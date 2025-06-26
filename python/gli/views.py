@@ -81,6 +81,9 @@ class NodeView:
     def keys(self):
         return self._rust_core.get_node_ids()
     
+    def __iter__(self):
+        return iter(self.keys())
+    
     def values(self):
         return [self[node_id] for node_id in self.keys()]
     
@@ -97,4 +100,34 @@ class EdgeView:
     def __len__(self):
         return self._rust_core.edge_count()
     
-    # TODO: Implement edge access methods when Rust backend supports it
+    def __contains__(self, edge_id):
+        try:
+            parts = edge_id.split('->')
+            if len(parts) != 2:
+                return False
+            source, target = parts
+            self._rust_core.get_edge_attributes(source, target)
+            return True
+        except:
+            return False
+    
+    def __getitem__(self, edge_id):
+        parts = edge_id.split('->')
+        if len(parts) != 2:
+            raise KeyError(f"Invalid edge ID format: {edge_id}")
+        source, target = parts
+        attrs = self._rust_core.get_edge_attributes(source, target)
+        from .data_structures import Edge
+        return Edge(source, target, attrs)
+    
+    def keys(self):
+        return self._rust_core.get_edge_ids()
+    
+    def __iter__(self):
+        return iter(self.keys())
+    
+    def values(self):
+        return [self[edge_id] for edge_id in self.keys()]
+    
+    def items(self):
+        return [(edge_id, self[edge_id]) for edge_id in self.keys()]

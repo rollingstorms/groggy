@@ -29,10 +29,17 @@ class BatchOperationContext:
         if self.batch_nodes or self.batch_edges:
             self.graph._apply_batch_operations(self.batch_nodes, self.batch_edges)
     
-    def add_node(self, node_id: str, **attributes):
+    def add_node(self, node_id: str = None, **attributes):
         """Queue node for batch addition"""
+        if node_id is None:
+            # Generate ID like the main add_node method
+            import uuid
+            node_id = f"node_{uuid.uuid4().hex[:8]}"
+        
         if node_id not in self.graph.nodes and node_id not in self.batch_nodes:
             self.batch_nodes[node_id] = Node(node_id, attributes)
+        
+        return node_id
     
     def add_edge(self, source: str, target: str, **attributes):
         """Queue edge for batch addition"""
@@ -45,6 +52,8 @@ class BatchOperationContext:
                 self.batch_nodes[target] = Node(target)
             
             self.batch_edges[edge_id] = Edge(source, target, attributes)
+        
+        return edge_id
 
 
 class Graph:
@@ -102,17 +111,17 @@ class Graph:
         self._cache_valid = True
     
     @classmethod
-    def empty(cls, graph_store=None, use_rust=None):
+    def empty(cls, graph_store=None, backend=None):
         """Create empty graph"""
-        return cls(graph_store=graph_store, use_rust=use_rust)
+        return cls(graph_store=graph_store, backend=backend)
     
     @classmethod
     def from_node_list(cls, node_ids: List[str], node_attrs: Dict[str, List[Any]] = None, 
-                      graph_store=None, use_rust=None):
+                      graph_store=None, backend=None):
         """Create graph from vectorized node data (NumPy-style)"""
-        if use_rust if use_rust is not None else RUST_AVAILABLE:
+        if backend == 'rust' or (backend is None and RUST_AVAILABLE):
             # Use Rust backend
-            graph = cls.empty(graph_store, use_rust=True)
+            graph = cls.empty(graph_store, backend='rust')
             
             if node_attrs:
                 node_data = []
@@ -142,11 +151,11 @@ class Graph:
     
     @classmethod
     def from_edge_list(cls, edges: List[tuple], node_attrs: Dict[str, List[Any]] = None, 
-                      edge_attrs: Dict[str, List[Any]] = None, graph_store=None, use_rust=None):
+                      edge_attrs: Dict[str, List[Any]] = None, graph_store=None, backend=None):
         """Create graph from edge list (NetworkX-style)"""
-        if use_rust if use_rust is not None else RUST_AVAILABLE:
+        if backend == 'rust' or (backend is None and RUST_AVAILABLE):
             # Use Rust backend
-            graph = cls.empty(graph_store, use_rust=True)
+            graph = cls.empty(graph_store, backend='rust')
             
             # Prepare edge data
             edge_data = []
@@ -214,29 +223,33 @@ class Graph:
             _, effective_edges, _ = self._get_effective_data()
             return effective_edges
     
-    def add_node(self, node_id: str, **attributes) -> 'Graph':
-        """Add node with optimized checking"""
+    def add_node(self, node_id: str = None, **attributes) -> str:
+        """Add node with optimized checking. Returns the node_id."""
+        import uuid
+        
+        # Auto-generate node_id if not provided
+        if node_id is None:
+            node_id = f"node_{uuid.uuid4().hex[:8]}"
+        
         if self.use_rust:
-            # For now, modify in place (TODO: implement immutable graph operations)
-            # Convert attributes dict to PyDict if there are any
+            # Pass attributes to Rust backend
             if attributes:
-                # TODO: Convert Python dict to PyDict for Rust
-                self._rust_core.add_node(node_id, None)  # For now, ignore attributes
+                self._rust_core.add_node(node_id, attributes)
             else:
                 self._rust_core.add_node(node_id, None)
-            return self
+            return node_id
         else:
             # Python implementation (fallback)
             # Quick check without effective data computation for performance
             if not self._is_modified and node_id in self._nodes:
-                return self
+                return node_id
             
             # Initialize delta first, then check
             self._init_delta()
             
             # Check in pending delta
             if node_id in self._pending_delta.added_nodes:
-                return self
+                return node_id
             
             new_node = Node(node_id, attributes)
             self._pending_delta.added_nodes[node_id] = new_node
@@ -244,28 +257,31 @@ class Graph:
             # Try incremental cache update instead of invalidation
             self._update_cache_for_node_add(node_id, new_node)
             
-            return self
+            return node_id
     
-    def add_edge(self, source: str, target: str, **attributes) -> 'Graph':
-        """Add edge with optimized node creation"""
+    def add_edge(self, source: str, target: str, **attributes) -> str:
+        """Add edge with optimized node creation. Returns the edge_id."""
         if self.use_rust:
-            # For now, modify in place (TODO: implement immutable graph operations)
-            self._rust_core.add_edge(source, target, None)  # For now, ignore attributes
-            return self
+            # Pass attributes to Rust backend
+            if attributes:
+                self._rust_core.add_edge(source, target, attributes)
+            else:
+                self._rust_core.add_edge(source, target, None)
+            return f"{source}->{target}"
         else:
             # Python implementation (fallback)
             edge_id = f"{source}->{target}"
             
             # Quick duplicate check
             if not self._is_modified and edge_id in self._edges:
-                return self
+                return edge_id
             
             # Initialize delta first
             self._init_delta()
             
             # Check in pending delta
             if edge_id in self._pending_delta.added_edges:
-                return self
+                return edge_id
             
             # Batch node creation - only check/create nodes that don't exist
             effective_nodes, _, _ = self._get_effective_data()
@@ -281,7 +297,7 @@ class Graph:
             # Try incremental cache update instead of invalidation
             self._update_cache_for_edge_add(edge_id, new_edge)
             
-            return self
+            return edge_id
     
     def batch_operations(self):
         """Context manager for efficient batch operations"""
@@ -291,12 +307,54 @@ class Graph:
                        edge_filter: Callable[[Edge], bool] = None,
                        node_ids: set = None, include_edges: bool = True) -> 'Graph':
         """Create a subgraph based on filters or node IDs"""
-        if self.use_rust and node_ids:
-            # Use Rust parallel implementation
-            rust_subgraph = self._rust_core.parallel_subgraph_by_node_ids(node_ids)
-            subgraph = Graph.empty(self.graph_store, use_rust=True)
-            subgraph._rust_core = rust_subgraph
-            subgraph.is_subgraph = True
+        if self.use_rust:
+            # For Rust backend, we need to implement subgraph filtering in Python
+            # since the Rust backend doesn't have subgraph methods yet
+            subgraph = Graph.empty(self.graph_store, backend='rust')
+            
+            # Get all nodes and filter them
+            all_node_ids = self.get_node_ids()
+            filtered_node_ids = []
+            
+            for node_id in all_node_ids:
+                include_node = False
+                
+                if node_ids and node_id in node_ids:
+                    include_node = True
+                elif node_filter:
+                    node = self.get_node(node_id)
+                    include_node = node_filter(node)
+                elif not node_ids and not node_filter:
+                    include_node = True
+                    
+                if include_node:
+                    filtered_node_ids.append(node_id)
+            
+            # Add filtered nodes to subgraph
+            for node_id in filtered_node_ids:
+                node = self.get_node(node_id)
+                # Copy the node with all its attributes
+                new_node_id = subgraph.add_node(**dict(node.attributes))
+                # Keep track of mapping between old and new node IDs
+                if not hasattr(subgraph, '_node_id_mapping'):
+                    subgraph._node_id_mapping = {}
+                subgraph._node_id_mapping[node_id] = new_node_id
+            
+            # Add edges between included nodes
+            if include_edges and hasattr(subgraph, '_node_id_mapping'):
+                for edge_id in self.edges:
+                    edge = self.get_edge(edge_id)
+                    if edge.source in filtered_node_ids and edge.target in filtered_node_ids:
+                        include_edge = True
+                        if edge_filter:
+                            include_edge = edge_filter(edge)
+                        
+                        if include_edge:
+                            # Use mapped node IDs for the subgraph
+                            source_mapped = subgraph._node_id_mapping[edge.source]
+                            target_mapped = subgraph._node_id_mapping[edge.target]
+                            subgraph.add_edge(source_mapped, target_mapped, **dict(edge.attributes))
+            
             return subgraph
         else:
             # Python implementation
@@ -335,13 +393,30 @@ class Graph:
     def get_connected_component(self, start_node_id: str) -> 'Graph':
         """Get connected component containing the specified node"""
         if self.use_rust:
-            rust_component = self._rust_core.connected_component(start_node_id)
-            if rust_component:
-                component = Graph.empty(self.graph_store, use_rust=True)
-                component._rust_core = rust_component
-                return component
-            else:
-                return Graph.empty(self.graph_store, use_rust=True)
+            # Implement connected component traversal for Rust backend
+            if start_node_id not in self.get_node_ids():
+                return Graph.empty(self.graph_store, backend='rust')
+            
+            visited = set()
+            to_visit = [start_node_id]
+            component_nodes = []
+            
+            while to_visit:
+                current = to_visit.pop(0)
+                if current in visited:
+                    continue
+                
+                visited.add(current)
+                component_nodes.append(current)
+                
+                # Add unvisited neighbors
+                neighbors = self.get_neighbors(current)
+                for neighbor in neighbors:
+                    if neighbor not in visited:
+                        to_visit.append(neighbor)
+            
+            # Create subgraph with connected component
+            return self.create_subgraph(node_ids=set(component_nodes))
         else:
             # Python implementation
             effective_nodes, effective_edges, _ = self._get_effective_data()
@@ -493,25 +568,36 @@ class Graph:
     
     def _apply_batch_operations(self, batch_nodes, batch_edges):
         """Apply batched operations efficiently"""
-        if not hasattr(self, '_init_delta'):
-            return
-            
         if not batch_nodes and not batch_edges:
             return
         
-        self._init_delta()
-        
-        # Add all nodes
-        for node_id, node in batch_nodes.items():
-            if node_id not in self._nodes:
-                self._pending_delta.added_nodes[node_id] = node
-        
-        # Add all edges  
-        for edge_id, edge in batch_edges.items():
-            if edge_id not in self._edges:
-                self._pending_delta.added_edges[edge_id] = edge
-        
-        self._invalidate_cache()
+        if self.use_rust:
+            # For Rust backend, apply operations directly
+            for node_id, node in batch_nodes.items():
+                if node_id not in self.nodes:
+                    self._rust_core.add_node(node_id, node.attributes)
+            
+            for edge_id, edge in batch_edges.items():
+                if edge_id not in self.edges:
+                    self._rust_core.add_edge(edge.source, edge.target, edge.attributes)
+        else:
+            # Python backend implementation
+            if not hasattr(self, '_init_delta'):
+                return
+            
+            self._init_delta()
+            
+            # Add all nodes
+            for node_id, node in batch_nodes.items():
+                if node_id not in self._nodes:
+                    self._pending_delta.added_nodes[node_id] = node
+            
+            # Add all edges  
+            for edge_id, edge in batch_edges.items():
+                if edge_id not in self._edges:
+                    self._pending_delta.added_edges[edge_id] = edge
+            
+            self._invalidate_cache()
     
     def _apply_pending_changes(self):
         """Apply pending delta changes"""
@@ -584,3 +670,94 @@ class Graph:
                 elif edge.target == node_id:
                     neighbors.append(edge.source)
             return neighbors
+    
+    def get_node(self, node_id: str) -> Node:
+        """Get node by ID"""
+        if self.use_rust:
+            try:
+                attrs = self._rust_core.get_node_attributes(node_id)
+                return Node(node_id, attrs or {})
+            except:
+                raise KeyError(f"Node {node_id} not found")
+        else:
+            # Python implementation
+            effective_nodes = self._get_effective_nodes()
+            if node_id not in effective_nodes:
+                raise KeyError(f"Node {node_id} not found")
+            return effective_nodes[node_id]
+    
+    def get_edge(self, edge_id: str) -> Edge:
+        """Get edge by ID"""
+        if self.use_rust:
+            # For now, edges are stored as "source->target" format
+            parts = edge_id.split('->')
+            if len(parts) != 2:
+                raise KeyError(f"Invalid edge ID format: {edge_id}")
+            source, target = parts
+            try:
+                attrs = self._rust_core.get_edge_attributes(source, target)
+                return Edge(source, target, attrs or {})
+            except:
+                raise KeyError(f"Edge {edge_id} not found")
+        else:
+            # Python implementation
+            effective_edges = self._get_effective_edges()
+            if edge_id not in effective_edges:
+                raise KeyError(f"Edge {edge_id} not found")
+            return effective_edges[edge_id]
+    
+    def set_node_attribute(self, node_id: str, key: str, value: Any) -> 'Graph':
+        """Set a node attribute"""
+        if self.use_rust:
+            try:
+                self._rust_core.set_node_attribute(node_id, key, value)
+                return self
+            except:
+                raise KeyError(f"Node {node_id} not found")
+        else:
+            # Python implementation
+            effective_nodes = self._get_effective_nodes()
+            if node_id not in effective_nodes:
+                raise KeyError(f"Node {node_id} not found")
+            
+            # Get current node and create modified version
+            current_node = effective_nodes[node_id]
+            new_attributes = dict(current_node.attributes)
+            new_attributes[key] = value
+            
+            # Add to delta
+            self._init_delta()
+            self._pending_delta.modified_nodes[node_id] = Node(node_id, new_attributes)
+            self._invalidate_cache()
+            
+            return self
+    
+    def set_edge_attribute(self, edge_id: str, key: str, value: Any) -> 'Graph':
+        """Set an edge attribute"""
+        if self.use_rust:
+            parts = edge_id.split('->')
+            if len(parts) != 2:
+                raise KeyError(f"Invalid edge ID format: {edge_id}")
+            source, target = parts
+            try:
+                self._rust_core.set_edge_attribute(source, target, key, value)
+                return self
+            except:
+                raise KeyError(f"Edge {edge_id} not found")
+        else:
+            # Python implementation
+            effective_edges = self._get_effective_edges()
+            if edge_id not in effective_edges:
+                raise KeyError(f"Edge {edge_id} not found")
+            
+            # Get current edge and create modified version
+            current_edge = effective_edges[edge_id]
+            new_attributes = dict(current_edge.attributes)
+            new_attributes[key] = value
+            
+            # Add to delta
+            self._init_delta()
+            self._pending_delta.modified_edges[edge_id] = Edge(current_edge.source, current_edge.target, new_attributes)
+            self._invalidate_cache()
+            
+            return self

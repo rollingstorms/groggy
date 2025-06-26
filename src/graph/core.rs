@@ -239,6 +239,18 @@ impl FastGraph {
             .collect()
     }
 
+    /// Get all edge IDs (formatted as "source->target")
+    pub fn get_edge_ids(&self) -> Vec<String> {
+        let mut edge_ids = Vec::new();
+        for edge_idx in self.graph.edge_indices() {
+            if let Some(edge_data) = self.graph.edge_weight(edge_idx) {
+                let edge_id = format!("{}->{}", edge_data.source, edge_data.target);
+                edge_ids.push(edge_id);
+            }
+        }
+        edge_ids
+    }
+
     /// Get node attributes
     pub fn get_node_attributes(&self, node_id: String) -> PyResult<PyObject> {
         let node_idx = self.node_id_to_index.get(&node_id)
@@ -250,12 +262,90 @@ impl FastGraph {
             Python::with_gil(|py| {
                 let dict = PyDict::new(py);
                 for (key, value) in &node_data.attributes {
-                    dict.set_item(key, value.to_string())?;
+                    let py_value = json_value_to_python(py, value)?;
+                    dict.set_item(key, py_value)?;
                 }
                 Ok(dict.into_py(py))
             })
         } else {
             Python::with_gil(|py| Ok(PyDict::new(py).into_py(py)))
+        }
+    }
+
+    /// Get edge attributes
+    pub fn get_edge_attributes(&self, source: String, target: String) -> PyResult<PyObject> {
+        let source_idx = self.node_id_to_index.get(&source)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Source node '{}' not found", source)
+            ))?;
+        let target_idx = self.node_id_to_index.get(&target)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Target node '{}' not found", target)
+            ))?;
+        
+        if let Some(edge_idx) = self.graph.find_edge(*source_idx, *target_idx) {
+            if let Some(edge_data) = self.graph.edge_weight(edge_idx) {
+                Python::with_gil(|py| {
+                    let dict = PyDict::new(py);
+                    for (key, value) in &edge_data.attributes {
+                        let py_value = json_value_to_python(py, value)?;
+                        dict.set_item(key, py_value)?;
+                    }
+                    Ok(dict.into_py(py))
+                })
+            } else {
+                Python::with_gil(|py| Ok(PyDict::new(py).into_py(py)))
+            }
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Edge from '{}' to '{}' not found", source, target)
+            ))
+        }
+    }
+
+    /// Set node attribute
+    pub fn set_node_attribute(&mut self, node_id: String, key: String, value: &PyAny) -> PyResult<()> {
+        let node_idx = self.node_id_to_index.get(&node_id)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Node '{}' not found", node_id)
+            ))?;
+        
+        if let Some(node_data) = self.graph.node_weight_mut(*node_idx) {
+            let json_value = python_to_json_value(value)?;
+            node_data.attributes.insert(key, json_value);
+            Ok(())
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Node '{}' not found", node_id)
+            ))
+        }
+    }
+
+    /// Set edge attribute
+    pub fn set_edge_attribute(&mut self, source: String, target: String, key: String, value: &PyAny) -> PyResult<()> {
+        let source_idx = self.node_id_to_index.get(&source)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Source node '{}' not found", source)
+            ))?;
+        let target_idx = self.node_id_to_index.get(&target)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Target node '{}' not found", target)
+            ))?;
+        
+        if let Some(edge_idx) = self.graph.find_edge(*source_idx, *target_idx) {
+            if let Some(edge_data) = self.graph.edge_weight_mut(edge_idx) {
+                let json_value = python_to_json_value(value)?;
+                edge_data.attributes.insert(key, json_value);
+                Ok(())
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                    format!("Edge from '{}' to '{}' not found", source, target)
+                ))
+            }
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Edge from '{}' to '{}' not found", source, target)
+            ))
         }
     }
 
@@ -324,5 +414,37 @@ fn python_to_json_value(py_value: &PyAny) -> PyResult<JsonValue> {
         // Fallback: convert to string
         let s: String = py_value.str()?.extract()?;
         Ok(JsonValue::String(s))
+    }
+}
+
+/// Convert JSON value back to Python object
+fn json_value_to_python(py: Python, value: &JsonValue) -> PyResult<PyObject> {
+    match value {
+        JsonValue::Null => Ok(py.None()),
+        JsonValue::Bool(b) => Ok(b.to_object(py)),
+        JsonValue::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(i.to_object(py))
+            } else if let Some(f) = n.as_f64() {
+                Ok(f.to_object(py))
+            } else {
+                Ok(py.None())
+            }
+        }
+        JsonValue::String(s) => Ok(s.to_object(py)),
+        JsonValue::Array(arr) => {
+            let py_list = pyo3::types::PyList::empty(py);
+            for item in arr {
+                py_list.append(json_value_to_python(py, item)?)?;
+            }
+            Ok(py_list.to_object(py))
+        }
+        JsonValue::Object(obj) => {
+            let py_dict = PyDict::new(py);
+            for (key, val) in obj {
+                py_dict.set_item(key, json_value_to_python(py, val)?)?;
+            }
+            Ok(py_dict.to_object(py))
+        }
     }
 }
