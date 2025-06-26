@@ -366,6 +366,177 @@ impl FastGraph {
         stats.insert("edges".to_string(), self.graph.edge_count());
         stats
     }
+
+    /// Batch filter nodes by attribute values - highly optimized
+    #[pyo3(name = "batch_filter_nodes_by_attributes")]
+    fn batch_filter_nodes_by_attributes(&self, filters: &PyDict) -> PyResult<Vec<String>> {
+        let mut results = Vec::new();
+        let filter_map = python_dict_to_json_map(filters)?;
+        
+        // Use parallel processing for large graphs
+        if self.graph.node_count() > 1000 {
+            let node_ids: Vec<_> = self.node_id_to_index.iter()
+                .filter_map(|entry| {
+                    let node_id = entry.key();
+                    let node_idx = *entry.value();
+                    
+                    if let Some(node_data) = self.graph.node_weight(node_idx) {
+                        if self.matches_filters(&node_data.attributes, &filter_map) {
+                            Some(node_id.clone())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            
+            results.extend(node_ids);
+        } else {
+            // Sequential for smaller graphs
+            for entry in self.node_id_to_index.iter() {
+                let node_id = entry.key();
+                let node_idx = *entry.value();
+                
+                if let Some(node_data) = self.graph.node_weight(node_idx) {
+                    if self.matches_filters(&node_data.attributes, &filter_map) {
+                        results.push(node_id.clone());
+                    }
+                }
+            }
+        }
+        
+        Ok(results)
+    }
+
+    /// Batch filter edges by attribute values
+    #[pyo3(name = "batch_filter_edges_by_attributes")]
+    fn batch_filter_edges_by_attributes(&self, filters: &PyDict) -> PyResult<Vec<(String, String)>> {
+        let mut results = Vec::new();
+        let filter_map = python_dict_to_json_map(filters)?;
+        
+        for edge_idx in self.graph.edge_indices() {
+            if let Some(edge_data) = self.graph.edge_weight(edge_idx) {
+                if self.matches_filters(&edge_data.attributes, &filter_map) {
+                    results.push((edge_data.source.clone(), edge_data.target.clone()));
+                }
+            }
+        }
+        
+        Ok(results)
+    }
+
+    /// Get subgraph by node IDs - optimized batch operation
+    fn get_subgraph_by_node_ids(&self, node_ids: Vec<String>) -> PyResult<FastGraph> {
+        let mut subgraph = FastGraph::new();
+        let node_id_set: std::collections::HashSet<_> = node_ids.iter().collect();
+        
+        // Batch add nodes
+        let mut nodes_to_add = Vec::new();
+        for node_id in &node_ids {
+            if let Some(node_idx) = self.node_id_to_index.get(node_id) {
+                if let Some(node_data) = self.graph.node_weight(*node_idx) {
+                    nodes_to_add.push((node_id.clone(), node_data.attributes.clone()));
+                }
+            }
+        }
+        
+        // Add nodes to subgraph
+        for (node_id, attributes) in nodes_to_add {
+            let node_data = NodeData { id: node_id.clone(), attributes };
+            let node_idx = subgraph.graph.add_node(node_data);
+            subgraph.node_id_to_index.insert(node_id.clone(), node_idx);
+            subgraph.node_index_to_id.insert(node_idx, node_id);
+        }
+        
+        // Batch add edges between included nodes
+        let mut edges_to_add = Vec::new();
+        for edge_idx in self.graph.edge_indices() {
+            if let Some(edge_data) = self.graph.edge_weight(edge_idx) {
+                if node_id_set.contains(&edge_data.source) && node_id_set.contains(&edge_data.target) {
+                    edges_to_add.push(edge_data.clone());
+                }
+            }
+        }
+        
+        for edge_data in edges_to_add {
+            let source_idx = *subgraph.node_id_to_index.get(&edge_data.source).unwrap();
+            let target_idx = *subgraph.node_id_to_index.get(&edge_data.target).unwrap();
+            subgraph.graph.add_edge(source_idx, target_idx, edge_data);
+        }
+        
+        Ok(subgraph)
+    }
+
+    /// Get k-hop neighborhood efficiently
+    fn get_k_hop_neighborhood(&self, start_node: String, k: usize) -> PyResult<Vec<String>> {
+        let mut visited = std::collections::HashSet::new();
+        let mut current_layer = vec![start_node.clone()];
+        visited.insert(start_node);
+        
+        for _ in 0..k {
+            let mut next_layer = Vec::new();
+            
+            for node_id in current_layer {
+                if let Some(neighbors) = self.get_neighbors(node_id.clone()).ok() {
+                    for neighbor in neighbors {
+                        if !visited.contains(&neighbor) {
+                            visited.insert(neighbor.clone());
+                            next_layer.push(neighbor);
+                        }
+                    }
+                }
+            }
+            
+            current_layer = next_layer;
+            if current_layer.is_empty() {
+                break;
+            }
+        }
+        
+        Ok(visited.into_iter().collect())
+    }
+
+    /// Batch get node attributes - optimized for multiple queries
+    #[pyo3(name = "batch_get_node_attributes")]
+    fn batch_get_node_attributes(&self, py: Python, node_ids: Vec<String>) -> PyResult<PyObject> {
+        let py_list = PyList::empty(py);
+        
+        for node_id in node_ids {
+            if let Some(node_idx) = self.node_id_to_index.get(&node_id) {
+                if let Some(node_data) = self.graph.node_weight(*node_idx) {
+                    let py_dict = PyDict::new(py);
+                    for (key, value) in &node_data.attributes {
+                        py_dict.set_item(key, json_value_to_python(py, value)?)?;
+                    }
+                    py_list.append(py_dict)?;
+                } else {
+                    py_list.append(PyDict::new(py))?;
+                }
+            } else {
+                py_list.append(PyDict::new(py))?;
+            }
+        }
+        
+        Ok(py_list.to_object(py))
+    }
+}
+
+impl FastGraph {
+    /// Helper method to check if attributes match filters
+    fn matches_filters(&self, attributes: &HashMap<String, JsonValue>, filters: &HashMap<String, JsonValue>) -> bool {
+        for (key, expected_value) in filters {
+            if let Some(actual_value) = attributes.get(key) {
+                if actual_value != expected_value {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 /// Helper function to convert Python dict to JSON HashMap

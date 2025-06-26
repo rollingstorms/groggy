@@ -761,3 +761,464 @@ class Graph:
             self._invalidate_cache()
             
             return self
+
+    # ========== OPTIMIZED BATCH FILTERING METHODS ==========
+    
+    def batch_filter_nodes(self, **filters) -> List[str]:
+        """
+        Efficiently filter nodes by attributes using batch operations.
+        
+        Args:
+            **filters: Attribute key-value pairs to filter by
+            
+        Returns:
+            List of node IDs matching all filters
+            
+        Example:
+            # Find all people over 25 in Chicago
+            node_ids = g.batch_filter_nodes(age=25, city="Chicago")
+        """
+        if self.use_rust:
+            # Use optimized Rust backend filtering
+            return self._rust_core.batch_filter_nodes_by_attributes(filters)
+        else:
+            # Python fallback with some optimization
+            effective_nodes = self._get_effective_nodes()
+            results = []
+            
+            for node_id, node in effective_nodes.items():
+                match = True
+                for key, expected_value in filters.items():
+                    if key not in node.attributes or node.attributes[key] != expected_value:
+                        match = False
+                        break
+                if match:
+                    results.append(node_id)
+            
+            return results
+    
+    def batch_filter_edges(self, **filters) -> List[tuple]:
+        """
+        Efficiently filter edges by attributes using batch operations.
+        
+        Args:
+            **filters: Attribute key-value pairs to filter by
+            
+        Returns:
+            List of (source, target) tuples for edges matching all filters
+        """
+        if self.use_rust:
+            return self._rust_core.batch_filter_edges_by_attributes(filters)
+        else:
+            effective_edges = self._get_effective_edges()
+            results = []
+            
+            for edge_id, edge in effective_edges.items():
+                match = True
+                for key, expected_value in filters.items():
+                    if key not in edge.attributes or edge.attributes[key] != expected_value:
+                        match = False
+                        break
+                if match:
+                    results.append((edge.source, edge.target))
+            
+            return results
+
+    def create_subgraph_fast(self, node_ids: List[str] = None, **attribute_filters) -> 'Graph':
+        """
+        Create a subgraph using optimized batch operations.
+        
+        Args:
+            node_ids: Specific node IDs to include
+            **attribute_filters: Filter nodes by attributes
+            
+        Returns:
+            New Graph instance containing the filtered subgraph
+        """
+        if self.use_rust:
+            if node_ids:
+                # Use optimized Rust subgraph creation
+                rust_subgraph = self._rust_core.get_subgraph_by_node_ids(node_ids)
+                # Wrap in Graph instance
+                new_graph = Graph(backend='rust')
+                new_graph._rust_core = rust_subgraph
+                return new_graph
+            elif attribute_filters:
+                # First filter nodes, then create subgraph
+                filtered_node_ids = self.batch_filter_nodes(**attribute_filters)
+                return self.create_subgraph_fast(node_ids=filtered_node_ids)
+            else:
+                return self.copy()
+        else:
+            # Use existing create_subgraph method for Python backend
+            if attribute_filters:
+                def node_filter(node):
+                    return all(node.attributes.get(k) == v for k, v in attribute_filters.items())
+                return self.create_subgraph(node_filter=node_filter)
+            elif node_ids:
+                return self.create_subgraph(node_ids=set(node_ids))
+            else:
+                return self.copy()
+
+    def get_k_hop_neighborhood(self, start_node: str, k: int = 1) -> List[str]:
+        """
+        Get all nodes within k hops of the start node.
+        
+        Args:
+            start_node: Starting node ID
+            k: Number of hops (default 1)
+            
+        Returns:
+            List of node IDs within k hops
+        """
+        if self.use_rust:
+            return self._rust_core.get_k_hop_neighborhood(start_node, k)
+        else:
+            visited = set()
+            current_layer = {start_node}
+            visited.add(start_node)
+            
+            for _ in range(k):
+                next_layer = set()
+                for node_id in current_layer:
+                    neighbors = self.get_neighbors(node_id)
+                    for neighbor in neighbors:
+                        if neighbor not in visited:
+                            visited.add(neighbor)
+                            next_layer.add(neighbor)
+                
+                current_layer = next_layer
+                if not current_layer:
+                    break
+            
+            return list(visited)
+
+    def batch_get_node_attributes(self, node_ids: List[str]) -> List[Dict[str, Any]]:
+        """
+        Efficiently get attributes for multiple nodes in one operation.
+        
+        Args:
+            node_ids: List of node IDs
+            
+        Returns:
+            List of attribute dictionaries (empty dict if node not found)
+        """
+        if self.use_rust:
+            return self._rust_core.batch_get_node_attributes(node_ids)
+        else:
+            effective_nodes = self._get_effective_nodes()
+            results = []
+            for node_id in node_ids:
+                if node_id in effective_nodes:
+                    results.append(dict(effective_nodes[node_id].attributes))
+                else:
+                    results.append({})
+            return results
+
+    # ========== OPTIMIZED BATCH FILTERING METHODS ==========
+    
+    def batch_filter_nodes(self, **filters) -> List[str]:
+        """
+        Efficiently filter nodes by attributes using batch operations.
+        
+        Args:
+            **filters: Attribute key-value pairs to filter by
+            
+        Returns:
+            List of node IDs matching all filters
+            
+        Example:
+            # Find all people over 25 in Chicago
+            node_ids = g.batch_filter_nodes(age=25, city="Chicago")
+        """
+        if self.use_rust:
+            # Use optimized Rust backend filtering
+            return self._rust_core.batch_filter_nodes_by_attributes(filters)
+        else:
+            # Python fallback with some optimization
+            effective_nodes = self._get_effective_nodes()
+            results = []
+            
+            for node_id, node in effective_nodes.items():
+                match = True
+                for key, expected_value in filters.items():
+                    if key not in node.attributes or node.attributes[key] != expected_value:
+                        match = False
+                        break
+                if match:
+                    results.append(node_id)
+            
+            return results
+    
+    def batch_filter_edges(self, **filters) -> List[tuple]:
+        """
+        Efficiently filter edges by attributes using batch operations.
+        
+        Args:
+            **filters: Attribute key-value pairs to filter by
+            
+        Returns:
+            List of (source, target) tuples for edges matching all filters
+        """
+        if self.use_rust:
+            return self._rust_core.batch_filter_edges_by_attributes(filters)
+        else:
+            effective_edges = self._get_effective_edges()
+            results = []
+            
+            for edge_id, edge in effective_edges.items():
+                match = True
+                for key, expected_value in filters.items():
+                    if key not in edge.attributes or edge.attributes[key] != expected_value:
+                        match = False
+                        break
+                if match:
+                    results.append((edge.source, edge.target))
+            
+            return results
+
+    def create_subgraph_fast(self, node_ids: List[str] = None, **attribute_filters) -> 'Graph':
+        """
+        Create a subgraph using optimized batch operations.
+        
+        Args:
+            node_ids: Specific node IDs to include
+            **attribute_filters: Filter nodes by attributes
+            
+        Returns:
+            New Graph instance containing the filtered subgraph
+        """
+        if self.use_rust:
+            if node_ids:
+                # Use optimized Rust subgraph creation
+                rust_subgraph = self._rust_core.get_subgraph_by_node_ids(node_ids)
+                # Wrap in Graph instance
+                new_graph = Graph(backend='rust')
+                new_graph._rust_core = rust_subgraph
+                return new_graph
+            elif attribute_filters:
+                # First filter nodes, then create subgraph
+                filtered_node_ids = self.batch_filter_nodes(**attribute_filters)
+                return self.create_subgraph_fast(node_ids=filtered_node_ids)
+            else:
+                return self.copy()
+        else:
+            # Use existing create_subgraph method for Python backend
+            if attribute_filters:
+                def node_filter(node):
+                    return all(node.attributes.get(k) == v for k, v in attribute_filters.items())
+                return self.create_subgraph(node_filter=node_filter)
+            elif node_ids:
+                return self.create_subgraph(node_ids=set(node_ids))
+            else:
+                return self.copy()
+
+    def get_k_hop_neighborhood(self, start_node: str, k: int = 1) -> List[str]:
+        """
+        Get all nodes within k hops of the start node.
+        
+        Args:
+            start_node: Starting node ID
+            k: Number of hops (default 1)
+            
+        Returns:
+            List of node IDs within k hops
+        """
+        if self.use_rust:
+            return self._rust_core.get_k_hop_neighborhood(start_node, k)
+        else:
+            visited = set()
+            current_layer = {start_node}
+            visited.add(start_node)
+            
+            for _ in range(k):
+                next_layer = set()
+                for node_id in current_layer:
+                    neighbors = self.get_neighbors(node_id)
+                    for neighbor in neighbors:
+                        if neighbor not in visited:
+                            visited.add(neighbor)
+                            next_layer.add(neighbor)
+                
+                current_layer = next_layer
+                if not current_layer:
+                    break
+            
+            return list(visited)
+
+    # ========== BATCH ATTRIBUTE SETTING ==========
+    
+    def batch_set_node_attributes(self, node_attributes: Dict[str, Dict[str, Any]]) -> 'Graph':
+        """
+        Efficiently set attributes for multiple nodes in one operation.
+        
+        Args:
+            node_attributes: Dict mapping node_id -> {attribute_key: value}
+            
+        Returns:
+            Self for method chaining
+            
+        Example:
+            g.batch_set_node_attributes({
+                "alice": {"age": 31, "status": "active"},
+                "bob": {"age": 26, "status": "inactive"}
+            })
+        """
+        if self.use_rust:
+            # Use Rust backend batch operation if available
+            try:
+                self._rust_core.batch_set_node_attributes(node_attributes)
+            except AttributeError:
+                # Fallback to individual operations
+                for node_id, attributes in node_attributes.items():
+                    for key, value in attributes.items():
+                        self.set_node_attribute(node_id, key, value)
+        else:
+            # Python implementation with delta tracking
+            self._init_delta()
+            effective_nodes = self._get_effective_nodes()
+            
+            for node_id, new_attributes in node_attributes.items():
+                if node_id not in effective_nodes:
+                    continue  # Skip non-existent nodes
+                
+                current_node = effective_nodes[node_id]
+                updated_attributes = dict(current_node.attributes)
+                updated_attributes.update(new_attributes)
+                
+                self._pending_delta.modified_nodes[node_id] = Node(node_id, updated_attributes)
+            
+            self._invalidate_cache()
+        
+        return self
+    
+    def batch_set_edge_attributes(self, edge_attributes: Dict[str, Dict[str, Any]]) -> 'Graph':
+        """
+        Efficiently set attributes for multiple edges in one operation.
+        
+        Args:
+            edge_attributes: Dict mapping edge_id -> {attribute_key: value}
+            
+        Returns:
+            Self for method chaining
+            
+        Example:
+            g.batch_set_edge_attributes({
+                "alice->bob": {"weight": 0.8, "type": "friend"},
+                "bob->charlie": {"weight": 0.6, "type": "colleague"}
+            })
+        """
+        if self.use_rust:
+            # Fallback to individual operations for now
+            for edge_id, attributes in edge_attributes.items():
+                for key, value in attributes.items():
+                    self.set_edge_attribute(edge_id, key, value)
+        else:
+            # Python implementation with delta tracking
+            self._init_delta()
+            effective_edges = self._get_effective_edges()
+            
+            for edge_id, new_attributes in edge_attributes.items():
+                if edge_id not in effective_edges:
+                    continue  # Skip non-existent edges
+                
+                current_edge = effective_edges[edge_id]
+                updated_attributes = dict(current_edge.attributes)
+                updated_attributes.update(new_attributes)
+                
+                self._pending_delta.modified_edges[edge_id] = Edge(
+                    current_edge.source, 
+                    current_edge.target, 
+                    updated_attributes
+                )
+            
+            self._invalidate_cache()
+        
+        return self
+
+    def batch_update_node_attributes(self, node_updates: Dict[str, Callable[[Dict], Dict]]) -> 'Graph':
+        """
+        Update node attributes using functions for complex transformations.
+        
+        Args:
+            node_updates: Dict mapping node_id -> update_function
+            
+        Returns:
+            Self for method chaining
+            
+        Example:
+            g.batch_update_node_attributes({
+                "alice": lambda attrs: {**attrs, "age": attrs["age"] + 1},
+                "bob": lambda attrs: {**attrs, "score": attrs.get("score", 0) * 1.1}
+            })
+        """
+        if self.use_rust:
+            # For Rust backend, get current attributes and apply updates
+            node_ids = list(node_updates.keys())
+            current_attrs = self.batch_get_node_attributes(node_ids)
+            
+            batch_updates = {}
+            for i, node_id in enumerate(node_ids):
+                if i < len(current_attrs):
+                    update_func = node_updates[node_id]
+                    new_attrs = update_func(current_attrs[i])
+                    batch_updates[node_id] = new_attrs
+            
+            return self.batch_set_node_attributes(batch_updates)
+        else:
+            # Python implementation
+            effective_nodes = self._get_effective_nodes()
+            batch_updates = {}
+            
+            for node_id, update_func in node_updates.items():
+                if node_id in effective_nodes:
+                    current_attrs = dict(effective_nodes[node_id].attributes)
+                    new_attrs = update_func(current_attrs)
+                    batch_updates[node_id] = new_attrs
+            
+            return self.batch_set_node_attributes(batch_updates)
+
+    # ========== PERFORMANCE MONITORING ==========
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Get performance statistics for the graph"""
+        stats = {
+            'backend': self.backend,
+            'node_count': self.node_count(),
+            'edge_count': self.edge_count(),
+            'rust_available': self.use_rust
+        }
+        
+        if self.use_rust:
+            try:
+                rust_stats = self._rust_core.get_stats()
+                stats.update(rust_stats)
+            except AttributeError:
+                # get_stats method not available in Rust backend
+                stats['rust_stats'] = 'not_available'
+        
+        return stats
+
+    def optimized_query(self, query_type: str, **params) -> Any:
+        """
+        Execute optimized queries using the best available backend method.
+        
+        Args:
+            query_type: Type of query ('filter_nodes', 'filter_edges', 'subgraph', 'k_hop', 'batch_attrs')
+            **params: Query-specific parameters
+            
+        Returns:
+            Query results
+        """
+        if query_type == 'filter_nodes':
+            return self.batch_filter_nodes(**params)
+        elif query_type == 'filter_edges':
+            return self.batch_filter_edges(**params)
+        elif query_type == 'subgraph':
+            return self.create_subgraph_fast(**params)
+        elif query_type == 'k_hop':
+            return self.get_k_hop_neighborhood(**params)
+        elif query_type == 'batch_attrs':
+            return self.batch_get_node_attributes(**params)
+        else:
+            raise ValueError(f"Unknown query type: {query_type}")

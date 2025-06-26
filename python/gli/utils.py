@@ -18,7 +18,7 @@ def create_random_graph(n_nodes: int = 10, edge_probability: float = 0.3, use_ru
                 edges.append((f"node_{i}", f"node_{j}"))
     
     # Use fast constructor
-    graph = Graph.from_edge_list(edges, use_rust=use_rust)
+    graph = Graph.from_edge_list(edges)
     return graph.snapshot()
 
 
