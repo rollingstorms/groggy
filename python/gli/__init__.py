@@ -4,7 +4,6 @@ High-performance graph manipulation library with Rust backend
 """
 
 from .graph import Graph
-from .store import GraphStore
 from .utils import create_random_graph
 from ._version import __version__
 
@@ -44,7 +43,6 @@ def get_current_backend():
 
 __all__ = [
     'Graph',
-    'GraphStore', 
     'create_random_graph',
     '__version__',
     'RUST_BACKEND_AVAILABLE',

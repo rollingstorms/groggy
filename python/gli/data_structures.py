@@ -3,13 +3,16 @@ Node and Edge data structures
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Dict, Any, Union
+
+# Type alias for node/edge identifiers  
+NodeID = Union[str, int]
 
 
 @dataclass
 class Node:
     """Graph node with attributes"""
-    id: str
+    id: NodeID
     attributes: Dict[str, Any] = field(default_factory=dict)
     
     def get_attribute(self, key: str, default=None):
@@ -49,8 +52,8 @@ class Node:
 @dataclass 
 class Edge:
     """Graph edge with attributes"""
-    source: str
-    target: str
+    source: NodeID
+    target: NodeID
     attributes: Dict[str, Any] = field(default_factory=dict)
     
     @property
@@ -89,3 +92,30 @@ class Edge:
     
     def __iter__(self):
         return iter(self.attributes)
+
+
+class GraphDelta:
+    """Tracks changes to a graph for efficient updates"""
+    
+    def __init__(self):
+        self.added_nodes = {}
+        self.added_edges = {}
+        self.removed_nodes = set()
+        self.removed_edges = set()
+        self.modified_nodes = {}
+        self.modified_edges = {}
+    
+    def clear(self):
+        """Clear all delta information"""
+        self.added_nodes.clear()
+        self.added_edges.clear()
+        self.removed_nodes.clear()
+        self.removed_edges.clear()
+        self.modified_nodes.clear()
+        self.modified_edges.clear()
+    
+    def is_empty(self):
+        """Check if delta has any changes"""
+        return not (self.added_nodes or self.added_edges or 
+                   self.removed_nodes or self.removed_edges or
+                   self.modified_nodes or self.modified_edges)

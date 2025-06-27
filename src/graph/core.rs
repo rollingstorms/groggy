@@ -68,7 +68,7 @@ impl FastGraph {
     }
 
     /// Add multiple nodes efficiently
-    fn batch_add_nodes(&mut self, node_data: &PyList) -> PyResult<()> {
+    fn add_nodes(&mut self, node_data: &PyList) -> PyResult<()> {
         let mut nodes_to_add = Vec::new();
         
         // Parse all nodes first
@@ -141,7 +141,7 @@ impl FastGraph {
     }
 
     /// Add multiple edges efficiently
-    fn batch_add_edges(&mut self, edge_data: &PyList) -> PyResult<()> {
+    fn add_edges(&mut self, edge_data: &PyList) -> PyResult<()> {
         let mut edges_to_add = Vec::new();
         let mut nodes_to_create = std::collections::HashSet::new();
         
@@ -368,8 +368,8 @@ impl FastGraph {
     }
 
     /// Batch filter nodes by attribute values - highly optimized
-    #[pyo3(name = "batch_filter_nodes_by_attributes")]
-    fn batch_filter_nodes_by_attributes(&self, filters: &PyDict) -> PyResult<Vec<String>> {
+    #[pyo3(name = "filter_nodes_by_attributes")]
+    fn filter_nodes_by_attributes(&self, filters: &PyDict) -> PyResult<Vec<String>> {
         let mut results = Vec::new();
         let filter_map = python_dict_to_json_map(filters)?;
         
@@ -411,8 +411,8 @@ impl FastGraph {
     }
 
     /// Batch filter edges by attribute values
-    #[pyo3(name = "batch_filter_edges_by_attributes")]
-    fn batch_filter_edges_by_attributes(&self, filters: &PyDict) -> PyResult<Vec<(String, String)>> {
+    #[pyo3(name = "filter_edges_by_attributes")]
+    fn filter_edges_by_attributes(&self, filters: &PyDict) -> PyResult<Vec<(String, String)>> {
         let mut results = Vec::new();
         let filter_map = python_dict_to_json_map(filters)?;
         
@@ -499,8 +499,8 @@ impl FastGraph {
     }
 
     /// Batch get node attributes - optimized for multiple queries
-    #[pyo3(name = "batch_get_node_attributes")]
-    fn batch_get_node_attributes(&self, py: Python, node_ids: Vec<String>) -> PyResult<PyObject> {
+    #[pyo3(name = "get_nodes_attributes")]
+    fn get_nodes_attributes(&self, py: Python, node_ids: Vec<String>) -> PyResult<PyObject> {
         let py_list = PyList::empty(py);
         
         for node_id in node_ids {
@@ -520,6 +520,96 @@ impl FastGraph {
         }
         
         Ok(py_list.to_object(py))
+    }
+
+    /// Batch set node attributes - highly optimized for large operations
+    pub fn set_nodes_attributes_batch(&mut self, node_attrs: &PyDict) -> PyResult<()> {
+        let mut updates = Vec::new();
+        
+        // Collect all updates first to avoid borrowing conflicts
+        for (node_id_py, attrs_py) in node_attrs.iter() {
+            let node_id: String = node_id_py.extract()?;
+            let attrs_dict: &PyDict = attrs_py.downcast()?;
+            
+            if let Some(node_idx) = self.node_id_to_index.get(&node_id) {
+                let mut attr_updates = HashMap::new();
+                for (key_py, value_py) in attrs_dict.iter() {
+                    let key: String = key_py.extract()?;
+                    let json_value = python_to_json_value(value_py)?;
+                    attr_updates.insert(key, json_value);
+                }
+                updates.push((*node_idx, attr_updates));
+            }
+        }
+        
+        // Apply all updates sequentially (parallel mutation not supported)
+        for (node_idx, attr_updates) in updates {
+            if let Some(node_data) = self.graph.node_weight_mut(node_idx) {
+                for (key, value) in attr_updates {
+                    node_data.attributes.insert(key, value);
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// Batch set edge attributes - highly optimized for large operations
+    pub fn set_edges_attributes_batch(&mut self, edge_attrs: &PyDict) -> PyResult<()> {
+        let mut edge_updates = Vec::new();
+        
+        // Collect all edge updates first
+        for (edge_key_py, attrs_py) in edge_attrs.iter() {
+            let edge_key: (String, String) = edge_key_py.extract()?;
+            let (source, target) = edge_key;
+            let attrs_dict: &PyDict = attrs_py.downcast()?;
+            
+            if let (Some(source_idx), Some(target_idx)) = (
+                self.node_id_to_index.get(&source),
+                self.node_id_to_index.get(&target)
+            ) {
+                // Find the edge
+                if let Some(edge_ref) = self.graph.find_edge(*source_idx, *target_idx) {
+                    let mut attr_updates = HashMap::new();
+                    for (key_py, value_py) in attrs_dict.iter() {
+                        let key: String = key_py.extract()?;
+                        let json_value = python_to_json_value(value_py)?;
+                        attr_updates.insert(key, json_value);
+                    }
+                    edge_updates.push((edge_ref, attr_updates));
+                }
+            }
+        }
+        
+        // Apply edge updates
+        for (edge_ref, attr_updates) in edge_updates {
+            if let Some(edge_data) = self.graph.edge_weight_mut(edge_ref) {
+                for (key, value) in attr_updates {
+                    edge_data.attributes.insert(key, value);
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// Get graph attributes
+    pub fn get_graph_attributes(&self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            let dict = PyDict::new(py);
+            for (key, value) in &self.graph_attributes {
+                let py_value = json_value_to_python(py, value)?;
+                dict.set_item(key, py_value)?;
+            }
+            Ok(dict.into_py(py))
+        })
+    }
+
+    /// Set graph attribute
+    pub fn set_graph_attribute(&mut self, key: String, value: &PyAny) -> PyResult<()> {
+        let json_value = python_to_json_value(value)?;
+        self.graph_attributes.insert(key, json_value);
+        Ok(())
     }
 }
 

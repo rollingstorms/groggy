@@ -257,7 +257,7 @@ edge_id = g.add_edge(source_id, target_id, weight=1.0)
 # Query operations
 neighbors = g.get_neighbors(node_id)
 node_data = g.get_node(node_id)
-edge_data = g.get_edge(edge_id)
+edge_data = g.get_edge(source_id, target_id)
 
 # Batch operations
 g.batch_add_nodes([("id1", {"attr": "val1"}), ("id2", {"attr": "val2"})])

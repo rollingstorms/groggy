@@ -19,7 +19,7 @@ def create_random_graph(n_nodes: int = 10, edge_probability: float = 0.3, use_ru
     
     # Use fast constructor
     graph = Graph.from_edge_list(edges)
-    return graph.snapshot()
+    return graph
 
 
 def create_clustering_workflow(store, graph: Graph, algorithms: List[str] = None) -> List[str]:

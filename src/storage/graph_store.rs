@@ -76,6 +76,16 @@ impl GraphStore {
             .map(|entry| (entry.key().clone(), entry.value().clone()))
             .collect()
     }
+    
+    /// Store a graph and return its state hash (exposed to Python)
+    fn store_current_graph(&self, graph: &FastGraph, operation: String) -> String {
+        self.store_graph(graph, operation)
+    }
+    
+    /// Reconstruct graph from state hash (exposed to Python)
+    fn get_graph_from_state(&self, state_hash: String) -> Option<FastGraph> {
+        self.reconstruct_graph(&state_hash)
+    }
 }
 
 impl GraphStore {
@@ -103,19 +113,27 @@ impl GraphStore {
     /// Store a graph and return its state hash
     pub fn store_graph(&self, graph: &FastGraph, operation: String) -> String {
         let mut node_hashes = HashMap::new();
-        let edge_hashes = HashMap::new();
+        let mut edge_hashes = HashMap::new();
         
         // Store all nodes in content pool
         for node_id in graph.get_node_ids() {
-            let node_data = crate::graph::core::NodeData {
-                id: node_id.clone(),
-                attributes: HashMap::new(), // TODO: Convert PyObject to HashMap<String, JsonValue>
-            };
-            let hash = self.content_pool.intern_node(node_data);
-            node_hashes.insert(node_id, hash);
+            // Get the actual node data from the graph
+            if let Some(node_idx) = graph.node_id_to_index.get(&node_id) {
+                if let Some(node_data) = graph.graph.node_weight(*node_idx) {
+                    let hash = self.content_pool.intern_node(node_data.clone());
+                    node_hashes.insert(node_id, hash);
+                }
+            }
         }
         
-        // TODO: Store edges similarly
+        // Store all edges in content pool
+        for edge_idx in graph.graph.edge_indices() {
+            if let Some(edge_data) = graph.graph.edge_weight(edge_idx) {
+                let edge_id = format!("{}->{}", edge_data.source, edge_data.target);
+                let hash = self.content_pool.intern_edge(edge_data.clone());
+                edge_hashes.insert(edge_id, hash);
+            }
+        }
         
         // Create state hash
         let state_data = format!("{:?}{:?}", node_hashes, edge_hashes);
@@ -146,13 +164,23 @@ impl GraphStore {
         
         // Reconstruct nodes
         for (node_id, content_hash) in &state.node_hashes {
-            if let Some(_node_data) = self.content_pool.get_node(content_hash) {
-                // Convert attributes back to Python-compatible format
-                graph.add_node(node_id.clone(), None).ok()?;
+            if let Some(node_data) = self.content_pool.get_node(content_hash) {
+                // Add node with proper attributes (dereference Arc)
+                let new_node_idx = graph.graph.add_node((*node_data).clone());
+                graph.node_id_to_index.insert(node_id.clone(), new_node_idx);
+                graph.node_index_to_id.insert(new_node_idx, node_id.clone());
             }
         }
         
-        // TODO: Reconstruct edges
+        // Reconstruct edges
+        for (edge_id, content_hash) in &state.edge_hashes {
+            if let Some(edge_data) = self.content_pool.get_edge(content_hash) {
+                let source_idx = graph.node_id_to_index.get(&edge_data.source)?;
+                let target_idx = graph.node_id_to_index.get(&edge_data.target)?;
+                // Add edge with proper attributes (dereference Arc)
+                graph.graph.add_edge(*source_idx, *target_idx, (*edge_data).clone());
+            }
+        }
         
         Some(graph)
     }

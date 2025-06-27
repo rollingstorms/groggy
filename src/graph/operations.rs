@@ -8,12 +8,14 @@ impl FastGraph {
     pub fn parallel_subgraph_by_node_ids(&self, node_ids: &HashSet<String>) -> FastGraph {
         let mut subgraph = FastGraph::new();
         
-        // Add filtered nodes
+        // Add filtered nodes with attributes
         for node_id in node_ids {
             if let Some(node_idx) = self.node_id_to_index.get(node_id) {
                 if let Some(node_data) = self.graph.node_weight(*node_idx) {
-                    subgraph.add_node(node_data.id.clone(), None).unwrap();
-                    // TODO: Set attributes
+                    // Add node directly to internal graph with all attributes
+                    let new_node_idx = subgraph.graph.add_node(node_data.clone());
+                    subgraph.node_id_to_index.insert(node_data.id.clone(), new_node_idx);
+                    subgraph.node_index_to_id.insert(new_node_idx, node_data.id.clone());
                 }
             }
         }
@@ -38,10 +40,12 @@ impl FastGraph {
             })
             .collect();
         
-        // Add edges to subgraph
-        for (source, target, _edge_data) in edges_to_add {
-            subgraph.add_edge(source, target, None).unwrap();
-            // TODO: Set edge attributes
+        // Add edges to subgraph with attributes
+        for (source, target, edge_data) in edges_to_add {
+            let source_idx = subgraph.node_id_to_index.get(&source).unwrap();
+            let target_idx = subgraph.node_id_to_index.get(&target).unwrap();
+            // Add edge directly with all attributes
+            subgraph.graph.add_edge(*source_idx, *target_idx, edge_data);
         }
         
         subgraph

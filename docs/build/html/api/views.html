@@ -1,0 +1,1356 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>views module &mdash; GLI Documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=9b665b3d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="utils module" href="utils.html" />
+    <link rel="prev" title="data_structures module" href="data_structures.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            GLI - Graph Language Interface
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#from-source">From Source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#building-with-rust-backend">Building with Rust Backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#development-installation">Development Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#docker-installation">Docker Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#verifying-installation">Verifying Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#troubleshooting">Troubleshooting</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quick Start Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#basic-graph-operations">Basic Graph Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#creating-a-graph">Creating a Graph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#adding-nodes">Adding Nodes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#adding-edges">Adding Edges</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#querying-the-graph">Querying the Graph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#graph-statistics">Graph Statistics</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#high-performance-batch-operations">High-Performance Batch Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#batch-filtering">Batch Filtering</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#batch-attribute-operations">Batch Attribute Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#performance-benefits">Performance Benefits</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#working-with-attributes">Working with Attributes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#complex-attributes">Complex Attributes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#updating-attributes">Updating Attributes</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#backend-selection">Backend Selection</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#choosing-backends">Choosing Backends</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#performance-comparison">Performance Comparison</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#batch-operations">Batch Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#graph-iteration">Graph Iteration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#iterating-over-nodes">Iterating Over Nodes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../quickstart.html#iterating-over-edges">Iterating Over Edges</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#error-handling">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../quickstart.html#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">API Reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="index.html#core-classes">Core Classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="gli.html">gli module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="gli.html#gli.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="gli.html#gli.GraphStore"><code class="docutils literal notranslate"><span class="pre">GraphStore</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="gli.html#gli.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="gli.html#gli.get_available_backends"><code class="docutils literal notranslate"><span class="pre">get_available_backends()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="gli.html#gli.get_current_backend"><code class="docutils literal notranslate"><span class="pre">get_current_backend()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="gli.html#gli.set_backend"><code class="docutils literal notranslate"><span class="pre">set_backend()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="gli.html#module-contents">Module Contents</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gli.html#backend-management">Backend Management</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html">graph module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#gli.graph.BatchOperationContext"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#gli.graph.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#graph-class">Graph Class</a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#batch-operations">Batch Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#performance-features">Performance Features</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="store.html">store module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="store.html#gli.store.Branch"><code class="docutils literal notranslate"><span class="pre">Branch</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="store.html#gli.store.GraphStore"><code class="docutils literal notranslate"><span class="pre">GraphStore</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="store.html#graphstore-class">GraphStore Class</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#data-structures">Data Structures</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html">data_structures module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge"><code class="docutils literal notranslate"><span class="pre">Edge</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="data_structures.html#gli.data_structures.Node"><code class="docutils literal notranslate"><span class="pre">Node</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="data_structures.html#core-data-structures">Core Data Structures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="data_structures.html#attribute-management">Attribute Management</a></li>
+</ul>
+</li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">views module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#gli.views.EdgeView"><code class="docutils literal notranslate"><span class="pre">EdgeView</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gli.views.LazyDict"><code class="docutils literal notranslate"><span class="pre">LazyDict</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gli.views.NodeView"><code class="docutils literal notranslate"><span class="pre">NodeView</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#lazy-data-structures">Lazy Data Structures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#performance-benefits">Performance Benefits</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#utilities">Utilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="utils.html">utils module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#gli.utils.create_clustering_workflow"><code class="docutils literal notranslate"><span class="pre">create_clustering_workflow()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#gli.utils.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#gli.utils.create_subgraph_branch"><code class="docutils literal notranslate"><span class="pre">create_subgraph_branch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#utility-functions">Utility Functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#performance-testing">Performance Testing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#best-practices">Best Practices</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="state.html">state module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="state.html#gli.state.GraphState"><code class="docutils literal notranslate"><span class="pre">GraphState</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="state.html#state-management">State Management</a></li>
+<li class="toctree-l4"><a class="reference internal" href="state.html#state-persistence">State Persistence</a></li>
+<li class="toctree-l4"><a class="reference internal" href="state.html#advanced-features">Advanced Features</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html">delta module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="delta.html#gli.delta.CompactGraphDelta"><code class="docutils literal notranslate"><span class="pre">CompactGraphDelta</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="delta.html#gli.delta.GraphDelta"><code class="docutils literal notranslate"><span class="pre">GraphDelta</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="delta.html#delta-operations">Delta Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="delta.html#advanced-operations">Advanced Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="delta.html#performance-considerations">Performance Considerations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="delta.html#use-cases">Use Cases</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#backend-management">Backend Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="index.html#backend-functions">Backend Functions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="generated/gli.get_available_backends.html">gli.get_available_backends</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/gli.set_backend.html">gli.set_backend</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/gli.get_current_backend.html">gli.get_current_backend</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#core-constants">Core Constants</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="index.html#gli.RUST_BACKEND_AVAILABLE"><code class="docutils literal notranslate"><span class="pre">RUST_BACKEND_AVAILABLE</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/index.html">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basic_usage.html">Basic Usage Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#creating-your-first-graph">Creating Your First Graph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#social-network-analysis">Social Network Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#knowledge-graph-example">Knowledge Graph Example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#working-with-complex-attributes">Working with Complex Attributes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#error-handling">Error Handling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#graph-iteration-patterns">Graph Iteration Patterns</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/batch_operations.html">Batch Operations Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#social-network-analysis">Social Network Analysis</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#building-and-analyzing-large-social-networks">Building and Analyzing Large Social Networks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#efficient-filtering-and-analysis">Efficient Filtering and Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#combined-filtering-for-complex-queries">Combined Filtering for Complex Queries</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#supply-chain-network-analysis">Supply Chain Network Analysis</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#enterprise-scale-graph-processing">Enterprise-Scale Graph Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#supply-chain-risk-analysis">Supply Chain Risk Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#bulk-attribute-updates">Bulk Attribute Updates</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#knowledge-graph-processing">Knowledge Graph Processing</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#academic-collaboration-network">Academic Collaboration Network</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#research-impact-analysis">Research Impact Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#performance-monitoring">Performance Monitoring</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#benchmarking-batch-operations">Benchmarking Batch Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#best-practices-summary">Best Practices Summary</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#performance-optimization-guidelines">Performance Optimization Guidelines</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#expected-performance-gains">Expected Performance Gains</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/performance_optimization.html">Performance Optimization Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#large-graph-construction">Large Graph Construction</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#building-million-node-graphs">Building Million-Node Graphs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#real-world-data-integration">Real-World Data Integration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#high-performance-queries">High-Performance Queries</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#optimized-graph-traversal">Optimized Graph Traversal</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#efficient-attribute-processing">Efficient Attribute Processing</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#memory-efficient-operations">Memory-Efficient Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#streaming-graph-processing">Streaming Graph Processing</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#parallel-processing-patterns">Parallel Processing Patterns</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#multi-threaded-graph-analysis">Multi-threaded Graph Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#benchmarking-and-profiling">Benchmarking and Profiling</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#performance-measurement-framework">Performance Measurement Framework</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#real-world-integration-examples">Real-World Integration Examples</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#database-integration">Database Integration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/index.html#basic-examples">Basic Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html">Basic Usage Examples</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#creating-your-first-graph">Creating Your First Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#social-network-analysis">Social Network Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#knowledge-graph-example">Knowledge Graph Example</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#working-with-complex-attributes">Working with Complex Attributes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#error-handling">Error Handling</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#graph-iteration-patterns">Graph Iteration Patterns</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/index.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html">Batch Operations Examples</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#social-network-analysis">Social Network Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#supply-chain-network-analysis">Supply Chain Network Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#knowledge-graph-processing">Knowledge Graph Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#performance-monitoring">Performance Monitoring</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#best-practices-summary">Best Practices Summary</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/index.html#performance-examples">Performance Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html">Performance Optimization Examples</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#large-graph-construction">Large Graph Construction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#high-performance-queries">High-Performance Queries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#memory-efficient-operations">Memory-Efficient Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#parallel-processing-patterns">Parallel Processing Patterns</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#benchmarking-and-profiling">Benchmarking and Profiling</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#real-world-integration-examples">Real-World Integration Examples</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/index.html#advanced-examples">Advanced Examples</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/index.html#integration-examples">Integration Examples</a><ul class="simple">
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#backend-comparison">Backend Comparison</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#performance-metrics">Performance Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#choosing-the-right-backend">Choosing the Right Backend</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#optimization-strategies">Optimization Strategies</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../performance.html#batch-filtering-examples">Batch Filtering Examples</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../performance.html#bulk-attribute-operations">Bulk Attribute Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../performance.html#context-manager-for-bulk-loading">Context Manager for Bulk Loading</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#performance-best-practices">Performance Best Practices</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#memory-management">Memory Management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#efficient-graph-construction">Efficient Graph Construction</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#benchmarking-tools">Benchmarking Tools</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#memory-profiling">Memory Profiling</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#id1">Performance Best Practices</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#graph-design">Graph Design</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#query-optimization">Query Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#large-graph-strategies">Large Graph Strategies</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#streaming-operations">Streaming Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#distributed-processing">Distributed Processing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#performance-monitoring">Performance Monitoring</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#system-architecture">System Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#core-components">Core Components</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#graph-interface">Graph Interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#backend-abstraction-layer">Backend Abstraction Layer</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#data-structures">Data Structures</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#node-and-edge-representation">Node and Edge Representation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#memory-management">Memory Management</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#rust-backend-design">Rust Backend Design</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#ffi-integration">FFI Integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#memory-layout">Memory Layout</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#performance-characteristics">Performance Characteristics</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#algorithmic-complexity">Algorithmic Complexity</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#memory-overhead">Memory Overhead</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#concurrency-model">Concurrency Model</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#thread-safety">Thread Safety</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#extensibility">Extensibility</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#plugin-architecture">Plugin Architecture</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#custom-backends">Custom Backends</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#error-handling-strategy">Error Handling Strategy</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#exception-hierarchy">Exception Hierarchy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#error-recovery">Error Recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#testing-architecture">Testing Architecture</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#backend-parity-testing">Backend Parity Testing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#performance-testing">Performance Testing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#future-architecture-considerations">Future Architecture Considerations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#planned-enhancements">Planned Enhancements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#scalability-roadmap">Scalability Roadmap</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../testing.html">Testing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#running-tests">Running Tests</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#basic-test-execution">Basic Test Execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#test-categories">Test Categories</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#test-structure">Test Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#backend-parity-testing">Backend Parity Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#cross-backend-comparison">Cross-Backend Comparison</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#performance-testing">Performance Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#benchmark-framework">Benchmark Framework</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#stress-testing">Stress Testing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#memory-testing">Memory Testing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#interactive-testing">Interactive Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#test-notebooks">Test Notebooks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#debugging-tests">Debugging Tests</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#test-configuration">Test Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#pytest-configuration">Pytest Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#test-markers">Test Markers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#running-specific-test-categories">Running Specific Test Categories</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#continuous-integration">Continuous Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#test-data-management">Test Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#contributing-tests">Contributing Tests</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to GLI</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#getting-started">Getting Started</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#development-setup">Development Setup</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#development-workflow">Development Workflow</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#branch-strategy">Branch Strategy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#code-standards">Code Standards</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#types-of-contributions">Types of Contributions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#bug-reports">Bug Reports</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#feature-requests">Feature Requests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#code-contributions">Code Contributions</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#contribution-guidelines">Contribution Guidelines</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#code-quality">Code Quality</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#performance-considerations">Performance Considerations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#specific-contribution-areas">Specific Contribution Areas</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#documentation">Documentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#testing">Testing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#performance">Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#new-features">New Features</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#review-process">Review Process</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#pull-request-guidelines">Pull Request Guidelines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#code-review-process">Code Review Process</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#community-guidelines">Community Guidelines</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#code-of-conduct">Code of Conduct</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#communication">Communication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#getting-help">Getting Help</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#recognition">Recognition</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#unreleased">[Unreleased]</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#id1">[0.2.0] - 2025-01-01</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#id2">[0.1.0] - 2024-12-01</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#migration-guide">Migration Guide</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#upgrading-from-0-1-x-to-0-2-x">Upgrading from 0.1.x to 0.2.x</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#breaking-changes">Breaking Changes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#future-breaking-changes-0-3-x">Future Breaking Changes (0.3.x)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#known-issues">Known Issues</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#current-limitations">Current Limitations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#workarounds">Workarounds</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#version-support">Version Support</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#support-policy">Support Policy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#python-version-support">Python Version Support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#rust-version-support">Rust Version Support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#platform-support">Platform Support</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#contributors">Contributors</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#version-0-2-0-contributors">Version 0.2.0 Contributors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#special-thanks">Special Thanks</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#future-roadmap">Future Roadmap</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#planned-features">Planned Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#deprecation-schedule">Deprecation Schedule</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Reference:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="gli.html">gli module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="gli.html#gli.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.__init__"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.add_edge"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.add_node"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.batch_filter_edges"><code class="docutils literal notranslate"><span class="pre">Graph.batch_filter_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.batch_filter_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.batch_filter_nodes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.batch_get_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.batch_get_node_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.batch_operations"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.batch_set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.batch_set_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.batch_set_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.batch_set_node_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.batch_update_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.batch_update_node_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.create_subgraph"><code class="docutils literal notranslate"><span class="pre">Graph.create_subgraph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.create_subgraph_fast"><code class="docutils literal notranslate"><span class="pre">Graph.create_subgraph_fast()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.edge_count"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.edges"><code class="docutils literal notranslate"><span class="pre">Graph.edges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.empty"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.from_edge_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.from_node_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.get_connected_component"><code class="docutils literal notranslate"><span class="pre">Graph.get_connected_component()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.get_edge"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.get_k_hop_neighborhood"><code class="docutils literal notranslate"><span class="pre">Graph.get_k_hop_neighborhood()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.get_node"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.get_performance_stats"><code class="docutils literal notranslate"><span class="pre">Graph.get_performance_stats()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.node_count"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.nodes"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.optimized_query"><code class="docutils literal notranslate"><span class="pre">Graph.optimized_query()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.set_node_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.Graph.snapshot"><code class="docutils literal notranslate"><span class="pre">Graph.snapshot()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="gli.html#gli.GraphStore"><code class="docutils literal notranslate"><span class="pre">GraphStore</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.GraphStore.__init__"><code class="docutils literal notranslate"><span class="pre">GraphStore.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.GraphStore.commit"><code class="docutils literal notranslate"><span class="pre">GraphStore.commit()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.GraphStore.create_branch"><code class="docutils literal notranslate"><span class="pre">GraphStore.create_branch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.GraphStore.get_current_graph"><code class="docutils literal notranslate"><span class="pre">GraphStore.get_current_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.GraphStore.get_storage_stats"><code class="docutils literal notranslate"><span class="pre">GraphStore.get_storage_stats()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.GraphStore.list_branches"><code class="docutils literal notranslate"><span class="pre">GraphStore.list_branches()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.GraphStore.switch_branch"><code class="docutils literal notranslate"><span class="pre">GraphStore.switch_branch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#gli.GraphStore.update_graph"><code class="docutils literal notranslate"><span class="pre">GraphStore.update_graph()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="gli.html#gli.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="gli.html#gli.get_available_backends"><code class="docutils literal notranslate"><span class="pre">get_available_backends()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="gli.html#gli.get_current_backend"><code class="docutils literal notranslate"><span class="pre">get_current_backend()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="gli.html#gli.set_backend"><code class="docutils literal notranslate"><span class="pre">set_backend()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="gli.html#module-contents">Module Contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#classes">Classes</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="generated/gli.Graph.html">gli.Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/gli.GraphStore.html">gli.GraphStore</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#functions">Functions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="generated/gli.create_random_graph.html">gli.create_random_graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/gli.get_available_backends.html">gli.get_available_backends</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/gli.set_backend.html">gli.set_backend</a></li>
+<li class="toctree-l4"><a class="reference internal" href="generated/gli.get_current_backend.html">gli.get_current_backend</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#constants">Constants</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="gli.html#gli.__version__"><code class="docutils literal notranslate"><span class="pre">__version__</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="gli.html#gli.RUST_BACKEND_AVAILABLE"><code class="docutils literal notranslate"><span class="pre">RUST_BACKEND_AVAILABLE</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="gli.html#backend-management">Backend Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#id0"><code class="docutils literal notranslate"><span class="pre">get_available_backends()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#id5"><code class="docutils literal notranslate"><span class="pre">set_backend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#id6"><code class="docutils literal notranslate"><span class="pre">get_current_backend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="gli.html#id7"><code class="docutils literal notranslate"><span class="pre">RUST_BACKEND_AVAILABLE</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="graph.html">graph module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="graph.html#gli.graph.BatchOperationContext"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.BatchOperationContext.__init__"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.BatchOperationContext.add_edge"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.BatchOperationContext.add_node"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_node()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="graph.html#gli.graph.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.__init__"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.add_edge"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.add_node"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.batch_filter_edges"><code class="docutils literal notranslate"><span class="pre">Graph.batch_filter_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.batch_filter_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.batch_filter_nodes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.batch_get_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.batch_get_node_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.batch_operations"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.batch_set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.batch_set_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.batch_set_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.batch_set_node_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.batch_update_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.batch_update_node_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.create_subgraph"><code class="docutils literal notranslate"><span class="pre">Graph.create_subgraph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.create_subgraph_fast"><code class="docutils literal notranslate"><span class="pre">Graph.create_subgraph_fast()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.edge_count"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.edges"><code class="docutils literal notranslate"><span class="pre">Graph.edges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.empty"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.from_edge_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.from_node_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.get_connected_component"><code class="docutils literal notranslate"><span class="pre">Graph.get_connected_component()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.get_edge"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.get_k_hop_neighborhood"><code class="docutils literal notranslate"><span class="pre">Graph.get_k_hop_neighborhood()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.get_node"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.get_performance_stats"><code class="docutils literal notranslate"><span class="pre">Graph.get_performance_stats()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.node_count"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.nodes"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.optimized_query"><code class="docutils literal notranslate"><span class="pre">Graph.optimized_query()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.set_node_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#gli.graph.Graph.snapshot"><code class="docutils literal notranslate"><span class="pre">Graph.snapshot()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="graph.html#graph-class">Graph Class</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#id0"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id5"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id6"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id7"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id8"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id9"><code class="docutils literal notranslate"><span class="pre">Graph.batch_filter_edges()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id10"><code class="docutils literal notranslate"><span class="pre">Graph.batch_filter_nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id11"><code class="docutils literal notranslate"><span class="pre">Graph.batch_get_node_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id12"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id13"><code class="docutils literal notranslate"><span class="pre">Graph.batch_set_edge_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id14"><code class="docutils literal notranslate"><span class="pre">Graph.batch_set_node_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id15"><code class="docutils literal notranslate"><span class="pre">Graph.batch_update_node_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id20"><code class="docutils literal notranslate"><span class="pre">Graph.create_subgraph()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id21"><code class="docutils literal notranslate"><span class="pre">Graph.create_subgraph_fast()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id22"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id23"><code class="docutils literal notranslate"><span class="pre">Graph.edges</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id24"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id25"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id26"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id27"><code class="docutils literal notranslate"><span class="pre">Graph.get_connected_component()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id28"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id29"><code class="docutils literal notranslate"><span class="pre">Graph.get_k_hop_neighborhood()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id30"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id31"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id32"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id33"><code class="docutils literal notranslate"><span class="pre">Graph.get_performance_stats()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id34"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id35"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id36"><code class="docutils literal notranslate"><span class="pre">Graph.optimized_query()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id37"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id38"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attribute()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id39"><code class="docutils literal notranslate"><span class="pre">Graph.snapshot()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#core-operations">Core Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#node-operations">Node Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#edge-operations">Edge Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#graph-queries">Graph Queries</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id44"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id45"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id46"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#iteration">Iteration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id47"><code class="docutils literal notranslate"><span class="pre">Graph.nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id48"><code class="docutils literal notranslate"><span class="pre">Graph.edges()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#factory-methods">Factory Methods</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id49"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id50"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="graph.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#batch-filtering">Batch Filtering</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id51"><code class="docutils literal notranslate"><span class="pre">Graph.batch_filter_nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id52"><code class="docutils literal notranslate"><span class="pre">Graph.batch_filter_edges()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#batch-attribute-operations">Batch Attribute Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id53"><code class="docutils literal notranslate"><span class="pre">Graph.batch_get_node_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id54"><code class="docutils literal notranslate"><span class="pre">Graph.batch_set_node_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id55"><code class="docutils literal notranslate"><span class="pre">Graph.batch_update_node_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id60"><code class="docutils literal notranslate"><span class="pre">Graph.batch_set_edge_attributes()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#subgraph-operations">Subgraph Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id61"><code class="docutils literal notranslate"><span class="pre">Graph.create_subgraph()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id62"><code class="docutils literal notranslate"><span class="pre">Graph.create_subgraph_fast()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id63"><code class="docutils literal notranslate"><span class="pre">Graph.get_connected_component()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id64"><code class="docutils literal notranslate"><span class="pre">Graph.get_k_hop_neighborhood()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="graph.html#batch-operation-context">Batch Operation Context</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="graph.html#id65"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="graph.html#performance-features">Performance Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="store.html">store module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="store.html#gli.store.Branch"><code class="docutils literal notranslate"><span class="pre">Branch</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="store.html#gli.store.Branch.__init__"><code class="docutils literal notranslate"><span class="pre">Branch.__init__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="store.html#gli.store.GraphStore"><code class="docutils literal notranslate"><span class="pre">GraphStore</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="store.html#gli.store.GraphStore.__init__"><code class="docutils literal notranslate"><span class="pre">GraphStore.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="store.html#gli.store.GraphStore.commit"><code class="docutils literal notranslate"><span class="pre">GraphStore.commit()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="store.html#gli.store.GraphStore.create_branch"><code class="docutils literal notranslate"><span class="pre">GraphStore.create_branch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="store.html#gli.store.GraphStore.get_current_graph"><code class="docutils literal notranslate"><span class="pre">GraphStore.get_current_graph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="store.html#gli.store.GraphStore.get_storage_stats"><code class="docutils literal notranslate"><span class="pre">GraphStore.get_storage_stats()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="store.html#gli.store.GraphStore.list_branches"><code class="docutils literal notranslate"><span class="pre">GraphStore.list_branches()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="store.html#gli.store.GraphStore.switch_branch"><code class="docutils literal notranslate"><span class="pre">GraphStore.switch_branch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="store.html#gli.store.GraphStore.update_graph"><code class="docutils literal notranslate"><span class="pre">GraphStore.update_graph()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="store.html#graphstore-class">GraphStore Class</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="store.html#id0"><code class="docutils literal notranslate"><span class="pre">GraphStore</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="store.html#id1"><code class="docutils literal notranslate"><span class="pre">GraphStore.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="store.html#id2"><code class="docutils literal notranslate"><span class="pre">GraphStore.commit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="store.html#id3"><code class="docutils literal notranslate"><span class="pre">GraphStore.create_branch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="store.html#id4"><code class="docutils literal notranslate"><span class="pre">GraphStore.get_current_graph()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="store.html#id5"><code class="docutils literal notranslate"><span class="pre">GraphStore.get_storage_stats()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="store.html#id6"><code class="docutils literal notranslate"><span class="pre">GraphStore.list_branches()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="store.html#id7"><code class="docutils literal notranslate"><span class="pre">GraphStore.switch_branch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="store.html#id8"><code class="docutils literal notranslate"><span class="pre">GraphStore.update_graph()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="store.html#storage-operations">Storage Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="store.html#serialization">Serialization</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="data_structures.html">data_structures module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge"><code class="docutils literal notranslate"><span class="pre">Edge</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge.__init__"><code class="docutils literal notranslate"><span class="pre">Edge.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge.attributes"><code class="docutils literal notranslate"><span class="pre">Edge.attributes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge.get"><code class="docutils literal notranslate"><span class="pre">Edge.get()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge.get_attribute"><code class="docutils literal notranslate"><span class="pre">Edge.get_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge.id"><code class="docutils literal notranslate"><span class="pre">Edge.id</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge.items"><code class="docutils literal notranslate"><span class="pre">Edge.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge.keys"><code class="docutils literal notranslate"><span class="pre">Edge.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge.set_attribute"><code class="docutils literal notranslate"><span class="pre">Edge.set_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge.source"><code class="docutils literal notranslate"><span class="pre">Edge.source</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge.target"><code class="docutils literal notranslate"><span class="pre">Edge.target</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Edge.values"><code class="docutils literal notranslate"><span class="pre">Edge.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data_structures.html#gli.data_structures.Node"><code class="docutils literal notranslate"><span class="pre">Node</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Node.__init__"><code class="docutils literal notranslate"><span class="pre">Node.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Node.attributes"><code class="docutils literal notranslate"><span class="pre">Node.attributes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Node.get"><code class="docutils literal notranslate"><span class="pre">Node.get()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Node.get_attribute"><code class="docutils literal notranslate"><span class="pre">Node.get_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Node.id"><code class="docutils literal notranslate"><span class="pre">Node.id</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Node.items"><code class="docutils literal notranslate"><span class="pre">Node.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Node.keys"><code class="docutils literal notranslate"><span class="pre">Node.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Node.set_attribute"><code class="docutils literal notranslate"><span class="pre">Node.set_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#gli.data_structures.Node.values"><code class="docutils literal notranslate"><span class="pre">Node.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data_structures.html#core-data-structures">Core Data Structures</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#node-class">Node Class</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="data_structures.html#id0"><code class="docutils literal notranslate"><span class="pre">Node</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#edge-class">Edge Class</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="data_structures.html#id11"><code class="docutils literal notranslate"><span class="pre">Edge</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data_structures.html#attribute-management">Attribute Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#id24"><code class="docutils literal notranslate"><span class="pre">Node.get_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_structures.html#id25"><code class="docutils literal notranslate"><span class="pre">Node.set_attribute()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">views module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#gli.views.EdgeView"><code class="docutils literal notranslate"><span class="pre">EdgeView</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.EdgeView.__init__"><code class="docutils literal notranslate"><span class="pre">EdgeView.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.EdgeView.items"><code class="docutils literal notranslate"><span class="pre">EdgeView.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.EdgeView.keys"><code class="docutils literal notranslate"><span class="pre">EdgeView.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.EdgeView.values"><code class="docutils literal notranslate"><span class="pre">EdgeView.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#gli.views.LazyDict"><code class="docutils literal notranslate"><span class="pre">LazyDict</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.LazyDict.__init__"><code class="docutils literal notranslate"><span class="pre">LazyDict.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.LazyDict.copy"><code class="docutils literal notranslate"><span class="pre">LazyDict.copy()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.LazyDict.get"><code class="docutils literal notranslate"><span class="pre">LazyDict.get()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.LazyDict.items"><code class="docutils literal notranslate"><span class="pre">LazyDict.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.LazyDict.keys"><code class="docutils literal notranslate"><span class="pre">LazyDict.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.LazyDict.values"><code class="docutils literal notranslate"><span class="pre">LazyDict.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#gli.views.NodeView"><code class="docutils literal notranslate"><span class="pre">NodeView</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.NodeView.__init__"><code class="docutils literal notranslate"><span class="pre">NodeView.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.NodeView.items"><code class="docutils literal notranslate"><span class="pre">NodeView.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.NodeView.keys"><code class="docutils literal notranslate"><span class="pre">NodeView.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gli.views.NodeView.values"><code class="docutils literal notranslate"><span class="pre">NodeView.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#lazy-data-structures">Lazy Data Structures</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#lazydict-class">LazyDict Class</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id0"><code class="docutils literal notranslate"><span class="pre">LazyDict</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#nodeview-class">NodeView Class</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id8"><code class="docutils literal notranslate"><span class="pre">NodeView</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#edgeview-class">EdgeView Class</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id13"><code class="docutils literal notranslate"><span class="pre">EdgeView</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#performance-benefits">Performance Benefits</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="utils.html">utils module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="utils.html#gli.utils.create_clustering_workflow"><code class="docutils literal notranslate"><span class="pre">create_clustering_workflow()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="utils.html#gli.utils.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="utils.html#gli.utils.create_subgraph_branch"><code class="docutils literal notranslate"><span class="pre">create_subgraph_branch()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="utils.html#utility-functions">Utility Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#graph-creation">Graph Creation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#id0"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html#workflow-utilities">Workflow Utilities</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#id1"><code class="docutils literal notranslate"><span class="pre">create_clustering_workflow()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="utils.html#id2"><code class="docutils literal notranslate"><span class="pre">create_subgraph_branch()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="utils.html#performance-testing">Performance Testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="utils.html#best-practices">Best Practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="state.html">state module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="state.html#gli.state.GraphState"><code class="docutils literal notranslate"><span class="pre">GraphState</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.__init__"><code class="docutils literal notranslate"><span class="pre">GraphState.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.branch_name"><code class="docutils literal notranslate"><span class="pre">GraphState.branch_name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.delta"><code class="docutils literal notranslate"><span class="pre">GraphState.delta</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.edges"><code class="docutils literal notranslate"><span class="pre">GraphState.edges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.graph_attributes"><code class="docutils literal notranslate"><span class="pre">GraphState.graph_attributes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.hash"><code class="docutils literal notranslate"><span class="pre">GraphState.hash</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.is_root"><code class="docutils literal notranslate"><span class="pre">GraphState.is_root()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.is_subgraph_state"><code class="docutils literal notranslate"><span class="pre">GraphState.is_subgraph_state</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.nodes"><code class="docutils literal notranslate"><span class="pre">GraphState.nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.operation"><code class="docutils literal notranslate"><span class="pre">GraphState.operation</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.parent_hash"><code class="docutils literal notranslate"><span class="pre">GraphState.parent_hash</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.subgraph_metadata"><code class="docutils literal notranslate"><span class="pre">GraphState.subgraph_metadata</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#gli.state.GraphState.timestamp"><code class="docutils literal notranslate"><span class="pre">GraphState.timestamp</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="state.html#state-management">State Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="state.html#classes">Classes</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="state.html#id0"><code class="docutils literal notranslate"><span class="pre">GraphState</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="state.html#versioning-operations">Versioning Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="state.html#state-persistence">State Persistence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="state.html#advanced-features">Advanced Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="delta.html">delta module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="delta.html#gli.delta.CompactGraphDelta"><code class="docutils literal notranslate"><span class="pre">CompactGraphDelta</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.CompactGraphDelta.__init__"><code class="docutils literal notranslate"><span class="pre">CompactGraphDelta.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.CompactGraphDelta.added_edges"><code class="docutils literal notranslate"><span class="pre">CompactGraphDelta.added_edges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.CompactGraphDelta.added_nodes"><code class="docutils literal notranslate"><span class="pre">CompactGraphDelta.added_nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.CompactGraphDelta.is_empty"><code class="docutils literal notranslate"><span class="pre">CompactGraphDelta.is_empty()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.CompactGraphDelta.modified_edges"><code class="docutils literal notranslate"><span class="pre">CompactGraphDelta.modified_edges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.CompactGraphDelta.modified_graph_attrs"><code class="docutils literal notranslate"><span class="pre">CompactGraphDelta.modified_graph_attrs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.CompactGraphDelta.modified_nodes"><code class="docutils literal notranslate"><span class="pre">CompactGraphDelta.modified_nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.CompactGraphDelta.removed_edges"><code class="docutils literal notranslate"><span class="pre">CompactGraphDelta.removed_edges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.CompactGraphDelta.removed_nodes"><code class="docutils literal notranslate"><span class="pre">CompactGraphDelta.removed_nodes</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="delta.html#gli.delta.GraphDelta"><code class="docutils literal notranslate"><span class="pre">GraphDelta</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.GraphDelta.__init__"><code class="docutils literal notranslate"><span class="pre">GraphDelta.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.GraphDelta.added_edges"><code class="docutils literal notranslate"><span class="pre">GraphDelta.added_edges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.GraphDelta.added_nodes"><code class="docutils literal notranslate"><span class="pre">GraphDelta.added_nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.GraphDelta.modified_edges"><code class="docutils literal notranslate"><span class="pre">GraphDelta.modified_edges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.GraphDelta.modified_graph_attrs"><code class="docutils literal notranslate"><span class="pre">GraphDelta.modified_graph_attrs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.GraphDelta.modified_nodes"><code class="docutils literal notranslate"><span class="pre">GraphDelta.modified_nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.GraphDelta.removed_edges"><code class="docutils literal notranslate"><span class="pre">GraphDelta.removed_edges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#gli.delta.GraphDelta.removed_nodes"><code class="docutils literal notranslate"><span class="pre">GraphDelta.removed_nodes</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="delta.html#delta-operations">Delta Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#classes">Classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="delta.html#core-concepts">Core Concepts</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="delta.html#advanced-operations">Advanced Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="delta.html#performance-considerations">Performance Considerations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="delta.html#use-cases">Use Cases</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Rust Backend:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../rust/overview.html">Rust Backend Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../rust/overview.html#architecture">Architecture</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#core-components">Core Components</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#performance-characteristics">Performance Characteristics</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/overview.html#key-features">Key Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#high-performance-data-structures">High-Performance Data Structures</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#memory-management">Memory Management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#thread-safety">Thread Safety</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/overview.html#usage-examples">Usage Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#basic-operations">Basic Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#large-graph-construction">Large Graph Construction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#complex-attributes">Complex Attributes</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/overview.html#performance-optimization">Performance Optimization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#backend-specific-optimizations">Backend-Specific Optimizations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#memory-profiling">Memory Profiling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#benchmarking">Benchmarking</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/overview.html#installation-and-setup">Installation and Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#building-from-source">Building from Source</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#troubleshooting-rust-backend">Troubleshooting Rust Backend</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/overview.html#advanced-features">Advanced Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#custom-rust-extensions">Custom Rust Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#ffi-optimizations">FFI Optimizations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/overview.html#limitations-and-considerations">Limitations and Considerations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#current-limitations">Current Limitations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#best-practices">Best Practices</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/overview.html#future-developments">Future Developments</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/overview.html#planned-enhancements">Planned Enhancements</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../rust/performance.html">Rust Performance Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../rust/performance.html#performance-characteristics">Performance Characteristics</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#benchmarking-results">Benchmarking Results</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#memory-usage-analysis">Memory Usage Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/performance.html#optimization-techniques">Optimization Techniques</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#data-structure-optimizations">Data Structure Optimizations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#content-addressed-storage">Content-Addressed Storage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#batch-operation-optimization">Batch Operation Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#memory-layout-optimization">Memory Layout Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#cache-friendly-iteration">Cache-Friendly Iteration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/performance.html#advanced-performance-features">Advanced Performance Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#simd-optimizations">SIMD Optimizations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#parallel-processing">Parallel Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#memory-pool-allocation">Memory Pool Allocation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/performance.html#benchmarking-tools">Benchmarking Tools</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#built-in-performance-monitoring">Built-in Performance Monitoring</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#memory-profiling">Memory Profiling</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/performance.html#performance-tuning">Performance Tuning</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#graph-size-optimization">Graph Size Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#attribute-optimization">Attribute Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#batch-size-tuning">Batch Size Tuning</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/performance.html#performance-monitoring-in-production">Performance Monitoring in Production</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#runtime-performance-tracking">Runtime Performance Tracking</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/performance.html#best-practices-summary">Best Practices Summary</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#performance-guidelines">Performance Guidelines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/performance.html#common-pitfalls">Common Pitfalls</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../rust/ffi.html">FFI (Foreign Function Interface) Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../rust/ffi.html#overview">Overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#architecture">Architecture</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/ffi.html#pyo3-integration">PyO3 Integration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#basic-ffi-structure">Basic FFI Structure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#data-type-conversion">Data Type Conversion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#complex-type-handling">Complex Type Handling</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/ffi.html#performance-characteristics">Performance Characteristics</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#ffi-overhead-analysis">FFI Overhead Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#optimization-strategies">Optimization Strategies</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/ffi.html#memory-management">Memory Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#reference-counting">Reference Counting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#zero-copy-operations">Zero-Copy Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/ffi.html#error-handling">Error Handling</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#exception-conversion">Exception Conversion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#custom-error-types">Custom Error Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/ffi.html#advanced-ffi-patterns">Advanced FFI Patterns</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#callback-functions">Callback Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#async-support">Async Support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#direct-memory-access">Direct Memory Access</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/ffi.html#debugging-and-profiling">Debugging and Profiling</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#debug-builds">Debug Builds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#ffi-call-tracing">FFI Call Tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#performance-profiling">Performance Profiling</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../rust/ffi.html#best-practices">Best Practices</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#ffi-design-guidelines">FFI Design Guidelines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../rust/ffi.html#common-pitfalls">Common Pitfalls</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">GLI - Graph Language Interface</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">API Reference</a></li>
+      <li class="breadcrumb-item active">views module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/views.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-gli.views">
+<span id="views-module"></span><h1>views module<a class="headerlink" href="#module-gli.views" title="Link to this heading"></a></h1>
+<p>Lazy views and data structures for zero-copy operations</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="gli.views.EdgeView">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">gli.views.</span></span><span class="sig-name descname"><span class="pre">EdgeView</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rust_core</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#EdgeView"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.EdgeView" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>View of edges in Rust backend</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.EdgeView.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rust_core</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#EdgeView.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.EdgeView.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.EdgeView.items">
+<span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#EdgeView.items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.EdgeView.items" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.EdgeView.keys">
+<span class="sig-name descname"><span class="pre">keys</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#EdgeView.keys"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.EdgeView.keys" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.EdgeView.values">
+<span class="sig-name descname"><span class="pre">values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#EdgeView.values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.EdgeView.values" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="gli.views.LazyDict">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">gli.views.</span></span><span class="sig-name descname"><span class="pre">LazyDict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_added</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_removed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Set" title="(in Python v3.13)"><span class="pre">Set</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_modified</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.LazyDict" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Zero-copy dictionary view that combines base dict with delta changes</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.LazyDict.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_added</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_removed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Set" title="(in Python v3.13)"><span class="pre">Set</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_modified</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.LazyDict.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.LazyDict.copy">
+<span class="sig-name descname"><span class="pre">copy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.copy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.LazyDict.copy" title="Link to this definition"></a></dt>
+<dd><p>Force materialization to regular dict</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.LazyDict.get">
+<span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.get"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.LazyDict.get" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.LazyDict.items">
+<span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.LazyDict.items" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.LazyDict.keys">
+<span class="sig-name descname"><span class="pre">keys</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.keys"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.LazyDict.keys" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.LazyDict.values">
+<span class="sig-name descname"><span class="pre">values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.LazyDict.values" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="gli.views.NodeView">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">gli.views.</span></span><span class="sig-name descname"><span class="pre">NodeView</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rust_core</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#NodeView"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.NodeView" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>View of nodes in Rust backend</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.NodeView.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rust_core</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#NodeView.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.NodeView.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.NodeView.items">
+<span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#NodeView.items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.NodeView.items" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.NodeView.keys">
+<span class="sig-name descname"><span class="pre">keys</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#NodeView.keys"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.NodeView.keys" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="gli.views.NodeView.values">
+<span class="sig-name descname"><span class="pre">values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#NodeView.values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gli.views.NodeView.values" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<section id="lazy-data-structures">
+<h2>Lazy Data Structures<a class="headerlink" href="#lazy-data-structures" title="Link to this heading"></a></h2>
+<p>GLI provides memory-efficient lazy views that avoid copying data when possible.</p>
+<section id="lazydict-class">
+<h3>LazyDict Class<a class="headerlink" href="#lazydict-class" title="Link to this heading"></a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="id0">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">gli.views.</span></span><span class="sig-name descname"><span class="pre">LazyDict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_added</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_removed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Set" title="(in Python v3.13)"><span class="pre">Set</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_modified</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id0" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Zero-copy dictionary view that combines base dict with delta changes</p>
+<p>Zero-copy dictionary view that combines base data with delta changes.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="id1">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_added</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_removed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Set" title="(in Python v3.13)"><span class="pre">Set</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_modified</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id1" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<p><strong>Usage Example</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">base_data</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;a&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;c&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">}</span>
+
+<span class="c1"># Create lazy view with modifications</span>
+<span class="n">lazy_dict</span> <span class="o">=</span> <span class="n">LazyDict</span><span class="p">(</span>
+    <span class="n">base_dict</span><span class="o">=</span><span class="n">base_data</span><span class="p">,</span>
+    <span class="n">delta_added</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;d&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">},</span>
+    <span class="n">delta_removed</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;b&quot;</span><span class="p">},</span>
+    <span class="n">delta_modified</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;a&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">}</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">lazy_dict</span><span class="p">[</span><span class="s2">&quot;a&quot;</span><span class="p">])</span>   <span class="c1"># 10 (modified)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">lazy_dict</span><span class="p">[</span><span class="s2">&quot;d&quot;</span><span class="p">])</span>   <span class="c1"># 4 (added)</span>
+<span class="c1"># lazy_dict[&quot;b&quot;]        # KeyError (removed)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">lazy_dict</span><span class="p">[</span><span class="s2">&quot;c&quot;</span><span class="p">])</span>   <span class="c1"># 3 (from base)</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="id2">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_added</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_removed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Set" title="(in Python v3.13)"><span class="pre">Set</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta_modified</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><span class="pre">Dict</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id2" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id3">
+<span class="sig-name descname"><span class="pre">copy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.copy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id3" title="Link to this definition"></a></dt>
+<dd><p>Force materialization to regular dict</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id4">
+<span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.get"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id4" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id5">
+<span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id5" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id6">
+<span class="sig-name descname"><span class="pre">keys</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.keys"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id6" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id7">
+<span class="sig-name descname"><span class="pre">values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#LazyDict.values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id7" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="nodeview-class">
+<h3>NodeView Class<a class="headerlink" href="#nodeview-class" title="Link to this heading"></a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="id8">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">gli.views.</span></span><span class="sig-name descname"><span class="pre">NodeView</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rust_core</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#NodeView"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id8" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>View of nodes in Rust backend</p>
+<p>Provides a lazy view over graph nodes with efficient iteration.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="id9">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rust_core</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#NodeView.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id9" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id10">
+<span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#NodeView.items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id10" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id11">
+<span class="sig-name descname"><span class="pre">keys</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#NodeView.keys"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id11" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id12">
+<span class="sig-name descname"><span class="pre">values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#NodeView.values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id12" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="edgeview-class">
+<h3>EdgeView Class<a class="headerlink" href="#edgeview-class" title="Link to this heading"></a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="id13">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">gli.views.</span></span><span class="sig-name descname"><span class="pre">EdgeView</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rust_core</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#EdgeView"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id13" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>View of edges in Rust backend</p>
+<p>Provides a lazy view over graph edges with efficient iteration.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="id14">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rust_core</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#EdgeView.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id14" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id15">
+<span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#EdgeView.items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id15" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id16">
+<span class="sig-name descname"><span class="pre">keys</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#EdgeView.keys"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id16" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="id17">
+<span class="sig-name descname"><span class="pre">values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/gli/views.html#EdgeView.values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id17" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+<section id="performance-benefits">
+<h2>Performance Benefits<a class="headerlink" href="#performance-benefits" title="Link to this heading"></a></h2>
+<p>Lazy views provide several performance advantages:</p>
+<dl class="simple">
+<dt><strong>Memory Efficiency</strong></dt><dd><ul class="simple">
+<li><p>No data copying for read operations</p></li>
+<li><p>Delta-based change tracking</p></li>
+<li><p>Shared base data across views</p></li>
+</ul>
+</dd>
+<dt><strong>Computational Efficiency</strong></dt><dd><ul class="simple">
+<li><p>Deferred computation until needed</p></li>
+<li><p>Efficient iteration patterns</p></li>
+<li><p>Minimal memory allocations</p></li>
+</ul>
+</dd>
+<dt><strong>Use Cases</strong></dt><dd><ul class="simple">
+<li><p>Graph snapshots and versioning</p></li>
+<li><p>Temporary modifications</p></li>
+<li><p>Filter operations</p></li>
+<li><p>Subgraph views</p></li>
+</ul>
+</dd>
+</dl>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Efficient subgraph filtering</span>
+<span class="n">large_graph</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">()</span>
+<span class="c1"># ... populate with millions of nodes ...</span>
+
+<span class="c1"># Create filtered view without copying data</span>
+<span class="n">filtered_nodes</span> <span class="o">=</span> <span class="n">NodeView</span><span class="p">(</span>
+    <span class="n">base_nodes</span><span class="o">=</span><span class="n">large_graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">,</span>
+    <span class="n">filter_func</span><span class="o">=</span><span class="k">lambda</span> <span class="n">node</span><span class="p">:</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;category&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;important&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="data_structures.html" class="btn btn-neutral float-left" title="data_structures module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="utils.html" class="btn btn-neutral float-right" title="utils module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, GLI Contributors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
