@@ -50,7 +50,7 @@ class BatchOperationContext:
         
         return edge_id
     
-    def set_node_attributes_bulk(self, node_attr_dict):
+    def set_node_attributes(self, node_attr_dict):
         """Queue bulk node attribute updates
         
         Args:
@@ -75,7 +75,7 @@ class BatchOperationContext:
                 # Create new node with attributes
                 self.batch_nodes[node_id_str] = Node(node_id_str, attributes)
     
-    def set_edge_attributes_bulk(self, edge_attr_dict):
+    def set_edge_attributes(self, edge_attr_dict):
         """Queue bulk edge attribute updates
         
         Args:

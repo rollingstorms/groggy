@@ -78,15 +78,17 @@
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Batch Operations Examples</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#social-network-analysis">Social Network Analysis</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#building-and-analyzing-large-social-networks">Building and Analyzing Large Social Networks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#building-large-social-networks-efficiently">Building Large Social Networks Efficiently</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#efficient-filtering-and-analysis">Efficient Filtering and Analysis</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#combined-filtering-for-complex-queries">Combined Filtering for Complex Queries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#bulk-attribute-updates">Bulk Attribute Updates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#using-context-manager-for-maximum-performance">Using Context Manager for Maximum Performance</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#performance-comparison-example">Performance Comparison Example</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#supply-chain-network-analysis">Supply Chain Network Analysis</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#enterprise-scale-graph-processing">Enterprise-Scale Graph Processing</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#supply-chain-risk-analysis">Supply Chain Risk Analysis</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#bulk-attribute-updates">Bulk Attribute Updates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id1">Bulk Attribute Updates</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#knowledge-graph-processing">Knowledge Graph Processing</a><ul>
@@ -98,6 +100,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#benchmarking-batch-operations">Benchmarking Batch Operations</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="#best-practices-for-batch-operations">Best Practices for Batch Operations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#best-practices-summary">Best Practices Summary</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#performance-optimization-guidelines">Performance Optimization Guidelines</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#expected-performance-gains">Expected Performance Gains</a></li>
@@ -166,6 +169,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#supply-chain-network-analysis">Supply Chain Network Analysis</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#knowledge-graph-processing">Knowledge Graph Processing</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#performance-monitoring">Performance Monitoring</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#best-practices-for-batch-operations">Best Practices for Batch Operations</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#best-practices-summary">Best Practices Summary</a></li>
 </ul>
 </li>
@@ -192,6 +196,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../api/index.html#core-classes">Core Classes</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html">gli module</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../api/gli.html#gli.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/gli.html#gli.Subgraph"><code class="docutils literal notranslate"><span class="pre">Subgraph</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/gli.html#gli.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/gli.html#gli.get_available_backends"><code class="docutils literal notranslate"><span class="pre">get_available_backends()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/gli.html#gli.get_current_backend"><code class="docutils literal notranslate"><span class="pre">get_current_backend()</span></code></a></li>
@@ -204,8 +209,8 @@
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.BatchOperationContext"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#graph-class">Graph Class</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id24">Batch Operations</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#performance-features">Performance Features</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#api-examples">API Examples</a></li>
 </ul>
 </li>
 </ul>
@@ -488,15 +493,17 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Batch Operations Examples</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#social-network-analysis">Social Network Analysis</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#building-and-analyzing-large-social-networks">Building and Analyzing Large Social Networks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#building-large-social-networks-efficiently">Building Large Social Networks Efficiently</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#efficient-filtering-and-analysis">Efficient Filtering and Analysis</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#combined-filtering-for-complex-queries">Combined Filtering for Complex Queries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#bulk-attribute-updates">Bulk Attribute Updates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#using-context-manager-for-maximum-performance">Using Context Manager for Maximum Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#performance-comparison-example">Performance Comparison Example</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#supply-chain-network-analysis">Supply Chain Network Analysis</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#enterprise-scale-graph-processing">Enterprise-Scale Graph Processing</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#supply-chain-risk-analysis">Supply Chain Risk Analysis</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#bulk-attribute-updates">Bulk Attribute Updates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Bulk Attribute Updates</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#knowledge-graph-processing">Knowledge Graph Processing</a><ul>
@@ -508,6 +515,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#benchmarking-batch-operations">Benchmarking Batch Operations</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#best-practices-for-batch-operations">Best Practices for Batch Operations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#best-practices-summary">Best Practices Summary</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#performance-optimization-guidelines">Performance Optimization Guidelines</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#expected-performance-gains">Expected Performance Gains</a></li>
@@ -551,7 +559,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../api/gli.html#gli.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.__init__"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.add_edge"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.add_edges"><code class="docutils literal notranslate"><span class="pre">Graph.add_edges()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.add_node"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.add_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.add_nodes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.batch_operations"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.branches"><code class="docutils literal notranslate"><span class="pre">Graph.branches</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.edge_count"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
@@ -563,14 +573,21 @@
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.filter_nodes_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes_by_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.from_edge_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.from_node_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.get_all_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_all_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.get_edge"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.get_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.get_incoming_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_incoming_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.get_node"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.get_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.get_outgoing_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_outgoing_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.node_count"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.nodes"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.remove_edge"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.remove_edges"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.remove_node"><code class="docutils literal notranslate"><span class="pre">Graph.remove_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.remove_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.remove_nodes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.set_edges_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
@@ -578,6 +595,15 @@
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.set_nodes_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.states"><code class="docutils literal notranslate"><span class="pre">Graph.states</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.update_edge"><code class="docutils literal notranslate"><span class="pre">Graph.update_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.update_node"><code class="docutils literal notranslate"><span class="pre">Graph.update_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Graph.update_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.update_nodes()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/gli.html#gli.Subgraph"><code class="docutils literal notranslate"><span class="pre">Subgraph</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Subgraph.__init__"><code class="docutils literal notranslate"><span class="pre">Subgraph.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Subgraph.__repr__"><code class="docutils literal notranslate"><span class="pre">Subgraph.__repr__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/gli.html#gli.Subgraph.get_metadata"><code class="docutils literal notranslate"><span class="pre">Subgraph.get_metadata()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../api/gli.html#gli.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
@@ -617,14 +643,16 @@
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.BatchOperationContext.__init__"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.BatchOperationContext.add_edge"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_edge()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.BatchOperationContext.add_node"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_node()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.BatchOperationContext.set_edge_attributes_bulk"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes_bulk()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.BatchOperationContext.set_node_attributes_bulk"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes_bulk()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.BatchOperationContext.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.BatchOperationContext.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../api/graph.html#gli.graph.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.__init__"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.add_edge"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.add_edges"><code class="docutils literal notranslate"><span class="pre">Graph.add_edges()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.add_node"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.add_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.add_nodes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.batch_operations"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.branches"><code class="docutils literal notranslate"><span class="pre">Graph.branches</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.edge_count"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
@@ -636,14 +664,21 @@
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.filter_nodes_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes_by_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.from_edge_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.from_node_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.get_all_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_all_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.get_edge"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.get_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.get_incoming_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_incoming_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.get_node"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.get_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.get_outgoing_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_outgoing_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.node_count"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.nodes"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.remove_edge"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.remove_edges"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.remove_node"><code class="docutils literal notranslate"><span class="pre">Graph.remove_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.remove_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.remove_nodes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.set_edges_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
@@ -651,6 +686,9 @@
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.set_nodes_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.states"><code class="docutils literal notranslate"><span class="pre">Graph.states</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.update_edge"><code class="docutils literal notranslate"><span class="pre">Graph.update_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.update_node"><code class="docutils literal notranslate"><span class="pre">Graph.update_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#gli.graph.Graph.update_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.update_nodes()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../api/graph.html#graph-class">Graph Class</a><ul>
@@ -658,7 +696,9 @@
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.__init__"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id0"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.add_edge"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.add_edges"><code class="docutils literal notranslate"><span class="pre">Graph.add_edges()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.add_node"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.add_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.add_nodes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.batch_operations"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.branches"><code class="docutils literal notranslate"><span class="pre">Graph.branches</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.edge_count"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
@@ -670,14 +710,21 @@
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.filter_nodes_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes_by_attributes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.from_edge_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.from_node_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.get_all_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_all_neighbors()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.get_edge"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.get_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.get_incoming_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_incoming_neighbors()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.get_node"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.get_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_attributes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.get_outgoing_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_outgoing_neighbors()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.node_count"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.nodes"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.remove_edge"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.remove_edges"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edges()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.remove_node"><code class="docutils literal notranslate"><span class="pre">Graph.remove_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.remove_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.remove_nodes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attributes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.set_edges_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
@@ -685,11 +732,15 @@
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attributes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.set_nodes_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.states"><code class="docutils literal notranslate"><span class="pre">Graph.states</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.update_edge"><code class="docutils literal notranslate"><span class="pre">Graph.update_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.update_node"><code class="docutils literal notranslate"><span class="pre">Graph.update_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.core.Graph.update_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.update_nodes()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#creation-methods">Creation Methods</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id1"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id2"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id1"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id2"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id3"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#core-operations">Core Operations</a><ul>
@@ -697,42 +748,38 @@
 <li class="toctree-l4"><a class="reference internal" href="../api/graph.html#edge-operations">Edge Operations</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#attribute-operations">Attribute Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#single-attribute-operations">Single Attribute Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#multiple-attribute-operations">Multiple Attribute Operations</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#batch-operations">Batch Operations</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id13"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id14"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#new-simplified-batch-api">New Simplified Batch API</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#graph-queries">Graph Queries</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id15"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id16"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id17"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id18"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id19"><code class="docutils literal notranslate"><span class="pre">Graph.filter_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#graph-queries-and-navigation">Graph Queries and Navigation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#neighbor-queries">Neighbor Queries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#filtering-operations">Filtering Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#legacy-compatibility">Legacy Compatibility</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#iteration">Iteration</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id20"><code class="docutils literal notranslate"><span class="pre">Graph.nodes()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id21"><code class="docutils literal notranslate"><span class="pre">Graph.edges()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#factory-methods">Factory Methods</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id22"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id23"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="../api/graph.html#id24">Batch Operations</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#batch-filtering">Batch Filtering</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#batch-attribute-operations">Batch Attribute Operations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#subgraph-operations">Subgraph Operations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/graph.html#batch-operation-context">Batch Operation Context</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id25"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#gli.graph.batch.BatchOperationContext"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id36"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
 </ul>
 </li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../api/graph.html#performance-features">Performance Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/graph.html#api-examples">API Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#basic-operations">Basic Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#id37">Batch Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#update-operations">Update Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#id38">Filtering Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#context-manager-for-batch-operations">Context Manager for Batch Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#migration-from-old-api">Migration from Old API</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../api/data_structures.html">data_structures module</a><ul>
@@ -855,8 +902,8 @@
 <li class="toctree-l3"><a class="reference internal" href="../api/batch.html#gli.graph.batch.BatchOperationContext.__init__"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/batch.html#gli.graph.batch.BatchOperationContext.add_edge"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_edge()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../api/batch.html#gli.graph.batch.BatchOperationContext.add_node"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_node()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#gli.graph.batch.BatchOperationContext.set_edge_attributes_bulk"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes_bulk()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#gli.graph.batch.BatchOperationContext.set_node_attributes_bulk"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes_bulk()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#gli.graph.batch.BatchOperationContext.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#gli.graph.batch.BatchOperationContext.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../api/batch.html#batchoperationcontext">BatchOperationContext</a><ul>
@@ -867,8 +914,8 @@
 <li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id2"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__init__()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id3"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_edge()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id4"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_node()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id5"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes_bulk()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id6"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes_bulk()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id5"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id6"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../api/batch.html#batch-operations">Batch Operations</a><ul>
@@ -1086,7 +1133,7 @@
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>GLI’s batch operations provide significant performance improvements over individual operations:</p>
 <ul class="simple">
-<li><p><strong>30-40x faster</strong> filtering and querying</p></li>
+<li><p><strong>10-100x faster</strong> for bulk operations</p></li>
 <li><p><strong>Memory efficient</strong> bulk processing</p></li>
 <li><p><strong>Identical API</strong> across Python and Rust backends</p></li>
 <li><p><strong>Linear scaling</strong> to millions of nodes</p></li>
@@ -1094,8 +1141,8 @@
 </section>
 <section id="social-network-analysis">
 <h2>Social Network Analysis<a class="headerlink" href="#social-network-analysis" title="Link to this heading"></a></h2>
-<section id="building-and-analyzing-large-social-networks">
-<h3>Building and Analyzing Large Social Networks<a class="headerlink" href="#building-and-analyzing-large-social-networks" title="Link to this heading"></a></h3>
+<section id="building-large-social-networks-efficiently">
+<h3>Building Large Social Networks Efficiently<a class="headerlink" href="#building-large-social-networks-efficiently" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">gli</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">random</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
@@ -1110,82 +1157,161 @@
 <span class="c1"># Sample demographic data</span>
 <span class="n">cities</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;New York&#39;</span><span class="p">,</span> <span class="s1">&#39;Los Angeles&#39;</span><span class="p">,</span> <span class="s1">&#39;Chicago&#39;</span><span class="p">,</span> <span class="s1">&#39;Houston&#39;</span><span class="p">,</span> <span class="s1">&#39;Phoenix&#39;</span><span class="p">]</span>
 <span class="n">occupations</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Engineer&#39;</span><span class="p">,</span> <span class="s1">&#39;Teacher&#39;</span><span class="p">,</span> <span class="s1">&#39;Doctor&#39;</span><span class="p">,</span> <span class="s1">&#39;Artist&#39;</span><span class="p">,</span> <span class="s1">&#39;Manager&#39;</span><span class="p">]</span>
-<span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Alice&#39;</span><span class="p">,</span> <span class="s1">&#39;Bob&#39;</span><span class="p">,</span> <span class="s1">&#39;Charlie&#39;</span><span class="p">,</span> <span class="s1">&#39;Diana&#39;</span><span class="p">,</span> <span class="s1">&#39;Eve&#39;</span><span class="p">,</span> <span class="s1">&#39;Frank&#39;</span><span class="p">]</span>
+<span class="n">first_names</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Alice&#39;</span><span class="p">,</span> <span class="s1">&#39;Bob&#39;</span><span class="p">,</span> <span class="s1">&#39;Charlie&#39;</span><span class="p">,</span> <span class="s1">&#39;Diana&#39;</span><span class="p">,</span> <span class="s1">&#39;Eve&#39;</span><span class="p">,</span> <span class="s1">&#39;Frank&#39;</span><span class="p">]</span>
 
-<span class="c1"># Create 10,000 people efficiently</span>
-<span class="n">node_ids</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="c1"># Create 10,000 people efficiently using batch operations</span>
+<span class="n">people_data</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10000</span><span class="p">):</span>
-    <span class="n">person_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;person_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span>
-    <span class="n">g</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">person_id</span><span class="p">,</span>
-               <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">names</span><span class="p">)</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
-               <span class="n">age</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">18</span><span class="p">,</span> <span class="mi">65</span><span class="p">),</span>
-               <span class="n">city</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">cities</span><span class="p">),</span>
-               <span class="n">occupation</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">occupations</span><span class="p">),</span>
-               <span class="n">active</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">]))</span>
-    <span class="n">node_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">person_id</span><span class="p">)</span>
+    <span class="n">people_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+        <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;person_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">first_names</span><span class="p">)</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s1">&#39;age&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">18</span><span class="p">,</span> <span class="mi">65</span><span class="p">),</span>
+        <span class="s1">&#39;city&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">cities</span><span class="p">),</span>
+        <span class="s1">&#39;occupation&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">occupations</span><span class="p">),</span>
+        <span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">])</span>
+    <span class="p">})</span>
 
-<span class="c1"># Add friendships</span>
+<span class="c1"># Batch add all people at once - much faster than individual adds</span>
+<span class="n">g</span><span class="o">.</span><span class="n">add_nodes</span><span class="p">(</span><span class="n">people_data</span><span class="p">)</span>
+
+<span class="c1"># Create friendship connections</span>
+<span class="n">friendship_data</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">node_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">person</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">person</span> <span class="ow">in</span> <span class="n">people_data</span><span class="p">]</span>
+
 <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5000</span><span class="p">):</span>
     <span class="n">person1</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">node_ids</span><span class="p">)</span>
     <span class="n">person2</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">node_ids</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">person1</span> <span class="o">!=</span> <span class="n">person2</span><span class="p">:</span>
-        <span class="n">g</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">person1</span><span class="p">,</span> <span class="n">person2</span><span class="p">,</span>
-                   <span class="n">relationship</span><span class="o">=</span><span class="s1">&#39;friend&#39;</span><span class="p">,</span>
-                   <span class="n">strength</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
+        <span class="n">friendship_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="n">person1</span><span class="p">,</span>
+            <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="n">person2</span><span class="p">,</span>
+            <span class="s1">&#39;relationship&#39;</span><span class="p">:</span> <span class="s1">&#39;friend&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;strength&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+        <span class="p">})</span>
+
+<span class="c1"># Batch add all friendships at once</span>
+<span class="n">g</span><span class="o">.</span><span class="n">add_edges</span><span class="p">(</span><span class="n">friendship_data</span><span class="p">)</span>
 
 <span class="n">creation_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created </span><span class="si">{</span><span class="n">g</span><span class="o">.</span><span class="n">node_count</span><span class="p">()</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> people in </span><span class="si">{</span><span class="n">creation_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created </span><span class="si">{</span><span class="n">g</span><span class="o">.</span><span class="n">node_count</span><span class="p">()</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> people and </span><span class="si">{</span><span class="n">g</span><span class="o">.</span><span class="n">edge_count</span><span class="p">()</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> friendships in </span><span class="si">{</span><span class="n">creation_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
 <section id="efficient-filtering-and-analysis">
 <h3>Efficient Filtering and Analysis<a class="headerlink" href="#efficient-filtering-and-analysis" title="Link to this heading"></a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Batch filtering - much faster than individual queries</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Efficient filtering using the new API</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">nPerforming batch analysis...&quot;</span><span class="p">)</span>
 
-<span class="c1"># Find people by city</span>
-<span class="n">ny_people</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_filter_nodes</span><span class="p">(</span><span class="n">city</span><span class="o">=</span><span class="s1">&#39;New York&#39;</span><span class="p">)</span>
-<span class="n">la_people</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_filter_nodes</span><span class="p">(</span><span class="n">city</span><span class="o">=</span><span class="s1">&#39;Los Angeles&#39;</span><span class="p">)</span>
+<span class="c1"># Find people by city using dictionary filters</span>
+<span class="n">ny_people</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">({</span><span class="s1">&#39;city&#39;</span><span class="p">:</span> <span class="s1">&#39;New York&#39;</span><span class="p">})</span>
+<span class="n">la_people</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">({</span><span class="s1">&#39;city&#39;</span><span class="p">:</span> <span class="s1">&#39;Los Angeles&#39;</span><span class="p">})</span>
 
 <span class="c1"># Find people by occupation</span>
-<span class="n">engineers</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_filter_nodes</span><span class="p">(</span><span class="n">occupation</span><span class="o">=</span><span class="s1">&#39;Engineer&#39;</span><span class="p">)</span>
-<span class="n">teachers</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_filter_nodes</span><span class="p">(</span><span class="n">occupation</span><span class="o">=</span><span class="s1">&#39;Teacher&#39;</span><span class="p">)</span>
+<span class="n">engineers</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">({</span><span class="s1">&#39;occupation&#39;</span><span class="p">:</span> <span class="s1">&#39;Engineer&#39;</span><span class="p">})</span>
+<span class="n">teachers</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">({</span><span class="s1">&#39;occupation&#39;</span><span class="p">:</span> <span class="s1">&#39;Teacher&#39;</span><span class="p">})</span>
 
 <span class="c1"># Find active users</span>
-<span class="n">active_users</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_filter_nodes</span><span class="p">(</span><span class="n">active</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">active_users</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">({</span><span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+
+<span class="c1"># Complex lambda-based filtering</span>
+<span class="n">young_professionals</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">(</span>
+    <span class="k">lambda</span> <span class="n">node_id</span><span class="p">,</span> <span class="n">attrs</span><span class="p">:</span> <span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;age&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">30</span> <span class="ow">and</span> <span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;occupation&#39;</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;Engineer&#39;</span><span class="p">,</span> <span class="s1">&#39;Doctor&#39;</span><span class="p">]</span>
+<span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;New York residents: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ny_people</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Los Angeles residents: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">la_people</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Engineers: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">engineers</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Teachers: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">teachers</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Active users: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">active_users</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Young professionals: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">young_professionals</span><span class="p">)</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
-<section id="combined-filtering-for-complex-queries">
-<h3>Combined Filtering for Complex Queries<a class="headerlink" href="#combined-filtering-for-complex-queries" title="Link to this heading"></a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Complex analysis: young professionals in major cities</span>
-<span class="n">young_professionals</span> <span class="o">=</span> <span class="p">[]</span>
+<section id="bulk-attribute-updates">
+<h3>Bulk Attribute Updates<a class="headerlink" href="#bulk-attribute-updates" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Bulk updates for performance - promote some engineers</span>
+<span class="n">promotion_updates</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">senior_engineers</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">(</span>
+    <span class="k">lambda</span> <span class="n">node_id</span><span class="p">,</span> <span class="n">attrs</span><span class="p">:</span> <span class="p">(</span><span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;occupation&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;Engineer&#39;</span> <span class="ow">and</span>
+                           <span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;age&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">35</span><span class="p">)</span>
+<span class="p">)</span>
 
-<span class="c1"># Get all engineers first</span>
-<span class="n">all_engineers</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_filter_nodes</span><span class="p">(</span><span class="n">occupation</span><span class="o">=</span><span class="s1">&#39;Engineer&#39;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">engineer_id</span> <span class="ow">in</span> <span class="n">senior_engineers</span><span class="p">[:</span><span class="mi">50</span><span class="p">]:</span>  <span class="c1"># Promote first 50</span>
+    <span class="n">promotion_updates</span><span class="p">[</span><span class="n">engineer_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;title&#39;</span><span class="p">:</span> <span class="s1">&#39;Senior Engineer&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;salary&#39;</span><span class="p">:</span> <span class="mi">120000</span><span class="p">,</span>
+        <span class="s1">&#39;promotion_date&#39;</span><span class="p">:</span> <span class="s1">&#39;2025-01-01&#39;</span>
+    <span class="p">}</span>
 
-<span class="c1"># Get their attributes efficiently</span>
-<span class="n">engineer_attrs</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_get_node_attributes</span><span class="p">(</span><span class="n">all_engineers</span><span class="p">)</span>
+<span class="c1"># Apply all updates efficiently</span>
+<span class="n">g</span><span class="o">.</span><span class="n">update_nodes</span><span class="p">(</span><span class="n">promotion_updates</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Promoted </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">promotion_updates</span><span class="p">)</span><span class="si">}</span><span class="s2"> engineers to senior level&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="using-context-manager-for-maximum-performance">
+<h3>Using Context Manager for Maximum Performance<a class="headerlink" href="#using-context-manager-for-maximum-performance" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use context manager for optimal batch performance</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">nUsing batch context for maximum efficiency...&quot;</span><span class="p">)</span>
 
-<span class="c1"># Filter by age and city</span>
-<span class="n">target_cities</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;New York&#39;</span><span class="p">,</span> <span class="s1">&#39;Los Angeles&#39;</span><span class="p">,</span> <span class="s1">&#39;Chicago&#39;</span><span class="p">}</span>
-<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">attrs</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">engineer_attrs</span><span class="p">):</span>
-    <span class="k">if</span> <span class="p">(</span><span class="mi">25</span> <span class="o">&lt;=</span> <span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;age&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mi">35</span> <span class="ow">and</span>
-        <span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;city&#39;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">target_cities</span><span class="p">):</span>
-        <span class="n">young_professionals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">all_engineers</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+<span class="k">with</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_operations</span><span class="p">()</span> <span class="k">as</span> <span class="n">batch</span><span class="p">:</span>
+    <span class="c1"># Add many nodes within context</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1000</span><span class="p">):</span>
+        <span class="n">batch</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;batch_person_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                      <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;BatchPerson_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                      <span class="n">category</span><span class="o">=</span><span class="s2">&quot;batch_added&quot;</span><span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Young engineers in major cities: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">young_professionals</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="c1"># Add edges within context</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">500</span><span class="p">):</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;batch_person_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;batch_person_</span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">batch</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">connection_type</span><span class="o">=</span><span class="s2">&quot;sequential&quot;</span><span class="p">)</span>
 
-<span class="c1"># Show examples</span>
-<span class="n">sample_attrs</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_get_node_attributes</span><span class="p">(</span><span class="n">young_professionals</span><span class="p">[:</span><span class="mi">5</span><span class="p">])</span>
-<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">attrs</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">sample_attrs</span><span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: age </span><span class="si">{</span><span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;age&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;city&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="c1"># Bulk attribute updates within context</span>
+    <span class="n">updates</span> <span class="o">=</span> <span class="p">{</span><span class="sa">f</span><span class="s2">&quot;batch_person_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;processed&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">)}</span>
+    <span class="n">batch</span><span class="o">.</span><span class="n">set_node_attributes</span><span class="p">(</span><span class="n">updates</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final graph size: </span><span class="si">{</span><span class="n">g</span><span class="o">.</span><span class="n">node_count</span><span class="p">()</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> nodes, </span><span class="si">{</span><span class="n">g</span><span class="o">.</span><span class="n">edge_count</span><span class="p">()</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2"> edges&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="performance-comparison-example">
+<h3>Performance Comparison Example<a class="headerlink" href="#performance-comparison-example" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+
+<span class="c1"># Compare individual vs batch operations</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">time_individual_operations</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">num_operations</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_operations</span><span class="p">):</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;individual_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">graph</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;individual_</span><span class="si">{</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;individual_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">time_batch_operations</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">num_operations</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+    <span class="c1"># Prepare data</span>
+    <span class="n">nodes_data</span> <span class="o">=</span> <span class="p">[{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;batch_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">i</span><span class="p">}</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_operations</span><span class="p">)]</span>
+    <span class="n">edges_data</span> <span class="o">=</span> <span class="p">[{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;batch_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;batch_</span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
+                  <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_operations</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
+
+    <span class="c1"># Batch operations</span>
+    <span class="n">graph</span><span class="o">.</span><span class="n">add_nodes</span><span class="p">(</span><span class="n">nodes_data</span><span class="p">)</span>
+    <span class="n">graph</span><span class="o">.</span><span class="n">add_edges</span><span class="p">(</span><span class="n">edges_data</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+
+<span class="c1"># Create separate graphs for fair comparison</span>
+<span class="n">g1</span> <span class="o">=</span> <span class="n">gli</span><span class="o">.</span><span class="n">Graph</span><span class="p">()</span>
+<span class="n">g2</span> <span class="o">=</span> <span class="n">gli</span><span class="o">.</span><span class="n">Graph</span><span class="p">()</span>
+
+<span class="n">individual_time</span> <span class="o">=</span> <span class="n">time_individual_operations</span><span class="p">(</span><span class="n">g1</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+<span class="n">batch_time</span> <span class="o">=</span> <span class="n">time_batch_operations</span><span class="p">(</span><span class="n">g2</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Individual operations: </span><span class="si">{</span><span class="n">individual_time</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Batch operations: </span><span class="si">{</span><span class="n">batch_time</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Speedup: </span><span class="si">{</span><span class="n">individual_time</span><span class="o">/</span><span class="n">batch_time</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">x&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -1194,7 +1320,7 @@
 <h2>Supply Chain Network Analysis<a class="headerlink" href="#supply-chain-network-analysis" title="Link to this heading"></a></h2>
 <section id="enterprise-scale-graph-processing">
 <h3>Enterprise-Scale Graph Processing<a class="headerlink" href="#enterprise-scale-graph-processing" title="Link to this heading"></a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create supply chain network</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create supply chain network using new batch API</span>
 <span class="n">supply_chain</span> <span class="o">=</span> <span class="n">gli</span><span class="o">.</span><span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
 
 <span class="c1"># Company types and attributes</span>
@@ -1202,74 +1328,86 @@
 <span class="n">industries</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Electronics&#39;</span><span class="p">,</span> <span class="s1">&#39;Automotive&#39;</span><span class="p">,</span> <span class="s1">&#39;Textiles&#39;</span><span class="p">,</span> <span class="s1">&#39;Food&#39;</span><span class="p">,</span> <span class="s1">&#39;Pharma&#39;</span><span class="p">]</span>
 <span class="n">regions</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;North America&#39;</span><span class="p">,</span> <span class="s1">&#39;Europe&#39;</span><span class="p">,</span> <span class="s1">&#39;Asia&#39;</span><span class="p">,</span> <span class="s1">&#39;South America&#39;</span><span class="p">]</span>
 
-<span class="c1"># Create companies</span>
-<span class="n">companies</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="c1"># Create companies using batch operations</span>
+<span class="n">companies_data</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5000</span><span class="p">):</span>
-    <span class="n">company_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;company_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span>
-    <span class="n">supply_chain</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">company_id</span><span class="p">,</span>
-                          <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Company_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
-                          <span class="nb">type</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">company_types</span><span class="p">),</span>
-                          <span class="n">industry</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">industries</span><span class="p">),</span>
-                          <span class="n">region</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">regions</span><span class="p">),</span>
-                          <span class="n">size</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="s1">&#39;Small&#39;</span><span class="p">,</span> <span class="s1">&#39;Medium&#39;</span><span class="p">,</span> <span class="s1">&#39;Large&#39;</span><span class="p">]),</span>
-                          <span class="n">sustainability_score</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">),</span>
-                          <span class="n">financial_rating</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;D&#39;</span><span class="p">]))</span>
-    <span class="n">companies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">company_id</span><span class="p">)</span>
+    <span class="n">companies_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+        <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;company_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Company_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">company_types</span><span class="p">),</span>
+        <span class="s1">&#39;industry&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">industries</span><span class="p">),</span>
+        <span class="s1">&#39;region&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">regions</span><span class="p">),</span>
+        <span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="s1">&#39;Small&#39;</span><span class="p">,</span> <span class="s1">&#39;Medium&#39;</span><span class="p">,</span> <span class="s1">&#39;Large&#39;</span><span class="p">]),</span>
+        <span class="s1">&#39;sustainability_score&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">),</span>
+        <span class="s1">&#39;financial_rating&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="s1">&#39;A&#39;</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">,</span> <span class="s1">&#39;C&#39;</span><span class="p">,</span> <span class="s1">&#39;D&#39;</span><span class="p">])</span>
+    <span class="p">})</span>
 
-<span class="c1"># Create supply relationships</span>
+<span class="n">supply_chain</span><span class="o">.</span><span class="n">add_nodes</span><span class="p">(</span><span class="n">companies_data</span><span class="p">)</span>
+
+<span class="c1"># Create supply relationships using batch operations</span>
+<span class="n">relationships_data</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">company_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">companies_data</span><span class="p">]</span>
+
 <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">8000</span><span class="p">):</span>
-    <span class="n">supplier</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">companies</span><span class="p">)</span>
-    <span class="n">customer</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">companies</span><span class="p">)</span>
+    <span class="n">supplier</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">company_ids</span><span class="p">)</span>
+    <span class="n">customer</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">company_ids</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">supplier</span> <span class="o">!=</span> <span class="n">customer</span><span class="p">:</span>
-        <span class="n">supply_chain</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">supplier</span><span class="p">,</span> <span class="n">customer</span><span class="p">,</span>
-                             <span class="n">relationship</span><span class="o">=</span><span class="s1">&#39;supplies&#39;</span><span class="p">,</span>
-                             <span class="n">volume</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">100000</span><span class="p">),</span>
-                             <span class="n">contract_value</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">10000</span><span class="p">,</span> <span class="mi">5000000</span><span class="p">),</span>
-                             <span class="n">risk_level</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="s1">&#39;Low&#39;</span><span class="p">,</span> <span class="s1">&#39;Medium&#39;</span><span class="p">,</span> <span class="s1">&#39;High&#39;</span><span class="p">]))</span>
+        <span class="n">relationships_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="n">supplier</span><span class="p">,</span>
+            <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="n">customer</span><span class="p">,</span>
+            <span class="s1">&#39;relationship&#39;</span><span class="p">:</span> <span class="s1">&#39;supplies&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;volume&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">100000</span><span class="p">),</span>
+            <span class="s1">&#39;contract_value&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">10000</span><span class="p">,</span> <span class="mi">5000000</span><span class="p">),</span>
+            <span class="s1">&#39;risk_level&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="s1">&#39;Low&#39;</span><span class="p">,</span> <span class="s1">&#39;Medium&#39;</span><span class="p">,</span> <span class="s1">&#39;High&#39;</span><span class="p">])</span>
+        <span class="p">})</span>
+
+<span class="n">supply_chain</span><span class="o">.</span><span class="n">add_edges</span><span class="p">(</span><span class="n">relationships_data</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
 <section id="supply-chain-risk-analysis">
 <h3>Supply Chain Risk Analysis<a class="headerlink" href="#supply-chain-risk-analysis" title="Link to this heading"></a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Risk analysis using batch operations</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Risk analysis using the new filtering API</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">nSupply Chain Risk Analysis:&quot;</span><span class="p">)</span>
 
-<span class="c1"># Find high-risk suppliers</span>
-<span class="n">high_risk_edges</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">batch_filter_edges</span><span class="p">(</span><span class="n">risk_level</span><span class="o">=</span><span class="s1">&#39;High&#39;</span><span class="p">)</span>
+<span class="c1"># Find high-risk supply relationships</span>
+<span class="n">high_risk_edges</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">filter_edges</span><span class="p">({</span><span class="s1">&#39;risk_level&#39;</span><span class="p">:</span> <span class="s1">&#39;High&#39;</span><span class="p">})</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;High-risk supply relationships: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">high_risk_edges</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Find companies by sustainability score</span>
-<span class="n">sustainable_companies</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="n">all_companies</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">supply_chain</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
-<span class="n">company_attrs</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">batch_get_node_attributes</span><span class="p">(</span><span class="n">all_companies</span><span class="p">)</span>
-
-<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">attrs</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">company_attrs</span><span class="p">):</span>
-    <span class="k">if</span> <span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;sustainability_score&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mf">8.0</span><span class="p">:</span>
-        <span class="n">sustainable_companies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">all_companies</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
-
+<span class="n">sustainable_companies</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">(</span>
+    <span class="k">lambda</span> <span class="n">node_id</span><span class="p">,</span> <span class="n">attrs</span><span class="p">:</span> <span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;sustainability_score&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mf">8.0</span>
+<span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Highly sustainable companies: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">sustainable_companies</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Regional analysis</span>
 <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">:</span>
-    <span class="n">regional_companies</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">batch_filter_nodes</span><span class="p">(</span><span class="n">region</span><span class="o">=</span><span class="n">region</span><span class="p">)</span>
-    <span class="n">regional_attrs</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">batch_get_node_attributes</span><span class="p">(</span><span class="n">regional_companies</span><span class="p">)</span>
+    <span class="n">regional_companies</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">({</span><span class="s1">&#39;region&#39;</span><span class="p">:</span> <span class="n">region</span><span class="p">})</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">region</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">regional_companies</span><span class="p">)</span><span class="si">}</span><span class="s2"> companies&quot;</span><span class="p">)</span>
 
-    <span class="n">avg_sustainability</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="s1">&#39;sustainability_score&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">regional_attrs</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">regional_attrs</span><span class="p">)</span>
-    <span class="n">large_companies</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">regional_attrs</span> <span class="k">if</span> <span class="n">a</span><span class="p">[</span><span class="s1">&#39;size&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;Large&#39;</span><span class="p">)</span>
+    <span class="c1"># Calculate regional statistics</span>
+    <span class="n">region_scores</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">large_count</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">company_id</span> <span class="ow">in</span> <span class="n">regional_companies</span><span class="p">:</span>
+        <span class="n">company</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="n">company_id</span><span class="p">)</span>
+        <span class="n">region_scores</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">company</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;sustainability_score&#39;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">company</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;size&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;Large&#39;</span><span class="p">:</span>
+            <span class="n">large_count</span> <span class="o">+=</span> <span class="mi">1</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">region</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">regional_companies</span><span class="p">)</span><span class="si">}</span><span class="s2"> companies, &quot;</span>
-          <span class="sa">f</span><span class="s2">&quot;avg sustainability: </span><span class="si">{</span><span class="n">avg_sustainability</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, &quot;</span>
-          <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">large_companies</span><span class="si">}</span><span class="s2"> large companies&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">region_scores</span><span class="p">:</span>
+        <span class="n">avg_sustainability</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">region_scores</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">region_scores</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Average sustainability: </span><span class="si">{</span><span class="n">avg_sustainability</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Large companies: </span><span class="si">{</span><span class="n">large_count</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
-<section id="bulk-attribute-updates">
-<h3>Bulk Attribute Updates<a class="headerlink" href="#bulk-attribute-updates" title="Link to this heading"></a></h3>
+<section id="id1">
+<h3>Bulk Attribute Updates<a class="headerlink" href="#id1" title="Link to this heading"></a></h3>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Quarterly updates - efficient bulk operations</span>
 <span class="n">quarterly_updates</span> <span class="o">=</span> <span class="p">{}</span>
 
 <span class="c1"># Update all companies in electronics industry</span>
-<span class="n">electronics_companies</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">batch_filter_nodes</span><span class="p">(</span><span class="n">industry</span><span class="o">=</span><span class="s1">&#39;Electronics&#39;</span><span class="p">)</span>
+<span class="n">electronics_companies</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">({</span><span class="s1">&#39;industry&#39;</span><span class="p">:</span> <span class="s1">&#39;Electronics&#39;</span><span class="p">})</span>
 <span class="k">for</span> <span class="n">company_id</span> <span class="ow">in</span> <span class="n">electronics_companies</span><span class="p">:</span>
     <span class="n">quarterly_updates</span><span class="p">[</span><span class="n">company_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s1">&#39;last_audit&#39;</span><span class="p">:</span> <span class="s1">&#39;2024-Q1&#39;</span><span class="p">,</span>
@@ -1277,20 +1415,21 @@
     <span class="p">}</span>
 
 <span class="c1"># Apply all updates at once</span>
-<span class="n">supply_chain</span><span class="o">.</span><span class="n">batch_set_node_attributes</span><span class="p">(</span><span class="n">quarterly_updates</span><span class="p">)</span>
+<span class="n">supply_chain</span><span class="o">.</span><span class="n">update_nodes</span><span class="p">(</span><span class="n">quarterly_updates</span><span class="p">)</span>
 
-<span class="c1"># Functional updates based on current attributes</span>
+<span class="c1"># Update large companies with growth metrics</span>
 <span class="n">large_company_updates</span> <span class="o">=</span> <span class="p">{}</span>
-<span class="n">large_companies</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">batch_filter_nodes</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="s1">&#39;Large&#39;</span><span class="p">)</span>
+<span class="n">large_companies</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">({</span><span class="s1">&#39;size&#39;</span><span class="p">:</span> <span class="s1">&#39;Large&#39;</span><span class="p">})</span>
 
-<span class="k">for</span> <span class="n">company_id</span> <span class="ow">in</span> <span class="n">large_companies</span><span class="p">:</span>
-    <span class="n">large_company_updates</span><span class="p">[</span><span class="n">company_id</span><span class="p">]</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">attrs</span><span class="p">:</span> <span class="p">{</span>
-        <span class="o">**</span><span class="n">attrs</span><span class="p">,</span>
-        <span class="s1">&#39;market_cap&#39;</span><span class="p">:</span> <span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;market_cap&#39;</span><span class="p">,</span> <span class="mi">1000000</span><span class="p">)</span> <span class="o">*</span> <span class="mf">1.1</span><span class="p">,</span>
-        <span class="s1">&#39;employees&#39;</span><span class="p">:</span> <span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;employees&#39;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span> <span class="o">+</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">company_id</span> <span class="ow">in</span> <span class="n">large_companies</span><span class="p">[:</span><span class="mi">100</span><span class="p">]:</span>  <span class="c1"># Update first 100</span>
+    <span class="n">current_node</span> <span class="o">=</span> <span class="n">supply_chain</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="n">company_id</span><span class="p">)</span>
+    <span class="n">large_company_updates</span><span class="p">[</span><span class="n">company_id</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;market_cap&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1000000</span><span class="p">,</span> <span class="mi">10000000</span><span class="p">),</span>
+        <span class="s1">&#39;employees&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">50000</span><span class="p">),</span>
+        <span class="s1">&#39;updated&#39;</span><span class="p">:</span> <span class="kc">True</span>
     <span class="p">}</span>
 
-<span class="n">supply_chain</span><span class="o">.</span><span class="n">batch_update_node_attributes</span><span class="p">(</span><span class="n">large_company_updates</span><span class="p">)</span>
+<span class="n">supply_chain</span><span class="o">.</span><span class="n">update_nodes</span><span class="p">(</span><span class="n">large_company_updates</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -1299,7 +1438,7 @@
 <h2>Knowledge Graph Processing<a class="headerlink" href="#knowledge-graph-processing" title="Link to this heading"></a></h2>
 <section id="academic-collaboration-network">
 <h3>Academic Collaboration Network<a class="headerlink" href="#academic-collaboration-network" title="Link to this heading"></a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create academic collaboration network</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create academic collaboration network with batch operations</span>
 <span class="n">academic_graph</span> <span class="o">=</span> <span class="n">gli</span><span class="o">.</span><span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
 
 <span class="c1"># Academic data</span>
@@ -1307,64 +1446,76 @@
 <span class="n">institutions</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;MIT&#39;</span><span class="p">,</span> <span class="s1">&#39;Stanford&#39;</span><span class="p">,</span> <span class="s1">&#39;Harvard&#39;</span><span class="p">,</span> <span class="s1">&#39;Caltech&#39;</span><span class="p">,</span> <span class="s1">&#39;Berkeley&#39;</span><span class="p">]</span>
 <span class="n">positions</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Professor&#39;</span><span class="p">,</span> <span class="s1">&#39;Associate Professor&#39;</span><span class="p">,</span> <span class="s1">&#39;Assistant Professor&#39;</span><span class="p">,</span> <span class="s1">&#39;Postdoc&#39;</span><span class="p">]</span>
 
-<span class="c1"># Create researchers</span>
-<span class="n">researchers</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="c1"># Create researchers using batch operations</span>
+<span class="n">researchers_data</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3000</span><span class="p">):</span>
-    <span class="n">researcher_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;researcher_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span>
-    <span class="n">academic_graph</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">researcher_id</span><span class="p">,</span>
-                            <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Dr. </span><span class="si">{</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="s1">&#39;Smith&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;Johnson&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;Williams&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;Brown&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
-                            <span class="n">field</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">fields</span><span class="p">),</span>
-                            <span class="n">institution</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">institutions</span><span class="p">),</span>
-                            <span class="n">position</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">positions</span><span class="p">),</span>
-                            <span class="n">h_index</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">100</span><span class="p">),</span>
-                            <span class="n">publications</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">200</span><span class="p">),</span>
-                            <span class="n">years_active</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">30</span><span class="p">))</span>
-    <span class="n">researchers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">researcher_id</span><span class="p">)</span>
+    <span class="n">researchers_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+        <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;researcher_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Dr. </span><span class="si">{</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="s1">&#39;Smith&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;Johnson&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;Williams&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;Brown&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s1">&#39;field&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">fields</span><span class="p">),</span>
+        <span class="s1">&#39;institution&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">institutions</span><span class="p">),</span>
+        <span class="s1">&#39;position&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">positions</span><span class="p">),</span>
+        <span class="s1">&#39;h_index&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">100</span><span class="p">),</span>
+        <span class="s1">&#39;publications&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">200</span><span class="p">),</span>
+        <span class="s1">&#39;years_active&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span>
+    <span class="p">})</span>
 
-<span class="c1"># Create collaborations</span>
+<span class="n">academic_graph</span><span class="o">.</span><span class="n">add_nodes</span><span class="p">(</span><span class="n">researchers_data</span><span class="p">)</span>
+
+<span class="c1"># Create collaborations using batch operations</span>
+<span class="n">collaborations_data</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">researcher_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">researchers_data</span><span class="p">]</span>
+
 <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5000</span><span class="p">):</span>
-    <span class="n">researcher1</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">researchers</span><span class="p">)</span>
-    <span class="n">researcher2</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">researchers</span><span class="p">)</span>
+    <span class="n">researcher1</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">researcher_ids</span><span class="p">)</span>
+    <span class="n">researcher2</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">researcher_ids</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">researcher1</span> <span class="o">!=</span> <span class="n">researcher2</span><span class="p">:</span>
-        <span class="n">academic_graph</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">researcher1</span><span class="p">,</span> <span class="n">researcher2</span><span class="p">,</span>
-                                <span class="n">relationship</span><span class="o">=</span><span class="s1">&#39;collaboration&#39;</span><span class="p">,</span>
-                                <span class="n">papers_coauthored</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>
-                                <span class="n">collaboration_strength</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
-                                <span class="n">active</span><span class="o">=</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">]))</span>
+        <span class="n">collaborations_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="n">researcher1</span><span class="p">,</span>
+            <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="n">researcher2</span><span class="p">,</span>
+            <span class="s1">&#39;relationship&#39;</span><span class="p">:</span> <span class="s1">&#39;collaboration&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;papers_coauthored&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">20</span><span class="p">),</span>
+            <span class="s1">&#39;collaboration_strength&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">),</span>
+            <span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">])</span>
+        <span class="p">})</span>
+
+<span class="n">academic_graph</span><span class="o">.</span><span class="n">add_edges</span><span class="p">(</span><span class="n">collaborations_data</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
 <section id="research-impact-analysis">
 <h3>Research Impact Analysis<a class="headerlink" href="#research-impact-analysis" title="Link to this heading"></a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Analyze research network using batch operations</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Analyze research network using new filtering API</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">nAcademic Network Analysis:&quot;</span><span class="p">)</span>
 
 <span class="c1"># Find top researchers by field</span>
 <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
-    <span class="n">field_researchers</span> <span class="o">=</span> <span class="n">academic_graph</span><span class="o">.</span><span class="n">batch_filter_nodes</span><span class="p">(</span><span class="n">field</span><span class="o">=</span><span class="n">field</span><span class="p">)</span>
-    <span class="n">field_attrs</span> <span class="o">=</span> <span class="n">academic_graph</span><span class="o">.</span><span class="n">batch_get_node_attributes</span><span class="p">(</span><span class="n">field_researchers</span><span class="p">)</span>
+    <span class="n">field_researchers</span> <span class="o">=</span> <span class="n">academic_graph</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">({</span><span class="s1">&#39;field&#39;</span><span class="p">:</span> <span class="n">field</span><span class="p">})</span>
+
+    <span class="c1"># Get top researchers by h-index</span>
+    <span class="n">top_researchers</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">researcher_id</span> <span class="ow">in</span> <span class="n">field_researchers</span><span class="p">:</span>
+        <span class="n">researcher</span> <span class="o">=</span> <span class="n">academic_graph</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="n">researcher_id</span><span class="p">)</span>
+        <span class="n">top_researchers</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">researcher_id</span><span class="p">,</span> <span class="n">researcher</span><span class="o">.</span><span class="n">attributes</span><span class="p">))</span>
 
     <span class="c1"># Sort by h-index</span>
-    <span class="n">top_researchers</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span>
-        <span class="nb">zip</span><span class="p">(</span><span class="n">field_researchers</span><span class="p">,</span> <span class="n">field_attrs</span><span class="p">),</span>
-        <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;h_index&#39;</span><span class="p">],</span>
-        <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span>
-    <span class="p">)[:</span><span class="mi">5</span><span class="p">]</span>
+    <span class="n">top_researchers</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="s1">&#39;h_index&#39;</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">nTop </span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s2"> researchers:&quot;</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">researcher_id</span><span class="p">,</span> <span class="n">attrs</span> <span class="ow">in</span> <span class="n">top_researchers</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">researcher_id</span><span class="p">,</span> <span class="n">attrs</span> <span class="ow">in</span> <span class="n">top_researchers</span><span class="p">[:</span><span class="mi">5</span><span class="p">]:</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: h-index </span><span class="si">{</span><span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;h_index&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">, &quot;</span>
               <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">attrs</span><span class="p">[</span><span class="s1">&#39;publications&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> publications&quot;</span><span class="p">)</span>
 
 <span class="c1"># Cross-institutional collaborations</span>
-<span class="n">active_collabs</span> <span class="o">=</span> <span class="n">academic_graph</span><span class="o">.</span><span class="n">batch_filter_edges</span><span class="p">(</span><span class="n">active</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">active_collabs</span> <span class="o">=</span> <span class="n">academic_graph</span><span class="o">.</span><span class="n">filter_edges</span><span class="p">({</span><span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
 <span class="n">cross_institutional</span> <span class="o">=</span> <span class="p">[]</span>
 
-<span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">active_collabs</span><span class="p">:</span>
-    <span class="n">source_attrs</span> <span class="o">=</span> <span class="n">academic_graph</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
-    <span class="n">target_attrs</span> <span class="o">=</span> <span class="n">academic_graph</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">edge_id</span> <span class="ow">in</span> <span class="n">active_collabs</span><span class="p">:</span>
+    <span class="n">edge</span> <span class="o">=</span> <span class="n">academic_graph</span><span class="o">.</span><span class="n">edges</span><span class="p">[</span><span class="n">edge_id</span><span class="p">]</span>
+    <span class="n">source_attrs</span> <span class="o">=</span> <span class="n">academic_graph</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="p">)</span><span class="o">.</span><span class="n">attributes</span>
+    <span class="n">target_attrs</span> <span class="o">=</span> <span class="n">academic_graph</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="p">)</span><span class="o">.</span><span class="n">attributes</span>
     <span class="k">if</span> <span class="n">source_attrs</span><span class="p">[</span><span class="s1">&#39;institution&#39;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">target_attrs</span><span class="p">[</span><span class="s1">&#39;institution&#39;</span><span class="p">]:</span>
-        <span class="n">cross_institutional</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">source</span><span class="p">,</span> <span class="n">target</span><span class="p">))</span>
+        <span class="n">cross_institutional</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="p">,</span> <span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="p">))</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">nCross-institutional collaborations: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">cross_institutional</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
@@ -1378,43 +1529,128 @@
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">benchmark_operations</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">description</span><span class="p">):</span>
-    \<span class="s2">&quot;</span><span class="se">\&quot;\&quot;</span><span class="s2">Benchmark various batch operations</span><span class="se">\&quot;\&quot;\&quot;</span>
+    \<span class="s2">&quot;</span><span class="se">\&quot;\&quot;</span><span class="s2">Benchmark various operations</span><span class="se">\&quot;\&quot;\&quot;</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">n</span><span class="si">{</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">description</span><span class="p">))</span>
 
     <span class="c1"># Benchmark filtering</span>
     <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-    <span class="n">filtered_nodes</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">batch_filter_nodes</span><span class="p">(</span><span class="n">active</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">filtered_nodes</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">filter_nodes</span><span class="p">({</span><span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
     <span class="n">filter_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Batch filter: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">filtered_nodes</span><span class="p">)</span><span class="si">}</span><span class="s2"> nodes in </span><span class="si">{</span><span class="n">filter_time</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Filter operation: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">filtered_nodes</span><span class="p">)</span><span class="si">}</span><span class="s2"> nodes in </span><span class="si">{</span><span class="n">filter_time</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
 
-    <span class="c1"># Benchmark attribute retrieval</span>
+    <span class="c1"># Benchmark bulk updates</span>
     <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-    <span class="n">attrs</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">batch_get_node_attributes</span><span class="p">(</span><span class="n">filtered_nodes</span><span class="p">[:</span><span class="mi">1000</span><span class="p">])</span>
-    <span class="n">attr_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Batch attributes: 1000 nodes in </span><span class="si">{</span><span class="n">attr_time</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
-
-    <span class="c1"># Benchmark updates</span>
-    <span class="n">updates</span> <span class="o">=</span> <span class="p">{</span><span class="n">node_id</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;last_accessed&#39;</span><span class="p">:</span> <span class="s1">&#39;2024-01-15&#39;</span><span class="p">}</span>
-               <span class="k">for</span> <span class="n">node_id</span> <span class="ow">in</span> <span class="n">filtered_nodes</span><span class="p">[:</span><span class="mi">500</span><span class="p">]}</span>
-    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-    <span class="n">graph</span><span class="o">.</span><span class="n">batch_set_node_attributes</span><span class="p">(</span><span class="n">updates</span><span class="p">)</span>
+    <span class="n">updates</span> <span class="o">=</span> <span class="p">{</span><span class="n">node_id</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;last_checked&#39;</span><span class="p">:</span> <span class="s1">&#39;2025-01-01&#39;</span><span class="p">}</span> <span class="k">for</span> <span class="n">node_id</span> <span class="ow">in</span> <span class="n">filtered_nodes</span><span class="p">[:</span><span class="mi">1000</span><span class="p">]}</span>
+    <span class="n">graph</span><span class="o">.</span><span class="n">update_nodes</span><span class="p">(</span><span class="n">updates</span><span class="p">)</span>
     <span class="n">update_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Batch updates: 500 nodes in </span><span class="si">{</span><span class="n">update_time</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Bulk update: 1000 nodes in </span><span class="si">{</span><span class="n">update_time</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
 
-<span class="c1"># Test with different backends</span>
-<span class="n">gli</span><span class="o">.</span><span class="n">set_backend</span><span class="p">(</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
-<span class="n">rust_graph</span> <span class="o">=</span> <span class="n">gli</span><span class="o">.</span><span class="n">Graph</span><span class="p">()</span>
-<span class="c1"># ... populate graph ...</span>
-<span class="n">benchmark_operations</span><span class="p">(</span><span class="n">rust_graph</span><span class="p">,</span> <span class="s2">&quot;Rust Backend Performance&quot;</span><span class="p">)</span>
+    <span class="c1"># Benchmark neighbor queries</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">sample_nodes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">graph</span><span class="o">.</span><span class="n">get_node_ids</span><span class="p">())[:</span><span class="mi">100</span><span class="p">]</span>
+    <span class="n">neighbor_counts</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">node_id</span> <span class="ow">in</span> <span class="n">sample_nodes</span><span class="p">:</span>
+        <span class="n">neighbors</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">get_neighbors</span><span class="p">(</span><span class="n">node_id</span><span class="p">)</span>
+        <span class="n">neighbor_counts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">neighbors</span><span class="p">))</span>
+    <span class="n">neighbor_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+    <span class="n">avg_neighbors</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">neighbor_counts</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">neighbor_counts</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Neighbor queries: 100 nodes in </span><span class="si">{</span><span class="n">neighbor_time</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">s, avg </span><span class="si">{</span><span class="n">avg_neighbors</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> neighbors&quot;</span><span class="p">)</span>
 
-<span class="n">gli</span><span class="o">.</span><span class="n">set_backend</span><span class="p">(</span><span class="s1">&#39;python&#39;</span><span class="p">)</span>
-<span class="n">python_graph</span> <span class="o">=</span> <span class="n">gli</span><span class="o">.</span><span class="n">Graph</span><span class="p">()</span>
-<span class="c1"># ... populate graph ...</span>
-<span class="n">benchmark_operations</span><span class="p">(</span><span class="n">python_graph</span><span class="p">,</span> <span class="s2">&quot;Python Backend Performance&quot;</span><span class="p">)</span>
+<span class="c1"># Benchmark different graph sizes</span>
+<span class="k">for</span> <span class="n">size</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">5000</span><span class="p">,</span> <span class="mi">10000</span><span class="p">]:</span>
+    <span class="n">test_graph</span> <span class="o">=</span> <span class="n">gli</span><span class="o">.</span><span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Create test data</span>
+    <span class="n">nodes_data</span> <span class="o">=</span> <span class="p">[{</span><span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;node_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39;active&#39;</span><span class="p">:</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="n">i</span><span class="p">}</span>
+                  <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">size</span><span class="p">)]</span>
+    <span class="n">edges_data</span> <span class="o">=</span> <span class="p">[{</span><span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;node_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;node_</span><span class="si">{</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">size</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="s1">&#39;weight&#39;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">}</span>
+                  <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">size</span><span class="o">//</span><span class="mi">2</span><span class="p">)]</span>
+
+    <span class="c1"># Time graph creation</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="n">test_graph</span><span class="o">.</span><span class="n">add_nodes</span><span class="p">(</span><span class="n">nodes_data</span><span class="p">)</span>
+    <span class="n">test_graph</span><span class="o">.</span><span class="n">add_edges</span><span class="p">(</span><span class="n">edges_data</span><span class="p">)</span>
+    <span class="n">creation_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">nGraph creation (</span><span class="si">{</span><span class="n">size</span><span class="si">}</span><span class="s2"> nodes): </span><span class="si">{</span><span class="n">creation_time</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+    <span class="n">benchmark_operations</span><span class="p">(</span><span class="n">test_graph</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Operations on </span><span class="si">{</span><span class="n">size</span><span class="si">}</span><span class="s2">-node graph&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
+</section>
+<section id="best-practices-for-batch-operations">
+<h2>Best Practices for Batch Operations<a class="headerlink" href="#best-practices-for-batch-operations" title="Link to this heading"></a></h2>
+<ol class="arabic simple">
+<li><p><strong>Use Batch Methods</strong>: Always prefer <cite>add_nodes()</cite>, <cite>add_edges()</cite>, and <cite>update_nodes()</cite> over individual operations</p></li>
+<li><p><strong>Context Managers</strong>: Use <cite>batch_operations()</cite> context manager for optimal performance</p></li>
+<li><p><strong>Backend Selection</strong>: Use Rust backend for large graphs (<cite>backend=’rust’</cite>)</p></li>
+<li><p><strong>Memory Management</strong>: Process large datasets in chunks to avoid memory issues</p></li>
+<li><p><strong>Filtering Strategy</strong>: Use dictionary filters for simple cases, lambda functions for complex logic</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example of optimal batch processing pattern</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">process_large_dataset</span><span class="p">(</span><span class="n">data_source</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">10000</span><span class="p">):</span>
+    <span class="n">graph</span> <span class="o">=</span> <span class="n">gli</span><span class="o">.</span><span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Process in chunks</span>
+    <span class="k">for</span> <span class="n">chunk_start</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">data_source</span><span class="p">),</span> <span class="n">chunk_size</span><span class="p">):</span>
+        <span class="n">chunk_end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">chunk_start</span> <span class="o">+</span> <span class="n">chunk_size</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">data_source</span><span class="p">))</span>
+        <span class="n">chunk_data</span> <span class="o">=</span> <span class="n">data_source</span><span class="p">[</span><span class="n">chunk_start</span><span class="p">:</span><span class="n">chunk_end</span><span class="p">]</span>
+
+        <span class="c1"># Prepare batch data</span>
+        <span class="n">nodes_data</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">edges_data</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">chunk_data</span><span class="p">:</span>
+            <span class="n">nodes_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s1">&#39;id&#39;</span><span class="p">:</span> <span class="n">item</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">],</span>
+                <span class="s1">&#39;attributes&#39;</span><span class="p">:</span> <span class="n">item</span><span class="p">[</span><span class="s1">&#39;attributes&#39;</span><span class="p">]</span>
+            <span class="p">})</span>
+
+            <span class="k">if</span> <span class="s1">&#39;connections&#39;</span> <span class="ow">in</span> <span class="n">item</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">connection</span> <span class="ow">in</span> <span class="n">item</span><span class="p">[</span><span class="s1">&#39;connections&#39;</span><span class="p">]:</span>
+                    <span class="n">edges_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                        <span class="s1">&#39;source&#39;</span><span class="p">:</span> <span class="n">item</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">],</span>
+                        <span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="n">connection</span><span class="p">[</span><span class="s1">&#39;target&#39;</span><span class="p">],</span>
+                        <span class="s1">&#39;attributes&#39;</span><span class="p">:</span> <span class="n">connection</span><span class="p">[</span><span class="s1">&#39;attributes&#39;</span><span class="p">]</span>
+                    <span class="p">})</span>
+
+        <span class="c1"># Batch process chunk</span>
+        <span class="k">with</span> <span class="n">graph</span><span class="o">.</span><span class="n">batch_operations</span><span class="p">()</span> <span class="k">as</span> <span class="n">batch</span><span class="p">:</span>
+            <span class="n">graph</span><span class="o">.</span><span class="n">add_nodes</span><span class="p">(</span><span class="n">nodes_data</span><span class="p">)</span>
+            <span class="n">graph</span><span class="o">.</span><span class="n">add_edges</span><span class="p">(</span><span class="n">edges_data</span><span class="p">)</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processed chunk </span><span class="si">{</span><span class="n">chunk_start</span><span class="o">//</span><span class="n">chunk_size</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">, &quot;</span>
+              <span class="sa">f</span><span class="s2">&quot;total nodes: </span><span class="si">{</span><span class="n">graph</span><span class="o">.</span><span class="n">node_count</span><span class="p">()</span><span class="si">:</span><span class="s2">,</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">graph</span>
+
+<span class="c1"># Usage</span>
+<span class="c1"># large_graph = process_large_dataset(your_data_source)</span>
+</pre></div>
+</div>
+<dl>
+<dt>This completes the comprehensive batch operations guide with the updated GLI API.</dt><dd><blockquote>
+<div><dl class="simple">
+<dt>updates = {node_id: {‘last_accessed’: ‘2024-01-15’}</dt><dd><p>for node_id in filtered_nodes[:500]}</p>
+</dd>
+</dl>
+<p>start = time.time()
+graph.batch_set_node_attributes(updates)
+update_time = time.time() - start
+print(f”Batch updates: 500 nodes in {update_time:.4f}s”)</p>
+</div></blockquote>
+<p># Test with different backends
+gli.set_backend(‘rust’)
+rust_graph = gli.Graph()
+# … populate graph …
+benchmark_operations(rust_graph, “Rust Backend Performance”)</p>
+<p>gli.set_backend(‘python’)
+python_graph = gli.Graph()
+# … populate graph …
+benchmark_operations(python_graph, “Python Backend Performance”)</p>
+</dd>
+</dl>
 </section>
 <section id="best-practices-summary">
 <h2>Best Practices Summary<a class="headerlink" href="#best-practices-summary" title="Link to this heading"></a></h2>

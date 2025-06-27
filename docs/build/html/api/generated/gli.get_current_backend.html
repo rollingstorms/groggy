@@ -78,15 +78,17 @@
 <li class="toctree-l2"><a class="reference internal" href="../../examples/batch_operations.html">Batch Operations Examples</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#overview">Overview</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#social-network-analysis">Social Network Analysis</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#building-and-analyzing-large-social-networks">Building and Analyzing Large Social Networks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#building-large-social-networks-efficiently">Building Large Social Networks Efficiently</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#efficient-filtering-and-analysis">Efficient Filtering and Analysis</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#combined-filtering-for-complex-queries">Combined Filtering for Complex Queries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#bulk-attribute-updates">Bulk Attribute Updates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#using-context-manager-for-maximum-performance">Using Context Manager for Maximum Performance</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#performance-comparison-example">Performance Comparison Example</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#supply-chain-network-analysis">Supply Chain Network Analysis</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#enterprise-scale-graph-processing">Enterprise-Scale Graph Processing</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#supply-chain-risk-analysis">Supply Chain Risk Analysis</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#bulk-attribute-updates">Bulk Attribute Updates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#id1">Bulk Attribute Updates</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#knowledge-graph-processing">Knowledge Graph Processing</a><ul>
@@ -98,6 +100,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#benchmarking-batch-operations">Benchmarking Batch Operations</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#best-practices-for-batch-operations">Best Practices for Batch Operations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#best-practices-summary">Best Practices Summary</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#performance-optimization-guidelines">Performance Optimization Guidelines</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#expected-performance-gains">Expected Performance Gains</a></li>
@@ -166,6 +169,7 @@
 <li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#supply-chain-network-analysis">Supply Chain Network Analysis</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#knowledge-graph-processing">Knowledge Graph Processing</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#performance-monitoring">Performance Monitoring</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#best-practices-for-batch-operations">Best Practices for Batch Operations</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../examples/batch_operations.html#best-practices-summary">Best Practices Summary</a></li>
 </ul>
 </li>
@@ -192,6 +196,7 @@
 <li class="toctree-l2 current"><a class="reference internal" href="../index.html#core-classes">Core Classes</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="../gli.html">gli module</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="../gli.html#gli.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../gli.html#gli.Subgraph"><code class="docutils literal notranslate"><span class="pre">Subgraph</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../gli.html#gli.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../gli.html#gli.get_available_backends"><code class="docutils literal notranslate"><span class="pre">get_available_backends()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../gli.html#gli.get_current_backend"><code class="docutils literal notranslate"><span class="pre">get_current_backend()</span></code></a></li>
@@ -204,8 +209,8 @@
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.BatchOperationContext"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#graph-class">Graph Class</a></li>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id24">Batch Operations</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#performance-features">Performance Features</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#api-examples">API Examples</a></li>
 </ul>
 </li>
 </ul>
@@ -488,15 +493,17 @@
 <li class="toctree-l1"><a class="reference internal" href="../../examples/batch_operations.html">Batch Operations Examples</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/batch_operations.html#overview">Overview</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/batch_operations.html#social-network-analysis">Social Network Analysis</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#building-and-analyzing-large-social-networks">Building and Analyzing Large Social Networks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#building-large-social-networks-efficiently">Building Large Social Networks Efficiently</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#efficient-filtering-and-analysis">Efficient Filtering and Analysis</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#combined-filtering-for-complex-queries">Combined Filtering for Complex Queries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#bulk-attribute-updates">Bulk Attribute Updates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#using-context-manager-for-maximum-performance">Using Context Manager for Maximum Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#performance-comparison-example">Performance Comparison Example</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/batch_operations.html#supply-chain-network-analysis">Supply Chain Network Analysis</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#enterprise-scale-graph-processing">Enterprise-Scale Graph Processing</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#supply-chain-risk-analysis">Supply Chain Risk Analysis</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#bulk-attribute-updates">Bulk Attribute Updates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#id1">Bulk Attribute Updates</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/batch_operations.html#knowledge-graph-processing">Knowledge Graph Processing</a><ul>
@@ -508,6 +515,7 @@
 <li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#benchmarking-batch-operations">Benchmarking Batch Operations</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/batch_operations.html#best-practices-for-batch-operations">Best Practices for Batch Operations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../examples/batch_operations.html#best-practices-summary">Best Practices Summary</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#performance-optimization-guidelines">Performance Optimization Guidelines</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../examples/batch_operations.html#expected-performance-gains">Expected Performance Gains</a></li>
@@ -551,7 +559,9 @@
 <li class="toctree-l2"><a class="reference internal" href="../gli.html#gli.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.__init__"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.add_edge"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.add_edges"><code class="docutils literal notranslate"><span class="pre">Graph.add_edges()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.add_node"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.add_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.add_nodes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.batch_operations"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.branches"><code class="docutils literal notranslate"><span class="pre">Graph.branches</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.edge_count"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
@@ -563,14 +573,21 @@
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.filter_nodes_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes_by_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.from_edge_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.from_node_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.get_all_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_all_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.get_edge"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.get_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.get_incoming_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_incoming_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.get_node"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.get_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.get_outgoing_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_outgoing_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.node_count"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.nodes"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.remove_edge"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.remove_edges"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.remove_node"><code class="docutils literal notranslate"><span class="pre">Graph.remove_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.remove_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.remove_nodes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.set_edges_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
@@ -578,6 +595,15 @@
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.set_nodes_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.states"><code class="docutils literal notranslate"><span class="pre">Graph.states</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.update_edge"><code class="docutils literal notranslate"><span class="pre">Graph.update_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.update_node"><code class="docutils literal notranslate"><span class="pre">Graph.update_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Graph.update_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.update_nodes()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../gli.html#gli.Subgraph"><code class="docutils literal notranslate"><span class="pre">Subgraph</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Subgraph.__init__"><code class="docutils literal notranslate"><span class="pre">Subgraph.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Subgraph.__repr__"><code class="docutils literal notranslate"><span class="pre">Subgraph.__repr__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../gli.html#gli.Subgraph.get_metadata"><code class="docutils literal notranslate"><span class="pre">Subgraph.get_metadata()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../gli.html#gli.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
@@ -617,14 +643,16 @@
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.BatchOperationContext.__init__"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.BatchOperationContext.add_edge"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_edge()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.BatchOperationContext.add_node"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_node()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.BatchOperationContext.set_edge_attributes_bulk"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes_bulk()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.BatchOperationContext.set_node_attributes_bulk"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes_bulk()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.BatchOperationContext.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.BatchOperationContext.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../graph.html#gli.graph.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.__init__"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.add_edge"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.add_edges"><code class="docutils literal notranslate"><span class="pre">Graph.add_edges()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.add_node"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.add_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.add_nodes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.batch_operations"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.branches"><code class="docutils literal notranslate"><span class="pre">Graph.branches</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.edge_count"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
@@ -636,14 +664,21 @@
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.filter_nodes_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes_by_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.from_edge_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.from_node_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.get_all_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_all_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.get_edge"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.get_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.get_incoming_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_incoming_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.get_node"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.get_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.get_outgoing_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_outgoing_neighbors()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.node_count"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.nodes"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.remove_edge"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.remove_edges"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.remove_node"><code class="docutils literal notranslate"><span class="pre">Graph.remove_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.remove_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.remove_nodes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.set_edges_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
@@ -651,6 +686,9 @@
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attributes()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.set_nodes_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.states"><code class="docutils literal notranslate"><span class="pre">Graph.states</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.update_edge"><code class="docutils literal notranslate"><span class="pre">Graph.update_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.update_node"><code class="docutils literal notranslate"><span class="pre">Graph.update_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#gli.graph.Graph.update_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.update_nodes()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../graph.html#graph-class">Graph Class</a><ul>
@@ -658,7 +696,9 @@
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.__init__"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#id0"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.add_edge"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.add_edges"><code class="docutils literal notranslate"><span class="pre">Graph.add_edges()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.add_node"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.add_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.add_nodes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.batch_operations"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.branches"><code class="docutils literal notranslate"><span class="pre">Graph.branches</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.edge_count"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
@@ -670,14 +710,21 @@
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.filter_nodes_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes_by_attributes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.from_edge_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.from_node_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.get_all_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_all_neighbors()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.get_edge"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.get_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.get_incoming_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_incoming_neighbors()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.get_node"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.get_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_attributes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.get_outgoing_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_outgoing_neighbors()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.node_count"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.nodes"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.remove_edge"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.remove_edges"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edges()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.remove_node"><code class="docutils literal notranslate"><span class="pre">Graph.remove_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.remove_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.remove_nodes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attributes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.set_edges_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
@@ -685,11 +732,15 @@
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attributes()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.set_nodes_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.states"><code class="docutils literal notranslate"><span class="pre">Graph.states</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.update_edge"><code class="docutils literal notranslate"><span class="pre">Graph.update_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.update_node"><code class="docutils literal notranslate"><span class="pre">Graph.update_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.core.Graph.update_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.update_nodes()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#creation-methods">Creation Methods</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id1"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id2"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#id1"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#id2"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#id3"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#core-operations">Core Operations</a><ul>
@@ -697,42 +748,38 @@
 <li class="toctree-l4"><a class="reference internal" href="../graph.html#edge-operations">Edge Operations</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#attribute-operations">Attribute Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#single-attribute-operations">Single Attribute Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#multiple-attribute-operations">Multiple Attribute Operations</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#batch-operations">Batch Operations</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id13"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id14"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#new-simplified-batch-api">New Simplified Batch API</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="../graph.html#graph-queries">Graph Queries</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id15"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id16"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id17"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id18"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id19"><code class="docutils literal notranslate"><span class="pre">Graph.filter_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#graph-queries-and-navigation">Graph Queries and Navigation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#neighbor-queries">Neighbor Queries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#filtering-operations">Filtering Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#legacy-compatibility">Legacy Compatibility</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="../graph.html#iteration">Iteration</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id20"><code class="docutils literal notranslate"><span class="pre">Graph.nodes()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id21"><code class="docutils literal notranslate"><span class="pre">Graph.edges()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="../graph.html#factory-methods">Factory Methods</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id22"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id23"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="../graph.html#id24">Batch Operations</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="../graph.html#batch-filtering">Batch Filtering</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../graph.html#batch-attribute-operations">Batch Attribute Operations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../graph.html#subgraph-operations">Subgraph Operations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../graph.html#batch-operation-context">Batch Operation Context</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="../graph.html#id25"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#gli.graph.batch.BatchOperationContext"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../graph.html#id36"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
 </ul>
 </li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../graph.html#performance-features">Performance Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../graph.html#api-examples">API Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#basic-operations">Basic Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#id37">Batch Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#update-operations">Update Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#id38">Filtering Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#context-manager-for-batch-operations">Context Manager for Batch Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graph.html#migration-from-old-api">Migration from Old API</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../data_structures.html">data_structures module</a><ul>
@@ -855,8 +902,8 @@
 <li class="toctree-l3"><a class="reference internal" href="../batch.html#gli.graph.batch.BatchOperationContext.__init__"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../batch.html#gli.graph.batch.BatchOperationContext.add_edge"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_edge()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../batch.html#gli.graph.batch.BatchOperationContext.add_node"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_node()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="../batch.html#gli.graph.batch.BatchOperationContext.set_edge_attributes_bulk"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes_bulk()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="../batch.html#gli.graph.batch.BatchOperationContext.set_node_attributes_bulk"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes_bulk()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../batch.html#gli.graph.batch.BatchOperationContext.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../batch.html#gli.graph.batch.BatchOperationContext.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../batch.html#batchoperationcontext">BatchOperationContext</a><ul>
@@ -867,8 +914,8 @@
 <li class="toctree-l4"><a class="reference internal" href="../batch.html#id2"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__init__()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../batch.html#id3"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_edge()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="../batch.html#id4"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_node()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../batch.html#id5"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes_bulk()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="../batch.html#id6"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes_bulk()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../batch.html#id5"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../batch.html#id6"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../batch.html#batch-operations">Batch Operations</a><ul>

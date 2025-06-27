@@ -14,14 +14,32 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 - Interactive Jupyter notebook tutorials
 - Performance benchmarking suite
 - Memory profiling tools
+- New simplified batch API methods: `add_nodes()`, `add_edges()`, `update_nodes()`, `remove_nodes()`, `remove_edges()`
+- Enhanced update methods: `update_node()` and `update_edge()` with flexible attribute syntax
+- Neighbor query methods: `get_outgoing_neighbors()`, `get_incoming_neighbors()`, `get_all_neighbors()`
 
 ### Changed
+- **BREAKING**: Simplified batch operation method names by removing `_bulk` suffix
+  - `add_nodes_bulk()` → `add_nodes()`
+  - `add_edges_bulk()` → `add_edges()`  
+  - `update_nodes_bulk()` → `update_nodes()`
+  - `set_node_attributes_bulk()` → `set_node_attributes()` (in batch context)
+  - `set_edge_attributes_bulk()` → `set_edge_attributes()` (in batch context)
 - Improved error messages with more context
 - Enhanced backend selection logic
+- Refactored Rust backend to remove duplicate function definitions
 
 ### Fixed
 - Edge iteration performance improvements
 - Memory leak in large graph operations
+- Removed duplicate Rust function definitions that caused compilation issues
+- Fixed Python wrapper to auto-create nodes before adding edges in Rust backend
+- Added missing neighbor methods to Rust core to match Python expectations
+
+### Migration Guide
+- Replace `_bulk` method calls with the new simplified names
+- Update batch operation context usage to use new method names
+- Old method names remain available for backward compatibility but are deprecated
 
 [0.2.0] - 2025-01-01
 --------------------

@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use dashmap::DashMap;
 use std::sync::Arc;
-use crate::graph::core::{NodeData, EdgeData};
+use crate::graph::types::{NodeData, EdgeData};
 use crate::utils::hash::fast_hash;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

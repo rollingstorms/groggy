@@ -166,7 +166,7 @@ impl GraphStore {
         for (node_id, content_hash) in &state.node_hashes {
             if let Some(node_data) = self.content_pool.get_node(content_hash) {
                 // Add node with proper attributes (dereference Arc)
-                let new_node_idx = graph.add_node_to_graph((*node_data).clone());
+                let new_node_idx = graph.add_node_to_graph_public((*node_data).clone());
                 graph.node_id_to_index.insert(node_id.clone(), new_node_idx);
                 graph.node_index_to_id.insert(new_node_idx, node_id.clone());
             }

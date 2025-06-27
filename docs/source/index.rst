@@ -50,19 +50,32 @@ Quick Start
                           since=2020, 
                           strength=0.9)
 
+   # Efficient batch operations for large graphs
+   nodes_data = [
+       {'id': 'employee_001', 'name': 'Charlie', 'age': 35, 'role': 'manager'},
+       {'id': 'employee_002', 'name': 'Diana', 'age': 28, 'role': 'engineer'}
+   ]
+   g.add_nodes(nodes_data)  # Add thousands of nodes efficiently
+
+   edges_data = [
+       {'source': alice, 'target': 'employee_001', 'relationship': 'reports_to'},
+       {'source': bob, 'target': 'employee_002', 'relationship': 'collaborates'}
+   ]
+   g.add_edges(edges_data)  # Add thousands of edges efficiently
+
+   # Update multiple nodes at once
+   updates = {
+       alice: {'salary': 75000, 'department': 'Engineering'},
+       bob: {'salary': 68000, 'department': 'Design'}
+   }
+   g.update_nodes(updates)  # Bulk updates for performance
+
    # State management and branching
    initial_state = g.save_state("Initial graph")
    g.create_branch("development")
    g.switch_branch("development")
 
-   # Efficient batch operations
-   node_updates = {
-       alice: {"department": "Engineering", "salary": 100000},
-       bob: {"department": "Design", "salary": 85000}
-   }
-   g.set_nodes_attributes_batch(node_updates)
-
-   # Query the graph with new API
+   # Query the graph
    neighbors = g.get_neighbors(alice)
    edge = g.get_edge(alice, bob)  # Takes (source, target) parameters
    
@@ -71,8 +84,8 @@ Quick Start
    print(f"Available branches: {list(g.branches.keys())}")
 
    # High-performance filtering
-   engineers = g.filter_nodes(lambda node_id, attrs: attrs.get("department") == "Engineering")
-   high_earners = g.filter_nodes({"salary": lambda x: x > 90000})
+   engineers = g.filter_nodes(lambda node_id, attrs: attrs.get("role") == "engineer")
+   managers = g.filter_nodes({"role": "manager"})
 
    # Access node/edge collections with lazy loading
    print(f"Nodes: {len(g.nodes)}, Edges: {len(g.edges)}")

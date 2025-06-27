@@ -69,7 +69,6 @@ class Graph(StateMixin):
         self.branch_heads = {}
         
         self.graph_attributes = graph_attributes or {}
-        self._current_time = 0
     
     def _init_rust_backend(self, nodes, edges, graph_attributes):
         """Initialize Rust backend"""
@@ -251,6 +250,9 @@ class Graph(StateMixin):
         # Convert node_id to string for consistent backend handling
         node_id_str = str(node_id)
         
+        # Check if node already exists
+        node_exists = node_id_str in self.nodes
+        
         if self.use_rust:
             self._rust_core.add_node(node_id_str, attributes)
             self._invalidate_cache()
@@ -275,7 +277,16 @@ class Graph(StateMixin):
         target_str = str(target)
         edge_id = f"{source_str}->{target_str}"
         
+        # Check if edge already exists
+        edge_exists = edge_id in self.edges
+        
         if self.use_rust:
+            # Ensure both nodes exist before adding edge
+            if source_str not in self.nodes:
+                self.add_node(source_str)
+            if target_str not in self.nodes:
+                self.add_node(target_str)
+            
             self._rust_core.add_edge(source_str, target_str, attributes)
             self._invalidate_cache()
         else:
@@ -812,3 +823,350 @@ class Graph(StateMixin):
         """Create a subgraph containing only the specified edges and their connected nodes"""
         from .filtering import SubgraphCreator
         return SubgraphCreator.create_edge_subgraph(self, edge_ids, filter_criteria)
+
+    def update_node(self, node_id: NodeID, attributes: Dict[str, Any] = None, **kwargs):
+        """Update node attributes with a user-friendly interface
+        
+        Args:
+            node_id: ID of the node to update
+            attributes: Dictionary of attributes to set (optional)
+            **kwargs: Attributes as keyword arguments
+            
+        Examples:
+            g.update_node("alice", {"age": 31, "role": "senior_engineer"})
+            g.update_node("alice", age=31, role="senior_engineer")
+            g.update_node("alice", {"age": 31}, role="senior_engineer")  # Both work together
+        """
+        # Combine dictionary and keyword attributes
+        combined_attrs = attributes or {}
+        combined_attrs.update(kwargs)
+        
+        node_id_str = str(node_id)
+        if self.use_rust:
+            # Rust backend - direct update using set_node_attribute for each attribute
+            for attr_name, attr_value in combined_attrs.items():
+                self._rust_core.set_node_attribute(node_id_str, attr_name, attr_value)
+            self._invalidate_cache()
+        else:
+            # Python fallback - use delta
+            self._init_delta()
+            
+            if node_id_str in self._pending_delta.added_nodes:
+                # Update existing pending node
+                current_node = self._pending_delta.added_nodes[node_id_str]
+                current_node.attributes.update(combined_attrs)
+            else:
+                # Create new node with combined attributes
+                new_node = Node(node_id_str, combined_attrs)
+                self._pending_delta.added_nodes[node_id_str] = new_node
+                self._update_cache_for_node_add(node_id_str, new_node)
+
+    def update_edge(self, source: NodeID, target: NodeID, attributes: Dict[str, Any] = None, **kwargs):
+        """Update edge attributes with a user-friendly interface
+        
+        Args:
+            source: Source node ID of the edge to update
+            target: Target node ID of the edge to update
+            attributes: Dictionary of attributes to set (optional)
+            **kwargs: Attributes as keyword arguments
+            
+        Examples:
+            g.update_edge("alice", "bob", {"relationship": "colleague", "since": 2020})
+            g.update_edge("alice", "bob", relationship="colleague", since=2020)
+            g.update_edge("alice", "bob", {"relationship": "colleague"}, since=2020)  # Both work together
+        """
+        # Combine dictionary and keyword attributes
+        combined_attrs = attributes or {}
+        combined_attrs.update(kwargs)
+        
+        source_str = str(source)
+        target_str = str(target)
+        edge_id = f"{source_str}->{target_str}"
+        
+        if self.use_rust:
+            # Rust backend - direct update
+            self._rust_core.set_edge_attributes(source_str, target_str, combined_attrs)
+            self._invalidate_cache()
+        else:
+            # Python fallback - use delta
+            self._init_delta()
+            
+            if edge_id in self._pending_delta.added_edges:
+                # Update existing pending edge
+                current_edge = self._pending_delta.added_edges[edge_id]
+                current_edge.attributes.update(combined_attrs)
+            else:
+                # Create new edge with combined attributes
+                new_edge = Edge(source, target, combined_attrs)
+                self._pending_delta.added_edges[edge_id] = new_edge
+                self._update_cache_for_edge_add(edge_id, new_edge)
+
+    def add_nodes(self, nodes_data: List[Dict[str, Any]]):
+        """Add multiple nodes efficiently in a single operation
+        
+        Args:
+            nodes_data: List of node dictionaries, each containing 'id' and optional attributes
+            
+        Example:
+            nodes = [
+                {'id': 'user_1', 'age': 25, 'role': 'engineer'},
+                {'id': 'user_2', 'age': 30, 'role': 'manager'}
+            ]
+            g.add_nodes(nodes)
+        """
+        if self.use_rust:
+            # Prepare data for Rust backend
+            rust_nodes = []
+            for node_data in nodes_data:
+                node_id = str(node_data['id'])
+                attributes = {k: v for k, v in node_data.items() if k != 'id'}
+                rust_nodes.append((node_id, attributes))
+            
+            self._rust_core.add_nodes(rust_nodes)
+            self._invalidate_cache()
+        else:
+            # Python fallback - batch add with single delta
+            self._init_delta()
+            
+            for node_data in nodes_data:
+                node_id = str(node_data['id'])
+                attributes = {k: v for k, v in node_data.items() if k != 'id'}
+                
+                if node_id not in self._pending_delta.added_nodes:
+                    new_node = Node(node_id, attributes)
+                    self._pending_delta.added_nodes[node_id] = new_node
+                    self._update_cache_for_node_add(node_id, new_node)
+
+    def add_edges(self, edges_data: List[Dict[str, Any]]):
+        """Add multiple edges efficiently in a single operation
+        
+        Args:
+            edges_data: List of edge dictionaries, each containing 'source', 'target' and optional attributes
+            
+        Example:
+            edges = [
+                {'source': 'user_1', 'target': 'user_2', 'relationship': 'manages'},
+                {'source': 'user_2', 'target': 'user_3', 'relationship': 'collaborates'}
+            ]
+            g.add_edges(edges)
+        """
+        if self.use_rust:
+            # Prepare data for Rust backend
+            rust_edges = []
+            for edge_data in edges_data:
+                source = str(edge_data['source'])
+                target = str(edge_data['target'])
+                attributes = {k: v for k, v in edge_data.items() if k not in ['source', 'target']}
+                rust_edges.append((source, target, attributes))
+            
+            self._rust_core.add_edges(rust_edges)
+            self._invalidate_cache()
+        else:
+            # Python fallback - batch add with single delta
+            self._init_delta()
+            effective_nodes, _, _ = self._get_effective_data()
+            
+            for edge_data in edges_data:
+                source = str(edge_data['source'])
+                target = str(edge_data['target'])
+                attributes = {k: v for k, v in edge_data.items() if k not in ['source', 'target']}
+                edge_id = f"{source}->{target}"
+                
+                # Auto-create nodes if they don't exist
+                if source not in effective_nodes and source not in self._pending_delta.added_nodes:
+                    self._pending_delta.added_nodes[source] = Node(source)
+                if target not in effective_nodes and target not in self._pending_delta.added_nodes:
+                    self._pending_delta.added_nodes[target] = Node(target)
+                
+                if edge_id not in self._pending_delta.added_edges:
+                    new_edge = Edge(source, target, attributes)
+                    self._pending_delta.added_edges[edge_id] = new_edge
+                    self._update_cache_for_edge_add(edge_id, new_edge)
+
+    def update_nodes(self, updates: Dict[NodeID, Dict[str, Any]]):
+        """Update multiple nodes efficiently in a single operation
+        
+        Args:
+            updates: Dictionary mapping node IDs to their attribute updates
+            
+        Example:
+            updates = {
+                'user_1': {'salary': 80000, 'role': 'senior_engineer'},
+                'user_2': {'salary': 90000, 'department': 'engineering'}
+            }
+            g.update_nodes(updates)
+        """
+        if self.use_rust:
+            # Use Rust backend for efficient bulk updates - expects dict format
+            rust_updates = {}
+            for node_id, attrs in updates.items():
+                node_id_str = str(node_id)
+                rust_updates[node_id_str] = attrs
+            
+            self._rust_core.set_nodes_attributes_batch(rust_updates)
+            self._invalidate_cache()
+        else:
+            # Python fallback - batch update with single delta
+            self._init_delta()
+            effective_nodes, _, _ = self._get_effective_data()
+            
+            for node_id, attrs in updates.items():
+                node_id_str = str(node_id)
+                
+                # Get current node or create if it doesn't exist
+                if node_id_str in effective_nodes:
+                    current_node = effective_nodes[node_id_str]
+                    updated_attrs = {**current_node.attributes, **attrs}
+                elif node_id_str in self._pending_delta.added_nodes:
+                    current_node = self._pending_delta.added_nodes[node_id_str]
+                    updated_attrs = {**current_node.attributes, **attrs}
+                else:
+                    # Create new node with the attributes
+                    updated_attrs = attrs
+                
+                updated_node = Node(node_id_str, updated_attrs)
+                self._pending_delta.added_nodes[node_id_str] = updated_node
+                self._update_cache_for_node_add(node_id_str, updated_node)
+
+    def remove_node(self, node_id: NodeID) -> bool:
+        """Remove a node from the graph
+        
+        Args:
+            node_id: The ID of the node to remove
+            
+        Returns:
+            bool: True if the node was removed, False if it didn't exist
+        """
+        node_id_str = str(node_id)
+        
+        if self.use_rust:
+            result = self._rust_core.remove_node(node_id_str)
+            self._invalidate_cache()
+            return result
+        else:
+            # Python fallback implementation
+            self._init_delta()
+            effective_nodes, _, _ = self._get_effective_data()
+            
+            if node_id_str in effective_nodes or node_id_str in self._pending_delta.added_nodes:
+                # Mark for removal and invalidate cache
+                self._pending_delta.removed_nodes.add(node_id_str)
+                
+                # Also remove any edges connected to this node
+                effective_edges, _, _ = self._get_effective_data()
+                edges_to_remove = []
+                for edge_id, edge in effective_edges.items():
+                    if edge.source == node_id_str or edge.target == node_id_str:
+                        edges_to_remove.append(edge_id)
+                
+                for edge_id in edges_to_remove:
+                    self._pending_delta.removed_edges.add(edge_id)
+                
+                self._invalidate_cache()
+                return True
+            
+            return False
+
+    def remove_edge(self, source: NodeID, target: NodeID) -> bool:
+        """Remove an edge from the graph
+        
+        Args:
+            source: Source node ID
+            target: Target node ID
+            
+        Returns:
+            bool: True if the edge was removed, False if it didn't exist
+        """
+        source_str = str(source)
+        target_str = str(target)
+        edge_id = f"{source_str}->{target_str}"
+        
+        if self.use_rust:
+            result = self._rust_core.remove_edge(source_str, target_str)
+            self._invalidate_cache()
+            return result
+        else:
+            # Python fallback implementation
+            self._init_delta()
+            _, effective_edges, _ = self._get_effective_data()
+            
+            if edge_id in effective_edges or edge_id in self._pending_delta.added_edges:
+                self._pending_delta.removed_edges.add(edge_id)
+                self._invalidate_cache()
+                return True
+            
+            return False
+
+    def remove_nodes(self, node_ids: List[NodeID]) -> int:
+        """Remove multiple nodes efficiently
+        
+        Args:
+            node_ids: List of node IDs to remove
+            
+        Returns:
+            int: Number of nodes actually removed
+        """
+        node_ids_str = [str(node_id) for node_id in node_ids]
+        
+        if self.use_rust:
+            removed_count = self._rust_core.remove_nodes(node_ids_str)
+            self._invalidate_cache()
+            return removed_count
+        else:
+            # Python fallback implementation
+            self._init_delta()
+            effective_nodes, effective_edges, _ = self._get_effective_data()
+            removed_count = 0
+            
+            for node_id_str in node_ids_str:
+                if node_id_str in effective_nodes or node_id_str in self._pending_delta.added_nodes:
+                    self._pending_delta.removed_nodes.add(node_id_str)
+                    removed_count += 1
+                    
+                    # Also remove connected edges
+                    edges_to_remove = []
+                    for edge_id, edge in effective_edges.items():
+                        if edge.source == node_id_str or edge.target == node_id_str:
+                            edges_to_remove.append(edge_id)
+                    
+                    for edge_id in edges_to_remove:
+                        self._pending_delta.removed_edges.add(edge_id)
+            
+            if removed_count > 0:
+                self._invalidate_cache()
+            
+            return removed_count
+
+    def remove_edges(self, edge_pairs: List[tuple]) -> int:
+        """Remove multiple edges efficiently
+        
+        Args:
+            edge_pairs: List of (source, target) tuples
+            
+        Returns:
+            int: Number of edges actually removed
+        """
+        edge_pairs_str = [(str(source), str(target)) for source, target in edge_pairs]
+        
+        if self.use_rust:
+            removed_count = self._rust_core.remove_edges(edge_pairs_str)
+            self._invalidate_cache()
+            return removed_count
+        else:
+            # Python fallback implementation
+            self._init_delta()
+            _, effective_edges, _ = self._get_effective_data()
+            removed_count = 0
+            
+            for source_str, target_str in edge_pairs_str:
+                edge_id = f"{source_str}->{target_str}"
+                if edge_id in effective_edges or edge_id in self._pending_delta.added_edges:
+                    self._pending_delta.removed_edges.add(edge_id)
+                    removed_count += 1
+            
+            if removed_count > 0:
+                self._invalidate_cache()
+            
+            return removed_count
+
+
