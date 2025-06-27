@@ -82,19 +82,8 @@ pip install -r requirements-dev.txt
 # Build the Rust extension
 maturin develop
 
-# Run tests
-pytest tests/
 ```
 
-### Testing
-
-```bash
-# Run Python tests
-pytest tests/
-
-# Run Rust tests
-cargo test
-```
 
 ## Contributing
 
@@ -103,7 +92,3 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Benchmarks
-
-See the `tests/` directory for various performance benchmarks and stress tests demonstrating Groggy's capabilities with large-scale graphs.
