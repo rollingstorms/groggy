@@ -1,6 +1,6 @@
-# GLI Documentation
+# Groggy Documentation
 
-This directory contains the complete Sphinx documentation for GLI (Graph Language Interface).
+This directory contains the complete Sphinx documentation for Groggy (Graph Language Interface).
 
 ## Building the Documentation
 
@@ -130,7 +130,7 @@ The documentation includes custom CSS for:
 - Better code highlighting
 - Performance metrics styling
 - Responsive design
-- GLI-specific branding
+- Groggy-specific branding
 
 ### Cross-References
 
@@ -138,7 +138,7 @@ Use Sphinx cross-references to link between sections:
 
 ```rst
 See :doc:`quickstart` for basic usage.
-Reference :func:`gli.Graph.add_node` for details.
+Reference :func:`groggy.Graph.add_node` for details.
 ```
 
 ### Code Examples
@@ -148,7 +148,7 @@ Include testable code examples:
 ```rst
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    g = Graph()
    alice = g.add_node(name="Alice")
@@ -170,7 +170,7 @@ The documentation can be deployed to various platforms:
 1. **Missing Dependencies**: Install with `pip install -r docs-requirements.txt`
 2. **Build Errors**: Use `make dev-build` for detailed error messages
 3. **Broken Links**: Run `make linkcheck` to identify issues
-4. **Import Errors**: Ensure GLI is installed in the environment
+4. **Import Errors**: Ensure Groggy is installed in the environment
 
 ### Performance
 

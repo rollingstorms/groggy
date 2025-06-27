@@ -1,7 +1,7 @@
 state module
 ============
 
-.. automodule:: gli.graph.state
+.. automodule:: groggy.graph.state
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ GLI provides Git-like state management for graph versioning and branching, backe
 StateMixin Class
 ~~~~~~~~~~~~~~~~
 
-.. autoclass:: gli.graph.state.StateMixin
+.. autoclass:: groggy.graph.state.StateMixin
    :members:
    :undoc-members:
    :show-inheritance:
@@ -25,21 +25,21 @@ State Operations
 Saving and Loading States
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.state.StateMixin.save_state
-.. automethod:: gli.graph.state.StateMixin.load_state
-.. automethod:: gli.graph.state.StateMixin.commit
-.. automethod:: gli.graph.state.StateMixin.get_state_info
+.. automethod:: groggy.graph.state.StateMixin.save_state
+.. automethod:: groggy.graph.state.StateMixin.load_state
+.. automethod:: groggy.graph.state.StateMixin.commit
+.. automethod:: groggy.graph.state.StateMixin.get_state_info
 
 Branch Management
 ^^^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.state.StateMixin.create_branch
-.. automethod:: gli.graph.state.StateMixin.switch_branch
+.. automethod:: groggy.graph.state.StateMixin.create_branch
+.. automethod:: groggy.graph.state.StateMixin.switch_branch
 
 Storage Statistics
 ^^^^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.state.StateMixin.get_storage_stats
+.. automethod:: groggy.graph.state.StateMixin.get_storage_stats
 
 Lazy Properties
 ~~~~~~~~~~~~~~~
@@ -75,7 +75,7 @@ Usage Examples
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    g = Graph()
    g.add_node("alice", name="Alice", age=30)

@@ -72,7 +72,7 @@ One of GLI's key testing strategies is ensuring both backends produce identical 
 .. code-block:: python
 
    import pytest
-   from gli import Graph
+   from groggy import Graph
    
    @pytest.mark.parametrize("backend", ["python", "rust"])
    def test_basic_operations(backend):
@@ -139,8 +139,8 @@ Benchmark Framework
 
    import time
    import pytest
-   from gli import Graph
-   from gli.utils import create_random_graph
+   from groggy import Graph
+   from groggy.utils import create_random_graph
    
    class PerformanceBenchmark:
        def __init__(self):
@@ -235,7 +235,7 @@ The `tests/gli_tests.ipynb` notebook provides interactive testing capabilities:
 .. code-block:: python
 
    # Cell 1: Setup
-   from gli import Graph, set_backend
+   from groggy import Graph, set_backend
    import time
    
    # Test both backends

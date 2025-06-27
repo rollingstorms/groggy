@@ -53,7 +53,7 @@ Development Setup
       python -m pytest tests/test_backend_parity.py
       
       # Check both backends are available
-      python -c "from gli import get_available_backends; print(get_available_backends())"
+      python -c "from groggy import get_available_backends; print(get_available_backends())"
 
 Development Workflow
 -------------------
@@ -129,7 +129,7 @@ When reporting bugs, please include:
 
    .. code-block:: python
 
-      from gli import Graph
+      from groggy import Graph
       
       # Minimal code that demonstrates the bug
       g = Graph()
@@ -141,8 +141,8 @@ When reporting bugs, please include:
 
       # Include this information
       python --version
-      python -c "import gli; print(gli.__version__)"
-      python -c "from gli import get_available_backends; print(get_available_backends())"
+      python -c "import groggy; print(groggy.__version__)"
+      python -c "from groggy import get_available_backends; print(get_available_backends())"
 
 3. **Expected vs Actual Behavior**
 

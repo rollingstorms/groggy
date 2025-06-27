@@ -1,7 +1,7 @@
 utils module
 ============
 
-.. automodule:: gli.utils
+.. automodule:: groggy.utils
    :members:
    :undoc-members:
    :show-inheritance:
@@ -12,7 +12,7 @@ Utility Functions
 Graph Creation
 ~~~~~~~~~~~~~~
 
-.. autofunction:: gli.utils.create_random_graph
+.. autofunction:: groggy.utils.create_random_graph
 
    Create a random graph for testing and benchmarking.
 
@@ -30,7 +30,7 @@ Graph Creation
 
    .. code-block:: python
 
-      from gli.utils import create_random_graph
+      from groggy.utils import create_random_graph
       
       # Create small random graph
       g = create_random_graph(100, 0.1)
@@ -44,11 +44,11 @@ Graph Creation
 Workflow Utilities
 ~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: gli.utils.create_clustering_workflow
+.. autofunction:: groggy.utils.create_clustering_workflow
 
    Set up branches for different clustering algorithms.
 
-.. autofunction:: gli.utils.create_subgraph_branch
+.. autofunction:: groggy.utils.create_subgraph_branch
 
    Create a branch from a subgraph for isolated processing.
 
@@ -60,7 +60,7 @@ The utils module provides functions specifically designed for performance testin
 .. code-block:: python
 
    import time
-   from gli.utils import create_random_graph
+   from groggy.utils import create_random_graph
    
    # Benchmark graph creation
    start = time.time()
@@ -88,7 +88,7 @@ Best Practices
 .. code-block:: python
 
    # Good practice: structured workflow
-   from gli.utils import create_clustering_workflow, create_random_graph
+   from groggy.utils import create_clustering_workflow, create_random_graph
    
    # Create base graph
    graph = create_random_graph(1000, 0.05)

@@ -1,7 +1,7 @@
 Changelog
 =========
 
-All notable changes to GLI will be documented in this file.
+All notable changes to Groggy will be documented in this file.
 
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
@@ -75,7 +75,7 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 
 .. code-block:: python
 
-   from gli import Graph, set_backend
+   from groggy import Graph, set_backend
    
    # Use high-performance Rust backend
    set_backend('rust')
@@ -112,7 +112,7 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    g = Graph()
    alice = g.add_node(name="Alice")

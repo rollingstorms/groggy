@@ -1,7 +1,7 @@
 Quick Start Guide
 =================
 
-This guide will get you up and running with GLI in just a few minutes.
+This guide will get you up and running with Groggy in just a few minutes.
 
 Basic Graph Operations
 ----------------------
@@ -11,7 +11,7 @@ Creating a Graph
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    # Create a new graph
    g = Graph()
@@ -97,7 +97,7 @@ Graph Statistics
 Modern Update API
 ~~~~~~~~~~~~~~~~~
 
-GLI provides multiple ways to update node and edge attributes with a clean, intuitive interface:
+Groggy provides multiple ways to update node and edge attributes with a clean, intuitive interface:
 
 .. code-block:: python
 
@@ -125,7 +125,7 @@ GLI provides multiple ways to update node and edge attributes with a clean, intu
 High-Performance Batch Operations
 ---------------------------------
 
-For large graphs, GLI provides efficient batch operations that are **10-100x faster** than individual operations.
+For large graphs, Groggy provides efficient batch operations that are **10-100x faster** than individual operations.
 
 Efficient Filtering Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -215,7 +215,7 @@ Working with Attributes
 Complex Attributes
 ~~~~~~~~~~~~~~~~~~
 
-GLI supports complex nested attributes:
+Groggy supports complex nested attributes:
 
 .. code-block:: python
 
@@ -257,7 +257,7 @@ Choosing Backends
 
 .. code-block:: python
 
-   from gli import Graph, set_backend, get_available_backends
+   from groggy import Graph, set_backend, get_available_backends
    
    # Check available backends
    print(f"Available backends: {get_available_backends()}")
@@ -348,7 +348,7 @@ Iterating Over Edges
 Error Handling
 --------------
 
-GLI provides comprehensive error handling:
+Groggy provides comprehensive error handling:
 
 .. code-block:: python
 
@@ -372,4 +372,4 @@ Now that you've learned the basics, explore:
 - :doc:`api/index` - Complete API reference
 - :doc:`examples/index` - More complex examples
 - :doc:`performance` - Performance optimization tips
-- :doc:`architecture` - Understanding GLI's architecture
+- :doc:`architecture` - Understanding Groggy's architecture

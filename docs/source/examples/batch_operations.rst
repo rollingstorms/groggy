@@ -1,12 +1,12 @@
 Batch Operations Examples
 =========================
 
-This guide demonstrates GLI's high-performance batch operations for efficient large-scale graph processing.
+This guide demonstrates Groggy's high-performance batch operations for efficient large-scale graph processing.
 
 Overview
 --------
 
-GLI's batch operations provide significant performance improvements over individual operations:
+Groggy's batch operations provide significant performance improvements over individual operations:
 
 - **10-100x faster** for bulk operations
 - **Memory efficient** bulk processing
@@ -21,7 +21,7 @@ Building Large Social Networks Efficiently
 
 .. code-block:: python
 
-   import gli
+   import groggy
    import random
    import time
    
@@ -514,7 +514,7 @@ Best Practices for Batch Operations
    # Usage
    # large_graph = process_large_dataset(your_data_source)
 
-This completes the comprehensive batch operations guide with the updated GLI API.
+This completes the comprehensive batch operations guide with the updated Groggy API.
        updates = {node_id: {'last_accessed': '2024-01-15'} 
                   for node_id in filtered_nodes[:500]}
        start = time.time()
@@ -588,4 +588,4 @@ With proper use of batch operations, expect:
 - **50-70% less memory** usage with Rust backend
 - **Sub-millisecond** query times for common operations
 
-These optimizations make GLI suitable for real-time applications and large-scale graph analysis.
+These optimizations make Groggy suitable for real-time applications and large-scale graph analysis.

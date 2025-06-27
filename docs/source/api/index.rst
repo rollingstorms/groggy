@@ -1,7 +1,7 @@
 API Reference
 =============
 
-This section contains the complete API reference for GLI.
+This section contains the complete API reference for Groggy.
 
 Core Classes
 ------------
@@ -9,7 +9,7 @@ Core Classes
 .. toctree::
    :maxdepth: 2
 
-   gli
+   groggy
    graph
 
 Data Structures & Views
@@ -41,7 +41,7 @@ Utilities
 Backend Architecture
 --------------------
 
-GLI uses a high-performance Rust backend with Python bindings for optimal performance:
+Groggy uses a high-performance Rust backend with Python bindings for optimal performance:
 
 * **Rust Backend**: High-performance core implementation in Rust
 * **Python Interface**: Pythonic API with lazy loading and smart caching

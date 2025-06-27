@@ -1,17 +1,17 @@
 Performance Guide
 =================
 
-GLI is designed for high performance using a Rust backend with Python interface. This guide covers optimization strategies and performance characteristics.
+Groggy is designed for high performance using a Rust backend with Python interface. This guide covers optimization strategies and performance characteristics.
 
 Performance Overview
 --------------------
 
-GLI uses a high-performance Rust backend by default, providing excellent performance for large-scale graph operations:
+Groggy uses a high-performance Rust backend by default, providing excellent performance for large-scale graph operations:
 
 Benchmark Results
 ~~~~~~~~~~~~~~~~~
 
-.. list-table:: GLI Performance Benchmarks
+.. list-table:: Groggy Performance Benchmarks
    :header-rows: 1
    :widths: 30 25 25 20
 
@@ -75,7 +75,7 @@ Key Performance Features
 
 .. code-block:: python
 
-   from gli import Graph, set_backend, get_available_backends
+   from groggy import Graph, set_backend, get_available_backends
    
    # Check available backends
    print("Available backends:", get_available_backends())
@@ -93,7 +93,7 @@ Optimization Strategies
 Batch Operations
 ~~~~~~~~~~~~~~~
 
-GLI provides high-performance batch operations for bulk processing:
+Groggy provides high-performance batch operations for bulk processing:
 
 .. list-table:: Batch Operations Performance
    :header-rows: 1
@@ -127,7 +127,7 @@ Use batch filtering for efficient queries:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    g = Graph(backend='rust')
    
@@ -182,7 +182,7 @@ Use batch operations for multiple insertions:
 .. code-block:: python
 
    import time
-   from gli import Graph
+   from groggy import Graph
    
    g = Graph(backend='rust')
    
@@ -216,7 +216,7 @@ Optimize memory usage for large graphs:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    import gc
    
    # Use Rust backend for better memory efficiency
@@ -238,7 +238,7 @@ Build graphs efficiently from different data sources:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    # From edge list (most efficient)
    edges = [("a", "b"), ("b", "c"), ("c", "d")]
@@ -267,11 +267,11 @@ Build graphs efficiently from different data sources:
 Benchmarking Tools
 ------------------
 
-GLI includes benchmarking utilities:
+Groggy includes benchmarking utilities:
 
 .. code-block:: python
 
-   from gli.utils import create_random_graph
+   from groggy.utils import create_random_graph
    import time
    import memory_profiler
    
@@ -310,7 +310,7 @@ Profile memory usage:
 .. code-block:: python
 
    import tracemalloc
-   from gli import Graph
+   from groggy import Graph
    
    # Start memory tracking
    tracemalloc.start()

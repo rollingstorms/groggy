@@ -515,7 +515,7 @@ Profile FFI performance:
 
    import time
    import cProfile
-   from gli import Graph
+   from groggy import Graph
    
    def profile_ffi_calls():
        g = Graph(backend='rust')

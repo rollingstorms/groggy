@@ -105,7 +105,7 @@ The Rust backend uses several optimized data structures:
 
    # Measuring string interning impact
    import time
-   from gli import Graph
+   from groggy import Graph
    
    g = Graph(backend='rust')
    
@@ -129,7 +129,7 @@ Identical attribute sets are automatically deduplicated:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    g = Graph(backend='rust')
    
@@ -151,7 +151,7 @@ Rust backend batch operations are highly optimized:
 .. code-block:: python
 
    import time
-   from gli import Graph
+   from groggy import Graph
    
    def compare_batch_vs_individual():
        # Individual operations
@@ -200,7 +200,7 @@ Rust backend provides cache-efficient iteration patterns:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    import time
    
    g = Graph(backend='rust')
@@ -253,7 +253,7 @@ Safe parallel operations with Rust's concurrency model:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    import concurrent.futures
    
    def parallel_graph_processing():
@@ -314,7 +314,7 @@ Built-in Performance Monitoring
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    import time
    
    class RustPerformanceMonitor:
@@ -375,7 +375,7 @@ Memory Profiling
    import tracemalloc
    import psutil
    import os
-   from gli import Graph
+   from groggy import Graph
    
    def profile_rust_memory():
        # Get initial memory
@@ -472,7 +472,7 @@ Batch Size Tuning
 .. code-block:: python
 
    import time
-   from gli import Graph
+   from groggy import Graph
    
    def find_optimal_batch_size():
        \"\"\"Find the optimal batch size for your workload\"\"\"

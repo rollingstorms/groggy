@@ -1,7 +1,7 @@
 Examples
 ========
 
-This section contains practical examples demonstrating GLI's capabilities with the new high-performance API.
+This section contains practical examples demonstrating Groggy's capabilities with the new high-performance API.
 
 .. toctree::
    :maxdepth: 2

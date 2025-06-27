@@ -1,14 +1,14 @@
 State Management and Branching
 ==============================
 
-This section demonstrates GLI's powerful state management and branching capabilities, similar to Git for graphs.
+This section demonstrates Groggy's powerful state management and branching capabilities, similar to Git for graphs.
 
 Basic State Management
 ----------------------
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    # Create a graph and add initial data
    g = Graph()
@@ -42,7 +42,7 @@ Create and manage different versions of your graph:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    # Start with a base graph
    g = Graph()
@@ -82,7 +82,7 @@ Implement complex workflows with multiple branches:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    import time
    
    # Initialize project graph
@@ -139,7 +139,7 @@ Handle state persistence and recovery scenarios:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    # Create a complex graph with multiple states
    g = Graph()
@@ -190,7 +190,7 @@ Monitor state management performance:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    import time
    
    # Create test graph

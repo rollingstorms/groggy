@@ -1,5 +1,5 @@
-GLI - Graph Language Interface Documentation
-=============================================
+Groggy - Graph Language Interface Documentation
+===============================================
 
 .. image:: https://img.shields.io/badge/license-MIT-blue.svg
    :target: https://opensource.org/licenses/MIT
@@ -15,7 +15,7 @@ GLI - Graph Language Interface Documentation
 
 **A high-performance graph library with Rust backend for efficient graph operations, state management, and branching at scale.**
 
-GLI (Graph Language Interface) is a powerful graph manipulation library designed for both rapid prototyping and production-scale applications. It features a high-performance Rust backend with a Python interface for maximum performance and usability.
+Groggy (Graph Language Interface) is a powerful graph manipulation library designed for both rapid prototyping and production-scale applications. It features a high-performance Rust backend with a Python interface for maximum performance and usability.
 
 Features
 --------
@@ -35,7 +35,7 @@ Quick Start
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
 
    # Create a graph (uses high-performance Rust backend)
    g = Graph()
@@ -117,7 +117,7 @@ Quick Start
    :maxdepth: 1
    :caption: Python API Reference:
 
-   api/gli
+   api/groggy
    api/graph
    api/data_structures
    api/views

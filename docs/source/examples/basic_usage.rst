@@ -1,14 +1,14 @@
 Basic Usage Examples
 ====================
 
-This section demonstrates basic GLI operations with practical examples using the new high-performance API.
+This section demonstrates basic Groggy operations with practical examples using the new high-performance API.
 
 Creating Your First Graph
 --------------------------
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    # Create a new graph (automatically uses Rust backend)
    g = Graph()
@@ -35,11 +35,11 @@ Creating Your First Graph
 Working with Mixed ID Types
 ----------------------------
 
-GLI seamlessly handles both string and integer node IDs:
+Groggy seamlessly handles both string and integer node IDs:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    g = Graph()
    
@@ -63,7 +63,7 @@ Building a social network and analyzing connections:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    # Create social network
    social_net = Graph()
@@ -126,7 +126,7 @@ Building a simple knowledge graph:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    # Create knowledge graph
    kg = Graph()
@@ -181,7 +181,7 @@ Handling nested and complex data structures:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    import json
    from datetime import datetime
    
@@ -257,11 +257,11 @@ Handling nested and complex data structures:
 Error Handling
 --------------
 
-Proper error handling in GLI operations:
+Proper error handling in Groggy operations:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    g = Graph()
    
@@ -315,7 +315,7 @@ Efficient ways to iterate through graphs:
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    # Create sample graph
    g = Graph()

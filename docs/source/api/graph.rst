@@ -1,7 +1,7 @@
 graph module
 ============
 
-.. automodule:: gli.graph
+.. automodule:: groggy.graph
    :members:
    :undoc-members:
    :show-inheritance:
@@ -9,9 +9,9 @@ graph module
 Graph Class
 -----------
 
-The Graph class is the main interface for graph operations in GLI. It provides a high-level Python API backed by a high-performance Rust implementation.
+The Graph class is the main interface for graph operations in Groggy. It provides a high-level Python API backed by a high-performance Rust implementation.
 
-.. autoclass:: gli.graph.core.Graph
+.. autoclass:: groggy.graph.core.Graph
    :members:
    :undoc-members:
    :show-inheritance:
@@ -21,9 +21,9 @@ The Graph class is the main interface for graph operations in GLI. It provides a
 Creation Methods
 ~~~~~~~~~~~~~~~~
 
-.. automethod:: gli.graph.core.Graph.empty
-.. automethod:: gli.graph.core.Graph.from_edge_list
-.. automethod:: gli.graph.core.Graph.from_node_list
+.. automethod:: groggy.graph.core.Graph.empty
+.. automethod:: groggy.graph.core.Graph.from_edge_list
+.. automethod:: groggy.graph.core.Graph.from_node_list
 
 Core Operations
 ~~~~~~~~~~~~~~~
@@ -31,19 +31,19 @@ Core Operations
 Node Operations
 ^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.core.Graph.add_node
-.. automethod:: gli.graph.core.Graph.get_node
-.. automethod:: gli.graph.core.Graph.get_node_ids
-.. automethod:: gli.graph.core.Graph.remove_node
-.. automethod:: gli.graph.core.Graph.node_count
+.. automethod:: groggy.graph.core.Graph.add_node
+.. automethod:: groggy.graph.core.Graph.get_node
+.. automethod:: groggy.graph.core.Graph.get_node_ids
+.. automethod:: groggy.graph.core.Graph.remove_node
+.. automethod:: groggy.graph.core.Graph.node_count
 
 Edge Operations
 ^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.core.Graph.add_edge
-.. automethod:: gli.graph.core.Graph.get_edge
-.. automethod:: gli.graph.core.Graph.remove_edge
-.. automethod:: gli.graph.core.Graph.edge_count
+.. automethod:: groggy.graph.core.Graph.add_edge
+.. automethod:: groggy.graph.core.Graph.get_edge
+.. automethod:: groggy.graph.core.Graph.remove_edge
+.. automethod:: groggy.graph.core.Graph.edge_count
 
 Attribute Operations
 ~~~~~~~~~~~~~~~~~~~~
@@ -51,18 +51,18 @@ Attribute Operations
 Single Attribute Operations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.core.Graph.set_node_attribute
-.. automethod:: gli.graph.core.Graph.set_edge_attribute
-.. automethod:: gli.graph.core.Graph.get_node_attributes
-.. automethod:: gli.graph.core.Graph.get_edge_attributes
+.. automethod:: groggy.graph.core.Graph.set_node_attribute
+.. automethod:: groggy.graph.core.Graph.set_edge_attribute
+.. automethod:: groggy.graph.core.Graph.get_node_attributes
+.. automethod:: groggy.graph.core.Graph.get_edge_attributes
 
 Multiple Attribute Operations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.core.Graph.set_node_attributes
-.. automethod:: gli.graph.core.Graph.set_edge_attributes
-.. automethod:: gli.graph.core.Graph.set_nodes_attributes_batch
-.. automethod:: gli.graph.core.Graph.set_edges_attributes_batch
+.. automethod:: groggy.graph.core.Graph.set_node_attributes
+.. automethod:: groggy.graph.core.Graph.set_edge_attributes
+.. automethod:: groggy.graph.core.Graph.set_nodes_attributes_batch
+.. automethod:: groggy.graph.core.Graph.set_edges_attributes_batch
 
 Batch Operations
 ~~~~~~~~~~~~~~~~
@@ -70,13 +70,13 @@ Batch Operations
 New Simplified Batch API
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.core.Graph.add_nodes
-.. automethod:: gli.graph.core.Graph.add_edges
-.. automethod:: gli.graph.core.Graph.update_node
-.. automethod:: gli.graph.core.Graph.update_edge
-.. automethod:: gli.graph.core.Graph.update_nodes
-.. automethod:: gli.graph.core.Graph.remove_nodes
-.. automethod:: gli.graph.core.Graph.remove_edges
+.. automethod:: groggy.graph.core.Graph.add_nodes
+.. automethod:: groggy.graph.core.Graph.add_edges
+.. automethod:: groggy.graph.core.Graph.update_node
+.. automethod:: groggy.graph.core.Graph.update_edge
+.. automethod:: groggy.graph.core.Graph.update_nodes
+.. automethod:: groggy.graph.core.Graph.remove_nodes
+.. automethod:: groggy.graph.core.Graph.remove_edges
 
 Graph Queries and Navigation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -84,32 +84,32 @@ Graph Queries and Navigation
 Neighbor Queries
 ^^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.core.Graph.get_neighbors
-.. automethod:: gli.graph.core.Graph.get_outgoing_neighbors
-.. automethod:: gli.graph.core.Graph.get_incoming_neighbors
-.. automethod:: gli.graph.core.Graph.get_all_neighbors
+.. automethod:: groggy.graph.core.Graph.get_neighbors
+.. automethod:: groggy.graph.core.Graph.get_outgoing_neighbors
+.. automethod:: groggy.graph.core.Graph.get_incoming_neighbors
+.. automethod:: groggy.graph.core.Graph.get_all_neighbors
 
 Filtering Operations
 ^^^^^^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.core.Graph.filter_nodes
-.. automethod:: gli.graph.core.Graph.filter_edges
+.. automethod:: groggy.graph.core.Graph.filter_nodes
+.. automethod:: groggy.graph.core.Graph.filter_edges
 
 Legacy Compatibility
 ^^^^^^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.core.Graph.filter_nodes_by_attributes
-.. automethod:: gli.graph.core.Graph.filter_edges_by_attributes
+.. automethod:: groggy.graph.core.Graph.filter_nodes_by_attributes
+.. automethod:: groggy.graph.core.Graph.filter_edges_by_attributes
 
 Batch Operation Context
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: gli.graph.batch.BatchOperationContext
+.. autoclass:: groggy.graph.batch.BatchOperationContext
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automethod:: gli.graph.core.Graph.batch_operations
+.. automethod:: groggy.graph.core.Graph.batch_operations
 
 Performance Features
 --------------------
@@ -123,7 +123,7 @@ Backend selection can be controlled globally or per-instance:
 
 .. code-block:: python
 
-   from gli import Graph, set_backend
+   from groggy import Graph, set_backend
    
    # Global backend setting  
    set_backend('rust')
@@ -140,7 +140,7 @@ Basic Operations
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    # Create a new graph
    g = Graph()

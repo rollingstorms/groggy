@@ -3,12 +3,12 @@ requires = ["maturin>=1.4,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "gli"
-description = "Graph Language Interface - High-performance graph manipulation library"
+name = "groggy"
+description = "Groggy - A Graph Language Engine for dynamic graphs and versioned state"
 version = "0.2.0"
 requires-python = ">=3.8"
 authors = [
-    { name = "GLI Contributors" }
+    { name = "Groggy Contributors" }
 ]
 license = { text = "MIT" }
 readme = "README.md"
@@ -42,13 +42,13 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/gli"
-Repository = "https://github.com/your-org/gli"
-Documentation = "https://gli.readthedocs.io"
+Homepage = "https://github.com/your-org/groggy"
+Repository = "https://github.com/your-org/groggy"
+Documentation = "https://groggy.readthedocs.io"
 
 [tool.maturin]
 python-source = "python"
-module-name = "gli._core"
+module-name = "groggy._core"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

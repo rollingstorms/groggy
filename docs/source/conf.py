@@ -17,9 +17,9 @@ sys.path.insert(0, os.path.abspath('../../'))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'GLI - Graph Language Interface'
-copyright = '2025, GLI Contributors'
-author = 'GLI Contributors'
+project = 'Groggy - Graph Language Interface'
+copyright = '2025, Groggy Contributors'
+author = 'Groggy Contributors'
 release = '0.2.0'
 
 # -- General configuration ---------------------------------------------------
@@ -90,8 +90,8 @@ html_theme_options = {
     'titles_only': False
 }
 
-html_title = "GLI Documentation"
-html_short_title = "GLI"
+html_title = "Groggy Documentation"
+html_short_title = "Groggy"
 
 # -- Extension configuration -------------------------------------------------
 

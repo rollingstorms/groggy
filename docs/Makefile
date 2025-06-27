@@ -19,7 +19,7 @@ help:
 %: Makefile
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-# Custom targets for GLI documentation
+# Custom targets for Groggy documentation
 install-deps:
 	pip install sphinx sphinx-rtd-theme myst-parser
 

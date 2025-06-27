@@ -1,7 +1,7 @@
 store module
 ============
 
-.. automodule:: gli.store
+.. automodule:: groggy.store
    :members:
    :undoc-members:
    :show-inheritance:
@@ -11,7 +11,7 @@ GraphStore Class
 
 The GraphStore class provides persistent storage capabilities for graphs.
 
-.. autoclass:: gli.store.GraphStore
+.. autoclass:: groggy.store.GraphStore
    :members:
    :undoc-members:
    :show-inheritance:
@@ -19,9 +19,9 @@ The GraphStore class provides persistent storage capabilities for graphs.
 Storage Operations
 ~~~~~~~~~~~~~~~~~~
 
-.. automethod:: gli.store.GraphStore.save
-.. automethod:: gli.store.GraphStore.load
-.. automethod:: gli.store.GraphStore.exists
+.. automethod:: groggy.store.GraphStore.save
+.. automethod:: groggy.store.GraphStore.load
+.. automethod:: groggy.store.GraphStore.exists
 
 Serialization
 ~~~~~~~~~~~~~
@@ -34,7 +34,7 @@ GLI supports multiple serialization formats:
 
 .. code-block:: python
 
-   from gli import Graph, GraphStore
+   from groggy import Graph, GraphStore
    
    # Create and populate graph
    g = Graph()

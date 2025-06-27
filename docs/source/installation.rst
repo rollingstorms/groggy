@@ -1,7 +1,7 @@
 Installation
 ============
 
-GLI can be installed from source with both Python and Rust backend support.
+Groggy can be installed from source with both Python and Rust backend support.
 
 Requirements
 ------------
@@ -22,8 +22,8 @@ Clone the repository and install:
 .. code-block:: bash
 
    # Clone the repository
-   git clone https://github.com/your-org/gli.git
-   cd gli
+   git clone https://github.com/your-org/groggy.git
+   cd groggy
 
    # Install Python dependencies
    pip install -e .
@@ -81,8 +81,8 @@ Test your installation:
 
 .. code-block:: python
 
-   import gli
-   print(f"GLI version: {gli.__version__}")
+   import groggy
+   print(f"GLI version: {groggy.__version__}")
    print(f"Available backends: {gli.get_available_backends()}")
    
    # Test basic functionality

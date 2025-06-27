@@ -1,12 +1,12 @@
 Architecture Overview
 ====================
 
-GLI's architecture is designed for performance, flexibility, and ease of use. This section explains the key architectural decisions and components.
+Groggy's architecture is designed for performance, flexibility, and ease of use. This section explains the key architectural decisions and components.
 
 System Architecture
 -------------------
 
-GLI follows a layered architecture:
+Groggy follows a layered architecture:
 
 .. code-block::
 
@@ -43,7 +43,7 @@ The main `Graph` class provides a unified interface regardless of backend:
 Backend Abstraction Layer
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-GLI uses a strategy pattern to switch between backends:
+Groggy uses a strategy pattern to switch between backends:
 
 .. code-block:: python
 
@@ -59,7 +59,7 @@ Data Structures
 Node and Edge Representation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-GLI uses immutable data structures for consistency:
+Groggy uses immutable data structures for consistency:
 
 .. code-block:: python
 
@@ -77,7 +77,7 @@ GLI uses immutable data structures for consistency:
 Memory Management
 ~~~~~~~~~~~~~~~~
 
-GLI implements several memory optimization strategies:
+Groggy implements several memory optimization strategies:
 
 1. **Content-Addressed Storage**: Deduplicate identical attribute sets
 2. **Lazy Views**: Avoid copying data during queries
@@ -105,7 +105,7 @@ The Rust backend is designed for maximum performance:
 FFI Integration
 ~~~~~~~~~~~~~~
 
-GLI uses PyO3 for Python-Rust interoperability:
+Groggy uses PyO3 for Python-Rust interoperability:
 
 .. code-block:: rust
 
@@ -211,7 +211,7 @@ Concurrency Model
 Thread Safety
 ~~~~~~~~~~~~~
 
-GLI's concurrency model depends on the backend:
+Groggy's concurrency model depends on the backend:
 
 **Python Backend**:
 - Protected by Python's GIL
@@ -227,7 +227,7 @@ GLI's concurrency model depends on the backend:
 
    # Thread-safe usage example
    from threading import Thread
-   from gli import Graph
+   from groggy import Graph
    
    g = Graph(backend='rust')  # Thread-safe backend
    
@@ -251,7 +251,7 @@ Extensibility
 Plugin Architecture
 ~~~~~~~~~~~~~~~~~~
 
-GLI supports plugins for extending functionality:
+Groggy supports plugins for extending functionality:
 
 .. code-block:: python
 
@@ -295,33 +295,33 @@ Advanced users can implement custom backends:
 Error Handling Strategy
 ----------------------
 
-GLI uses a layered error handling approach:
+Groggy uses a layered error handling approach:
 
 Exception Hierarchy
 ~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   class GLIError(Exception):
-       """Base exception for GLI operations"""
+   class GroggyError(Exception):
+       """Base exception for Groggy operations"""
        pass
    
-   class NodeNotFoundError(GLIError, KeyError):
+   class NodeNotFoundError(GroggyError, KeyError):
        """Raised when a node is not found"""
        pass
    
-   class EdgeNotFoundError(GLIError, KeyError):
+   class EdgeNotFoundError(GroggyError, KeyError):
        """Raised when an edge is not found"""
        pass
    
-   class BackendError(GLIError):
+   class BackendError(GroggyError):
        """Raised when backend operations fail"""
        pass
 
 Error Recovery
 ~~~~~~~~~~~~~
 
-GLI implements graceful error recovery:
+Groggy implements graceful error recovery:
 
 .. code-block:: python
 
@@ -339,7 +339,7 @@ GLI implements graceful error recovery:
 Testing Architecture
 -------------------
 
-GLI uses comprehensive testing strategies:
+Groggy uses comprehensive testing strategies:
 
 Backend Parity Testing
 ~~~~~~~~~~~~~~~~~~~~~
@@ -413,7 +413,7 @@ Planned Enhancements
 Scalability Roadmap
 ~~~~~~~~~~~~~~~~~~
 
-GLI's architecture is designed to scale:
+Groggy's architecture is designed to scale:
 
 - **Vertical Scaling**: Better single-machine performance
 - **Horizontal Scaling**: Multi-machine distribution

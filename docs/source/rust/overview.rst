@@ -147,7 +147,7 @@ Basic Operations
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    
    # Create graph with Rust backend
    g = Graph(backend='rust')
@@ -168,7 +168,7 @@ Large Graph Construction
 .. code-block:: python
 
    import time
-   from gli import Graph
+   from groggy import Graph
    
    # Efficient large graph creation
    g = Graph(backend='rust')
@@ -262,7 +262,7 @@ Monitor memory usage with the Rust backend:
 .. code-block:: python
 
    import tracemalloc
-   from gli import Graph
+   from groggy import Graph
    
    # Enable memory tracking
    tracemalloc.start()
@@ -291,7 +291,7 @@ Compare backend performance:
 .. code-block:: python
 
    import time
-   from gli import Graph
+   from groggy import Graph
    
    def benchmark_backends():
        backends = ['python', 'rust']
@@ -370,7 +370,7 @@ Troubleshooting Rust Backend
    
    .. code-block:: python
    
-      from gli import RUST_BACKEND_AVAILABLE
+      from groggy import RUST_BACKEND_AVAILABLE
       if not RUST_BACKEND_AVAILABLE:
           print("Install Rust and rebuild: maturin develop")
 
@@ -390,7 +390,7 @@ Troubleshooting Rust Backend
    .. code-block:: python
    
       try:
-          from gli import Graph
+          from groggy import Graph
           g = Graph(backend='rust')
       except ImportError as e:
           print(f"Rust backend import failed: {e}")
@@ -431,7 +431,7 @@ Direct FFI calls for maximum performance:
 .. code-block:: python
 
    # Access low-level Rust functions (advanced)
-   from gli._core import FastGraph
+   from groggy._core import FastGraph
    
    rust_graph = FastGraph()
    

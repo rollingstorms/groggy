@@ -7,7 +7,7 @@ mod utils;
 use graph::FastGraph;
 use storage::{ContentPool, GraphStore};
 
-/// GLI Core - High-performance graph operations implemented in Rust
+/// Groggy Core - High-performance graph operations implemented in Rust
 #[pymodule]
 fn _core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<FastGraph>()?;

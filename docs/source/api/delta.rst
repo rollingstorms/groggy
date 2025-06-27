@@ -1,7 +1,7 @@
 delta module
 ============
 
-.. automodule:: gli.delta
+.. automodule:: groggy.delta
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,14 +14,14 @@ GLI's delta system provides efficient change tracking and manipulation.
 Classes
 ~~~~~~~
 
-.. autoclass:: gli.delta.Delta
+.. autoclass:: groggy.delta.Delta
    :members:
    :undoc-members:
    :show-inheritance:
 
    Represents a set of changes to a graph.
 
-.. autoclass:: gli.delta.Operation
+.. autoclass:: groggy.delta.Operation
    :members:
    :undoc-members:
    :show-inheritance:
@@ -37,7 +37,7 @@ Deltas can be composed to represent complex changes:
 
 .. code-block:: python
 
-   from gli.delta import Delta
+   from groggy.delta import Delta
    
    # Create individual deltas
    delta1 = Delta()
@@ -85,11 +85,11 @@ Advanced Operations
 
 **Conflict Detection**
 
-.. autofunction:: gli.delta.detect_conflicts
+.. autofunction:: groggy.delta.detect_conflicts
 
 **Delta Optimization**
 
-.. autofunction:: gli.delta.optimize_delta
+.. autofunction:: groggy.delta.optimize_delta
 
 **Patch Application**
 

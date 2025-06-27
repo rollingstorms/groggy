@@ -1,7 +1,7 @@
 data_structures module
 ======================
 
-.. automodule:: gli.data_structures
+.. automodule:: groggy.data_structures
    :members:
    :undoc-members:
    :show-inheritance:
@@ -12,7 +12,7 @@ Core Data Structures
 Node Class
 ~~~~~~~~~~
 
-.. autoclass:: gli.data_structures.Node
+.. autoclass:: groggy.data_structures.Node
    :members:
    :undoc-members:
    :show-inheritance:
@@ -61,7 +61,7 @@ Node Class
 Edge Class
 ~~~~~~~~~~
 
-.. autoclass:: gli.data_structures.Edge
+.. autoclass:: groggy.data_structures.Edge
    :members:
    :undoc-members:
    :show-inheritance:
@@ -91,8 +91,8 @@ Both Node and Edge classes provide consistent attribute management:
 
 **Common Methods**
 
-.. automethod:: gli.data_structures.Node.get_attribute
-.. automethod:: gli.data_structures.Node.set_attribute
+.. automethod:: groggy.data_structures.Node.get_attribute
+.. automethod:: groggy.data_structures.Node.set_attribute
 
 **Dict-like Interface**
 

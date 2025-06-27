@@ -1,7 +1,7 @@
 views module
 ============
 
-.. automodule:: gli.views
+.. automodule:: groggy.views
    :members:
    :undoc-members:
    :show-inheritance:
@@ -14,7 +14,7 @@ GLI provides memory-efficient lazy views that avoid copying data when possible.
 LazyDict Class
 ~~~~~~~~~~~~~~
 
-.. autoclass:: gli.views.LazyDict
+.. autoclass:: groggy.views.LazyDict
    :members:
    :undoc-members:
    :show-inheritance:
@@ -45,7 +45,7 @@ LazyDict Class
 NodeView Class
 ~~~~~~~~~~~~~~
 
-.. autoclass:: gli.views.NodeView
+.. autoclass:: groggy.views.NodeView
    :members:
    :undoc-members:
    :show-inheritance:
@@ -55,7 +55,7 @@ NodeView Class
 EdgeView Class
 ~~~~~~~~~~~~~~
 
-.. autoclass:: gli.views.EdgeView
+.. autoclass:: groggy.views.EdgeView
    :members:
    :undoc-members:
    :show-inheritance:

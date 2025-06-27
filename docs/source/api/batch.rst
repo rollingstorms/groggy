@@ -1,7 +1,7 @@
 batch module
 ============
 
-.. automodule:: gli.graph.batch
+.. automodule:: groggy.graph.batch
    :members:
    :undoc-members:
    :show-inheritance:
@@ -11,7 +11,7 @@ BatchOperationContext
 
 The BatchOperationContext provides a context manager for efficient bulk operations.
 
-.. autoclass:: gli.graph.batch.BatchOperationContext
+.. autoclass:: groggy.graph.batch.BatchOperationContext
    :members:
    :undoc-members:
    :show-inheritance:
@@ -26,21 +26,21 @@ Batch Operations
 Node Operations
 ^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.batch.BatchOperationContext.add_node
-.. automethod:: gli.graph.batch.BatchOperationContext.set_node_attributes
+.. automethod:: groggy.graph.batch.BatchOperationContext.add_node
+.. automethod:: groggy.graph.batch.BatchOperationContext.set_node_attributes
 
 Edge Operations
 ^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.batch.BatchOperationContext.add_edge
-.. automethod:: gli.graph.batch.BatchOperationContext.set_edge_attributes
+.. automethod:: groggy.graph.batch.BatchOperationContext.add_edge
+.. automethod:: groggy.graph.batch.BatchOperationContext.set_edge_attributes
 
 Usage Example
 ~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
 
    g = Graph()
    

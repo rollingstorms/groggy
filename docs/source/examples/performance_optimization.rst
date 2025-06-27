@@ -1,7 +1,7 @@
 Performance Optimization Examples
 ==================================
 
-This section provides practical examples for optimizing GLI performance in real-world scenarios.
+This section provides practical examples for optimizing Groggy performance in real-world scenarios.
 
 Large Graph Construction
 -----------------------
@@ -13,7 +13,7 @@ Building Million-Node Graphs
 
    import time
    import memory_profiler
-   from gli import Graph, set_backend
+   from groggy import Graph, set_backend
    
    def create_large_social_network():
        \"\"\"Create a social network with 1M users efficiently\"\"\"
@@ -67,7 +67,7 @@ Real-World Data Integration
 
    import pandas as pd
    import json
-   from gli import Graph
+   from groggy import Graph
    
    def load_from_csv_efficiently(csv_file, chunk_size=10000):
        \"\"\"Load graph from large CSV file\"\"\"
@@ -132,7 +132,7 @@ Optimized Graph Traversal
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    import time
    from collections import deque, defaultdict
    
@@ -216,7 +216,7 @@ Efficient Attribute Processing
 
 .. code-block:: python
 
-   from gli import Graph
+   from groggy import Graph
    import numpy as np
    from collections import Counter
    
@@ -287,7 +287,7 @@ Streaming Graph Processing
 .. code-block:: python
 
    import gc
-   from gli import Graph
+   from groggy import Graph
    
    def process_graph_in_chunks(large_graph, chunk_size=10000):
        \"\"\"Process large graph in memory-efficient chunks\"\"\"
@@ -362,7 +362,7 @@ Multi-threaded Graph Analysis
 
    import concurrent.futures
    import threading
-   from gli import Graph
+   from groggy import Graph
    
    def parallel_node_processing(graph, process_func, num_workers=4):
        \"\"\"Process nodes in parallel using thread pool\"\"\"
@@ -441,7 +441,7 @@ Performance Measurement Framework
    import psutil
    import os
    from contextlib import contextmanager
-   from gli import Graph
+   from groggy import Graph
    
    class PerformanceBenchmark:
        def __init__(self):
@@ -542,7 +542,7 @@ Database Integration
 .. code-block:: python
 
    import sqlite3
-   from gli import Graph
+   from groggy import Graph
    
    def load_from_database(db_path, node_query, edge_query):
        \"\"\"Load graph from database efficiently\"\"\"
@@ -588,7 +588,7 @@ Database Integration
        
        return g
 
-These examples demonstrate how to achieve optimal performance with GLI in real-world scenarios. The key principles are:
+These examples demonstrate how to achieve optimal performance with Groggy in real-world scenarios. The key principles are:
 
 1. **Use the Rust backend** for large graphs
 2. **Batch operations** whenever possible
