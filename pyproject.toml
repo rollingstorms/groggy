@@ -40,10 +40,19 @@ dev = [
     "numpy",
     "matplotlib",
 ]
+docs = [
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=1.3.0",
+    "myst-parser>=2.0.0",
+    "sphinx-autobuild>=2021.3.14",
+    "sphinx-copybutton>=0.5.2",
+    "sphinx-autoapi>=3.0.0",
+    "pygments>=2.15.0",
+]
 
 [project.urls]
-Homepage = "https://github.com/your-org/groggy"
-Repository = "https://github.com/your-org/groggy"
+Homepage = "https://github.com/rollingstorms/groggy"
+Repository = "https://github.com/rollingstorms/groggy"
 Documentation = "https://groggy.readthedocs.io"
 
 [tool.maturin]

@@ -1,4 +1,4 @@
-# Documentation requirements for GLI
+# Documentation requirements for Groggy
 # Install with: pip install -r docs-requirements.txt
 
 # Core Sphinx
@@ -17,6 +17,12 @@ sphinx-autoapi>=3.0.0
 
 # For better code highlighting
 pygments>=2.15.0
+
+# Build dependencies
+maturin>=1.4,<2.0
+
+# Runtime dependencies (needed for autodoc)
+typing-extensions>=4.0.0
 
 # For generating diagrams (optional)
 sphinxcontrib-mermaid>=0.9.2

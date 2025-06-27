@@ -50,7 +50,7 @@ print(f"Edges: {list(graph.edges())}")
 
 ## Documentation
 
-Full documentation is available at [docs link] or can be built locally:
+Full documentation is available at [groggy.readthedocs.io](https://groggy.readthedocs.io) or can be built locally:
 
 ```bash
 cd docs
