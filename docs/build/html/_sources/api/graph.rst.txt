@@ -9,14 +9,20 @@ graph module
 Graph Class
 -----------
 
-The Graph class is the main interface for graph operations in GLI.
+The Graph class is the main interface for graph operations in GLI. It provides a high-level Python API backed by a high-performance Rust implementation.
 
-.. autoclass:: gli.graph.Graph
+.. autoclass:: gli.graph.core.Graph
    :members:
    :undoc-members:
    :show-inheritance:
 
    .. automethod:: __init__
+
+Creation Methods
+~~~~~~~~~~~~~~~~
+
+.. automethod:: gli.graph.core.Graph.from_edge_list
+.. automethod:: gli.graph.core.Graph.from_node_list
 
 Core Operations
 ~~~~~~~~~~~~~~~
@@ -24,28 +30,35 @@ Core Operations
 Node Operations
 ^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.Graph.add_node
-.. automethod:: gli.graph.Graph.get_node
-.. automethod:: gli.graph.Graph.update_node
-.. automethod:: gli.graph.Graph.remove_node
-.. automethod:: gli.graph.Graph.has_node
+.. automethod:: gli.graph.core.Graph.add_node
+.. automethod:: gli.graph.core.Graph.get_node
+.. automethod:: gli.graph.core.Graph.set_node_attribute
+.. automethod:: gli.graph.core.Graph.set_node_attributes
+.. automethod:: gli.graph.core.Graph.get_node_attributes
 
 Edge Operations
 ^^^^^^^^^^^^^^^
 
-.. automethod:: gli.graph.Graph.add_edge
-.. automethod:: gli.graph.Graph.get_edge
-.. automethod:: gli.graph.Graph.update_edge
-.. automethod:: gli.graph.Graph.remove_edge
-.. automethod:: gli.graph.Graph.has_edge
+.. automethod:: gli.graph.core.Graph.add_edge
+.. automethod:: gli.graph.core.Graph.get_edge
+.. automethod:: gli.graph.core.Graph.set_edge_attribute
+.. automethod:: gli.graph.core.Graph.set_edge_attributes
+.. automethod:: gli.graph.core.Graph.get_edge_attributes
+
+Batch Operations
+~~~~~~~~~~~~~~~~
+
+.. automethod:: gli.graph.core.Graph.set_nodes_attributes_batch
+.. automethod:: gli.graph.core.Graph.set_edges_attributes_batch
 
 Graph Queries
 ~~~~~~~~~~~~~
 
-.. automethod:: gli.graph.Graph.get_neighbors
-.. automethod:: gli.graph.Graph.degree
-.. automethod:: gli.graph.Graph.node_count
-.. automethod:: gli.graph.Graph.edge_count
+.. automethod:: gli.graph.core.Graph.get_neighbors
+.. automethod:: gli.graph.core.Graph.node_count
+.. automethod:: gli.graph.core.Graph.edge_count
+.. automethod:: gli.graph.core.Graph.filter_nodes
+.. automethod:: gli.graph.core.Graph.filter_edges
 
 Iteration
 ~~~~~~~~~

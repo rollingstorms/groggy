@@ -2,7 +2,10 @@
 Core Graph class implementation
 """
 
-from typing import Dict, List, Any, Optional, Callable, Union
+from typing import Dict, List, Any, Optional, Callable, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .subgraph import Subgraph
 
 # Type alias for node/edge identifiers
 NodeID = Union[str, int]
@@ -23,7 +26,10 @@ except ImportError:
 class Graph(StateMixin):
     """High-level Graph interface with automatic Rust/Python backend selection"""
     
-    def __init__(self, nodes=None, edges=None, graph_attributes=None, backend=None, max_auto_states: int = 10):
+    def __init__(self, nodes=None, edges=None, graph_attributes=None, backend=None, max_auto_states: int = 10, directed: bool = True):
+        # Store graph properties
+        self.directed = directed
+        
         # Backend selection - use global setting or override
         if backend is None:
             # Import here to avoid circular import
@@ -35,7 +41,7 @@ class Graph(StateMixin):
         
         if self.use_rust:
             # Rust handles processing, Python manages state/branches
-            self._rust_core = _core.FastGraph()
+            self._rust_core = _core.FastGraph(directed=directed)
             self._rust_store = _core.GraphStore()
             self._init_rust_backend(nodes, edges, graph_attributes)
             
@@ -354,11 +360,25 @@ class Graph(StateMixin):
             return list(effective_nodes.keys())
 
     def get_neighbors(self, node_id: NodeID, direction: str = 'both') -> List[str]:
-        """Get neighbors of a node"""
+        """Get neighbors of a node
+        
+        Args:
+            node_id: The node to get neighbors for
+            direction: 'out' for outgoing, 'in' for incoming, 'both' for all neighbors
+        """
         node_id_str = str(node_id)
         if self.use_rust:
-            # Rust backend currently only supports 'both' direction
-            return self._rust_core.get_neighbors(node_id_str)
+            # Use the appropriate Rust method based on direction
+            if direction == 'out':
+                return self._rust_core.get_outgoing_neighbors(node_id_str)
+            elif direction == 'in':
+                return self._rust_core.get_incoming_neighbors(node_id_str)
+            else:  # 'both'
+                if self.directed:
+                    return self._rust_core.get_all_neighbors(node_id_str)
+                else:
+                    # For undirected graphs, neighbors() already gives all connected nodes
+                    return self._rust_core.get_neighbors(node_id_str)
         else:
             neighbors = set()
             _, effective_edges, _ = self._get_effective_data()
@@ -371,98 +391,187 @@ class Graph(StateMixin):
             
             return list(neighbors)
 
+    def get_outgoing_neighbors(self, node_id: NodeID) -> List[str]:
+        """Get outgoing neighbors of a node (for directed graphs)"""
+        node_id_str = str(node_id)
+        if self.use_rust:
+            return self._rust_core.get_outgoing_neighbors(node_id_str)
+        else:
+            neighbors = set()
+            _, effective_edges, _ = self._get_effective_data()
+            
+            for edge in effective_edges.values():
+                if edge.source == node_id_str:
+                    neighbors.add(edge.target)
+            
+            return list(neighbors)
+    
+    def get_incoming_neighbors(self, node_id: NodeID) -> List[str]:
+        """Get incoming neighbors of a node (for directed graphs)"""
+        node_id_str = str(node_id)
+        if self.use_rust:
+            return self._rust_core.get_incoming_neighbors(node_id_str)
+        else:
+            neighbors = set()
+            _, effective_edges, _ = self._get_effective_data()
+            
+            for edge in effective_edges.values():
+                if edge.target == node_id_str:
+                    neighbors.add(edge.source)
+            
+            return list(neighbors)
+    
+    def get_all_neighbors(self, node_id: NodeID) -> List[str]:
+        """Get all neighbors of a node (both incoming and outgoing)"""
+        node_id_str = str(node_id)
+        if self.use_rust:
+            return self._rust_core.get_all_neighbors(node_id_str)
+        else:
+            neighbors = set()
+            _, effective_edges, _ = self._get_effective_data()
+            
+            for edge in effective_edges.values():
+                if edge.source == node_id_str:
+                    neighbors.add(edge.target)
+                if edge.target == node_id_str:
+                    neighbors.add(edge.source)
+            
+            return list(neighbors)
+
     # High-level wrapper methods to avoid direct _rust_core access
-    def filter_nodes(self, filter_func: Union[Callable[[NodeID, Dict[str, Any]], bool], Dict[str, Any]]) -> List[str]:
-        """Filter nodes by lambda function or attribute values
+    def filter_nodes(self, filter_func: Union[Callable[[NodeID, Dict[str, Any]], bool], Dict[str, Any], str] = None, return_graph: bool = False) -> Union[List[str], 'Subgraph']:
+        """Filter nodes by lambda function, attribute values, or string query
         
         Args:
             filter_func: Either a callable that takes (node_id, attributes) and returns bool,
-                        or a dictionary of attribute filters
+                        a dictionary of attribute filters, or a string query like "role == 'Manager'"
+            return_graph: If True, return a new Subgraph with filtered nodes and their edges.
+                         If False, return a list of node IDs (default)
             
         Returns:
-            List of node IDs that match the filter
+            List of node IDs that match the filter, or a new Subgraph instance if return_graph=True
+            
+        Examples:
+            # Function predicate
+            filtered_ids = graph.filter_nodes(lambda node_id, attrs: attrs.get('age', 0) > 30)
+            
+            # Dictionary predicate
+            filtered_ids = graph.filter_nodes({'role': 'Manager', 'department': 'Engineering'})
+            
+            # String query
+            filtered_ids = graph.filter_nodes("role == 'Manager' and salary > 100000")
+            
+            # Return subgraph
+            subgraph = graph.filter_nodes({'role': 'Manager'}, return_graph=True)
         """
-        if callable(filter_func):
-            # Lambda function filtering
+        # Store original filter criteria for metadata
+        original_filter = filter_func
+        
+        # Handle string query
+        if isinstance(filter_func, str):
+            from .filtering import QueryCompiler
+            filter_func = QueryCompiler.compile_node_query(filter_func)
+        elif isinstance(filter_func, dict):
+            # Dictionary-based filtering - convert to function
+            filter_dict = filter_func  # Store reference to dict before reassigning
+            def dict_filter(node_id: str, attributes: Dict[str, Any]) -> bool:
+                for attr, value in filter_dict.items():
+                    if attr not in attributes or attributes[attr] != value:
+                        return False
+                return True
+            filter_func = dict_filter
+        
+        # Apply the filter
+        if filter_func is None:
+            filtered_node_ids = list(self.get_node_ids())
+        else:
+            # Apply filter function
             if self.use_rust:
                 # For Rust backend, we need to iterate through all nodes
-                result = []
+                filtered_node_ids = []
                 for node_id in self.nodes:
                     node = self.get_node(node_id)
                     if node and filter_func(node_id, node.attributes):
-                        result.append(node_id)
-                return result
+                        filtered_node_ids.append(node_id)
             else:
                 # Python fallback implementation
                 effective_nodes, _, _ = self._get_effective_data()
-                result = []
+                filtered_node_ids = []
                 for node_id, node in effective_nodes.items():
                     if filter_func(node_id, node.attributes):
-                        result.append(node_id)
-                return result
+                        filtered_node_ids.append(node_id)
+        
+        if return_graph:
+            return self._create_subgraph_from_nodes(filtered_node_ids, original_filter)
         else:
-            # Dictionary-based attribute filtering
-            if self.use_rust:
-                return self._rust_core.filter_nodes_by_attributes(filter_func)
-            else:
-                # Python fallback implementation
-                effective_nodes, _, _ = self._get_effective_data()
-                result = []
-                for node_id, node in effective_nodes.items():
-                    match = True
-                    for attr, value in filter_func.items():
-                        if attr not in node.attributes or node.attributes[attr] != value:
-                            match = False
-                            break
-                    if match:
-                        result.append(node_id)
-                return result
+            return filtered_node_ids
 
-    def filter_edges(self, filter_func: Union[Callable[[str, NodeID, NodeID, Dict[str, Any]], bool], Dict[str, Any]]) -> List[str]:
-        """Filter edges by lambda function or attribute values
+    def filter_edges(self, filter_func: Union[Callable[[str, NodeID, NodeID, Dict[str, Any]], bool], Dict[str, Any], str] = None, return_graph: bool = False) -> Union[List[str], 'Subgraph']:
+        """Filter edges by lambda function, attribute values, or string query
         
         Args:
             filter_func: Either a callable that takes (edge_id, source, target, attributes) and returns bool,
-                        or a dictionary of attribute filters
+                        a dictionary of attribute filters, or a string query like "weight > 0.5"
+            return_graph: If True, return a new Subgraph with filtered edges and connected nodes.
+                         If False, return a list of edge IDs (default)
             
         Returns:
-            List of edge IDs that match the filter
+            List of edge IDs that match the filter, or a new Subgraph instance if return_graph=True
+            
+        Examples:
+            # Function predicate
+            filtered_ids = graph.filter_edges(lambda edge_id, src, tgt, attrs: attrs.get('weight', 0) > 0.5)
+            
+            # Dictionary predicate
+            filtered_ids = graph.filter_edges({'relationship': 'friend', 'active': True})
+            
+            # String query
+            filtered_ids = graph.filter_edges("weight > 0.5 and relationship == 'colleague'")
+            
+            # Return subgraph
+            subgraph = graph.filter_edges({'relationship': 'friend'}, return_graph=True)
         """
-        if callable(filter_func):
-            # Lambda function filtering
+        # Store original filter criteria for metadata
+        original_filter = filter_func
+        
+        # Handle string query
+        if isinstance(filter_func, str):
+            from .filtering import QueryCompiler
+            filter_func = QueryCompiler.compile_edge_query(filter_func)
+        elif isinstance(filter_func, dict):
+            # Dictionary-based filtering - convert to function
+            filter_dict = filter_func  # Store reference to dict before reassigning
+            def dict_filter(edge_id: str, source: str, target: str, attributes: Dict[str, Any]) -> bool:
+                for attr, value in filter_dict.items():
+                    if attr not in attributes or attributes[attr] != value:
+                        return False
+                return True
+            filter_func = dict_filter
+        
+        # Apply the filter
+        if filter_func is None:
+            filtered_edge_ids = list(self.edges.keys())
+        else:
+            # Apply filter function
             if self.use_rust:
                 # For Rust backend, we need to iterate through all edges
-                result = []
+                filtered_edge_ids = []
                 for edge_id in self.edges:
                     edge = self.edges[edge_id]  # Use the EdgeView instead of get_edge
                     if edge and filter_func(edge_id, edge.source, edge.target, edge.attributes):
-                        result.append(edge_id)
-                return result
+                        filtered_edge_ids.append(edge_id)
             else:
                 # Python fallback implementation
                 _, effective_edges, _ = self._get_effective_data()
-                result = []
+                filtered_edge_ids = []
                 for edge_id, edge in effective_edges.items():
                     if filter_func(edge_id, edge.source, edge.target, edge.attributes):
-                        result.append(edge_id)
-                return result
+                        filtered_edge_ids.append(edge_id)
+        
+        if return_graph:
+            return self._create_subgraph_from_edges(filtered_edge_ids, original_filter)
         else:
-            # Dictionary-based attribute filtering
-            if self.use_rust:
-                return self._rust_core.filter_edges_by_attributes(filter_func)
-            else:
-                # Python fallback implementation
-                _, effective_edges, _ = self._get_effective_data()
-                result = []
-                for edge_id, edge in effective_edges.items():
-                    match = True
-                    for attr, value in filter_func.items():
-                        if attr not in edge.attributes or edge.attributes[attr] != value:
-                            match = False
-                            break
-                    if match:
-                        result.append(edge_id)
-                return result
+            return filtered_edge_ids
 
     def set_node_attribute(self, node_id: NodeID, attribute: str, value: Any):
         """Set a single attribute on a node
@@ -683,3 +792,23 @@ class Graph(StateMixin):
     def filter_edges_by_attributes(self, filters: Dict[str, Any]) -> List[str]:
         """Legacy alias for filter_edges with attribute dictionary"""
         return self.filter_edges(filters)
+
+    # Helper methods for enhanced filtering
+    def _compile_query_predicate(self, query_str: str, is_node: bool = True):
+        """Compile a string query into a filter predicate function"""
+        from .filtering import QueryCompiler
+        
+        if is_node:
+            return QueryCompiler.compile_node_query(query_str)
+        else:
+            return QueryCompiler.compile_edge_query(query_str)
+    
+    def _create_subgraph_from_nodes(self, node_ids: List[str], filter_criteria=None) -> 'Subgraph':
+        """Create a subgraph containing only the specified nodes and edges between them"""
+        from .filtering import SubgraphCreator
+        return SubgraphCreator.create_node_subgraph(self, node_ids, filter_criteria)
+    
+    def _create_subgraph_from_edges(self, edge_ids: List[str], filter_criteria=None) -> 'Subgraph':
+        """Create a subgraph containing only the specified edges and their connected nodes"""
+        from .filtering import SubgraphCreator
+        return SubgraphCreator.create_edge_subgraph(self, edge_ids, filter_criteria)

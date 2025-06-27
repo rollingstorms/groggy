@@ -13,33 +13,36 @@ GLI - Graph Language Interface Documentation
    :target: https://www.rust-lang.org/
    :alt: Rust 1.70+
 
-**A high-performance graph library with dual Python/Rust backends for efficient graph operations at scale.**
+**A high-performance graph library with Rust backend for efficient graph operations, state management, and branching at scale.**
 
-GLI (Graph Language Interface) is a powerful graph manipulation library designed for both rapid prototyping and production-scale applications.
+GLI (Graph Language Interface) is a powerful graph manipulation library designed for both rapid prototyping and production-scale applications. It features a high-performance Rust backend with a Python interface for maximum performance and usability.
 
 Features
 --------
 
-* **Dual Backend Architecture**: Switch seamlessly between Python and Rust backends
-* **High Performance**: Rust backend handles 2M+ nodes with excellent memory efficiency  
-* **Batch Operations**: 30-40x faster filtering and bulk operations for large graphs
-* **Rich Attributes**: Complex nested data structures on nodes and edges
-* **Memory Efficient**: Content-addressed storage with deduplication
-* **Developer Friendly**: Intuitive API with comprehensive error handling
+* **High-Performance Rust Backend**: Handle 1M+ nodes/edges efficiently with ~85MB per million nodes
+* **Comprehensive State Management**: Save, restore, and branch graph states with version control-like functionality
+* **Batch Operations**: Optimized bulk operations for nodes and edges with 10-100x performance improvements
+* **Flexible Node/Edge IDs**: Support both string and integer identifiers with automatic conversion
+* **Rich Attributes**: Complex nested data structures on nodes and edges with efficient batch updates
+* **Intuitive API**: Clean, Pythonic interface with lazy-loaded properties and smart caching
+* **Memory Efficient**: Content-addressed storage with deduplication and garbage collection
+* **Branch Management**: Create, switch, and manage multiple graph states like Git branches
+* **Developer Friendly**: Comprehensive error handling, type hints, and extensive documentation
 
 Quick Start
 -----------
 
 .. code-block:: python
 
-   from gli import Graph, set_backend
+   from gli import Graph
 
-   # Create a graph (auto-selects best available backend)
+   # Create a graph (uses high-performance Rust backend)
    g = Graph()
 
-   # Add nodes with attributes
+   # Add nodes with attributes (supports int and str IDs)
    alice = g.add_node(label="Alice", age=30, city="New York")
-   bob = g.add_node(label="Bob", age=25, city="Boston")
+   bob = g.add_node(1, label="Bob", age=25, city="Boston")  # Mixed ID types
 
    # Add edges with attributes
    friendship = g.add_edge(alice, bob, 
@@ -47,27 +50,41 @@ Quick Start
                           since=2020, 
                           strength=0.9)
 
-   # Query the graph
+   # State management and branching
+   initial_state = g.save_state("Initial graph")
+   g.create_branch("development")
+   g.switch_branch("development")
+
+   # Efficient batch operations
+   node_updates = {
+       alice: {"department": "Engineering", "salary": 100000},
+       bob: {"department": "Design", "salary": 85000}
+   }
+   g.set_nodes_attributes_batch(node_updates)
+
+   # Query the graph with new API
    neighbors = g.get_neighbors(alice)
-   print(f"Alice has {len(neighbors)} connections")
+   edge = g.get_edge(alice, bob)  # Takes (source, target) parameters
+   
+   # Lazy-loaded properties
+   print(f"Total states: {len(g.states['state_hashes'])}")
+   print(f"Available branches: {list(g.branches.keys())}")
 
-   # Access attributes
-   alice_node = g.get_node(alice)
-   print(f"Alice is {alice_node['age']} years old")
+   # High-performance filtering
+   engineers = g.filter_nodes(lambda node_id, attrs: attrs.get("department") == "Engineering")
+   high_earners = g.filter_nodes({"salary": lambda x: x > 90000})
 
-   # High-performance batch operations
-   engineers = g.batch_filter_nodes(occupation="Engineer")
-   attributes = g.batch_get_node_attributes(engineers)
-   print(f"Found {len(engineers)} engineers")
+   # Access node/edge collections with lazy loading
+   print(f"Nodes: {len(g.nodes)}, Edges: {len(g.edges)}")
+   print(f"Alice is {g.nodes[alice]['age']} years old")
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
    installation
-   quickstart
-   api/index
    examples/index
+   api/index
    performance
    architecture
    testing
@@ -76,16 +93,24 @@ Quick Start
 
 .. toctree::
    :maxdepth: 1
+   :caption: Examples:
+
+   examples/basic_usage
+   examples/state_management
+   examples/batch_operations
+   examples/performance_optimization
+
+.. toctree::
+   :maxdepth: 1
    :caption: Python API Reference:
 
    api/gli
    api/graph
-   api/store
    api/data_structures
    api/views
    api/utils
+   api/batch
    api/state
-   api/delta
 
 .. toctree::
    :maxdepth: 1

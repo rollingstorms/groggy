@@ -1,5 +1,5 @@
 data_structures module
-====================
+======================
 
 .. automodule:: gli.data_structures
    :members:
@@ -17,9 +17,21 @@ Node Class
    :undoc-members:
    :show-inheritance:
 
-   The Node class represents a graph vertex with associated attributes.
+   The Node class represents a graph vertex with associated attributes. It supports both string and integer IDs.
 
    .. automethod:: __init__
+
+   **Type Support**
+
+   Nodes support flexible ID types:
+
+   .. code-block:: python
+
+      # String IDs
+      node1 = Node("alice", {"age": 30, "city": "NYC"})
+      
+      # Integer IDs  
+      node2 = Node(42, {"value": 100, "category": "important"})
 
    **Attribute Access**
 
@@ -34,9 +46,17 @@ Node Class
       print(node.get("job", ""))  # "" (default)
       node["job"] = "Engineer"
       
+      # Check membership
+      if "age" in node:
+          print("Node has age attribute")
+      
       # Iteration
       for key in node:
           print(f"{key}: {node[key]}")
+      
+      # Get all items
+      for key, value in node.items():
+          print(f"{key}: {value}")
 
 Edge Class
 ~~~~~~~~~~
@@ -46,7 +66,7 @@ Edge Class
    :undoc-members:
    :show-inheritance:
 
-   The Edge class represents a graph edge connecting two nodes.
+   The Edge class represents a graph edge connecting two nodes. It supports mixed node ID types.
 
    .. automethod:: __init__
 

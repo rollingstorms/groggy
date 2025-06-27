@@ -1,6 +1,6 @@
 # GLI - Graph Language Interface
 
-**A high-performance graph library with dual Python/Rust backends for efficient graph operations at scale.**
+**A high-performance graph library with Rust backend for efficient graph operations, state management, and branching at scale.**
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
@@ -8,40 +8,66 @@
 
 ## Overview
 
-GLI (Graph Language Interface) is a powerful graph manipulation library designed for both rapid prototyping and production-scale applications. It features:
+GLI (Graph Language Interface) is a powerful graph manipulation library with a high-performance Rust backend and intuitive Python interface. It's designed for both rapid prototyping and production-scale applications.
 
-- **Dual Backend Architecture**: Switch seamlessly between Python and Rust backends
-- **High Performance**: Rust backend handles 2M+ nodes with excellent memory efficiency
-- **Rich Attributes**: Complex nested data structures on nodes and edges
-- **Memory Efficient**: Content-addressed storage with deduplication
-- **Developer Friendly**: Intuitive API with comprehensive error handling
+### ✨ Key Features
+
+- **🚀 High-Performance Rust Backend**: Handle 1M+ nodes/edges efficiently (~85MB per million nodes)
+- **🌳 State Management & Branching**: Git-like versioning with save, restore, and branch operations
+- **⚡ Batch Operations**: Optimized bulk operations with 10-100x performance improvements
+- **🔢 Flexible Node/Edge IDs**: Support both string and integer identifiers seamlessly
+- **💾 Memory Efficient**: Content-addressed storage with deduplication and smart caching
+- **🐍 Pythonic API**: Intuitive interface with lazy loading and comprehensive type hints
+- **🔧 Developer Friendly**: Extensive documentation, examples, and error handling
 
 ## Quick Start
 
 ```python
-from gli import Graph, set_backend
+from gli import Graph
 
-# Create a graph (auto-selects best available backend)
+# Create a graph (uses high-performance Rust backend automatically)
 g = Graph()
 
-# Add nodes with attributes
-alice = g.add_node(label="Alice", age=30, city="New York")
-bob = g.add_node(label="Bob", age=25, city="Boston")
+# Add nodes with mixed ID types and rich attributes
+alice = g.add_node("alice", name="Alice", age=30, department="Engineering")
+bob = g.add_node(1, name="Bob", age=25, department="Design")
 
-# Add edges with attributes
-friendship = g.add_edge(alice, bob, 
-                       relationship="friends", 
-                       since=2020, 
-                       strength=0.9)
+# Add edges with the intuitive API
+g.add_edge(alice, bob, relationship="collaborates", since=2020)
 
-# Query the graph
-neighbors = g.get_neighbors(alice)
-print(f"Alice has {len(neighbors)} connections")
+# State management and branching
+initial_state = g.save_state("Initial team")
+g.create_branch("development", switch=True)
 
-# Access attributes
-alice_node = g.get_node(alice)
-print(f"Alice is {alice_node['age']} years old")
+# Efficient batch operations for large datasets
+updates = {
+    alice: {"salary": 100000, "level": "senior"},
+    bob: {"salary": 85000, "level": "mid"}
+}
+g.set_nodes_attributes_batch(updates)  # Much faster than individual updates
+
+# Lazy-loaded collections and properties
+print(f"Nodes: {len(g.nodes)}, Edges: {len(g.edges)}")
+print(f"Available branches: {list(g.branches.keys())}")
+print(f"States: {len(g.states['state_hashes'])}")
+
+# High-performance filtering
+engineers = g.filter_nodes({"department": "Engineering"})
+friendships = g.filter_edges(lambda eid, src, tgt, attrs: attrs.get("relationship") == "collaborates")
+
+# Switch between graph states instantly
+g.switch_branch("main")          # ~0.1s for 100K+ nodes
+g.load_state(initial_state)      # Restore any previous state
 ```
+
+## Performance Benchmarks
+
+| Operation | Scale | Time | Memory |
+|-----------|-------|------|---------|
+| Graph Creation | 10K nodes + 10K edges | 0.12s | 25 MB |
+| Batch Updates | 100K nodes | 1.04s | 85 MB |
+| State Save/Load | 10K nodes | 0.1s | Efficient |
+| Branch Switching | 100K+ nodes | 0.1-0.2s | ~85 MB/million |
 
 ## Installation
 
@@ -54,8 +80,8 @@ cd gli
 # Install Python package
 pip install -e .
 
-# Build Rust backend (optional, for high performance)
-cargo build --release
+# Build Rust backend (automatically done with maturin)
+maturin develop
 ```
 
 ### Requirements

@@ -119,7 +119,7 @@ impl GraphStore {
         for node_id in graph.get_node_ids() {
             // Get the actual node data from the graph
             if let Some(node_idx) = graph.node_id_to_index.get(&node_id) {
-                if let Some(node_data) = graph.graph.node_weight(*node_idx) {
+                if let Some(node_data) = graph.get_node_weight(*node_idx) {
                     let hash = self.content_pool.intern_node(node_data.clone());
                     node_hashes.insert(node_id, hash);
                 }
@@ -127,8 +127,8 @@ impl GraphStore {
         }
         
         // Store all edges in content pool
-        for edge_idx in graph.graph.edge_indices() {
-            if let Some(edge_data) = graph.graph.edge_weight(edge_idx) {
+        for edge_idx in graph.get_edge_indices() {
+            if let Some(edge_data) = graph.get_edge_weight(edge_idx) {
                 let edge_id = format!("{}->{}", edge_data.source, edge_data.target);
                 let hash = self.content_pool.intern_edge(edge_data.clone());
                 edge_hashes.insert(edge_id, hash);
@@ -160,13 +160,13 @@ impl GraphStore {
     /// Reconstruct graph from state hash
     pub fn reconstruct_graph(&self, state_hash: &str) -> Option<FastGraph> {
         let state = self.states.get(state_hash)?;
-        let mut graph = FastGraph::new();
+        let mut graph = FastGraph::new(true); // Default to directed for now
         
         // Reconstruct nodes
         for (node_id, content_hash) in &state.node_hashes {
             if let Some(node_data) = self.content_pool.get_node(content_hash) {
                 // Add node with proper attributes (dereference Arc)
-                let new_node_idx = graph.graph.add_node((*node_data).clone());
+                let new_node_idx = graph.add_node_to_graph((*node_data).clone());
                 graph.node_id_to_index.insert(node_id.clone(), new_node_idx);
                 graph.node_index_to_id.insert(new_node_idx, node_id.clone());
             }
@@ -175,10 +175,10 @@ impl GraphStore {
         // Reconstruct edges
         for (edge_id, content_hash) in &state.edge_hashes {
             if let Some(edge_data) = self.content_pool.get_edge(content_hash) {
-                let source_idx = graph.node_id_to_index.get(&edge_data.source)?;
-                let target_idx = graph.node_id_to_index.get(&edge_data.target)?;
+                let source_idx = *graph.node_id_to_index.get(&edge_data.source)?;
+                let target_idx = *graph.node_id_to_index.get(&edge_data.target)?;
                 // Add edge with proper attributes (dereference Arc)
-                graph.graph.add_edge(*source_idx, *target_idx, (*edge_data).clone());
+                let _ = graph.add_edge_to_graph_public(source_idx, target_idx, (*edge_data).clone());
             }
         }
         

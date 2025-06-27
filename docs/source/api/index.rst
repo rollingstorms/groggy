@@ -11,16 +11,24 @@ Core Classes
 
    gli
    graph
-   store
 
-Data Structures
----------------
+Data Structures & Views
+-----------------------
 
 .. toctree::
    :maxdepth: 2
 
    data_structures
    views
+
+Graph Operations
+----------------
+
+.. toctree::
+   :maxdepth: 2
+
+   batch
+   state
 
 Utilities
 ---------
@@ -29,16 +37,17 @@ Utilities
    :maxdepth: 2
 
    utils
-   state
-   delta
 
-Backend Management
-------------------
+Backend Architecture
+--------------------
 
-GLI supports multiple backends for different performance characteristics:
+GLI uses a high-performance Rust backend with Python bindings for optimal performance:
 
-* **Python Backend**: Pure Python implementation for maximum compatibility
-* **Rust Backend**: High-performance Rust implementation with Python bindings
+* **Rust Backend**: High-performance core implementation in Rust
+* **Python Interface**: Pythonic API with lazy loading and smart caching
+* **Automatic Conversion**: Seamless handling of mixed int/str node IDs
+* **State Management**: Git-like branching and state management
+* **Batch Operations**: Optimized bulk operations for large-scale graphs
 
 Backend Functions
 ~~~~~~~~~~~~~~~~~

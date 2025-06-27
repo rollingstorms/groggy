@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use petgraph::{Graph as PetGraph, Directed};
+use petgraph::{Graph as PetGraph, Directed, Undirected, EdgeType};
 use petgraph::graph::NodeIndex;
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
@@ -21,25 +21,139 @@ pub struct EdgeData {
     pub attributes: HashMap<String, JsonValue>,
 }
 
+/// Graph type enum to support both directed and undirected graphs
+#[derive(Debug, Clone)]
+pub enum GraphType {
+    Directed(PetGraph<NodeData, EdgeData, Directed>),
+    Undirected(PetGraph<NodeData, EdgeData, Undirected>),
+}
+
+impl GraphType {
+    fn add_node(&mut self, node_data: NodeData) -> NodeIndex {
+        match self {
+            GraphType::Directed(graph) => graph.add_node(node_data),
+            GraphType::Undirected(graph) => graph.add_node(node_data),
+        }
+    }
+    
+    fn add_edge(&mut self, source: NodeIndex, target: NodeIndex, edge_data: EdgeData) -> petgraph::graph::EdgeIndex {
+        match self {
+            GraphType::Directed(graph) => graph.add_edge(source, target, edge_data),
+            GraphType::Undirected(graph) => graph.add_edge(source, target, edge_data),
+        }
+    }
+    
+    fn node_count(&self) -> usize {
+        match self {
+            GraphType::Directed(graph) => graph.node_count(),
+            GraphType::Undirected(graph) => graph.node_count(),
+        }
+    }
+    
+    fn edge_count(&self) -> usize {
+        match self {
+            GraphType::Directed(graph) => graph.edge_count(),
+            GraphType::Undirected(graph) => graph.edge_count(),
+        }
+    }
+    
+    fn neighbors(&self, node: NodeIndex) -> Box<dyn Iterator<Item = NodeIndex> + '_> {
+        match self {
+            GraphType::Directed(graph) => Box::new(graph.neighbors(node)),
+            GraphType::Undirected(graph) => Box::new(graph.neighbors(node)),
+        }
+    }
+    
+    fn find_edge(&self, source: NodeIndex, target: NodeIndex) -> Option<petgraph::graph::EdgeIndex> {
+        match self {
+            GraphType::Directed(graph) => graph.find_edge(source, target),
+            GraphType::Undirected(graph) => graph.find_edge(source, target),
+        }
+    }
+    
+    fn node_weight(&self, node: NodeIndex) -> Option<&NodeData> {
+        match self {
+            GraphType::Directed(graph) => graph.node_weight(node),
+            GraphType::Undirected(graph) => graph.node_weight(node),
+        }
+    }
+    
+    fn node_weight_mut(&mut self, node: NodeIndex) -> Option<&mut NodeData> {
+        match self {
+            GraphType::Directed(graph) => graph.node_weight_mut(node),
+            GraphType::Undirected(graph) => graph.node_weight_mut(node),
+        }
+    }
+    
+    fn edge_weight(&self, edge: petgraph::graph::EdgeIndex) -> Option<&EdgeData> {
+        match self {
+            GraphType::Directed(graph) => graph.edge_weight(edge),
+            GraphType::Undirected(graph) => graph.edge_weight(edge),
+        }
+    }
+    
+    fn edge_weight_mut(&mut self, edge: petgraph::graph::EdgeIndex) -> Option<&mut EdgeData> {
+        match self {
+            GraphType::Directed(graph) => graph.edge_weight_mut(edge),
+            GraphType::Undirected(graph) => graph.edge_weight_mut(edge),
+        }
+    }
+    
+    fn edge_indices(&self) -> Box<dyn Iterator<Item = petgraph::graph::EdgeIndex> + '_> {
+        match self {
+            GraphType::Directed(graph) => Box::new(graph.edge_indices()),
+            GraphType::Undirected(graph) => Box::new(graph.edge_indices()),
+        }
+    }
+    
+    fn edges_directed(&self, node: NodeIndex, direction: petgraph::Direction) -> Box<dyn Iterator<Item = petgraph::graph::EdgeReference<EdgeData>> + '_> {
+        match self {
+            GraphType::Directed(graph) => Box::new(graph.edges_directed(node, direction)),
+            GraphType::Undirected(graph) => Box::new(graph.edges_directed(node, direction)),
+        }
+    }
+    
+    fn edge_endpoints(&self, edge: petgraph::graph::EdgeIndex) -> Option<(NodeIndex, NodeIndex)> {
+        match self {
+            GraphType::Directed(graph) => graph.edge_endpoints(edge),
+            GraphType::Undirected(graph) => graph.edge_endpoints(edge),
+        }
+    }
+}
+
 /// High-performance graph structure implemented in Rust
 #[pyclass]
 pub struct FastGraph {
-    pub graph: PetGraph<NodeData, EdgeData, Directed>,
+    pub graph: GraphType,
     pub node_id_to_index: DashMap<String, NodeIndex>,
     pub node_index_to_id: DashMap<NodeIndex, String>,
     pub graph_attributes: HashMap<String, JsonValue>,
+    pub is_directed: bool,
 }
 
 #[pymethods]
 impl FastGraph {
     #[new]
-    pub fn new() -> Self {
+    #[pyo3(signature = (directed = true))]
+    pub fn new(directed: bool) -> Self {
+        let graph = if directed {
+            GraphType::Directed(PetGraph::new())
+        } else {
+            GraphType::Undirected(PetGraph::new_undirected())
+        };
+        
         Self {
-            graph: PetGraph::new(),
+            graph,
             node_id_to_index: DashMap::new(),
             node_index_to_id: DashMap::new(),
             graph_attributes: HashMap::new(),
+            is_directed: directed,
         }
+    }
+
+    /// Get whether this graph is directed
+    pub fn is_directed(&self) -> bool {
+        self.is_directed
     }
 
     /// Add a single node to the graph
@@ -59,7 +173,7 @@ impl FastGraph {
             attributes: attrs 
         };
         
-        let node_index = self.graph.add_node(node_data);
+        let node_index = self.add_node_to_graph(node_data);
         
         self.node_id_to_index.insert(node_id.clone(), node_index);
         self.node_index_to_id.insert(node_index, node_id);
@@ -97,7 +211,7 @@ impl FastGraph {
                 attributes 
             };
             
-            let node_index = self.graph.add_node(node_data);
+        let node_index = self.add_node_to_graph(node_data);
             self.node_id_to_index.insert(node_id.clone(), node_index);
             self.node_index_to_id.insert(node_index, node_id);
         }
@@ -135,7 +249,7 @@ impl FastGraph {
             attributes: attrs 
         };
         
-        self.graph.add_edge(source_idx, target_idx, edge_data);
+        let _ = self.graph.add_edge(source_idx, target_idx, edge_data);
         
         Ok(())
     }
@@ -184,24 +298,84 @@ impl FastGraph {
                 attributes 
             };
             
-            self.graph.add_edge(source_idx, target_idx, edge_data);
+            let _ = self.graph.add_edge(source_idx, target_idx, edge_data);
         }
         
         Ok(())
     }
 
-    /// Get node count
-    fn node_count(&self) -> usize {
-        self.graph.node_count()
-    }
-
-    /// Get edge count
-    fn edge_count(&self) -> usize {
-        self.graph.edge_count()
-    }
-
     /// Get neighbors of a node (both incoming and outgoing)
     fn get_neighbors(&self, node_id: String) -> PyResult<Vec<String>> {
+        use petgraph::visit::EdgeRef;
+        
+        let node_idx = self.node_id_to_index.get(&node_id)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Node '{}' not found", node_id)
+            ))?;
+        
+        let mut neighbors: Vec<String> = Vec::new();
+        
+        if self.is_directed {
+            // For directed graphs, only return outgoing neighbors
+            for neighbor_idx in self.graph.neighbors(*node_idx) {
+                if let Some(id) = self.node_index_to_id.get(&neighbor_idx) {
+                    neighbors.push(id.clone());
+                }
+            }
+        } else {
+            // For undirected graphs, get all connected neighbors
+            for neighbor_idx in self.graph.neighbors(*node_idx) {
+                if let Some(id) = self.node_index_to_id.get(&neighbor_idx) {
+                    neighbors.push(id.clone());
+                }
+            }
+            
+            // Also get incoming neighbors (which are the same as outgoing in undirected graphs)
+            // but petgraph's neighbors() should already handle this for undirected graphs
+        }
+        
+        Ok(neighbors)
+    }
+
+    /// Get outgoing neighbors (for directed graphs)
+    pub fn get_outgoing_neighbors(&self, node_id: String) -> PyResult<Vec<String>> {
+        let node_idx = self.node_id_to_index.get(&node_id)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Node '{}' not found", node_id)
+            ))?;
+        
+        let mut neighbors: Vec<String> = Vec::new();
+        for neighbor_idx in self.graph.neighbors(*node_idx) {
+            if let Some(id) = self.node_index_to_id.get(&neighbor_idx) {
+                neighbors.push(id.clone());
+            }
+        }
+        
+        Ok(neighbors)
+    }
+    
+    /// Get incoming neighbors (for directed graphs)
+    pub fn get_incoming_neighbors(&self, node_id: String) -> PyResult<Vec<String>> {
+        use petgraph::visit::EdgeRef;
+        
+        let node_idx = self.node_id_to_index.get(&node_id)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Node '{}' not found", node_id)
+            ))?;
+        
+        let mut neighbors: Vec<String> = Vec::new();
+        for edge_ref in self.graph.edges_directed(*node_idx, petgraph::Direction::Incoming) {
+            let source_idx = edge_ref.source();
+            if let Some(id) = self.node_index_to_id.get(&source_idx) {
+                neighbors.push(id.clone());
+            }
+        }
+        
+        Ok(neighbors)
+    }
+    
+    /// Get all neighbors (both incoming and outgoing for directed graphs)
+    pub fn get_all_neighbors(&self, node_id: String) -> PyResult<Vec<String>> {
         use petgraph::visit::EdgeRef;
         
         let node_idx = self.node_id_to_index.get(&node_id)
@@ -356,14 +530,15 @@ impl FastGraph {
             node_id_to_index: self.node_id_to_index.clone(),
             node_index_to_id: self.node_index_to_id.clone(),
             graph_attributes: self.graph_attributes.clone(),
+            is_directed: self.is_directed,
         }
     }
 
     /// Get graph statistics
     fn get_stats(&self) -> HashMap<String, usize> {
         let mut stats = HashMap::new();
-        stats.insert("nodes".to_string(), self.graph.node_count());
-        stats.insert("edges".to_string(), self.graph.edge_count());
+        stats.insert("nodes".to_string(), self.node_count());
+        stats.insert("edges".to_string(), self.edge_count());
         stats
     }
 
@@ -374,7 +549,7 @@ impl FastGraph {
         let filter_map = python_dict_to_json_map(filters)?;
         
         // Use parallel processing for large graphs
-        if self.graph.node_count() > 1000 {
+        if self.node_count() > 1000 {
             let node_ids: Vec<_> = self.node_id_to_index.iter()
                 .filter_map(|entry| {
                     let node_id = entry.key();
@@ -429,7 +604,7 @@ impl FastGraph {
 
     /// Get subgraph by node IDs - optimized batch operation
     fn get_subgraph_by_node_ids(&self, node_ids: Vec<String>) -> PyResult<FastGraph> {
-        let mut subgraph = FastGraph::new();
+        let mut subgraph = FastGraph::new(self.is_directed);
         let node_id_set: std::collections::HashSet<_> = node_ids.iter().collect();
         
         // Batch add nodes
@@ -611,6 +786,22 @@ impl FastGraph {
         self.graph_attributes.insert(key, json_value);
         Ok(())
     }
+
+    /// Get node count
+    pub fn node_count(&self) -> usize {
+        match &self.graph {
+            GraphType::Directed(g) => g.node_count(),
+            GraphType::Undirected(g) => g.node_count(),
+        }
+    }
+
+    /// Get edge count
+    pub fn edge_count(&self) -> usize {
+        match &self.graph {
+            GraphType::Directed(g) => g.edge_count(),
+            GraphType::Undirected(g) => g.edge_count(),
+        }
+    }
 }
 
 impl FastGraph {
@@ -627,9 +818,64 @@ impl FastGraph {
         }
         true
     }
+    
+    /// Helper method to add a node to either directed or undirected graph
+    pub fn add_node_to_graph(&mut self, node_data: NodeData) -> NodeIndex {
+        match &mut self.graph {
+            GraphType::Directed(ref mut g) => g.add_node(node_data),
+            GraphType::Undirected(ref mut g) => g.add_node(node_data),
+        }
+    }
+    
+    /// Helper method to add an edge to either directed or undirected graph
+    fn add_edge_to_graph(&mut self, source_idx: NodeIndex, target_idx: NodeIndex, edge_data: EdgeData) -> Result<petgraph::graph::EdgeIndex, ()> {
+        match &mut self.graph {
+            GraphType::Directed(ref mut g) => Ok(g.add_edge(source_idx, target_idx, edge_data)),
+            GraphType::Undirected(ref mut g) => Ok(g.add_edge(source_idx, target_idx, edge_data)),
+        }
+    }
+    
+    // Public helper methods for operations.rs
+    pub fn get_node_weight(&self, node_idx: NodeIndex) -> Option<&NodeData> {
+        self.graph.node_weight(node_idx)
+    }
+    
+    pub fn get_edge_indices(&self) -> Vec<petgraph::graph::EdgeIndex> {
+        self.graph.edge_indices().collect()
+    }
+    
+    pub fn get_edge_endpoints(&self, edge_idx: petgraph::graph::EdgeIndex) -> Option<(NodeIndex, NodeIndex)> {
+        self.graph.edge_endpoints(edge_idx)
+    }
+    
+    pub fn get_edge_weight(&self, edge_idx: petgraph::graph::EdgeIndex) -> Option<&EdgeData> {
+        self.graph.edge_weight(edge_idx)
+    }
+    
+    pub fn get_neighbors_public(&self, node_idx: NodeIndex) -> Vec<NodeIndex> {
+        match &self.graph {
+            GraphType::Directed(g) => g.neighbors(node_idx).collect(),
+            GraphType::Undirected(g) => g.neighbors(node_idx).collect(),
+        }
+    }
+    
+    pub fn get_edges_directed(&self, node_idx: NodeIndex, direction: petgraph::Direction) -> Vec<petgraph::graph::EdgeReference<EdgeData>> {
+        match &self.graph {
+            GraphType::Directed(g) => g.edges_directed(node_idx, direction).collect(),
+            GraphType::Undirected(g) => g.edges_directed(node_idx, direction).collect(),
+        }
+    }
+    
+    pub fn add_edge_to_graph_public(&mut self, source_idx: NodeIndex, target_idx: NodeIndex, edge_data: EdgeData) -> Result<petgraph::graph::EdgeIndex, ()> {
+        self.add_edge_to_graph(source_idx, target_idx, edge_data)
+    }
+    
+    pub fn get_find_edge(&self, source: NodeIndex, target: NodeIndex) -> Option<petgraph::graph::EdgeIndex> {
+        self.graph.find_edge(source, target)
+    }
 }
 
-/// Helper function to convert Python dict to JSON HashMap
+/// Utility functions for Python-JSON conversion
 fn python_dict_to_json_map(py_dict: &PyDict) -> PyResult<HashMap<String, JsonValue>> {
     let mut map = HashMap::new();
     

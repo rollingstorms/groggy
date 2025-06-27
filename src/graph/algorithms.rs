@@ -20,7 +20,7 @@ impl FastGraph {
                 result.push(node_id.clone());
             }
             
-            for neighbor_idx in self.graph.neighbors(current_idx) {
+            for neighbor_idx in self.get_neighbors_public(current_idx) {
                 if !visited.contains(&neighbor_idx) {
                     visited.insert(neighbor_idx);
                     queue.push_back(neighbor_idx);
@@ -50,7 +50,7 @@ impl FastGraph {
                 }
                 
                 // Add neighbors to stack (in reverse order for consistent traversal)
-                let mut neighbors: Vec<_> = self.graph.neighbors(current_idx).collect();
+                let mut neighbors: Vec<_> = self.get_neighbors_public(current_idx);
                 neighbors.reverse();
                 
                 for neighbor_idx in neighbors {
@@ -102,7 +102,7 @@ impl FastGraph {
                 return Some(path);
             }
             
-            for neighbor_idx in self.graph.neighbors(current_idx) {
+            for neighbor_idx in self.get_neighbors_public(current_idx) {
                 if !visited.contains(&neighbor_idx) {
                     visited.insert(neighbor_idx);
                     parent.insert(neighbor_idx, current_idx);
@@ -119,7 +119,7 @@ impl FastGraph {
         let node_idx = self.node_id_to_index.get(node_id)?;
         
         // Get all neighbors
-        let neighbors: Vec<_> = self.graph.neighbors(*node_idx).collect();
+        let neighbors: Vec<_> = self.get_neighbors_public(*node_idx);
         let degree = neighbors.len();
         
         if degree < 2 {
@@ -130,8 +130,8 @@ impl FastGraph {
         let mut edge_count = 0;
         for i in 0..neighbors.len() {
             for j in (i + 1)..neighbors.len() {
-                if self.graph.find_edge(neighbors[i], neighbors[j]).is_some() ||
-                   self.graph.find_edge(neighbors[j], neighbors[i]).is_some() {
+                if self.get_find_edge(neighbors[i], neighbors[j]).is_some() ||
+                   self.get_find_edge(neighbors[j], neighbors[i]).is_some() {
                     edge_count += 1;
                 }
             }

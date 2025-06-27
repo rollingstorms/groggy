@@ -1,7 +1,7 @@
 Basic Usage Examples
 ====================
 
-This section demonstrates basic GLI operations with practical examples.
+This section demonstrates basic GLI operations with practical examples using the new high-performance API.
 
 Creating Your First Graph
 --------------------------
@@ -10,20 +10,51 @@ Creating Your First Graph
 
    from gli import Graph
    
-   # Create a new graph
+   # Create a new graph (automatically uses Rust backend)
    g = Graph()
    
-   # Add some people
-   alice = g.add_node(name="Alice", age=30, occupation="Engineer")
-   bob = g.add_node(name="Bob", age=25, occupation="Designer") 
-   charlie = g.add_node(name="Charlie", age=35, occupation="Manager")
+   # Add some people (supports both string and integer IDs)
+   alice = g.add_node("alice", name="Alice", age=30, occupation="Engineer")
+   bob = g.add_node(1, name="Bob", age=25, occupation="Designer") 
+   charlie = g.add_node("charlie", name="Charlie", age=35, occupation="Manager")
    
-   # Add relationships
+   # Add relationships with the new API
    g.add_edge(alice, bob, relationship="colleagues", since=2020)
    g.add_edge(bob, charlie, relationship="friends", since=2018)
    g.add_edge(alice, charlie, relationship="reports_to", since=2021)
    
    print(f"Created graph with {g.node_count()} nodes and {g.edge_count()} edges")
+   
+   # Access nodes and edges with lazy loading
+   print(f"Alice's details: {g.nodes[alice].attributes}")
+   
+   # Get edge with new (source, target) API
+   relationship = g.get_edge(alice, bob)
+   print(f"Alice-Bob relationship: {relationship.attributes}")
+
+Working with Mixed ID Types
+----------------------------
+
+GLI seamlessly handles both string and integer node IDs:
+
+.. code-block:: python
+
+   from gli import Graph
+   
+   g = Graph()
+   
+   # Mix string and integer IDs freely
+   user_alice = g.add_node("user_alice", name="Alice", type="user")
+   server_1 = g.add_node(1001, name="Database Server", type="server")
+   process_42 = g.add_node(42, name="Auth Process", type="process")
+   
+   # Connect different ID types
+   g.add_edge("user_alice", 1001, action="connects_to")
+   g.add_edge(1001, 42, action="spawns")
+   
+   # Query works with any ID type
+   neighbors = g.get_neighbors("user_alice")
+   print(f"Alice connects to: {neighbors}")
 
 Social Network Analysis
 -----------------------
@@ -45,9 +76,15 @@ Building a social network and analyzing connections:
        ("dave", {"name": "Dave Wilson", "age": 30, "city": "NYC", "interests": ["tech", "music"]}),
    ]
    
-   # Batch add users
-   with social_net.batch_operations() as batch:
-       for user_id, profile in users:
+   # Efficient batch addition using new batch API
+   user_attrs = {user_id: profile for user_id, profile in users}
+   
+   # Add all nodes first
+   for user_id in user_attrs:
+       social_net.add_node(user_id)
+   
+   # Then set all attributes in batch (much faster)
+   social_net.set_nodes_attributes_batch(user_attrs)
            batch.add_node(user_id, **profile)
    
    # Add friendships with metadata

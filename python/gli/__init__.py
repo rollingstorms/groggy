@@ -4,6 +4,8 @@ High-performance graph manipulation library with Rust backend
 """
 
 from .graph import Graph
+from .graph.subgraph import Subgraph
+from .graph.state_tracking import StateTracker, ChangeType, create_state, record_change
 from .utils import create_random_graph
 from ._version import __version__
 
@@ -43,6 +45,11 @@ def get_current_backend():
 
 __all__ = [
     'Graph',
+    'Subgraph',
+    'StateTracker',
+    'ChangeType',
+    'create_state',
+    'record_change',
     'create_random_graph',
     '__version__',
     'RUST_BACKEND_AVAILABLE',

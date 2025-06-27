@@ -16,31 +16,35 @@
       ~Graph.__init__
       ~Graph.add_edge
       ~Graph.add_node
-      ~Graph.batch_filter_edges
-      ~Graph.batch_filter_nodes
-      ~Graph.batch_get_node_attributes
       ~Graph.batch_operations
-      ~Graph.batch_set_edge_attributes
-      ~Graph.batch_set_node_attributes
-      ~Graph.batch_update_node_attributes
-      ~Graph.create_subgraph
-      ~Graph.create_subgraph_fast
+      ~Graph.commit
+      ~Graph.create_branch
       ~Graph.edge_count
       ~Graph.empty
+      ~Graph.filter_edges
+      ~Graph.filter_edges_by_attributes
+      ~Graph.filter_nodes
+      ~Graph.filter_nodes_by_attributes
       ~Graph.from_edge_list
       ~Graph.from_node_list
-      ~Graph.get_connected_component
       ~Graph.get_edge
-      ~Graph.get_k_hop_neighborhood
+      ~Graph.get_edge_attributes
       ~Graph.get_neighbors
       ~Graph.get_node
+      ~Graph.get_node_attributes
       ~Graph.get_node_ids
-      ~Graph.get_performance_stats
+      ~Graph.get_state_info
+      ~Graph.get_storage_stats
+      ~Graph.load_state
       ~Graph.node_count
-      ~Graph.optimized_query
+      ~Graph.save_state
       ~Graph.set_edge_attribute
+      ~Graph.set_edge_attributes
+      ~Graph.set_edges_attributes_batch
       ~Graph.set_node_attribute
-      ~Graph.snapshot
+      ~Graph.set_node_attributes
+      ~Graph.set_nodes_attributes_batch
+      ~Graph.switch_branch
    
    
 
@@ -50,7 +54,9 @@
 
    .. autosummary::
    
+      ~Graph.branches
       ~Graph.edges
       ~Graph.nodes
+      ~Graph.states
    
    
