@@ -81,12 +81,12 @@ Test your installation:
 
 .. code-block:: python
 
-   import groggy
-   print(f"GLI version: {groggy.__version__}")
-   print(f"Available backends: {gli.get_available_backends()}")
+   import groggy as gr
+   print(f"Groggy version: {gr.__version__}")
+   print(f"Available backends: {gr.get_available_backends()}")
    
    # Test basic functionality
-   g = gli.Graph()
+   g = gr.Graph()
    node_id = g.add_node(name="test")
    print(f"Created node: {node_id}")
 

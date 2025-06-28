@@ -362,6 +362,17 @@ class Graph(StateMixin):
             edge_id = f"{source_str}->{target_str}"
             return effective_edges.get(edge_id)
 
+    def has_edge(self, source: NodeID, target: NodeID) -> bool:
+        """Check if an edge exists between source and target nodes"""
+        source_str = str(source)
+        target_str = str(target)
+        if self.use_rust:
+            return self._rust_core.has_edge(source_str, target_str)
+        else:
+            _, effective_edges, _ = self._get_effective_data()
+            edge_id = f"{source_str}->{target_str}"
+            return edge_id in effective_edges
+
     def get_node_ids(self) -> List[str]:
         """Get all node IDs"""
         if self.use_rust:

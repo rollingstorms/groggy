@@ -125,6 +125,21 @@ impl FastGraph {
         Ok(())
     }
 
+    /// Check if an edge exists between two nodes
+    pub fn has_edge(&self, source: String, target: String) -> PyResult<bool> {
+        // Return false if either node doesn't exist
+        let source_idx = match self.node_id_to_index.get(&source) {
+            Some(idx) => idx,
+            None => return Ok(false),
+        };
+        let target_idx = match self.node_id_to_index.get(&target) {
+            Some(idx) => idx,
+            None => return Ok(false),
+        };
+
+        Ok(self.graph.find_edge(*source_idx, *target_idx).is_some())
+    }
+
     /// Remove an edge between two nodes
     pub fn remove_edge(&mut self, source: String, target: String) -> PyResult<bool> {
         let source_idx = self.node_id_to_index.get(&source)
@@ -357,6 +372,37 @@ impl FastGraph {
             if let Some(edge_data) = self.graph.edge_weight_mut(edge_idx) {
                 let json_value = python_to_json_value(value)?;
                 edge_data.attributes.insert(key, json_value);
+                Ok(())
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                    format!("Edge from '{}' to '{}' not found", source, target)
+                ))
+            }
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Edge from '{}' to '{}' not found", source, target)
+            ))
+        }
+    }
+
+    pub fn set_edge_attributes(&mut self, source: String, target: String, attributes: &PyDict) -> PyResult<()> {
+        let source_idx = self.node_id_to_index.get(&source)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Source node '{}' not found", source)
+            ))?;
+        let target_idx = self.node_id_to_index.get(&target)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Target node '{}' not found", target)
+            ))?;
+        
+        if let Some(edge_idx) = self.graph.find_edge(*source_idx, *target_idx) {
+            if let Some(edge_data) = self.graph.edge_weight_mut(edge_idx) {
+                // Update each attribute from the dictionary
+                for (key, value) in attributes {
+                    let key_str = key.extract::<String>()?;
+                    let json_value = python_to_json_value(value)?;
+                    edge_data.attributes.insert(key_str, json_value);
+                }
                 Ok(())
             } else {
                 Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(

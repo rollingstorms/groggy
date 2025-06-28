@@ -75,13 +75,13 @@ Key Performance Features
 
 .. code-block:: python
 
-   from groggy import Graph, set_backend, get_available_backends
+   import groggy as gr
    
    # Check available backends
-   print("Available backends:", get_available_backends())
+   print("Available backends:", gr.get_available_backends())
    
    # Set backend globally
-   set_backend('rust')  # Use Rust for all new graphs
+   gr.set_backend('rust')  # Use Rust for all new graphs
    
    # Or specify per-graph
    fast_graph = Graph(backend='rust')
@@ -127,9 +127,9 @@ Use batch filtering for efficient queries:
 
 .. code-block:: python
 
-   from groggy import Graph
+   import groggy as gr
    
-   g = Graph(backend='rust')
+   g = gr.Graph(backend='rust')
    
    # Add sample data
    for i in range(10000):

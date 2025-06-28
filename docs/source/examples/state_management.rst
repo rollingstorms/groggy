@@ -8,10 +8,10 @@ Basic State Management
 
 .. code-block:: python
 
-   from groggy import Graph
+   import groggy as gr
    
    # Create a graph and add initial data
-   g = Graph()
+   g = gr.Graph()
    g.add_node("alice", name="Alice", department="Engineering")
    g.add_node("bob", name="Bob", department="Design")
    g.add_edge("alice", "bob", relationship="collaborates")

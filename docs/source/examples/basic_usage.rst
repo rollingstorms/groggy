@@ -8,10 +8,10 @@ Creating Your First Graph
 
 .. code-block:: python
 
-   from groggy import Graph
+   import groggy as gr
    
    # Create a new graph (automatically uses Rust backend)
-   g = Graph()
+   g = gr.Graph()
    
    # Add some people (supports both string and integer IDs)
    alice = g.add_node("alice", name="Alice", age=30, occupation="Engineer")
@@ -39,9 +39,9 @@ Groggy seamlessly handles both string and integer node IDs:
 
 .. code-block:: python
 
-   from groggy import Graph
+   import groggy as gr
    
-   g = Graph()
+   g = gr.Graph()
    
    # Mix string and integer IDs freely
    user_alice = g.add_node("user_alice", name="Alice", type="user")
