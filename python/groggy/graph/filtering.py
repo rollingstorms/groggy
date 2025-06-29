@@ -304,19 +304,28 @@ class SubgraphCreator:
         
         # Handle both edge IDs and tuples (for Rust backend compatibility)
         actual_edge_ids = []
+        
         for item in edge_ids:
             if isinstance(item, tuple):
                 # Handle tuple format (source, target) from Rust backend
                 source, target = item
                 # Find the actual edge ID
+                found = False
                 for edge_id in source_graph.edges:
                     edge = source_graph.edges[edge_id]
                     if edge.source == source and edge.target == target:
                         actual_edge_ids.append(edge_id)
+                        found = True
                         break
+                if not found:
+                    raise ValueError(f"Edge ({source}, {target}) not found in graph. Available edges: {list(source_graph.edges.keys())}")
             else:
-                # Already an edge ID
-                actual_edge_ids.append(item)
+                # Already an edge ID - check if it exists
+                if item in source_graph.edges:
+                    actual_edge_ids.append(item)
+                else:
+                    raise ValueError(f"Edge '{item}' not found in graph. Available edges: {list(source_graph.edges.keys())}")
+        
         
         # Collect all nodes that are connected by the specified edges
         connected_nodes = set()
@@ -345,7 +354,7 @@ class SubgraphCreator:
 def enhanced_filter_nodes(
     graph: 'Graph',
     filter_criteria: Union[Callable[[str, Dict[str, Any]], bool], Dict[str, Any], str],
-    return_graph: bool = False
+    return_subgraph: bool = False
 ) -> Union[List[str], 'Subgraph']:
     """
     Enhanced node filtering with optional subgraph creation.
@@ -353,7 +362,7 @@ def enhanced_filter_nodes(
     Args:
         graph: The graph to filter
         filter_criteria: Filter function, attribute dict, or query string
-        return_graph: If True, return a Subgraph object; if False, return node IDs
+        return_subgraph: If True, return a Subgraph object; if False, return node IDs
         
     Returns:
         List of node IDs or Subgraph
@@ -391,7 +400,7 @@ def enhanced_filter_nodes(
                 result.append(node_id)
     
     # Return based on requested format
-    if return_graph:
+    if return_subgraph:
         return SubgraphCreator.create_node_subgraph(graph, result, filter_criteria)
     else:
         return result
@@ -400,7 +409,7 @@ def enhanced_filter_nodes(
 def enhanced_filter_edges(
     graph: 'Graph',
     filter_criteria: Union[Callable[[str, str, str, Dict[str, Any]], bool], Dict[str, Any], str],
-    return_graph: bool = False
+    return_subgraph: bool = False
 ) -> Union[List[str], 'Subgraph']:
     """
     Enhanced edge filtering with optional subgraph creation.
@@ -408,7 +417,7 @@ def enhanced_filter_edges(
     Args:
         graph: The graph to filter
         filter_criteria: Filter function, attribute dict, or query string
-        return_graph: If True, return a Subgraph object; if False, return edge IDs
+        return_subgraph: If True, return a Subgraph object; if False, return edge IDs
         
     Returns:
         List of edge IDs or Subgraph
@@ -446,7 +455,7 @@ def enhanced_filter_edges(
                 result.append(edge_id)
     
     # Return based on requested format
-    if return_graph:
+    if return_subgraph:
         return SubgraphCreator.create_edge_subgraph(graph, result, filter_criteria)
     else:
         return result

@@ -461,17 +461,18 @@ class Graph(StateMixin):
             return list(neighbors)
 
     # High-level wrapper methods to avoid direct _rust_core access
-    def filter_nodes(self, filter_func: Union[Callable[[NodeID, Dict[str, Any]], bool], Dict[str, Any], str] = None, return_graph: bool = False) -> Union[List[str], 'Subgraph']:
-        """Filter nodes by lambda function, attribute values, or string query
+    def filter_nodes(self, filter_func: Union[Callable[[NodeID, Dict[str, Any]], bool], Dict[str, Any], str] = None, return_graph: bool = False, **kwargs) -> Union[List[str], 'Subgraph']:
+        """Filter nodes by lambda function, attribute values, string query, or keyword arguments
         
         Args:
             filter_func: Either a callable that takes (node_id, attributes) and returns bool,
                         a dictionary of attribute filters, or a string query like "role == 'Manager'"
             return_graph: If True, return a new Subgraph with filtered nodes and their edges.
                          If False, return a list of node IDs (default)
+            **kwargs: Keyword arguments for attribute filtering (e.g., role='engineer', age=30)
             
         Returns:
-            List of node IDs that match the filter, or a new Subgraph instance if return_graph=True
+            List of node IDs that match the filter, or a new Subgraph instance if return_subgraph=True
             
         Examples:
             # Function predicate
@@ -483,9 +484,19 @@ class Graph(StateMixin):
             # String query
             filtered_ids = graph.filter_nodes("role == 'Manager' and salary > 100000")
             
+            # Keyword arguments (most convenient)
+            filtered_ids = graph.filter_nodes(role='engineer')
+            filtered_ids = graph.filter_nodes(role='Manager', department='Engineering')
+            
             # Return subgraph
-            subgraph = graph.filter_nodes({'role': 'Manager'}, return_graph=True)
+            subgraph = graph.filter_nodes(role='Manager', return_graph=True)
         """
+        # Handle keyword arguments - convert to dictionary filter
+        if kwargs:
+            if filter_func is not None:
+                raise ValueError("Cannot specify both filter_func and keyword arguments")
+            filter_func = kwargs
+        
         # Store original filter criteria for metadata
         original_filter = filter_func
         
@@ -528,17 +539,18 @@ class Graph(StateMixin):
         else:
             return filtered_node_ids
 
-    def filter_edges(self, filter_func: Union[Callable[[str, NodeID, NodeID, Dict[str, Any]], bool], Dict[str, Any], str] = None, return_graph: bool = False) -> Union[List[str], 'Subgraph']:
-        """Filter edges by lambda function, attribute values, or string query
+    def filter_edges(self, filter_func: Union[Callable[[str, NodeID, NodeID, Dict[str, Any]], bool], Dict[str, Any], str] = None, return_graph: bool = False, **kwargs) -> Union[List[str], 'Subgraph']:
+        """Filter edges by lambda function, attribute values, string query, or keyword arguments
         
         Args:
             filter_func: Either a callable that takes (edge_id, source, target, attributes) and returns bool,
                         a dictionary of attribute filters, or a string query like "weight > 0.5"
             return_graph: If True, return a new Subgraph with filtered edges and connected nodes.
                          If False, return a list of edge IDs (default)
+            **kwargs: Keyword arguments for attribute filtering (e.g., relationship='friend', weight=0.8)
             
         Returns:
-            List of edge IDs that match the filter, or a new Subgraph instance if return_graph=True
+            List of edge IDs that match the filter, or a new Subgraph instance if return_subgraph=True
             
         Examples:
             # Function predicate
@@ -550,9 +562,19 @@ class Graph(StateMixin):
             # String query
             filtered_ids = graph.filter_edges("weight > 0.5 and relationship == 'colleague'")
             
+            # Keyword arguments (most convenient)
+            filtered_ids = graph.filter_edges(relationship='friend')
+            filtered_ids = graph.filter_edges(relationship='colleague', weight=0.8)
+            
             # Return subgraph
-            subgraph = graph.filter_edges({'relationship': 'friend'}, return_graph=True)
+            subgraph = graph.filter_edges(relationship='friend', return_graph=True)
         """
+        # Handle keyword arguments - convert to dictionary filter
+        if kwargs:
+            if filter_func is not None:
+                raise ValueError("Cannot specify both filter_func and keyword arguments")
+            filter_func = kwargs
+        
         # Store original filter criteria for metadata
         original_filter = filter_func
         
@@ -1179,5 +1201,169 @@ class Graph(StateMixin):
                 self._invalidate_cache()
             
             return removed_count
+
+    def subgraph(self, node_ids: List[NodeID] = None, edge_ids: List[str] = None, include_edges: bool = True) -> 'Subgraph':
+        """Create a single subgraph from specified nodes or edges
+        
+        Args:
+            node_ids: List of node IDs to include in the subgraph
+            edge_ids: List of edge IDs to include in the subgraph  
+            include_edges: If True and node_ids provided, include edges between specified nodes
+            
+        Returns:
+            Subgraph containing the specified nodes/edges
+            
+        Examples:
+            # Create subgraph from specific nodes
+            sub = g.subgraph(node_ids=['alice', 'bob', 'charlie'])
+            
+            # Create subgraph from specific edges (includes connected nodes)
+            sub = g.subgraph(edge_ids=['alice->bob', 'bob->charlie'])
+            
+            # Create subgraph from nodes without their edges
+            sub = g.subgraph(node_ids=['alice', 'bob'], include_edges=False)
+        """
+        if node_ids is not None and edge_ids is not None:
+            raise ValueError("Cannot specify both node_ids and edge_ids")
+        
+        if node_ids is None and edge_ids is None:
+            raise ValueError("Must specify either node_ids or edge_ids")
+        
+        if node_ids is not None:
+            # Convert to strings for consistency
+            node_ids_str = [str(node_id) for node_id in node_ids]
+            return self._create_subgraph_from_nodes(node_ids_str, f"nodes: {node_ids_str}")
+        else:
+            # Convert to strings for consistency
+            edge_ids_str = [str(edge_id) for edge_id in edge_ids]
+            return self._create_subgraph_from_edges(edge_ids_str, f"edges: {edge_ids_str}")
+
+    def subgraphs(self, group_by: Union[str, Dict[str, List[Any]]] = None, **filters) -> Dict[str, 'Subgraph']:
+        """Create multiple subgraphs grouped by attribute values
+        
+        Args:
+            group_by: Either:
+                - String: attribute name to group nodes by (like SQL GROUP BY)
+                - Dict: mapping of group names to lists of attribute values
+            **filters: Additional filters as keyword arguments
+            
+        Returns:
+            Dictionary mapping attribute values to Subgraph objects
+            
+        Examples:
+            # Group by single attribute (discovers unique values)
+            subs = g.subgraphs('department')  # Returns {'engineering': subgraph, 'design': subgraph, ...}
+            
+            # Group by specific attribute values  
+            subs = g.subgraphs(role=['engineer', 'manager'])  # Returns {'engineer': subgraph, 'manager': subgraph}
+            
+            # Group by custom mapping
+            groups = {
+                'technical': ['engineer', 'architect'],
+                'leadership': ['manager', 'director']
+            }
+            subs = g.subgraphs(group_by={'role': groups})  # Returns {'technical': subgraph, 'leadership': subgraph}
+            
+            # Multiple filters
+            subs = g.subgraphs('department', active=True, salary_min=50000)
+            
+            # Access subgraphs by attribute value:
+            designer_sub = subs['designer']  # Gets subgraph with filter_criteria="role=designer"
+        """
+        result = {}
+        
+        if isinstance(group_by, str):
+            # Group by attribute name - discover unique values
+            attr_name = group_by
+            unique_values = set()
+            
+            # Collect unique values for the attribute
+            for node_id in self.nodes:
+                node = self.get_node(node_id)
+                if node and attr_name in node.attributes:
+                    unique_values.add(node.attributes[attr_name])
+            
+            # Create subgraph for each unique value
+            for value in unique_values:
+                # Build filter criteria
+                filter_criteria = {attr_name: value}
+                filter_criteria.update(filters)
+                
+                # Filter nodes matching this value
+                matching_nodes = self.filter_nodes(filter_criteria)
+                
+                if matching_nodes:
+                    group_name = f"{attr_name}={value}"
+                    subgraph = self._create_subgraph_from_nodes(matching_nodes, group_name)
+                    result[str(value)] = subgraph  # Use attribute value as key
+        
+        elif isinstance(group_by, dict):
+            # Group by custom mapping
+            for attr_name, groups in group_by.items():
+                if isinstance(groups, dict):
+                    # groups is a mapping of group_name -> list of values
+                    for group_name, values in groups.items():
+                        # Find nodes with any of these values
+                        matching_nodes = []
+                        for node_id in self.nodes:
+                            node = self.get_node(node_id)
+                            if node and attr_name in node.attributes:
+                                if node.attributes[attr_name] in values:
+                                    # Check additional filters
+                                    matches_filters = True
+                                    for filter_attr, filter_value in filters.items():
+                                        if filter_attr not in node.attributes or node.attributes[filter_attr] != filter_value:
+                                            matches_filters = False
+                                            break
+                                    
+                                    if matches_filters:
+                                        matching_nodes.append(node_id)
+                        
+                        if matching_nodes:
+                            subgraph = self._create_subgraph_from_nodes(matching_nodes, group_name)
+                            result[group_name] = subgraph  # Use custom group name as key
+                else:
+                    # groups is a list of values
+                    for value in groups:
+                        filter_criteria = {attr_name: value}
+                        filter_criteria.update(filters)
+                        
+                        matching_nodes = self.filter_nodes(filter_criteria)
+                        if matching_nodes:
+                            group_name = f"{attr_name}={value}"
+                            subgraph = self._create_subgraph_from_nodes(matching_nodes, group_name)
+                            result[str(value)] = subgraph  # Use attribute value as key
+        
+        elif filters:
+            # No group_by specified, but filters provided - create single subgraph
+            if len(filters) == 1:
+                # Single filter - group by its values
+                attr_name, values = next(iter(filters.items()))
+                if isinstance(values, list):
+                    for value in values:
+                        matching_nodes = self.filter_nodes({attr_name: value})
+                        if matching_nodes:
+                            group_name = f"{attr_name}={value}"
+                            subgraph = self._create_subgraph_from_nodes(matching_nodes, group_name)
+                            result[str(value)] = subgraph  # Use attribute value as key
+                else:
+                    # Single value
+                    matching_nodes = self.filter_nodes(filters)
+                    if matching_nodes:
+                        group_name = f"{attr_name}={values}"
+                        subgraph = self._create_subgraph_from_nodes(matching_nodes, group_name)
+                        result[str(values)] = subgraph  # Use attribute value as key
+            else:
+                # Multiple filters - create one subgraph
+                matching_nodes = self.filter_nodes(filters)
+                if matching_nodes:
+                    filter_desc = "_".join(f"{k}={v}" for k, v in filters.items())
+                    subgraph = self._create_subgraph_from_nodes(matching_nodes, filter_desc)
+                    result[filter_desc] = subgraph  # Use combined filter as key
+        
+        else:
+            raise ValueError("Must specify either group_by or filter criteria")
+        
+        return result
 
 

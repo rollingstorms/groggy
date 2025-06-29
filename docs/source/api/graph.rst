@@ -209,7 +209,7 @@ Filtering Operations
    high_earners = g.filter_nodes("salary > 85000 and role == 'engineer'")
    
    # Return subgraph instead of node list
-   manager_subgraph = g.filter_nodes({'role': 'manager'}, return_graph=True)
+   manager_subgraph = g.filter_nodes({'role': 'manager'}, return_subgraph=True)
 
 Context Manager for Batch Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
