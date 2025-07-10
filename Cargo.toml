@@ -1,5 +1,5 @@
 [package]
-name = "groggy-core"
+name = "groggy"
 version = "0.2.0"
 edition = "2021"
 description = "Groggy - A Graph Language Engine for dynamic graphs and versioned state"
@@ -9,7 +9,7 @@ repository = "https://github.com/rollingstorms/groggy"
 documentation = "https://groggy.readthedocs.io"
 
 [lib]
-name = "groggy_core"
+name = "groggy"
 crate-type = ["cdylib"]
 
 [dependencies]
