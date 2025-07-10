@@ -373,6 +373,19 @@ class Graph(StateMixin):
             edge_id = f"{source_str}->{target_str}"
             return edge_id in effective_edges
 
+    def has_node(self, node_id: NodeID) -> bool:
+        """Check if a node exists in the graph"""
+        node_id_str = str(node_id)
+        if self.use_rust:
+            return self._rust_core.has_node(node_id_str)
+        else:
+            effective_nodes, _, _ = self._get_effective_data()
+            return node_id_str in effective_nodes
+
+    def is_directed(self) -> bool:
+        """Check if the graph is directed"""
+        return self.directed
+
     def get_node_ids(self) -> List[str]:
         """Get all node IDs"""
         if self.use_rust:
@@ -381,29 +394,50 @@ class Graph(StateMixin):
             effective_nodes, _, _ = self._get_effective_data()
             return list(effective_nodes.keys())
 
-    def get_neighbors(self, node_id: NodeID, direction: str = 'both') -> List[str]:
+    @property
+    def node_id_to_index(self):
+        """Get node ID to internal index mapping for debugging (Python backend only)"""
+        if self.use_rust:
+            # For Rust backend, this is internal - return empty dict
+            return {}
+        else:
+            effective_nodes, _, _ = self._get_effective_data()
+            return {node_id: idx for idx, node_id in enumerate(effective_nodes.keys())}
+
+    def get_neighbors(self, node_id: NodeID, direction: str = 'auto') -> List[str]:
         """Get neighbors of a node
         
         Args:
             node_id: The node to get neighbors for
-            direction: 'out' for outgoing, 'in' for incoming, 'both' for all neighbors
+            direction: 'out' for outgoing, 'in' for incoming, 'both' for all neighbors,
+                      'auto' (default) - outgoing for directed graphs, all for undirected
         """
         node_id_str = str(node_id)
         if self.use_rust:
-            # Use the appropriate Rust method based on direction
-            if direction == 'out':
+            # Handle 'auto' direction based on graph type
+            if direction == 'auto':
+                # For directed graphs, default to outgoing neighbors
+                # For undirected graphs, get all neighbors
+                if self.directed:
+                    return self._rust_core.get_outgoing_neighbors(node_id_str)
+                else:
+                    return self._rust_core.get_neighbors(node_id_str)
+            elif direction == 'out':
                 return self._rust_core.get_outgoing_neighbors(node_id_str)
             elif direction == 'in':
                 return self._rust_core.get_incoming_neighbors(node_id_str)
             else:  # 'both'
-                if self.directed:
-                    return self._rust_core.get_all_neighbors(node_id_str)
-                else:
-                    # For undirected graphs, neighbors() already gives all connected nodes
-                    return self._rust_core.get_neighbors(node_id_str)
+                return self._rust_core.get_all_neighbors(node_id_str)
         else:
             neighbors = set()
             _, effective_edges, _ = self._get_effective_data()
+            
+            # Handle 'auto' direction based on graph type
+            if direction == 'auto':
+                if self.directed:
+                    direction = 'out'
+                else:
+                    direction = 'both'
             
             for edge in effective_edges.values():
                 if direction in ['out', 'both'] and edge.source == node_id_str:
@@ -461,13 +495,13 @@ class Graph(StateMixin):
             return list(neighbors)
 
     # High-level wrapper methods to avoid direct _rust_core access
-    def filter_nodes(self, filter_func: Union[Callable[[NodeID, Dict[str, Any]], bool], Dict[str, Any], str] = None, return_graph: bool = False, **kwargs) -> Union[List[str], 'Subgraph']:
+    def filter_nodes(self, filter_func: Union[Callable[[NodeID, Dict[str, Any]], bool], Dict[str, Any], str] = None, return_subgraph: bool = False, **kwargs) -> Union[List[str], 'Subgraph']:
         """Filter nodes by lambda function, attribute values, string query, or keyword arguments
         
         Args:
             filter_func: Either a callable that takes (node_id, attributes) and returns bool,
                         a dictionary of attribute filters, or a string query like "role == 'Manager'"
-            return_graph: If True, return a new Subgraph with filtered nodes and their edges.
+            return_subgraph: If True, return a new Subgraph with filtered nodes and their edges.
                          If False, return a list of node IDs (default)
             **kwargs: Keyword arguments for attribute filtering (e.g., role='engineer', age=30)
             
@@ -489,63 +523,55 @@ class Graph(StateMixin):
             filtered_ids = graph.filter_nodes(role='Manager', department='Engineering')
             
             # Return subgraph
-            subgraph = graph.filter_nodes(role='Manager', return_graph=True)
+            subgraph = graph.filter_nodes(role='Manager', return_subgraph=True)
         """
-        # Handle keyword arguments - convert to dictionary filter
-        if kwargs:
-            if filter_func is not None:
-                raise ValueError("Cannot specify both filter_func and keyword arguments")
-            filter_func = kwargs
-        
-        # Store original filter criteria for metadata
+        # Store original filter criteria for metadata  
         original_filter = filter_func
         
-        # Handle string query
-        if isinstance(filter_func, str):
-            from .filtering import QueryCompiler
-            filter_func = QueryCompiler.compile_node_query(filter_func)
-        elif isinstance(filter_func, dict):
-            # Dictionary-based filtering - convert to function
-            filter_dict = filter_func  # Store reference to dict before reassigning
-            def dict_filter(node_id: str, attributes: Dict[str, Any]) -> bool:
-                for attr, value in filter_dict.items():
-                    if attr not in attributes or attributes[attr] != value:
-                        return False
-                return True
-            filter_func = dict_filter
+        # Combine filter_func and kwargs
+        if kwargs:
+            if filter_func is not None:
+                raise ValueError(f"Cannot specify both filter_func and keyword arguments")
+            filter_func = kwargs
+            original_filter = kwargs
         
-        # Apply the filter
-        if filter_func is None:
+        # Handle string query - try optimized path first
+        if isinstance(filter_func, str):
+            # Try to use optimized Rust backend for simple queries
+            if self.use_rust:
+                optimized_result = self._try_optimized_string_filter_nodes(filter_func)
+                if optimized_result is not None:
+                    filtered_node_ids = optimized_result
+                else:
+                    # Fall back to compiled query
+                    from .filtering import QueryCompiler
+                    filter_func = QueryCompiler.compile_node_query(filter_func)
+                    filtered_node_ids = self._filter_nodes_vectorized(filter_func)
+            else:
+                from .filtering import QueryCompiler
+                filter_func = QueryCompiler.compile_node_query(filter_func)
+                filtered_node_ids = self._filter_nodes_vectorized(filter_func)
+        elif isinstance(filter_func, dict):
+            # Use super-fast dictionary filtering for exact matches
+            filtered_node_ids = self._filter_nodes_by_dict_vectorized(filter_func)
+        elif filter_func is None:
             filtered_node_ids = list(self.get_node_ids())
         else:
-            # Apply filter function
-            if self.use_rust:
-                # For Rust backend, we need to iterate through all nodes
-                filtered_node_ids = []
-                for node_id in self.nodes:
-                    node = self.get_node(node_id)
-                    if node and filter_func(node_id, node.attributes):
-                        filtered_node_ids.append(node_id)
-            else:
-                # Python fallback implementation
-                effective_nodes, _, _ = self._get_effective_data()
-                filtered_node_ids = []
-                for node_id, node in effective_nodes.items():
-                    if filter_func(node_id, node.attributes):
-                        filtered_node_ids.append(node_id)
+            # Use vectorized approach for other filter types
+            filtered_node_ids = self._filter_nodes_vectorized(filter_func)
         
-        if return_graph:
+        if return_subgraph:
             return self._create_subgraph_from_nodes(filtered_node_ids, original_filter)
         else:
             return filtered_node_ids
 
-    def filter_edges(self, filter_func: Union[Callable[[str, NodeID, NodeID, Dict[str, Any]], bool], Dict[str, Any], str] = None, return_graph: bool = False, **kwargs) -> Union[List[str], 'Subgraph']:
+    def filter_edges(self, filter_func: Union[Callable[[str, NodeID, NodeID, Dict[str, Any]], bool], Dict[str, Any], str] = None, return_subgraph: bool = False, **kwargs) -> Union[List[str], 'Subgraph']:
         """Filter edges by lambda function, attribute values, string query, or keyword arguments
         
         Args:
             filter_func: Either a callable that takes (edge_id, source, target, attributes) and returns bool,
                         a dictionary of attribute filters, or a string query like "weight > 0.5"
-            return_graph: If True, return a new Subgraph with filtered edges and connected nodes.
+            return_subgraph: If True, return a new Subgraph with filtered edges and connected nodes.
                          If False, return a list of edge IDs (default)
             **kwargs: Keyword arguments for attribute filtering (e.g., relationship='friend', weight=0.8)
             
@@ -567,7 +593,7 @@ class Graph(StateMixin):
             filtered_ids = graph.filter_edges(relationship='colleague', weight=0.8)
             
             # Return subgraph
-            subgraph = graph.filter_edges(relationship='friend', return_graph=True)
+            subgraph = graph.filter_edges(relationship='friend', return_subgraph=True)
         """
         # Handle keyword arguments - convert to dictionary filter
         if kwargs:
@@ -578,10 +604,22 @@ class Graph(StateMixin):
         # Store original filter criteria for metadata
         original_filter = filter_func
         
-        # Handle string query
+        # Handle string query - try optimized path first
         if isinstance(filter_func, str):
-            from .filtering import QueryCompiler
-            filter_func = QueryCompiler.compile_edge_query(filter_func)
+            # Try to use optimized Rust backend for simple queries
+            if self.use_rust:
+                optimized_result = self._try_optimized_string_filter_edges(filter_func)
+                if optimized_result is not None:
+                    filtered_edge_ids = optimized_result
+                else:
+                    # Fall back to compiled query
+                    from .filtering import QueryCompiler
+                    filter_func = QueryCompiler.compile_edge_query(filter_func)
+                    filtered_edge_ids = self._filter_edges_vectorized(filter_func)
+            else:
+                from .filtering import QueryCompiler
+                filter_func = QueryCompiler.compile_edge_query(filter_func)
+                filtered_edge_ids = self._filter_edges_vectorized(filter_func)
         elif isinstance(filter_func, dict):
             # Dictionary-based filtering - convert to function
             filter_dict = filter_func  # Store reference to dict before reassigning
@@ -591,28 +629,18 @@ class Graph(StateMixin):
                         return False
                 return True
             filter_func = dict_filter
-        
-        # Apply the filter
-        if filter_func is None:
+            filtered_edge_ids = self._filter_edges_vectorized(filter_func)
+        elif filter_func is None:
             filtered_edge_ids = list(self.edges.keys())
+        elif isinstance(original_filter, dict) or kwargs:
+            # Use super-fast dictionary filtering for exact matches
+            filter_dict = original_filter if isinstance(original_filter, dict) else kwargs
+            filtered_edge_ids = self._filter_edges_by_dict_vectorized(filter_dict)
         else:
-            # Apply filter function
-            if self.use_rust:
-                # For Rust backend, we need to iterate through all edges
-                filtered_edge_ids = []
-                for edge_id in self.edges:
-                    edge = self.edges[edge_id]  # Use the EdgeView instead of get_edge
-                    if edge and filter_func(edge_id, edge.source, edge.target, edge.attributes):
-                        filtered_edge_ids.append(edge_id)
-            else:
-                # Python fallback implementation
-                _, effective_edges, _ = self._get_effective_data()
-                filtered_edge_ids = []
-                for edge_id, edge in effective_edges.items():
-                    if filter_func(edge_id, edge.source, edge.target, edge.attributes):
-                        filtered_edge_ids.append(edge_id)
+            # Use vectorized approach for other filter types
+            filtered_edge_ids = self._filter_edges_vectorized(filter_func)
         
-        if return_graph:
+        if return_subgraph:
             return self._create_subgraph_from_edges(filtered_edge_ids, original_filter)
         else:
             return filtered_edge_ids
@@ -1365,5 +1393,291 @@ class Graph(StateMixin):
             raise ValueError("Must specify either group_by or filter criteria")
         
         return result
+
+    def _filter_nodes_vectorized(self, filter_func: Callable[[NodeID, Dict[str, Any]], bool]) -> List[str]:
+        """
+        Vectorized node filtering for better performance on large graphs.
+        
+        Instead of individual attribute lookups per node, this method:
+        1. Collects all node data in bulk
+        2. Applies filters in batch operations where possible
+        3. Only evaluates the filter function on collected data
+        
+        Args:
+            filter_func: Function that takes (node_id, attributes) and returns bool
+            
+        Returns:
+            List of filtered node IDs
+        """
+        if self.use_rust:
+            # For Rust backend, collect all node data efficiently
+            node_ids = list(self.nodes.keys())
+            if not node_ids:
+                return []
+            
+            # Collect all node data in a single pass
+            nodes_data = []
+            for node_id in node_ids:
+                node = self.get_node(node_id)
+                if node:
+                    nodes_data.append((node_id, node.attributes))
+            
+            # Apply filter to collected data
+            filtered_node_ids = []
+            for node_id, attributes in nodes_data:
+                if filter_func(node_id, attributes):
+                    filtered_node_ids.append(node_id)
+            
+            return filtered_node_ids
+        else:
+            # Python backend - use effective data which is already collected
+            effective_nodes, _, _ = self._get_effective_data()
+            filtered_node_ids = []
+            for node_id, node in effective_nodes.items():
+                if filter_func(node_id, node.attributes):
+                    filtered_node_ids.append(node_id)
+            return filtered_node_ids
+    
+    def _filter_edges_vectorized(self, filter_func: Callable[[str, NodeID, NodeID, Dict[str, Any]], bool]) -> List[str]:
+        """
+        Vectorized edge filtering for better performance on large graphs.
+        
+        Instead of individual attribute lookups per edge, this method:
+        1. Collects all edge data in bulk
+        2. Applies filters in batch operations where possible  
+        3. Only evaluates the filter function on collected data
+        
+        Args:
+            filter_func: Function that takes (edge_id, source, target, attributes) and returns bool
+            
+        Returns:
+            List of filtered edge IDs
+        """
+        if self.use_rust:
+            # For Rust backend, collect all edge data efficiently
+            edge_ids = list(self.edges.keys())
+            if not edge_ids:
+                return []
+            
+            # Collect all edge data in a single pass
+            edges_data = []
+            for edge_id in edge_ids:
+                edge = self.edges[edge_id]  # Use EdgeView for efficiency
+                if edge:
+                    edges_data.append((edge_id, edge.source, edge.target, edge.attributes))
+            
+            # Apply filter to collected data
+            filtered_edge_ids = []
+            for edge_id, source, target, attributes in edges_data:
+                if filter_func(edge_id, source, target, attributes):
+                    filtered_edge_ids.append(edge_id)
+            
+            return filtered_edge_ids
+        else:
+            # Python backend - use effective data which is already collected
+            _, effective_edges, _ = self._get_effective_data()
+            filtered_edge_ids = []
+            for edge_id, edge in effective_edges.items():
+                if filter_func(edge_id, edge.source, target, edge.attributes):
+                    filtered_edge_ids.append(edge_id)
+            return filtered_edge_ids
+
+    def _filter_nodes_optimized(self, filter_func: Union[Callable, Dict, str], **kwargs) -> List[str]:
+        """
+        Highly optimized node filtering that detects filter patterns and applies
+        the most efficient algorithm for each pattern.
+        """
+        # Handle kwargs conversion
+        if kwargs:
+            if filter_func is not None:
+                raise ValueError("Cannot specify both filter_func and keyword arguments")
+            filter_func = kwargs
+
+        # Pattern 1: Dictionary filters (most common) - super fast path
+        if isinstance(filter_func, dict):
+            return self._filter_nodes_by_dict_vectorized(filter_func)
+        
+        # Pattern 2: String queries - compile once, apply efficiently
+        if isinstance(filter_func, str):
+            from .filtering import QueryCompiler
+            compiled_func = QueryCompiler.compile_node_query(filter_func)
+            return self._filter_nodes_vectorized(compiled_func)
+        
+        # Pattern 3: General callable - use standard vectorized approach
+        if callable(filter_func):
+            return self._filter_nodes_vectorized(filter_func)
+        
+        # No filter - return all
+        if filter_func is None:
+            return list(self.get_node_ids())
+        
+        raise ValueError(f"Unsupported filter type: {type(filter_func)}")
+
+    def _filter_nodes_by_dict_vectorized(self, filter_dict: Dict[str, Any]) -> List[str]:
+        """
+        Super-optimized filtering for dictionary-based filters.
+        Uses O(1) indexed filtering from the Rust backend.
+        """
+        if not filter_dict:
+            return list(self.get_node_ids())
+        
+        if self.use_rust:
+            # Use the optimized Rust backend with O(1) attribute indexing
+            return self._rust_core.filter_nodes_by_attributes(filter_dict)
+        else:
+            # Python backend: use effective data
+            effective_nodes, _, _ = self._get_effective_data()
+            
+            # Column-wise filtering
+            filtered_ids = []
+            for node_id, node in effective_nodes.items():
+                # Check all attributes at once
+                if all(node.attributes.get(attr) == value for attr, value in filter_dict.items()):
+                    filtered_ids.append(node_id)
+            
+            return filtered_ids
+
+    def _filter_edges_optimized(self, filter_func: Union[Callable, Dict, str], **kwargs) -> List[str]:
+        """
+        Highly optimized edge filtering that detects filter patterns and applies
+        the most efficient algorithm for each pattern.
+        """
+        # Handle kwargs conversion
+        if kwargs:
+            if filter_func is not None:
+                raise ValueError("Cannot specify both filter_func and keyword arguments")
+            filter_func = kwargs
+
+        # Pattern 1: Dictionary filters (most common) - super fast path
+        if isinstance(filter_func, dict):
+            return self._filter_edges_by_dict_vectorized(filter_func)
+        
+        # Pattern 2: String queries - compile once, apply efficiently  
+        if isinstance(filter_func, str):
+            from .filtering import QueryCompiler
+            compiled_func = QueryCompiler.compile_edge_query(filter_func)
+            return self._filter_edges_vectorized(compiled_func)
+        
+        # Pattern 3: General callable - use standard vectorized approach
+        if callable(filter_func):
+            return self._filter_edges_vectorized(filter_func)
+        
+        # No filter - return all
+        if filter_func is None:
+            return list(self.edges.keys())
+        
+        raise ValueError(f"Unsupported filter type: {type(filter_func)}")
+
+    def _filter_edges_by_dict_vectorized(self, filter_dict: Dict[str, Any]) -> List[str]:
+        """
+        Super-optimized filtering for dictionary-based edge filters.
+        Uses column-wise operations to minimize attribute access overhead.
+        """
+        if not filter_dict:
+            return list(self.edges.keys())
+        
+        if self.use_rust:
+            # Rust backend: collect all edges with required attributes
+            edge_ids = list(self.edges.keys())
+            if not edge_ids:
+                return []
+            
+            # Column-wise filtering: extract each attribute across all edges
+            filtered_ids = set(edge_ids)  # Start with all edges
+            
+            for attr_name, expected_value in filter_dict.items():
+                # Extract this attribute from all remaining edges
+                edges_with_attr = []
+                for edge_id in filtered_ids:
+                    edge = self.edges[edge_id]
+                    if edge and edge.attributes.get(attr_name) == expected_value:
+                        edges_with_attr.append(edge_id)
+                
+                # Update filtered set (intersection)
+                filtered_ids = set(edges_with_attr)
+                
+                # Early termination if no edges left
+                if not filtered_ids:
+                    break
+            
+            return list(filtered_ids)
+        else:
+            # Python backend: use effective data
+            _, effective_edges, _ = self._get_effective_data()
+            
+            # Column-wise filtering
+            filtered_ids = []
+            for edge_id, edge in effective_edges.items():
+                # Check all attributes at once
+                if all(edge.attributes.get(attr) == value for attr, value in filter_dict.items()):
+                    filtered_ids.append(edge_id)
+            
+            return filtered_ids
+
+    def _try_optimized_string_filter_nodes(self, query_str: str) -> Optional[List[str]]:
+        """
+        Try to optimize simple string queries using fast Rust backend operations.
+        Returns None if the query cannot be optimized.
+        """
+        import re
+        
+        # Pattern for simple numeric comparisons: "attribute operator value"
+        numeric_pattern = r'^\s*(\w+)\s*(>=|<=|>|<|==|!=)\s*(\d+(?:\.\d+)?)\s*$'
+        match = re.match(numeric_pattern, query_str)
+        
+        if match:
+            attr_name, operator, value_str = match.groups()
+            try:
+                value = float(value_str)
+                return self._rust_core.filter_nodes_by_numeric_comparison(attr_name, operator, value)
+            except (ValueError, AttributeError):
+                return None
+        
+        # Pattern for simple string comparisons: "attribute == 'value'"
+        string_pattern = r"^\s*(\w+)\s*(==|!=)\s*['\"]([^'\"]*)['\"]?\s*$"
+        match = re.match(string_pattern, query_str)
+        
+        if match:
+            attr_name, operator, value = match.groups()
+            try:
+                return self._rust_core.filter_nodes_by_string_comparison(attr_name, operator, value)
+            except AttributeError:
+                return None
+        
+        # Could not optimize - return None to fall back to compiled query
+        return None
+
+    def _try_optimized_string_filter_edges(self, query_str: str) -> Optional[List[str]]:
+        """
+        Try to optimize simple string queries for edges using fast Rust backend operations.
+        Returns None if the query cannot be optimized.
+        """
+        import re
+        
+        # Pattern for simple numeric comparisons: "attribute operator value"
+        numeric_pattern = r'^\s*(\w+)\s*(>=|<=|>|<|==|!=)\s*(\d+(?:\.\d+)?)\s*$'
+        match = re.match(numeric_pattern, query_str)
+        
+        if match:
+            attr_name, operator, value_str = match.groups()
+            try:
+                value = float(value_str)
+                return self._rust_core.filter_edges_by_numeric_comparison(attr_name, operator, value)
+            except (ValueError, AttributeError):
+                return None
+        
+        # Pattern for simple string comparisons: "attribute == 'value'"
+        string_pattern = r"^\s*(\w+)\s*(==|!=)\s*['\"]([^'\"]*)['\"]?\s*$"
+        match = re.match(string_pattern, query_str)
+        
+        if match:
+            attr_name, operator, value = match.groups()
+            try:
+                return self._rust_core.filter_edges_by_string_comparison(attr_name, operator, value)
+            except AttributeError:
+                return None
+        
+        # Could not optimize - return None to fall back to compiled query
+        return None
 
 

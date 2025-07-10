@@ -21,18 +21,17 @@ Groggy is in development! I am excited to release this early public version for 
 
 ## Installation
 
-### From PyPI (IN DEVELOPMENT)
-
-```bash
-pip install groggy
-```
-
 ### From Source
 
 ```bash
 git clone https://github.com/rollingstorms/groggy.git
 cd groggy
-pip install .
+
+# Install development dependencies
+pip install maturin
+
+# Build and install
+maturin develop --release
 ```
 
 ## Quick Start
@@ -121,12 +120,18 @@ make html
 
 ## Performance
 
-Groggy is designed for high-performance graph processing:
+Groggy is designed for high-performance graph processing with a unified Rust-based columnar storage system:
 
-- Handles graphs with millions of nodes
-- Efficient memory usage
-- Fast graph traversal and analysis
-- Optimized algorithms for common graph operations
+- **Optimized Filtering**: Fast bitmap-based exact matching and range queries
+- **Columnar Storage**: Efficient attribute storage with O(1) lookups for exact matches
+- **Scalable Architecture**: Handles large graphs efficiently
+- **Memory Efficient**: Optimized data structures for minimal memory footprint
+
+Key architectural features:
+- Unified type system (NodeData, EdgeData, GraphType)
+- Bitmap indexing for fast attribute filtering
+- Optimized numeric and string comparison operations
+- Efficient batch operations for bulk data processing
 
 ## Development
 
@@ -185,11 +190,10 @@ The test suite includes:
   - State management with bulk data
 
 - **Performance Benchmarks**:
-  - Batch vs individual operations comparison
-  - Node creation: ~760K nodes/second (batch)
-  - Edge creation: ~290K edges/second (batch)
-  - Node updates: ~580K updates/second (batch)
-  - **330x speedup** with batch operations
+  - Comprehensive filtering performance testing
+  - Graph creation and manipulation benchmarks
+  - Comparison with other graph libraries
+  - Memory efficiency validation
 
 ### Test Environment Setup
 
@@ -205,14 +209,19 @@ pip install -e .
 python -m pytest tests/ -v
 ```
 
-### Performance Results
+### Performance Testing
 
-Recent benchmark results on modern hardware:
-- **Node Creation**: 760,940 nodes/second (batch)
-- **Edge Creation**: 290,236 edges/second (batch) 
-- **Node Updates**: 581,573 updates/second (batch)
-- **Graph Analysis**: Sub-millisecond filtering on 1K+ nodes
-- **Memory Usage**: Efficient handling of 10K+ element graphs
+For performance validation:
+```bash
+# Run comprehensive functionality tests
+python run_tests.py
+
+# Run stress tests
+python tests/test_stress.py
+
+# Benchmark against other libraries
+python benchmark_graph_libraries.py
+```
 
 
 ## Contributing

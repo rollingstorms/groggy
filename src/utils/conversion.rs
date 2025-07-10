@@ -81,3 +81,14 @@ pub fn json_value_to_python(py: Python, json_value: &JsonValue) -> PyResult<PyOb
         }
     }
 }
+
+/// Convert Python value to JSON (alias for python_to_json_value)
+pub fn python_value_to_json(py_value: &PyAny) -> PyResult<JsonValue> {
+    python_to_json_value(py_value)
+}
+
+/// Convert PyObject to JSON value
+pub fn python_pyobject_to_json(py: Python, py_obj: &PyObject) -> PyResult<JsonValue> {
+    let py_value = py_obj.as_ref(py);
+    python_to_json_value(py_value)
+}

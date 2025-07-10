@@ -11,9 +11,13 @@ from ._version import __version__
 # Try to import Rust core, fallback to Python implementation
 try:
     from . import _core
+    from ._core import FastGraph, ColumnarStore
     RUST_BACKEND_AVAILABLE = True
 except ImportError:
     RUST_BACKEND_AVAILABLE = False
+    # Define placeholders for when Rust backend is not available
+    FastGraph = None
+    ColumnarStore = None
     import warnings
     warnings.warn(
         "Rust backend not available, falling back to Python implementation. "
@@ -54,5 +58,7 @@ __all__ = [
     'RUST_BACKEND_AVAILABLE',
     'get_available_backends',
     'set_backend',
-    'get_current_backend'
+    'get_current_backend',
+    'FastGraph',
+    'ColumnarStore'
 ]

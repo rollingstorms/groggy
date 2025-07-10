@@ -104,8 +104,7 @@ impl FastGraph {
     /// Get all nodes with degree greater than threshold
     pub fn high_degree_nodes(&self, min_degree: usize) -> Vec<(String, usize)> {
         self.node_id_to_index.iter()
-            .filter_map(|entry| {
-                let node_id = entry.key();
+            .filter_map(|(node_id, _node_idx)| {
                 let degree = self.node_degree(node_id)?;
                 if degree >= min_degree {
                     Some((node_id.clone(), degree))
@@ -118,10 +117,12 @@ impl FastGraph {
 
     /// Internal method to remove a node
     pub fn remove_node_internal(&mut self, node_id: String) -> bool {
-        if let Some(entry) = self.node_id_to_index.remove(&node_id) {
-            let node_idx = entry.1;
+        if let Some(node_idx) = self.node_id_to_index.remove(&node_id) {
             // Remove from reverse mapping
             self.node_index_to_id.remove(&node_idx);
+            
+            // Remove from columnar storage
+            self.columnar_store.remove_node(node_idx.index());
             
             // Remove from graph (this also removes all connected edges)
             self.graph.remove_node(node_idx);
@@ -139,8 +140,8 @@ impl FastGraph {
 
         // Collect node indices to remove
         for node_id in &node_ids {
-            if let Some(entry) = self.node_id_to_index.get(node_id) {
-                indices_to_remove.push((*entry.value(), node_id.clone()));
+            if let Some(node_idx) = self.node_id_to_index.get(node_id) {
+                indices_to_remove.push((*node_idx, node_id.clone()));
             }
         }
 
@@ -148,6 +149,7 @@ impl FastGraph {
         for (node_idx, node_id) in indices_to_remove {
             self.node_id_to_index.remove(&node_id);
             self.node_index_to_id.remove(&node_idx);
+            self.columnar_store.remove_node(node_idx.index());
             self.graph.remove_node(node_idx);
             removed_count += 1;
         }
@@ -223,14 +225,19 @@ impl FastGraph {
         } else {
             HashMap::new()
         };
-        
-        let edge_data = EdgeData { 
-            source, 
-            target, 
-            attributes: attrs 
+         let edge_data = EdgeData { 
+            source: source.clone(), 
+            target: target.clone(), 
+            attr_uids: std::collections::HashSet::new(),
         };
+
+        let edge_idx = self.graph.add_edge(source_idx, target_idx, edge_data);
+        self.edge_index_to_endpoints.insert(edge_idx, (source, target));
         
-        self.graph.add_edge(source_idx, target_idx, edge_data);
+        // Store attributes in columnar format
+        for (attr_name, attr_value) in attrs {
+            self.columnar_store.set_edge_attribute(edge_idx.index(), &attr_name, attr_value);
+        }
         
         Ok(())
     }
@@ -274,12 +281,18 @@ impl FastGraph {
             let target_idx = *self.node_id_to_index.get(&target).unwrap();
             
             let edge_data = EdgeData { 
-                source, 
-                target, 
-                attributes 
+                source: source.clone(), 
+                target: target.clone(), 
+                attr_uids: std::collections::HashSet::new(),
             };
             
-            self.graph.add_edge(source_idx, target_idx, edge_data);
+            let edge_idx = self.graph.add_edge(source_idx, target_idx, edge_data);
+            self.edge_index_to_endpoints.insert(edge_idx, (source, target));
+            
+            // Store attributes in columnar format
+            for (attr_name, attr_value) in attributes {
+                self.columnar_store.set_edge_attribute(edge_idx.index(), &attr_name, attr_value);
+            }
         }
         
         Ok(())

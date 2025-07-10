@@ -1,24 +1,63 @@
-use pyo3::prelude::*;
 use petgraph::{Graph as PetGraph, Directed, Undirected};
 use petgraph::graph::NodeIndex;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
 use serde_json::Value as JsonValue;
+use crate::storage::columnar::AttrUID;
 
+/// Node data that only stores ID and attribute UIDs for columnar storage (PRIMARY)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeData {
+    pub id: String,
+    /// Only store the attribute UIDs, not the values
+    pub attr_uids: HashSet<AttrUID>,
+}
+
+/// Edge data that only stores source/target and attribute UIDs for columnar storage (PRIMARY)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EdgeData {
+    pub source: String,
+    pub target: String,
+    /// Only store the attribute UIDs, not the values
+    pub attr_uids: HashSet<AttrUID>,
+}
+
+/// Legacy types for storage compatibility only - DO NOT USE IN NEW CODE
+/// These exist only to support the ContentPool storage format
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegacyNodeData {
     pub id: String,
     pub attributes: HashMap<String, JsonValue>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EdgeData {
+pub struct LegacyEdgeData {
     pub source: String,
     pub target: String,
     pub attributes: HashMap<String, JsonValue>,
 }
 
-/// Graph type enum to support both directed and undirected graphs
+/// Conversion utilities between legacy and new formats (for storage only)
+impl From<LegacyNodeData> for NodeData {
+    fn from(node_data: LegacyNodeData) -> Self {
+        NodeData {
+            id: node_data.id,
+            attr_uids: HashSet::new(), // Will be populated by the columnar store
+        }
+    }
+}
+
+impl From<LegacyEdgeData> for EdgeData {
+    fn from(edge_data: LegacyEdgeData) -> Self {
+        EdgeData {
+            source: edge_data.source,
+            target: edge_data.target,
+            attr_uids: HashSet::new(), // Will be populated by the columnar store
+        }
+    }
+}
+
+/// Graph type enum to support both directed and undirected graphs with columnar storage
 #[derive(Debug, Clone)]
 pub enum GraphType {
     Directed(PetGraph<NodeData, EdgeData, Directed>),
@@ -132,10 +171,24 @@ impl GraphType {
         }
     }
 
+    pub fn neighbors_directed(&self, node_idx: NodeIndex, direction: petgraph::Direction) -> Vec<NodeIndex> {
+        match self {
+            GraphType::Directed(g) => g.neighbors_directed(node_idx, direction).collect(),
+            GraphType::Undirected(g) => g.neighbors_directed(node_idx, direction).collect(),
+        }
+    }
+
     pub fn edge_endpoints(&self, edge_idx: petgraph::graph::EdgeIndex) -> Option<(NodeIndex, NodeIndex)> {
         match self {
             GraphType::Directed(g) => g.edge_endpoints(edge_idx),
             GraphType::Undirected(g) => g.edge_endpoints(edge_idx),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        match self {
+            GraphType::Directed(g) => g.clear(),
+            GraphType::Undirected(g) => g.clear(),
         }
     }
 }

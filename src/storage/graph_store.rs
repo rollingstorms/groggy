@@ -4,6 +4,7 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 use std::collections::HashMap;
 use crate::graph::FastGraph;
+use crate::graph::types::{LegacyNodeData, LegacyEdgeData};
 use crate::storage::{ContentPool, ContentHash};
 use crate::utils::hash::fast_hash;
 
@@ -120,7 +121,13 @@ impl GraphStore {
             // Get the actual node data from the graph
             if let Some(node_idx) = graph.node_id_to_index.get(&node_id) {
                 if let Some(node_data) = graph.get_node_weight(*node_idx) {
-                    let hash = self.content_pool.intern_node(node_data.clone());
+                    // Convert new data to legacy format for content pool
+                    let node_attributes = graph.columnar_store.get_node_attributes(node_idx.index());
+                    let legacy_node_data = LegacyNodeData {
+                        id: node_data.id.clone(),
+                        attributes: node_attributes,
+                    };
+                    let hash = self.content_pool.intern_node(legacy_node_data);
                     node_hashes.insert(node_id, hash);
                 }
             }
@@ -130,7 +137,14 @@ impl GraphStore {
         for edge_idx in graph.get_edge_indices() {
             if let Some(edge_data) = graph.get_edge_weight(edge_idx) {
                 let edge_id = format!("{}->{}", edge_data.source, edge_data.target);
-                let hash = self.content_pool.intern_edge(edge_data.clone());
+                // Convert new data to legacy format for content pool
+                let edge_attributes = graph.columnar_store.get_edge_attributes(edge_idx.index());
+                let legacy_edge_data = LegacyEdgeData {
+                    source: edge_data.source.clone(),
+                    target: edge_data.target.clone(),
+                    attributes: edge_attributes,
+                };
+                let hash = self.content_pool.intern_edge(legacy_edge_data);
                 edge_hashes.insert(edge_id, hash);
             }
         }
@@ -164,21 +178,33 @@ impl GraphStore {
         
         // Reconstruct nodes
         for (node_id, content_hash) in &state.node_hashes {
-            if let Some(node_data) = self.content_pool.get_node(content_hash) {
-                // Add node with proper attributes (dereference Arc)
-                let new_node_idx = graph.add_node_to_graph_public((*node_data).clone());
+            if let Some(legacy_node_data) = self.content_pool.get_node(content_hash) {
+                // Convert legacy data to new format
+                let node_data = crate::graph::types::NodeData::from((*legacy_node_data).clone());
+                let new_node_idx = graph.add_node_to_graph_public(node_data);
                 graph.node_id_to_index.insert(node_id.clone(), new_node_idx);
                 graph.node_index_to_id.insert(new_node_idx, node_id.clone());
+                
+                // Store attributes in columnar format
+                for (attr_name, attr_value) in &legacy_node_data.attributes {
+                    graph.columnar_store.set_node_attribute(new_node_idx.index(), attr_name, attr_value.clone());
+                }
             }
         }
         
         // Reconstruct edges
         for (edge_id, content_hash) in &state.edge_hashes {
-            if let Some(edge_data) = self.content_pool.get_edge(content_hash) {
-                let source_idx = *graph.node_id_to_index.get(&edge_data.source)?;
-                let target_idx = *graph.node_id_to_index.get(&edge_data.target)?;
-                // Add edge with proper attributes (dereference Arc)
-                let _ = graph.add_edge_to_graph_public(source_idx, target_idx, (*edge_data).clone());
+            if let Some(legacy_edge_data) = self.content_pool.get_edge(content_hash) {
+                let source_idx = *graph.node_id_to_index.get(&legacy_edge_data.source)?;
+                let target_idx = *graph.node_id_to_index.get(&legacy_edge_data.target)?;
+                // Convert legacy data to new format
+                let edge_data = crate::graph::types::EdgeData::from((*legacy_edge_data).clone());
+                let edge_idx = graph.add_edge_to_graph_public(source_idx, target_idx, edge_data);
+                
+                // Store attributes in columnar format
+                for (attr_name, attr_value) in &legacy_edge_data.attributes {
+                    graph.columnar_store.set_edge_attribute(edge_idx.index(), attr_name, attr_value.clone());
+                }
             }
         }
         

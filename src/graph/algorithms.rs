@@ -130,9 +130,15 @@ impl FastGraph {
         let mut edge_count = 0;
         for i in 0..neighbors.len() {
             for j in (i + 1)..neighbors.len() {
-                if self.get_find_edge(neighbors[i], neighbors[j]).is_some() ||
-                   self.get_find_edge(neighbors[j], neighbors[i]).is_some() {
-                    edge_count += 1;
+                // Check if there's an edge between neighbors[i] and neighbors[j]
+                if let (Some(idx_i), Some(idx_j)) = (
+                    self.node_id_to_index.get(self.node_index_to_id.get(&neighbors[i]).unwrap()),
+                    self.node_id_to_index.get(self.node_index_to_id.get(&neighbors[j]).unwrap())
+                ) {
+                    if self.graph.find_edge(*idx_i, *idx_j).is_some() ||
+                       self.graph.find_edge(*idx_j, *idx_i).is_some() {
+                        edge_count += 1;
+                    }
                 }
             }
         }
@@ -144,8 +150,7 @@ impl FastGraph {
     /// Calculate average clustering coefficient for the entire graph
     pub fn average_clustering_coefficient(&self) -> f64 {
         let coefficients: Vec<f64> = self.node_id_to_index.iter()
-            .filter_map(|entry| {
-                let node_id = entry.key();
+            .filter_map(|(node_id, _node_idx)| {
                 self.clustering_coefficient(node_id)
             })
             .collect();

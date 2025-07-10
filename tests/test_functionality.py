@@ -156,7 +156,7 @@ def test_edge_operations():
 
 def test_graph_properties():
     """Test graph property calculations."""
-    g = gr.Graph()
+    g = gr.Graph(directed=False)  # Use undirected graph for property calculations
     
     # Create a simple network
     nodes = ["A", "B", "C", "D"]

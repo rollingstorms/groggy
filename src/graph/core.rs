@@ -1,105 +1,86 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use petgraph::graph::NodeIndex;
 use std::collections::HashMap;
-use serde_json::Value as JsonValue;
-use dashmap::DashMap;
-use crate::graph::types::{GraphType, NodeData, EdgeData};
-use crate::utils::{python_dict_to_json_map, python_to_json_value, json_value_to_python};
+use petgraph::graph::NodeIndex;
 
-/// High-performance graph structure implemented in Rust
+use crate::graph::types::{GraphType, NodeData, EdgeData};
+use crate::storage::{ColumnarStore};
+use crate::utils::{python_dict_to_json_map, python_value_to_json, python_pyobject_to_json};
+
+/// FastGraph struct with hybrid/columnar storage (MAIN IMPLEMENTATION)
 #[pyclass]
 pub struct FastGraph {
+    /// The actual graph structure using the new lightweight types
     pub graph: GraphType,
-    pub node_id_to_index: DashMap<String, petgraph::graph::NodeIndex>,
-    pub node_index_to_id: DashMap<petgraph::graph::NodeIndex, String>,
-    pub graph_attributes: HashMap<String, JsonValue>,
+    
+    /// Whether this is a directed graph
     pub is_directed: bool,
+    
+    /// Columnar storage for attributes
+    pub columnar_store: ColumnarStore,
+    
+    /// Bidirectional mappings for node IDs
+    pub node_id_to_index: HashMap<String, NodeIndex>,
+    pub node_index_to_id: HashMap<NodeIndex, String>,
+    
+    /// Edge tracking
+    pub edge_index_to_endpoints: HashMap<petgraph::graph::EdgeIndex, (String, String)>,
 }
 
 #[pymethods]
 impl FastGraph {
     #[new]
-    #[pyo3(signature = (directed = true))]
     pub fn new(directed: bool) -> Self {
         let graph = if directed {
             GraphType::new_directed()
         } else {
             GraphType::new_undirected()
         };
-        
+
         Self {
             graph,
-            node_id_to_index: DashMap::new(),
-            node_index_to_id: DashMap::new(),
-            graph_attributes: HashMap::new(),
             is_directed: directed,
+            columnar_store: ColumnarStore::new(),
+            node_id_to_index: HashMap::new(),
+            node_index_to_id: HashMap::new(),
+            edge_index_to_endpoints: HashMap::new(),
         }
     }
 
-    /// Get whether this graph is directed
-    pub fn is_directed(&self) -> bool {
-        self.is_directed
-    }
-
-    /// Add a single node to the graph
+    /// Add a single node with optional attributes
     pub fn add_node(&mut self, node_id: String, attributes: Option<&PyDict>) -> PyResult<()> {
+        // Check if node already exists
         if self.node_id_to_index.contains_key(&node_id) {
             return Ok(()); // Node already exists
         }
 
-        let attrs = if let Some(py_attrs) = attributes {
-            python_dict_to_json_map(py_attrs)?
-        } else {
-            HashMap::new()
-        };
-
-        let node_data = NodeData { 
-            id: node_id.clone(), 
-            attributes: attrs 
+        // Create node data (lightweight)
+        let node_data = NodeData {
+            id: node_id.clone(),
+            attr_uids: std::collections::HashSet::new(),
         };
         
+        // Add to graph topology
         let node_index = self.graph.add_node(node_data);
         
+        // Update mappings
         self.node_id_to_index.insert(node_id.clone(), node_index);
-        self.node_index_to_id.insert(node_index, node_id);
+        self.node_index_to_id.insert(node_index, node_id.clone());
+        
+        // Store attributes in columnar format
+        if let Some(attrs) = attributes {
+            let attr_map = python_dict_to_json_map(attrs)?;
+            for (attr_name, attr_value) in attr_map {
+                self.columnar_store.set_node_attribute(node_index.index(), &attr_name, attr_value);
+            }
+        }
         
         Ok(())
     }
 
-    /// Remove a node from the graph
-    pub fn remove_node(&mut self, node_id: String) -> PyResult<bool> {
-        if let Some((_, node_idx)) = self.node_id_to_index.remove(&node_id) {
-            self.node_index_to_id.remove(&node_idx);
-            self.graph.remove_node(node_idx);
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    /// Add multiple nodes efficiently
-    fn add_nodes(&mut self, node_data: &PyList) -> PyResult<()> {
-        for item in node_data.iter() {
-            let node_info: (String, Option<&PyDict>) = item.extract()?;
-            self.add_node(node_info.0, node_info.1)?;
-        }
-        Ok(())
-    }
-
-    /// Remove multiple nodes efficiently  
-    fn remove_nodes(&mut self, node_ids: Vec<String>) -> PyResult<usize> {
-        let mut removed_count = 0;
-        for node_id in node_ids {
-            if self.remove_node(node_id)? {
-                removed_count += 1;
-            }
-        }
-        Ok(removed_count)
-    }
-
-    /// Add an edge between two nodes
+    /// Add a single edge with optional attributes
     pub fn add_edge(&mut self, source: String, target: String, attributes: Option<&PyDict>) -> PyResult<()> {
+        // Get node indices
         let source_idx = self.node_id_to_index.get(&source)
             .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                 format!("Source node '{}' not found", source)
@@ -109,638 +90,627 @@ impl FastGraph {
                 format!("Target node '{}' not found", target)
             ))?;
 
-        let attrs = if let Some(py_attrs) = attributes {
-            python_dict_to_json_map(py_attrs)?
-        } else {
-            HashMap::new()
-        };
-
+        // Create edge data (lightweight)
         let edge_data = EdgeData {
             source: source.clone(),
             target: target.clone(),
-            attributes: attrs,
+            attr_uids: std::collections::HashSet::new(),
         };
 
-        self.graph.add_edge(*source_idx, *target_idx, edge_data);
-        Ok(())
-    }
-
-    /// Check if an edge exists between two nodes
-    pub fn has_edge(&self, source: String, target: String) -> PyResult<bool> {
-        // Return false if either node doesn't exist
-        let source_idx = match self.node_id_to_index.get(&source) {
-            Some(idx) => idx,
-            None => return Ok(false),
-        };
-        let target_idx = match self.node_id_to_index.get(&target) {
-            Some(idx) => idx,
-            None => return Ok(false),
-        };
-
-        Ok(self.graph.find_edge(*source_idx, *target_idx).is_some())
-    }
-
-    /// Remove an edge between two nodes
-    pub fn remove_edge(&mut self, source: String, target: String) -> PyResult<bool> {
-        let source_idx = self.node_id_to_index.get(&source)
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                format!("Source node '{}' not found", source)
-            ))?;
-        let target_idx = self.node_id_to_index.get(&target)
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                format!("Target node '{}' not found", target)
-            ))?;
-
-        if let Some(edge_idx) = self.graph.find_edge(*source_idx, *target_idx) {
-            self.graph.remove_edge(edge_idx);
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    /// Add multiple edges efficiently
-    fn add_edges(&mut self, edge_data: &PyList) -> PyResult<()> {
-        for item in edge_data.iter() {
-            let edge_info: (String, String, Option<&PyDict>) = item.extract()?;
-            self.add_edge(edge_info.0, edge_info.1, edge_info.2)?;
-        }
-        Ok(())
-    }
-
-    /// Remove multiple edges efficiently
-    fn remove_edges(&mut self, edge_pairs: Vec<(String, String)>) -> PyResult<usize> {
-        let mut removed_count = 0;
-        for (source, target) in edge_pairs {
-            if self.remove_edge(source, target)? {
-                removed_count += 1;
+        // Add to graph topology
+        let edge_index = self.graph.add_edge(*source_idx, *target_idx, edge_data);
+        
+        // Store edge mapping
+        self.edge_index_to_endpoints.insert(edge_index, (source, target));
+        
+        // Store attributes in columnar format
+        if let Some(attrs) = attributes {
+            let attr_map = python_dict_to_json_map(attrs)?;
+            for (attr_name, attr_value) in attr_map {
+                self.columnar_store.set_edge_attribute(edge_index.index(), &attr_name, attr_value);
             }
         }
-        Ok(removed_count)
+        
+        Ok(())
     }
 
     /// Get node count
-    fn node_count(&self) -> usize {
+    pub fn node_count(&self) -> usize {
         self.graph.node_count()
     }
 
     /// Get edge count
-    fn edge_count(&self) -> usize {
+    pub fn edge_count(&self) -> usize {
         self.graph.edge_count()
-    }
-
-    /// Get neighbors of a node (both incoming and outgoing)
-    fn get_neighbors(&self, node_id: String) -> PyResult<Vec<String>> {
-        use petgraph::visit::EdgeRef;
-        
-        let node_idx = self.node_id_to_index.get(&node_id)
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                format!("Node '{}' not found", node_id)
-            ))?;
-        
-        let mut neighbors: Vec<String> = Vec::new();
-        
-        // Get outgoing neighbors
-        for neighbor_idx in self.graph.neighbors(*node_idx) {
-            if let Some(id) = self.node_index_to_id.get(&neighbor_idx) {
-                neighbors.push(id.clone());
-            }
-        }
-        
-        // Get incoming neighbors
-        for edge_ref in self.graph.edges_directed(*node_idx, petgraph::Direction::Incoming) {
-            let source_idx = edge_ref.source();
-            if let Some(id) = self.node_index_to_id.get(&source_idx) {
-                let id_str = id.clone();
-                if !neighbors.contains(&id_str) {  // Avoid duplicates
-                    neighbors.push(id_str);
-                }
-            }
-        }
-        
-        Ok(neighbors)
-    }
-
-    /// Get outgoing neighbors of a node
-    fn get_outgoing_neighbors(&self, node_id: String) -> PyResult<Vec<String>> {
-        let node_idx = self.node_id_to_index.get(&node_id)
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                format!("Node '{}' not found", node_id)
-            ))?;
-        
-        let mut neighbors: Vec<String> = Vec::new();
-        
-        // Get outgoing neighbors only
-        for neighbor_idx in self.graph.neighbors(*node_idx) {
-            if let Some(id) = self.node_index_to_id.get(&neighbor_idx) {
-                neighbors.push(id.clone());
-            }
-        }
-        
-        Ok(neighbors)
-    }
-
-    /// Get incoming neighbors of a node
-    fn get_incoming_neighbors(&self, node_id: String) -> PyResult<Vec<String>> {
-        use petgraph::visit::EdgeRef;
-        
-        let node_idx = self.node_id_to_index.get(&node_id)
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                format!("Node '{}' not found", node_id)
-            ))?;
-        
-        let mut neighbors: Vec<String> = Vec::new();
-        
-        // Get incoming neighbors only
-        for edge_ref in self.graph.edges_directed(*node_idx, petgraph::Direction::Incoming) {
-            let source_idx = edge_ref.source();
-            if let Some(id) = self.node_index_to_id.get(&source_idx) {
-                neighbors.push(id.clone());
-            }
-        }
-        
-        Ok(neighbors)
-    }
-
-    /// Get all neighbors of a node (both incoming and outgoing)
-    fn get_all_neighbors(&self, node_id: String) -> PyResult<Vec<String>> {
-        // This is the same as get_neighbors for now
-        self.get_neighbors(node_id)
     }
 
     /// Get all node IDs
     pub fn get_node_ids(&self) -> Vec<String> {
-        self.node_id_to_index.iter()
-            .map(|entry| entry.key().clone())
-            .collect()
+        self.node_id_to_index.keys().cloned().collect()
     }
 
-    /// Get all edge IDs (formatted as "source->target")
+    /// Check if node exists
+    pub fn has_node(&self, node_id: &str) -> bool {
+        self.node_id_to_index.contains_key(node_id)
+    }
+
+    /// Check if edge exists
+    pub fn has_edge(&self, source: &str, target: &str) -> bool {
+        if let (Some(source_idx), Some(target_idx)) = (
+            self.node_id_to_index.get(source),
+            self.node_id_to_index.get(target)
+        ) {
+            self.graph.find_edge(*source_idx, *target_idx).is_some()
+        } else {
+            false
+        }
+    }
+
+    /// Get neighbors of a node (for directed graphs, returns only outgoing neighbors)
+    pub fn get_neighbors(&self, node_id: &str) -> PyResult<Vec<String>> {
+        let node_idx = self.node_id_to_index.get(node_id)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Node '{}' not found", node_id)
+            ))?;
+
+        let neighbor_indices = if self.is_directed {
+            // For directed graphs, only return outgoing neighbors
+            self.graph.neighbors_directed(*node_idx, petgraph::Direction::Outgoing)
+        } else {
+            // For undirected graphs, neighbors() returns all connected nodes
+            self.graph.neighbors(*node_idx)
+        };
+        
+        let neighbor_ids: Vec<String> = neighbor_indices
+            .into_iter()
+            .filter_map(|idx| self.node_index_to_id.get(&idx).cloned())
+            .collect();
+
+        Ok(neighbor_ids)
+    }
+
+    /// Get outgoing neighbors of a node (for directed graphs)
+    pub fn get_outgoing_neighbors(&self, node_id: &str) -> PyResult<Vec<String>> {
+        let node_idx = self.node_id_to_index.get(node_id)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Node '{}' not found", node_id)
+            ))?;
+
+        let neighbor_indices = self.graph.neighbors_directed(*node_idx, petgraph::Direction::Outgoing);
+        let neighbor_ids: Vec<String> = neighbor_indices
+            .into_iter()
+            .filter_map(|idx| self.node_index_to_id.get(&idx).cloned())
+            .collect();
+
+        Ok(neighbor_ids)
+    }
+
+    /// Get incoming neighbors of a node (for directed graphs)
+    pub fn get_incoming_neighbors(&self, node_id: &str) -> PyResult<Vec<String>> {
+        let node_idx = self.node_id_to_index.get(node_id)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Node '{}' not found", node_id)
+            ))?;
+
+        let neighbor_indices = self.graph.neighbors_directed(*node_idx, petgraph::Direction::Incoming);
+        let neighbor_ids: Vec<String> = neighbor_indices
+            .into_iter()
+            .filter_map(|idx| self.node_index_to_id.get(&idx).cloned())
+            .collect();
+
+        Ok(neighbor_ids)
+    }
+
+    /// Get all neighbors of a node (both incoming and outgoing)
+    pub fn get_all_neighbors(&self, node_id: &str) -> PyResult<Vec<String>> {
+        let node_idx = self.node_id_to_index.get(node_id)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Node '{}' not found", node_id)
+            ))?;
+
+        let mut neighbor_ids = std::collections::HashSet::new();
+        
+        // Get outgoing neighbors
+        for idx in self.graph.neighbors_directed(*node_idx, petgraph::Direction::Outgoing) {
+            if let Some(id) = self.node_index_to_id.get(&idx) {
+                neighbor_ids.insert(id.clone());
+            }
+        }
+        
+        // Get incoming neighbors
+        for idx in self.graph.neighbors_directed(*node_idx, petgraph::Direction::Incoming) {
+            if let Some(id) = self.node_index_to_id.get(&idx) {
+                neighbor_ids.insert(id.clone());
+            }
+        }
+
+        Ok(neighbor_ids.into_iter().collect())
+    }
+
+    /// Get node attributes - retrieve from columnar store
+    pub fn get_node_attributes(&self, node_id: &str) -> PyResult<Option<HashMap<String, pyo3::PyObject>>> {
+        use pyo3::Python;
+        use crate::utils::json_value_to_python;
+        
+        let node_idx = self.node_id_to_index.get(node_id)
+            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Node '{}' not found", node_id)
+            ))?;
+
+        if let Some(_node_data) = self.graph.node_weight(*node_idx) {
+            Python::with_gil(|py| {
+                // Retrieve attributes from columnar store
+                let json_attributes = self.columnar_store.get_node_attributes(node_idx.index());
+                
+                // Convert JsonValue to PyObject
+                let mut py_attributes = HashMap::new();
+                for (attr_name, json_value) in json_attributes {
+                    let py_value = json_value_to_python(py, &json_value)?;
+                    py_attributes.insert(attr_name, py_value);
+                }
+                
+                Ok(Some(py_attributes))
+            })
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get edge attributes - retrieve from columnar store  
+    pub fn get_edge_attributes(&self, source: &str, target: &str) -> PyResult<Option<HashMap<String, pyo3::PyObject>>> {
+        use pyo3::Python;
+        if let (Some(source_idx), Some(target_idx)) = (
+            self.node_id_to_index.get(source),
+            self.node_id_to_index.get(target)
+        ) {
+            if let Some(edge_idx) = self.graph.find_edge(*source_idx, *target_idx) {
+                if let Some(_edge_data) = self.graph.edge_weight(edge_idx) {
+                    Python::with_gil(|py| {
+                        use crate::utils::json_value_to_python;
+                        
+                        // Retrieve attributes from columnar store
+                        let json_attributes = self.columnar_store.get_edge_attributes(edge_idx.index());
+                        
+                        // Convert JsonValue to PyObject
+                        let mut py_attributes = HashMap::new();
+                        for (attr_name, json_value) in json_attributes {
+                            let py_value = json_value_to_python(py, &json_value)?;
+                            py_attributes.insert(attr_name, py_value);
+                        }
+                        
+                        Ok(Some(py_attributes))
+                    })
+                } else {
+                    Ok(None)
+                }
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Check if the graph is directed
+    pub fn is_directed(&self) -> bool {
+        self.is_directed
+    }
+
+    /// Get edge IDs
     pub fn get_edge_ids(&self) -> Vec<String> {
         let mut edge_ids = Vec::new();
         for edge_idx in self.graph.edge_indices() {
-            if let Some(edge_data) = self.graph.edge_weight(edge_idx) {
-                let edge_id = format!("{}->{}", edge_data.source, edge_data.target);
-                edge_ids.push(edge_id);
+            if let Some((source_idx, target_idx)) = self.graph.edge_endpoints(edge_idx) {
+                if let (Some(source_id), Some(target_id)) = (
+                    self.node_index_to_id.get(&source_idx),
+                    self.node_index_to_id.get(&target_idx)
+                ) {
+                    edge_ids.push(format!("{}->{}", source_id, target_id));
+                }
             }
         }
         edge_ids
     }
 
-    /// Get node attributes
-    pub fn get_node_attributes(&self, node_id: String) -> PyResult<PyObject> {
-        let node_idx = self.node_id_to_index.get(&node_id)
+    /// Set a single node attribute
+    pub fn set_node_attribute(&mut self, node_id: &str, attribute: &str, value: &PyAny) -> PyResult<()> {
+        let node_idx = self.node_id_to_index.get(node_id)
             .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                 format!("Node '{}' not found", node_id)
             ))?;
+
+        // Convert Python value to JsonValue
+        let json_value = python_value_to_json(value)?;
         
-        if let Some(node_data) = self.graph.node_weight(*node_idx) {
-            Python::with_gil(|py| {
-                let dict = PyDict::new(py);
-                for (key, value) in &node_data.attributes {
-                    let py_value = json_value_to_python(py, value)?;
-                    dict.set_item(key, py_value)?;
-                }
-                Ok(dict.into_py(py))
-            })
-        } else {
-            Python::with_gil(|py| Ok(PyDict::new(py).into_py(py)))
-        }
+        // Store in columnar format
+        self.columnar_store.set_node_attribute(node_idx.index(), attribute, json_value);
+        
+        Ok(())
     }
 
-    /// Get edge attributes
-    pub fn get_edge_attributes(&self, source: String, target: String) -> PyResult<PyObject> {
-        let source_idx = self.node_id_to_index.get(&source)
+    /// Set a single edge attribute
+    pub fn set_edge_attribute(&mut self, source: &str, target: &str, attribute: &str, value: &PyAny) -> PyResult<()> {
+        let source_idx = self.node_id_to_index.get(source)
             .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                 format!("Source node '{}' not found", source)
             ))?;
-        let target_idx = self.node_id_to_index.get(&target)
+        let target_idx = self.node_id_to_index.get(target)
             .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                 format!("Target node '{}' not found", target)
             ))?;
-        
-        if let Some(edge_idx) = self.graph.find_edge(*source_idx, *target_idx) {
-            if let Some(edge_data) = self.graph.edge_weight(edge_idx) {
-                Python::with_gil(|py| {
-                    let dict = PyDict::new(py);
-                    for (key, value) in &edge_data.attributes {
-                        let py_value = json_value_to_python(py, value)?;
-                        dict.set_item(key, py_value)?;
-                    }
-                    Ok(dict.into_py(py))
-                })
-            } else {
-                Python::with_gil(|py| Ok(PyDict::new(py).into_py(py)))
-            }
-        } else {
-            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                format!("Edge from '{}' to '{}' not found", source, target)
-            ))
-        }
-    }
 
-    /// Set node attribute
-    pub fn set_node_attribute(&mut self, node_id: String, key: String, value: &PyAny) -> PyResult<()> {
-        let node_idx = self.node_id_to_index.get(&node_id)
+        let edge_idx = self.graph.find_edge(*source_idx, *target_idx)
             .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                format!("Node '{}' not found", node_id)
+                format!("Edge from '{}' to '{}' not found", source, target)
             ))?;
+
+        // Convert Python value to JsonValue
+        let json_value = python_value_to_json(value)?;
         
-        if let Some(node_data) = self.graph.node_weight_mut(*node_idx) {
-            let json_value = python_to_json_value(value)?;
-            node_data.attributes.insert(key, json_value);
-            Ok(())
-        } else {
-            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                format!("Node '{}' not found", node_id)
-            ))
-        }
+        // Store in columnar format
+        self.columnar_store.set_edge_attribute(edge_idx.index(), attribute, json_value);
+        
+        Ok(())
     }
 
-    /// Set edge attribute
-    pub fn set_edge_attribute(&mut self, source: String, target: String, key: String, value: &PyAny) -> PyResult<()> {
-        let source_idx = self.node_id_to_index.get(&source)
+    /// Set multiple edge attributes at once
+    pub fn set_edge_attributes(&mut self, source: &str, target: &str, attributes: &PyDict) -> PyResult<()> {
+        let source_idx = self.node_id_to_index.get(source)
             .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                 format!("Source node '{}' not found", source)
             ))?;
-        let target_idx = self.node_id_to_index.get(&target)
+        let target_idx = self.node_id_to_index.get(target)
             .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                 format!("Target node '{}' not found", target)
             ))?;
-        
-        if let Some(edge_idx) = self.graph.find_edge(*source_idx, *target_idx) {
-            if let Some(edge_data) = self.graph.edge_weight_mut(edge_idx) {
-                let json_value = python_to_json_value(value)?;
-                edge_data.attributes.insert(key, json_value);
-                Ok(())
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                    format!("Edge from '{}' to '{}' not found", source, target)
-                ))
-            }
-        } else {
-            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                format!("Edge from '{}' to '{}' not found", source, target)
-            ))
-        }
-    }
 
-    pub fn set_edge_attributes(&mut self, source: String, target: String, attributes: &PyDict) -> PyResult<()> {
-        let source_idx = self.node_id_to_index.get(&source)
+        let edge_idx = self.graph.find_edge(*source_idx, *target_idx)
             .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                format!("Source node '{}' not found", source)
-            ))?;
-        let target_idx = self.node_id_to_index.get(&target)
-            .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                format!("Target node '{}' not found", target)
-            ))?;
-        
-        if let Some(edge_idx) = self.graph.find_edge(*source_idx, *target_idx) {
-            if let Some(edge_data) = self.graph.edge_weight_mut(edge_idx) {
-                // Update each attribute from the dictionary
-                for (key, value) in attributes {
-                    let key_str = key.extract::<String>()?;
-                    let json_value = python_to_json_value(value)?;
-                    edge_data.attributes.insert(key_str, json_value);
-                }
-                Ok(())
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                    format!("Edge from '{}' to '{}' not found", source, target)
-                ))
-            }
-        } else {
-            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                 format!("Edge from '{}' to '{}' not found", source, target)
-            ))
-        }
-    }
+            ))?;
 
-    /// Create a deep copy of the graph
-    fn copy(&self) -> Self {
-        FastGraph {
-            graph: self.graph.clone(),
-            node_id_to_index: self.node_id_to_index.clone(),
-            node_index_to_id: self.node_index_to_id.clone(),
-            graph_attributes: self.graph_attributes.clone(),
-            is_directed: self.is_directed,
-        }
-    }
-
-    /// Get graph statistics
-    fn get_stats(&self) -> HashMap<String, usize> {
-        let mut stats = HashMap::new();
-        stats.insert("nodes".to_string(), self.graph.node_count());
-        stats.insert("edges".to_string(), self.graph.edge_count());
-        stats
-    }
-
-    /// Batch filter nodes by attribute values - highly optimized
-    #[pyo3(name = "filter_nodes_by_attributes")]
-    fn filter_nodes_by_attributes(&self, filters: &PyDict) -> PyResult<Vec<String>> {
-        let mut results = Vec::new();
-        let filter_map = python_dict_to_json_map(filters)?;
+        // Convert all attributes
+        let attr_map = python_dict_to_json_map(attributes)?;
         
-        // Use parallel processing for large graphs
-        if self.graph.node_count() > 1000 {
-            let node_ids: Vec<_> = self.node_id_to_index.iter()
-                .filter_map(|entry| {
-                    let node_id = entry.key();
-                    let node_idx = *entry.value();
-                    
-                    if let Some(node_data) = self.graph.node_weight(node_idx) {
-                        if self.matches_filters(&node_data.attributes, &filter_map) {
-                            Some(node_id.clone())
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            
-            results.extend(node_ids);
-        } else {
-            // Sequential for smaller graphs
-            for entry in self.node_id_to_index.iter() {
-                let node_id = entry.key();
-                let node_idx = *entry.value();
-                
-                if let Some(node_data) = self.graph.node_weight(node_idx) {
-                    if self.matches_filters(&node_data.attributes, &filter_map) {
-                        results.push(node_id.clone());
-                    }
-                }
-            }
-        }
-        
-        Ok(results)
-    }
-
-    /// Batch filter edges by attribute values
-    #[pyo3(name = "filter_edges_by_attributes")]
-    fn filter_edges_by_attributes(&self, filters: &PyDict) -> PyResult<Vec<(String, String)>> {
-        let mut results = Vec::new();
-        let filter_map = python_dict_to_json_map(filters)?;
-        
-        for edge_idx in self.graph.edge_indices() {
-            if let Some(edge_data) = self.graph.edge_weight(edge_idx) {
-                if self.matches_filters(&edge_data.attributes, &filter_map) {
-                    results.push((edge_data.source.clone(), edge_data.target.clone()));
-                }
-            }
-        }
-        
-        Ok(results)
-    }
-
-    /// Get subgraph by node IDs - optimized batch operation
-    fn get_subgraph_by_node_ids(&self, node_ids: Vec<String>) -> PyResult<FastGraph> {
-        let mut subgraph = FastGraph::new(self.is_directed);
-        let node_id_set: std::collections::HashSet<_> = node_ids.iter().collect();
-        
-        // Batch add nodes
-        let mut nodes_to_add = Vec::new();
-        for node_id in &node_ids {
-            if let Some(node_idx) = self.node_id_to_index.get(node_id) {
-                if let Some(node_data) = self.graph.node_weight(*node_idx) {
-                    nodes_to_add.push((node_id.clone(), node_data.attributes.clone()));
-                }
-            }
-        }
-        
-        // Add nodes to subgraph
-        for (node_id, attributes) in nodes_to_add {
-            let node_data = NodeData { id: node_id.clone(), attributes };
-            let node_idx = subgraph.graph.add_node(node_data);
-            subgraph.node_id_to_index.insert(node_id.clone(), node_idx);
-            subgraph.node_index_to_id.insert(node_idx, node_id);
-        }
-        
-        // Batch add edges between included nodes
-        let mut edges_to_add = Vec::new();
-        for edge_idx in self.graph.edge_indices() {
-            if let Some(edge_data) = self.graph.edge_weight(edge_idx) {
-                if node_id_set.contains(&edge_data.source) && node_id_set.contains(&edge_data.target) {
-                    edges_to_add.push(edge_data.clone());
-                }
-            }
-        }
-        
-        for edge_data in edges_to_add {
-            let source_idx = *subgraph.node_id_to_index.get(&edge_data.source).unwrap();
-            let target_idx = *subgraph.node_id_to_index.get(&edge_data.target).unwrap();
-            subgraph.graph.add_edge(source_idx, target_idx, edge_data);
-        }
-        
-        Ok(subgraph)
-    }
-
-    /// Get k-hop neighborhood efficiently
-    fn get_k_hop_neighborhood(&self, start_node: String, k: usize) -> PyResult<Vec<String>> {
-        let mut visited = std::collections::HashSet::new();
-        let mut current_layer = vec![start_node.clone()];
-        visited.insert(start_node);
-        
-        for _ in 0..k {
-            let mut next_layer = Vec::new();
-            
-            for node_id in current_layer {
-                if let Some(neighbors) = self.get_neighbors(node_id.clone()).ok() {
-                    for neighbor in neighbors {
-                        if !visited.contains(&neighbor) {
-                            visited.insert(neighbor.clone());
-                            next_layer.push(neighbor);
-                        }
-                    }
-                }
-            }
-            
-            current_layer = next_layer;
-            if current_layer.is_empty() {
-                break;
-            }
-        }
-        
-        Ok(visited.into_iter().collect())
-    }
-
-    /// Batch get node attributes - optimized for multiple queries
-    #[pyo3(name = "get_nodes_attributes")]
-    fn get_nodes_attributes(&self, py: Python, node_ids: Vec<String>) -> PyResult<PyObject> {
-        let py_list = PyList::empty(py);
-        
-        for node_id in node_ids {
-            if let Some(node_idx) = self.node_id_to_index.get(&node_id) {
-                if let Some(node_data) = self.graph.node_weight(*node_idx) {
-                    let py_dict = PyDict::new(py);
-                    for (key, value) in &node_data.attributes {
-                        py_dict.set_item(key, json_value_to_python(py, value)?)?;
-                    }
-                    py_list.append(py_dict)?;
-                } else {
-                    py_list.append(PyDict::new(py))?;
-                }
-            } else {
-                py_list.append(PyDict::new(py))?;
-            }
-        }
-        
-        Ok(py_list.to_object(py))
-    }
-
-    /// Batch set node attributes - highly optimized for large operations
-    pub fn set_nodes_attributes_batch(&mut self, node_attrs: &PyDict) -> PyResult<()> {
-        let mut updates = Vec::new();
-        
-        // Collect all updates first to avoid borrowing conflicts
-        for (node_id_py, attrs_py) in node_attrs.iter() {
-            let node_id: String = node_id_py.extract()?;
-            let attrs_dict: &PyDict = attrs_py.downcast()?;
-            
-            if let Some(node_idx) = self.node_id_to_index.get(&node_id) {
-                let mut attr_updates = HashMap::new();
-                for (key_py, value_py) in attrs_dict.iter() {
-                    let key: String = key_py.extract()?;
-                    let json_value = python_to_json_value(value_py)?;
-                    attr_updates.insert(key, json_value);
-                }
-                updates.push((*node_idx, attr_updates));
-            }
-        }
-        
-        // Apply all updates sequentially (parallel mutation not supported)
-        for (node_idx, attr_updates) in updates {
-            if let Some(node_data) = self.graph.node_weight_mut(node_idx) {
-                for (key, value) in attr_updates {
-                    node_data.attributes.insert(key, value);
-                }
-            }
+        // Store each attribute in columnar format
+        for (attr_name, attr_value) in attr_map {
+            self.columnar_store.set_edge_attribute(edge_idx.index(), &attr_name, attr_value);
         }
         
         Ok(())
     }
 
-    /// Batch set edge attributes - highly optimized for large operations
-    pub fn set_edges_attributes_batch(&mut self, edge_attrs: &PyDict) -> PyResult<()> {
-        let mut edge_updates = Vec::new();
+    /// Set batch node attributes - efficiently set attributes for multiple nodes
+    pub fn set_nodes_attributes_batch(&mut self, node_attrs: HashMap<String, HashMap<String, pyo3::PyObject>>) -> PyResult<()> {
+        use pyo3::Python;
         
-        // Collect all edge updates first
-        for (edge_key_py, attrs_py) in edge_attrs.iter() {
-            let edge_key: (String, String) = edge_key_py.extract()?;
-            let (source, target) = edge_key;
-            let attrs_dict: &PyDict = attrs_py.downcast()?;
-            
-            if let (Some(source_idx), Some(target_idx)) = (
-                self.node_id_to_index.get(&source),
-                self.node_id_to_index.get(&target)
-            ) {
-                // Find the edge
-                if let Some(edge_ref) = self.graph.find_edge(*source_idx, *target_idx) {
-                    let mut attr_updates = HashMap::new();
-                    for (key_py, value_py) in attrs_dict.iter() {
-                        let key: String = key_py.extract()?;
-                        let json_value = python_to_json_value(value_py)?;
-                        attr_updates.insert(key, json_value);
-                    }
-                    edge_updates.push((edge_ref, attr_updates));
-                }
-            }
-        }
-        
-        // Apply edge updates
-        for (edge_ref, attr_updates) in edge_updates {
-            if let Some(edge_data) = self.graph.edge_weight_mut(edge_ref) {
-                for (key, value) in attr_updates {
-                    edge_data.attributes.insert(key, value);
-                }
-            }
-        }
-        
-        Ok(())
-    }
-
-    /// Get graph attributes
-    pub fn get_graph_attributes(&self) -> PyResult<PyObject> {
         Python::with_gil(|py| {
-            let dict = PyDict::new(py);
-            for (key, value) in &self.graph_attributes {
-                let py_value = json_value_to_python(py, value)?;
-                dict.set_item(key, py_value)?;
+            for (node_id, attributes) in node_attrs {
+                let node_idx = self.node_id_to_index.get(&node_id)
+                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                        format!("Node '{}' not found", node_id)
+                    ))?;
+
+                for (attr_name, py_value) in attributes {
+                    let json_value = python_pyobject_to_json(py, &py_value)?;
+                    self.columnar_store.set_node_attribute(node_idx.index(), &attr_name, json_value);
+                }
             }
-            Ok(dict.into_py(py))
+            Ok(())
         })
     }
 
-    /// Set graph attribute
-    pub fn set_graph_attribute(&mut self, key: String, value: &PyAny) -> PyResult<()> {
-        let json_value = python_to_json_value(value)?;
-        self.graph_attributes.insert(key, json_value);
-        Ok(())
-    }
-}
+    /// Set batch edge attributes - efficiently set attributes for multiple edges
+    pub fn set_edges_attributes_batch(&mut self, edge_attrs: HashMap<(String, String), HashMap<String, pyo3::PyObject>>) -> PyResult<()> {
+        use pyo3::Python;
+        
+        Python::with_gil(|py| {
+            for ((source, target), attributes) in edge_attrs {
+                let source_idx = self.node_id_to_index.get(&source)
+                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                        format!("Source node '{}' not found", source)
+                    ))?;
+                let target_idx = self.node_id_to_index.get(&target)
+                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                        format!("Target node '{}' not found", target)
+                    ))?;
 
-impl FastGraph {
-    /// Helper method to check if attributes match filters
-    fn matches_filters(&self, attributes: &HashMap<String, JsonValue>, filters: &HashMap<String, JsonValue>) -> bool {
-        for (key, expected_value) in filters {
-            if let Some(actual_value) = attributes.get(key) {
-                if actual_value != expected_value {
-                    return false;
+                let edge_idx = self.graph.find_edge(*source_idx, *target_idx)
+                    .ok_or_else(|| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                        format!("Edge from '{}' to '{}' not found", source, target)
+                    ))?;
+
+                for (attr_name, py_value) in attributes {
+                    let json_value = python_pyobject_to_json(py, &py_value)?;
+                    self.columnar_store.set_edge_attribute(edge_idx.index(), &attr_name, json_value);
                 }
+            }
+            Ok(())
+        })
+    }
+
+    /// Remove a node and all its edges
+    pub fn remove_node(&mut self, node_id: &str) -> bool {
+        if let Some(node_idx) = self.node_id_to_index.get(node_id).cloned() {
+            // Remove all edges connected to this node first
+            let edges_to_remove: Vec<_> = self.graph.edge_indices()
+                .into_iter()
+                .filter(|&edge_idx| {
+                    if let Some((source, target)) = self.graph.edge_endpoints(edge_idx) {
+                        source == node_idx || target == node_idx
+                    } else {
+                        false
+                    }
+                })
+                .collect();
+
+            for edge_idx in edges_to_remove {
+                // Clean up edge mappings and columnar storage
+                if let Some((source, target)) = self.edge_index_to_endpoints.remove(&edge_idx) {
+                    // Remove from columnar store (implement if needed)
+                    // self.columnar_store.remove_edge(edge_idx.index());
+                }
+                self.graph.remove_edge(edge_idx);
+            }
+
+            // Remove the node from columnar store
+            self.columnar_store.remove_node(node_idx.index());
+            
+            // Remove the node from the graph
+            self.graph.remove_node(node_idx);
+            
+            // Clean up mappings
+            self.node_id_to_index.remove(node_id);
+            self.node_index_to_id.remove(&node_idx);
+            
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Remove an edge
+    pub fn remove_edge(&mut self, source: &str, target: &str) -> bool {
+        if let (Some(source_idx), Some(target_idx)) = (
+            self.node_id_to_index.get(source),
+            self.node_id_to_index.get(target)
+        ) {
+            if let Some(edge_idx) = self.graph.find_edge(*source_idx, *target_idx) {
+                // Remove from edge mappings
+                self.edge_index_to_endpoints.remove(&edge_idx);
+                
+                // Remove from columnar store (if needed)
+                // self.columnar_store.remove_edge(edge_idx.index());
+                
+                // Remove from graph
+                self.graph.remove_edge(edge_idx);
+                
+                true
             } else {
-                return false;
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Remove multiple nodes
+    pub fn remove_nodes(&mut self, node_ids: Vec<String>) -> usize {
+        let mut removed_count = 0;
+        for node_id in node_ids {
+            if self.remove_node(&node_id) {
+                removed_count += 1;
             }
         }
-        true
+        removed_count
     }
 
-    /// Get node weight by index (public for other modules)
-    pub fn get_node_weight(&self, node_idx: NodeIndex) -> Option<&NodeData> {
+    /// Remove multiple edges
+    pub fn remove_edges(&mut self, edge_pairs: Vec<(String, String)>) -> usize {
+        let mut removed_count = 0;
+        for (source, target) in edge_pairs {
+            if self.remove_edge(&source, &target) {
+                removed_count += 1;
+            }
+        }
+        removed_count
+    }
+
+    /// Add multiple nodes in batch
+    pub fn add_nodes(&mut self, nodes_data: Vec<(String, Option<&PyDict>)>) -> PyResult<()> {
+        for (node_id, attributes) in nodes_data {
+            self.add_node(node_id, attributes)?;
+        }
+        Ok(())
+    }
+
+    /// Add multiple edges in batch  
+    pub fn add_edges(&mut self, edges_data: Vec<(String, String, Option<&PyDict>)>) -> PyResult<()> {
+        for (source, target, attributes) in edges_data {
+            self.add_edge(source, target, attributes)?;
+        }
+        Ok(())
+    }
+
+    /// Filter nodes by attribute dictionary - optimized for exact matches
+    pub fn filter_nodes_by_attributes(&self, filters: HashMap<String, pyo3::PyObject>) -> PyResult<Vec<String>> {
+        use pyo3::Python;
+        
+        if filters.is_empty() {
+            return Ok(self.get_node_ids());
+        }
+        
+        Python::with_gil(|py| {
+            // Convert PyObjects to JsonValues
+            let mut json_filters = HashMap::new();
+            for (attr_name, py_value) in filters {
+                let json_value = python_pyobject_to_json(py, &py_value)?;
+                json_filters.insert(attr_name, json_value);
+            }
+            
+            // Use columnar store's optimized filtering
+            let matching_indices = self.columnar_store.filter_nodes_by_attributes(&json_filters);
+            
+            // Convert indices back to node IDs
+            let mut result = Vec::new();
+            for node_index in matching_indices {
+                if let Some(node_id) = self.node_index_to_id.get(&petgraph::graph::NodeIndex::new(node_index)) {
+                    result.push(node_id.clone());
+                }
+            }
+            
+            Ok(result)
+        })
+    }
+
+    /// Filter edges by attribute dictionary - optimized for exact matches  
+    pub fn filter_edges_by_attributes(&self, filters: HashMap<String, pyo3::PyObject>) -> PyResult<Vec<String>> {
+        use pyo3::Python;
+        
+        if filters.is_empty() {
+            return Ok(self.get_edge_ids());
+        }
+        
+        Python::with_gil(|py| {
+            // Convert PyObjects to JsonValues
+            let mut json_filters = HashMap::new();
+            for (attr_name, py_value) in filters {
+                let json_value = python_pyobject_to_json(py, &py_value)?;
+                json_filters.insert(attr_name, json_value);
+            }
+            
+            // Use columnar store's optimized filtering
+            let matching_indices = self.columnar_store.filter_edges_by_attributes(&json_filters);
+            
+            // Convert indices back to edge IDs (source->target format)
+            let mut result = Vec::new();
+            for edge_index in matching_indices {
+                if let Some((source_idx, target_idx)) = self.graph.edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index)) {
+                    if let (Some(source_id), Some(target_id)) = (
+                        self.node_index_to_id.get(&source_idx),
+                        self.node_index_to_id.get(&target_idx)
+                    ) {
+                        result.push(format!("{}->{}", source_id, target_id));
+                    }
+                }
+            }
+            
+            Ok(result)
+        })
+    }
+
+    /// Filter nodes by numeric comparison - optimized for performance
+    pub fn filter_nodes_by_numeric_comparison(&self, attr_name: &str, operator: &str, value: f64) -> PyResult<Vec<String>> {
+        let matching_indices = self.columnar_store.filter_nodes_by_numeric_comparison(attr_name, operator, value);
+        
+        // Convert indices back to node IDs
+        let mut result = Vec::new();
+        for node_index in matching_indices {
+            if let Some(node_id) = self.node_index_to_id.get(&petgraph::graph::NodeIndex::new(node_index)) {
+                result.push(node_id.clone());
+            }
+        }
+        
+        Ok(result)
+    }
+
+    /// Filter nodes by string comparison - optimized for performance  
+    pub fn filter_nodes_by_string_comparison(&self, attr_name: &str, operator: &str, value: &str) -> PyResult<Vec<String>> {
+        let matching_indices = self.columnar_store.filter_nodes_by_string_comparison(attr_name, operator, value);
+        
+        // Convert indices back to node IDs
+        let mut result = Vec::new();
+        for node_index in matching_indices {
+            if let Some(node_id) = self.node_index_to_id.get(&petgraph::graph::NodeIndex::new(node_index)) {
+                result.push(node_id.clone());
+            }
+        }
+        
+        Ok(result)
+    }
+
+    /// Filter edges by numeric comparison - optimized for performance
+    pub fn filter_edges_by_numeric_comparison(&self, attr_name: &str, operator: &str, value: f64) -> PyResult<Vec<String>> {
+        let matching_indices = self.columnar_store.filter_edges_by_numeric_comparison(attr_name, operator, value);
+        
+        // Convert indices back to edge IDs (source->target format)
+        let mut result = Vec::new();
+        for edge_index in matching_indices {
+            if let Some((source_idx, target_idx)) = self.graph.edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index)) {
+                if let (Some(source_id), Some(target_id)) = (
+                    self.node_index_to_id.get(&source_idx),
+                    self.node_index_to_id.get(&target_idx)
+                ) {
+                    result.push(format!("{}->{}", source_id, target_id));
+                }
+            }
+        }
+        
+        Ok(result)
+    }
+
+    /// Filter edges by string comparison - optimized for performance
+    pub fn filter_edges_by_string_comparison(&self, attr_name: &str, operator: &str, value: &str) -> PyResult<Vec<String>> {
+        let matching_indices = self.columnar_store.filter_edges_by_string_comparison(attr_name, operator, value);
+        
+        // Convert indices back to edge IDs (source->target format)
+        let mut result = Vec::new();
+        for edge_index in matching_indices {
+            if let Some((source_idx, target_idx)) = self.graph.edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index)) {
+                if let (Some(source_id), Some(target_id)) = (
+                    self.node_index_to_id.get(&source_idx),
+                    self.node_index_to_id.get(&target_idx)
+                ) {
+                    result.push(format!("{}->{}", source_id, target_id));
+                }
+            }
+        }
+        
+        Ok(result)
+    }
+
+    // ...existing code...
+}
+
+// Internal methods (not exposed to Python)
+impl FastGraph {
+    /// Get node weight by index (internal use)
+    pub fn get_node_weight(&self, node_idx: petgraph::graph::NodeIndex) -> Option<&NodeData> {
         self.graph.node_weight(node_idx)
     }
 
-    /// Get edge weight by index (public for other modules)  
+    /// Get edge weight by index (internal use) 
     pub fn get_edge_weight(&self, edge_idx: petgraph::graph::EdgeIndex) -> Option<&EdgeData> {
         self.graph.edge_weight(edge_idx)
     }
 
-    /// Get edge indices (public for other modules)
+    /// Get all edge indices (internal use)
     pub fn get_edge_indices(&self) -> Vec<petgraph::graph::EdgeIndex> {
         self.graph.edge_indices()
     }
 
-    /// Get edge endpoints (public for other modules)
-    pub fn get_edge_endpoints(&self, edge_idx: petgraph::graph::EdgeIndex) -> Option<(NodeIndex, NodeIndex)> {
+    /// Get edge endpoints (internal use)
+    pub fn get_edge_endpoints(&self, edge_idx: petgraph::graph::EdgeIndex) -> Option<(petgraph::graph::NodeIndex, petgraph::graph::NodeIndex)> {
         self.graph.edge_endpoints(edge_idx)
     }
 
-    /// Add node to graph directly (public for other modules)
-    pub fn add_node_to_graph_public(&mut self, node_data: NodeData) -> NodeIndex {
-        let node_idx = self.graph.add_node(node_data.clone());
-        self.node_id_to_index.insert(node_data.id.clone(), node_idx);
-        self.node_index_to_id.insert(node_idx, node_data.id);
-        node_idx
+    /// Add node directly to graph (internal use)
+    pub fn add_node_to_graph_public(&mut self, node_data: NodeData) -> petgraph::graph::NodeIndex {
+        self.graph.add_node(node_data)
     }
 
-    /// Add edge to graph directly (public for other modules)
-    pub fn add_edge_to_graph_public(&mut self, source_idx: NodeIndex, target_idx: NodeIndex, edge_data: EdgeData) -> petgraph::graph::EdgeIndex {
+    /// Add edge directly to graph (internal use)
+    pub fn add_edge_to_graph_public(&mut self, source_idx: petgraph::graph::NodeIndex, target_idx: petgraph::graph::NodeIndex, edge_data: EdgeData) -> petgraph::graph::EdgeIndex {
         self.graph.add_edge(source_idx, target_idx, edge_data)
     }
 
-    /// Get neighbors publicly (for other modules)
-    pub fn get_neighbors_public(&self, node_idx: NodeIndex) -> Vec<NodeIndex> {
+    /// Get neighbors by index (internal use)
+    pub fn get_neighbors_public(&self, node_idx: petgraph::graph::NodeIndex) -> Vec<petgraph::graph::NodeIndex> {
         self.graph.neighbors(node_idx)
     }
 
-    /// Get edges directed publicly (for other modules)
-    pub fn get_edges_directed(&self, node_idx: NodeIndex, direction: petgraph::Direction) -> Vec<petgraph::graph::EdgeReference<EdgeData>> {
+    /// Get directed edges (internal use)
+    pub fn get_edges_directed(&self, node_idx: petgraph::graph::NodeIndex, direction: petgraph::Direction) -> Vec<petgraph::graph::EdgeReference<EdgeData>> {
         self.graph.edges_directed(node_idx, direction)
-    }
-
-    /// Find edge publicly (for other modules)
-    pub fn get_find_edge(&self, source_idx: NodeIndex, target_idx: NodeIndex) -> Option<petgraph::graph::EdgeIndex> {
-        self.graph.find_edge(source_idx, target_idx)
     }
 }

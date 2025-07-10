@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use dashmap::DashMap;
 use std::sync::Arc;
-use crate::graph::types::{NodeData, EdgeData};
+use crate::graph::types::{LegacyNodeData, LegacyEdgeData};
 use crate::utils::hash::fast_hash;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -10,8 +10,8 @@ pub struct ContentHash(pub u64);
 /// High-performance content-addressed storage for graph components
 #[pyclass]
 pub struct ContentPool {
-    nodes: DashMap<ContentHash, Arc<NodeData>>,
-    edges: DashMap<ContentHash, Arc<EdgeData>>,
+    nodes: DashMap<ContentHash, Arc<LegacyNodeData>>,
+    edges: DashMap<ContentHash, Arc<LegacyEdgeData>>,
     node_refs: DashMap<ContentHash, usize>,
     edge_refs: DashMap<ContentHash, usize>,
 }
@@ -41,19 +41,19 @@ impl ContentPool {
 
 impl ContentPool {
     /// Hash a node for content addressing
-    pub fn hash_node(node: &NodeData) -> ContentHash {
+    pub fn hash_node(node: &LegacyNodeData) -> ContentHash {
         let serialized = serde_json::to_string(node).unwrap_or_default();
         ContentHash(fast_hash(serialized.as_bytes()))
     }
     
     /// Hash an edge for content addressing
-    pub fn hash_edge(edge: &EdgeData) -> ContentHash {
+    pub fn hash_edge(edge: &LegacyEdgeData) -> ContentHash {
         let serialized = serde_json::to_string(edge).unwrap_or_default();
         ContentHash(fast_hash(serialized.as_bytes()))
     }
     
     /// Store node in pool and return its content hash
-    pub fn intern_node(&self, node: NodeData) -> ContentHash {
+    pub fn intern_node(&self, node: LegacyNodeData) -> ContentHash {
         let hash = Self::hash_node(&node);
         let arc_node = Arc::new(node);
         
@@ -67,7 +67,7 @@ impl ContentPool {
     }
     
     /// Store edge in pool and return its content hash
-    pub fn intern_edge(&self, edge: EdgeData) -> ContentHash {
+    pub fn intern_edge(&self, edge: LegacyEdgeData) -> ContentHash {
         let hash = Self::hash_edge(&edge);
         let arc_edge = Arc::new(edge);
         
@@ -81,12 +81,12 @@ impl ContentPool {
     }
     
     /// Get node by content hash
-    pub fn get_node(&self, hash: &ContentHash) -> Option<Arc<NodeData>> {
+    pub fn get_node(&self, hash: &ContentHash) -> Option<Arc<LegacyNodeData>> {
         self.nodes.get(hash).map(|entry| entry.clone())
     }
     
     /// Get edge by content hash
-    pub fn get_edge(&self, hash: &ContentHash) -> Option<Arc<EdgeData>> {
+    pub fn get_edge(&self, hash: &ContentHash) -> Option<Arc<LegacyEdgeData>> {
         self.edges.get(hash).map(|entry| entry.clone())
     }
     
