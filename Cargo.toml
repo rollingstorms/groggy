@@ -2,6 +2,11 @@
 name = "groggy-core"
 version = "0.2.0"
 edition = "2021"
+description = "Groggy - A Graph Language Engine for dynamic graphs and versioned state"
+license = "MIT"
+homepage = "https://github.com/rollingstorms/groggy"
+repository = "https://github.com/rollingstorms/groggy"
+documentation = "https://groggy.readthedocs.io"
 
 [lib]
 name = "groggy_core"
