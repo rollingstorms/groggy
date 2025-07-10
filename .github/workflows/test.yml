@@ -90,23 +90,42 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         python -m venv .venv
-        .\.venv\Scripts\Activate.ps1
         echo "${{ github.workspace }}\.venv\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         echo "VIRTUAL_ENV=${{ github.workspace }}\.venv" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-    - name: Install Python dependencies
+    - name: Install Python dependencies (Unix)
+      if: runner.os != 'Windows'
       run: |
         pip install --upgrade pip
         pip install maturin pytest numpy
 
-    - name: Build extension
+    - name: Install Python dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        python -m pip install maturin pytest numpy
+
+    - name: Build extension (Unix)
+      if: runner.os != 'Windows'
       run: |
         source .venv/bin/activate
         maturin develop --release
 
-    - name: Run Python tests
+    - name: Build extension (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        .\.venv\Scripts\Activate.ps1
+        maturin develop --release
+
+    - name: Run Python tests (Unix)
+      if: runner.os != 'Windows'
       run: |
         source .venv/bin/activate
+        pytest tests/ -v
+
+    - name: Run Python tests (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        .\.venv\Scripts\Activate.ps1
         pytest tests/ -v
 
   benchmark:
