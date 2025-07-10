@@ -100,10 +100,14 @@ jobs:
         pip install maturin pytest numpy
 
     - name: Build extension
-      run: maturin develop --release
+      run: |
+        source .venv/bin/activate
+        maturin develop --release
 
     - name: Run Python tests
-      run: pytest tests/ -v
+      run: |
+        source .venv/bin/activate
+        pytest tests/ -v
 
   benchmark:
     name: Performance benchmarks
@@ -136,9 +140,12 @@ jobs:
         pip install maturin pytest
     
     - name: Build extension
-      run: maturin develop --release
+      run: |
+        source .venv/bin/activate
+        maturin develop --release
     
     - name: Run benchmarks
       run: |
+        source .venv/bin/activate
         python tests/performance_benchmark.py
         python tests/simple_performance_test.py
