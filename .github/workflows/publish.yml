@@ -26,15 +26,27 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
     
+    - name: Create virtual environment
+      run: |
+        python -m venv .venv
+        source .venv/bin/activate
+        echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
+        echo "PATH=$VIRTUAL_ENV/bin:$PATH" >> $GITHUB_ENV
+    
     - name: Install maturin
-      run: pip install maturin
+      run: |
+        source .venv/bin/activate
+        pip install --upgrade pip
+        pip install maturin
     
     - name: Build wheels for current Python
       run: |
+        source .venv/bin/activate
         maturin build --release --out dist/
         
     - name: Build source distribution
       run: |
+        source .venv/bin/activate
         maturin sdist --out dist/
     
     - name: List built files
