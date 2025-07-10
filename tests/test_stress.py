@@ -99,7 +99,10 @@ def test_batch_updates():
     g.update_nodes(updates)
     update_time = time.time() - start_time
     print(f"✅ Batch update completed in {update_time:.3f} seconds")
-    print(f"   Rate: {update_count / update_time:.0f} updates/second")
+    if update_time > 0:
+        print(f"   Rate: {update_count / update_time:.0f} updates/second")
+    else:
+        print(f"   Rate: Very fast (< 0.001 seconds)")
     
     # Verify updates
     sample_node = g.get_node("user_0")
