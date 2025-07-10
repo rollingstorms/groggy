@@ -14,13 +14,13 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            target: x86_64
+            target: x86_64-unknown-linux-gnu
           - os: windows-latest
-            target: x64
+            target: x86_64-pc-windows-msvc
           - os: macos-latest
-            target: x86_64
+            target: x86_64-apple-darwin
           - os: macos-14
-            target: aarch64
+            target: aarch64-apple-darwin
 
     steps:
     - uses: actions/checkout@v4
@@ -30,17 +30,11 @@ jobs:
       with:
         python-version: "3.11"
 
-    - name: Set up Rust
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Install maturin
-      run: python -m pip install maturin
-
     - name: Build wheels
       uses: PyO3/maturin-action@v1
       with:
         target: ${{ matrix.target }}
-        args: --release --out dist --find-interpreter
+        args: --release --out dist
         sccache: 'true'
         manylinux: auto
 
@@ -57,19 +51,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-
-    - name: Set up Rust
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Install maturin
-      run: python -m pip install maturin
-
     - name: Build sdist
-      run: maturin sdist --out dist
+      uses: PyO3/maturin-action@v1
+      with:
+        command: sdist
+        args: --out dist
 
     - name: Upload sdist
       uses: actions/upload-artifact@v4
