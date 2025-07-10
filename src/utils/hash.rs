@@ -13,5 +13,5 @@ pub fn hash_string(s: &str) -> u64 {
 
 /// Create a hex string from hash
 pub fn hash_to_hex(hash: u64) -> String {
-    format!("{:016x}", hash)
+    format!("{hash:016x}")
 }

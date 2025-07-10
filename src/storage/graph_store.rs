@@ -1,5 +1,6 @@
 #![allow(non_local_definitions)]
 #![allow(dead_code)]
+#![allow(clippy::uninlined_format_args)]
 use crate::graph::types::{LegacyEdgeData, LegacyNodeData};
 use crate::graph::FastGraph;
 use crate::storage::{ContentHash, ContentPool};
@@ -68,8 +69,7 @@ impl GraphStore {
 
         if !self.states.contains_key(&base_hash) {
             return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
-                "State '{}' not found",
-                base_hash
+                "State '{base_hash}' not found"
             )));
         }
 
@@ -159,7 +159,7 @@ impl GraphStore {
         }
 
         // Create state hash
-        let state_data = format!("{:?}{:?}", node_hashes, edge_hashes);
+        let state_data = format!("{node_hashes:?}{edge_hashes:?}");
         let state_hash = format!("{:x}", fast_hash(state_data.as_bytes()));
 
         let state = GraphState {
