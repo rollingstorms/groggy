@@ -9,7 +9,7 @@ state module
 State Management
 ----------------
 
-GLI provides Git-like state management for graph versioning and branching, backed by the high-performance Rust backend.
+Groggy provides Git-like state management for graph versioning and branching, backed by the high-performance Rust backend.
 
 StateMixin Class
 ~~~~~~~~~~~~~~~~

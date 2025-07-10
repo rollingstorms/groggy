@@ -21,15 +21,6 @@ Data Structures & Views
    data_structures
    views
 
-Graph Operations
-----------------
-
-.. toctree::
-   :maxdepth: 2
-
-   batch
-   state
-
 Utilities
 ---------
 
@@ -41,23 +32,26 @@ Utilities
 Backend Architecture
 --------------------
 
-Groggy uses a high-performance Rust backend with Python bindings for optimal performance:
+Groggy uses a unified high-performance Rust backend with Python bindings:
 
-* **Rust Backend**: High-performance core implementation in Rust
-* **Python Interface**: Pythonic API with lazy loading and smart caching
-* **Automatic Conversion**: Seamless handling of mixed int/str node IDs
-* **State Management**: Git-like branching and state management
+* **Rust Backend**: High-performance columnar storage implementation in Rust
+* **Python Interface**: Pythonic API with optimized filtering pipeline
+* **Columnar Storage**: Efficient attribute storage with bitmap indexing
+* **Smart Query Optimization**: Automatic selection of optimal filtering strategy
 * **Batch Operations**: Optimized bulk operations for large-scale graphs
+* **Thread Safety**: Multi-threaded operations with proper synchronization
 
 Backend Functions
 ~~~~~~~~~~~~~~~~~
 
-.. currentmodule:: gli
+.. currentmodule:: groggy
 
 .. autosummary::
    :toctree: generated/
 
    get_available_backends
+   set_backend
+   get_current_backend
    set_backend
    get_current_backend
 

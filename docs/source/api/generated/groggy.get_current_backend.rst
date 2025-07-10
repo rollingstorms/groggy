@@ -1,6 +1,6 @@
 ﻿groggy.get\_current\_backend
-=========================
+============================
 
-.. currentmodule:: gli
+.. currentmodule:: groggy
 
 .. autofunction:: get_current_backend

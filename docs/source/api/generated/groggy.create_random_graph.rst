@@ -1,6 +1,6 @@
 ﻿groggy.create\_random\_graph
-=========================
+============================
 
-.. currentmodule:: gli
+.. currentmodule:: groggy
 
 .. autofunction:: create_random_graph

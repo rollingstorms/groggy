@@ -6,48 +6,41 @@ This section provides practical examples for optimizing Groggy performance in re
 Large Graph Construction
 -----------------------
 
-Building Million-Node Graphs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Building Large Graphs Efficiently
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
    import time
-   import memory_profiler
-   from groggy import Graph, set_backend
+   import random
+   import groggy as gr
    
    def create_large_social_network():
-       \"\"\"Create a social network with 1M users efficiently\"\"\"
+       """Create a social network with 100K users efficiently"""
        
-       # Use Rust backend for performance
-       set_backend('rust')
-       g = Graph()
-       
-       print("Creating 1M node social network...")
+       g = gr.Graph()
+       print("Creating 100K node social network...")
        start_time = time.time()
        
-       # Generate user data efficiently
-       def generate_users(count):
-           for i in range(count):
-               yield {
-                   'id': f"user_{i}",
-                   'name': f"User{i}",
-                   'age': 18 + (i % 50),
-                   'city': ['NYC', 'SF', 'LA', 'CHI', 'BOS'][i % 5],
-                   'interests': ['tech', 'sports', 'music', 'art'][i % 4:i % 4 + 2]
-               }
+       # Generate user data efficiently  
+       users_data = []
+       cities = ['NYC', 'SF', 'LA', 'CHI', 'BOS']
+       interests = ['tech', 'sports', 'music', 'art', 'cooking', 'travel']
        
-       # Batch operations for maximum efficiency
-       batch_size = 50000  # Optimal batch size
-       users = generate_users(1000000)
+       for i in range(100000):
+           users_data.append({
+               'id': f"user_{i}",
+               'name': f"User{i}",
+               'age': random.randint(18, 65),
+               'city': random.choice(cities),
+               'interest': random.choice(interests),
+               'score': random.randint(0, 1000)
+           })
        
-       for batch_start in range(0, 1000000, batch_size):
-           with g.batch_operations() as batch:
-               for _ in range(batch_size):
-                   try:
-                       user = next(users)
-                       batch.add_node(user['id'], **{k: v for k, v in user.items() if k != 'id'})
-                   except StopIteration:
-                       break
+       # Single batch operation for maximum efficiency
+       g.add_nodes(users_data)
+       
+       print(f"Added {len(g.nodes)} nodes in {time.time() - start_time:.2f}s")
            
            # Progress reporting
            if batch_start % 200000 == 0:
@@ -55,56 +48,62 @@ Building Million-Node Graphs
                print(f"  Added {batch_start + batch_size} nodes in {elapsed:.1f}s")
        
        construction_time = time.time() - start_time
+       
+       # Add some edges for realism
+       edges_data = []
+       for i in range(0, len(users_data), 100):  # Connect every 100th user
+           if i + 1 < len(users_data):
+               edges_data.append({
+                   'source': f"user_{i}",
+                   'target': f"user_{i+1}",
+                   'relationship': 'friend',
+                   'strength': random.random()
+               })
+       
+       start_edges = time.time()
+       g.add_edges(edges_data)
+       
+       construction_time = time.time() - start_time
        print(f"Graph construction completed in {construction_time:.2f}s")
-       print(f"Rate: {g.node_count() / construction_time:.0f} nodes/sec")
+       print(f"Rate: {len(g.nodes) / construction_time:.0f} nodes/sec")
        
        return g
 
-Real-World Data Integration
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+High-Performance Filtering
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   import pandas as pd
-   import json
-   from groggy import Graph
-   
-   def load_from_csv_efficiently(csv_file, chunk_size=10000):
-       \"\"\"Load graph from large CSV file\"\"\"
+   def demonstrate_filtering_performance():
+       """Show optimized filtering techniques"""
        
-       g = Graph(backend='rust')
+       # Create test graph
+       g = create_large_social_network()
        
-       # Process CSV in chunks to manage memory
-       total_rows = 0
+       # Benchmark different filtering approaches
+       import time
        
-       for chunk in pd.read_csv(csv_file, chunksize=chunk_size):
-           with g.batch_operations() as batch:
-               for _, row in chunk.iterrows():
-                   # Clean and prepare data
-                   node_id = str(row['id'])
-                   attributes = {
-                       col: val for col, val in row.items() 
-                       if col != 'id' and pd.notna(val)
-                   }
-                   
-                   batch.add_node(node_id, **attributes)
-           
-           total_rows += len(chunk)
-           print(f"Processed {total_rows} rows")
+       # Fast exact matching (bitmap index)
+       start = time.time()
+       tech_users = g.filter_nodes(interest='tech')
+       exact_time = time.time() - start
+       print(f"Exact match filtering: {len(tech_users)} results in {exact_time:.4f}s")
        
-       return g
-   
-   def load_from_json_stream(json_file):
-       \"\"\"Load graph from streaming JSON\"\"\"
+       # Range queries  
+       start = time.time()
+       young_users = g.filter_nodes(lambda n, a: 18 <= a.get('age', 0) <= 25)
+       range_time = time.time() - start
+       print(f"Range filtering: {len(young_users)} results in {range_time:.4f}s")
        
-       g = Graph(backend='rust')
-       batch_size = 5000
-       current_batch = []
-       
-       with open(json_file, 'r') as f:
-           for line in f:
-               try:
-                   data = json.loads(line)
+       # Complex filtering
+       start = time.time()
+       young_tech_sf = g.filter_nodes(
+           lambda n, a: (a.get('interest') == 'tech' and 
+                        a.get('age', 0) < 30 and
+                        a.get('city') == 'SF')
+       )
+       complex_time = time.time() - start
+       print(f"Complex filtering: {len(young_tech_sf)} results in {complex_time:.4f}s")
                    current_batch.append(data)
                    
                    if len(current_batch) >= batch_size:

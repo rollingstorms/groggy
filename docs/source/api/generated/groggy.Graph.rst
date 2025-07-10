@@ -1,7 +1,7 @@
 ﻿groggy.Graph
-=========
+============
 
-.. currentmodule:: gli
+.. currentmodule:: groggy
 
 .. autoclass:: Graph
 
@@ -40,6 +40,9 @@
       ~Graph.get_outgoing_neighbors
       ~Graph.get_state_info
       ~Graph.get_storage_stats
+      ~Graph.has_edge
+      ~Graph.has_node
+      ~Graph.is_directed
       ~Graph.load_state
       ~Graph.node_count
       ~Graph.remove_edge
@@ -53,6 +56,8 @@
       ~Graph.set_node_attribute
       ~Graph.set_node_attributes
       ~Graph.set_nodes_attributes_batch
+      ~Graph.subgraph
+      ~Graph.subgraphs
       ~Graph.switch_branch
       ~Graph.update_edge
       ~Graph.update_node
@@ -68,6 +73,7 @@
    
       ~Graph.branches
       ~Graph.edges
+      ~Graph.node_id_to_index
       ~Graph.nodes
       ~Graph.states
    

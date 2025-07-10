@@ -9,7 +9,7 @@ views module
 Lazy Data Structures
 --------------------
 
-GLI provides memory-efficient lazy views that avoid copying data when possible.
+Groggy provides memory-efficient lazy views that avoid copying data when possible.
 
 LazyDict Class
 ~~~~~~~~~~~~~~

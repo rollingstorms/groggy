@@ -1,77 +1,98 @@
 Performance Guide
 =================
 
-Groggy is designed for high performance using a Rust backend with Python interface. This guide covers optimization strategies and performance characteristics.
+Groggy is designed for high performance using a unified Rust backend with columnar storage and bitmap indexing. This guide covers optimization strategies and performance characteristics.
 
 Performance Overview
 --------------------
 
-Groggy uses a high-performance Rust backend by default, providing excellent performance for large-scale graph operations:
+Groggy uses a high-performance unified Rust backend with columnar storage, providing excellent performance for large-scale graph operations and competitive filtering performance:
 
-Benchmark Results
-~~~~~~~~~~~~~~~~~
+Benchmark Results vs NetworkX
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. list-table:: Groggy Performance Benchmarks
+.. list-table:: Groggy vs NetworkX Performance Comparison (50k nodes)
+   :header-rows: 1
+   :widths: 40 20 20 20
+
+   * - Operation
+     - Groggy Time
+     - NetworkX Time  
+     - Speedup
+   * - Node role filtering
+     - 0.0022s
+     - 0.0040s
+     - **1.8x faster**
+   * - Node salary filtering  
+     - 0.0041s
+     - 0.0049s
+     - **1.2x faster**
+   * - Edge strength filtering
+     - 0.0032s
+     - 0.0179s
+     - **5.6x faster**
+   * - Graph creation
+     - 0.599s
+     - 0.168s
+     - 0.3x (acceptable)
+
+Internal Performance Metrics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Groggy Internal Benchmarks
    :header-rows: 1
    :widths: 30 25 25 20
 
    * - Operation
      - Dataset Size
      - Time
-     - Memory Usage
-   * - Graph Creation
-     - 10K nodes + 10K edges
-     - 0.12 seconds
-     - 25 MB
-   * - Graph Creation
-     - 100K nodes + 100K edges
-     - 1.04 seconds
-     - 85 MB
-   * - Batch Attribute Update
-     - 100 nodes
-     - 0.01 seconds
-     - Minimal
-   * - Node Filtering
+     - Performance Notes
+   * - Bitmap exact match
      - 10K nodes
-     - 0.033 seconds
-     - Minimal
-   * - State Save/Load
-     - 10K nodes graph
-     - 0.1-0.2 seconds
-     - Efficient
-   * - Branch Switching
-     - 100K+ nodes
-     - 0.1-0.2 seconds
-     - ~85 MB/million nodes
+     - 0.0005s
+     - O(1) lookup
+   * - Numeric range query
+     - 10K nodes  
+     - 0.0010s
+     - Optimized iteration
+   * - Complex lambda filter
+     - 10K nodes
+     - 0.0897s
+     - Python overhead
+   * - Batch node creation
+     - 10K nodes
+     - 0.070s
+     - 143k nodes/sec
+   * - Batch edge creation
+     - 10K edges
+     - 0.060s
+     - 168k edges/sec
 
 Key Performance Features
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**High-Performance Rust Backend:**
-- 10-100x faster than pure Python implementations
-- Memory efficient: ~85MB per million nodes
-- Optimized for large-scale operations
+**Unified Columnar Storage:**
+- Bitmap indexing for O(1) exact match filtering
+- Sparse storage for efficient range queries  
+- Unified type system (NodeData, EdgeData, GraphType)
+- Memory efficient attribute management
+
+**Smart Filtering Pipeline:**
+- Automatic optimization path selection
+- Bitmap indices for exact matches (``role='engineer'``)
+- Optimized Rust backend for range queries (``'salary > 100000'``)
+- Falls back to Python iteration for complex expressions
 
 **Batch Operations:**
-- `set_nodes_attributes_batch()` and `set_edges_attributes_batch()`
-- Significantly faster than individual attribute updates
+- ``add_nodes()`` and ``add_edges()`` for bulk creation
+- ``set_nodes_attributes_batch()`` and ``set_edges_attributes_batch()``
+- Significantly faster than individual operations
 - Ideal for bulk data processing
 
-**Smart Caching:**
-- Lazy-loaded node and edge collections
-- Automatic cache invalidation
-- Minimal memory overhead
-
-**Efficient State Management:**
-- Content-addressed storage with deduplication
-- Fast branch switching (0.1-0.2s for large graphs)
-- Memory-efficient state persistence
-
-**Use Python Backend When:**
-- Rapid prototyping
-- Small graphs (<1,000 nodes)
-- Debugging graph algorithms
-- Rust backend unavailable
+**Performance Competitive with NetworkX:**
+- 1.2-5.6x faster for common filtering operations
+- Optimized string query detection and routing
+- No performance regressions from Python interface
 
 .. code-block:: python
 

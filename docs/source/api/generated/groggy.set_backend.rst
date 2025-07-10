@@ -1,6 +1,6 @@
 ﻿groggy.set\_backend
-================
+===================
 
-.. currentmodule:: gli
+.. currentmodule:: groggy
 
 .. autofunction:: set_backend

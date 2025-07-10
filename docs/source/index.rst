@@ -13,89 +13,75 @@ Groggy - Graph Language Interface Documentation
    :target: https://www.rust-lang.org/
    :alt: Rust 1.70+
 
-**A high-performance graph library with Rust backend for efficient graph operations, state management, and branching at scale.**
+**A high-performance graph library with unified Rust backend for efficient graph operations and optimized filtering at scale.**
 
-Groggy (Graph Language Interface) is a powerful graph manipulation library designed for both rapid prototyping and production-scale applications. It features a high-performance Rust backend with a Python interface for maximum performance and usability.
+Groggy is a powerful graph manipulation library designed for both rapid prototyping and production-scale applications. It features a unified Rust-based columnar storage system with bitmap indexing for maximum performance and a Python interface for ease of use.
 
 Features
 --------
 
-* **High-Performance Rust Backend**: Handle 1M+ nodes/edges efficiently with ~85MB per million nodes
-* **Comprehensive State Management**: Save, restore, and branch graph states with version control-like functionality
-* **Batch Operations**: Optimized bulk operations for nodes and edges with 10-100x performance improvements
-* **Flexible Node/Edge IDs**: Support both string and integer identifiers with automatic conversion
-* **Rich Attributes**: Complex nested data structures on nodes and edges with efficient batch updates
-* **Intuitive API**: Clean, Pythonic interface with lazy-loaded properties and smart caching
-* **Memory Efficient**: Content-addressed storage with deduplication and garbage collection
-* **Branch Management**: Create, switch, and manage multiple graph states like Git branches
-* **Developer Friendly**: Comprehensive error handling, type hints, and extensive documentation
+* **High-Performance Unified Backend**: Columnar storage with bitmap indexing for O(1) exact match filtering
+* **Competitive Performance**: 1.2-5.6x faster than NetworkX for common filtering operations
+* **Optimized Filtering**: Fast bitmap-based exact matching and range queries with smart query detection
+* **Scalable Architecture**: Unified type system (NodeData, EdgeData, GraphType) handles large graphs efficiently  
+* **Batch Operations**: Efficient bulk operations for nodes and edges with significant performance improvements
+* **Memory Efficient**: Optimized data structures with sparse storage and bitmap indices
+* **State Management**: Save, restore, and track graph states over time
+* **Intuitive API**: Clean, Pythonic interface with automatic optimization path selection
+* **Comprehensive Testing**: Full test suite with performance benchmarks and stress testing
 
 Quick Start
 -----------
 
 .. code-block:: python
 
-   from groggy import Graph
+   import groggy as gr
 
-   # Create a graph (uses high-performance Rust backend)
-   g = Graph()
+   # Create a graph (uses optimized Rust backend)
+   g = gr.Graph()
 
-   # Add nodes with attributes (supports int and str IDs)
-   alice = g.add_node(label="Alice", age=30, city="New York")
-   bob = g.add_node(1, label="Bob", age=25, city="Boston")  # Mixed ID types
+   # Add nodes with attributes
+   g.add_node("alice", age=30, role="engineer")
+   g.add_node("bob", age=25, role="designer") 
+   g.add_node("charlie", age=35, role="manager")
 
    # Add edges with attributes
-   friendship = g.add_edge(alice, bob, 
-                          relationship="friends", 
-                          since=2020, 
-                          strength=0.9)
+   g.add_edge("alice", "bob", relationship="collaborates")
+   g.add_edge("charlie", "alice", relationship="manages")
 
    # Efficient batch operations for large graphs
    nodes_data = [
-       {'id': 'employee_001', 'name': 'Charlie', 'age': 35, 'role': 'manager'},
-       {'id': 'employee_002', 'name': 'Diana', 'age': 28, 'role': 'engineer'}
+       {'id': 'employee_001', 'name': 'Charlie', 'role': 'manager', 'salary': 75000},
+       {'id': 'employee_002', 'name': 'Diana', 'role': 'engineer', 'salary': 68000}
    ]
    g.add_nodes(nodes_data)  # Add thousands of nodes efficiently
 
    edges_data = [
-       {'source': alice, 'target': 'employee_001', 'relationship': 'reports_to'},
-       {'source': bob, 'target': 'employee_002', 'relationship': 'collaborates'}
+       {'source': 'alice', 'target': 'employee_001', 'relationship': 'reports_to'},
+       {'source': 'bob', 'target': 'employee_002', 'relationship': 'collaborates'}
    ]
    g.add_edges(edges_data)  # Add thousands of edges efficiently
 
-   # Update multiple nodes at once
-   updates = {
-       alice: {'salary': 75000, 'department': 'Engineering'},
-       bob: {'salary': 68000, 'department': 'Design'}
-   }
-   g.update_nodes(updates)  # Bulk updates for performance
-
-   # State management and branching
-   initial_state = g.save_state("Initial graph")
-   g.create_branch("development")
-   g.switch_branch("development")
+   # Fast filtering with automatic optimization
+   engineers = g.filter_nodes(role='engineer')        # O(1) bitmap lookup
+   high_earners = g.filter_nodes('salary > 70000')    # Optimized range query
+   managers = g.filter_nodes({'role': 'manager'})     # Dictionary filter
 
    # Query the graph
-   neighbors = g.get_neighbors(alice)
-   edge = g.get_edge(alice, bob)  # Takes (source, target) parameters
-   
-   # Lazy-loaded properties
-   print(f"Total states: {len(g.states['state_hashes'])}")
-   print(f"Available branches: {list(g.branches.keys())}")
-
-   # High-performance filtering
-   engineers = g.filter_nodes(lambda node_id, attrs: attrs.get("role") == "engineer")
-   managers = g.filter_nodes({"role": "manager"})
-
-   # Access node/edge collections with lazy loading
    print(f"Nodes: {len(g.nodes)}, Edges: {len(g.edges)}")
-   print(f"Alice is {g.nodes[alice]['age']} years old")
+   neighbors = g.get_neighbors("alice")
+   
+   # State management
+   g.save_state("initial")
+   g.update_node("alice", {"promoted": True, "salary": 80000})
+   g.save_state("after_promotion")
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
    installation
+   quickstart
    examples/index
    api/index
    performance

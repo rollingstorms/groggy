@@ -11,13 +11,15 @@ Creating a Graph
 
 .. code-block:: python
 
-   from groggy import Graph
+   import groggy as gr
    
-   # Create a new graph
-   g = Graph()
+   # Create a new undirected graph
+   g = gr.Graph()
    
-   # Check which backend is being used
-   print(f"Using backend: {g.backend}")
+   # Create a directed graph
+   g_directed = gr.Graph(directed=True)
+   
+   print(f"Graph created with {len(g.nodes)} nodes and {len(g.edges)} edges")
 
 Adding Nodes
 ~~~~~~~~~~~~
@@ -25,11 +27,11 @@ Adding Nodes
 .. code-block:: python
 
    # Add single nodes with attributes
-   alice = g.add_node(name="Alice", age=30, city="New York")
-   bob = g.add_node(name="Bob", age=25, city="Boston")
-   charlie = g.add_node(name="Charlie", age=35, city="Chicago")
+   alice_id = g.add_node(name="Alice", age=30, city="New York")
+   bob_id = g.add_node(name="Bob", age=25, city="Boston")
+   charlie_id = g.add_node(name="Charlie", age=35, city="Chicago")
    
-   print(f"Added nodes: {[alice, bob, charlie]}")
+   print(f"Added nodes: {[alice_id, bob_id, charlie_id]}")
 
    # Add multiple nodes efficiently with add_nodes()
    team_data = [
@@ -45,21 +47,21 @@ Adding Edges
 .. code-block:: python
 
    # Add single edges with attributes
-   friendship1 = g.add_edge(alice, bob, 
+   friendship1 = g.add_edge(alice_id, bob_id, 
                            relationship="friends",
                            since=2020,
                            strength=0.9)
    
-   friendship2 = g.add_edge(bob, charlie,
+   friendship2 = g.add_edge(bob_id, charlie_id,
                            relationship="colleagues", 
                            since=2019,
                            strength=0.7)
 
    # Add multiple edges efficiently with add_edges()
    connections = [
-       {'source': alice, 'target': 'emp001', 'relationship': 'mentor', 'frequency': 'weekly'},
-       {'source': bob, 'target': 'emp002', 'relationship': 'collaborator', 'frequency': 'daily'},
-       {'source': charlie, 'target': 'emp003', 'relationship': 'manager', 'frequency': 'weekly'}
+       {'source': alice_id, 'target': 'emp001', 'relationship': 'mentor', 'frequency': 'weekly'},
+       {'source': bob_id, 'target': 'emp002', 'relationship': 'collaborator', 'frequency': 'daily'},
+       {'source': charlie_id, 'target': 'emp003', 'relationship': 'manager', 'frequency': 'weekly'}
    ]
    g.add_edges(connections)  # Much faster for many edges
 
@@ -69,17 +71,21 @@ Querying the Graph
 .. code-block:: python
 
    # Get node attributes
-   alice_node = g.get_node(alice)
+   alice_node = g.get_node(alice_id)
    print(f"Alice's data: {alice_node}")
    print(f"Alice's age: {alice_node['age']}")
    
    # Get neighbors
-   alice_neighbors = g.get_neighbors(alice)
+   alice_neighbors = g.get_neighbors(alice_id)
    print(f"Alice's neighbors: {alice_neighbors}")
    
    # Get edge attributes
-   edge_data = g.get_edge(alice, bob)
+   edge_data = g.get_edge(alice_id, bob_id)
    print(f"Alice-Bob relationship: {edge_data}")
+   
+   # Check if nodes/edges exist
+   print(f"Has Alice: {g.has_node(alice_id)}")
+   print(f"Alice-Bob connected: {g.has_edge(alice_id, bob_id)}")
 
 Graph Statistics
 ~~~~~~~~~~~~~~~~
@@ -87,59 +93,75 @@ Graph Statistics
 .. code-block:: python
 
    # Basic statistics
-   print(f"Number of nodes: {g.node_count()}")
-   print(f"Number of edges: {g.edge_count()}")
+   print(f"Number of nodes: {len(g.nodes)}")
+   print(f"Number of edges: {len(g.edges)}")
    
-   # Get neighbors to calculate degree manually
-   alice_neighbors = g.get_neighbors(alice)
+   # Get neighbors to calculate degree
+   alice_neighbors = g.get_neighbors(alice_id)
    print(f"Alice's degree: {len(alice_neighbors)}")
 
-Modern Update API
-~~~~~~~~~~~~~~~~~
+High-Performance Filtering
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Groggy provides multiple ways to update node and edge attributes with a clean, intuitive interface:
+Groggy provides optimized filtering that's 1.2-5.6x faster than NetworkX:
 
 .. code-block:: python
 
-   # Update single node - multiple ways
-   g.update_node(alice, age=31, title="Senior Engineer")  # Keyword args
-   g.update_node(alice, {"salary": 85000, "department": "AI Research"})  # Dict
-   g.update_node(alice, {"level": "L5"}, bonus_eligible=True)  # Both combined!
+   # Fast exact matching (uses bitmap indices)
+   engineers = g.filter_nodes(role="engineer")  # O(1) lookup
+   
+   # Efficient range queries
+   young_people = g.filter_nodes(lambda n, a: 20 <= a.get('age', 0) <= 30)
+   
+   # Complex filtering with multiple conditions
+   senior_engineers = g.filter_nodes(
+       lambda n, a: a.get('role') == 'engineer' and a.get('age', 0) > 35
+   )
+   
+   # Filter edges too
+   strong_friendships = g.filter_edges(
+       lambda s, t, a: a.get('relationship') == 'friends' and a.get('strength', 0) > 0.8
+   )
 
-   # Update single edge - same flexibility  
-   g.update_edge(alice, bob, strength=0.95, last_contact="2024-01-15")
-   g.update_edge(alice, bob, {"duration": "4 years"}, active=True)
+Batch Update Operations
+~~~~~~~~~~~~~~~~~~~~~~
+
+Groggy provides efficient batch operations for large-scale updates:
+
+.. code-block:: python
+
+   # Update single node
+   g.update_node(alice_id, age=31, title="Senior Engineer")
+   
+   # Update single edge  
+   g.update_edge(alice_id, bob_id, strength=0.95, last_contact="2024-01-15")
 
    # Efficient bulk updates for large operations
    salary_updates = {
-       alice: {"salary": 90000, "promotion": "2024-01"},
-       bob: {"salary": 75000, "department": "UX Design"}, 
-       charlie: {"salary": 95000, "title": "Engineering Manager"}
+       alice_id: {"salary": 90000, "promotion": "2024-01"},
+       bob_id: {"salary": 75000, "department": "UX Design"}, 
+       charlie_id: {"salary": 95000, "title": "Engineering Manager"}
    }
-   g.update_nodes(salary_updates)  # Update thousands of nodes efficiently
-
-   # Backwards compatibility - old methods still work
-   g.set_node_attribute(alice, "status", "active")
-   g.set_node_attributes(bob, {"team": "core", "level": "senior"})
+   g.update_nodes(salary_updates)  # 10-100x faster than individual updates
 
 High-Performance Batch Operations
 ---------------------------------
 
-For large graphs, Groggy provides efficient batch operations that are **10-100x faster** than individual operations.
+For large graphs, Groggy provides efficient batch operations:
 
-Efficient Filtering Operations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Creating Large Graphs
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
    # Create a larger graph for demonstration
    import random
-   g = Graph(backend='rust')  # Use Rust backend for performance
+   g = gr.Graph()
    
    # Add many people using batch operations
    people_data = []
    cities = ['New York', 'Boston', 'Chicago', 'San Francisco']
-   occupations = ['Engineer', 'Teacher', 'Doctor', 'Artist']
+   occupations = ['engineer', 'teacher', 'doctor', 'artist']
    
    for i in range(1000):
        people_data.append({
@@ -153,11 +175,11 @@ Efficient Filtering Operations
    # Add all people efficiently
    g.add_nodes(people_data)
    
-   # Efficient filtering using the new API
-   engineers = g.filter_nodes({'occupation': 'Engineer'})
-   ny_residents = g.filter_nodes({'city': 'New York'})
+   # Fast filtering using optimized methods
+   engineers = g.filter_nodes(occupation='engineer')  # Bitmap index lookup
+   ny_residents = g.filter_nodes(city='New York')     # Bitmap index lookup
    senior_engineers = g.filter_nodes(
-       lambda node_id, attrs: attrs.get('occupation') == 'Engineer' and attrs.get('age', 0) > 40
+       lambda node_id, attrs: attrs.get('occupation') == 'engineer' and attrs.get('age', 0) > 40
    )
    
    print(f"Found {len(engineers)} engineers")

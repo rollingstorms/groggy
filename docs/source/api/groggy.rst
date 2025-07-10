@@ -9,7 +9,7 @@ groggy module
 Module Contents
 ---------------
 
-The main Groggy module provides the primary interface for graph operations.
+The main Groggy module provides the primary interface for graph operations with a unified Rust-based backend.
 
 Classes
 ~~~~~~~
@@ -19,7 +19,6 @@ Classes
    :nosignatures:
 
    Graph
-   GraphStore
 
 Functions
 ~~~~~~~~~
@@ -29,9 +28,6 @@ Functions
    :nosignatures:
 
    create_random_graph
-   get_available_backends
-   set_backend
-   get_current_backend
 
 Constants
 ~~~~~~~~~
@@ -39,15 +35,14 @@ Constants
 .. autodata:: __version__
    :annotation: = "0.2.0"
 
-.. autodata:: RUST_BACKEND_AVAILABLE
-   :annotation: = True/False
+Core Graph Interface
+-------------------
 
-Backend Management
-------------------
+The unified Graph class provides high-performance operations through Rust backend:
 
-Groggy supports multiple computational backends:
-
-.. autofunction:: get_available_backends
+.. autoclass:: Graph
+   :members:
+   :undoc-members:
 
 .. autofunction:: set_backend
 
