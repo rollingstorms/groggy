@@ -1,7 +1,6 @@
+#![allow(non_local_definitions)]
 use crate::graph::types::{LegacyEdgeData, LegacyNodeData};
 use crate::utils::hash::fast_hash;
-#![allow(non_local_definitions)]
-
 use dashmap::DashMap;
 use pyo3::prelude::*;
 use std::sync::Arc;

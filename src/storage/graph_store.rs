@@ -1,6 +1,5 @@
 #![allow(non_local_definitions)]
 #![allow(dead_code)]
-
 use crate::graph::types::{LegacyEdgeData, LegacyNodeData};
 use crate::graph::FastGraph;
 use crate::storage::{ContentHash, ContentPool};
@@ -207,7 +206,7 @@ impl GraphStore {
         }
 
         // Reconstruct edges
-        for (_edge_id, content_hash) in &state.edge_hashes {
+        for content_hash in state.edge_hashes.values() {
             if let Some(legacy_edge_data) = self.content_pool.get_edge(content_hash) {
                 let source_idx = *graph.node_id_to_index.get(&legacy_edge_data.source)?;
                 let target_idx = *graph.node_id_to_index.get(&legacy_edge_data.target)?;

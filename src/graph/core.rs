@@ -1,5 +1,4 @@
 #![allow(non_local_definitions)]
-
 use petgraph::graph::NodeIndex;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;

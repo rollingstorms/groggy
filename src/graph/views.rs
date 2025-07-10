@@ -1,6 +1,5 @@
 #![allow(non_local_definitions)]
 #![allow(dead_code)]
-
 use crate::graph::types::GraphType;
 use crate::storage::columnar::ColumnarStore;
 use petgraph::graph::NodeIndex;

@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-
 use xxhash_rust::xxh3::xxh3_64;
 
 /// Fast hash function using xxHash
