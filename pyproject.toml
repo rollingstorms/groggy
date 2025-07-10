@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "groggy"
 description = "Groggy - A Graph Language Engine for dynamic graphs and versioned state"
-version = "0.2.1"
+version = "0.1.0"
 requires-python = ">=3.8"
 authors = [
     { name = "Groggy Contributors" }
@@ -14,7 +14,7 @@ license = { text = "MIT" }
 readme = "README.md"
 keywords = ["graph", "network", "data-structure", "algorithms"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
