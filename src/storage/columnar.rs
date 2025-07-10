@@ -216,10 +216,7 @@ impl ColumnarStore {
         sparse_entry.insert(node_index, value.clone());
 
         // Update attribute set for this node
-        let mut attr_set = self
-            .node_attr_sets
-            .entry(node_index)
-            .or_default();
+        let mut attr_set = self.node_attr_sets.entry(node_index).or_default();
         attr_set.insert(attr_uid);
     }
 
@@ -488,10 +485,7 @@ impl ColumnarStore {
         sparse_entry.insert(edge_index, value.clone());
 
         // Update attribute set for this edge
-        let mut attr_set = self
-            .edge_attr_sets
-            .entry(edge_index)
-            .or_default();
+        let mut attr_set = self.edge_attr_sets.entry(edge_index).or_default();
         attr_set.insert(attr_uid);
     }
 
