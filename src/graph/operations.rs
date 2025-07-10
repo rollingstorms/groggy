@@ -1,38 +1,45 @@
 use super::core::FastGraph;
-use super::types::{NodeData, EdgeData};
+use super::types::EdgeData;
+use crate::utils::python_dict_to_json_map;
+use petgraph::visit::EdgeRef;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use rayon::prelude::*;
-use std::collections::{HashSet, HashMap};
-use petgraph::visit::EdgeRef;
-use crate::utils::{python_dict_to_json_map, python_to_json_value, json_value_to_python};
+use std::collections::{HashMap, HashSet};
 
 impl FastGraph {
     /// Create subgraph with parallel node filtering
     pub fn parallel_subgraph_by_node_ids(&self, node_ids: &HashSet<String>) -> FastGraph {
         let mut subgraph = FastGraph::new(self.is_directed);
-        
+
         // Add filtered nodes with attributes
         for node_id in node_ids {
             if let Some(node_idx) = self.node_id_to_index.get(node_id) {
                 if let Some(node_data) = self.get_node_weight(*node_idx) {
                     // Add node directly to internal graph with all attributes
                     let new_node_idx = subgraph.add_node_to_graph_public(node_data.clone());
-                    subgraph.node_id_to_index.insert(node_data.id.clone(), new_node_idx);
-                    subgraph.node_index_to_id.insert(new_node_idx, node_data.id.clone());
+                    subgraph
+                        .node_id_to_index
+                        .insert(node_data.id.clone(), new_node_idx);
+                    subgraph
+                        .node_index_to_id
+                        .insert(new_node_idx, node_data.id.clone());
                 }
             }
         }
-        
+
         // Add edges between filtered nodes in parallel
-        let edges_to_add: Vec<_> = self.get_edge_indices()
+        let edges_to_add: Vec<_> = self
+            .get_edge_indices()
             .par_iter()
             .filter_map(|edge_idx| {
                 if let Some((source_idx, target_idx)) = self.get_edge_endpoints(*edge_idx) {
                     let source_id = self.node_index_to_id.get(&source_idx)?;
                     let target_id = self.node_index_to_id.get(&target_idx)?;
-                    
-                    if node_ids.contains(source_id.as_str()) && node_ids.contains(target_id.as_str()) {
+
+                    if node_ids.contains(source_id.as_str())
+                        && node_ids.contains(target_id.as_str())
+                    {
                         let edge_data = self.get_edge_weight(*edge_idx)?;
                         Some((source_id.clone(), target_id.clone(), edge_data.clone()))
                     } else {
@@ -43,7 +50,7 @@ impl FastGraph {
                 }
             })
             .collect();
-        
+
         // Add edges to subgraph with attributes
         for (source, target, edge_data) in edges_to_add {
             let source_idx = *subgraph.node_id_to_index.get(&source).unwrap();
@@ -51,18 +58,18 @@ impl FastGraph {
             // Add edge directly with all attributes
             let _ = subgraph.add_edge_to_graph_public(source_idx, target_idx, edge_data);
         }
-        
+
         subgraph
     }
-    
+
     /// Find connected component starting from a node
     pub fn connected_component(&self, start_node_id: &str) -> Option<FastGraph> {
         let start_idx = self.node_id_to_index.get(start_node_id)?;
-        
+
         let mut visited = HashSet::new();
         let mut queue = vec![*start_idx];
         visited.insert(*start_idx);
-        
+
         // BFS to find all connected nodes
         while let Some(current_idx) = queue.pop() {
             // Check all neighbors
@@ -72,7 +79,7 @@ impl FastGraph {
                     queue.push(neighbor_idx);
                 }
             }
-            
+
             // Also check incoming edges (for undirected behavior)
             for edge_ref in self.get_edges_directed(current_idx, petgraph::Direction::Incoming) {
                 let source_idx = edge_ref.source();
@@ -82,28 +89,34 @@ impl FastGraph {
                 }
             }
         }
-        
+
         // Convert node indices to IDs
-        let node_ids: HashSet<String> = visited.iter()
-            .filter_map(|idx| self.node_index_to_id.get(idx).map(|id| id.clone()))
+        let node_ids: HashSet<String> = visited
+            .iter()
+            .filter_map(|idx| self.node_index_to_id.get(idx).cloned())
             .collect();
-        
+
         Some(self.parallel_subgraph_by_node_ids(&node_ids))
     }
-    
+
     /// Get degree of a node
     pub fn node_degree(&self, node_id: &str) -> Option<usize> {
         let node_idx = self.node_id_to_index.get(node_id)?;
-        
-        let in_degree = self.get_edges_directed(*node_idx, petgraph::Direction::Incoming).len();
-        let out_degree = self.get_edges_directed(*node_idx, petgraph::Direction::Outgoing).len();
-        
+
+        let in_degree = self
+            .get_edges_directed(*node_idx, petgraph::Direction::Incoming)
+            .len();
+        let out_degree = self
+            .get_edges_directed(*node_idx, petgraph::Direction::Outgoing)
+            .len();
+
         Some(in_degree + out_degree)
     }
-    
+
     /// Get all nodes with degree greater than threshold
     pub fn high_degree_nodes(&self, min_degree: usize) -> Vec<(String, usize)> {
-        self.node_id_to_index.iter()
+        self.node_id_to_index
+            .iter()
             .filter_map(|(node_id, _node_idx)| {
                 let degree = self.node_degree(node_id)?;
                 if degree >= min_degree {
@@ -120,13 +133,13 @@ impl FastGraph {
         if let Some(node_idx) = self.node_id_to_index.remove(&node_id) {
             // Remove from reverse mapping
             self.node_index_to_id.remove(&node_idx);
-            
+
             // Remove from columnar storage
             self.columnar_store.remove_node(node_idx.index());
-            
+
             // Remove from graph (this also removes all connected edges)
             self.graph.remove_node(node_idx);
-            
+
             true
         } else {
             false // Node didn't exist
@@ -185,7 +198,7 @@ impl FastGraph {
         for (source, target) in &edge_pairs {
             if let (Some(source_idx), Some(target_idx)) = (
                 self.node_id_to_index.get(source),
-                self.node_id_to_index.get(target)
+                self.node_id_to_index.get(target),
             ) {
                 if let Some(edge_idx) = self.graph.find_edge(*source_idx, *target_idx) {
                     edges_to_remove.push(edge_idx);
@@ -203,7 +216,12 @@ impl FastGraph {
     }
 
     /// Internal method to add an edge
-    pub fn add_edge_internal(&mut self, source: String, target: String, attributes: Option<&PyDict>) -> PyResult<()> {
+    pub fn add_edge_internal(
+        &mut self,
+        source: String,
+        target: String,
+        attributes: Option<&PyDict>,
+    ) -> PyResult<()> {
         // Ensure both nodes exist, create if they don't
         if !self.node_id_to_index.contains_key(&source) {
             self.add_node(source.clone(), None)?;
@@ -211,34 +229,36 @@ impl FastGraph {
         if !self.node_id_to_index.contains_key(&target) {
             self.add_node(target.clone(), None)?;
         }
-        
+
         let source_idx = *self.node_id_to_index.get(&source).unwrap();
         let target_idx = *self.node_id_to_index.get(&target).unwrap();
-        
+
         // Check if edge already exists
         if self.graph.find_edge(source_idx, target_idx).is_some() {
             return Ok(()); // Edge already exists, skip
         }
-        
+
         let attrs = if let Some(py_attrs) = attributes {
             python_dict_to_json_map(py_attrs)?
         } else {
             HashMap::new()
         };
-         let edge_data = EdgeData { 
-            source: source.clone(), 
-            target: target.clone(), 
+        let edge_data = EdgeData {
+            source: source.clone(),
+            target: target.clone(),
             attr_uids: std::collections::HashSet::new(),
         };
 
         let edge_idx = self.graph.add_edge(source_idx, target_idx, edge_data);
-        self.edge_index_to_endpoints.insert(edge_idx, (source, target));
-        
+        self.edge_index_to_endpoints
+            .insert(edge_idx, (source, target));
+
         // Store attributes in columnar format
         for (attr_name, attr_value) in attrs {
-            self.columnar_store.set_edge_attribute(edge_idx.index(), &attr_name, attr_value);
+            self.columnar_store
+                .set_edge_attribute(edge_idx.index(), &attr_name, attr_value);
         }
-        
+
         Ok(())
     }
 
@@ -246,55 +266,57 @@ impl FastGraph {
     pub fn add_edges_internal(&mut self, edge_data: &PyList) -> PyResult<()> {
         let mut edges_to_add = Vec::new();
         let mut nodes_to_create = std::collections::HashSet::new();
-        
+
         // First pass: collect edges and nodes to create
         for item in edge_data {
             let tuple = item.downcast::<pyo3::types::PyTuple>()?;
             let source: String = tuple.get_item(0)?.extract()?;
             let target: String = tuple.get_item(1)?.extract()?;
-            
+
             if !self.node_id_to_index.contains_key(&source) {
                 nodes_to_create.insert(source.clone());
             }
             if !self.node_id_to_index.contains_key(&target) {
                 nodes_to_create.insert(target.clone());
             }
-            
+
             let attributes = if tuple.len() > 2 {
                 let py_attrs = tuple.get_item(2)?.downcast::<PyDict>()?;
                 python_dict_to_json_map(py_attrs)?
             } else {
                 HashMap::new()
             };
-            
+
             edges_to_add.push((source, target, attributes));
         }
-        
+
         // Create missing nodes
         for node_id in nodes_to_create {
             self.add_node(node_id, None)?;
         }
-        
+
         // Add all edges
         for (source, target, attributes) in edges_to_add {
             let source_idx = *self.node_id_to_index.get(&source).unwrap();
             let target_idx = *self.node_id_to_index.get(&target).unwrap();
-            
-            let edge_data = EdgeData { 
-                source: source.clone(), 
-                target: target.clone(), 
+
+            let edge_data = EdgeData {
+                source: source.clone(),
+                target: target.clone(),
                 attr_uids: std::collections::HashSet::new(),
             };
-            
+
             let edge_idx = self.graph.add_edge(source_idx, target_idx, edge_data);
-            self.edge_index_to_endpoints.insert(edge_idx, (source, target));
-            
+            self.edge_index_to_endpoints
+                .insert(edge_idx, (source, target));
+
             // Store attributes in columnar format
             for (attr_name, attr_value) in attributes {
-                self.columnar_store.set_edge_attribute(edge_idx.index(), &attr_name, attr_value);
+                self.columnar_store
+                    .set_edge_attribute(edge_idx.index(), &attr_name, attr_value);
             }
         }
-        
+
         Ok(())
     }
 }

@@ -1,18 +1,18 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyAny};
-use std::collections::HashMap;
+use pyo3::types::{PyAny, PyDict, PyList};
 use serde_json::Value as JsonValue;
+use std::collections::HashMap;
 
 /// Convert Python dictionary to JSON map
 pub fn python_dict_to_json_map(py_dict: &PyDict) -> PyResult<HashMap<String, JsonValue>> {
     let mut map = HashMap::new();
-    
+
     for (key, value) in py_dict {
         let key_str: String = key.extract()?;
         let json_value = python_to_json_value(value)?;
         map.insert(key_str, json_value);
     }
-    
+
     Ok(map)
 }
 

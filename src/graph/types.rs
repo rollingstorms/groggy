@@ -1,9 +1,9 @@
-use petgraph::{Graph as PetGraph, Directed, Undirected};
-use petgraph::graph::NodeIndex;
-use std::collections::{HashMap, HashSet};
-use serde::{Serialize, Deserialize};
-use serde_json::Value as JsonValue;
 use crate::storage::columnar::AttrUID;
+use petgraph::graph::NodeIndex;
+use petgraph::{Directed, Graph as PetGraph, Undirected};
+use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
+use std::collections::{HashMap, HashSet};
 
 /// Node data that only stores ID and attribute UIDs for columnar storage (PRIMARY)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,7 +94,12 @@ impl GraphType {
         }
     }
 
-    pub fn add_edge(&mut self, source_idx: NodeIndex, target_idx: NodeIndex, edge_data: EdgeData) -> petgraph::graph::EdgeIndex {
+    pub fn add_edge(
+        &mut self,
+        source_idx: NodeIndex,
+        target_idx: NodeIndex,
+        edge_data: EdgeData,
+    ) -> petgraph::graph::EdgeIndex {
         match self {
             GraphType::Directed(g) => g.add_edge(source_idx, target_idx, edge_data),
             GraphType::Undirected(g) => g.add_edge(source_idx, target_idx, edge_data),
@@ -115,7 +120,11 @@ impl GraphType {
         }
     }
 
-    pub fn find_edge(&self, source_idx: NodeIndex, target_idx: NodeIndex) -> Option<petgraph::graph::EdgeIndex> {
+    pub fn find_edge(
+        &self,
+        source_idx: NodeIndex,
+        target_idx: NodeIndex,
+    ) -> Option<petgraph::graph::EdgeIndex> {
         match self {
             GraphType::Directed(g) => g.find_edge(source_idx, target_idx),
             GraphType::Undirected(g) => g.find_edge(source_idx, target_idx),
@@ -150,7 +159,10 @@ impl GraphType {
         }
     }
 
-    pub fn edge_weight_mut(&mut self, edge_idx: petgraph::graph::EdgeIndex) -> Option<&mut EdgeData> {
+    pub fn edge_weight_mut(
+        &mut self,
+        edge_idx: petgraph::graph::EdgeIndex,
+    ) -> Option<&mut EdgeData> {
         match self {
             GraphType::Directed(g) => g.edge_weight_mut(edge_idx),
             GraphType::Undirected(g) => g.edge_weight_mut(edge_idx),
@@ -164,21 +176,32 @@ impl GraphType {
         }
     }
 
-    pub fn edges_directed(&self, node_idx: NodeIndex, direction: petgraph::Direction) -> Vec<petgraph::graph::EdgeReference<EdgeData>> {
+    pub fn edges_directed(
+        &self,
+        node_idx: NodeIndex,
+        direction: petgraph::Direction,
+    ) -> Vec<petgraph::graph::EdgeReference<EdgeData>> {
         match self {
             GraphType::Directed(g) => g.edges_directed(node_idx, direction).collect(),
             GraphType::Undirected(g) => g.edges_directed(node_idx, direction).collect(),
         }
     }
 
-    pub fn neighbors_directed(&self, node_idx: NodeIndex, direction: petgraph::Direction) -> Vec<NodeIndex> {
+    pub fn neighbors_directed(
+        &self,
+        node_idx: NodeIndex,
+        direction: petgraph::Direction,
+    ) -> Vec<NodeIndex> {
         match self {
             GraphType::Directed(g) => g.neighbors_directed(node_idx, direction).collect(),
             GraphType::Undirected(g) => g.neighbors_directed(node_idx, direction).collect(),
         }
     }
 
-    pub fn edge_endpoints(&self, edge_idx: petgraph::graph::EdgeIndex) -> Option<(NodeIndex, NodeIndex)> {
+    pub fn edge_endpoints(
+        &self,
+        edge_idx: petgraph::graph::EdgeIndex,
+    ) -> Option<(NodeIndex, NodeIndex)> {
         match self {
             GraphType::Directed(g) => g.edge_endpoints(edge_idx),
             GraphType::Undirected(g) => g.edge_endpoints(edge_idx),

@@ -1,9 +1,11 @@
+#![allow(non_local_definitions)]
+#![allow(dead_code)]
+
+use crate::graph::types::GraphType;
+use crate::storage::columnar::ColumnarStore;
+use petgraph::graph::NodeIndex;
 use pyo3::prelude::*;
 use std::collections::HashMap;
-use serde_json::Value as JsonValue;
-use crate::storage::columnar::ColumnarStore;
-use crate::graph::types::GraphType;
-use petgraph::graph::NodeIndex;
 
 /// Graph View - Provides topology-focused operations (simplified)
 #[pyclass]
@@ -27,7 +29,7 @@ impl GraphView {
         } else {
             GraphType::new_undirected()
         };
-        
+
         Self {
             graph,
             store: ColumnarStore::new(),
@@ -35,7 +37,7 @@ impl GraphView {
             node_index_to_id: HashMap::new(),
         }
     }
-    
+
     /// Get graph topology statistics
     pub fn topology_stats(&self) -> HashMap<String, usize> {
         let mut stats = HashMap::new();
@@ -65,17 +67,23 @@ impl NodeView {
             node_index_to_id: HashMap::new(),
         }
     }
-    
+
     /// Get node statistics
     pub fn node_stats(&self) -> HashMap<String, usize> {
         let mut stats = HashMap::new();
         stats.insert("total_nodes".to_string(), self.node_index_to_id.len());
-        
+
         // Add attribute statistics
         let store_stats = self.store.get_stats();
         stats.extend(store_stats);
-        
+
         stats
+    }
+}
+
+impl Default for NodeView {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -90,16 +98,24 @@ pub struct AttributeView {
 impl AttributeView {
     #[new]
     pub fn new() -> Self {
-        Self { 
-            store: ColumnarStore::new() 
+        Self {
+            store: ColumnarStore::new(),
         }
     }
-    
+
     /// Get all attribute names
     pub fn get_attribute_names(&self) -> Vec<String> {
-        self.store.attr_name_to_uid.iter()
+        self.store
+            .attr_name_to_uid
+            .iter()
             .map(|entry| entry.key().clone())
             .collect()
+    }
+}
+
+impl Default for AttributeView {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -118,27 +134,30 @@ impl ViewManager {
         let graph_view = GraphView::new(directed);
         let node_view = NodeView::new();
         let attribute_view = AttributeView::new();
-        
+
         Self {
             graph_view,
             node_view,
             attribute_view,
         }
     }
-    
+
     /// Get unified statistics
     pub fn stats(&self) -> HashMap<String, usize> {
         let mut stats = HashMap::new();
-        
+
         // Topology stats
         stats.extend(self.graph_view.topology_stats());
-        
+
         // Node stats
         stats.extend(self.node_view.node_stats());
-        
+
         // Attribute stats
-        stats.insert("total_attributes".to_string(), self.attribute_view.get_attribute_names().len());
-        
+        stats.insert(
+            "total_attributes".to_string(),
+            self.attribute_view.get_attribute_names().len(),
+        );
+
         stats
     }
 }

@@ -1,0 +1,1742 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rust Backend Overview &mdash; Groggy Documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=9b665b3d" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+      <script src="../_static/doctools.js?v=9a2dae69"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Rust Performance Guide" href="performance.html" />
+    <link rel="prev" title="state module" href="../api/state.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Groggy - Graph Language Interface
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#from-source">From Source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#development-installation">Development Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#testing-installation">Testing Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation.html#troubleshooting">Troubleshooting</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/index.html">Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basic_usage.html">Basic Usage Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#creating-your-first-graph">Creating Your First Graph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#working-with-mixed-id-types">Working with Mixed ID Types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#social-network-analysis">Social Network Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#knowledge-graph-example">Knowledge Graph Example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#working-with-complex-attributes">Working with Complex Attributes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#error-handling">Error Handling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html#graph-iteration-patterns">Graph Iteration Patterns</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/state_management.html">State Management and Branching</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/state_management.html#basic-state-management">Basic State Management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/state_management.html#branch-management">Branch Management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/state_management.html#advanced-branching-workflows">Advanced Branching Workflows</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/state_management.html#state-persistence-and-recovery">State Persistence and Recovery</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/state_management.html#performance-monitoring">Performance Monitoring</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/state_management.html#tips-and-best-practices">Tips and Best Practices</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/batch_operations.html">Batch Operations Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#social-network-analysis">Social Network Analysis</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#building-large-social-networks-efficiently">Building Large Social Networks Efficiently</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#efficient-filtering-and-analysis">Efficient Filtering and Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#bulk-attribute-updates">Bulk Attribute Updates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#using-context-manager-for-maximum-performance">Using Context Manager for Maximum Performance</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#performance-comparison-example">Performance Comparison Example</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#supply-chain-network-analysis">Supply Chain Network Analysis</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#enterprise-scale-graph-processing">Enterprise-Scale Graph Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#supply-chain-risk-analysis">Supply Chain Risk Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#id1">Bulk Attribute Updates</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#knowledge-graph-processing">Knowledge Graph Processing</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#academic-collaboration-network">Academic Collaboration Network</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#research-impact-analysis">Research Impact Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#performance-monitoring">Performance Monitoring</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#benchmarking-batch-operations">Benchmarking Batch Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#best-practices-for-batch-operations">Best Practices for Batch Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#best-practices-summary">Best Practices Summary</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#performance-optimization-guidelines">Performance Optimization Guidelines</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#expected-performance-gains">Expected Performance Gains</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/performance_optimization.html">Performance Optimization Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#large-graph-construction">Large Graph Construction</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#building-large-graphs-efficiently">Building Large Graphs Efficiently</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#high-performance-filtering">High-Performance Filtering</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#high-performance-queries">High-Performance Queries</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#optimized-graph-traversal">Optimized Graph Traversal</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#efficient-attribute-processing">Efficient Attribute Processing</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#memory-efficient-operations">Memory-Efficient Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#streaming-graph-processing">Streaming Graph Processing</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#parallel-processing-patterns">Parallel Processing Patterns</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#multi-threaded-graph-analysis">Multi-threaded Graph Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#benchmarking-and-profiling">Benchmarking and Profiling</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#performance-measurement-framework">Performance Measurement Framework</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#real-world-integration-examples">Real-World Integration Examples</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#database-integration">Database Integration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/index.html#getting-started">Getting Started</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/basic_usage.html">Basic Usage Examples</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#creating-your-first-graph">Creating Your First Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#working-with-mixed-id-types">Working with Mixed ID Types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#social-network-analysis">Social Network Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#knowledge-graph-example">Knowledge Graph Example</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#working-with-complex-attributes">Working with Complex Attributes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#error-handling">Error Handling</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/basic_usage.html#graph-iteration-patterns">Graph Iteration Patterns</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/index.html#state-management">State Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/state_management.html">State Management and Branching</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/state_management.html#basic-state-management">Basic State Management</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/state_management.html#branch-management">Branch Management</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/state_management.html#advanced-branching-workflows">Advanced Branching Workflows</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/state_management.html#state-persistence-and-recovery">State Persistence and Recovery</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/state_management.html#performance-monitoring">Performance Monitoring</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/state_management.html#tips-and-best-practices">Tips and Best Practices</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/index.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html">Batch Operations Examples</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#social-network-analysis">Social Network Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#supply-chain-network-analysis">Supply Chain Network Analysis</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#knowledge-graph-processing">Knowledge Graph Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#performance-monitoring">Performance Monitoring</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#best-practices-for-batch-operations">Best Practices for Batch Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/batch_operations.html#best-practices-summary">Best Practices Summary</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/index.html#performance-examples">Performance Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html">Performance Optimization Examples</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#large-graph-construction">Large Graph Construction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#high-performance-queries">High-Performance Queries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#memory-efficient-operations">Memory-Efficient Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#parallel-processing-patterns">Parallel Processing Patterns</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#benchmarking-and-profiling">Benchmarking and Profiling</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../examples/performance_optimization.html#real-world-integration-examples">Real-World Integration Examples</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/index.html#advanced-features">Advanced Features</a><ul class="simple">
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">API Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/index.html#core-classes">Core Classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html">groggy module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#groggy.ColumnarStore"><code class="docutils literal notranslate"><span class="pre">ColumnarStore</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph"><code class="docutils literal notranslate"><span class="pre">FastGraph</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#groggy.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#groggy.Subgraph"><code class="docutils literal notranslate"><span class="pre">Subgraph</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#groggy.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#groggy.get_available_backends"><code class="docutils literal notranslate"><span class="pre">get_available_backends()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#groggy.get_current_backend"><code class="docutils literal notranslate"><span class="pre">get_current_backend()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#groggy.set_backend"><code class="docutils literal notranslate"><span class="pre">set_backend()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#module-contents">Module Contents</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#core-graph-interface">Core Graph Interface</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html">graph module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.BatchOperationContext"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#graph-class">Graph Class</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#performance-features">Performance Features</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#api-examples">API Examples</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/index.html#data-structures-views">Data Structures &amp; Views</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html">data_structures module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge"><code class="docutils literal notranslate"><span class="pre">Edge</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.GraphDelta"><code class="docutils literal notranslate"><span class="pre">GraphDelta</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Node"><code class="docutils literal notranslate"><span class="pre">Node</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/data_structures.html#core-data-structures">Core Data Structures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/data_structures.html#attribute-management">Attribute Management</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html">views module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/views.html#groggy.views.EdgeView"><code class="docutils literal notranslate"><span class="pre">EdgeView</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/views.html#groggy.views.LazyDict"><code class="docutils literal notranslate"><span class="pre">LazyDict</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/views.html#groggy.views.NodeView"><code class="docutils literal notranslate"><span class="pre">NodeView</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/views.html#lazy-data-structures">Lazy Data Structures</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/views.html#performance-benefits">Performance Benefits</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/index.html#utilities">Utilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/utils.html">utils module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/utils.html#groggy.utils.create_clustering_workflow"><code class="docutils literal notranslate"><span class="pre">create_clustering_workflow()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/utils.html#groggy.utils.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/utils.html#groggy.utils.create_subgraph_branch"><code class="docutils literal notranslate"><span class="pre">create_subgraph_branch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/utils.html#utility-functions">Utility Functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/utils.html#performance-testing">Performance Testing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/utils.html#best-practices">Best Practices</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/index.html#backend-architecture">Backend Architecture</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/index.html#backend-functions">Backend Functions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/generated/groggy.get_available_backends.html">groggy.get_available_backends</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/generated/groggy.set_backend.html">groggy.set_backend</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/generated/groggy.get_current_backend.html">groggy.get_current_backend</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/generated/groggy.set_backend.html">groggy.set_backend</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/generated/groggy.get_current_backend.html">groggy.get_current_backend</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/index.html#core-constants">Core Constants</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/index.html#groggy.RUST_BACKEND_AVAILABLE"><code class="docutils literal notranslate"><span class="pre">RUST_BACKEND_AVAILABLE</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../performance.html">Performance Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#performance-overview">Performance Overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#benchmark-results-vs-networkx">Benchmark Results vs NetworkX</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#internal-performance-metrics">Internal Performance Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#key-performance-features">Key Performance Features</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#optimization-strategies">Optimization Strategies</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../performance.html#batch-filtering-examples">Batch Filtering Examples</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../performance.html#bulk-attribute-operations">Bulk Attribute Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../performance.html#context-manager-for-bulk-loading">Context Manager for Bulk Loading</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#performance-best-practices">Performance Best Practices</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#memory-management">Memory Management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#efficient-graph-construction">Efficient Graph Construction</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#benchmarking-tools">Benchmarking Tools</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#memory-profiling">Memory Profiling</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#id1">Performance Best Practices</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#graph-design">Graph Design</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#query-optimization">Query Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#large-graph-strategies">Large Graph Strategies</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#streaming-operations">Streaming Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance.html#distributed-processing">Distributed Processing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../performance.html#performance-monitoring">Performance Monitoring</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../architecture.html">Architecture Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#system-architecture">System Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#core-components">Core Components</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#unified-graph-interface">Unified Graph Interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#smart-filtering-pipeline">Smart Filtering Pipeline</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#data-structures">Data Structures</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#unified-type-system">Unified Type System</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#columnar-attribute-storage">Columnar Attribute Storage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#memory-management">Memory Management</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#rust-backend-design">Rust Backend Design</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#ffi-integration">FFI Integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#high-performance-filtering">High-Performance Filtering</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#performance-characteristics">Performance Characteristics</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#algorithmic-complexity">Algorithmic Complexity</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#memory-overhead">Memory Overhead</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#filtering-performance">Filtering Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#concurrency-model">Concurrency Model</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#thread-safety">Thread Safety</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#smart-query-optimization">Smart Query Optimization</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#extensibility">Extensibility</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#plugin-architecture">Plugin Architecture</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#custom-backends">Custom Backends</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#error-handling-strategy">Error Handling Strategy</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#exception-hierarchy">Exception Hierarchy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#error-recovery">Error Recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#testing-architecture">Testing Architecture</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#backend-parity-testing">Backend Parity Testing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#performance-testing">Performance Testing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../architecture.html#future-architecture-considerations">Future Architecture Considerations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#planned-enhancements">Planned Enhancements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#scalability-roadmap">Scalability Roadmap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../architecture.html#query-optimization-roadmap">Query Optimization Roadmap</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../testing.html">Testing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#running-tests">Running Tests</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#basic-test-execution">Basic Test Execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#test-categories">Test Categories</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#test-structure">Test Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#backend-parity-testing">Backend Parity Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#cross-backend-comparison">Cross-Backend Comparison</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#performance-testing">Performance Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#benchmark-framework">Benchmark Framework</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#stress-testing">Stress Testing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#memory-testing">Memory Testing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#interactive-testing">Interactive Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#test-notebooks">Test Notebooks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#debugging-tests">Debugging Tests</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#test-configuration">Test Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#pytest-configuration">Pytest Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#test-markers">Test Markers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../testing.html#running-specific-test-categories">Running Specific Test Categories</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#continuous-integration">Continuous Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#test-data-management">Test Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../testing.html#contributing-tests">Contributing Tests</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing to GLI</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#getting-started">Getting Started</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#development-setup">Development Setup</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#development-workflow">Development Workflow</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#branch-strategy">Branch Strategy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#code-standards">Code Standards</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#types-of-contributions">Types of Contributions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#bug-reports">Bug Reports</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#feature-requests">Feature Requests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#code-contributions">Code Contributions</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#contribution-guidelines">Contribution Guidelines</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#code-quality">Code Quality</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#performance-considerations">Performance Considerations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#specific-contribution-areas">Specific Contribution Areas</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#documentation">Documentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#testing">Testing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#performance">Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#new-features">New Features</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#review-process">Review Process</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#pull-request-guidelines">Pull Request Guidelines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#code-review-process">Code Review Process</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#community-guidelines">Community Guidelines</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#code-of-conduct">Code of Conduct</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#communication">Communication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../contributing.html#getting-help">Getting Help</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../contributing.html#recognition">Recognition</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#unreleased">[Unreleased]</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#id1">[0.2.0] - 2025-01-01</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#id2">[0.1.0] - 2024-12-01</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#migration-guide">Migration Guide</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#upgrading-from-0-1-x-to-0-2-x">Upgrading from 0.1.x to 0.2.x</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#breaking-changes">Breaking Changes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#future-breaking-changes-0-3-x">Future Breaking Changes (0.3.x)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#known-issues">Known Issues</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#current-limitations">Current Limitations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#workarounds">Workarounds</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#version-support">Version Support</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#support-policy">Support Policy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#python-version-support">Python Version Support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#rust-version-support">Rust Version Support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#platform-support">Platform Support</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#contributors">Contributors</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#version-0-2-0-contributors">Version 0.2.0 Contributors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#special-thanks">Special Thanks</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../changelog.html#future-roadmap">Future Roadmap</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#planned-features">Planned Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../changelog.html#deprecation-schedule">Deprecation Schedule</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Examples:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples/basic_usage.html">Basic Usage Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basic_usage.html#creating-your-first-graph">Creating Your First Graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basic_usage.html#working-with-mixed-id-types">Working with Mixed ID Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basic_usage.html#social-network-analysis">Social Network Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basic_usage.html#knowledge-graph-example">Knowledge Graph Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basic_usage.html#working-with-complex-attributes">Working with Complex Attributes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basic_usage.html#error-handling">Error Handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basic_usage.html#graph-iteration-patterns">Graph Iteration Patterns</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/state_management.html">State Management and Branching</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/state_management.html#basic-state-management">Basic State Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/state_management.html#branch-management">Branch Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/state_management.html#advanced-branching-workflows">Advanced Branching Workflows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/state_management.html#state-persistence-and-recovery">State Persistence and Recovery</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/state_management.html#performance-monitoring">Performance Monitoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/state_management.html#tips-and-best-practices">Tips and Best Practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/batch_operations.html">Batch Operations Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/batch_operations.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/batch_operations.html#social-network-analysis">Social Network Analysis</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#building-large-social-networks-efficiently">Building Large Social Networks Efficiently</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#efficient-filtering-and-analysis">Efficient Filtering and Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#bulk-attribute-updates">Bulk Attribute Updates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#using-context-manager-for-maximum-performance">Using Context Manager for Maximum Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#performance-comparison-example">Performance Comparison Example</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/batch_operations.html#supply-chain-network-analysis">Supply Chain Network Analysis</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#enterprise-scale-graph-processing">Enterprise-Scale Graph Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#supply-chain-risk-analysis">Supply Chain Risk Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#id1">Bulk Attribute Updates</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/batch_operations.html#knowledge-graph-processing">Knowledge Graph Processing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#academic-collaboration-network">Academic Collaboration Network</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#research-impact-analysis">Research Impact Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/batch_operations.html#performance-monitoring">Performance Monitoring</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#benchmarking-batch-operations">Benchmarking Batch Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/batch_operations.html#best-practices-for-batch-operations">Best Practices for Batch Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/batch_operations.html#best-practices-summary">Best Practices Summary</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#performance-optimization-guidelines">Performance Optimization Guidelines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/batch_operations.html#expected-performance-gains">Expected Performance Gains</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/performance_optimization.html">Performance Optimization Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/performance_optimization.html#large-graph-construction">Large Graph Construction</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#building-large-graphs-efficiently">Building Large Graphs Efficiently</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#high-performance-filtering">High-Performance Filtering</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/performance_optimization.html#high-performance-queries">High-Performance Queries</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#optimized-graph-traversal">Optimized Graph Traversal</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#efficient-attribute-processing">Efficient Attribute Processing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/performance_optimization.html#memory-efficient-operations">Memory-Efficient Operations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#streaming-graph-processing">Streaming Graph Processing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/performance_optimization.html#parallel-processing-patterns">Parallel Processing Patterns</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#multi-threaded-graph-analysis">Multi-threaded Graph Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/performance_optimization.html#benchmarking-and-profiling">Benchmarking and Profiling</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#performance-measurement-framework">Performance Measurement Framework</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/performance_optimization.html#real-world-integration-examples">Real-World Integration Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../examples/performance_optimization.html#database-integration">Database Integration</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/groggy.html">groggy module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/groggy.html#groggy.ColumnarStore"><code class="docutils literal notranslate"><span class="pre">ColumnarStore</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.ColumnarStore.get_stats"><code class="docutils literal notranslate"><span class="pre">ColumnarStore.get_stats()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph"><code class="docutils literal notranslate"><span class="pre">FastGraph</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.add_edge"><code class="docutils literal notranslate"><span class="pre">FastGraph.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.add_edges"><code class="docutils literal notranslate"><span class="pre">FastGraph.add_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.add_node"><code class="docutils literal notranslate"><span class="pre">FastGraph.add_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.add_nodes"><code class="docutils literal notranslate"><span class="pre">FastGraph.add_nodes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.edge_count"><code class="docutils literal notranslate"><span class="pre">FastGraph.edge_count()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.filter_edges_by_attributes"><code class="docutils literal notranslate"><span class="pre">FastGraph.filter_edges_by_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.filter_edges_by_numeric_comparison"><code class="docutils literal notranslate"><span class="pre">FastGraph.filter_edges_by_numeric_comparison()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.filter_edges_by_string_comparison"><code class="docutils literal notranslate"><span class="pre">FastGraph.filter_edges_by_string_comparison()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.filter_nodes_by_attributes"><code class="docutils literal notranslate"><span class="pre">FastGraph.filter_nodes_by_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.filter_nodes_by_numeric_comparison"><code class="docutils literal notranslate"><span class="pre">FastGraph.filter_nodes_by_numeric_comparison()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.filter_nodes_by_string_comparison"><code class="docutils literal notranslate"><span class="pre">FastGraph.filter_nodes_by_string_comparison()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.get_all_neighbors"><code class="docutils literal notranslate"><span class="pre">FastGraph.get_all_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.get_edge_attributes"><code class="docutils literal notranslate"><span class="pre">FastGraph.get_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.get_edge_ids"><code class="docutils literal notranslate"><span class="pre">FastGraph.get_edge_ids()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.get_incoming_neighbors"><code class="docutils literal notranslate"><span class="pre">FastGraph.get_incoming_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">FastGraph.get_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.get_node_attributes"><code class="docutils literal notranslate"><span class="pre">FastGraph.get_node_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">FastGraph.get_node_ids()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.get_outgoing_neighbors"><code class="docutils literal notranslate"><span class="pre">FastGraph.get_outgoing_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.has_edge"><code class="docutils literal notranslate"><span class="pre">FastGraph.has_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.has_node"><code class="docutils literal notranslate"><span class="pre">FastGraph.has_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.is_directed"><code class="docutils literal notranslate"><span class="pre">FastGraph.is_directed()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.node_count"><code class="docutils literal notranslate"><span class="pre">FastGraph.node_count()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.remove_edge"><code class="docutils literal notranslate"><span class="pre">FastGraph.remove_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.remove_edges"><code class="docutils literal notranslate"><span class="pre">FastGraph.remove_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.remove_node"><code class="docutils literal notranslate"><span class="pre">FastGraph.remove_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.remove_nodes"><code class="docutils literal notranslate"><span class="pre">FastGraph.remove_nodes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">FastGraph.set_edge_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">FastGraph.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.set_edges_attributes_batch"><code class="docutils literal notranslate"><span class="pre">FastGraph.set_edges_attributes_batch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.set_node_attribute"><code class="docutils literal notranslate"><span class="pre">FastGraph.set_node_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.FastGraph.set_nodes_attributes_batch"><code class="docutils literal notranslate"><span class="pre">FastGraph.set_nodes_attributes_batch()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/groggy.html#groggy.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.__init__"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.add_edge"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.add_edges"><code class="docutils literal notranslate"><span class="pre">Graph.add_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.add_node"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.add_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.add_nodes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.batch_operations"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.branches"><code class="docutils literal notranslate"><span class="pre">Graph.branches</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.edge_count"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.edges"><code class="docutils literal notranslate"><span class="pre">Graph.edges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.empty"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.filter_edges"><code class="docutils literal notranslate"><span class="pre">Graph.filter_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.filter_edges_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_edges_by_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.filter_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.filter_nodes_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes_by_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.from_edge_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.from_node_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.get_all_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_all_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.get_edge"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.get_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.get_incoming_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_incoming_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.get_node"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.get_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.get_outgoing_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_outgoing_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.has_edge"><code class="docutils literal notranslate"><span class="pre">Graph.has_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.has_node"><code class="docutils literal notranslate"><span class="pre">Graph.has_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.is_directed"><code class="docutils literal notranslate"><span class="pre">Graph.is_directed()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.node_count"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.node_id_to_index"><code class="docutils literal notranslate"><span class="pre">Graph.node_id_to_index</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.nodes"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.remove_edge"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.remove_edges"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.remove_node"><code class="docutils literal notranslate"><span class="pre">Graph.remove_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.remove_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.remove_nodes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.set_edges_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.set_node_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.set_nodes_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.states"><code class="docutils literal notranslate"><span class="pre">Graph.states</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.subgraph"><code class="docutils literal notranslate"><span class="pre">Graph.subgraph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.subgraphs"><code class="docutils literal notranslate"><span class="pre">Graph.subgraphs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.update_edge"><code class="docutils literal notranslate"><span class="pre">Graph.update_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.update_node"><code class="docutils literal notranslate"><span class="pre">Graph.update_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Graph.update_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.update_nodes()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/groggy.html#groggy.Subgraph"><code class="docutils literal notranslate"><span class="pre">Subgraph</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Subgraph.__init__"><code class="docutils literal notranslate"><span class="pre">Subgraph.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Subgraph.__repr__"><code class="docutils literal notranslate"><span class="pre">Subgraph.__repr__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.Subgraph.get_metadata"><code class="docutils literal notranslate"><span class="pre">Subgraph.get_metadata()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/groggy.html#groggy.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/groggy.html#groggy.get_available_backends"><code class="docutils literal notranslate"><span class="pre">get_available_backends()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/groggy.html#groggy.get_current_backend"><code class="docutils literal notranslate"><span class="pre">get_current_backend()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/groggy.html#groggy.set_backend"><code class="docutils literal notranslate"><span class="pre">set_backend()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/groggy.html#module-contents">Module Contents</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#classes">Classes</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/generated/groggy.Graph.html">groggy.Graph</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#functions">Functions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/generated/groggy.create_random_graph.html">groggy.create_random_graph</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#constants">Constants</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#groggy.__version__"><code class="docutils literal notranslate"><span class="pre">__version__</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/groggy.html#core-graph-interface">Core Graph Interface</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#id0"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id1"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id2"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id3"><code class="docutils literal notranslate"><span class="pre">Graph.add_edges()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id4"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id5"><code class="docutils literal notranslate"><span class="pre">Graph.add_nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id6"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id7"><code class="docutils literal notranslate"><span class="pre">Graph.branches</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id8"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id9"><code class="docutils literal notranslate"><span class="pre">Graph.edges</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id10"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id11"><code class="docutils literal notranslate"><span class="pre">Graph.filter_edges()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id12"><code class="docutils literal notranslate"><span class="pre">Graph.filter_edges_by_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id13"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id14"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes_by_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id15"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id16"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id17"><code class="docutils literal notranslate"><span class="pre">Graph.get_all_neighbors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id18"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id19"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id20"><code class="docutils literal notranslate"><span class="pre">Graph.get_incoming_neighbors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id21"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id22"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id23"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id24"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id25"><code class="docutils literal notranslate"><span class="pre">Graph.get_outgoing_neighbors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id26"><code class="docutils literal notranslate"><span class="pre">Graph.has_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id27"><code class="docutils literal notranslate"><span class="pre">Graph.has_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id28"><code class="docutils literal notranslate"><span class="pre">Graph.is_directed()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id29"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id30"><code class="docutils literal notranslate"><span class="pre">Graph.node_id_to_index</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id31"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id32"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id33"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edges()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id34"><code class="docutils literal notranslate"><span class="pre">Graph.remove_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id35"><code class="docutils literal notranslate"><span class="pre">Graph.remove_nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id36"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id37"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id38"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id39"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attribute()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id40"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id41"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id42"><code class="docutils literal notranslate"><span class="pre">Graph.states</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id43"><code class="docutils literal notranslate"><span class="pre">Graph.subgraph()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id44"><code class="docutils literal notranslate"><span class="pre">Graph.subgraphs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id45"><code class="docutils literal notranslate"><span class="pre">Graph.update_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id46"><code class="docutils literal notranslate"><span class="pre">Graph.update_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/groggy.html#id47"><code class="docutils literal notranslate"><span class="pre">Graph.update_nodes()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#id48"><code class="docutils literal notranslate"><span class="pre">set_backend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#id49"><code class="docutils literal notranslate"><span class="pre">get_current_backend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/groggy.html#groggy.RUST_BACKEND_AVAILABLE"><code class="docutils literal notranslate"><span class="pre">RUST_BACKEND_AVAILABLE</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api/graph.html">graph module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/graph.html#groggy.graph.BatchOperationContext"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.BatchOperationContext.__init__"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.BatchOperationContext.add_edge"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.BatchOperationContext.add_node"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.BatchOperationContext.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.BatchOperationContext.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.__init__"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.add_edge"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.add_edges"><code class="docutils literal notranslate"><span class="pre">Graph.add_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.add_node"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.add_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.add_nodes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.batch_operations"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.branches"><code class="docutils literal notranslate"><span class="pre">Graph.branches</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.edge_count"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.edges"><code class="docutils literal notranslate"><span class="pre">Graph.edges</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.empty"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.filter_edges"><code class="docutils literal notranslate"><span class="pre">Graph.filter_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.filter_edges_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_edges_by_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.filter_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.filter_nodes_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes_by_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.from_edge_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.from_node_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.get_all_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_all_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.get_edge"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.get_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.get_incoming_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_incoming_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.get_node"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.get_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.get_outgoing_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_outgoing_neighbors()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.has_edge"><code class="docutils literal notranslate"><span class="pre">Graph.has_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.has_node"><code class="docutils literal notranslate"><span class="pre">Graph.has_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.is_directed"><code class="docutils literal notranslate"><span class="pre">Graph.is_directed()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.node_count"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.node_id_to_index"><code class="docutils literal notranslate"><span class="pre">Graph.node_id_to_index</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.nodes"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.remove_edge"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.remove_edges"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edges()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.remove_node"><code class="docutils literal notranslate"><span class="pre">Graph.remove_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.remove_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.remove_nodes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.set_edges_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.set_node_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.set_nodes_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.states"><code class="docutils literal notranslate"><span class="pre">Graph.states</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.subgraph"><code class="docutils literal notranslate"><span class="pre">Graph.subgraph()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.subgraphs"><code class="docutils literal notranslate"><span class="pre">Graph.subgraphs()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.update_edge"><code class="docutils literal notranslate"><span class="pre">Graph.update_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.update_node"><code class="docutils literal notranslate"><span class="pre">Graph.update_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.Graph.update_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.update_nodes()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/graph.html#graph-class">Graph Class</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.__init__"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id0"><code class="docutils literal notranslate"><span class="pre">Graph.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.add_edge"><code class="docutils literal notranslate"><span class="pre">Graph.add_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.add_edges"><code class="docutils literal notranslate"><span class="pre">Graph.add_edges()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.add_node"><code class="docutils literal notranslate"><span class="pre">Graph.add_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.add_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.add_nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.batch_operations"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.branches"><code class="docutils literal notranslate"><span class="pre">Graph.branches</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.edge_count"><code class="docutils literal notranslate"><span class="pre">Graph.edge_count()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.edges"><code class="docutils literal notranslate"><span class="pre">Graph.edges</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.empty"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.filter_edges"><code class="docutils literal notranslate"><span class="pre">Graph.filter_edges()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.filter_edges_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_edges_by_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.filter_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.filter_nodes_by_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.filter_nodes_by_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.from_edge_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.from_node_list"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.get_all_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_all_neighbors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.get_edge"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.get_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_edge_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.get_incoming_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_incoming_neighbors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.get_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_neighbors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.get_node"><code class="docutils literal notranslate"><span class="pre">Graph.get_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.get_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.get_node_ids"><code class="docutils literal notranslate"><span class="pre">Graph.get_node_ids()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.get_outgoing_neighbors"><code class="docutils literal notranslate"><span class="pre">Graph.get_outgoing_neighbors()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.has_edge"><code class="docutils literal notranslate"><span class="pre">Graph.has_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.has_node"><code class="docutils literal notranslate"><span class="pre">Graph.has_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.is_directed"><code class="docutils literal notranslate"><span class="pre">Graph.is_directed()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.node_count"><code class="docutils literal notranslate"><span class="pre">Graph.node_count()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.node_id_to_index"><code class="docutils literal notranslate"><span class="pre">Graph.node_id_to_index</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.nodes"><code class="docutils literal notranslate"><span class="pre">Graph.nodes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.remove_edge"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.remove_edges"><code class="docutils literal notranslate"><span class="pre">Graph.remove_edges()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.remove_node"><code class="docutils literal notranslate"><span class="pre">Graph.remove_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.remove_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.remove_nodes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.set_edge_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attribute()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.set_edges_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_edges_attributes_batch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.set_node_attribute"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attribute()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">Graph.set_node_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.set_nodes_attributes_batch"><code class="docutils literal notranslate"><span class="pre">Graph.set_nodes_attributes_batch()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.states"><code class="docutils literal notranslate"><span class="pre">Graph.states</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.subgraph"><code class="docutils literal notranslate"><span class="pre">Graph.subgraph()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.subgraphs"><code class="docutils literal notranslate"><span class="pre">Graph.subgraphs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.update_edge"><code class="docutils literal notranslate"><span class="pre">Graph.update_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.update_node"><code class="docutils literal notranslate"><span class="pre">Graph.update_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.core.Graph.update_nodes"><code class="docutils literal notranslate"><span class="pre">Graph.update_nodes()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#creation-methods">Creation Methods</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id1"><code class="docutils literal notranslate"><span class="pre">Graph.empty()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id2"><code class="docutils literal notranslate"><span class="pre">Graph.from_edge_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id3"><code class="docutils literal notranslate"><span class="pre">Graph.from_node_list()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#core-operations">Core Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#node-operations">Node Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#edge-operations">Edge Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#attribute-operations">Attribute Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#single-attribute-operations">Single Attribute Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#multiple-attribute-operations">Multiple Attribute Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#new-simplified-batch-api">New Simplified Batch API</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#graph-queries-and-navigation">Graph Queries and Navigation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#neighbor-queries">Neighbor Queries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#filtering-operations">Filtering Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#legacy-compatibility">Legacy Compatibility</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#batch-operation-context">Batch Operation Context</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#groggy.graph.batch.BatchOperationContext"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/graph.html#id36"><code class="docutils literal notranslate"><span class="pre">Graph.batch_operations()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/graph.html#performance-features">Performance Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/graph.html#api-examples">API Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#basic-operations">Basic Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#id37">Batch Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#update-operations">Update Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#id38">Filtering Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#context-manager-for-batch-operations">Context Manager for Batch Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/graph.html#migration-from-old-api">Migration from Old API</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api/data_structures.html">data_structures module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge"><code class="docutils literal notranslate"><span class="pre">Edge</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge.__init__"><code class="docutils literal notranslate"><span class="pre">Edge.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge.attributes"><code class="docutils literal notranslate"><span class="pre">Edge.attributes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge.get"><code class="docutils literal notranslate"><span class="pre">Edge.get()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge.get_attribute"><code class="docutils literal notranslate"><span class="pre">Edge.get_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge.id"><code class="docutils literal notranslate"><span class="pre">Edge.id</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge.items"><code class="docutils literal notranslate"><span class="pre">Edge.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge.keys"><code class="docutils literal notranslate"><span class="pre">Edge.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge.set_attribute"><code class="docutils literal notranslate"><span class="pre">Edge.set_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge.source"><code class="docutils literal notranslate"><span class="pre">Edge.source</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge.target"><code class="docutils literal notranslate"><span class="pre">Edge.target</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Edge.values"><code class="docutils literal notranslate"><span class="pre">Edge.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.GraphDelta"><code class="docutils literal notranslate"><span class="pre">GraphDelta</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.GraphDelta.__init__"><code class="docutils literal notranslate"><span class="pre">GraphDelta.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.GraphDelta.clear"><code class="docutils literal notranslate"><span class="pre">GraphDelta.clear()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.GraphDelta.is_empty"><code class="docutils literal notranslate"><span class="pre">GraphDelta.is_empty()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Node"><code class="docutils literal notranslate"><span class="pre">Node</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Node.__init__"><code class="docutils literal notranslate"><span class="pre">Node.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Node.attributes"><code class="docutils literal notranslate"><span class="pre">Node.attributes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Node.get"><code class="docutils literal notranslate"><span class="pre">Node.get()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Node.get_attribute"><code class="docutils literal notranslate"><span class="pre">Node.get_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Node.id"><code class="docutils literal notranslate"><span class="pre">Node.id</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Node.items"><code class="docutils literal notranslate"><span class="pre">Node.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Node.keys"><code class="docutils literal notranslate"><span class="pre">Node.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Node.set_attribute"><code class="docutils literal notranslate"><span class="pre">Node.set_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#groggy.data_structures.Node.values"><code class="docutils literal notranslate"><span class="pre">Node.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/data_structures.html#core-data-structures">Core Data Structures</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#node-class">Node Class</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/data_structures.html#id0"><code class="docutils literal notranslate"><span class="pre">Node</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#edge-class">Edge Class</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/data_structures.html#id11"><code class="docutils literal notranslate"><span class="pre">Edge</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/data_structures.html#attribute-management">Attribute Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#id24"><code class="docutils literal notranslate"><span class="pre">Node.get_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/data_structures.html#id25"><code class="docutils literal notranslate"><span class="pre">Node.set_attribute()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api/views.html">views module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/views.html#groggy.views.EdgeView"><code class="docutils literal notranslate"><span class="pre">EdgeView</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.EdgeView.__init__"><code class="docutils literal notranslate"><span class="pre">EdgeView.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.EdgeView.items"><code class="docutils literal notranslate"><span class="pre">EdgeView.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.EdgeView.items_iter"><code class="docutils literal notranslate"><span class="pre">EdgeView.items_iter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.EdgeView.keys"><code class="docutils literal notranslate"><span class="pre">EdgeView.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.EdgeView.values"><code class="docutils literal notranslate"><span class="pre">EdgeView.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/views.html#groggy.views.LazyDict"><code class="docutils literal notranslate"><span class="pre">LazyDict</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.LazyDict.__init__"><code class="docutils literal notranslate"><span class="pre">LazyDict.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.LazyDict.copy"><code class="docutils literal notranslate"><span class="pre">LazyDict.copy()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.LazyDict.get"><code class="docutils literal notranslate"><span class="pre">LazyDict.get()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.LazyDict.items"><code class="docutils literal notranslate"><span class="pre">LazyDict.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.LazyDict.keys"><code class="docutils literal notranslate"><span class="pre">LazyDict.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.LazyDict.values"><code class="docutils literal notranslate"><span class="pre">LazyDict.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/views.html#groggy.views.NodeView"><code class="docutils literal notranslate"><span class="pre">NodeView</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.NodeView.__init__"><code class="docutils literal notranslate"><span class="pre">NodeView.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.NodeView.items"><code class="docutils literal notranslate"><span class="pre">NodeView.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.NodeView.items_iter"><code class="docutils literal notranslate"><span class="pre">NodeView.items_iter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.NodeView.keys"><code class="docutils literal notranslate"><span class="pre">NodeView.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#groggy.views.NodeView.values"><code class="docutils literal notranslate"><span class="pre">NodeView.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/views.html#lazy-data-structures">Lazy Data Structures</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#lazydict-class">LazyDict Class</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/views.html#id0"><code class="docutils literal notranslate"><span class="pre">LazyDict</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#nodeview-class">NodeView Class</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/views.html#id8"><code class="docutils literal notranslate"><span class="pre">NodeView</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/views.html#edgeview-class">EdgeView Class</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/views.html#id14"><code class="docutils literal notranslate"><span class="pre">EdgeView</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/views.html#performance-benefits">Performance Benefits</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api/utils.html">utils module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/utils.html#groggy.utils.create_clustering_workflow"><code class="docutils literal notranslate"><span class="pre">create_clustering_workflow()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/utils.html#groggy.utils.create_random_graph"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/utils.html#groggy.utils.create_subgraph_branch"><code class="docutils literal notranslate"><span class="pre">create_subgraph_branch()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/utils.html#utility-functions">Utility Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/utils.html#graph-creation">Graph Creation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/utils.html#id0"><code class="docutils literal notranslate"><span class="pre">create_random_graph()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/utils.html#workflow-utilities">Workflow Utilities</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/utils.html#id1"><code class="docutils literal notranslate"><span class="pre">create_clustering_workflow()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/utils.html#id2"><code class="docutils literal notranslate"><span class="pre">create_subgraph_branch()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/utils.html#performance-testing">Performance Testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/utils.html#best-practices">Best Practices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api/batch.html">batch module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/batch.html#groggy.graph.batch.BatchOperationContext"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#groggy.graph.batch.BatchOperationContext.__init__"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#groggy.graph.batch.BatchOperationContext.add_edge"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_edge()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#groggy.graph.batch.BatchOperationContext.add_node"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_node()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#groggy.graph.batch.BatchOperationContext.set_edge_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#groggy.graph.batch.BatchOperationContext.set_node_attributes"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/batch.html#batchoperationcontext">BatchOperationContext</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#id0"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id1"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#groggy.graph.batch.BatchOperationContext.__enter__"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__enter__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#groggy.graph.batch.BatchOperationContext.__exit__"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__exit__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id2"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id3"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_edge()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id4"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.add_node()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id5"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_edge_attributes()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#id6"><code class="docutils literal notranslate"><span class="pre">BatchOperationContext.set_node_attributes()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#batch-operations">Batch Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#node-operations">Node Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/batch.html#edge-operations">Edge Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#usage-example">Usage Example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/batch.html#performance-notes">Performance Notes</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../api/state.html">state module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api/state.html#groggy.graph.state.StateMixin"><code class="docutils literal notranslate"><span class="pre">StateMixin</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#groggy.graph.state.StateMixin.commit"><code class="docutils literal notranslate"><span class="pre">StateMixin.commit()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#groggy.graph.state.StateMixin.create_branch"><code class="docutils literal notranslate"><span class="pre">StateMixin.create_branch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#groggy.graph.state.StateMixin.get_state_info"><code class="docutils literal notranslate"><span class="pre">StateMixin.get_state_info()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#groggy.graph.state.StateMixin.get_storage_stats"><code class="docutils literal notranslate"><span class="pre">StateMixin.get_storage_stats()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#groggy.graph.state.StateMixin.load_state"><code class="docutils literal notranslate"><span class="pre">StateMixin.load_state()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#groggy.graph.state.StateMixin.save_state"><code class="docutils literal notranslate"><span class="pre">StateMixin.save_state()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#groggy.graph.state.StateMixin.switch_branch"><code class="docutils literal notranslate"><span class="pre">StateMixin.switch_branch()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/state.html#state-management">State Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#statemixin-class">StateMixin Class</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/state.html#id0"><code class="docutils literal notranslate"><span class="pre">StateMixin</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#state-operations">State Operations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/state.html#saving-and-loading-states">Saving and Loading States</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/state.html#branch-management">Branch Management</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/state.html#storage-statistics">Storage Statistics</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#lazy-properties">Lazy Properties</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../api/state.html#state-information">State Information</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../api/state.html#branch-information">Branch Information</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#usage-examples">Usage Examples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../api/state.html#performance-notes">Performance Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../api/state.html#state-persistence">State Persistence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../api/state.html#advanced-features">Advanced Features</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Rust Backend:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Rust Backend Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#architecture">Architecture</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#core-components">Core Components</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#performance-characteristics">Performance Characteristics</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#key-features">Key Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#high-performance-data-structures">High-Performance Data Structures</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#memory-management">Memory Management</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#thread-safety">Thread Safety</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#usage-examples">Usage Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#basic-operations">Basic Operations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#large-graph-construction">Large Graph Construction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#complex-attributes">Complex Attributes</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#performance-optimization">Performance Optimization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#backend-specific-optimizations">Backend-Specific Optimizations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#memory-profiling">Memory Profiling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#benchmarking">Benchmarking</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#installation-and-setup">Installation and Setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#building-from-source">Building from Source</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#troubleshooting-rust-backend">Troubleshooting Rust Backend</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#advanced-features">Advanced Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#custom-rust-extensions">Custom Rust Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ffi-optimizations">FFI Optimizations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#limitations-and-considerations">Limitations and Considerations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#current-limitations">Current Limitations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#best-practices">Best Practices</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#future-developments">Future Developments</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#planned-enhancements">Planned Enhancements</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="performance.html">Rust Performance Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="performance.html#performance-characteristics">Performance Characteristics</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#benchmarking-results">Benchmarking Results</a></li>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#memory-usage-analysis">Memory Usage Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="performance.html#optimization-techniques">Optimization Techniques</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#data-structure-optimizations">Data Structure Optimizations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#content-addressed-storage">Content-Addressed Storage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#batch-operation-optimization">Batch Operation Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#memory-layout-optimization">Memory Layout Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#cache-friendly-iteration">Cache-Friendly Iteration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="performance.html#advanced-performance-features">Advanced Performance Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#simd-optimizations">SIMD Optimizations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#parallel-processing">Parallel Processing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#memory-pool-allocation">Memory Pool Allocation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="performance.html#benchmarking-tools">Benchmarking Tools</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#built-in-performance-monitoring">Built-in Performance Monitoring</a></li>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#memory-profiling">Memory Profiling</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="performance.html#performance-tuning">Performance Tuning</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#graph-size-optimization">Graph Size Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#attribute-optimization">Attribute Optimization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#batch-size-tuning">Batch Size Tuning</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="performance.html#performance-monitoring-in-production">Performance Monitoring in Production</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#runtime-performance-tracking">Runtime Performance Tracking</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="performance.html#best-practices-summary">Best Practices Summary</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#performance-guidelines">Performance Guidelines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="performance.html#common-pitfalls">Common Pitfalls</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ffi.html">FFI (Foreign Function Interface) Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ffi.html#overview">Overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#architecture">Architecture</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ffi.html#pyo3-integration">PyO3 Integration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#basic-ffi-structure">Basic FFI Structure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#data-type-conversion">Data Type Conversion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#complex-type-handling">Complex Type Handling</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ffi.html#performance-characteristics">Performance Characteristics</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#ffi-overhead-analysis">FFI Overhead Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#optimization-strategies">Optimization Strategies</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ffi.html#memory-management">Memory Management</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#reference-counting">Reference Counting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#zero-copy-operations">Zero-Copy Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ffi.html#error-handling">Error Handling</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#exception-conversion">Exception Conversion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#custom-error-types">Custom Error Types</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ffi.html#advanced-ffi-patterns">Advanced FFI Patterns</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#callback-functions">Callback Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#async-support">Async Support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#direct-memory-access">Direct Memory Access</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ffi.html#debugging-and-profiling">Debugging and Profiling</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#debug-builds">Debug Builds</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#ffi-call-tracing">FFI Call Tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#performance-profiling">Performance Profiling</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ffi.html#best-practices">Best Practices</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#ffi-design-guidelines">FFI Design Guidelines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ffi.html#common-pitfalls">Common Pitfalls</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Groggy - Graph Language Interface</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Rust Backend Overview</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/rust/overview.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="rust-backend-overview">
+<h1>Rust Backend Overview<a class="headerlink" href="#rust-backend-overview" title="Link to this heading"></a></h1>
+<p>GLI’s Rust backend provides high-performance graph operations with seamless Python integration. This section covers the Rust backend’s architecture, features, and usage.</p>
+<section id="architecture">
+<h2>Architecture<a class="headerlink" href="#architecture" title="Link to this heading"></a></h2>
+<p>The Rust backend is built using PyO3 for Python-Rust interoperability and provides significant performance improvements over the pure Python implementation.</p>
+<section id="core-components">
+<h3>Core Components<a class="headerlink" href="#core-components" title="Link to this heading"></a></h3>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="c1">// Simplified Rust backend structure</span>
+<span class="k">use</span><span class="w"> </span><span class="n">pyo3</span><span class="p">::</span><span class="n">prelude</span><span class="p">::</span><span class="o">*</span><span class="p">;</span>
+<span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">collections</span><span class="p">::</span><span class="n">HashMap</span><span class="p">;</span>
+
+<span class="cp">#[pyclass]</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">FastGraph</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">nodes</span><span class="p">:</span><span class="w"> </span><span class="nc">HashMap</span><span class="o">&lt;</span><span class="nb">String</span><span class="p">,</span><span class="w"> </span><span class="n">RustNode</span><span class="o">&gt;</span><span class="p">,</span>
+<span class="w">    </span><span class="n">edges</span><span class="p">:</span><span class="w"> </span><span class="nc">HashMap</span><span class="o">&lt;</span><span class="nb">String</span><span class="p">,</span><span class="w"> </span><span class="n">RustEdge</span><span class="o">&gt;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="cp">#[pyclass]</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">RustNode</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">id</span><span class="p">:</span><span class="w"> </span><span class="nb">String</span><span class="p">,</span>
+<span class="w">    </span><span class="n">attributes</span><span class="p">:</span><span class="w"> </span><span class="nc">HashMap</span><span class="o">&lt;</span><span class="nb">String</span><span class="p">,</span><span class="w"> </span><span class="n">PyObject</span><span class="o">&gt;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="cp">#[pyclass]</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">RustEdge</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">source</span><span class="p">:</span><span class="w"> </span><span class="nb">String</span><span class="p">,</span>
+<span class="w">    </span><span class="n">target</span><span class="p">:</span><span class="w"> </span><span class="nb">String</span><span class="p">,</span>
+<span class="w">    </span><span class="n">attributes</span><span class="p">:</span><span class="w"> </span><span class="nc">HashMap</span><span class="o">&lt;</span><span class="nb">String</span><span class="p">,</span><span class="w"> </span><span class="n">PyObject</span><span class="o">&gt;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="performance-characteristics">
+<h3>Performance Characteristics<a class="headerlink" href="#performance-characteristics" title="Link to this heading"></a></h3>
+<p>The Rust backend provides significant performance improvements:</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Performance Comparison</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 20.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Operation</p></th>
+<th class="head"><p>Python Backend</p></th>
+<th class="head"><p>Rust Backend</p></th>
+<th class="head"><p>Improvement</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Add 1M nodes</p></td>
+<td><p>2.5 seconds</p></td>
+<td><p>0.8 seconds</p></td>
+<td><p>3.1x faster</p></td>
+</tr>
+<tr class="row-odd"><td><p>Add 1M edges</p></td>
+<td><p>3.2 seconds</p></td>
+<td><p>0.6 seconds</p></td>
+<td><p>5.3x faster</p></td>
+</tr>
+<tr class="row-even"><td><p>Random node access</p></td>
+<td><p>1.0 μs</p></td>
+<td><p>0.3 μs</p></td>
+<td><p>3.3x faster</p></td>
+</tr>
+<tr class="row-odd"><td><p>Neighbor queries</p></td>
+<td><p>2.0 μs</p></td>
+<td><p>0.5 μs</p></td>
+<td><p>4.0x faster</p></td>
+</tr>
+<tr class="row-even"><td><p>Memory usage (1M nodes)</p></td>
+<td><p>450 MB</p></td>
+<td><p>180 MB</p></td>
+<td><p>2.5x less</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="key-features">
+<h2>Key Features<a class="headerlink" href="#key-features" title="Link to this heading"></a></h2>
+<section id="high-performance-data-structures">
+<h3>High-Performance Data Structures<a class="headerlink" href="#high-performance-data-structures" title="Link to this heading"></a></h3>
+<p>The Rust backend uses optimized data structures:</p>
+<ol class="arabic simple">
+<li><p><strong>FxHashMap</strong>: Fast hash maps optimized for string keys</p></li>
+<li><p><strong>SmallVec</strong>: Stack-allocated vectors for small collections</p></li>
+<li><p><strong>Interned Strings</strong>: Efficient string storage and comparison</p></li>
+<li><p><strong>Content Addressing</strong>: Deduplication of identical attribute sets</p></li>
+</ol>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">rustc_hash</span><span class="p">::</span><span class="n">FxHashMap</span><span class="p">;</span>
+<span class="k">use</span><span class="w"> </span><span class="n">smallvec</span><span class="p">::</span><span class="n">SmallVec</span><span class="p">;</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">OptimizedNode</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">id</span><span class="p">:</span><span class="w"> </span><span class="nc">InternedString</span><span class="p">,</span>
+<span class="w">    </span><span class="n">attributes</span><span class="p">:</span><span class="w"> </span><span class="nc">ContentAddress</span><span class="p">,</span>
+<span class="w">    </span><span class="n">edges</span><span class="p">:</span><span class="w"> </span><span class="nc">SmallVec</span><span class="o">&lt;</span><span class="p">[</span><span class="n">EdgeId</span><span class="p">;</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span><span class="o">&gt;</span><span class="p">,</span><span class="w">  </span><span class="c1">// Most nodes have few edges</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="memory-management">
+<h3>Memory Management<a class="headerlink" href="#memory-management" title="Link to this heading"></a></h3>
+<p>Efficient memory usage through:</p>
+<ol class="arabic simple">
+<li><p><strong>Zero-Copy Operations</strong>: Avoid unnecessary data copying</p></li>
+<li><p><strong>Reference Counting</strong>: Automatic memory management</p></li>
+<li><p><strong>Memory Pools</strong>: Reuse allocated memory</p></li>
+<li><p><strong>Compression</strong>: Compact representation of graph data</p></li>
+</ol>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="c1">// Memory-efficient attribute storage</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">AttributeStore</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">content_map</span><span class="p">:</span><span class="w"> </span><span class="nc">FxHashMap</span><span class="o">&lt;</span><span class="kt">u64</span><span class="p">,</span><span class="w"> </span><span class="n">Arc</span><span class="o">&lt;</span><span class="n">Attributes</span><span class="o">&gt;&gt;</span><span class="p">,</span>
+<span class="w">    </span><span class="n">interned_strings</span><span class="p">:</span><span class="w"> </span><span class="nc">StringInterner</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="thread-safety">
+<h3>Thread Safety<a class="headerlink" href="#thread-safety" title="Link to this heading"></a></h3>
+<p>The Rust backend provides thread-safe operations:</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">sync</span><span class="p">::{</span><span class="n">Arc</span><span class="p">,</span><span class="w"> </span><span class="n">RwLock</span><span class="p">};</span>
+
+<span class="cp">#[pyclass]</span>
+<span class="k">pub</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">ThreadSafeGraph</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">inner</span><span class="p">:</span><span class="w"> </span><span class="nc">Arc</span><span class="o">&lt;</span><span class="n">RwLock</span><span class="o">&lt;</span><span class="n">FastGraph</span><span class="o">&gt;&gt;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="cp">#[pymethods]</span>
+<span class="k">impl</span><span class="w"> </span><span class="n">ThreadSafeGraph</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">add_node</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">id</span><span class="p">:</span><span class="w"> </span><span class="nb">String</span><span class="p">,</span><span class="w"> </span><span class="n">attributes</span><span class="p">:</span><span class="w"> </span><span class="nc">HashMap</span><span class="o">&lt;</span><span class="nb">String</span><span class="p">,</span><span class="w"> </span><span class="n">PyObject</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">PyResult</span><span class="o">&lt;</span><span class="nb">String</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">graph</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">inner</span><span class="p">.</span><span class="n">write</span><span class="p">().</span><span class="n">unwrap</span><span class="p">();</span>
+<span class="w">        </span><span class="n">graph</span><span class="p">.</span><span class="n">add_node_internal</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">attributes</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">get_node</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">id</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="kt">str</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">PyResult</span><span class="o">&lt;</span><span class="nb">Option</span><span class="o">&lt;</span><span class="n">RustNode</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">graph</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">inner</span><span class="p">.</span><span class="n">read</span><span class="p">().</span><span class="n">unwrap</span><span class="p">();</span>
+<span class="w">        </span><span class="nb">Ok</span><span class="p">(</span><span class="n">graph</span><span class="p">.</span><span class="n">get_node_internal</span><span class="p">(</span><span class="n">id</span><span class="p">))</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="usage-examples">
+<h2>Usage Examples<a class="headerlink" href="#usage-examples" title="Link to this heading"></a></h2>
+<section id="basic-operations">
+<h3>Basic Operations<a class="headerlink" href="#basic-operations" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">groggy</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span>
+
+<span class="c1"># Create graph with Rust backend</span>
+<span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
+
+<span class="c1"># Add nodes (fast)</span>
+<span class="n">alice</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span> <span class="n">age</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">city</span><span class="o">=</span><span class="s2">&quot;NYC&quot;</span><span class="p">)</span>
+<span class="n">bob</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Bob&quot;</span><span class="p">,</span> <span class="n">age</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">city</span><span class="o">=</span><span class="s2">&quot;SF&quot;</span><span class="p">)</span>
+
+<span class="c1"># Add edges (fast)</span>
+<span class="n">friendship</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">alice</span><span class="p">,</span> <span class="n">bob</span><span class="p">,</span>
+                       <span class="n">relationship</span><span class="o">=</span><span class="s2">&quot;friends&quot;</span><span class="p">,</span>
+                       <span class="n">strength</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+                       <span class="n">since</span><span class="o">=</span><span class="mi">2020</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="large-graph-construction">
+<h3>Large Graph Construction<a class="headerlink" href="#large-graph-construction" title="Link to this heading"></a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">groggy</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span>
+
+<span class="c1"># Efficient large graph creation</span>
+<span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
+
+<span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+
+<span class="c1"># Use batch operations for maximum performance</span>
+<span class="k">with</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_operations</span><span class="p">()</span> <span class="k">as</span> <span class="n">batch</span><span class="p">:</span>
+    <span class="c1"># Add 100K nodes</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100000</span><span class="p">):</span>
+        <span class="n">batch</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;node_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                      <span class="n">value</span><span class="o">=</span><span class="n">i</span><span class="p">,</span>
+                      <span class="n">category</span><span class="o">=</span><span class="n">i</span> <span class="o">%</span> <span class="mi">100</span><span class="p">,</span>
+                      <span class="n">metadata</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;created&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;2025-01-</span><span class="si">{</span><span class="n">i</span><span class="o">%</span><span class="mi">30</span><span class="o">+</span><span class="mi">1</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">})</span>
+
+    <span class="c1"># Add 500K edges</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">500000</span><span class="p">):</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;node_</span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="mi">100000</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;node_</span><span class="si">{</span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="mi">100000</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">batch</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+
+<span class="n">construction_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created </span><span class="si">{</span><span class="n">g</span><span class="o">.</span><span class="n">node_count</span><span class="p">()</span><span class="si">}</span><span class="s2"> nodes and </span><span class="si">{</span><span class="n">g</span><span class="o">.</span><span class="n">edge_count</span><span class="p">()</span><span class="si">}</span><span class="s2"> edges in </span><span class="si">{</span><span class="n">construction_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="complex-attributes">
+<h3>Complex Attributes<a class="headerlink" href="#complex-attributes" title="Link to this heading"></a></h3>
+<p>The Rust backend efficiently handles complex Python objects:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
+
+<span class="c1"># Complex nested attributes</span>
+<span class="n">company</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span>
+    <span class="s2">&quot;techcorp&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;TechCorp Inc.&quot;</span><span class="p">,</span>
+    <span class="n">employees</span><span class="o">=</span><span class="p">[</span>
+        <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Alice&quot;</span><span class="p">,</span> <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;CTO&quot;</span><span class="p">,</span> <span class="s2">&quot;salary&quot;</span><span class="p">:</span> <span class="mi">200000</span><span class="p">},</span>
+        <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Bob&quot;</span><span class="p">,</span> <span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;Engineer&quot;</span><span class="p">,</span> <span class="s2">&quot;salary&quot;</span><span class="p">:</span> <span class="mi">150000</span><span class="p">},</span>
+    <span class="p">],</span>
+    <span class="n">financial_data</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;revenue&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1000000</span><span class="p">,</span> <span class="mi">2500000</span><span class="p">,</span> <span class="mi">5000000</span><span class="p">],</span>
+        <span class="s2">&quot;funding&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;series_a&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;amount&quot;</span><span class="p">:</span> <span class="mi">5000000</span><span class="p">,</span> <span class="s2">&quot;date&quot;</span><span class="p">:</span> <span class="s2">&quot;2020-01-15&quot;</span><span class="p">},</span>
+            <span class="s2">&quot;series_b&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;amount&quot;</span><span class="p">:</span> <span class="mi">15000000</span><span class="p">,</span> <span class="s2">&quot;date&quot;</span><span class="p">:</span> <span class="s2">&quot;2022-06-20&quot;</span><span class="p">},</span>
+        <span class="p">}</span>
+    <span class="p">},</span>
+    <span class="n">metadata</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;last_updated&quot;</span><span class="p">:</span> <span class="s2">&quot;2025-01-26&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;confidence&quot;</span><span class="p">:</span> <span class="mf">0.95</span><span class="p">,</span>
+        <span class="s2">&quot;tags&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;startup&quot;</span><span class="p">,</span> <span class="s2">&quot;ai&quot;</span><span class="p">,</span> <span class="s2">&quot;saas&quot;</span><span class="p">]</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+
+<span class="c1"># Efficient attribute access</span>
+<span class="n">company_data</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="n">company</span><span class="p">)</span>
+<span class="n">employees</span> <span class="o">=</span> <span class="n">company_data</span><span class="p">[</span><span class="s2">&quot;employees&quot;</span><span class="p">]</span>
+<span class="n">latest_revenue</span> <span class="o">=</span> <span class="n">company_data</span><span class="p">[</span><span class="s2">&quot;financial_data&quot;</span><span class="p">][</span><span class="s2">&quot;revenue&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="performance-optimization">
+<h2>Performance Optimization<a class="headerlink" href="#performance-optimization" title="Link to this heading"></a></h2>
+<section id="backend-specific-optimizations">
+<h3>Backend-Specific Optimizations<a class="headerlink" href="#backend-specific-optimizations" title="Link to this heading"></a></h3>
+<p>The Rust backend includes several optimizations not available in Python:</p>
+<ol class="arabic simple">
+<li><p><strong>Vectorized Operations</strong>: SIMD instructions for bulk operations</p></li>
+<li><p><strong>Memory Prefetching</strong>: Optimized memory access patterns</p></li>
+<li><p><strong>Lock-Free Data Structures</strong>: For concurrent read operations</p></li>
+<li><p><strong>Custom Allocators</strong>: Optimized memory allocation</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Leverage Rust optimizations</span>
+<span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
+
+<span class="c1"># Vectorized bulk operations</span>
+<span class="n">node_data</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="sa">f</span><span class="s2">&quot;node_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">i</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">10</span><span class="p">})</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100000</span><span class="p">)</span>
+<span class="p">]</span>
+<span class="n">g</span><span class="o">.</span><span class="n">batch_add_nodes</span><span class="p">(</span><span class="n">node_data</span><span class="p">)</span>  <span class="c1"># Rust-optimized batch operation</span>
+</pre></div>
+</div>
+</section>
+<section id="memory-profiling">
+<h3>Memory Profiling<a class="headerlink" href="#memory-profiling" title="Link to this heading"></a></h3>
+<p>Monitor memory usage with the Rust backend:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">tracemalloc</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">groggy</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span>
+
+<span class="c1"># Enable memory tracking</span>
+<span class="n">tracemalloc</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+<span class="c1"># Create large graph with Rust backend</span>
+<span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
+
+<span class="c1"># Add substantial data</span>
+<span class="k">with</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_operations</span><span class="p">()</span> <span class="k">as</span> <span class="n">batch</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1000000</span><span class="p">):</span>
+        <span class="n">batch</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;node_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                      <span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">i</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">i</span> <span class="o">%</span> <span class="mi">1000</span><span class="p">})</span>
+
+<span class="c1"># Check memory usage</span>
+<span class="n">current</span><span class="p">,</span> <span class="n">peak</span> <span class="o">=</span> <span class="n">tracemalloc</span><span class="o">.</span><span class="n">get_traced_memory</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Peak memory: </span><span class="si">{</span><span class="n">peak</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">1024</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">1024</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Nodes per MB: </span><span class="si">{</span><span class="n">g</span><span class="o">.</span><span class="n">node_count</span><span class="p">()</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="n">peak</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">1024</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">1024</span><span class="p">)</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="n">tracemalloc</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="benchmarking">
+<h3>Benchmarking<a class="headerlink" href="#benchmarking" title="Link to this heading"></a></h3>
+<p>Compare backend performance:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">groggy</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">benchmark_backends</span><span class="p">():</span>
+    <span class="n">backends</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;python&#39;</span><span class="p">,</span> <span class="s1">&#39;rust&#39;</span><span class="p">]</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">for</span> <span class="n">backend</span> <span class="ow">in</span> <span class="n">backends</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s1">&#39;rust&#39;</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rust backend not available&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;python&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Benchmark node creation</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10000</span><span class="p">):</span>
+            <span class="n">g</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;node_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">i</span><span class="p">)</span>
+        <span class="n">node_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+
+        <span class="c1"># Benchmark edge creation</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">5000</span><span class="p">):</span>
+            <span class="n">g</span><span class="o">.</span><span class="n">add_edge</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;node_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;node_</span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">weight</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="n">edge_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+
+        <span class="c1"># Benchmark queries</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1000</span><span class="p">):</span>
+            <span class="n">neighbors</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">get_neighbors</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;node_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">query_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+
+        <span class="n">results</span><span class="p">[</span><span class="n">backend</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;node_creation&#39;</span><span class="p">:</span> <span class="n">node_time</span><span class="p">,</span>
+            <span class="s1">&#39;edge_creation&#39;</span><span class="p">:</span> <span class="n">edge_time</span><span class="p">,</span>
+            <span class="s1">&#39;queries&#39;</span><span class="p">:</span> <span class="n">query_time</span>
+        <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">results</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="n">benchmark_backends</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">backend</span><span class="p">,</span> <span class="n">times</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\\</span><span class="s2">n</span><span class="si">{</span><span class="n">backend</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="si">}</span><span class="s2"> Backend:&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">operation</span><span class="p">,</span> <span class="n">time_taken</span> <span class="ow">in</span> <span class="n">times</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">operation</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">time_taken</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="installation-and-setup">
+<h2>Installation and Setup<a class="headerlink" href="#installation-and-setup" title="Link to this heading"></a></h2>
+<section id="building-from-source">
+<h3>Building from Source<a class="headerlink" href="#building-from-source" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Install Rust toolchain</span>
+curl<span class="w"> </span>--proto<span class="w"> </span><span class="s1">&#39;=https&#39;</span><span class="w"> </span>--tlsv1.2<span class="w"> </span>-sSf<span class="w"> </span>https://sh.rustup.rs<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
+<span class="nb">source</span><span class="w"> </span>~/.cargo/env
+
+<span class="c1"># Install Python dependencies</span>
+pip<span class="w"> </span>install<span class="w"> </span>maturin
+
+<span class="c1"># Clone and build GLI</span>
+git<span class="w"> </span>clone<span class="w"> </span>https://github.com/your-org/gli.git
+<span class="nb">cd</span><span class="w"> </span>gli
+
+<span class="c1"># Build Rust backend</span>
+maturin<span class="w"> </span>develop<span class="w"> </span>--release
+</pre></div>
+</div>
+</section>
+<section id="troubleshooting-rust-backend">
+<h3>Troubleshooting Rust Backend<a class="headerlink" href="#troubleshooting-rust-backend" title="Link to this heading"></a></h3>
+<p><strong>Common Issues:</strong></p>
+<ol class="arabic">
+<li><p><strong>Rust Not Installed</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">groggy</span><span class="w"> </span><span class="kn">import</span> <span class="n">RUST_BACKEND_AVAILABLE</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">RUST_BACKEND_AVAILABLE</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Install Rust and rebuild: maturin develop&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Compilation Errors</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Update Rust toolchain</span>
+rustup<span class="w"> </span>update
+
+<span class="c1"># Clean and rebuild</span>
+cargo<span class="w"> </span>clean
+maturin<span class="w"> </span>develop<span class="w"> </span>--release
+</pre></div>
+</div>
+</li>
+<li><p><strong>Import Errors</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">groggy</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span>
+    <span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>
+<span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rust backend import failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;python&#39;</span><span class="p">)</span>  <span class="c1"># Fallback</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+</section>
+<section id="advanced-features">
+<h2>Advanced Features<a class="headerlink" href="#advanced-features" title="Link to this heading"></a></h2>
+<section id="custom-rust-extensions">
+<h3>Custom Rust Extensions<a class="headerlink" href="#custom-rust-extensions" title="Link to this heading"></a></h3>
+<p>For advanced users, the Rust backend can be extended:</p>
+<div class="highlight-rust notranslate"><div class="highlight"><pre><span></span><span class="c1">// Custom algorithm implementation</span>
+<span class="cp">#[pymethods]</span>
+<span class="k">impl</span><span class="w"> </span><span class="n">FastGraph</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">fn</span><span class="w"> </span><span class="nf">custom_algorithm</span><span class="p">(</span><span class="o">&amp;</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">parameter</span><span class="p">:</span><span class="w"> </span><span class="kt">f64</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">PyResult</span><span class="o">&lt;</span><span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">String</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// High-performance custom algorithm</span>
+<span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">results</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">node_id</span><span class="p">,</span><span class="w"> </span><span class="n">node</span><span class="p">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="o">&amp;</span><span class="bp">self</span><span class="p">.</span><span class="n">nodes</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="bp">self</span><span class="p">.</span><span class="n">custom_condition</span><span class="p">(</span><span class="n">node</span><span class="p">,</span><span class="w"> </span><span class="n">parameter</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">results</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="n">node_id</span><span class="p">.</span><span class="n">clone</span><span class="p">());</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="nb">Ok</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="ffi-optimizations">
+<h3>FFI Optimizations<a class="headerlink" href="#ffi-optimizations" title="Link to this heading"></a></h3>
+<p>Direct FFI calls for maximum performance:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access low-level Rust functions (advanced)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">groggy._core</span><span class="w"> </span><span class="kn">import</span> <span class="n">FastGraph</span>
+
+<span class="n">rust_graph</span> <span class="o">=</span> <span class="n">FastGraph</span><span class="p">()</span>
+
+<span class="c1"># Direct Rust calls (bypasses Python overhead)</span>
+<span class="n">rust_graph</span><span class="o">.</span><span class="n">batch_add_nodes_raw</span><span class="p">(</span><span class="n">node_data</span><span class="p">)</span>
+<span class="n">rust_graph</span><span class="o">.</span><span class="n">batch_add_edges_raw</span><span class="p">(</span><span class="n">edge_data</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="limitations-and-considerations">
+<h2>Limitations and Considerations<a class="headerlink" href="#limitations-and-considerations" title="Link to this heading"></a></h2>
+<section id="current-limitations">
+<h3>Current Limitations<a class="headerlink" href="#current-limitations" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Platform Support</strong>: Best supported on Linux and macOS</p></li>
+<li><p><strong>Python Object Serialization</strong>: Complex Python objects may not serialize efficiently</p></li>
+<li><p><strong>Memory Debugging</strong>: Rust memory issues harder to debug than Python</p></li>
+<li><p><strong>Build Complexity</strong>: Requires Rust toolchain for compilation</p></li>
+</ol>
+</section>
+<section id="best-practices">
+<h3>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>Use for Large Graphs</strong>: Most beneficial for &gt;10K nodes</p></li>
+<li><p><strong>Batch Operations</strong>: Always use batch operations for bulk changes</p></li>
+<li><p><strong>Simple Attributes</strong>: Use simple types when possible for best performance</p></li>
+<li><p><strong>Memory Monitoring</strong>: Monitor memory usage in production</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Best practices example</span>
+<span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust&#39;</span><span class="p">)</span>  <span class="c1"># Use Rust for performance</span>
+
+<span class="c1"># Batch operations for efficiency</span>
+<span class="k">with</span> <span class="n">g</span><span class="o">.</span><span class="n">batch_operations</span><span class="p">()</span> <span class="k">as</span> <span class="n">batch</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">large_dataset</span><span class="p">:</span>
+        <span class="n">batch</span><span class="o">.</span><span class="n">add_node</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">],</span> <span class="o">**</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;attributes&#39;</span><span class="p">])</span>
+
+<span class="c1"># Simple attribute access</span>
+<span class="k">for</span> <span class="n">node_id</span> <span class="ow">in</span> <span class="n">g</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+    <span class="n">node_data</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">get_node</span><span class="p">(</span><span class="n">node_id</span><span class="p">)</span>
+    <span class="c1"># Process node efficiently</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="future-developments">
+<h2>Future Developments<a class="headerlink" href="#future-developments" title="Link to this heading"></a></h2>
+<section id="planned-enhancements">
+<h3>Planned Enhancements<a class="headerlink" href="#planned-enhancements" title="Link to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p><strong>SIMD Optimizations</strong>: Vectorized operations for bulk processing</p></li>
+<li><p><strong>GPU Integration</strong>: CUDA support for graph algorithms</p></li>
+<li><p><strong>Distributed Processing</strong>: Multi-machine graph processing</p></li>
+<li><p><strong>Advanced Algorithms</strong>: Native Rust implementations of graph algorithms</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Future API examples</span>
+<span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust-gpu&#39;</span><span class="p">)</span>  <span class="c1"># GPU-accelerated backend</span>
+<span class="n">g</span> <span class="o">=</span> <span class="n">Graph</span><span class="p">(</span><span class="n">backend</span><span class="o">=</span><span class="s1">&#39;rust-distributed&#39;</span><span class="p">)</span>  <span class="c1"># Distributed backend</span>
+
+<span class="c1"># Native Rust algorithms</span>
+<span class="n">shortest_paths</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">rust_dijkstra</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s1">&#39;alice&#39;</span><span class="p">)</span>
+<span class="n">centrality</span> <span class="o">=</span> <span class="n">g</span><span class="o">.</span><span class="n">rust_betweenness_centrality</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The Rust backend represents GLI’s commitment to providing high-performance graph processing while maintaining Python’s ease of use and flexibility.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../api/state.html" class="btn btn-neutral float-left" title="state module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="performance.html" class="btn btn-neutral float-right" title="Rust Performance Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Groggy Contributors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
