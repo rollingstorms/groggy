@@ -131,10 +131,10 @@ impl GraphType {
         }
     }
 
-    pub fn neighbors(&self, node_idx: NodeIndex) -> Vec<NodeIndex> {
+    pub fn neighbors(&self, node_idx: NodeIndex) -> Box<dyn Iterator<Item = NodeIndex> + '_> {
         match self {
-            GraphType::Directed(g) => g.neighbors(node_idx).collect(),
-            GraphType::Undirected(g) => g.neighbors(node_idx).collect(),
+            GraphType::Directed(g) => Box::new(g.neighbors(node_idx)),
+            GraphType::Undirected(g) => Box::new(g.neighbors(node_idx)),
         }
     }
 
@@ -191,10 +191,10 @@ impl GraphType {
         &self,
         node_idx: NodeIndex,
         direction: petgraph::Direction,
-    ) -> Vec<NodeIndex> {
+    ) -> Box<dyn Iterator<Item = NodeIndex> + '_> {
         match self {
-            GraphType::Directed(g) => g.neighbors_directed(node_idx, direction).collect(),
-            GraphType::Undirected(g) => g.neighbors_directed(node_idx, direction).collect(),
+            GraphType::Directed(g) => Box::new(g.neighbors_directed(node_idx, direction)),
+            GraphType::Undirected(g) => Box::new(g.neighbors_directed(node_idx, direction)),
         }
     }
 

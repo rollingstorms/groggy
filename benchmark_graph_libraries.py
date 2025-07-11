@@ -99,43 +99,46 @@ class GroggyBenchmark:
         print("🔧 Creating Groggy graph...")
         start = time.time()
         self.graph = gr.Graph()
+        
+        # Use optimized bulk operations - pass dictionaries directly
         self.graph.add_nodes(nodes_data)
         self.graph.add_edges(edges_data)
+        
         self.creation_time = time.time() - start
         print(f"   Created in {self.creation_time:.3f}s")
     
     def filter_nodes_by_role(self):
         """Filter nodes by role (dictionary - optimized path)"""
         start = time.time()
-        result = self.graph.filter_nodes(role='engineer')
+        result = self.graph.filter_nodes({'role': 'engineer'})
         return time.time() - start, len(result)
     
     def filter_nodes_by_salary(self):
-        """Filter nodes by salary > 100000 (string query)"""
+        """Filter nodes by salary > 100000 (numeric comparison)"""
         start = time.time()
-        result = self.graph.filter_nodes('salary > 100000')
+        result = self.graph.filter_nodes({'salary': ('>', 100000)})
         return time.time() - start, len(result)
     
     def filter_nodes_complex(self):
-        """Complex multi-attribute filter"""
+        """Complex multi-attribute filter - using optimized sparse method"""
         start = time.time()
-        result = self.graph.filter_nodes(lambda nid, attrs: 
-            attrs.get('role') == 'engineer' and 
-            attrs.get('salary', 0) > 80000 and
-            attrs.get('active', False)
-        )
+        result = self.graph.filter_nodes({
+            'role': 'engineer',
+            'active': True,
+            'salary': ('>', 80000)
+        })
         return time.time() - start, len(result)
     
     def filter_edges_by_relationship(self):
         """Filter edges by relationship (dictionary - optimized path)"""
         start = time.time()
-        result = self.graph.filter_edges(relationship='reports_to')
+        result = self.graph.filter_edges({'relationship': 'reports_to'})
         return time.time() - start, len(result)
     
     def filter_edges_by_strength(self):
-        """Filter edges by strength > 0.7 (string query)"""
+        """Filter edges by strength > 0.7 (numeric comparison)"""
         start = time.time()
-        result = self.graph.filter_edges('strength > 0.7')
+        result = self.graph.filter_edges({'strength': ('>', 0.7)})
         return time.time() - start, len(result)
 
 class NetworkXBenchmark:

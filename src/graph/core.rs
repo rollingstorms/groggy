@@ -545,7 +545,7 @@ impl FastGraph {
             }
 
             // Remove the node from columnar store
-            self.columnar_store.remove_node(node_idx.index());
+            self.columnar_store.remove_node_legacy(node_idx.index());
 
             // Remove the node from the graph
             self.graph.remove_node(node_idx);
@@ -585,7 +585,7 @@ impl FastGraph {
         }
     }
 
-    /// Remove multiple nodes
+    /// Remove multiple nodes - delegates to single node removal
     pub fn remove_nodes(&mut self, node_ids: Vec<String>) -> usize {
         let mut removed_count = 0;
         for node_id in node_ids {
@@ -596,7 +596,7 @@ impl FastGraph {
         removed_count
     }
 
-    /// Remove multiple edges
+    /// Remove multiple edges - delegates to single edge removal
     pub fn remove_edges(&mut self, edge_pairs: Vec<(String, String)>) -> usize {
         let mut removed_count = 0;
         for (source, target) in edge_pairs {
@@ -607,26 +607,46 @@ impl FastGraph {
         removed_count
     }
 
-    /// Add multiple nodes in batch
+    /// Add multiple nodes in batch - now uses optimized bulk operations internally
     pub fn add_nodes(&mut self, nodes_data: Vec<(String, Option<&PyDict>)>) -> PyResult<()> {
+        // Convert to bulk format
+        let mut bulk_nodes = Vec::new();
         for (node_id, attributes) in nodes_data {
-            self.add_node(node_id, attributes)?;
+            let attrs = if let Some(py_attrs) = attributes {
+                python_dict_to_json_map(py_attrs)?
+            } else {
+                std::collections::HashMap::new()
+            };
+            bulk_nodes.push((node_id, attrs));
         }
+        
+        // Use optimized bulk method
+        self.bulk_add_nodes_internal(bulk_nodes);
         Ok(())
     }
 
-    /// Add multiple edges in batch  
+    /// Add multiple edges in batch - now uses optimized bulk operations internally
     pub fn add_edges(
         &mut self,
         edges_data: Vec<(String, String, Option<&PyDict>)>,
     ) -> PyResult<()> {
+        // Convert to bulk format
+        let mut bulk_edges = Vec::new();
         for (source, target, attributes) in edges_data {
-            self.add_edge(source, target, attributes)?;
+            let attrs = if let Some(py_attrs) = attributes {
+                python_dict_to_json_map(py_attrs)?
+            } else {
+                std::collections::HashMap::new()
+            };
+            bulk_edges.push((source, target, attrs));
         }
+        
+        // Use optimized bulk method
+        self.bulk_add_edges_internal(bulk_edges);
         Ok(())
     }
 
-    /// Filter nodes by attribute dictionary - optimized for exact matches
+    /// Filter nodes by attribute dictionary - Python interface to columnar filtering
     pub fn filter_nodes_by_attributes(
         &self,
         filters: HashMap<String, pyo3::PyObject>,
@@ -645,7 +665,7 @@ impl FastGraph {
                 json_filters.insert(attr_name, json_value);
             }
 
-            // Use columnar store's optimized filtering
+            // Use columnar store's optimized filtering ONLY
             let matching_indices = self
                 .columnar_store
                 .filter_nodes_by_attributes(&json_filters);
@@ -665,7 +685,7 @@ impl FastGraph {
         })
     }
 
-    /// Filter edges by attribute dictionary - optimized for exact matches  
+    /// Filter edges by attribute dictionary - Python interface to columnar filtering  
     pub fn filter_edges_by_attributes(
         &self,
         filters: HashMap<String, pyo3::PyObject>,
@@ -684,7 +704,7 @@ impl FastGraph {
                 json_filters.insert(attr_name, json_value);
             }
 
-            // Use columnar store's optimized filtering
+            // Use columnar store's optimized filtering ONLY
             let matching_indices = self
                 .columnar_store
                 .filter_edges_by_attributes(&json_filters);
@@ -709,7 +729,7 @@ impl FastGraph {
         })
     }
 
-    /// Filter nodes by numeric comparison - optimized for performance
+    /// Filter nodes by numeric comparison - Python interface to columnar filtering
     pub fn filter_nodes_by_numeric_comparison(
         &self,
         attr_name: &str,
@@ -720,21 +740,10 @@ impl FastGraph {
             .columnar_store
             .filter_nodes_by_numeric_comparison(attr_name, operator, value);
 
-        // Convert indices back to node IDs
-        let mut result = Vec::new();
-        for node_index in matching_indices {
-            if let Some(node_id) = self
-                .node_index_to_id
-                .get(&petgraph::graph::NodeIndex::new(node_index))
-            {
-                result.push(node_id.clone());
-            }
-        }
-
-        Ok(result)
+        self.convert_node_indices_to_ids(matching_indices)
     }
 
-    /// Filter nodes by string comparison - optimized for performance  
+    /// Filter nodes by string comparison - Python interface to columnar filtering  
     pub fn filter_nodes_by_string_comparison(
         &self,
         attr_name: &str,
@@ -745,21 +754,10 @@ impl FastGraph {
             .columnar_store
             .filter_nodes_by_string_comparison(attr_name, operator, value);
 
-        // Convert indices back to node IDs
-        let mut result = Vec::new();
-        for node_index in matching_indices {
-            if let Some(node_id) = self
-                .node_index_to_id
-                .get(&petgraph::graph::NodeIndex::new(node_index))
-            {
-                result.push(node_id.clone());
-            }
-        }
-
-        Ok(result)
+        self.convert_node_indices_to_ids(matching_indices)
     }
 
-    /// Filter edges by numeric comparison - optimized for performance
+    /// Filter edges by numeric comparison - Python interface to columnar filtering
     pub fn filter_edges_by_numeric_comparison(
         &self,
         attr_name: &str,
@@ -770,26 +768,10 @@ impl FastGraph {
             .columnar_store
             .filter_edges_by_numeric_comparison(attr_name, operator, value);
 
-        // Convert indices back to edge IDs (source->target format)
-        let mut result = Vec::new();
-        for edge_index in matching_indices {
-            if let Some((source_idx, target_idx)) = self
-                .graph
-                .edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index))
-            {
-                if let (Some(source_id), Some(target_id)) = (
-                    self.node_index_to_id.get(&source_idx),
-                    self.node_index_to_id.get(&target_idx),
-                ) {
-                    result.push(format!("{}->{}", source_id, target_id));
-                }
-            }
-        }
-
-        Ok(result)
+        self.convert_edge_indices_to_ids(matching_indices)
     }
 
-    /// Filter edges by string comparison - optimized for performance
+    /// Filter edges by string comparison - Python interface to columnar filtering
     pub fn filter_edges_by_string_comparison(
         &self,
         attr_name: &str,
@@ -800,9 +782,54 @@ impl FastGraph {
             .columnar_store
             .filter_edges_by_string_comparison(attr_name, operator, value);
 
-        // Convert indices back to edge IDs (source->target format)
+        self.convert_edge_indices_to_ids(matching_indices)
+    }
+
+    /// Filter nodes with sparse algorithm - Python interface to optimized sparse filtering  
+    pub fn filter_nodes_by_attributes_sparse(
+        &self,
+        filters: HashMap<String, pyo3::PyObject>,
+    ) -> PyResult<Vec<String>> {
+        use pyo3::Python;
+
+        if filters.is_empty() {
+            return Ok(self.get_node_ids());
+        }
+
+        Python::with_gil(|py| {
+            // Convert PyObjects to JsonValues
+            let mut json_filters = HashMap::new();
+            for (attr_name, py_value) in filters {
+                let json_value = python_pyobject_to_json(py, &py_value)?;
+                json_filters.insert(attr_name, json_value);
+            }
+
+            // Use columnar store's optimized sparse filtering ONLY (no bitmap creation)
+            let matching_indices = self
+                .columnar_store
+                .filter_nodes_sparse(&json_filters);
+
+            self.convert_node_indices_to_ids(matching_indices)
+        })
+    }
+
+    // Helper methods for index conversion
+    fn convert_node_indices_to_ids(&self, indices: Vec<usize>) -> PyResult<Vec<String>> {
         let mut result = Vec::new();
-        for edge_index in matching_indices {
+        for node_index in indices {
+            if let Some(node_id) = self
+                .node_index_to_id
+                .get(&petgraph::graph::NodeIndex::new(node_index))
+            {
+                result.push(node_id.clone());
+            }
+        }
+        Ok(result)
+    }
+
+    fn convert_edge_indices_to_ids(&self, indices: Vec<usize>) -> PyResult<Vec<String>> {
+        let mut result = Vec::new();
+        for edge_index in indices {
             if let Some((source_idx, target_idx)) = self
                 .graph
                 .edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index))
@@ -815,11 +842,58 @@ impl FastGraph {
                 }
             }
         }
-
         Ok(result)
     }
 
-    // ...existing code...
+    /// Bulk add nodes from a list - optimized for large-scale graph creation
+    pub fn bulk_add_nodes_py(&mut self, py_nodes: &pyo3::types::PyList) -> PyResult<Vec<String>> {
+        self.create_nodes_from_list(py_nodes)
+    }
+
+    /// Bulk add edges from a list - optimized for large-scale graph creation  
+    pub fn bulk_add_edges_py(&mut self, py_edges: &pyo3::types::PyList) -> PyResult<()> {
+        self.create_edges_from_list(py_edges)
+    }
+
+    /// Bulk set node attributes by attribute name for multiple nodes
+    pub fn bulk_set_node_attributes_py(
+        &mut self,
+        attr_name: &str,
+        node_value_pairs: Vec<(String, pyo3::PyObject)>
+    ) -> PyResult<()> {
+        use pyo3::Python;
+        
+        Python::with_gil(|py| {
+            // Convert PyObjects to JsonValues
+            let mut json_pairs = Vec::new();
+            for (node_id, py_value) in node_value_pairs {
+                let json_value = python_pyobject_to_json(py, &py_value)?;
+                json_pairs.push((node_id, json_value));
+            }
+            
+            self.bulk_set_node_attributes_by_uid(attr_name, json_pairs)
+        })
+    }
+
+    /// Bulk set edge attributes by attribute name for multiple edges
+    pub fn bulk_set_edge_attributes_py(
+        &mut self,
+        attr_name: &str,
+        edge_value_pairs: Vec<((String, String), pyo3::PyObject)>
+    ) -> PyResult<()> {
+        use pyo3::Python;
+        
+        Python::with_gil(|py| {
+            // Convert PyObjects to JsonValues
+            let mut json_pairs = Vec::new();
+            for (edge_pair, py_value) in edge_value_pairs {
+                let json_value = python_pyobject_to_json(py, &py_value)?;
+                json_pairs.push((edge_pair, json_value));
+            }
+            
+            self.bulk_set_edge_attributes_by_uid(attr_name, json_pairs)
+        })
+    }
 }
 
 // Internal methods (not exposed to Python)
@@ -867,7 +941,7 @@ impl FastGraph {
         &self,
         node_idx: petgraph::graph::NodeIndex,
     ) -> Vec<petgraph::graph::NodeIndex> {
-        self.graph.neighbors(node_idx)
+        self.graph.neighbors(node_idx).collect()
     }
 
     /// Get directed edges (internal use)

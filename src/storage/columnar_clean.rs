@@ -11,8 +11,6 @@ use std::collections::{HashMap, HashSet};
 )]
 pub struct AttrUID(pub u64);
 
-
-
 /// Simplified columnar storage for graph attributes with on-demand bitmap indexing
 #[pyclass]
 pub struct ColumnarStore {
@@ -307,47 +305,7 @@ impl ColumnarStore {
         attributes
     }
 
-    /// Get all attributes for a node (legacy interface - looks up attr_uids from NodeData)
-    /// This method will need to be called with the actual node data to get attr_uids
-    pub fn get_node_attributes(&self, node_index: usize) -> HashMap<String, JsonValue> {
-        let mut attributes = HashMap::new();
-
-        // Iterate through all attributes and check if this node has them
-        // This is less efficient than the new approach but maintains compatibility
-        for attr_entry in self.node_attributes.iter() {
-            let attr_uid = attr_entry.key();
-            let attr_map = attr_entry.value();
-            
-            if let Some(value) = attr_map.get(&node_index) {
-                if let Some(attr_name) = self.get_attr_name(attr_uid) {
-                    attributes.insert(attr_name, value.clone());
-                }
-            }
-        }
-
-        attributes
-    }
-
-    /// Get all attributes for an edge (legacy interface)
-    pub fn get_edge_attributes(&self, edge_index: usize) -> HashMap<String, JsonValue> {
-        let mut attributes = HashMap::new();
-
-        // Iterate through all attributes and check if this edge has them
-        for attr_entry in self.edge_attributes.iter() {
-            let attr_uid = attr_entry.key();
-            let attr_map = attr_entry.value();
-            
-            if let Some(value) = attr_map.get(&edge_index) {
-                if let Some(attr_name) = self.get_attr_name(attr_uid) {
-                    attributes.insert(attr_name, value.clone());
-                }
-            }
-        }
-
-        attributes
-    }
-
-    /// Filter nodes by numeric comparison (simple interface)
+    /// Filter nodes by numeric comparison using sparse storage
     pub fn filter_nodes_by_numeric_comparison(
         &self,
         attr_name: &str,
@@ -359,10 +317,11 @@ impl ColumnarStore {
 
             if let Some(attr_map) = self.node_attributes.get(&attr_uid) {
                 for (&node_index, json_value) in attr_map.iter() {
+                    // Try to get numeric value
                     let node_value = match json_value {
                         JsonValue::Number(n) => n.as_f64().unwrap_or(0.0),
                         JsonValue::String(s) => s.parse::<f64>().unwrap_or(0.0),
-                        _ => continue,
+                        _ => continue, // Skip non-numeric values
                     };
 
                     let matches = match operator {
@@ -387,7 +346,7 @@ impl ColumnarStore {
         }
     }
 
-    /// Filter nodes by string comparison (simple interface)
+    /// Filter nodes by string comparison using sparse storage
     pub fn filter_nodes_by_string_comparison(
         &self,
         attr_name: &str,
@@ -440,24 +399,6 @@ impl ColumnarStore {
         
         // Mark bitmaps as dirty
         self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
-    }
-
-    /// Remove node and clean up attribute storage (legacy interface - finds attr_uids automatically)
-    pub fn remove_node_legacy(&self, node_index: usize) {
-        // Find all attributes this node has by scanning all attribute maps
-        let mut node_attr_uids = HashSet::new();
-        
-        for attr_entry in self.node_attributes.iter() {
-            let attr_uid = attr_entry.key();
-            let attr_map = attr_entry.value();
-            
-            if attr_map.contains_key(&node_index) {
-                node_attr_uids.insert(attr_uid.clone());
-            }
-        }
-        
-        // Use the new method with the found attr_uids
-        self.remove_node(node_index, &node_attr_uids);
     }
 }
 
@@ -551,81 +492,6 @@ impl ColumnarStore {
         }
     }
 
-    /// Filter edges by numeric comparison (simple interface)
-    pub fn filter_edges_by_numeric_comparison(
-        &self,
-        attr_name: &str,
-        operator: &str,
-        value: f64,
-    ) -> Vec<usize> {
-        if let Some(attr_uid) = self.attr_name_to_uid.get(attr_name) {
-            let mut result = Vec::new();
-
-            if let Some(attr_map) = self.edge_attributes.get(&attr_uid) {
-                for (&edge_index, json_value) in attr_map.iter() {
-                    let edge_value = match json_value {
-                        JsonValue::Number(n) => n.as_f64().unwrap_or(0.0),
-                        JsonValue::String(s) => s.parse::<f64>().unwrap_or(0.0),
-                        _ => continue,
-                    };
-
-                    let matches = match operator {
-                        ">" => edge_value > value,
-                        ">=" => edge_value >= value,
-                        "<" => edge_value < value,
-                        "<=" => edge_value <= value,
-                        "==" => (edge_value - value).abs() < f64::EPSILON,
-                        "!=" => (edge_value - value).abs() >= f64::EPSILON,
-                        _ => false,
-                    };
-
-                    if matches {
-                        result.push(edge_index);
-                    }
-                }
-            }
-
-            result
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// Filter edges by string comparison (simple interface)
-    pub fn filter_edges_by_string_comparison(
-        &self,
-        attr_name: &str,
-        operator: &str,
-        value: &str,
-    ) -> Vec<usize> {
-        if let Some(attr_uid) = self.attr_name_to_uid.get(attr_name) {
-            let mut result = Vec::new();
-
-            if let Some(attr_map) = self.edge_attributes.get(&attr_uid) {
-                for (&edge_index, json_value) in attr_map.iter() {
-                    if let Some(edge_value) = json_value.as_str() {
-                        let matches = match operator {
-                            "==" => edge_value == value,
-                            "!=" => edge_value != value,
-                            "contains" => edge_value.contains(value),
-                            "startswith" => edge_value.starts_with(value),
-                            "endswith" => edge_value.ends_with(value),
-                            _ => false,
-                        };
-
-                        if matches {
-                            result.push(edge_index);
-                        }
-                    }
-                }
-            }
-
-            result
-        } else {
-            Vec::new()
-        }
-    }
-
     /// Remove edge and clean up attribute storage
     pub fn remove_edge(&self, edge_index: usize, attr_uids: &HashSet<AttrUID>) {
         for attr_uid in attr_uids {
@@ -644,24 +510,6 @@ impl ColumnarStore {
         
         // Mark bitmaps as dirty
         self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
-    }
-
-    /// Remove edge and clean up attribute storage (legacy interface)  
-    pub fn remove_edge_legacy(&self, edge_index: usize) {
-        // Find all attributes this edge has by scanning all attribute maps
-        let mut edge_attr_uids = HashSet::new();
-        
-        for attr_entry in self.edge_attributes.iter() {
-            let attr_uid = attr_entry.key();
-            let attr_map = attr_entry.value();
-            
-            if attr_map.contains_key(&edge_index) {
-                edge_attr_uids.insert(attr_uid.clone());
-            }
-        }
-        
-        // Use the new method with the found attr_uids
-        self.remove_edge(edge_index, &edge_attr_uids);
     }
 }
 
@@ -689,390 +537,4 @@ impl Clone for ColumnarStore {
             ),
         }
     }
-}
-
-/// Complex query structure for multi-stage filtering
-#[derive(Debug, Clone)]
-pub struct ComplexQuery {
-    /// Exact value filters (fast bitmap operations)
-    pub exact_filters: HashMap<String, JsonValue>,
-    /// Numeric comparison filters: (attribute, operator, value)
-    pub numeric_filters: Vec<(String, String, f64)>,
-    /// String comparison filters: (attribute, operator, value)
-    pub string_filters: Vec<(String, String, String)>,
-}
-
-impl ComplexQuery {
-    pub fn new() -> Self {
-        Self {
-            exact_filters: HashMap::new(),
-            numeric_filters: Vec::new(),
-            string_filters: Vec::new(),
-        }
-    }
-
-    /// Add exact value filter
-    pub fn with_exact(mut self, attr_name: String, value: JsonValue) -> Self {
-        self.exact_filters.insert(attr_name, value);
-        self
-    }
-
-    /// Add numeric comparison filter
-    pub fn with_numeric(mut self, attr_name: String, operator: String, value: f64) -> Self {
-        self.numeric_filters.push((attr_name, operator, value));
-        self
-    }
-
-    /// Add string comparison filter
-    pub fn with_string(mut self, attr_name: String, operator: String, value: String) -> Self {
-        self.string_filters.push((attr_name, operator, value));
-        self
-    }
-}
-
-impl ColumnarStore {
-    /// Batch set node attributes for multiple nodes efficiently
-    /// Uses attr_uid mapping and value deduplication
-    pub fn batch_set_node_attributes(&self, 
-        batch_data: Vec<(usize, Vec<(String, JsonValue)>)>
-    ) -> HashMap<String, AttrUID> {
-        let mut attr_name_to_uid = HashMap::new();
-        
-        // Pre-allocate or get attr_uids for all attribute names in batch
-        let mut all_attr_names = HashSet::new();
-        for (_, attrs) in &batch_data {
-            for (attr_name, _) in attrs {
-                all_attr_names.insert(attr_name.clone());
-            }
-        }
-        
-        // Get/create all attr_uids at once
-        for attr_name in all_attr_names {
-            let attr_uid = self.get_or_create_attr_uid(&attr_name);
-            attr_name_to_uid.insert(attr_name, attr_uid);
-        }
-        
-        // Track max node index for this batch
-        let mut max_node_in_batch = 0;
-        
-        // Group by attribute for efficient columnar updates
-        let mut attr_updates: HashMap<AttrUID, Vec<(usize, JsonValue)>> = HashMap::new();
-        
-        for (node_index, attrs) in batch_data {
-            max_node_in_batch = max_node_in_batch.max(node_index);
-            
-            for (attr_name, value) in attrs {
-                if let Some(attr_uid) = attr_name_to_uid.get(&attr_name) {
-                    attr_updates.entry(attr_uid.clone())
-                        .or_default()
-                        .push((node_index, value));
-                }
-            }
-        }
-        
-        // Update max node index atomically
-        let current_max = self.max_node_index.load(std::sync::atomic::Ordering::Relaxed);
-        if max_node_in_batch > current_max {
-            self.max_node_index.store(max_node_in_batch, std::sync::atomic::Ordering::Relaxed);
-        }
-        
-        // Apply all updates per attribute in batch
-        for (attr_uid, updates) in attr_updates {
-            let mut attr_map = self.node_attributes.entry(attr_uid).or_default();
-            
-            for (node_index, value) in updates {
-                attr_map.insert(node_index, value);
-            }
-        }
-        
-        // Mark bitmaps as dirty - they'll be rebuilt on demand
-        self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
-        
-        attr_name_to_uid
-    }
-
-    /// Batch set edge attributes for multiple edges efficiently  
-    pub fn batch_set_edge_attributes(&self, 
-        batch_data: Vec<(usize, Vec<(String, JsonValue)>)>
-    ) -> HashMap<String, AttrUID> {
-        let mut attr_name_to_uid = HashMap::new();
-        
-        // Pre-allocate or get attr_uids for all attribute names in batch
-        let mut all_attr_names = HashSet::new();
-        for (_, attrs) in &batch_data {
-            for (attr_name, _) in attrs {
-                all_attr_names.insert(attr_name.clone());
-            }
-        }
-        
-        // Get/create all attr_uids at once
-        for attr_name in all_attr_names {
-            let attr_uid = self.get_or_create_attr_uid(&attr_name);
-            attr_name_to_uid.insert(attr_name, attr_uid);
-        }
-        
-        // Track max edge index for this batch
-        let mut max_edge_in_batch = 0;
-        
-        // Group by attribute for efficient columnar updates
-        let mut attr_updates: HashMap<AttrUID, Vec<(usize, JsonValue)>> = HashMap::new();
-        
-        for (edge_index, attrs) in batch_data {
-            max_edge_in_batch = max_edge_in_batch.max(edge_index);
-            
-            for (attr_name, value) in attrs {
-                if let Some(attr_uid) = attr_name_to_uid.get(&attr_name) {
-                    attr_updates.entry(attr_uid.clone())
-                        .or_default()
-                        .push((edge_index, value));
-                }
-            }
-        }
-        
-        // Update max edge index atomically
-        let current_max = self.max_edge_index.load(std::sync::atomic::Ordering::Relaxed);
-        if max_edge_in_batch > current_max {
-            self.max_edge_index.store(max_edge_in_batch, std::sync::atomic::Ordering::Relaxed);
-        }
-        
-        // Apply all updates per attribute in batch
-        for (attr_uid, updates) in attr_updates {
-            let mut attr_map = self.edge_attributes.entry(attr_uid).or_default();
-            
-            for (edge_index, value) in updates {
-                attr_map.insert(edge_index, value);
-            }
-        }
-        
-        // Mark bitmaps as dirty - they'll be rebuilt on demand
-        self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
-        
-        attr_name_to_uid
-    }
-
-    /// High-performance multi-attribute filtering using sparse intersection
-    /// Instead of building full bitmaps, directly intersect sparse attribute maps
-    pub fn filter_nodes_sparse(&self, filters: &HashMap<String, JsonValue>) -> Vec<usize> {
-        if filters.is_empty() {
-            return Vec::new();
-        }
-
-        // Convert attribute names to UIDs
-        let mut attr_uid_filters = Vec::new();
-        for (attr_name, expected_value) in filters {
-            if let Some(attr_uid) = self.attr_name_to_uid.get(attr_name) {
-                attr_uid_filters.push((attr_uid.clone(), expected_value.clone()));
-            } else {
-                // Attribute doesn't exist - return empty immediately
-                return Vec::new();
-            }
-        }
-
-        // Start with candidates from the first (hopefully most selective) attribute
-        let mut candidates: HashSet<usize> = HashSet::new();
-        let mut first_iteration = true;
-
-        for (attr_uid, expected_value) in attr_uid_filters {
-            if let Some(attr_map) = self.node_attributes.get(&attr_uid) {
-                let matching_nodes: HashSet<usize> = attr_map
-                    .iter()
-                    .filter_map(|(&node_index, node_value)| {
-                        if node_value == &expected_value {
-                            Some(node_index)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                if first_iteration {
-                    candidates = matching_nodes;
-                    first_iteration = false;
-                } else {
-                    // Intersect with previous candidates
-                    candidates.retain(|node_index| matching_nodes.contains(node_index));
-                }
-
-                // Early termination if no candidates remain
-                if candidates.is_empty() {
-                    return Vec::new();
-                }
-            } else {
-                // No nodes have this attribute - return empty
-                return Vec::new();
-            }
-        }
-
-        let mut result: Vec<usize> = candidates.into_iter().collect();
-        result.sort_unstable();
-        result
-    }
-
-    /// Get unique values for an attribute (for analytics and optimization)
-    pub fn get_unique_values_for_attribute(&self, attr_name: &str, is_node: bool) -> Vec<JsonValue> {
-        if let Some(attr_uid) = self.attr_name_to_uid.get(attr_name) {
-            let attr_map = if is_node {
-                self.node_attributes.get(&attr_uid)
-            } else {
-                self.edge_attributes.get(&attr_uid)
-            };
-
-            if let Some(attr_map) = attr_map {
-                let mut unique_values: HashSet<JsonValue> = HashSet::new();
-                for (_, value) in attr_map.iter() {
-                    unique_values.insert(value.clone());
-                }
-                unique_values.into_iter().collect()
-            } else {
-                Vec::new()
-            }
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// Get value distribution for an attribute (useful for query optimization)
-    pub fn get_value_distribution(&self, attr_name: &str, is_node: bool) -> HashMap<JsonValue, usize> {
-        if let Some(attr_uid) = self.attr_name_to_uid.get(attr_name) {
-            let attr_map = if is_node {
-                self.node_attributes.get(&attr_uid)
-            } else {
-                self.edge_attributes.get(&attr_uid)
-            };
-
-            if let Some(attr_map) = attr_map {
-                let mut distribution: HashMap<JsonValue, usize> = HashMap::new();
-                for (_, value) in attr_map.iter() {
-                    *distribution.entry(value.clone()).or_default() += 1;
-                }
-                distribution
-            } else {
-                HashMap::new()
-            }
-        } else {
-            HashMap::new()
-        }
-    }
-    
-    /// Bulk set node attributes for efficient batch operations
-    pub fn bulk_set_node_attributes(
-        &self,
-        attr_name: &str,
-        node_value_pairs: Vec<(usize, JsonValue)>
-    ) {
-        if node_value_pairs.is_empty() {
-            return;
-        }
-
-        // Get or create attribute UID
-        let attr_uid = self.get_or_create_attr_uid(attr_name);
-        
-        // Update max node index if needed
-        if let Some(max_index) = node_value_pairs.iter().map(|(idx, _)| *idx).max() {
-            self.max_node_index.fetch_max(max_index, std::sync::atomic::Ordering::Relaxed);
-        }
-
-        // Bulk insert into columnar storage
-        {
-            let mut attr_map = self.node_attributes.entry(attr_uid).or_insert_with(HashMap::new);
-            for (node_index, value) in node_value_pairs {
-                attr_map.insert(node_index, value);
-            }
-        }
-
-        // Mark bitmaps as dirty
-        self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
-    }
-
-    /// Bulk set edge attributes for efficient batch operations
-    pub fn bulk_set_edge_attributes(
-        &self,
-        attr_name: &str,
-        edge_value_pairs: Vec<(usize, JsonValue)>
-    ) {
-        if edge_value_pairs.is_empty() {
-            return;
-        }
-
-        // Get or create attribute UID
-        let attr_uid = self.get_or_create_attr_uid(attr_name);
-        
-        // Update max edge index if needed
-        if let Some(max_index) = edge_value_pairs.iter().map(|(idx, _)| *idx).max() {
-            self.max_edge_index.fetch_max(max_index, std::sync::atomic::Ordering::Relaxed);
-        }
-
-        // Bulk insert into columnar storage
-        {
-            let mut attr_map = self.edge_attributes.entry(attr_uid).or_insert_with(HashMap::new);
-            for (edge_index, value) in edge_value_pairs {
-                attr_map.insert(edge_index, value);
-            }
-        }
-
-        // Mark bitmaps as dirty
-        self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
-    }
-
-    /// Bulk set multiple node attributes efficiently - optimized for graph creation
-    pub fn bulk_set_multiple_node_attributes(
-        &self,
-        nodes_attrs: Vec<(usize, HashMap<String, JsonValue>)>
-    ) {
-        if nodes_attrs.is_empty() {
-            return;
-        }
-
-        // Group by attribute name for better cache locality
-        let mut attr_groups: HashMap<String, Vec<(usize, JsonValue)>> = HashMap::new();
-        
-        for (node_index, attributes) in nodes_attrs {
-            // Update max node index
-            self.max_node_index.fetch_max(node_index, std::sync::atomic::Ordering::Relaxed);
-            
-            for (attr_name, attr_value) in attributes {
-                attr_groups
-                    .entry(attr_name)
-                    .or_insert_with(Vec::new)
-                    .push((node_index, attr_value));
-            }
-        }
-
-        // Bulk insert each attribute group
-        for (attr_name, pairs) in attr_groups {
-            self.bulk_set_node_attributes(&attr_name, pairs);
-        }
-    }
-
-    /// Bulk set multiple edge attributes efficiently - optimized for graph creation  
-    pub fn bulk_set_multiple_edge_attributes(
-        &self,
-        edges_attrs: Vec<(usize, HashMap<String, JsonValue>)>
-    ) {
-        if edges_attrs.is_empty() {
-            return;
-        }
-
-        // Group by attribute name for better cache locality
-        let mut attr_groups: HashMap<String, Vec<(usize, JsonValue)>> = HashMap::new();
-        
-        for (edge_index, attributes) in edges_attrs {
-            // Update max edge index
-            self.max_edge_index.fetch_max(edge_index, std::sync::atomic::Ordering::Relaxed);
-            
-            for (attr_name, attr_value) in attributes {
-                attr_groups
-                    .entry(attr_name)
-                    .or_insert_with(Vec::new)
-                    .push((edge_index, attr_value));
-            }
-        }
-
-        // Bulk insert each attribute group
-        for (attr_name, pairs) in attr_groups {
-            self.bulk_set_edge_attributes(&attr_name, pairs);
-        }
-    }
-
-    // ...existing code...
 }
