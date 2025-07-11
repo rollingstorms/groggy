@@ -621,21 +621,10 @@ class Graph(StateMixin):
                 filter_func = QueryCompiler.compile_edge_query(filter_func)
                 filtered_edge_ids = self._filter_edges_vectorized(filter_func)
         elif isinstance(filter_func, dict):
-            # Dictionary-based filtering - convert to function
-            filter_dict = filter_func  # Store reference to dict before reassigning
-            def dict_filter(edge_id: str, source: str, target: str, attributes: Dict[str, Any]) -> bool:
-                for attr, value in filter_dict.items():
-                    if attr not in attributes or attributes[attr] != value:
-                        return False
-                return True
-            filter_func = dict_filter
-            filtered_edge_ids = self._filter_edges_vectorized(filter_func)
+            # Use super-fast dictionary filtering with tuple syntax support
+            filtered_edge_ids = self._filter_edges_by_dict_vectorized(filter_func)
         elif filter_func is None:
             filtered_edge_ids = list(self.edges.keys())
-        elif isinstance(original_filter, dict) or kwargs:
-            # Use super-fast dictionary filtering for exact matches
-            filter_dict = original_filter if isinstance(original_filter, dict) else kwargs
-            filtered_edge_ids = self._filter_edges_by_dict_vectorized(filter_dict)
         else:
             # Use vectorized approach for other filter types
             filtered_edge_ids = self._filter_edges_vectorized(filter_func)
@@ -1516,14 +1505,50 @@ class Graph(StateMixin):
     def _filter_nodes_by_dict_vectorized(self, filter_dict: Dict[str, Any]) -> List[str]:
         """
         Super-optimized filtering for dictionary-based filters.
+        Supports both exact match and tuple syntax for numeric/string comparisons.
         Uses O(1) indexed filtering from the Rust backend.
         """
         if not filter_dict:
             return list(self.get_node_ids())
         
         if self.use_rust:
-            # Use the optimized Rust backend with O(1) attribute indexing
-            return self._rust_core.filter_nodes_by_attributes(filter_dict)
+            # Separate exact matches from tuple comparisons for optimal performance
+            exact_matches = {}
+            tuple_filters = []
+            
+            for attr_name, value in filter_dict.items():
+                if isinstance(value, tuple) and len(value) == 2:
+                    # Tuple syntax: ('>', 100000) or ('contains', 'text')
+                    operator, comparison_value = value
+                    tuple_filters.append((attr_name, operator, comparison_value))
+                else:
+                    # Exact match
+                    exact_matches[attr_name] = value
+            
+            # Start with all nodes, then apply filters
+            if exact_matches:
+                # Use fast bitmap-based exact matching
+                result_ids = set(self._rust_core.filter_nodes_by_attributes(exact_matches))
+            else:
+                result_ids = set(self.get_node_ids())
+            
+            # Apply tuple filters one by one, intersecting results
+            for attr_name, operator, value in tuple_filters:
+                if isinstance(value, (int, float)):
+                    # Numeric comparison
+                    filtered_ids = self._rust_core.filter_nodes_by_numeric_comparison(attr_name, operator, float(value))
+                else:
+                    # String comparison
+                    filtered_ids = self._rust_core.filter_nodes_by_string_comparison(attr_name, operator, str(value))
+                
+                # Intersect with previous results
+                result_ids = result_ids.intersection(set(filtered_ids))
+                
+                # Early termination if no results left
+                if not result_ids:
+                    break
+            
+            return list(result_ids)
         else:
             # Python backend: use effective data
             effective_nodes, _, _ = self._get_effective_data()
@@ -1531,8 +1556,39 @@ class Graph(StateMixin):
             # Column-wise filtering
             filtered_ids = []
             for node_id, node in effective_nodes.items():
-                # Check all attributes at once
-                if all(node.attributes.get(attr) == value for attr, value in filter_dict.items()):
+                match = True
+                
+                for attr_name, value in filter_dict.items():
+                    if isinstance(value, tuple) and len(value) == 2:
+                        # Tuple syntax for comparisons
+                        operator, comparison_value = value
+                        node_value = node.attributes.get(attr_name)
+                        
+                        if node_value is None:
+                            match = False
+                            break
+                        
+                        # Apply comparison
+                        if operator == '>':
+                            match = match and (node_value > comparison_value)
+                        elif operator == '>=':
+                            match = match and (node_value >= comparison_value)
+                        elif operator == '<':
+                            match = match and (node_value < comparison_value)
+                        elif operator == '<=':
+                            match = match and (node_value <= comparison_value)
+                        elif operator == '!=':
+                            match = match and (node_value != comparison_value)
+                        elif operator == 'contains':
+                            match = match and (str(comparison_value) in str(node_value))
+                        else:
+                            match = False
+                            break
+                    else:
+                        # Exact match
+                        match = match and (node.attributes.get(attr_name) == value)
+                
+                if match:
                     filtered_ids.append(node_id)
             
             return filtered_ids
@@ -1571,36 +1627,50 @@ class Graph(StateMixin):
     def _filter_edges_by_dict_vectorized(self, filter_dict: Dict[str, Any]) -> List[str]:
         """
         Super-optimized filtering for dictionary-based edge filters.
-        Uses column-wise operations to minimize attribute access overhead.
+        Supports both exact match and tuple syntax for numeric/string comparisons.
+        Uses optimized Rust backend methods.
         """
         if not filter_dict:
             return list(self.edges.keys())
         
         if self.use_rust:
-            # Rust backend: collect all edges with required attributes
-            edge_ids = list(self.edges.keys())
-            if not edge_ids:
-                return []
+            # Separate exact matches from tuple comparisons for optimal performance
+            exact_matches = {}
+            tuple_filters = []
             
-            # Column-wise filtering: extract each attribute across all edges
-            filtered_ids = set(edge_ids)  # Start with all edges
+            for attr_name, value in filter_dict.items():
+                if isinstance(value, tuple) and len(value) == 2:
+                    # Tuple syntax: ('>', 0.7) or ('contains', 'text')
+                    operator, comparison_value = value
+                    tuple_filters.append((attr_name, operator, comparison_value))
+                else:
+                    # Exact match
+                    exact_matches[attr_name] = value
             
-            for attr_name, expected_value in filter_dict.items():
-                # Extract this attribute from all remaining edges
-                edges_with_attr = []
-                for edge_id in filtered_ids:
-                    edge = self.edges[edge_id]
-                    if edge and edge.attributes.get(attr_name) == expected_value:
-                        edges_with_attr.append(edge_id)
+            # Start with all edges, then apply filters
+            if exact_matches:
+                # Use fast bitmap-based exact matching
+                result_ids = set(self._rust_core.filter_edges_by_attributes(exact_matches))
+            else:
+                result_ids = set(self.edges.keys())
+            
+            # Apply tuple filters one by one, intersecting results
+            for attr_name, operator, value in tuple_filters:
+                if isinstance(value, (int, float)):
+                    # Numeric comparison
+                    filtered_ids = self._rust_core.filter_edges_by_numeric_comparison(attr_name, operator, float(value))
+                else:
+                    # String comparison
+                    filtered_ids = self._rust_core.filter_edges_by_string_comparison(attr_name, operator, str(value))
                 
-                # Update filtered set (intersection)
-                filtered_ids = set(edges_with_attr)
+                # Intersect with previous results
+                result_ids = result_ids.intersection(set(filtered_ids))
                 
-                # Early termination if no edges left
-                if not filtered_ids:
+                # Early termination if no results left
+                if not result_ids:
                     break
             
-            return list(filtered_ids)
+            return list(result_ids)
         else:
             # Python backend: use effective data
             _, effective_edges, _ = self._get_effective_data()
@@ -1608,8 +1678,39 @@ class Graph(StateMixin):
             # Column-wise filtering
             filtered_ids = []
             for edge_id, edge in effective_edges.items():
-                # Check all attributes at once
-                if all(edge.attributes.get(attr) == value for attr, value in filter_dict.items()):
+                match = True
+                
+                for attr_name, value in filter_dict.items():
+                    if isinstance(value, tuple) and len(value) == 2:
+                        # Tuple syntax for comparisons
+                        operator, comparison_value = value
+                        edge_value = edge.attributes.get(attr_name)
+                        
+                        if edge_value is None:
+                            match = False
+                            break
+                        
+                        # Apply comparison
+                        if operator == '>':
+                            match = match and (edge_value > comparison_value)
+                        elif operator == '>=':
+                            match = match and (edge_value >= comparison_value)
+                        elif operator == '<':
+                            match = match and (edge_value < comparison_value)
+                        elif operator == '<=':
+                            match = match and (edge_value <= comparison_value)
+                        elif operator == '!=':
+                            match = match and (edge_value != comparison_value)
+                        elif operator == 'contains':
+                            match = match and (str(comparison_value) in str(edge_value))
+                        else:
+                            match = False
+                            break
+                    else:
+                        # Exact match
+                        match = match and (edge.attributes.get(attr_name) == value)
+                
+                if match:
                     filtered_ids.append(edge_id)
             
             return filtered_ids
