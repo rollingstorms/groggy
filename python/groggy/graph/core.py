@@ -1519,53 +1519,27 @@ class Graph(StateMixin):
             
             # Mixed filtering: separate exact matches from tuple comparisons
             exact_matches = {}
-            tuple_filters = []
+            numeric_comparisons = []
+            string_comparisons = []
             
             for attr_name, value in filter_dict.items():
                 if isinstance(value, tuple) and len(value) == 2:
                     # Tuple syntax: ('>', 100000) or ('contains', 'text')
                     operator, comparison_value = value
-                    tuple_filters.append((attr_name, operator, comparison_value))
+                    if isinstance(comparison_value, (int, float)):
+                        # Numeric comparison
+                        numeric_comparisons.append((attr_name, operator, float(comparison_value)))
+                    else:
+                        # String comparison
+                        string_comparisons.append((attr_name, operator, str(comparison_value)))
                 else:
                     # Exact match
-                    exact_matches[attr_name] = value
+                    exact_matches[attr_name] = str(value)
             
-            # Strategy: Start with most selective filter to minimize intersection work
-            if exact_matches:
-                # Exact matches are usually very selective - start with those
-                result_ids = self._rust_core.filter_nodes_by_attributes(exact_matches)
-                result_set = set(result_ids)
-            else:
-                # No exact matches - start with all nodes and filter down
-                result_set = None
-            
-            # Apply tuple filters one by one
-            for attr_name, operator, value in tuple_filters:
-                if isinstance(value, (int, float)):
-                    # Numeric comparison
-                    filtered_ids = self._rust_core.filter_nodes_by_numeric_comparison(attr_name, operator, float(value))
-                else:
-                    # String comparison
-                    filtered_ids = self._rust_core.filter_nodes_by_string_comparison(attr_name, operator, str(value))
-                
-                if result_set is None:
-                    # First filter - initialize result set
-                    result_set = set(filtered_ids)
-                else:
-                    # Intersect efficiently: iterate through smaller collection
-                    if len(filtered_ids) < len(result_set):
-                        # filtered_ids is smaller - check which of its elements are in result_set
-                        result_set = {node_id for node_id in filtered_ids if node_id in result_set}
-                    else:
-                        # result_set is smaller - keep only elements that exist in filtered_ids
-                        filtered_set = set(filtered_ids)
-                        result_set = {node_id for node_id in result_set if node_id in filtered_set}
-                
-                # Early termination if no results left
-                if not result_set:
-                    return []
-            
-            return list(result_set) if result_set else []
+            # Use the fully optimized multi-criteria filter (all intersection logic in Rust)
+            return self._rust_core.filter_nodes_multi_criteria(
+                exact_matches, numeric_comparisons, string_comparisons
+            )
         else:
             # Python backend: use effective data
             effective_nodes, _, _ = self._get_effective_data()
@@ -1658,53 +1632,27 @@ class Graph(StateMixin):
             
             # Mixed filtering: separate exact matches from tuple comparisons
             exact_matches = {}
-            tuple_filters = []
+            numeric_comparisons = []
+            string_comparisons = []
             
             for attr_name, value in filter_dict.items():
                 if isinstance(value, tuple) and len(value) == 2:
                     # Tuple syntax: ('>', 0.7) or ('contains', 'text')
                     operator, comparison_value = value
-                    tuple_filters.append((attr_name, operator, comparison_value))
+                    if isinstance(comparison_value, (int, float)):
+                        # Numeric comparison
+                        numeric_comparisons.append((attr_name, operator, float(comparison_value)))
+                    else:
+                        # String comparison
+                        string_comparisons.append((attr_name, operator, str(comparison_value)))
                 else:
                     # Exact match
-                    exact_matches[attr_name] = value
+                    exact_matches[attr_name] = str(value)
             
-            # Strategy: Start with most selective filter to minimize intersection work
-            if exact_matches:
-                # Exact matches are usually very selective - start with those
-                result_ids = self._rust_core.filter_edges_by_attributes(exact_matches)
-                result_set = set(result_ids)
-            else:
-                # No exact matches - start with all edges and filter down
-                result_set = None
-            
-            # Apply tuple filters one by one
-            for attr_name, operator, value in tuple_filters:
-                if isinstance(value, (int, float)):
-                    # Numeric comparison
-                    filtered_ids = self._rust_core.filter_edges_by_numeric_comparison(attr_name, operator, float(value))
-                else:
-                    # String comparison
-                    filtered_ids = self._rust_core.filter_edges_by_string_comparison(attr_name, operator, str(value))
-                
-                if result_set is None:
-                    # First filter - initialize result set
-                    result_set = set(filtered_ids)
-                else:
-                    # Intersect efficiently: iterate through smaller collection
-                    if len(filtered_ids) < len(result_set):
-                        # filtered_ids is smaller - check which of its elements are in result_set
-                        result_set = {edge_id for edge_id in filtered_ids if edge_id in result_set}
-                    else:
-                        # result_set is smaller - keep only elements that exist in filtered_ids
-                        filtered_set = set(filtered_ids)
-                        result_set = {edge_id for edge_id in result_set if edge_id in filtered_set}
-                
-                # Early termination if no results left
-                if not result_set:
-                    return []
-            
-            return list(result_set) if result_set else []
+            # Use the fully optimized multi-criteria filter (all intersection logic in Rust)
+            return self._rust_core.filter_edges_multi_criteria(
+                exact_matches, numeric_comparisons, string_comparisons
+            )
         else:
             # Python backend: use effective data
             _, effective_edges, _ = self._get_effective_data()

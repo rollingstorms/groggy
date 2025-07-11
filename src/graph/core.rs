@@ -740,7 +740,18 @@ impl FastGraph {
             .columnar_store
             .filter_nodes_by_numeric_comparison(attr_name, operator, value);
 
-        self.convert_node_indices_to_ids(matching_indices)
+        // Convert indices back to node IDs
+        let mut result = Vec::new();
+        for node_index in matching_indices {
+            if let Some(node_id) = self
+                .node_index_to_id
+                .get(&petgraph::graph::NodeIndex::new(node_index))
+            {
+                result.push(node_id.clone());
+            }
+        }
+
+        Ok(result)
     }
 
     /// Filter nodes by string comparison - Python interface to columnar filtering  
@@ -754,7 +765,18 @@ impl FastGraph {
             .columnar_store
             .filter_nodes_by_string_comparison(attr_name, operator, value);
 
-        self.convert_node_indices_to_ids(matching_indices)
+        // Convert indices back to node IDs
+        let mut result = Vec::new();
+        for node_index in matching_indices {
+            if let Some(node_id) = self
+                .node_index_to_id
+                .get(&petgraph::graph::NodeIndex::new(node_index))
+            {
+                result.push(node_id.clone());
+            }
+        }
+
+        Ok(result)
     }
 
     /// Filter edges by numeric comparison - Python interface to columnar filtering
@@ -768,7 +790,23 @@ impl FastGraph {
             .columnar_store
             .filter_edges_by_numeric_comparison(attr_name, operator, value);
 
-        self.convert_edge_indices_to_ids(matching_indices)
+        // Convert indices back to edge IDs
+        let mut result = Vec::new();
+        for edge_index in matching_indices {
+            if let Some((source_idx, target_idx)) = self
+                .graph
+                .edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index))
+            {
+                if let (Some(source_id), Some(target_id)) = (
+                    self.node_index_to_id.get(&source_idx),
+                    self.node_index_to_id.get(&target_idx),
+                ) {
+                    result.push(format!("{}->{}", source_id, target_id));
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     /// Filter edges by string comparison - Python interface to columnar filtering
@@ -782,7 +820,23 @@ impl FastGraph {
             .columnar_store
             .filter_edges_by_string_comparison(attr_name, operator, value);
 
-        self.convert_edge_indices_to_ids(matching_indices)
+        // Convert indices back to edge IDs
+        let mut result = Vec::new();
+        for edge_index in matching_indices {
+            if let Some((source_idx, target_idx)) = self
+                .graph
+                .edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index))
+            {
+                if let (Some(source_id), Some(target_id)) = (
+                    self.node_index_to_id.get(&source_idx),
+                    self.node_index_to_id.get(&target_idx),
+                ) {
+                    result.push(format!("{}->{}", source_id, target_id));
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     /// Filter nodes with sparse algorithm - Python interface to optimized sparse filtering  
@@ -809,14 +863,58 @@ impl FastGraph {
                 .columnar_store
                 .filter_nodes_sparse(&json_filters);
 
-            self.convert_node_indices_to_ids(matching_indices)
+            // Convert indices back to node IDs
+            let mut result = Vec::new();
+            for node_index in matching_indices {
+                if let Some(node_id) = self
+                    .node_index_to_id
+                    .get(&petgraph::graph::NodeIndex::new(node_index))
+                {
+                    result.push(node_id.clone());
+                }
+            }
+
+            Ok(result)
         })
     }
 
-    // Helper methods for index conversion
-    fn convert_node_indices_to_ids(&self, indices: Vec<usize>) -> PyResult<Vec<String>> {
+    /// Optimized multi-criteria node filtering - all intersection logic in Rust
+    pub fn filter_nodes_multi_criteria(
+        &self,
+        exact_matches: HashMap<String, String>,
+        numeric_comparisons: Vec<(String, String, f64)>,
+        string_comparisons: Vec<(String, String, String)>,
+    ) -> PyResult<Vec<String>> {
+        // Convert exact matches to JsonValue
+        let json_exact: HashMap<String, serde_json::Value> = exact_matches
+            .into_iter()
+            .map(|(k, v)| {
+                // Smart type conversion
+                let json_value = if v == "true" || v == "True" {
+                    serde_json::Value::Bool(true)
+                } else if v == "false" || v == "False" {
+                    serde_json::Value::Bool(false)
+                } else if let Ok(num) = v.parse::<i64>() {
+                    serde_json::Value::Number(serde_json::Number::from(num))
+                } else if let Ok(num) = v.parse::<f64>() {
+                    serde_json::Value::Number(serde_json::Number::from_f64(num).unwrap_or(serde_json::Number::from(0)))
+                } else {
+                    serde_json::Value::String(v)
+                };
+                (k, json_value)
+            })
+            .collect();
+
+        // Use the optimized multi-criteria filtering (all intersection logic in Rust)
+        let matching_indices = self.columnar_store.filter_nodes_multi_criteria(
+            &json_exact,
+            &numeric_comparisons,
+            &string_comparisons,
+        );
+
+        // Convert indices back to node IDs
         let mut result = Vec::new();
-        for node_index in indices {
+        for node_index in matching_indices {
             if let Some(node_id) = self
                 .node_index_to_id
                 .get(&petgraph::graph::NodeIndex::new(node_index))
@@ -824,12 +922,47 @@ impl FastGraph {
                 result.push(node_id.clone());
             }
         }
+
         Ok(result)
     }
 
-    fn convert_edge_indices_to_ids(&self, indices: Vec<usize>) -> PyResult<Vec<String>> {
+    /// Optimized multi-criteria edge filtering - all intersection logic in Rust
+    pub fn filter_edges_multi_criteria(
+        &self,
+        exact_matches: HashMap<String, String>,
+        numeric_comparisons: Vec<(String, String, f64)>,
+        string_comparisons: Vec<(String, String, String)>,
+    ) -> PyResult<Vec<String>> {
+        // Convert exact matches to JsonValue
+        let json_exact: HashMap<String, serde_json::Value> = exact_matches
+            .into_iter()
+            .map(|(k, v)| {
+                // Smart type conversion
+                let json_value = if v == "true" || v == "True" {
+                    serde_json::Value::Bool(true)
+                } else if v == "false" || v == "False" {
+                    serde_json::Value::Bool(false)
+                } else if let Ok(num) = v.parse::<i64>() {
+                    serde_json::Value::Number(serde_json::Number::from(num))
+                } else if let Ok(num) = v.parse::<f64>() {
+                    serde_json::Value::Number(serde_json::Number::from_f64(num).unwrap_or(serde_json::Number::from(0)))
+                } else {
+                    serde_json::Value::String(v)
+                };
+                (k, json_value)
+            })
+            .collect();
+
+        // Use the optimized multi-criteria filtering (all intersection logic in Rust)
+        let matching_indices = self.columnar_store.filter_edges_multi_criteria(
+            &json_exact,
+            &numeric_comparisons,
+            &string_comparisons,
+        );
+
+        // Convert indices back to edge IDs
         let mut result = Vec::new();
-        for edge_index in indices {
+        for edge_index in matching_indices {
             if let Some((source_idx, target_idx)) = self
                 .graph
                 .edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index))
@@ -842,61 +975,11 @@ impl FastGraph {
                 }
             }
         }
+
         Ok(result)
-    }
-
-    /// Bulk add nodes from a list - optimized for large-scale graph creation
-    pub fn bulk_add_nodes_py(&mut self, py_nodes: &pyo3::types::PyList) -> PyResult<Vec<String>> {
-        self.create_nodes_from_list(py_nodes)
-    }
-
-    /// Bulk add edges from a list - optimized for large-scale graph creation  
-    pub fn bulk_add_edges_py(&mut self, py_edges: &pyo3::types::PyList) -> PyResult<()> {
-        self.create_edges_from_list(py_edges)
-    }
-
-    /// Bulk set node attributes by attribute name for multiple nodes
-    pub fn bulk_set_node_attributes_py(
-        &mut self,
-        attr_name: &str,
-        node_value_pairs: Vec<(String, pyo3::PyObject)>
-    ) -> PyResult<()> {
-        use pyo3::Python;
-        
-        Python::with_gil(|py| {
-            // Convert PyObjects to JsonValues
-            let mut json_pairs = Vec::new();
-            for (node_id, py_value) in node_value_pairs {
-                let json_value = python_pyobject_to_json(py, &py_value)?;
-                json_pairs.push((node_id, json_value));
-            }
-            
-            self.bulk_set_node_attributes_by_uid(attr_name, json_pairs)
-        })
-    }
-
-    /// Bulk set edge attributes by attribute name for multiple edges
-    pub fn bulk_set_edge_attributes_py(
-        &mut self,
-        attr_name: &str,
-        edge_value_pairs: Vec<((String, String), pyo3::PyObject)>
-    ) -> PyResult<()> {
-        use pyo3::Python;
-        
-        Python::with_gil(|py| {
-            // Convert PyObjects to JsonValues
-            let mut json_pairs = Vec::new();
-            for (edge_pair, py_value) in edge_value_pairs {
-                let json_value = python_pyobject_to_json(py, &py_value)?;
-                json_pairs.push((edge_pair, json_value));
-            }
-            
-            self.bulk_set_edge_attributes_by_uid(attr_name, json_pairs)
-        })
     }
 }
 
-// Internal methods (not exposed to Python)
 impl FastGraph {
     /// Get node weight by index (internal use)
     pub fn get_node_weight(&self, node_idx: petgraph::graph::NodeIndex) -> Option<&NodeData> {

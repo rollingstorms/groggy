@@ -1094,5 +1094,136 @@ impl ColumnarStore {
         }
     }
 
-    // ...existing code...
+    /// Optimized multi-criteria filtering that handles exact matches, numeric comparisons, and string comparisons
+    /// All filtering and intersection logic is done in Rust to avoid Python overhead
+    pub fn filter_nodes_multi_criteria(
+        &self,
+        exact_filters: &HashMap<String, JsonValue>,
+        numeric_filters: &[(String, String, f64)], // (attr_name, operator, value)
+        string_filters: &[(String, String, String)], // (attr_name, operator, value)
+    ) -> Vec<usize> {
+        
+        // Start with exact matches if any (usually most selective)
+        let mut candidates: Option<HashSet<usize>> = None;
+        
+        if !exact_filters.is_empty() {
+            candidates = Some(self.filter_nodes_sparse(exact_filters).into_iter().collect());
+            
+            // Early termination if no exact matches
+            if let Some(ref cands) = candidates {
+                if cands.is_empty() {
+                    return Vec::new();
+                }
+            }
+        }
+        
+        // Apply numeric filters
+        for (attr_name, operator, value) in numeric_filters {
+            let matching_indices = self.filter_nodes_by_numeric_comparison(attr_name, operator, *value);
+            
+            if let Some(ref mut cands) = candidates {
+                // Intersect with existing candidates - efficient approach
+                let matching_set: HashSet<usize> = matching_indices.into_iter().collect();
+                cands.retain(|&idx| matching_set.contains(&idx));
+                
+                // Early termination
+                if cands.is_empty() {
+                    return Vec::new();
+                }
+            } else {
+                // First filter - initialize candidates
+                candidates = Some(matching_indices.into_iter().collect());
+            }
+        }
+        
+        // Apply string filters
+        for (attr_name, operator, value) in string_filters {
+            let matching_indices = self.filter_nodes_by_string_comparison(attr_name, operator, value);
+            
+            if let Some(ref mut cands) = candidates {
+                // Intersect with existing candidates - efficient approach
+                let matching_set: HashSet<usize> = matching_indices.into_iter().collect();
+                cands.retain(|&idx| matching_set.contains(&idx));
+                
+                // Early termination
+                if cands.is_empty() {
+                    return Vec::new();
+                }
+            } else {
+                // First filter - initialize candidates
+                candidates = Some(matching_indices.into_iter().collect());
+            }
+        }
+        
+        // Convert to sorted vector
+        let mut result: Vec<usize> = candidates.unwrap_or_default().into_iter().collect();
+        result.sort_unstable();
+        result
+    }
+
+    /// Similar multi-criteria filtering for edges
+    pub fn filter_edges_multi_criteria(
+        &self,
+        exact_filters: &HashMap<String, JsonValue>,
+        numeric_filters: &[(String, String, f64)],
+        string_filters: &[(String, String, String)],
+    ) -> Vec<usize> {
+        
+        // Start with exact matches if any (usually most selective)
+        let mut candidates: Option<HashSet<usize>> = None;
+        
+        if !exact_filters.is_empty() {
+            candidates = Some(self.filter_edges_by_attributes(exact_filters).into_iter().collect());
+            
+            // Early termination if no exact matches
+            if let Some(ref cands) = candidates {
+                if cands.is_empty() {
+                    return Vec::new();
+                }
+            }
+        }
+        
+        // Apply numeric filters
+        for (attr_name, operator, value) in numeric_filters {
+            let matching_indices = self.filter_edges_by_numeric_comparison(attr_name, operator, *value);
+            
+            if let Some(ref mut cands) = candidates {
+                // Intersect with existing candidates
+                let matching_set: HashSet<usize> = matching_indices.into_iter().collect();
+                cands.retain(|&idx| matching_set.contains(&idx));
+                
+                // Early termination
+                if cands.is_empty() {
+                    return Vec::new();
+                }
+            } else {
+                // First filter - initialize candidates
+                candidates = Some(matching_indices.into_iter().collect());
+            }
+        }
+        
+        // Apply string filters
+        for (attr_name, operator, value) in string_filters {
+            let matching_indices = self.filter_edges_by_string_comparison(attr_name, operator, value);
+            
+            if let Some(ref mut cands) = candidates {
+                // Intersect with existing candidates
+                let matching_set: HashSet<usize> = matching_indices.into_iter().collect();
+                cands.retain(|&idx| matching_set.contains(&idx));
+                
+                // Early termination
+                if cands.is_empty() {
+                    return Vec::new();
+                }
+            } else {
+                // First filter - initialize candidates
+                candidates = Some(matching_indices.into_iter().collect());
+            }
+        }
+        
+        // Convert to sorted vector
+        let mut result: Vec<usize> = candidates.unwrap_or_default().into_iter().collect();
+        result.sort_unstable();
+        result
+    }
 }
