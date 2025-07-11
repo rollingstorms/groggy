@@ -1512,7 +1512,12 @@ class Graph(StateMixin):
             return list(self.get_node_ids())
         
         if self.use_rust:
-            # Separate exact matches from tuple comparisons for optimal performance
+            # Quick check: if all filters are exact matches, use the fastest path
+            if all(not isinstance(value, tuple) for value in filter_dict.values()):
+                # Pure exact match - use super-fast bitmap filtering
+                return self._rust_core.filter_nodes_by_attributes(filter_dict)
+            
+            # Mixed filtering: separate exact matches from tuple comparisons
             exact_matches = {}
             tuple_filters = []
             
@@ -1525,14 +1530,16 @@ class Graph(StateMixin):
                     # Exact match
                     exact_matches[attr_name] = value
             
-            # Start with all nodes, then apply filters
+            # Strategy: Start with most selective filter to minimize intersection work
             if exact_matches:
-                # Use fast bitmap-based exact matching
-                result_ids = set(self._rust_core.filter_nodes_by_attributes(exact_matches))
+                # Exact matches are usually very selective - start with those
+                result_ids = self._rust_core.filter_nodes_by_attributes(exact_matches)
+                result_set = set(result_ids)
             else:
-                result_ids = set(self.get_node_ids())
+                # No exact matches - start with all nodes and filter down
+                result_set = None
             
-            # Apply tuple filters one by one, intersecting results
+            # Apply tuple filters one by one
             for attr_name, operator, value in tuple_filters:
                 if isinstance(value, (int, float)):
                     # Numeric comparison
@@ -1541,14 +1548,24 @@ class Graph(StateMixin):
                     # String comparison
                     filtered_ids = self._rust_core.filter_nodes_by_string_comparison(attr_name, operator, str(value))
                 
-                # Intersect with previous results
-                result_ids = result_ids.intersection(set(filtered_ids))
+                if result_set is None:
+                    # First filter - initialize result set
+                    result_set = set(filtered_ids)
+                else:
+                    # Intersect efficiently: iterate through smaller collection
+                    if len(filtered_ids) < len(result_set):
+                        # filtered_ids is smaller - check which of its elements are in result_set
+                        result_set = {node_id for node_id in filtered_ids if node_id in result_set}
+                    else:
+                        # result_set is smaller - keep only elements that exist in filtered_ids
+                        filtered_set = set(filtered_ids)
+                        result_set = {node_id for node_id in result_set if node_id in filtered_set}
                 
                 # Early termination if no results left
-                if not result_ids:
-                    break
+                if not result_set:
+                    return []
             
-            return list(result_ids)
+            return list(result_set) if result_set else []
         else:
             # Python backend: use effective data
             effective_nodes, _, _ = self._get_effective_data()
@@ -1634,7 +1651,12 @@ class Graph(StateMixin):
             return list(self.edges.keys())
         
         if self.use_rust:
-            # Separate exact matches from tuple comparisons for optimal performance
+            # Quick check: if all filters are exact matches, use the fastest path
+            if all(not isinstance(value, tuple) for value in filter_dict.values()):
+                # Pure exact match - use super-fast bitmap filtering
+                return self._rust_core.filter_edges_by_attributes(filter_dict)
+            
+            # Mixed filtering: separate exact matches from tuple comparisons
             exact_matches = {}
             tuple_filters = []
             
@@ -1647,14 +1669,16 @@ class Graph(StateMixin):
                     # Exact match
                     exact_matches[attr_name] = value
             
-            # Start with all edges, then apply filters
+            # Strategy: Start with most selective filter to minimize intersection work
             if exact_matches:
-                # Use fast bitmap-based exact matching
-                result_ids = set(self._rust_core.filter_edges_by_attributes(exact_matches))
+                # Exact matches are usually very selective - start with those
+                result_ids = self._rust_core.filter_edges_by_attributes(exact_matches)
+                result_set = set(result_ids)
             else:
-                result_ids = set(self.edges.keys())
+                # No exact matches - start with all edges and filter down
+                result_set = None
             
-            # Apply tuple filters one by one, intersecting results
+            # Apply tuple filters one by one
             for attr_name, operator, value in tuple_filters:
                 if isinstance(value, (int, float)):
                     # Numeric comparison
@@ -1663,14 +1687,24 @@ class Graph(StateMixin):
                     # String comparison
                     filtered_ids = self._rust_core.filter_edges_by_string_comparison(attr_name, operator, str(value))
                 
-                # Intersect with previous results
-                result_ids = result_ids.intersection(set(filtered_ids))
+                if result_set is None:
+                    # First filter - initialize result set
+                    result_set = set(filtered_ids)
+                else:
+                    # Intersect efficiently: iterate through smaller collection
+                    if len(filtered_ids) < len(result_set):
+                        # filtered_ids is smaller - check which of its elements are in result_set
+                        result_set = {edge_id for edge_id in filtered_ids if edge_id in result_set}
+                    else:
+                        # result_set is smaller - keep only elements that exist in filtered_ids
+                        filtered_set = set(filtered_ids)
+                        result_set = {edge_id for edge_id in result_set if edge_id in filtered_set}
                 
                 # Early termination if no results left
-                if not result_ids:
-                    break
+                if not result_set:
+                    return []
             
-            return list(result_ids)
+            return list(result_set) if result_set else []
         else:
             # Python backend: use effective data
             _, effective_edges, _ = self._get_effective_data()

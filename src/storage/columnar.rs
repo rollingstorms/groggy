@@ -347,7 +347,7 @@ impl ColumnarStore {
         attributes
     }
 
-    /// Filter nodes by numeric comparison (simple interface)
+    /// Filter nodes by numeric comparison (optimized implementation)
     pub fn filter_nodes_by_numeric_comparison(
         &self,
         attr_name: &str,
@@ -355,39 +355,44 @@ impl ColumnarStore {
         value: f64,
     ) -> Vec<usize> {
         if let Some(attr_uid) = self.attr_name_to_uid.get(attr_name) {
-            let mut result = Vec::new();
-
             if let Some(attr_map) = self.node_attributes.get(&attr_uid) {
-                for (&node_index, json_value) in attr_map.iter() {
-                    let node_value = match json_value {
-                        JsonValue::Number(n) => n.as_f64().unwrap_or(0.0),
-                        JsonValue::String(s) => s.parse::<f64>().unwrap_or(0.0),
-                        _ => continue,
-                    };
+                let mut result = Vec::with_capacity(attr_map.len() / 4); // Estimate capacity
+                
+                // Vectorized processing with efficient iterator
+                result.extend(
+                    attr_map
+                        .iter()
+                        .filter_map(|(&node_index, json_value)| {
+                            let node_value = match json_value {
+                                JsonValue::Number(n) => n.as_f64()?,
+                                JsonValue::String(s) => s.parse::<f64>().ok()?,
+                                _ => return None,
+                            };
 
-                    let matches = match operator {
-                        ">" => node_value > value,
-                        ">=" => node_value >= value,
-                        "<" => node_value < value,
-                        "<=" => node_value <= value,
-                        "==" => (node_value - value).abs() < f64::EPSILON,
-                        "!=" => (node_value - value).abs() >= f64::EPSILON,
-                        _ => false,
-                    };
+                            let matches = match operator {
+                                ">" => node_value > value,
+                                ">=" => node_value >= value,
+                                "<" => node_value < value,
+                                "<=" => node_value <= value,
+                                "==" => (node_value - value).abs() < f64::EPSILON,
+                                "!=" => (node_value - value).abs() >= f64::EPSILON,
+                                _ => return None,
+                            };
 
-                    if matches {
-                        result.push(node_index);
-                    }
-                }
+                            if matches { Some(node_index) } else { None }
+                        })
+                );
+                
+                result
+            } else {
+                Vec::new()
             }
-
-            result
         } else {
             Vec::new()
         }
     }
 
-    /// Filter nodes by string comparison (simple interface)
+    /// Filter nodes by string comparison (optimized implementation)
     pub fn filter_nodes_by_string_comparison(
         &self,
         attr_name: &str,
@@ -395,28 +400,33 @@ impl ColumnarStore {
         value: &str,
     ) -> Vec<usize> {
         if let Some(attr_uid) = self.attr_name_to_uid.get(attr_name) {
-            let mut result = Vec::new();
-
             if let Some(attr_map) = self.node_attributes.get(&attr_uid) {
-                for (&node_index, json_value) in attr_map.iter() {
-                    if let Some(node_value) = json_value.as_str() {
-                        let matches = match operator {
-                            "==" => node_value == value,
-                            "!=" => node_value != value,
-                            "contains" => node_value.contains(value),
-                            "startswith" => node_value.starts_with(value),
-                            "endswith" => node_value.ends_with(value),
-                            _ => false,
-                        };
+                let mut result = Vec::with_capacity(attr_map.len() / 4); // Estimate capacity
+                
+                // Vectorized processing with efficient iterator
+                result.extend(
+                    attr_map
+                        .iter()
+                        .filter_map(|(&node_index, json_value)| {
+                            let node_value = json_value.as_str()?;
 
-                        if matches {
-                            result.push(node_index);
-                        }
-                    }
-                }
+                            let matches = match operator {
+                                "==" => node_value == value,
+                                "!=" => node_value != value,
+                                "contains" => node_value.contains(value),
+                                "startswith" => node_value.starts_with(value),
+                                "endswith" => node_value.ends_with(value),
+                                _ => return None,
+                            };
+
+                            if matches { Some(node_index) } else { None }
+                        })
+                );
+                
+                result
+            } else {
+                Vec::new()
             }
-
-            result
         } else {
             Vec::new()
         }
@@ -551,7 +561,7 @@ impl ColumnarStore {
         }
     }
 
-    /// Filter edges by numeric comparison (simple interface)
+    /// Filter edges by numeric comparison (optimized implementation)
     pub fn filter_edges_by_numeric_comparison(
         &self,
         attr_name: &str,
@@ -559,39 +569,44 @@ impl ColumnarStore {
         value: f64,
     ) -> Vec<usize> {
         if let Some(attr_uid) = self.attr_name_to_uid.get(attr_name) {
-            let mut result = Vec::new();
-
             if let Some(attr_map) = self.edge_attributes.get(&attr_uid) {
-                for (&edge_index, json_value) in attr_map.iter() {
-                    let edge_value = match json_value {
-                        JsonValue::Number(n) => n.as_f64().unwrap_or(0.0),
-                        JsonValue::String(s) => s.parse::<f64>().unwrap_or(0.0),
-                        _ => continue,
-                    };
+                let mut result = Vec::with_capacity(attr_map.len() / 4); // Estimate capacity
+                
+                // Vectorized processing with efficient iterator
+                result.extend(
+                    attr_map
+                        .iter()
+                        .filter_map(|(&edge_index, json_value)| {
+                            let edge_value = match json_value {
+                                JsonValue::Number(n) => n.as_f64()?,
+                                JsonValue::String(s) => s.parse::<f64>().ok()?,
+                                _ => return None,
+                            };
 
-                    let matches = match operator {
-                        ">" => edge_value > value,
-                        ">=" => edge_value >= value,
-                        "<" => edge_value < value,
-                        "<=" => edge_value <= value,
-                        "==" => (edge_value - value).abs() < f64::EPSILON,
-                        "!=" => (edge_value - value).abs() >= f64::EPSILON,
-                        _ => false,
-                    };
+                            let matches = match operator {
+                                ">" => edge_value > value,
+                                ">=" => edge_value >= value,
+                                "<" => edge_value < value,
+                                "<=" => edge_value <= value,
+                                "==" => (edge_value - value).abs() < f64::EPSILON,
+                                "!=" => (edge_value - value).abs() >= f64::EPSILON,
+                                _ => return None,
+                            };
 
-                    if matches {
-                        result.push(edge_index);
-                    }
-                }
+                            if matches { Some(edge_index) } else { None }
+                        })
+                );
+                
+                result
+            } else {
+                Vec::new()
             }
-
-            result
         } else {
             Vec::new()
         }
     }
 
-    /// Filter edges by string comparison (simple interface)
+    /// Filter edges by string comparison (optimized implementation)
     pub fn filter_edges_by_string_comparison(
         &self,
         attr_name: &str,
@@ -599,28 +614,33 @@ impl ColumnarStore {
         value: &str,
     ) -> Vec<usize> {
         if let Some(attr_uid) = self.attr_name_to_uid.get(attr_name) {
-            let mut result = Vec::new();
-
             if let Some(attr_map) = self.edge_attributes.get(&attr_uid) {
-                for (&edge_index, json_value) in attr_map.iter() {
-                    if let Some(edge_value) = json_value.as_str() {
-                        let matches = match operator {
-                            "==" => edge_value == value,
-                            "!=" => edge_value != value,
-                            "contains" => edge_value.contains(value),
-                            "startswith" => edge_value.starts_with(value),
-                            "endswith" => edge_value.ends_with(value),
-                            _ => false,
-                        };
+                let mut result = Vec::with_capacity(attr_map.len() / 4); // Estimate capacity
+                
+                // Vectorized processing with efficient iterator
+                result.extend(
+                    attr_map
+                        .iter()
+                        .filter_map(|(&edge_index, json_value)| {
+                            let edge_value = json_value.as_str()?;
 
-                        if matches {
-                            result.push(edge_index);
-                        }
-                    }
-                }
+                            let matches = match operator {
+                                "==" => edge_value == value,
+                                "!=" => edge_value != value,
+                                "contains" => edge_value.contains(value),
+                                "startswith" => edge_value.starts_with(value),
+                                "endswith" => edge_value.ends_with(value),
+                                _ => return None,
+                            };
+
+                            if matches { Some(edge_index) } else { None }
+                        })
+                );
+                
+                result
+            } else {
+                Vec::new()
             }
-
-            result
         } else {
             Vec::new()
         }
