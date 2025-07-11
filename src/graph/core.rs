@@ -978,6 +978,142 @@ impl FastGraph {
 
         Ok(result)
     }
+
+    /// Get a specific attribute for multiple nodes efficiently  
+    pub fn get_nodes_attribute(
+        &self,
+        attr_name: &str,
+        node_ids: Vec<String>
+    ) -> PyResult<HashMap<String, pyo3::PyObject>> {
+        use crate::utils::json_value_to_python;
+        use pyo3::Python;
+        
+        Python::with_gil(|py| {
+            let mut result = HashMap::new();
+            
+            for node_id in node_ids {
+                if let Some(node_idx) = self.node_id_to_index.get(&node_id) {
+                    if let Some(json_value) = self.columnar_store.get_node_attribute(node_idx.index(), attr_name) {
+                        let py_value = json_value_to_python(py, &json_value)?;
+                        result.insert(node_id, py_value);
+                    }
+                }
+            }
+            
+            Ok(result)
+        })
+    }
+
+    /// Get all attributes for multiple nodes efficiently
+    pub fn get_nodes_attributes(
+        &self,
+        node_ids: Vec<String>
+    ) -> PyResult<HashMap<String, HashMap<String, pyo3::PyObject>>> {
+        use crate::utils::json_value_to_python;
+        use pyo3::Python;
+        
+        Python::with_gil(|py| {
+            let mut result = HashMap::new();
+            
+            for node_id in node_ids {
+                if let Some(node_idx) = self.node_id_to_index.get(&node_id) {
+                    let json_attributes = self.columnar_store.get_node_attributes(node_idx.index());
+                    if !json_attributes.is_empty() {
+                        let mut py_attributes = HashMap::new();
+                        for (attr_name, json_value) in json_attributes {
+                            let py_value = json_value_to_python(py, &json_value)?;
+                            py_attributes.insert(attr_name, py_value);
+                        }
+                        result.insert(node_id, py_attributes);
+                    }
+                }
+            }
+            
+            Ok(result)
+        })
+    }
+
+    /// Get a specific attribute for all nodes efficiently (useful for statistics)
+    pub fn get_all_nodes_attribute(
+        &self,
+        attr_name: &str
+    ) -> PyResult<HashMap<String, pyo3::PyObject>> {
+        use crate::utils::json_value_to_python;
+        use pyo3::Python;
+        
+        Python::with_gil(|py| {
+            let mut result = HashMap::new();
+            
+            for (node_id, node_idx) in &self.node_id_to_index {
+                if let Some(json_value) = self.columnar_store.get_node_attribute(node_idx.index(), attr_name) {
+                    let py_value = json_value_to_python(py, &json_value)?;
+                    result.insert(node_id.clone(), py_value);
+                }
+            }
+            
+            Ok(result)
+        })
+    }
+
+    /// Get a specific attribute for multiple edges efficiently
+    pub fn get_edges_attribute(
+        &self,
+        attr_name: &str,
+        edge_endpoints: Vec<(String, String)>
+    ) -> PyResult<HashMap<(String, String), pyo3::PyObject>> {
+        use crate::utils::json_value_to_python;
+        use pyo3::Python;
+        
+        Python::with_gil(|py| {
+            let mut result = HashMap::new();
+            
+            for (source, target) in edge_endpoints {
+                if let (Some(source_idx), Some(target_idx)) = (
+                    self.node_id_to_index.get(&source),
+                    self.node_id_to_index.get(&target)
+                ) {
+                    if let Some(edge_idx) = self.graph.find_edge(*source_idx, *target_idx) {
+                        if let Some(json_value) = self.columnar_store.get_edge_attribute(edge_idx.index(), attr_name) {
+                            let py_value = json_value_to_python(py, &json_value)?;
+                            result.insert((source, target), py_value);
+                        }
+                    }
+                }
+            }
+            
+            Ok(result)
+        })
+    }
+
+    /// Get a specific attribute for all edges efficiently (useful for statistics)
+    pub fn get_all_edges_attribute(
+        &self,
+        attr_name: &str
+    ) -> PyResult<HashMap<(String, String), pyo3::PyObject>> {
+        use crate::utils::json_value_to_python;
+        use pyo3::Python;
+        
+        Python::with_gil(|py| {
+            let mut result = HashMap::new();
+            
+            for edge_idx in self.graph.edge_indices() {
+                if let Some((source_idx, target_idx)) = self.graph.edge_endpoints(edge_idx) {
+                    // Get source and target node IDs from the mapping
+                    if let (Some(source_id), Some(target_id)) = (
+                        self.node_index_to_id.get(&source_idx),
+                        self.node_index_to_id.get(&target_idx)
+                    ) {
+                        if let Some(json_value) = self.columnar_store.get_edge_attribute(edge_idx.index(), attr_name) {
+                            let py_value = json_value_to_python(py, &json_value)?;
+                            result.insert((source_id.clone(), target_id.clone()), py_value);
+                        }
+                    }
+                }
+            }
+            
+            Ok(result)
+        })
+    }
 }
 
 impl FastGraph {

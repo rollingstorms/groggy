@@ -96,6 +96,16 @@ class Graph(StateMixin):
         self._effective_cache = None
         self._cache_valid = True
 
+    def _invalidate_cache(self):
+        """Invalidate the cache when graph structure changes"""
+        if self.use_rust:
+            self._cache_valid = False
+            self._cache.clear()
+        else:
+            # For Python backend, invalidate effective cache
+            self._effective_cache = None
+            self._cache_valid = False
+
     @classmethod
     def empty(cls, backend=None):
         """Create an empty graph"""
@@ -772,107 +782,129 @@ class Graph(StateMixin):
             edge_id = f"{source_str}->{target_str}"
             raise KeyError(f"Edge {edge_id} not found")
 
-    def _invalidate_cache(self):
-        """Invalidate the lazy rendering cache"""
-        if self.use_rust and hasattr(self, '_cache'):
-            self._cache_valid = False
-            self._cache.clear()
-
-    # Python fallback helper methods
-    def _init_delta(self):
-        """Initialize delta tracking for Python backend"""
-        if not hasattr(self, '_pending_delta') or self._pending_delta is None:
-            from ..data_structures import GraphDelta
-            self._pending_delta = GraphDelta()
-            self._is_modified = True
-
-    def _get_effective_data(self):
-        """Get effective nodes, edges, and attributes for Python backend"""
-        if self._effective_cache is not None and self._cache_valid:
-            return self._effective_cache
+    def get_nodes_attribute(self, node_ids: List[NodeID], attr_name: str) -> Dict[str, Any]:
+        """Get a specific attribute for multiple nodes efficiently
         
-        # Start with base data
-        effective_nodes = self._nodes.copy()
-        effective_edges = self._edges.copy()
-        effective_attrs = {}
-        
-        # Apply pending changes
-        if self._pending_delta:
-            effective_nodes.update(self._pending_delta.added_nodes)
-            effective_edges.update(self._pending_delta.added_edges)
+        Args:
+            node_ids: List of node IDs
+            attr_name: Name of the attribute to retrieve
             
-            # Remove deleted items
-            for node_id in self._pending_delta.removed_nodes:
-                effective_nodes.pop(node_id, None)
-            for edge_id in self._pending_delta.removed_edges:
-                effective_edges.pop(edge_id, None)
-        
-        self._effective_cache = (effective_nodes, effective_edges, effective_attrs)
-        self._cache_valid = True
-        
-        return self._effective_cache
-
-    def _update_cache_for_node_add(self, node_id: NodeID, node: Node):
-        """Update cache when adding a node"""
-        if self._effective_cache:
-            self._effective_cache[0][node_id] = node
-
-    def _update_cache_for_edge_add(self, edge_id: str, edge: Edge):
-        """Update cache when adding an edge"""
-        if self._effective_cache:
-            self._effective_cache[1][edge_id] = edge
-
-    def _apply_batch_operations(self, batch_nodes, batch_edges):
-        """Apply batched operations efficiently"""
-        if not batch_nodes and not batch_edges:
-            return
-        
+        Returns:
+            Dictionary mapping node IDs to their attribute values
+        """
         if self.use_rust:
-            # Apply to Rust backend
-            if batch_nodes:
-                node_data = [(node_id, node.attributes) for node_id, node in batch_nodes.items()]
-                self._rust_core.add_nodes(node_data)
-            
-            if batch_edges:
-                edge_data = [(edge.source, edge.target, edge.attributes) for edge in batch_edges.values()]
-                self._rust_core.add_edges(edge_data)
-            
-            self._invalidate_cache()
+            # Use Rust backend for efficient retrieval
+            node_ids_str = [str(nid) for nid in node_ids]
+            return self._rust_core.get_nodes_attribute(attr_name, node_ids_str)
         else:
-            # Apply to Python backend
-            self._init_delta()
-            self._pending_delta.added_nodes.update(batch_nodes)
-            self._pending_delta.added_edges.update(batch_edges)
-            self._cache_valid = False
+            # Python fallback
+            result = {}
+            for node_id in node_ids:
+                node = self.get_node(node_id)
+                if node and attr_name in node.attributes:
+                    result[str(node_id)] = node.attributes[attr_name]
+            return result
 
-    # Backward compatibility aliases
-    def filter_nodes_by_attributes(self, filters: Dict[str, Any]) -> List[str]:
-        """Legacy alias for filter_nodes with attribute dictionary"""
-        return self.filter_nodes(filters)
-    
-    def filter_edges_by_attributes(self, filters: Dict[str, Any]) -> List[str]:
-        """Legacy alias for filter_edges with attribute dictionary"""
-        return self.filter_edges(filters)
-
-    # Helper methods for enhanced filtering
-    def _compile_query_predicate(self, query_str: str, is_node: bool = True):
-        """Compile a string query into a filter predicate function"""
-        from .filtering import QueryCompiler
+    def get_nodes_attributes(self, node_ids: List[NodeID]) -> Dict[str, Dict[str, Any]]:
+        """Get all attributes for multiple nodes efficiently
         
-        if is_node:
-            return QueryCompiler.compile_node_query(query_str)
+        Args:
+            node_ids: List of node IDs
+            
+        Returns:
+            Dictionary mapping node IDs to their complete attribute dictionaries
+        """
+        if self.use_rust:
+            # Use Rust backend for efficient retrieval
+            node_ids_str = [str(nid) for nid in node_ids]
+            return self._rust_core.get_nodes_attributes(node_ids_str)
         else:
-            return QueryCompiler.compile_edge_query(query_str)
-    
-    def _create_subgraph_from_nodes(self, node_ids: List[str], filter_criteria=None) -> 'Subgraph':
-        """Create a subgraph containing only the specified nodes and edges between them"""
-        from .filtering import SubgraphCreator
-        return SubgraphCreator.create_node_subgraph(self, node_ids, filter_criteria)
-    
-    def _create_subgraph_from_edges(self, edge_ids: List[str], filter_criteria=None) -> 'Subgraph':
-        """Create a subgraph containing only the specified edges and their connected nodes"""
-        from .filtering import SubgraphCreator
-        return SubgraphCreator.create_edge_subgraph(self, edge_ids, filter_criteria)
+            # Python fallback
+            result = {}
+            for node_id in node_ids:
+                node = self.get_node(node_id)
+                if node:
+                    result[str(node_id)] = dict(node.attributes)
+            return result
+
+    def get_all_nodes_attribute(self, attr_name: str) -> Dict[str, Any]:
+        """Get a specific attribute for all nodes efficiently (useful for statistics)
+        
+        Args:
+            attr_name: Name of the attribute to retrieve
+            
+        Returns:
+            Dictionary mapping node IDs to their attribute values
+        """
+        if self.use_rust:
+            # Use Rust backend for efficient retrieval
+            return self._rust_core.get_all_nodes_attribute(attr_name)
+        else:
+            # Python fallback
+            result = {}
+            effective_nodes, _, _ = self._get_effective_data()
+            for node_id, node in effective_nodes.items():
+                if attr_name in node.attributes:
+                    result[node_id] = node.attributes[attr_name]
+            return result
+
+    def get_edges_attribute(self, edge_endpoints: List[tuple], attr_name: str) -> Dict[tuple, Any]:
+        """Get a specific attribute for multiple edges efficiently
+        
+        Args:
+            edge_endpoints: List of (source, target) tuples
+            attr_name: Name of the attribute to retrieve
+            
+        Returns:
+            Dictionary mapping (source, target) tuples to their attribute values
+        """
+        if self.use_rust:
+            # Use Rust backend for efficient retrieval
+            endpoints_str = [(str(s), str(t)) for s, t in edge_endpoints]
+            return self._rust_core.get_edges_attribute(attr_name, endpoints_str)
+        else:
+            # Python fallback
+            result = {}
+            for source, target in edge_endpoints:
+                edge = self.get_edge(source, target)
+                if edge and attr_name in edge.attributes:
+                    result[(str(source), str(target))] = edge.attributes[attr_name]
+            return result
+
+    def get_all_edges_attribute(self, attr_name: str) -> Dict[tuple, Any]:
+        """Get a specific attribute for all edges efficiently (useful for statistics)
+        
+        Args:
+            attr_name: Name of the attribute to retrieve
+            
+        Returns:
+            Dictionary mapping (source, target) tuples to their attribute values
+        """
+        if self.use_rust:
+            # Use Rust backend for efficient retrieval
+            return self._rust_core.get_all_edges_attribute(attr_name)
+        else:
+            # Python fallback
+            result = {}
+            _, effective_edges, _ = self._get_effective_data()
+            for edge_id, edge in effective_edges.items():
+                if attr_name in edge.attributes:
+                    result[(edge.source, edge.target)] = edge.attributes[attr_name]
+            return result
+
+    def get_edge_ids(self) -> List[str]:
+        """Get all edge IDs in the graph
+        
+        Returns:
+            List of edge IDs (formatted as 'source->target')
+        """
+        if self.use_rust:
+            return self._rust_core.get_edge_ids()
+        else:
+            _, effective_edges, _ = self._get_effective_data()
+            return list(effective_edges.keys())
+
+    # ...existing code...
 
     def update_node(self, node_id: NodeID, attributes: Dict[str, Any] = None, **kwargs):
         """Update node attributes with a user-friendly interface
