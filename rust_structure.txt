@@ -1,0 +1,1409 @@
+CODE STRUCTURE ANALYSIS
+Directory: ../groggy/src
+Generated: rust_structure.txt
+============================================================
+
+============================================================
+FILE: lib.rs
+============================================================
+
+⚙️  FUNCTION: _core() (line 12)
+   🏷️  #pymodule
+   📞 Calls: Ok, add, m.add
+
+============================================================
+FILE: graph/core.rs
+============================================================
+
+🏗️  STRUCT: FastGraph (line 14)
+   🏷️  #pyclass
+
+🔧 IMPL: FastGraph (line 33)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 35)
+       🏷️  #new
+       📞 Calls: ┌─ ColumnarStore::new, GraphType::new_directed
+              │  GraphType::new_undirected, HashMap::new, new
+              │  new_directed, new_undirected
+              └─
+   └── ⚙️  add_node() (line 53)
+       📞 Calls: ┌─ HashSet::new, Ok, Some, add_node, clone
+              │  contains_key, data, graph.add_node, index, insert
+              │  new, node_id.clone, node_id_to_index.contains_key
+              │  node_id_to_index.insert, node_index.index
+              │  node_index_to_id.insert, python_dict_to_json_map
+              │  set_node_attribute
+              └─
+       💬 Add a single node with optional attributes
+   └── ⚙️  add_edge() (line 85)
+       📞 Calls: ┌─ HashSet::new, Ok, Some, add_edge, clone, data
+              │  edge_index.index, get, graph.add_edge, index, insert
+              │  new, node_id_to_index.get, ok_or_else
+              │  python_dict_to_json_map, set_edge_attribute
+              │  source.clone, target.clone
+              └─
+       💬 Add a single edge with optional attributes
+   └── ⚙️  node_count() (line 132)
+       📞 Calls: graph.node_count, node_count
+       💬 Get node count
+   └── ⚙️  edge_count() (line 137)
+       📞 Calls: edge_count, graph.edge_count
+       💬 Get edge count
+   └── ⚙️  get_node_ids() (line 142)
+       📞 Calls: cloned, collect, keys, node_id_to_index.keys
+       💬 Get all node IDs
+   └── ⚙️  has_node() (line 147)
+       📞 Calls: contains_key, node_id_to_index.contains_key
+       💬 Check if node exists
+   └── ⚙️  has_edge() (line 152)
+       📞 Calls: ┌─ Some, find_edge, get, graph.find_edge, is_some
+              │  node_id_to_index.get
+              └─
+       💬 Check if edge exists
+   └── ⚙️  get_neighbors() (line 164)
+       📞 Calls: ┌─ Ok, cloned, collect, filter_map, get
+              │  graph.neighbors, into_iter, neighbors
+              │  neighbors_directed, node_id_to_index.get
+              │  node_index_to_id.get, ok_or_else
+              └─
+       💬 Get neighbors of a node (for directed graphs, returns only outgoing neighbors)
+   └── ⚙️  get_outgoing_neighbors() (line 187)
+       📞 Calls: ┌─ Ok, cloned, collect, filter_map, get, into_iter
+              │  neighbors_directed, node_id_to_index.get
+              │  node_index_to_id.get, ok_or_else
+              └─
+       💬 Get outgoing neighbors of a node (for directed graphs)
+   └── ⚙️  get_incoming_neighbors() (line 204)
+       📞 Calls: ┌─ Ok, cloned, collect, filter_map, get, into_iter
+              │  neighbors_directed, node_id_to_index.get
+              │  node_index_to_id.get, ok_or_else
+              └─
+       💬 Get incoming neighbors of a node (for directed graphs)
+   └── ⚙️  get_all_neighbors() (line 221)
+       📞 Calls: ┌─ HashSet::new, Ok, Some, clone, collect, get
+              │  id.clone, insert, into_iter, neighbor_ids.insert
+              │  neighbor_ids.into_iter, neighbors_directed, new
+              │  node_id_to_index.get, node_index_to_id.get
+              │  ok_or_else
+              └─
+       💬 Get all neighbors of a node (both incoming and outgoing)
+   └── ⚙️  get_node_attributes() (line 252)
+       📞 Calls: ┌─ HashMap::new, Ok, Python::with_gil, Some
+              │  columnar_store.get_node_attributes, get
+              │  get_node_attributes, graph.node_weight, index, insert
+              │  json_value_to_python, new, node_id_to_index.get
+              │  node_idx.index, node_weight, ok_or_else
+              │  py_attributes.insert, with_gil
+              └─
+       💬 Get node attributes - retrieve from columnar store
+   └── ⚙️  get_edge_attributes() (line 283)
+       📞 Calls: ┌─ HashMap::new, Ok, Python::with_gil, Some
+              │  columnar_store.get_edge_attributes, edge_idx.index
+              │  edge_weight, find_edge, get, get_edge_attributes
+              │  graph.edge_weight, graph.find_edge, index, insert
+              │  json_value_to_python, new, node_id_to_index.get
+              │  py_attributes.insert, with_gil
+              └─
+       💬 Get edge attributes - retrieve from columnar store
+   └── ⚙️  is_directed() (line 323)
+       💬 Check if the graph is directed
+   └── ⚙️  get_edge_ids() (line 328)
+       📞 Calls: ┌─ Some, Vec::new, edge_endpoints, edge_ids.push
+              │  edge_indices, get, graph.edge_endpoints
+              │  graph.edge_indices, new, node_index_to_id.get, push
+              └─
+       💬 Get edge IDs
+   └── ⚙️  set_node_attribute() (line 344)
+       📞 Calls: ┌─ Ok, get, index, node_id_to_index.get, node_idx.index
+              │  ok_or_else, python_value_to_json, set_node_attribute
+              └─
+       💬 Set a single node attribute
+   └── ⚙️  set_edge_attribute() (line 365)
+       📞 Calls: ┌─ Ok, edge_idx.index, find_edge, get, index
+              │  node_id_to_index.get, ok_or_else
+              │  python_value_to_json, set_edge_attribute
+              └─
+       💬 Set a single edge attribute
+   └── ⚙️  set_edge_attributes() (line 406)
+       📞 Calls: ┌─ Ok, edge_idx.index, find_edge, get, index
+              │  node_id_to_index.get, ok_or_else
+              │  python_dict_to_json_map, set_edge_attribute
+              └─
+       💬 Set multiple edge attributes at once
+   └── ⚙️  set_nodes_attributes_batch() (line 448)
+       📞 Calls: ┌─ Ok, Python::with_gil
+              │  columnar_store.set_node_attribute, get, index
+              │  node_id_to_index.get, node_idx.index, ok_or_else
+              │  python_pyobject_to_json, set_node_attribute, with_gil
+              └─
+       💬 Set batch node attributes - efficiently set attributes for multiple nodes
+   └── ⚙️  set_edges_attributes_batch() (line 477)
+       📞 Calls: ┌─ Ok, Python::with_gil
+              │  columnar_store.set_edge_attribute, edge_idx.index
+              │  find_edge, get, index, node_id_to_index.get
+              │  ok_or_else, python_pyobject_to_json
+              │  set_edge_attribute, with_gil
+              └─
+       💬 Set batch edge attributes - efficiently set attributes for multiple edges
+   └── ⚙️  remove_node() (line 522)
+       📞 Calls: ┌─ Some, cloned, collect, columnar_store.remove_edge
+              │  columnar_store.remove_node_legacy, edge_endpoints
+              │  edge_idx.index, edge_index_to_endpoints.remove
+              │  edge_indices, filter, get, graph.edge_endpoints
+              │  graph.remove_edge, graph.remove_node, index
+              │  into_iter, node_id_to_index.get
+              │  node_id_to_index.remove, node_idx.index
+              │  node_index_to_id.remove, remove, remove_edge
+              │  remove_node, remove_node_legacy, store
+              └─
+       💬 Remove a node and all its edges
+   └── ⚙️  remove_edge() (line 564)
+       📞 Calls: ┌─ Some, columnar_store.remove_edge, edge_idx.index
+              │  edge_index_to_endpoints.remove, find_edge, get
+              │  graph.find_edge, graph.remove_edge, index
+              │  node_id_to_index.get, remove, remove_edge, store
+              └─
+       💬 Remove an edge
+   └── ⚙️  remove_nodes() (line 589)
+       📞 Calls: remove_node, self.remove_node
+       💬 Remove multiple nodes - delegates to single node removal
+   └── ⚙️  remove_edges() (line 600)
+       📞 Calls: remove_edge, self.remove_edge
+       💬 Remove multiple edges - delegates to single edge removal
+   └── ⚙️  add_nodes() (line 611)
+       📞 Calls: ┌─ HashSet::new, Ok, Some, Vec::with_capacity, add_node
+              │  attrs.is_empty, bulk_set_multiple_node_attributes
+              │  clone, columnar_data.is_empty, columnar_data.push
+              │  columnar_store.bulk_set_multiple_node_attributes
+              │  contains_key, graph.add_node, index, insert, is_empty
+              │  len, new, node_id.clone
+              │  node_id_to_index.contains_key
+              │  node_id_to_index.insert, node_index.index
+              │  node_index_to_id.insert, nodes_data.is_empty
+              │  nodes_data.len, push, python_dict_to_json_map
+              │  with_capacity
+              └─
+       💬 Add multiple nodes in batch - optimized implementation
+   └── ⚙️  add_edges() (line 657)
+       📞 Calls: ┌─ HashSet::new, Ok, Some, Vec::with_capacity, add_edge
+              │  attrs.is_empty, bulk_set_multiple_edge_attributes
+              │  clone, columnar_data.is_empty, columnar_data.push
+              │  columnar_store.bulk_set_multiple_edge_attributes
+              │  edge_index.index, edge_index_to_endpoints.insert
+              │  edges_data.is_empty, edges_data.len, get
+              │  graph.add_edge, index, insert, is_empty, len, new
+              │  node_id_to_index.get, push, python_dict_to_json_map
+              │  source.clone, target.clone, with_capacity
+              └─
+       💬 Add multiple edges in batch - optimized implementation
+   └── ⚙️  filter_nodes_by_attributes() (line 708)
+       📞 Calls: ┌─ HashMap::new, NodeIndex::new, Ok, Python::with_gil
+              │  Some, Vec::new, clone, filter_nodes_by_attributes
+              │  filters.is_empty, get, get_node_ids, insert, is_empty
+              │  json_filters.insert, new, node_id.clone, push
+              │  python_pyobject_to_json, result.push
+              │  self.get_node_ids, with_gil
+              └─
+       💬 Filter nodes by attribute dictionary - Python interface to columnar filtering
+   └── ⚙️  filter_edges_by_attributes() (line 747)
+       📞 Calls: ┌─ EdgeIndex::new, HashMap::new, IDs, Ok
+              │  Python::with_gil, Some, Vec::new, edge_endpoints
+              │  filter_edges_by_attributes, filters.is_empty, get
+              │  get_edge_ids, insert, is_empty, json_filters.insert
+              │  new, node_index_to_id.get, push
+              │  python_pyobject_to_json, result.push
+              │  self.get_edge_ids, with_gil
+              └─
+       💬 Filter edges by attribute dictionary - Python interface to columnar filtering
+   └── ⚙️  filter_nodes_by_numeric_comparison() (line 791)
+       📞 Calls: ┌─ NodeIndex::new, Ok, Some, Vec::new, clone
+              │  filter_nodes_by_numeric_comparison, get, new
+              │  node_id.clone, push, result.push
+              └─
+       💬 Filter nodes by numeric comparison - Python interface to columnar filtering
+   └── ⚙️  filter_nodes_by_string_comparison() (line 816)
+       📞 Calls: ┌─ NodeIndex::new, Ok, Some, Vec::new, clone
+              │  filter_nodes_by_string_comparison, get, new
+              │  node_id.clone, push, result.push
+              └─
+       💬 Filter nodes by string comparison - Python interface to columnar filtering
+   └── ⚙️  filter_edges_by_numeric_comparison() (line 841)
+       📞 Calls: ┌─ EdgeIndex::new, Ok, Some, Vec::new, edge_endpoints
+              │  filter_edges_by_numeric_comparison, get, new
+              │  node_index_to_id.get, push, result.push
+              └─
+       💬 Filter edges by numeric comparison - Python interface to columnar filtering
+   └── ⚙️  filter_edges_by_string_comparison() (line 871)
+       📞 Calls: ┌─ EdgeIndex::new, Ok, Some, Vec::new, edge_endpoints
+              │  filter_edges_by_string_comparison, get, new
+              │  node_index_to_id.get, push, result.push
+              └─
+       💬 Filter edges by string comparison - Python interface to columnar filtering
+   └── ⚙️  filter_nodes_by_attributes_sparse() (line 901)
+       📞 Calls: ┌─ HashMap::new, NodeIndex::new, ONLY, Ok
+              │  Python::with_gil, Some, Vec::new, clone
+              │  filter_nodes_sparse, filters.is_empty, get
+              │  get_node_ids, insert, is_empty, json_filters.insert
+              │  new, node_id.clone, push, python_pyobject_to_json
+              │  result.push, self.get_node_ids, with_gil
+              └─
+       💬 Filter nodes with sparse algorithm - Python interface to optimized sparse filtering
+   └── ⚙️  filter_nodes_multi_criteria() (line 940)
+       📞 Calls: ┌─ Bool, NodeIndex::new, Number, Number::from
+              │  Number::from_f64, Ok, Some, String, Value::Bool
+              │  Value::Number, Value::String, Vec::new, clone
+              │  collect, columnar_store.filter_nodes_multi_criteria
+              │  filter_nodes_multi_criteria, filtering, from
+              │  from_f64, get, into_iter, map, new, node_id.clone
+              │  push, result.push, unwrap_or
+              └─
+       💬 Optimized multi-criteria node filtering - all intersection logic in Rust
+   └── ⚙️  filter_edges_multi_criteria() (line 988)
+       📞 Calls: ┌─ Bool, EdgeIndex::new, Number, Number::from
+              │  Number::from_f64, Ok, Some, String, Value::Bool
+              │  Value::Number, Value::String, Vec::new, collect
+              │  columnar_store.filter_edges_multi_criteria
+              │  edge_endpoints, filter_edges_multi_criteria
+              │  filtering, from, from_f64, get, into_iter, map, new
+              │  node_index_to_id.get, push, result.push, unwrap_or
+              └─
+       💬 Optimized multi-criteria edge filtering - all intersection logic in Rust
+   └── ⚙️  get_nodes_attribute() (line 1042)
+       📞 Calls: ┌─ HashMap::new, NodeIndex::new, Ok, Python::with_gil
+              │  Some, Vec::new, bulk_indices.iter, bulk_indices.len
+              │  clone, collect, columnar_store.get_attribute_bulk
+              │  columnar_store.get_node_attribute, enumerate
+              │  filter_map, get, get_attribute_bulk
+              │  get_node_attribute, idx.index, index, insert, iter
+              │  json_value_to_python, json_values.iter
+              │  json_values.len, json_values.push, len, map, new
+              │  node_id.clone, node_id_to_index.get, node_ids.iter
+              │  node_ids.len, node_idx.index, node_index_to_id.get
+              │  push, reserve, result.insert, result.reserve
+              │  valid_node_ids.push, with_gil
+              └─
+       💬 Get a specific attribute for multiple nodes efficiently Auto-optimizes based on dataset size and density
+   └── ⚙️  get_nodes_attributes() (line 1100)
+       📞 Calls: ┌─ HashMap::new, HashMap::with_capacity, NodeIndex::new
+              │  Ok, Python::with_gil, Some, attributes.len
+              │  bulk_results.len, clone, collect
+              │  columnar_store.get_multiple_attributes_bulk
+              │  columnar_store.get_node_attributes, filter_map, get
+              │  get_multiple_attributes_bulk, get_node_attributes
+              │  idx.index, index, insert, is_empty, iter
+              │  json_attributes.is_empty, json_attributes.len
+              │  json_value_to_python, len, map, new, node_id.clone
+              │  node_id_to_index.get, node_ids.iter, node_ids.len
+              │  node_idx.index, node_index_to_id.get
+              │  py_attributes.insert, reserve, result.insert
+              │  result.reserve, with_capacity, with_gil
+              └─
+       💬 Get all attributes for multiple nodes efficiently Auto-optimizes based on request pattern and data density
+   └── ⚙️  get_all_nodes_attribute() (line 1161)
+       📞 Calls: ┌─ HashMap::new, HashMap::with_capacity, NodeIndex::new
+              │  Ok, Python::with_gil, Some, clone
+              │  columnar_store.get_node_attribute
+              │  columnar_store.get_single_attribute_vectorized
+              │  enumerate, get, get_node_attribute
+              │  get_single_attribute_vectorized, graph.node_count
+              │  index, indices.iter, indices.len, insert, iter
+              │  json_value_to_python, len, new, node_count
+              │  node_id.clone, node_idx.index, node_index_to_id.get
+              │  result.insert, with_capacity, with_gil
+              └─
+       💬 Get a specific attribute for all nodes efficiently (useful for statistics) Auto-optimizes based on data density and sparsity
+   └── ⚙️  get_edges_attribute() (line 1203)
+       📞 Calls: ┌─ HashMap::new, Ok, Python::with_gil, Some, Vec::new
+              │  bulk_indices.iter, clone
+              │  columnar_store.get_attribute_bulk
+              │  columnar_store.get_edge_attribute, edge_endpoints.len
+              │  edge_idx.index, edge_indices.push, enumerate
+              │  find_edge, get, get_attribute_bulk
+              │  get_edge_attribute, graph.find_edge, index, insert
+              │  iter, json_value_to_python, len, new
+              │  node_id_to_index.get, push, result.insert
+              │  source.clone, target.clone, valid_endpoints.push
+              │  with_gil
+              └─
+       💬 Get a specific attribute for multiple edges efficiently Auto-optimizes based on request size and data patterns
+   └── ⚙️  get_dataframe_data() (line 1261)
+       📞 Calls: ┌─ HashMap::with_capacity, NodeIndex::new, None, Ok
+              │  Python::with_gil, Some, as_deref, attr_name.clone
+              │  attr_names.as_deref, clone, collect
+              │  columnar_store.export_node_attribute_table, enumerate
+              │  export_node_attribute_table, filter_map, get
+              │  id.clone, ids.iter, idx.index, index, insert, into_py
+              │  iter, json_value_to_python, len, map, new
+              │  node_id_to_index.get, node_index_to_id.get
+              │  node_indices.as_deref, py.None, results.insert
+              │  target_attrs.iter, target_attrs.len
+              │  target_nodes.iter, to_string
+              │  utils::json_value_to_python, with_capacity, with_gil
+              └─
+       💬 Ultra-fast DataFrame-style attribute retrieval - bypasses Python conversion overhead Returns data in format optimized for pandas/polars DataFrame creation
+   └── ⚙️  get_bulk_node_attribute_vectors() (line 1314)
+       📞 Calls: ┌─ HashMap::with_capacity, Ok, Python::with_gil, Some
+              │  as_deref, bulk_get_node_attribute_vectors, collect
+              │  columnar_store.bulk_get_node_attribute_vectors
+              │  filter_map, get, ids.iter, idx.index, index, insert
+              │  iter, json_value_to_python, len, map
+              │  node_id_to_index.get, node_indices.as_deref
+              │  raw_data.len, results.insert
+              │  utils::json_value_to_python, values.iter
+              │  with_capacity, with_gil
+              └─
+       💬 Ultra-fast vectorized bulk attribute retrieval using columnar store optimization
+   └── ⚙️  get_single_attribute_vectorized() (line 1352)
+       📞 Calls: ┌─ NodeIndex::new, Ok, Python::with_gil, Some, Vec::new
+              │  cloned, collect
+              │  columnar_store.get_single_attribute_fast, filter_map
+              │  get, get_single_attribute_fast, ids.iter, idx.index
+              │  index, indices.iter, iter, json_value_to_python, map
+              │  new, node_id_to_index.get, node_index_to_id.get
+              │  utils::json_value_to_python, values.iter, with_gil
+              └─
+       💬 Ultra-fast single attribute column retrieval using vectorized columnar operations
+   └── ⚙️  export_node_dataframe_optimized() (line 1390)
+       📞 Calls: ┌─ HashMap::with_capacity, NodeIndex::new, None, Ok
+              │  Python::with_gil, Some, as_deref, attr_name.clone
+              │  attr_names.as_deref, clone, collect
+              │  columnar_store.export_node_attribute_table, enumerate
+              │  export_node_attribute_table, filter_map, get
+              │  id.clone, ids.iter, idx.index, index, insert, into_py
+              │  iter, json_value_to_python, len, map, new
+              │  node_id_to_index.get, node_index_to_id.get
+              │  node_indices.as_deref, py.None, results.insert
+              │  target_attrs.iter, target_attrs.len
+              │  target_nodes.iter, to_string
+              │  utils::json_value_to_python, with_capacity, with_gil
+              └─
+       💬 Ultra-fast DataFrame-style bulk data export optimized for pandas/polars
+   └── ⚙️  set_node_attributes_chunked() (line 1441)
+       📞 Calls: ┌─ Ok, Vec::new, Vec::with_capacity, attributes.clone
+              │  bulk_add_nodes_internal, bulk_nodes.is_empty
+              │  bulk_nodes.push, chunk.len, chunk_size.unwrap_or
+              │  chunks, clone, contains_key, extract, is_empty, iter
+              │  len, new, node_id.clone, node_id.extract
+              │  node_id_to_index.contains_key, push
+              │  python_dict_to_json_map, self.bulk_add_nodes_internal
+              │  unwrap_or, update_data.chunks, update_data.push
+              │  updates.iter, utils::python_dict_to_json_map
+              │  with_capacity
+              └─
+       💬 Chunked bulk attribute updates for maximum performance with large datasets
+   └── ⚙️  add_nodes_chunked() (line 1480)
+       📞 Calls: ┌─ HashMap::new, Ok, Some, Vec::with_capacity
+              │  bulk_add_nodes_internal, bulk_nodes.is_empty
+              │  bulk_nodes.push, chunk.len, chunk_size.unwrap_or
+              │  chunks, clone, is_empty, len, new, node_id.clone
+              │  nodes_data.chunks, push, python_dict_to_json_map
+              │  self.bulk_add_nodes_internal, unwrap_or
+              │  utils::python_dict_to_json_map, with_capacity
+              └─
+       💬 High-performance batch node creation with chunked processing
+
+🔧 IMPL: FastGraph (line 1512)
+   └── ⚙️  get_node_weight() (line 1514)
+       📞 Calls: graph.node_weight, node_weight
+       💬 Get node weight by index (internal use)
+   └── ⚙️  get_edge_weight() (line 1519)
+       📞 Calls: edge_weight, graph.edge_weight
+       💬 Get edge weight by index (internal use)
+   └── ⚙️  get_edge_indices() (line 1524)
+       📞 Calls: edge_indices, graph.edge_indices
+       💬 Get all edge indices (internal use)
+   └── ⚙️  get_edge_endpoints() (line 1529)
+       📞 Calls: edge_endpoints, graph.edge_endpoints
+       💬 Get edge endpoints (internal use)
+   └── ⚙️  add_node_to_graph_public() (line 1537)
+       📞 Calls: add_node, graph.add_node
+       💬 Add node directly to graph (internal use)
+   └── ⚙️  add_edge_to_graph_public() (line 1542)
+       📞 Calls: add_edge, graph.add_edge
+       💬 Add edge directly to graph (internal use)
+   └── ⚙️  get_neighbors_public() (line 1552)
+       📞 Calls: collect, graph.neighbors, neighbors
+       💬 Get neighbors by index (internal use)
+   └── ⚙️  get_edges_directed() (line 1560)
+       📞 Calls: edges_directed, graph.edges_directed
+       💬 Get directed edges (internal use)
+
+============================================================
+FILE: graph/types.rs
+============================================================
+
+🏗️  STRUCT: NodeData (line 10)
+   🏷️  #derive(Debug, Clone, Serialize, Deserialize)
+
+🏗️  STRUCT: EdgeData (line 18)
+   🏷️  #derive(Debug, Clone, Serialize, Deserialize)
+
+🏗️  STRUCT: LegacyNodeData (line 28)
+   🏷️  #derive(Debug, Clone, Serialize, Deserialize)
+
+🏗️  STRUCT: LegacyEdgeData (line 34)
+   🏷️  #derive(Debug, Clone, Serialize, Deserialize)
+
+🔢 ENUM: GraphType (line 62)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: GraphType (line 67)
+   └── ⚙️  new_directed() (line 68)
+       📞 Calls: Directed, GraphType::Directed, PetGraph::new, new
+   └── ⚙️  new_undirected() (line 72)
+       📞 Calls: ┌─ GraphType::Undirected, PetGraph::new_undirected
+              │  Undirected, new_undirected
+              └─
+   └── ⚙️  node_count() (line 76)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, g.node_count, node_count
+              └─
+   └── ⚙️  edge_count() (line 83)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, edge_count, g.edge_count
+              └─
+   └── ⚙️  add_node() (line 90)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, add_node, g.add_node
+              └─
+   └── ⚙️  add_edge() (line 97)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, add_edge, g.add_edge
+              └─
+   └── ⚙️  remove_node() (line 109)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, g.remove_node, remove_node
+              └─
+   └── ⚙️  remove_edge() (line 116)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, g.remove_edge, remove_edge
+              └─
+   └── ⚙️  find_edge() (line 123)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, find_edge, g.find_edge
+              └─
+   └── ⚙️  neighbors() (line 134)
+       📞 Calls: ┌─ Box::new, Directed, GraphType::Directed
+              │  GraphType::Undirected, Undirected, g.neighbors
+              │  neighbors, new
+              └─
+   └── ⚙️  node_weight() (line 141)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, g.node_weight, node_weight
+              └─
+   └── ⚙️  node_weight_mut() (line 148)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, g.node_weight_mut, node_weight_mut
+              └─
+   └── ⚙️  edge_weight() (line 155)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, edge_weight, g.edge_weight
+              └─
+   └── ⚙️  edge_weight_mut() (line 162)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, edge_weight_mut, g.edge_weight_mut
+              └─
+   └── ⚙️  edge_indices() (line 172)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, collect, edge_indices, g.edge_indices
+              └─
+   └── ⚙️  edges_directed() (line 179)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, collect, edges_directed, g.edges_directed
+              └─
+   └── ⚙️  neighbors_directed() (line 190)
+       📞 Calls: ┌─ Box::new, Directed, GraphType::Directed
+              │  GraphType::Undirected, Undirected
+              │  g.neighbors_directed, neighbors_directed, new
+              └─
+   └── ⚙️  edge_endpoints() (line 201)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, edge_endpoints, g.edge_endpoints
+              └─
+   └── ⚙️  clear() (line 211)
+       📞 Calls: ┌─ Directed, GraphType::Directed, GraphType::Undirected
+              │  Undirected, clear, g.clear
+              └─
+
+⚙️  FUNCTION: from() (line 42)
+   📞 Calls: HashSet::new, new
+
+⚙️  FUNCTION: from() (line 51)
+   📞 Calls: HashSet::new, new
+
+============================================================
+FILE: graph/algorithms.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 5)
+   └── ⚙️  bfs() (line 7)
+       📞 Calls: ┌─ HashSet::new, Some, Vec::new, VecDeque::new, clone
+              │  contains, get, get_neighbors_public, insert, new
+              │  node_id.clone, node_id_to_index.get
+              │  node_index_to_id.get, pop_front, push, push_back
+              │  queue.pop_front, queue.push_back, result.push
+              │  self.get_neighbors_public, visited.contains
+              │  visited.insert
+              └─
+       💬 Breadth-First Search from a starting node
+   └── ⚙️  dfs() (line 34)
+       📞 Calls: ┌─ HashSet::new, Some, Vec::new, clone, contains, get
+              │  get_neighbors_public, insert, neighbors.reverse, new
+              │  node_id.clone, node_id_to_index.get
+              │  node_index_to_id.get, pop, push, result.push, reverse
+              │  self.get_neighbors_public, stack, stack.pop
+              │  stack.push, visited.contains, visited.insert
+              └─
+       💬 Depth-First Search from a starting node
+   └── ⚙️  shortest_path() (line 67)
+       📞 Calls: ┌─ HashMap::new, HashSet::new, Some, Vec::new
+              │  VecDeque::new, clone, contains, get
+              │  get_neighbors_public, insert, new, node_id.clone
+              │  node_id_to_index.get, node_index_to_id.get
+              │  parent.get, parent.insert, path.push, path.reverse
+              │  pop_front, push, push_back, queue.pop_front
+              │  queue.push_back, reverse, self.get_neighbors_public
+              │  start_node_id.to_string, to_string, visited.contains
+              │  visited.insert
+              └─
+       💬 Find shortest path between two nodes (BFS-based)
+   └── ⚙️  clustering_coefficient() (line 117)
+       📞 Calls: ┌─ Some, find_edge, get, get_neighbors_public
+              │  graph.find_edge, in, is_some, len, neighbors.len
+              │  node_id_to_index.get, node_index_to_id.get
+              │  self.get_neighbors_public, unwrap
+              └─
+       💬 Calculate clustering coefficient for a node
+   └── ⚙️  average_clustering_coefficient() (line 153)
+       📞 Calls: ┌─ clustering_coefficient, coefficients.is_empty
+              │  coefficients.iter, coefficients.len, collect
+              │  filter_map, is_empty, iter, len
+              │  self.clustering_coefficient
+              └─
+       💬 Calculate average clustering coefficient for the entire graph
+
+============================================================
+FILE: graph/bulk_operations.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 10)
+   └── ⚙️  bulk_add_nodes_internal() (line 12)
+       📞 Calls: ┌─ HashMap::new, HashSet::new, Vec::with_capacity
+              │  add_node, bulk_set_node_attributes, clone
+              │  columnar_store.bulk_set_node_attributes, contains_key
+              │  entry, graph.add_node, index, insert, len, new
+              │  node_id.clone, node_id_to_index.contains_key
+              │  node_id_to_index.insert, node_index.index
+              │  node_index_to_id.insert, node_indices.push
+              │  nodes_data.len, or_insert_with, push, with_capacity
+              └─
+       💬 Bulk add nodes with optimized columnar storage - INTERNAL USE ONLY
+   └── ⚙️  bulk_add_edges_internal() (line 61)
+       📞 Calls: ┌─ HashMap::new, HashSet::new, Some, Vec::with_capacity
+              │  add_edge, bulk_set_edge_attributes, clone
+              │  columnar_store.bulk_set_edge_attributes
+              │  edge_index.index, edge_index_to_endpoints.insert
+              │  edge_indices.push, edges_data.len, entry, get
+              │  graph.add_edge, index, insert, len, new
+              │  node_id_to_index.get, or_insert_with, push
+              │  source.clone, target.clone, with_capacity
+              └─
+       💬 Bulk add edges with optimized columnar storage - INTERNAL USE ONLY
+   └── ⚙️  create_nodes_from_list() (line 115)
+       📞 Calls: ┌─ HashMap::new, Ok, Vec::new, bulk_add_nodes_internal
+              │  clone, created_node_ids.push, extract, get_item, iter
+              │  len, new, node_id.clone, nodes_data.push, push
+              │  py_nodes.iter, python_dict_to_json_map
+              │  self.bulk_add_nodes_internal, tuple.get_item
+              │  tuple.len
+              └─
+       💬 Create nodes from Python list - PYTHON INTERFACE ONLY
+   └── ⚙️  create_edges_from_list() (line 148)
+       📞 Calls: ┌─ HashMap::new, Ok, Vec::new, bulk_add_edges_internal
+              │  edges_data.push, extract, get_item, iter, len, new
+              │  push, py_edges.iter, python_dict_to_json_map
+              │  self.bulk_add_edges_internal, tuple.get_item
+              │  tuple.len
+              └─
+       💬 Create edges from Python list - PYTHON INTERFACE ONLY
+   └── ⚙️  bulk_set_node_attributes_by_uid() (line 180)
+       📞 Calls: ┌─ Ok, Some, Vec::new, bulk_set_node_attributes
+              │  columnar_store.bulk_set_node_attributes, get, index
+              │  index_value_pairs.push, new, node_id_to_index.get
+              │  node_idx.index, push
+              └─
+       💬 Bulk set node attributes using attribute UIDs for efficiency
+   └── ⚙️  bulk_set_edge_attributes_by_uid() (line 200)
+       📞 Calls: ┌─ Ok, Some, Vec::new, bulk_set_edge_attributes
+              │  columnar_store.bulk_set_edge_attributes
+              │  edge_idx.index, find_edge, get, graph.find_edge
+              │  index, index_value_pairs.push, new
+              │  node_id_to_index.get, push
+              └─
+       💬 Bulk set edge attributes using attribute UIDs for efficiency
+
+============================================================
+FILE: graph/views.rs
+============================================================
+
+🏗️  STRUCT: GraphView (line 11)
+   🏷️  #pyclass
+
+🏗️  STRUCT: NodeView (line 51)
+   🏷️  #pyclass
+
+🏗️  STRUCT: AttributeView (line 91)
+   🏷️  #pyclass
+
+🏗️  STRUCT: ViewManager (line 123)
+   🏷️  #pyclass
+
+🔧 IMPL: GraphView (line 23)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 25)
+       🏷️  #new
+       📞 Calls: ┌─ ColumnarStore::new, GraphType::new_directed
+              │  GraphType::new_undirected, HashMap::new, new
+              │  new_directed, new_undirected
+              └─
+   └── ⚙️  topology_stats() (line 41)
+       📞 Calls: ┌─ HashMap::new, edge_count, graph.edge_count
+              │  graph.node_count, insert, new, node_count
+              │  stats.insert, to_string
+              └─
+       💬 Get graph topology statistics
+
+🔧 IMPL: NodeView (line 60)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 62)
+       🏷️  #new
+       📞 Calls: ColumnarStore::new, HashMap::new, new
+   └── ⚙️  node_stats() (line 71)
+       📞 Calls: ┌─ HashMap::new, extend, get_stats, insert, len, new
+              │  node_index_to_id.len, stats.extend, stats.insert
+              │  store.get_stats, to_string
+              └─
+       💬 Get node statistics
+
+🔧 IMPL: Default for NodeView (line 83)
+   └── ⚙️  default() (line 84)
+       📞 Calls: Self::new, new
+
+🔧 IMPL: AttributeView (line 97)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 99)
+       🏷️  #new
+       📞 Calls: ColumnarStore::new, new
+   └── ⚙️  get_attribute_names() (line 106)
+       📞 Calls: clone, collect, entry.key, iter, key, map
+       💬 Get all attribute names
+
+🔧 IMPL: Default for AttributeView (line 115)
+   └── ⚙️  default() (line 116)
+       📞 Calls: Self::new, new
+
+🔧 IMPL: ViewManager (line 130)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 132)
+       🏷️  #new
+       📞 Calls: AttributeView::new, GraphView::new, NodeView::new, new
+   └── ⚙️  stats() (line 145)
+       📞 Calls: ┌─ HashMap::new, attribute_view.get_attribute_names
+              │  extend, get_attribute_names
+              │  graph_view.topology_stats, insert, len, new
+              │  node_stats, node_view.node_stats, stats.extend
+              │  stats.insert, to_string, topology_stats
+              └─
+       💬 Get unified statistics
+
+============================================================
+FILE: graph/operations.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 6)
+   📝 High-level graph operations (subgraphs, algorithms, etc.) This module contains ONLY complex operations that operate on the full graph structure
+   └── ⚙️  parallel_subgraph_by_node_ids() (line 8)
+       📞 Calls: ┌─ FastGraph::new, Some, add_edge_to_graph_public
+              │  add_node_to_graph_public, as_str, clone
+              │  columnar_store.get_edge_attributes
+              │  columnar_store.get_node_attributes
+              │  columnar_store.set_edge_attribute
+              │  columnar_store.set_node_attribute, contains
+              │  edge_data.clone, edge_idx.index, get
+              │  get_edge_attributes, get_edge_endpoints
+              │  get_edge_indices, get_edge_weight
+              │  get_node_attributes, get_node_weight, id.clone, index
+              │  insert, new, new_edge_idx.index, new_node_idx.index
+              │  node_data.clone, node_id_to_index.get
+              │  node_ids.contains, node_idx.index
+              │  node_index_to_id.get, self.get_edge_endpoints
+              │  self.get_edge_indices, self.get_edge_weight
+              │  self.get_node_weight, set_edge_attribute
+              │  set_node_attribute, source_id.as_str
+              │  subgraph.add_edge_to_graph_public
+              │  subgraph.add_node_to_graph_public, target_id.as_str
+              └─
+       💬 Create subgraph with parallel node filtering - HIGH-LEVEL OPERATION ONLY
+   └── ⚙️  create_subgraph_by_node_filter() (line 78)
+       📞 Calls: ┌─ NodeIndex::new, cloned, collect
+              │  columnar_store.filter_nodes_sparse, filter_map
+              │  filter_nodes_sparse, get, into_iter, new
+              │  node_index_to_id.get, parallel_subgraph_by_node_ids
+              │  self.parallel_subgraph_by_node_ids
+              └─
+       💬 Create subgraph by filtering nodes with specific attributes - HIGH-LEVEL OPERATION
+   └── ⚙️  filter_nodes_by_degree() (line 99)
+       📞 Calls: ┌─ Vec::new, clone, count, degree, filtered_nodes.push
+              │  graph.neighbors, neighbors, neighbors_directed, new
+              │  node_id.clone, push
+              └─
+       💬 Degree-based node filtering - HIGH-LEVEL OPERATION
+   └── ⚙️  get_node_degree() (line 126)
+       📞 Calls: ┌─ Some, count, get, graph.neighbors, neighbors
+              │  neighbors_directed, node_id_to_index.get
+              └─
+       💬 Get node degree - HIGH-LEVEL OPERATION
+
+============================================================
+FILE: utils/conversion.rs
+============================================================
+
+⚙️  FUNCTION: python_dict_to_json_map() (line 7)
+   📞 Calls: ┌─ HashMap::new, Ok, extract, insert, key.extract
+          │  map.insert, new, python_to_json_value
+          └─
+   📝 Convert Python dictionary to JSON map
+
+⚙️  FUNCTION: python_to_json_value() (line 20)
+   📞 Calls: ┌─ Array, Bool, JsonValue::Array, JsonValue::Bool
+          │  JsonValue::Number, JsonValue::Object, JsonValue::String
+          │  Number, Number::from_f64, Object, Ok, Some, String
+          │  Vec::new, collect, extract, from_f64, i.into, into
+          │  into_iter, is_none, map.into_iter, new, push
+          │  py_value.is_none, py_value.str, python_dict_to_json_map
+          │  python_to_json_value, str, vec.push
+          └─
+   📝 Convert Python value to JSON value
+
+⚙️  FUNCTION: json_value_to_python() (line 52)
+   📞 Calls: ┌─ Array, Bool, JsonValue::Array, JsonValue::Bool
+          │  JsonValue::Number, JsonValue::Object, JsonValue::String
+          │  None, Number, Object, Ok, PyDict::new, PyList::empty
+          │  Some, String, append, as_f64, as_i64, b.to_object, empty
+          │  f.to_object, i.to_object, json_value_to_python, n.as_f64
+          │  n.as_i64, new, py.None, py_dict.set_item
+          │  py_dict.to_object, py_list.append, py_list.to_object
+          │  s.to_object, set_item, to_object
+          └─
+   📝 Convert JSON value to Python value
+
+⚙️  FUNCTION: python_value_to_json() (line 86)
+   📞 Calls: python_to_json_value
+   📝 Convert Python value to JSON (alias for python_to_json_value)
+
+⚙️  FUNCTION: python_pyobject_to_json() (line 91)
+   📞 Calls: as_ref, py_obj.as_ref, python_to_json_value
+   📝 Convert PyObject to JSON value
+
+============================================================
+FILE: utils/hash.rs
+============================================================
+
+⚙️  FUNCTION: fast_hash() (line 5)
+   📞 Calls: xxh3_64
+   📝 Fast hash function using xxHash
+
+⚙️  FUNCTION: hash_string() (line 10)
+   📞 Calls: as_bytes, fast_hash, s.as_bytes
+   📝 Hash a string
+
+⚙️  FUNCTION: hash_to_hex() (line 15)
+   📝 Create a hex string from hash
+
+============================================================
+FILE: storage/columnar.rs
+============================================================
+
+🏗️  STRUCT: ColumnarStore (line 18)
+   🏷️  #pyclass
+
+🔧 IMPL: Default for ColumnarStore (line 44)
+   └── ⚙️  default() (line 45)
+       📞 Calls: Self::new, new
+
+🔧 IMPL: ColumnarStore (line 51)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 53)
+       🏷️  #new
+       📞 Calls: ┌─ AtomicBool::new, AtomicU64::new, AtomicUsize::new
+              │  DashMap::new, new
+              └─
+   └── ⚙️  get_stats() (line 69)
+       📞 Calls: ┌─ HashMap::new, attr_name_to_uid.len
+              │  bitmaps_dirty.load, edge_attributes.len
+              │  edge_value_bitmaps.len, insert, len, load
+              │  max_edge_index.load, max_node_index.load, new
+              │  node_attributes.len, node_value_bitmaps.len
+              │  stats.insert, to_string
+              └─
+       💬 Get storage statistics
+
+🔧 IMPL: ColumnarStore (line 95)
+   └── ⚙️  get_or_create_attr_uid() (line 97)
+       📞 Calls: ┌─ AttrUID, Some, attr_name.to_string
+              │  attr_name_to_uid.get, clone, fetch_add, get, insert
+              │  to_string, uid.clone
+              └─
+       💬 Get or create an attribute UID for a given attribute name
+   └── ⚙️  get_attr_name() (line 114)
+       📞 Calls: attr_uid_to_name.get, clone, get, map, name.clone
+       💬 Get attribute name from UID
+   └── ⚙️  set_node_attribute() (line 119)
+       📞 Calls: ┌─ Some, attr_map.get, attr_map.insert, attr_uid.clone
+              │  bitmap.len, bitmap.set, bitmaps_dirty.store, clone
+              │  entry, get, get_mut, get_or_create_attr_uid, insert
+              │  len, load, max_node_index.load, max_node_index.store
+              │  node_attributes.entry, node_value_bitmaps.get_mut
+              │  old_value.clone, or_default
+              │  self.get_or_create_attr_uid, set, storage, store
+              │  value.clone
+              └─
+       💬 Set node attribute (simplified approach)
+   └── ⚙️  get_node_attribute() (line 149)
+       📞 Calls: attr_name_to_uid.get, cloned, get, storage
+       💬 Get node attribute
+   └── ⚙️  filter_nodes_by_attribute() (line 160)
+       📞 Calls: ┌─ Some, Vec::new, attr_name_to_uid.get, attr_uid.clone
+              │  bitmap.iter, clone, ensure_bitmap_exists, enumerate
+              │  get, iter, new, node_value_bitmaps.get, push
+              │  result.push, self.ensure_bitmap_exists, value.clone
+              └─
+       💬 Fast attribute-based filtering using bitmaps (builds on-demand)
+   └── ⚙️  ensure_bitmap_exists() (line 185)
+       📞 Calls: ┌─ BitVec::with_capacity, Some, attr_map.iter
+              │  bitmap.resize, bitmap.set, bitmap_key.clone, clone
+              │  contains_key, edge_attributes.get
+              │  edge_value_bitmaps.contains_key
+              │  edge_value_bitmaps.insert, get, insert, iter, load
+              │  max_edge_index.load, max_node_index.load
+              │  node_attributes.get, node_value_bitmaps.contains_key
+              │  node_value_bitmaps.insert, resize, set, with_capacity
+              └─
+       💬 Ensure a bitmap exists for the given key
+   └── ⚙️  filter_nodes_by_attributes() (line 230)
+       📞 Calls: ┌─ Some, Vec::new, as_bitslice, attr_name_to_uid.get
+              │  attr_uid.clone, bitmap.as_bitslice, bitmap.clone
+              │  bitmap.iter, clone, ensure_bitmap_exists, enumerate
+              │  expected_value.clone, filters.is_empty, get, is_empty
+              │  iter, new, node_value_bitmaps.get, push, result.push
+              │  self.ensure_bitmap_exists
+              └─
+       💬 Multi-attribute filtering with bitmap intersection (builds bitmaps on-demand)
+   └── ⚙️  get_node_attributes_by_uids() (line 277)
+       📞 Calls: ┌─ HashMap::new, Some, attr_map.get, attributes.insert
+              │  clone, get, get_attr_name, insert, new
+              │  node_attributes.get, self.get_attr_name, value.clone
+              └─
+       💬 Get all attributes for a node using attr_uids from NodeData
+   └── ⚙️  get_edge_attributes_by_uids() (line 294)
+       📞 Calls: ┌─ HashMap::new, Some, attr_map.get, attributes.insert
+              │  clone, edge_attributes.get, get, get_attr_name
+              │  insert, new, self.get_attr_name, value.clone
+              └─
+       💬 Get all attributes for an edge using attr_uids from EdgeData
+   └── ⚙️  get_node_attributes() (line 312)
+       📞 Calls: ┌─ HashMap::new, Some, attr_entry.key, attr_entry.value
+              │  attr_map.get, attributes.insert, clone, get
+              │  get_attr_name, insert, iter, key, new
+              │  node_attributes.iter, self.get_attr_name, value
+              │  value.clone
+              └─
+       💬 Get all attributes for a node (legacy interface - looks up attr_uids from NodeData) This method will need to be called with the actual node data to get attr_uids
+   └── ⚙️  get_edge_attributes() (line 332)
+       📞 Calls: ┌─ HashMap::new, Some, attr_entry.key, attr_entry.value
+              │  attr_map.get, attributes.insert, clone
+              │  edge_attributes.iter, get, get_attr_name, insert
+              │  iter, key, new, self.get_attr_name, value
+              │  value.clone
+              └─
+       💬 Get all attributes for an edge (legacy interface)
+   └── ⚙️  filter_nodes_by_numeric_comparison() (line 351)
+       📞 Calls: ┌─ JsonValue::Number, JsonValue::String, Number, Some
+              │  String, Vec::new, Vec::with_capacity, abs, as_f64
+              │  attr_map.len, attr_name_to_uid.get, extend
+              │  filter_map, get, iter, len, n.as_f64, new
+              │  node_attributes.get, ok, result.extend, with_capacity
+              └─
+       💬 Filter nodes by numeric comparison (optimized implementation)
+   └── ⚙️  filter_nodes_by_string_comparison() (line 396)
+       📞 Calls: ┌─ Some, Vec::new, Vec::with_capacity, as_str
+              │  attr_map.len, attr_name_to_uid.get, contains
+              │  ends_with, extend, filter_map, get, iter
+              │  json_value.as_str, len, new, node_attributes.get
+              │  node_value.contains, node_value.ends_with
+              │  node_value.starts_with, result.extend, starts_with
+              │  with_capacity
+              └─
+       💬 Filter nodes by string comparison (optimized implementation)
+   └── ⚙️  remove_node() (line 436)
+       📞 Calls: ┌─ Some, attr_map.remove, attr_uid.clone, bitmap.len
+              │  bitmap.set, bitmaps_dirty.store, clone, get_mut, len
+              │  node_attributes.get_mut, node_value_bitmaps.get_mut
+              │  remove, set, store
+              └─
+       💬 Remove node and clean up attribute storage
+   └── ⚙️  remove_node_legacy() (line 456)
+       📞 Calls: ┌─ HashSet::new, attr_entry.key, attr_entry.value
+              │  attr_map.contains_key, attr_uid.clone, clone
+              │  contains_key, insert, iter, key, new
+              │  node_attr_uids.insert, node_attributes.iter
+              │  remove_node, self.remove_node, value
+              └─
+       💬 Remove node and clean up attribute storage (legacy interface - finds attr_uids automatically)
+
+🔧 IMPL: ColumnarStore (line 475)
+   📝 Edge storage methods (simplified, same pattern as nodes)
+   └── ⚙️  set_edge_attribute() (line 477)
+       📞 Calls: ┌─ Some, attr_map.get, attr_map.insert, attr_uid.clone
+              │  bitmap.len, bitmap.set, bitmaps_dirty.store, clone
+              │  edge_attributes.entry, edge_value_bitmaps.get_mut
+              │  entry, get, get_mut, get_or_create_attr_uid, insert
+              │  len, load, max_edge_index.load, max_edge_index.store
+              │  old_value.clone, or_default
+              │  self.get_or_create_attr_uid, set, storage, store
+              │  value.clone
+              └─
+       💬 Set edge attribute (simplified approach)
+   └── ⚙️  get_edge_attribute() (line 507)
+       📞 Calls: attr_name_to_uid.get, cloned, get, storage
+       💬 Get edge attribute
+   └── ⚙️  filter_edges_by_attributes() (line 518)
+       📞 Calls: ┌─ Some, Vec::new, as_bitslice, attr_name_to_uid.get
+              │  attr_uid.clone, bitmap.as_bitslice, bitmap.clone
+              │  bitmap.iter, clone, edge_value_bitmaps.get
+              │  ensure_bitmap_exists, enumerate, expected_value.clone
+              │  filters.is_empty, get, is_empty, iter, new, push
+              │  result.push, self.ensure_bitmap_exists
+              └─
+       💬 Fast edge filtering using bitmaps (builds on-demand)
+   └── ⚙️  filter_edges_by_numeric_comparison() (line 565)
+       📞 Calls: ┌─ JsonValue::Number, JsonValue::String, Number, Some
+              │  String, Vec::new, Vec::with_capacity, abs, as_f64
+              │  attr_map.len, attr_name_to_uid.get
+              │  edge_attributes.get, extend, filter_map, get, iter
+              │  len, n.as_f64, new, ok, result.extend, with_capacity
+              └─
+       💬 Filter edges by numeric comparison (optimized implementation)
+   └── ⚙️  filter_edges_by_string_comparison() (line 610)
+       📞 Calls: ┌─ Some, Vec::new, Vec::with_capacity, as_str
+              │  attr_map.len, attr_name_to_uid.get, contains
+              │  edge_attributes.get, edge_value.contains
+              │  edge_value.ends_with, edge_value.starts_with
+              │  ends_with, extend, filter_map, get, iter
+              │  json_value.as_str, len, new, result.extend
+              │  starts_with, with_capacity
+              └─
+       💬 Filter edges by string comparison (optimized implementation)
+   └── ⚙️  remove_edge() (line 650)
+       📞 Calls: ┌─ Some, attr_map.remove, attr_uid.clone, bitmap.len
+              │  bitmap.set, bitmaps_dirty.store, clone
+              │  edge_attributes.get_mut, edge_value_bitmaps.get_mut
+              │  get_mut, len, remove, set, store
+              └─
+       💬 Remove edge and clean up attribute storage
+   └── ⚙️  remove_edge_legacy() (line 670)
+       📞 Calls: ┌─ HashSet::new, attr_entry.key, attr_entry.value
+              │  attr_map.contains_key, attr_uid.clone, clone
+              │  contains_key, edge_attr_uids.insert
+              │  edge_attributes.iter, insert, iter, key, new
+              │  remove_edge, self.remove_edge, value
+              └─
+       💬 Remove edge and clean up attribute storage (legacy interface)
+
+🔧 IMPL: Clone for ColumnarStore (line 688)
+   └── ⚙️  clone() (line 689)
+       📞 Calls: ┌─ AtomicBool::new, AtomicU64::new, AtomicUsize::new
+              │  attr_name_to_uid.clone, attr_uid_to_name.clone
+              │  bitmaps_dirty.load, clone, edge_attributes.clone
+              │  edge_value_bitmaps.clone, load, max_edge_index.load
+              │  max_node_index.load, new, node_attributes.clone
+              │  node_value_bitmaps.clone
+              └─
+
+🔧 IMPL: ColumnarStore (line 714)
+   └── ⚙️  batch_set_node_attributes() (line 717)
+       📞 Calls: ┌─ HashMap::new, HashSet::new, Some
+              │  all_attr_names.insert, attr_map.insert
+              │  attr_name.clone, attr_name_to_uid.get
+              │  attr_name_to_uid.insert, attr_uid.clone
+              │  attr_updates.entry, bitmaps_dirty.store, clone, entry
+              │  get, get_or_create_attr_uid, insert, load, max
+              │  max_node_in_batch.max, max_node_index.load
+              │  max_node_index.store, new, node_attributes.entry
+              │  or_default, push, self.get_or_create_attr_uid, store
+              └─
+       💬 Batch set node attributes for multiple nodes efficiently Uses attr_uid mapping and value deduplication
+   └── ⚙️  batch_set_edge_attributes() (line 776)
+       📞 Calls: ┌─ HashMap::new, HashSet::new, Some
+              │  all_attr_names.insert, attr_map.insert
+              │  attr_name.clone, attr_name_to_uid.get
+              │  attr_name_to_uid.insert, attr_uid.clone
+              │  attr_updates.entry, bitmaps_dirty.store, clone
+              │  edge_attributes.entry, entry, get
+              │  get_or_create_attr_uid, insert, load, max
+              │  max_edge_in_batch.max, max_edge_index.load
+              │  max_edge_index.store, new, or_default, push
+              │  self.get_or_create_attr_uid, store
+              └─
+       💬 Batch set edge attributes for multiple edges efficiently
+   └── ⚙️  filter_nodes_sparse() (line 836)
+       📞 Calls: ┌─ HashSet::new, Some, Vec::new, attr_name_to_uid.get
+              │  attr_uid.clone, attr_uid_filters.push
+              │  candidates.into_iter, candidates.is_empty
+              │  candidates.retain, clone, collect, contains
+              │  expected_value.clone, filter_map, filters.is_empty
+              │  first, get, into_iter, is_empty, iter
+              │  matching_nodes.contains, new, node_attributes.get
+              │  push, result.sort_unstable, retain, sort_unstable
+              └─
+       💬 High-performance multi-attribute filtering using sparse intersection Instead of building full bitmaps, directly intersect sparse attribute maps
+   └── ⚙️  get_unique_values_for_attribute() (line 893)
+       📞 Calls: ┌─ HashSet::new, Some, Vec::new, attr_map.iter
+              │  attr_name_to_uid.get, clone, collect
+              │  edge_attributes.get, get, insert, into_iter, iter
+              │  new, node_attributes.get, unique_values.insert
+              │  unique_values.into_iter, value.clone
+              └─
+       💬 Get unique values for an attribute (for analytics and optimization)
+   └── ⚙️  get_value_distribution() (line 916)
+       📞 Calls: ┌─ HashMap::new, Some, attr_map.iter
+              │  attr_name_to_uid.get, clone, distribution.entry
+              │  edge_attributes.get, entry, get, iter, new
+              │  node_attributes.get, or_default, value.clone
+              └─
+       💬 Get value distribution for an attribute (useful for query optimization)
+   └── ⚙️  bulk_set_node_attributes() (line 939)
+       📞 Calls: ┌─ Some, attr_map.insert, bitmaps_dirty.store, entry
+              │  fetch_max, get_or_create_attr_uid, insert, is_empty
+              │  iter, map, max, max_node_index.fetch_max
+              │  node_attributes.entry, node_value_pairs.is_empty
+              │  node_value_pairs.iter, or_insert_with
+              │  self.get_or_create_attr_uid, store
+              └─
+       💬 Bulk set node attributes for efficient batch operations
+   └── ⚙️  bulk_set_edge_attributes() (line 969)
+       📞 Calls: ┌─ Some, attr_map.insert, bitmaps_dirty.store
+              │  edge_attributes.entry, edge_value_pairs.is_empty
+              │  edge_value_pairs.iter, entry, fetch_max
+              │  get_or_create_attr_uid, insert, is_empty, iter, map
+              │  max, max_edge_index.fetch_max, or_insert_with
+              │  self.get_or_create_attr_uid, store
+              └─
+       💬 Bulk set edge attributes for efficient batch operations
+   └── ⚙️  bulk_set_multiple_node_attributes() (line 999)
+       📞 Calls: ┌─ HashMap::new, bulk_set_node_attributes, entry
+              │  fetch_max, is_empty, max_node_index.fetch_max, new
+              │  nodes_attrs.is_empty, or_insert_with, push
+              │  self.bulk_set_node_attributes
+              └─
+       💬 Bulk set multiple node attributes efficiently - optimized for graph creation
+   └── ⚙️  bulk_set_multiple_edge_attributes() (line 1029)
+       📞 Calls: ┌─ HashMap::new, bulk_set_edge_attributes
+              │  edges_attrs.is_empty, entry, fetch_max, is_empty
+              │  max_edge_index.fetch_max, new, or_insert_with, push
+              │  self.bulk_set_edge_attributes
+              └─
+       💬 Bulk set multiple edge attributes efficiently - optimized for graph creation
+   └── ⚙️  filter_nodes_multi_criteria() (line 1060)
+       📞 Calls: ┌─ Some, Vec::new, any, candidates.unwrap_or_default
+              │  cands.is_empty, cands.retain, collect, contains
+              │  exact_filters.is_empty
+              │  filter_nodes_by_numeric_comparison
+              │  filter_nodes_by_string_comparison
+              │  filter_nodes_sparse, into_iter, is_empty
+              │  matching_indices.into_iter, matching_set.contains
+              │  new, result.sort_unstable, retain
+              │  self.filter_nodes_by_numeric_comparison
+              │  self.filter_nodes_by_string_comparison
+              │  self.filter_nodes_sparse, sort_unstable
+              │  unwrap_or_default
+              └─
+       💬 Optimized multi-criteria filtering that handles exact matches, numeric comparisons, and string comparisons All filtering and intersection logic is done in Rust to avoid Python overhead
+   └── ⚙️  filter_edges_multi_criteria() (line 1126)
+       📞 Calls: ┌─ Some, Vec::new, any, candidates.unwrap_or_default
+              │  cands.is_empty, cands.retain, collect, contains
+              │  exact_filters.is_empty, filter_edges_by_attributes
+              │  filter_edges_by_numeric_comparison
+              │  filter_edges_by_string_comparison, into_iter
+              │  is_empty, matching_indices.into_iter
+              │  matching_set.contains, new, result.sort_unstable
+              │  retain, self.filter_edges_by_attributes
+              │  self.filter_edges_by_numeric_comparison
+              │  self.filter_edges_by_string_comparison, sort_unstable
+              │  unwrap_or_default
+              └─
+       💬 Similar multi-criteria filtering for edges
+   └── ⚙️  bulk_get_node_attribute_vectors() (line 1193)
+       📞 Calls: ┌─ HashMap::new, Some, Vec::new, attr_map.get
+              │  attr_map.iter, attr_map.len, attr_name.clone
+              │  attr_name_to_uid.get, attr_uid.clone, attr_uids.push
+              │  clone, collect, get, indices.push, indices.reserve
+              │  indices.to_vec, insert, is_some, iter, len, load
+              │  max_node_index.load, min, new, node_attributes.get
+              │  node_indices.is_some, push, reserve, results.insert
+              │  target_indices.len, to_vec, value.clone, values.push
+              │  values.reserve
+              └─
+       💬 DataFrame-optimized bulk attribute retrieval - returns raw vectors for fast conversion This method is designed for maximum performance when extracting data for pandas/polars
+   └── ⚙️  bulk_get_edge_attribute_vectors() (line 1251)
+       📞 Calls: ┌─ HashMap::new, Some, Vec::new, attr_map.get
+              │  attr_map.iter, attr_map.len, attr_name.clone
+              │  attr_name_to_uid.get, attr_uid.clone, attr_uids.push
+              │  clone, collect, edge_attributes.get
+              │  edge_indices.is_some, get, indices.push
+              │  indices.reserve, indices.to_vec, insert, is_some
+              │  iter, len, load, max_edge_index.load, min, new, push
+              │  reserve, results.insert, target_indices.len, to_vec
+              │  value.clone, values.push, values.reserve
+              └─
+       💬 DataFrame-optimized bulk edge attribute retrieval
+   └── ⚙️  get_single_attribute_fast() (line 1310)
+       📞 Calls: ┌─ Some, Vec::with_capacity, attr_map.iter
+              │  attr_map.len, attr_name_to_uid.get, clone
+              │  edge_attributes.get, get, indices.push, iter, len
+              │  node_attributes.get, push, value.clone, values.push
+              │  with_capacity
+              └─
+       💬 Ultra-fast single attribute retrieval for statistics - returns parallel vectors Optimized for cases like "get all salaries" or "get all weights"
+   └── ⚙️  get_attribute_bulk() (line 1338)
+       📞 Calls: ┌─ Some, Vec::with_capacity, attr_map.get
+              │  attr_name_to_uid.get, clone, get, is_empty, len
+              │  node_attributes.get, node_indices.len, push
+              │  result_indices.is_empty, result_indices.push
+              │  result_values.push, value.clone, with_capacity
+              └─
+       💬 Bulk attribute retrieval for multiple nodes - single attribute Returns (node_indices, values) for efficient processing
+   └── ⚙️  get_single_attribute_vectorized() (line 1366)
+       📞 Calls: ┌─ Some, Vec::with_capacity, attr_map.iter
+              │  attr_map.len, attr_name_to_uid.get, clone, collect
+              │  combined.into_iter, combined.sort_by_key, get
+              │  indices.into_iter, indices.push, into_iter, is_empty
+              │  iter, len, node_attributes.get, push, sort_by_key
+              │  sorted_indices.is_empty, unzip, value.clone
+              │  values.into_iter, values.push, with_capacity, zip
+              └─
+       💬 Vectorized single attribute retrieval for all nodes with the attribute Optimized for dense attribute access patterns
+   └── ⚙️  get_multiple_attributes_bulk() (line 1398)
+       📞 Calls: ┌─ HashMap::new, HashMap::with_capacity, Some
+              │  attr_map.get, attr_name.clone, attr_uid_to_name.iter
+              │  clone, collect, entry.key, entry.value, get, insert
+              │  is_empty, iter, key, len, map, new
+              │  node_attributes.get, node_attrs.insert
+              │  node_attrs.is_empty, node_indices.is_empty
+              │  node_indices.len, results.insert, results.is_empty
+              │  value, value.clone, with_capacity
+              └─
+       💬 Bulk multi-attribute retrieval for multiple nodes Returns HashMap<node_index, HashMap<attr_name, JsonValue>>
+   └── ⚙️  get_dataframe_node_data() (line 1439)
+       📞 Calls: ┌─ HashMap::new, Some, Vec::with_capacity, attr_map.get
+              │  attr_name_to_uid.get, attr_uid_to_name.iter
+              │  attrs.to_vec, clone, cloned, collect, entry.value
+              │  get, indices.to_vec, insert, iter, len, load, map
+              │  max_node_index.load, new, node_attributes.get, push
+              │  results.insert, target_nodes.len, to_vec, value
+              │  values.push, with_capacity
+              └─
+       💬 DataFrame-optimized bulk multi-attribute retrieval for all nodes Returns data in format optimized for pandas/polars DataFrame creation
+   └── ⚙️  export_node_attribute_table() (line 1486)
+       📞 Calls: ┌─ Some, Vec::with_capacity, attr_map.get
+              │  attr_name_to_uid.get, attr_uid_to_name.iter
+              │  attrs.to_vec, clone, cloned, collect, column.push
+              │  column.resize, entry.value, get, indices.to_vec, iter
+              │  len, load, map, max_node_index.load
+              │  node_attributes.get, push, resize, target_attrs.len
+              │  target_nodes.len, to_vec, value, value_matrix.push
+              │  with_capacity
+              └─
+       💬 High-performance node attribute table export for DataFrame libraries Returns (node_indices, attribute_names, value_matrix) for maximum efficiency
+   └── ⚙️  to_pandas_dict() (line 1533)
+       📞 Calls: ┌─ HashMap::new, None, Ok, Python::with_gil, Some
+              │  as_deref, attr_name.clone, attr_names.as_deref
+              │  attrs.iter, clone, collect, enumerate
+              │  export_node_attribute_table, idx.into_py, insert
+              │  into_py, iter, json_value_to_python, map, new
+              │  node_indices.as_deref, nodes.iter, py.None
+              │  results.insert, self.export_node_attribute_table
+              │  to_string, with_gil
+              └─
+       💬 DataFrame conversion methods for high-performance batch export Returns formatted data ready for pandas/polars
+   └── ⚙️  get_column_fast() (line 1574)
+       📞 Calls: ┌─ Ok, Python::with_gil, Some, Vec::new, collect
+              │  get_attribute_bulk, get_single_attribute_vectorized
+              │  iter, json_value_to_python, map, new
+              │  self.get_attribute_bulk
+              │  self.get_single_attribute_vectorized, values.iter
+              │  with_gil
+              └─
+       💬 Ultra-fast single column extraction for DataFrame operations
+
+============================================================
+FILE: storage/graph_store.rs
+============================================================
+
+🏗️  STRUCT: GraphState (line 15)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: GraphStore (line 26)
+   🏷️  #pyclass
+
+🔧 IMPL: GraphStore (line 34)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 36)
+       🏷️  #new
+       📞 Calls: ┌─ Arc::new, ContentPool::new, DashMap::new
+              │  RwLock::new, create_initial_state, new
+              │  store.create_initial_state
+              └─
+   └── ⚙️  get_current_hash() (line 50)
+       📞 Calls: clone, current_hash.read, read
+       💬 Get current graph hash
+   └── ⚙️  get_stats() (line 55)
+       📞 Calls: ┌─ branches.len, content_pool.get_stats, get_stats
+              │  insert, len, states.len, stats.insert, to_string
+              └─
+       💬 Get storage statistics
+   └── ⚙️  create_branch() (line 63)
+       📞 Calls: ┌─ Err, Ok, branches.insert, contains_key
+              │  get_current_hash, insert, ok_or_else, or_else
+              │  self.get_current_hash, states.contains_key
+              └─
+       💬 Create a new branch
+   └── ⚙️  list_branches() (line 81)
+       📞 Calls: ┌─ clone, collect, entry.key, entry.value, iter, key
+              │  map, value
+              └─
+       💬 List all branches
+   └── ⚙️  store_current_graph() (line 89)
+       📞 Calls: self.store_graph, store_graph
+       💬 Store a graph and return its state hash (exposed to Python)
+   └── ⚙️  get_graph_from_state() (line 94)
+       📞 Calls: reconstruct_graph, self.reconstruct_graph
+       💬 Reconstruct graph from state hash (exposed to Python)
+
+🔧 IMPL: GraphStore (line 99)
+   └── ⚙️  create_initial_state() (line 101)
+       📞 Calls: ┌─ HashMap::new, Some, SystemTime::now, as_secs
+              │  current_hash.write, duration_since, insert, new, now
+              │  states.insert, to_string, unwrap, write
+              └─
+       💬 Create initial empty state
+   └── ⚙️  store_graph() (line 123)
+       📞 Calls: ┌─ HashMap::new, Some, SystemTime::now, as_bytes
+              │  as_secs, clone, columnar_store.get_edge_attributes
+              │  columnar_store.get_node_attributes
+              │  content_pool.intern_edge, content_pool.intern_node
+              │  current_hash.write, duration_since
+              │  edge_hashes.insert, edge_idx.index, fast_hash, get
+              │  get_current_hash, get_edge_attributes
+              │  get_edge_indices, get_edge_weight
+              │  get_node_attributes, get_node_ids, get_node_weight
+              │  graph.get_edge_indices, graph.get_edge_weight
+              │  graph.get_node_ids, graph.get_node_weight, id.clone
+              │  index, insert, intern_edge, intern_node, new
+              │  node_hashes.insert, node_id_to_index.get
+              │  node_idx.index, now, self.get_current_hash
+              │  source.clone, state_data.as_bytes, state_hash.clone
+              │  states.insert, target.clone, unwrap, write
+              └─
+       💬 Store a graph and return its state hash
+   └── ⚙️  reconstruct_graph() (line 184)
+       📞 Calls: ┌─ EdgeData::from, FastGraph::new, NodeData::from, Some
+              │  add_edge_to_graph_public, add_node_to_graph_public
+              │  attr_value.clone, clone
+              │  columnar_store.set_edge_attribute
+              │  columnar_store.set_node_attribute
+              │  content_pool.get_edge, content_pool.get_node
+              │  edge_hashes.values, edge_idx.index, from, get
+              │  get_edge, get_node, graph.add_edge_to_graph_public
+              │  graph.add_node_to_graph_public, index, insert, new
+              │  new_node_idx.index, node_id.clone
+              │  node_id_to_index.get, node_id_to_index.insert
+              │  node_index_to_id.insert, set_edge_attribute
+              │  set_node_attribute, states.get, values
+              └─
+       💬 Reconstruct graph from state hash
+
+============================================================
+FILE: storage/content_pool.rs
+============================================================
+
+🏗️  STRUCT: ContentPool (line 13)
+   🏷️  #pyclass
+
+🔧 IMPL: ContentPool (line 21)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 23)
+       🏷️  #new
+       📞 Calls: DashMap::new, new
+   └── ⚙️  get_stats() (line 33)
+       📞 Calls: ┌─ HashMap::new, edge_refs.len, edges.len, insert, len
+              │  new, node_refs.len, nodes.len, stats.insert
+              │  to_string
+              └─
+       💬 Get storage statistics
+
+🔧 IMPL: ContentPool (line 43)
+   └── ⚙️  hash_node() (line 45)
+       📞 Calls: ┌─ ContentHash, as_bytes, fast_hash
+              │  serde_json::to_string, serialized.as_bytes, to_string
+              │  unwrap_or_default
+              └─
+       💬 Hash a node for content addressing
+   └── ⚙️  hash_edge() (line 51)
+       📞 Calls: ┌─ ContentHash, as_bytes, fast_hash
+              │  serde_json::to_string, serialized.as_bytes, to_string
+              │  unwrap_or_default
+              └─
+       💬 Hash an edge for content addressing
+   └── ⚙️  intern_node() (line 57)
+       📞 Calls: ┌─ Arc::new, Self::hash_node, clone, entry, hash.clone
+              │  hash_node, new, node_refs.entry, nodes.entry
+              │  or_insert
+              └─
+       💬 Store node in pool and return its content hash
+   └── ⚙️  intern_edge() (line 71)
+       📞 Calls: ┌─ Arc::new, Self::hash_edge, clone, edge_refs.entry
+              │  edges.entry, entry, hash.clone, hash_edge, new
+              │  or_insert
+              └─
+       💬 Store edge in pool and return its content hash
+   └── ⚙️  get_node() (line 85)
+       📞 Calls: clone, entry.clone, get, map, nodes.get
+       💬 Get node by content hash
+   └── ⚙️  get_edge() (line 90)
+       📞 Calls: clone, edges.get, entry.clone, get, map
+       💬 Get edge by content hash
+   └── ⚙️  release_node() (line 95)
+       📞 Calls: ┌─ Some, drop, get_mut, node_refs.get_mut
+              │  node_refs.remove, nodes.remove, remove
+              └─
+       💬 Release a node reference (for garbage collection)
+   └── ⚙️  release_edge() (line 109)
+       📞 Calls: ┌─ Some, drop, edge_refs.get_mut, edge_refs.remove
+              │  edges.remove, get_mut, remove
+              └─
+       💬 Release an edge reference (for garbage collection)
+   └── ⚙️  compact() (line 123)
+       📞 Calls: ┌─ clone, collect, edge_refs.remove, edges.remove
+              │  entry.key, entry.value, filter, iter, key, map
+              │  node_refs.remove, nodes.remove, remove, value
+              └─
+       💬 Compact the pool by removing unreferenced items
+
+🔧 IMPL: Default for ContentPool (line 158)
+   └── ⚙️  default() (line 159)
+       📞 Calls: Self::new, new
+
+============================================================
+SUMMARY: Analyzed 12 files
+============================================================

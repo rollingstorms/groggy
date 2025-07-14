@@ -9,6 +9,26 @@ use crate::graph::types::{EdgeData, GraphType, NodeData};
 use crate::storage::ColumnarStore;
 use crate::utils::{python_dict_to_json_map, python_pyobject_to_json, python_value_to_json};
 
+/// Entity type for filtering operations (minimal version for columnar store)
+#[derive(Debug, Clone, Copy)]
+pub enum EntityType {
+    Node,
+    Edge,
+}
+
+/// Filter criteria for columnar operations (minimal version for columnar store) 
+#[derive(Debug, Clone)]
+pub enum FilterCriteria {
+    Attributes(HashMap<String, serde_json::Value>),
+    Numeric(String, String, f64),
+    String(String, String, String), 
+    MultiCriteria {
+        exact: HashMap<String, serde_json::Value>,
+        numeric: Vec<(String, String, f64)>,
+        string: Vec<(String, String, String)>,
+    },
+}
+
 /// FastGraph struct with hybrid/columnar storage (MAIN IMPLEMENTATION)
 #[pyclass]
 pub struct FastGraph {
@@ -49,82 +69,53 @@ impl FastGraph {
         }
     }
 
-    /// Add a single node with optional attributes
+    /// Add a single node - ONLY public method for single node addition
     pub fn add_node(&mut self, node_id: String, attributes: Option<&PyDict>) -> PyResult<()> {
-        // Check if node already exists
-        if self.node_id_to_index.contains_key(&node_id) {
-            return Ok(()); // Node already exists
-        }
-
-        // Create node data (lightweight)
-        let node_data = NodeData {
-            id: node_id.clone(),
-            attr_uids: std::collections::HashSet::new(),
+        let attrs = if let Some(py_attrs) = attributes {
+            Some(python_dict_to_json_map(py_attrs)?)
+        } else {
+            None
         };
+        self.add_single_node_internal(node_id, attrs)
+    }
 
-        // Add to graph topology
-        let node_index = self.graph.add_node(node_data);
-
-        // Update mappings
-        self.node_id_to_index.insert(node_id.clone(), node_index);
-        self.node_index_to_id.insert(node_index, node_id.clone());
-
-        // Store attributes in columnar format
-        if let Some(attrs) = attributes {
-            let attr_map = python_dict_to_json_map(attrs)?;
-            for (attr_name, attr_value) in attr_map {
-                self.columnar_store
-                    .set_node_attribute(node_index.index(), &attr_name, attr_value);
-            }
+    /// Add multiple nodes - ONLY public method for batch node addition
+    pub fn add_nodes(&mut self, nodes_data: Vec<(String, Option<&PyDict>)>) -> PyResult<()> {
+        let mut bulk_nodes = Vec::new();
+        for (node_id, attributes) in nodes_data {
+            let attrs = if let Some(py_attrs) = attributes {
+                python_dict_to_json_map(py_attrs)?
+            } else {
+                HashMap::new()
+            };
+            bulk_nodes.push((node_id, attrs));
         }
-
+        self.bulk_add_nodes_internal_call(bulk_nodes);
         Ok(())
     }
 
-    /// Add a single edge with optional attributes
-    pub fn add_edge(
-        &mut self,
-        source: String,
-        target: String,
-        attributes: Option<&PyDict>,
-    ) -> PyResult<()> {
-        // Get node indices
-        let source_idx = self.node_id_to_index.get(&source).ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
-                "Source node '{}' not found",
-                source
-            ))
-        })?;
-        let target_idx = self.node_id_to_index.get(&target).ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
-                "Target node '{}' not found",
-                target
-            ))
-        })?;
-
-        // Create edge data (lightweight)
-        let edge_data = EdgeData {
-            source: source.clone(),
-            target: target.clone(),
-            attr_uids: std::collections::HashSet::new(),
+    /// Add a single edge - ONLY public method for single edge addition
+    pub fn add_edge(&mut self, source: String, target: String, attributes: Option<&PyDict>) -> PyResult<()> {
+        let attrs = if let Some(py_attrs) = attributes {
+            Some(python_dict_to_json_map(py_attrs)?)
+        } else {
+            None
         };
+        self.add_single_edge_internal(source, target, attrs)
+    }
 
-        // Add to graph topology
-        let edge_index = self.graph.add_edge(*source_idx, *target_idx, edge_data);
-
-        // Store edge mapping
-        self.edge_index_to_endpoints
-            .insert(edge_index, (source, target));
-
-        // Store attributes in columnar format
-        if let Some(attrs) = attributes {
-            let attr_map = python_dict_to_json_map(attrs)?;
-            for (attr_name, attr_value) in attr_map {
-                self.columnar_store
-                    .set_edge_attribute(edge_index.index(), &attr_name, attr_value);
-            }
+    /// Add multiple edges - ONLY public method for batch edge addition
+    pub fn add_edges(&mut self, edges_data: Vec<(String, String, Option<&PyDict>)>) -> PyResult<()> {
+        let mut bulk_edges = Vec::new();
+        for (source, target, attributes) in edges_data {
+            let attrs = if let Some(py_attrs) = attributes {
+                python_dict_to_json_map(py_attrs)?
+            } else {
+                HashMap::new()
+            };
+            bulk_edges.push((source, target, attrs));
         }
-
+        self.bulk_add_edges_internal_call(bulk_edges);
         Ok(())
     }
 
@@ -160,6 +151,242 @@ impl FastGraph {
         }
     }
 
+    /// Get node attributes
+    pub fn get_node_attributes(
+        &self,
+        node_id: &str,
+    ) -> PyResult<Option<HashMap<String, pyo3::PyObject>>> {
+        use crate::utils::json_value_to_python;
+        use pyo3::Python;
+
+        let node_idx = self.node_id_to_index.get(node_id).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Node '{}' not found", node_id))
+        })?;
+
+        if let Some(_node_data) = self.graph.node_weight(*node_idx) {
+            Python::with_gil(|py| {
+                // Retrieve attributes from columnar store
+                let json_attributes = self.columnar_store.get_node_attributes(node_idx.index());
+
+                // Convert JsonValue to PyObject
+                let mut py_attributes = HashMap::new();
+                for (attr_name, json_value) in json_attributes {
+                    let py_value = json_value_to_python(py, &json_value)?;
+                    py_attributes.insert(attr_name, py_value);
+                }
+
+                Ok(Some(py_attributes))
+            })
+        } else {
+            Ok(None)
+        }
+    }
+
+    // === UNIFIED FILTERING METHODS ===
+
+    /// Filter nodes by attribute dictionary - unified filtering interface
+    pub fn filter_nodes_by_attributes(
+        &self,
+        filters: HashMap<String, pyo3::PyObject>,
+    ) -> PyResult<Vec<String>> {
+        use pyo3::Python;
+
+        if filters.is_empty() {
+            return Ok(self.get_node_ids());
+        }
+
+        Python::with_gil(|py| {
+            // Convert PyObjects to JsonValues
+            let mut json_filters = HashMap::new();
+            for (attr_name, py_value) in filters {
+                let json_value = python_pyobject_to_json(py, &py_value)?;
+                json_filters.insert(attr_name, json_value);
+            }
+
+            // Use columnar store's optimized exact match filtering
+            let matching_indices = self.columnar_store.filter_nodes_by_attributes(&json_filters);
+            
+            // Convert indices back to node IDs
+            let mut result = Vec::new();
+            for node_index in matching_indices {
+                if let Some(node_id) = self
+                    .node_index_to_id
+                    .get(&petgraph::graph::NodeIndex::new(node_index))
+                {
+                    result.push(node_id.clone());
+                }
+            }
+            
+            Ok(result)
+        })
+    }
+
+    /// Filter edges by attribute dictionary - unified filtering interface  
+    pub fn filter_edges_by_attributes(
+        &self,
+        filters: HashMap<String, pyo3::PyObject>,
+    ) -> PyResult<Vec<String>> {
+        use pyo3::Python;
+
+        if filters.is_empty() {
+            return Ok(self.get_edge_ids());
+        }
+
+        Python::with_gil(|py| {
+            // Convert PyObjects to JsonValues
+            let mut json_filters = HashMap::new();
+            for (attr_name, py_value) in filters {
+                let json_value = python_pyobject_to_json(py, &py_value)?;
+                json_filters.insert(attr_name, json_value);
+            }
+
+            // Use columnar store's optimized exact match filtering
+            let matching_indices = self.columnar_store.filter_edges_by_attributes(&json_filters);
+            
+            // Convert indices back to edge IDs
+            let mut result = Vec::new();
+            for edge_index in matching_indices {
+                if let Some((source_idx, target_idx)) = self
+                    .graph
+                    .edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index))
+                {
+                    if let (Some(source_id), Some(target_id)) = (
+                        self.node_index_to_id.get(&source_idx),
+                        self.node_index_to_id.get(&target_idx),
+                    ) {
+                        result.push(format!("{}->{}", source_id, target_id));
+                    }
+                }
+            }
+            
+            Ok(result)
+        })
+    }
+
+    /// Filter nodes by numeric comparison - unified filtering interface
+    pub fn filter_nodes_by_numeric_comparison(
+        &self,
+        attr_name: &str,
+        operator: &str,
+        value: f64,
+    ) -> PyResult<Vec<String>> {
+        self.filter_entities_by_numeric_comparison("node", attr_name, operator, value)
+    }
+
+    /// Filter edges by numeric comparison - unified filtering interface
+    pub fn filter_edges_by_numeric_comparison(
+        &self,
+        attr_name: &str,
+        operator: &str,
+        value: f64,
+    ) -> PyResult<Vec<String>> {
+        self.filter_entities_by_numeric_comparison("edge", attr_name, operator, value)
+    }
+
+    /// Filter nodes by string comparison - unified filtering interface  
+    pub fn filter_nodes_by_string_comparison(
+        &self,
+        attr_name: &str,
+        operator: &str,
+        value: &str,
+    ) -> PyResult<Vec<String>> {
+        self.filter_entities_by_string_comparison("node", attr_name, operator, value)
+    }
+
+    /// Filter edges by string comparison - unified filtering interface
+    pub fn filter_edges_by_string_comparison(
+        &self,
+        attr_name: &str,
+        operator: &str,
+        value: &str,
+    ) -> PyResult<Vec<String>> {
+        self.filter_entities_by_string_comparison("edge", attr_name, operator, value)
+    }
+
+    /// Filter nodes with multi-criteria - unified filtering interface
+    pub fn filter_nodes_multi_criteria(
+        &self,
+        exact_matches: HashMap<String, String>,
+        numeric_comparisons: Vec<(String, String, f64)>,
+        string_comparisons: Vec<(String, String, String)>,
+    ) -> PyResult<Vec<String>> {
+        self.filter_entities_multi_criteria("node", exact_matches, numeric_comparisons, string_comparisons)
+    }
+
+    /// Filter edges with multi-criteria - unified filtering interface
+    pub fn filter_edges_multi_criteria(
+        &self,
+        exact_matches: HashMap<String, String>,
+        numeric_comparisons: Vec<(String, String, f64)>,
+        string_comparisons: Vec<(String, String, String)>,
+    ) -> PyResult<Vec<String>> {
+        self.filter_entities_multi_criteria("edge", exact_matches, numeric_comparisons, string_comparisons)
+    }
+
+    /// Filter nodes with sparse algorithm - unified filtering interface
+    pub fn filter_nodes_by_attributes_sparse(
+        &self,
+        filters: HashMap<String, pyo3::PyObject>,
+    ) -> PyResult<Vec<String>> {
+        self.filter_entities_by_attributes_sparse("node", filters)
+    }
+}
+
+impl FastGraph {
+    // === SIMPLIFIED HELPER METHODS ===
+    
+    fn add_single_node_internal(&mut self, id: String, attributes: Option<HashMap<String, serde_json::Value>>) -> PyResult<()> {
+        if self.node_id_to_index.contains_key(&id) {
+            return Ok(()); // Already exists
+        }
+        
+        // 1. Graph State: add address to topology
+        let node_data = NodeData { id: id.clone(), attr_uids: std::collections::HashSet::new() };
+        let node_idx = self.graph.add_node(node_data);
+        
+        // 2. Graph Pool: update address mappings  
+        self.node_id_to_index.insert(id.clone(), node_idx);
+        self.node_index_to_id.insert(node_idx, id);
+        
+        // 3. Attr Tables: store attributes via columnar
+        if let Some(attrs) = attributes {
+            for (attr_name, attr_value) in attrs {
+                self.columnar_store.set_node_attribute(node_idx.index(), &attr_name, attr_value);
+            }
+        }
+        
+        Ok(())
+    }
+    
+    fn add_single_edge_internal(&mut self, source: String, target: String, attributes: Option<HashMap<String, serde_json::Value>>) -> PyResult<()> {
+        // Get node indices
+        let source_idx = self.node_id_to_index.get(&source).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Source node '{}' not found", source))
+        })?;
+        let target_idx = self.node_id_to_index.get(&target).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Target node '{}' not found", target))
+        })?;
+
+        // 1. Graph State: add address to topology
+        let edge_data = EdgeData {
+            source: source.clone(),
+            target: target.clone(),
+            attr_uids: std::collections::HashSet::new(),
+        };
+        let edge_idx = self.graph.add_edge(*source_idx, *target_idx, edge_data);
+
+        // 2. Graph Pool: update address mappings
+        self.edge_index_to_endpoints.insert(edge_idx, (source, target));
+
+        // 3. Attr Tables: store attributes via columnar
+        if let Some(attrs) = attributes {
+            for (attr_name, attr_value) in attrs {
+                self.columnar_store.set_edge_attribute(edge_idx.index(), &attr_name, attr_value);
+            }
+        }
+
+        Ok(())
+    }    
     /// Get neighbors of a node (for directed graphs, returns only outgoing neighbors)
     pub fn get_neighbors(&self, node_id: &str) -> PyResult<Vec<String>> {
         let node_idx = self.node_id_to_index.get(node_id).ok_or_else(|| {
@@ -246,37 +473,6 @@ impl FastGraph {
         }
 
         Ok(neighbor_ids.into_iter().collect())
-    }
-
-    /// Get node attributes - retrieve from columnar store
-    pub fn get_node_attributes(
-        &self,
-        node_id: &str,
-    ) -> PyResult<Option<HashMap<String, pyo3::PyObject>>> {
-        use crate::utils::json_value_to_python;
-        use pyo3::Python;
-
-        let node_idx = self.node_id_to_index.get(node_id).ok_or_else(|| {
-            PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("Node '{}' not found", node_id))
-        })?;
-
-        if let Some(_node_data) = self.graph.node_weight(*node_idx) {
-            Python::with_gil(|py| {
-                // Retrieve attributes from columnar store
-                let json_attributes = self.columnar_store.get_node_attributes(node_idx.index());
-
-                // Convert JsonValue to PyObject
-                let mut py_attributes = HashMap::new();
-                for (attr_name, json_value) in json_attributes {
-                    let py_value = json_value_to_python(py, &json_value)?;
-                    py_attributes.insert(attr_name, py_value);
-                }
-
-                Ok(Some(py_attributes))
-            })
-        } else {
-            Ok(None)
-        }
     }
 
     /// Get edge attributes - retrieve from columnar store  
@@ -607,54 +803,22 @@ impl FastGraph {
         removed_count
     }
 
-    /// Add multiple nodes in batch - now uses optimized bulk operations internally
-    pub fn add_nodes(&mut self, nodes_data: Vec<(String, Option<&PyDict>)>) -> PyResult<()> {
-        // Convert to bulk format
-        let mut bulk_nodes = Vec::new();
-        for (node_id, attributes) in nodes_data {
-            let attrs = if let Some(py_attrs) = attributes {
-                python_dict_to_json_map(py_attrs)?
-            } else {
-                std::collections::HashMap::new()
-            };
-            bulk_nodes.push((node_id, attrs));
-        }
-        
-        // Use optimized bulk method
-        self.bulk_add_nodes_internal(bulk_nodes);
-        Ok(())
-    }
+    // === UNIFIED FILTERING IMPLEMENTATION ===
 
-    /// Add multiple edges in batch - now uses optimized bulk operations internally
-    pub fn add_edges(
-        &mut self,
-        edges_data: Vec<(String, String, Option<&PyDict>)>,
-    ) -> PyResult<()> {
-        // Convert to bulk format
-        let mut bulk_edges = Vec::new();
-        for (source, target, attributes) in edges_data {
-            let attrs = if let Some(py_attrs) = attributes {
-                python_dict_to_json_map(py_attrs)?
-            } else {
-                std::collections::HashMap::new()
-            };
-            bulk_edges.push((source, target, attrs));
-        }
-        
-        // Use optimized bulk method
-        self.bulk_add_edges_internal(bulk_edges);
-        Ok(())
-    }
-
-    /// Filter nodes by attribute dictionary - Python interface to columnar filtering
-    pub fn filter_nodes_by_attributes(
+    /// Unified entity filtering by attributes - eliminates duplication between nodes and edges
+    fn filter_entities_by_attributes(
         &self,
+        entity_type: &str,
         filters: HashMap<String, pyo3::PyObject>,
     ) -> PyResult<Vec<String>> {
         use pyo3::Python;
 
         if filters.is_empty() {
-            return Ok(self.get_node_ids());
+            return Ok(match entity_type {
+                "node" => self.get_node_ids(),
+                "edge" => self.get_edge_ids(),
+                _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("Invalid entity type")),
+            });
         }
 
         Python::with_gil(|py| {
@@ -665,35 +829,105 @@ impl FastGraph {
                 json_filters.insert(attr_name, json_value);
             }
 
-            // Use columnar store's optimized filtering ONLY
-            let matching_indices = self
-                .columnar_store
-                .filter_nodes_by_attributes(&json_filters);
+            // Use columnar store's unified filtering
+            let entity_enum = match entity_type {
+                "node" => EntityType::Node,
+                "edge" => EntityType::Edge,
+                _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("Invalid entity type")),
+            };
 
-            // Convert indices back to node IDs
-            let mut result = Vec::new();
-            for node_index in matching_indices {
-                if let Some(node_id) = self
-                    .node_index_to_id
-                    .get(&petgraph::graph::NodeIndex::new(node_index))
-                {
-                    result.push(node_id.clone());
-                }
-            }
+            let criteria = FilterCriteria::Attributes(json_filters);
+            let matching_indices = self.columnar_store.filter_entities(&entity_enum, criteria);
 
-            Ok(result)
+            // Convert indices back to IDs based on entity type
+            self.indices_to_ids(entity_type, matching_indices)
         })
     }
 
-    /// Filter edges by attribute dictionary - Python interface to columnar filtering  
-    pub fn filter_edges_by_attributes(
+    /// Unified entity filtering by numeric comparison
+    fn filter_entities_by_numeric_comparison(
         &self,
+        entity_type: &str,
+        attr_name: &str,
+        operator: &str,
+        value: f64,
+    ) -> PyResult<Vec<String>> {
+        let entity_enum = match entity_type {
+            "node" => EntityType::Node,
+            "edge" => EntityType::Edge,
+            _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("Invalid entity type")),
+        };
+
+        let criteria = FilterCriteria::Numeric(attr_name.to_string(), operator.to_string(), value);
+        let matching_indices = self.columnar_store.filter_entities(&entity_enum, criteria);
+
+        self.indices_to_ids(entity_type, matching_indices)
+    }
+
+    /// Unified entity filtering by string comparison
+    fn filter_entities_by_string_comparison(
+        &self,
+        entity_type: &str,
+        attr_name: &str,
+        operator: &str,
+        value: &str,
+    ) -> PyResult<Vec<String>> {
+        let entity_enum = match entity_type {
+            "node" => EntityType::Node,
+            "edge" => EntityType::Edge,
+            _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("Invalid entity type")),
+        };
+
+        let criteria = FilterCriteria::String(attr_name.to_string(), operator.to_string(), value.to_string());
+        let matching_indices = self.columnar_store.filter_entities(&entity_enum, criteria);
+
+        self.indices_to_ids(entity_type, matching_indices)
+    }
+
+    /// Unified entity filtering with multi-criteria
+    fn filter_entities_multi_criteria(
+        &self,
+        entity_type: &str,
+        exact_matches: HashMap<String, String>,
+        numeric_comparisons: Vec<(String, String, f64)>,
+        string_comparisons: Vec<(String, String, String)>,
+    ) -> PyResult<Vec<String>> {
+        let entity_enum = match entity_type {
+            "node" => EntityType::Node,
+            "edge" => EntityType::Edge,
+            _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("Invalid entity type")),
+        };
+
+        // Convert exact matches to JSON values
+        let mut exact_json = HashMap::new();
+        for (key, value) in exact_matches {
+            exact_json.insert(key, serde_json::Value::String(value));
+        }
+
+        let criteria = FilterCriteria::MultiCriteria {
+            exact: exact_json,
+            numeric: numeric_comparisons,
+            string: string_comparisons,
+        };
+
+        let matching_indices = self.columnar_store.filter_entities(&entity_enum, criteria);
+        self.indices_to_ids(entity_type, matching_indices)
+    }
+
+    /// Unified entity filtering by attributes with sparse algorithm
+    fn filter_entities_by_attributes_sparse(
+        &self,
+        entity_type: &str,
         filters: HashMap<String, pyo3::PyObject>,
     ) -> PyResult<Vec<String>> {
         use pyo3::Python;
 
         if filters.is_empty() {
-            return Ok(self.get_edge_ids());
+            return Ok(match entity_type {
+                "node" => self.get_node_ids(),
+                "edge" => self.get_edge_ids(),
+                _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("Invalid entity type")),
+            });
         }
 
         Python::with_gil(|py| {
@@ -704,276 +938,51 @@ impl FastGraph {
                 json_filters.insert(attr_name, json_value);
             }
 
-            // Use columnar store's optimized filtering ONLY
-            let matching_indices = self
-                .columnar_store
-                .filter_edges_by_attributes(&json_filters);
+            // Use columnar store's sparse filtering (only for nodes currently)
+            let matching_indices = match entity_type {
+                "node" => self.columnar_store.filter_nodes_sparse(&json_filters),
+                "edge" => {
+                    // For edges, fall back to regular filtering since sparse is only implemented for nodes
+                    self.columnar_store.filter_edges_by_attributes(&json_filters)
+                },
+                _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("Invalid entity type")),
+            };
 
-            // Convert indices back to edge IDs (source->target format)
-            let mut result = Vec::new();
-            for edge_index in matching_indices {
-                if let Some((source_idx, target_idx)) = self
-                    .graph
-                    .edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index))
-                {
-                    if let (Some(source_id), Some(target_id)) = (
-                        self.node_index_to_id.get(&source_idx),
-                        self.node_index_to_id.get(&target_idx),
-                    ) {
-                        result.push(format!("{}->{}", source_id, target_id));
+            self.indices_to_ids(entity_type, matching_indices)
+        })
+    }
+
+    /// Helper method to convert indices to IDs based on entity type
+    fn indices_to_ids(&self, entity_type: &str, indices: Vec<usize>) -> PyResult<Vec<String>> {
+        let mut result = Vec::new();
+
+        match entity_type {
+            "node" => {
+                for node_index in indices {
+                    if let Some(node_id) = self
+                        .node_index_to_id
+                        .get(&petgraph::graph::NodeIndex::new(node_index))
+                    {
+                        result.push(node_id.clone());
                     }
                 }
-            }
-
-            Ok(result)
-        })
-    }
-
-    /// Filter nodes by numeric comparison - Python interface to columnar filtering
-    pub fn filter_nodes_by_numeric_comparison(
-        &self,
-        attr_name: &str,
-        operator: &str,
-        value: f64,
-    ) -> PyResult<Vec<String>> {
-        let matching_indices = self
-            .columnar_store
-            .filter_nodes_by_numeric_comparison(attr_name, operator, value);
-
-        // Convert indices back to node IDs
-        let mut result = Vec::new();
-        for node_index in matching_indices {
-            if let Some(node_id) = self
-                .node_index_to_id
-                .get(&petgraph::graph::NodeIndex::new(node_index))
-            {
-                result.push(node_id.clone());
-            }
-        }
-
-        Ok(result)
-    }
-
-    /// Filter nodes by string comparison - Python interface to columnar filtering  
-    pub fn filter_nodes_by_string_comparison(
-        &self,
-        attr_name: &str,
-        operator: &str,
-        value: &str,
-    ) -> PyResult<Vec<String>> {
-        let matching_indices = self
-            .columnar_store
-            .filter_nodes_by_string_comparison(attr_name, operator, value);
-
-        // Convert indices back to node IDs
-        let mut result = Vec::new();
-        for node_index in matching_indices {
-            if let Some(node_id) = self
-                .node_index_to_id
-                .get(&petgraph::graph::NodeIndex::new(node_index))
-            {
-                result.push(node_id.clone());
-            }
-        }
-
-        Ok(result)
-    }
-
-    /// Filter edges by numeric comparison - Python interface to columnar filtering
-    pub fn filter_edges_by_numeric_comparison(
-        &self,
-        attr_name: &str,
-        operator: &str,
-        value: f64,
-    ) -> PyResult<Vec<String>> {
-        let matching_indices = self
-            .columnar_store
-            .filter_edges_by_numeric_comparison(attr_name, operator, value);
-
-        // Convert indices back to edge IDs
-        let mut result = Vec::new();
-        for edge_index in matching_indices {
-            if let Some((source_idx, target_idx)) = self
-                .graph
-                .edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index))
-            {
-                if let (Some(source_id), Some(target_id)) = (
-                    self.node_index_to_id.get(&source_idx),
-                    self.node_index_to_id.get(&target_idx),
-                ) {
-                    result.push(format!("{}->{}", source_id, target_id));
+            },
+            "edge" => {
+                for edge_index in indices {
+                    if let Some((source_idx, target_idx)) = self
+                        .graph
+                        .edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index))
+                    {
+                        if let (Some(source_id), Some(target_id)) = (
+                            self.node_index_to_id.get(&source_idx),
+                            self.node_index_to_id.get(&target_idx),
+                        ) {
+                            result.push(format!("{}->{}", source_id, target_id));
+                        }
+                    }
                 }
-            }
-        }
-
-        Ok(result)
-    }
-
-    /// Filter edges by string comparison - Python interface to columnar filtering
-    pub fn filter_edges_by_string_comparison(
-        &self,
-        attr_name: &str,
-        operator: &str,
-        value: &str,
-    ) -> PyResult<Vec<String>> {
-        let matching_indices = self
-            .columnar_store
-            .filter_edges_by_string_comparison(attr_name, operator, value);
-
-        // Convert indices back to edge IDs
-        let mut result = Vec::new();
-        for edge_index in matching_indices {
-            if let Some((source_idx, target_idx)) = self
-                .graph
-                .edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index))
-            {
-                if let (Some(source_id), Some(target_id)) = (
-                    self.node_index_to_id.get(&source_idx),
-                    self.node_index_to_id.get(&target_idx),
-                ) {
-                    result.push(format!("{}->{}", source_id, target_id));
-                }
-            }
-        }
-
-        Ok(result)
-    }
-
-    /// Filter nodes with sparse algorithm - Python interface to optimized sparse filtering  
-    pub fn filter_nodes_by_attributes_sparse(
-        &self,
-        filters: HashMap<String, pyo3::PyObject>,
-    ) -> PyResult<Vec<String>> {
-        use pyo3::Python;
-
-        if filters.is_empty() {
-            return Ok(self.get_node_ids());
-        }
-
-        Python::with_gil(|py| {
-            // Convert PyObjects to JsonValues
-            let mut json_filters = HashMap::new();
-            for (attr_name, py_value) in filters {
-                let json_value = python_pyobject_to_json(py, &py_value)?;
-                json_filters.insert(attr_name, json_value);
-            }
-
-            // Use columnar store's optimized sparse filtering ONLY (no bitmap creation)
-            let matching_indices = self
-                .columnar_store
-                .filter_nodes_sparse(&json_filters);
-
-            // Convert indices back to node IDs
-            let mut result = Vec::new();
-            for node_index in matching_indices {
-                if let Some(node_id) = self
-                    .node_index_to_id
-                    .get(&petgraph::graph::NodeIndex::new(node_index))
-                {
-                    result.push(node_id.clone());
-                }
-            }
-
-            Ok(result)
-        })
-    }
-
-    /// Optimized multi-criteria node filtering - all intersection logic in Rust
-    pub fn filter_nodes_multi_criteria(
-        &self,
-        exact_matches: HashMap<String, String>,
-        numeric_comparisons: Vec<(String, String, f64)>,
-        string_comparisons: Vec<(String, String, String)>,
-    ) -> PyResult<Vec<String>> {
-        // Convert exact matches to JsonValue
-        let json_exact: HashMap<String, serde_json::Value> = exact_matches
-            .into_iter()
-            .map(|(k, v)| {
-                // Smart type conversion
-                let json_value = if v == "true" || v == "True" {
-                    serde_json::Value::Bool(true)
-                } else if v == "false" || v == "False" {
-                    serde_json::Value::Bool(false)
-                } else if let Ok(num) = v.parse::<i64>() {
-                    serde_json::Value::Number(serde_json::Number::from(num))
-                } else if let Ok(num) = v.parse::<f64>() {
-                    serde_json::Value::Number(serde_json::Number::from_f64(num).unwrap_or(serde_json::Number::from(0)))
-                } else {
-                    serde_json::Value::String(v)
-                };
-                (k, json_value)
-            })
-            .collect();
-
-        // Use the optimized multi-criteria filtering (all intersection logic in Rust)
-        let matching_indices = self.columnar_store.filter_nodes_multi_criteria(
-            &json_exact,
-            &numeric_comparisons,
-            &string_comparisons,
-        );
-
-        // Convert indices back to node IDs
-        let mut result = Vec::new();
-        for node_index in matching_indices {
-            if let Some(node_id) = self
-                .node_index_to_id
-                .get(&petgraph::graph::NodeIndex::new(node_index))
-            {
-                result.push(node_id.clone());
-            }
-        }
-
-        Ok(result)
-    }
-
-    /// Optimized multi-criteria edge filtering - all intersection logic in Rust
-    pub fn filter_edges_multi_criteria(
-        &self,
-        exact_matches: HashMap<String, String>,
-        numeric_comparisons: Vec<(String, String, f64)>,
-        string_comparisons: Vec<(String, String, String)>,
-    ) -> PyResult<Vec<String>> {
-        // Convert exact matches to JsonValue
-        let json_exact: HashMap<String, serde_json::Value> = exact_matches
-            .into_iter()
-            .map(|(k, v)| {
-                // Smart type conversion
-                let json_value = if v == "true" || v == "True" {
-                    serde_json::Value::Bool(true)
-                } else if v == "false" || v == "False" {
-                    serde_json::Value::Bool(false)
-                } else if let Ok(num) = v.parse::<i64>() {
-                    serde_json::Value::Number(serde_json::Number::from(num))
-                } else if let Ok(num) = v.parse::<f64>() {
-                    serde_json::Value::Number(serde_json::Number::from_f64(num).unwrap_or(serde_json::Number::from(0)))
-                } else {
-                    serde_json::Value::String(v)
-                };
-                (k, json_value)
-            })
-            .collect();
-
-        // Use the optimized multi-criteria filtering (all intersection logic in Rust)
-        let matching_indices = self.columnar_store.filter_edges_multi_criteria(
-            &json_exact,
-            &numeric_comparisons,
-            &string_comparisons,
-        );
-
-        // Convert indices back to edge IDs
-        let mut result = Vec::new();
-        for edge_index in matching_indices {
-            if let Some((source_idx, target_idx)) = self
-                .graph
-                .edge_endpoints(petgraph::graph::EdgeIndex::new(edge_index))
-            {
-                if let (Some(source_id), Some(target_id)) = (
-                    self.node_index_to_id.get(&source_idx),
-                    self.node_index_to_id.get(&target_idx),
-                ) {
-                    result.push(format!("{}->{}", source_id, target_id));
-                }
-            }
+            },
+            _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>("Invalid entity type")),
         }
 
         Ok(result)
@@ -1140,20 +1149,7 @@ impl FastGraph {
         self.graph.edge_endpoints(edge_idx)
     }
 
-    /// Add node directly to graph (internal use)
-    pub fn add_node_to_graph_public(&mut self, node_data: NodeData) -> petgraph::graph::NodeIndex {
-        self.graph.add_node(node_data)
-    }
 
-    /// Add edge directly to graph (internal use)
-    pub fn add_edge_to_graph_public(
-        &mut self,
-        source_idx: petgraph::graph::NodeIndex,
-        target_idx: petgraph::graph::NodeIndex,
-        edge_data: EdgeData,
-    ) -> petgraph::graph::EdgeIndex {
-        self.graph.add_edge(source_idx, target_idx, edge_data)
-    }
 
     /// Get neighbors by index (internal use)
     pub fn get_neighbors_public(
@@ -1171,4 +1167,138 @@ impl FastGraph {
     ) -> Vec<petgraph::graph::EdgeReference<EdgeData>> {
         self.graph.edges_directed(node_idx, direction)
     }
+
+    /// Add node directly to graph (internal use only - not part of public API)
+    pub(crate) fn add_node_to_graph_public(&mut self, node_data: NodeData) -> petgraph::graph::NodeIndex {
+        self.graph.add_node(node_data)
+    }
+
+    /// Add edge directly to graph (internal use only - not part of public API)
+    pub(crate) fn add_edge_to_graph_public(
+        &mut self,
+        source_idx: petgraph::graph::NodeIndex,
+        target_idx: petgraph::graph::NodeIndex,
+        edge_data: EdgeData,
+    ) -> petgraph::graph::EdgeIndex {
+        self.graph.add_edge(source_idx, target_idx, edge_data)
+    }
+    
+    /// Internal bulk add nodes (delegates to bulk_operations.rs)
+    fn bulk_add_nodes_internal_call(&mut self, nodes: Vec<(String, HashMap<String, serde_json::Value>)>) {
+        // Use the existing optimized bulk operations
+        self.bulk_add_nodes_internal_impl(nodes);
+    }
+    
+    /// Internal bulk add edges (delegates to bulk_operations.rs) 
+    fn bulk_add_edges_internal_call(&mut self, edges: Vec<(String, String, HashMap<String, serde_json::Value>)>) {
+        // Use the existing optimized bulk operations
+        self.bulk_add_edges_internal_impl(edges);
+    }
+    
+
+    
+    /// Wrapper for the bulk operations implementation
+    pub(crate) fn bulk_add_nodes_internal_impl(
+        &mut self, 
+        nodes_data: Vec<(String, HashMap<String, serde_json::Value>)>
+    ) -> Vec<petgraph::graph::NodeIndex> {
+        let mut node_indices = Vec::with_capacity(nodes_data.len());
+        
+        // Prepare bulk columnar operations
+        let mut bulk_attributes: HashMap<String, Vec<(usize, serde_json::Value)>> = HashMap::new();
+        
+        // Add nodes to graph structure first
+        for (node_id, attributes) in nodes_data {
+            // Skip if node already exists
+            if self.node_id_to_index.contains_key(&node_id) {
+                continue;
+            }
+            
+            // Create lightweight node data
+            let node_data = NodeData {
+                id: node_id.clone(),
+                attr_uids: std::collections::HashSet::new(),
+            };
+            
+            // Add to graph topology
+            let node_index = self.graph.add_node(node_data);
+            
+            // Update mappings
+            self.node_id_to_index.insert(node_id.clone(), node_index);
+            self.node_index_to_id.insert(node_index, node_id);
+            
+            node_indices.push(node_index);
+            
+            // Prepare attributes for bulk columnar insert
+            for (attr_name, attr_value) in attributes {
+                bulk_attributes
+                    .entry(attr_name)
+                    .or_insert_with(Vec::new)
+                    .push((node_index.index(), attr_value));
+            }
+        }
+        
+        // Bulk insert attributes into columnar store
+        for (attr_name, attr_data) in bulk_attributes {
+            self.columnar_store.bulk_set_node_attributes(&attr_name, attr_data);
+        }
+        
+        node_indices
+    }
+    
+    /// Wrapper for the bulk edge operations implementation
+    pub(crate) fn bulk_add_edges_internal_impl(
+        &mut self,
+        edges_data: Vec<(String, String, HashMap<String, serde_json::Value>)>
+    ) -> Vec<petgraph::graph::EdgeIndex> {
+        let mut edge_indices = Vec::with_capacity(edges_data.len());
+        
+        // Prepare bulk columnar operations
+        let mut bulk_attributes: HashMap<String, Vec<(usize, serde_json::Value)>> = HashMap::new();
+        
+        // Add edges to graph structure first
+        for (source, target, attributes) in edges_data {
+            // Get node indices
+            let source_idx = match self.node_id_to_index.get(&source) {
+                Some(idx) => *idx,
+                None => continue, // Skip if source doesn't exist
+            };
+            let target_idx = match self.node_id_to_index.get(&target) {
+                Some(idx) => *idx,
+                None => continue, // Skip if target doesn't exist
+            };
+            
+            // Create lightweight edge data
+            let edge_data = EdgeData {
+                source: source.clone(),
+                target: target.clone(),
+                attr_uids: std::collections::HashSet::new(),
+            };
+            
+            // Add to graph topology
+            let edge_index = self.graph.add_edge(source_idx, target_idx, edge_data);
+            
+            // Store edge mapping
+            self.edge_index_to_endpoints.insert(edge_index, (source, target));
+            
+            edge_indices.push(edge_index);
+            
+            // Prepare attributes for bulk columnar insert
+            for (attr_name, attr_value) in attributes {
+                bulk_attributes
+                    .entry(attr_name)
+                    .or_insert_with(Vec::new)
+                    .push((edge_index.index(), attr_value));
+            }
+        }
+        
+        // Bulk insert attributes into columnar store
+        for (attr_name, attr_data) in bulk_attributes {
+            self.columnar_store.bulk_set_edge_attributes(&attr_name, attr_data);
+        }
+        
+        edge_indices
+    }
+    
+
 }

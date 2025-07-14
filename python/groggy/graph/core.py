@@ -194,6 +194,9 @@ class Graph(StateMixin):
                     if "->" in edge_id:
                         source, target = edge_id.split("->", 1)
                         attrs = self._rust_core.get_edge_attributes(source, target)
+                        # Convert optional result to empty dict if None
+                        if attrs is None:
+                            attrs = {}
                         edge_dict[edge_id] = Edge(source, target, attrs)
                 self._cache['edges'] = EdgeView(edge_dict)
                 self._cache_valid = True

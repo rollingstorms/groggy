@@ -1,0 +1,773 @@
+CODE STRUCTURE ANALYSIS
+Directory: ../groggy/python
+Generated: py_structure.txt
+============================================================
+
+============================================================
+FILE: groggy/analysis.py
+============================================================
+
+⚙️  FUNCTION: show_changes(graph_or_entity, graph, branch_name) (line 20)
+   📞 Calls: ┌─ ValueError, _show_entity_changes, _show_graph_changes
+          │  hasattr, isinstance
+          └─
+   📝 Analyze changes across saved states.
+
+⚙️  FUNCTION: _show_graph_changes(graph, branch_name) (line 50)
+   📞 Calls: ┌─ _analyze_state_diff, _get_saved_states, _print_changes
+          │  branches.keys, enumerate, graph.switch_branch, hasattr
+          │  len, list, metadata.get, print, state_info.get
+          └─
+   📝 Show all changes across states in a branch.
+
+⚙️  FUNCTION: _show_entity_changes(entity_id, graph, branch_name) (line 98)
+   📞 Calls: ┌─ _get_saved_states, _print_entity_timeline, branches.keys
+          │  dict, entity_timeline.append, enumerate, graph.load_state
+          │  graph.switch_branch, hasattr, list, print, str
+          └─
+   📝 Show changes for a specific entity across states.
+
+⚙️  FUNCTION: _get_saved_states(graph) (line 192)
+   📞 Calls: ┌─ *.isoformat, datetime.now, enumerate, hasattr
+          │  states.append
+          └─
+   📝 Get list of saved states from the graph storage.
+
+⚙️  FUNCTION: _analyze_state_diff(graph, prev_hash, curr_hash) (line 209)
+   📞 Calls: ┌─ _compare_graph_states, _empty_diff, dict
+          │  graph.load_state, hasattr, print
+          └─
+   📝 Analyze differences between two states by loading and comparing them.
+
+⚙️  FUNCTION: _empty_diff() (line 279)
+   📝 Return an empty diff structure.
+
+⚙️  FUNCTION: _compare_graph_states(prev_nodes, prev_edges, curr_nodes, curr_edges) (line 290)
+   📞 Calls: ┌─ curr_edges.keys, curr_nodes.keys, edges_modified.append
+          │  list, nodes_modified.append, prev_edges.keys
+          │  prev_nodes.keys, set, sorted
+          └─
+   📝 Compare two graph states and return the differences.
+
+⚙️  FUNCTION: _print_changes(changes) (line 328)
+   📞 Calls: ┌─ *.title, change_type.replace, changes.items
+          │  changes.values, isinstance, len, print, sum
+          └─
+   📝 Print formatted change summary.
+
+⚙️  FUNCTION: _print_entity_timeline(entity_id, timeline) (line 343)
+   📞 Calls: *.get, enumerate, print
+   📝 Print formatted entity timeline.
+
+⚙️  FUNCTION: show_entity_changes(entity_id, graph, branch_name) (line 379)
+   📞 Calls: show_changes
+   📝 Convenience function for entity-specific analysis.
+
+⚙️  FUNCTION: show_graph_changes(graph, branch_name) (line 383)
+   📞 Calls: show_changes
+   📝 Convenience function for graph-wide analysis.
+
+⚙️  FUNCTION: track_attribute_changes(graph, attribute_name, branch_name) (line 387)
+   📞 Calls: ┌─ *.append, _get_saved_states, attribute_timeline.items
+          │  entities_with_attr.items, enumerate, graph.load_state
+          │  graph.switch_branch, hasattr, len, print, set, str
+          └─
+   📝 Track changes to a specific attribute across all entities over time
+
+============================================================
+FILE: groggy/__init__.py
+============================================================
+
+⚙️  FUNCTION: get_available_backends() (line 31)
+   📞 Calls: backends.append
+   📝 Get list of available backends.
+
+⚙️  FUNCTION: set_backend(backend) (line 38)
+   📞 Calls: ValueError, get_available_backends
+   📝 Set the backend to use for new Graph instances.
+
+⚙️  FUNCTION: get_current_backend() (line 45)
+   📝 Get the currently selected backend.
+
+============================================================
+FILE: groggy/utils.py
+============================================================
+
+⚙️  FUNCTION: create_random_graph(n_nodes, edge_probability, use_rust) (line 10)
+   📞 Calls: Graph.from_edge_list, edges.append, random.random, range
+   📝 Create a random graph efficiently using vectorized operations
+
+⚙️  FUNCTION: create_clustering_workflow(store, graph, algorithms) (line 25)
+   📞 Calls: branches.append, store.create_branch
+   📝 Create branches for different clustering algorithms
+
+⚙️  FUNCTION: create_subgraph_branch(store, subgraph, branch_name, description) (line 42)
+   📞 Calls: store.create_branch
+   📝 Create a branch from a subgraph for isolated processing
+
+============================================================
+FILE: groggy/data_structures.py
+============================================================
+
+📁 CLASS: Node (line 13)
+   📝 Graph node with attributes
+   └── 🔧 get_attribute(self, key, default) (line 18)
+       📞 Calls: *.get
+   └── 🔧 set_attribute(self, key, value) (line 21)
+       📞 Calls: *.copy, Node
+   └── 🔧 get(self, key, default) (line 27)
+       📞 Calls: *.get
+   └── 🔧 __getitem__(self, key) (line 30)
+   └── 🔧 __setitem__(self, key, value) (line 33)
+   └── 🔧 __contains__(self, key) (line 36)
+   └── 🔧 keys(self) (line 39)
+       📞 Calls: *.keys
+   └── 🔧 values(self) (line 42)
+       📞 Calls: *.values
+   └── 🔧 items(self) (line 45)
+       📞 Calls: *.items
+   └── 🔧 __iter__(self) (line 48)
+       📞 Calls: iter
+
+📁 CLASS: Edge (line 53)
+   📝 Graph edge with attributes
+   └── 🔧 id(self) (line 60)
+   └── 🔧 get_attribute(self, key, default) (line 63)
+       📞 Calls: *.get
+   └── 🔧 set_attribute(self, key, value) (line 66)
+       📞 Calls: *.copy, Edge
+   └── 🔧 get(self, key, default) (line 72)
+       📞 Calls: *.get
+   └── 🔧 __getitem__(self, key) (line 75)
+   └── 🔧 __setitem__(self, key, value) (line 78)
+   └── 🔧 __contains__(self, key) (line 81)
+   └── 🔧 keys(self) (line 84)
+       📞 Calls: *.keys
+   └── 🔧 values(self) (line 87)
+       📞 Calls: *.values
+   └── 🔧 items(self) (line 90)
+       📞 Calls: *.items
+   └── 🔧 __iter__(self) (line 93)
+       📞 Calls: iter
+
+📁 CLASS: GraphDelta (line 97)
+   📝 Tracks changes to a graph for efficient updates
+   └── 🔧 __init__(self) (line 100)
+       📞 Calls: set
+   └── 🔧 clear(self) (line 108)
+       📞 Calls: *.clear
+       💬 Clear all delta information
+   └── 🔧 is_empty(self) (line 117)
+       💬 Check if delta has any changes
+
+============================================================
+FILE: groggy/views.py
+============================================================
+
+📁 CLASS: LazyDict (line 8)
+   📝 Zero-copy dictionary view that combines base dict with delta changes
+   └── 🔧 __init__(self, base_dict, delta_added, delta_removed, delta_modified) (line 11)
+       📞 Calls: set
+   └── 🔧 __getitem__(self, key) (line 18)
+       📞 Calls: KeyError
+   └── 🔧 get(self, key, default) (line 27)
+   └── 🔧 __contains__(self, key) (line 33)
+   └── 🔧 keys(self) (line 38)
+       📞 Calls: *.keys, set
+   └── 🔧 values(self) (line 43)
+       📞 Calls: self.keys
+   └── 🔧 items(self) (line 46)
+       📞 Calls: self.keys
+   └── 🔧 __len__(self) (line 49)
+       📞 Calls: len, self.keys
+   └── 🔧 __iter__(self) (line 52)
+       📞 Calls: iter, self.keys
+   └── 🔧 copy(self) (line 55)
+       📞 Calls: self.keys
+       💬 Force materialization to regular dict
+
+📁 CLASS: NodeView (line 60)
+   📝 View of nodes - works with both dict and Rust backend
+   └── 🔧 __init__(self, data) (line 63)
+       📞 Calls: isinstance
+   └── 🔧 __len__(self) (line 73)
+       📞 Calls: *.node_count, len
+   └── 🔧 __contains__(self, node_id) (line 79)
+       📞 Calls: *.get_node_attributes
+   └── 🔧 __getitem__(self, node_id) (line 89)
+       📞 Calls: *.get_node_attributes, Node
+   └── 🔧 keys(self) (line 97)
+       📞 Calls: *.get_node_ids, *.keys
+   └── 🔧 __iter__(self) (line 103)
+       📞 Calls: iter, self.keys
+   └── 🔧 values(self) (line 106)
+       📞 Calls: *.values, self.keys
+   └── 🔧 items(self) (line 112)
+       📞 Calls: *.items, list, self.keys
+   └── 🔧 items_iter(self) (line 118)
+       📞 Calls: *.items, iter, self.keys
+       💬 Iterator version of items() for memory efficiency
+
+📁 CLASS: EdgeView (line 126)
+   📝 View of edges - works with both dict and Rust backend
+   └── 🔧 __init__(self, data) (line 129)
+       📞 Calls: isinstance
+   └── 🔧 __len__(self) (line 139)
+       📞 Calls: *.edge_count, len
+   └── 🔧 __contains__(self, edge_id) (line 145)
+       📞 Calls: *.get_edge_attributes, edge_id.split, len
+   └── 🔧 __getitem__(self, edge_id) (line 159)
+       📞 Calls: ┌─ *.get_edge_attributes, Edge, KeyError, edge_id.split
+              │  len
+              └─
+   └── 🔧 keys(self) (line 171)
+       📞 Calls: *.get_edge_ids, *.keys
+   └── 🔧 __iter__(self) (line 177)
+       📞 Calls: iter, self.keys
+   └── 🔧 values(self) (line 180)
+       📞 Calls: *.values, self.keys
+   └── 🔧 items(self) (line 186)
+       📞 Calls: *.items, list, self.keys
+   └── 🔧 items_iter(self) (line 192)
+       📞 Calls: *.items, iter, self.keys
+       💬 Iterator version of items() for memory efficiency
+
+============================================================
+FILE: groggy/graph/filtering.py
+============================================================
+
+📁 CLASS: QueryCompiler (line 19)
+   📝 Compiles string-based queries into executable filter functions.
+   └── 🔧 compile_node_query(cls, query_str) (line 42)
+       📞 Calls: cls._evaluate_query
+       💬 Compile a string query into a function for node filtering.
+   └── 🔧 compile_edge_query(cls, query_str) (line 58)
+       📞 Calls: ┌─ attributes.copy, cls._evaluate_query
+              │  extended_attrs.update
+              └─
+       💬 Compile a string query into a function for edge filtering.
+   └── 🔧 _evaluate_query(cls, query_str, context) (line 81)
+       📞 Calls: ┌─ ValueError, cls._evaluate_logical_expression
+              │  cls._evaluate_simple_expression
+              │  cls._preprocess_logical_operators
+              │  cls._split_logical_expression, len
+              └─
+       💬 Evaluate a query string against a context dictionary.
+   └── 🔧 _preprocess_logical_operators(cls, query_str) (line 110)
+       📞 Calls: re.sub
+       💬 Normalize logical operators.
+   └── 🔧 _split_logical_expression(cls, query_str) (line 119)
+       📞 Calls: ┌─ part.strip, parts.append, query_str.split
+              │  query_str.strip
+              └─
+       💬 Split expression by logical operators while preserving them.
+   └── 🔧 _evaluate_logical_expression(cls, parts, context) (line 138)
+       📞 Calls: cls._evaluate_simple_expression, len
+       💬 Evaluate a logical expression with multiple parts.
+   └── 🔧 _evaluate_simple_expression(cls, expr, context) (line 160)
+       📞 Calls: ┌─ *.items, *.strip, ValueError, cls._parse_literal
+              │  expr.split, expr.strip, float, int, isinstance, len
+              │  op_func
+              └─
+       💬 Evaluate a simple comparison expression.
+   └── 🔧 _parse_literal(cls, value_str) (line 208)
+       📞 Calls: ┌─ float, int, value_str.endswith, value_str.lower
+              │  value_str.startswith, value_str.strip
+              └─
+       💬 Parse a literal value from a string.
+
+📁 CLASS: SubgraphCreator (line 240)
+   📝 Creates subgraphs from filtering operations.
+   └── 🔧 create_node_subgraph(source_graph, node_ids, filter_criteria) (line 244)
+       📞 Calls: ┌─ Subgraph, source_graph.get_node, str
+              │  subgraph.add_edge, subgraph.add_node
+              └─
+       💬 Create a subgraph containing only the specified nodes and edges between them.
+   └── 🔧 create_edge_subgraph(source_graph, edge_ids, filter_criteria) (line 282)
+       📞 Calls: ┌─ *.keys, Subgraph, ValueError, actual_edge_ids.append
+              │  connected_nodes.add, isinstance, list, set
+              │  source_graph.get_node, str, subgraph.add_edge
+              │  subgraph.add_node
+              └─
+       💬 Create a subgraph containing only the specified edges and their connected nodes.
+
+⚙️  FUNCTION: enhanced_filter_nodes(graph, filter_criteria, return_subgraph) (line 354)
+   📞 Calls: ┌─ QueryCompiler.compile_node_query
+          │  SubgraphCreator.create_node_subgraph, ValueError
+          │  callable, effective_nodes.items, filter_criteria.items
+          │  filter_func, graph._get_effective_data, graph.get_node
+          │  isinstance, result.append
+          └─
+   📝 Enhanced node filtering with optional subgraph creation.
+
+⚙️  FUNCTION: enhanced_filter_edges(graph, filter_criteria, return_subgraph) (line 409)
+   📞 Calls: ┌─ QueryCompiler.compile_edge_query
+          │  SubgraphCreator.create_edge_subgraph, ValueError
+          │  callable, effective_edges.items, filter_criteria.items
+          │  filter_func, graph._get_effective_data, isinstance
+          │  result.append
+          └─
+   📝 Enhanced edge filtering with optional subgraph creation.
+
+============================================================
+FILE: groggy/graph/batch.py
+============================================================
+
+📁 CLASS: BatchOperationContext (line 12)
+   📝 Context manager for efficient batch operations
+   └── 🔧 __init__(self, graph) (line 15)
+   └── 🔧 __enter__(self) (line 20)
+   └── 🔧 __exit__(self, exc_type, exc_val, exc_tb) (line 23)
+       📞 Calls: *._apply_batch_operations
+   └── 🔧 add_node(self, node_id) (line 27)
+       📞 Calls: Node, uuid.uuid4
+       💬 Queue node for batch addition
+   └── 🔧 add_edge(self, source, target) (line 39)
+       📞 Calls: Edge, Node
+       💬 Queue edge for batch addition
+   └── 🔧 set_node_attributes(self, node_attr_dict) (line 53)
+       📞 Calls: ┌─ *.copy, Node, current_attrs.update, new_attrs.update
+              │  node_attr_dict.items, str
+              └─
+       💬 Queue bulk node attribute updates
+   └── 🔧 set_edge_attributes(self, edge_attr_dict) (line 78)
+       📞 Calls: ┌─ *.copy, Edge, current_attrs.update
+              │  edge_attr_dict.items, new_attrs.update, str
+              └─
+       💬 Queue bulk edge attribute updates
+
+============================================================
+FILE: groggy/graph/core.py
+============================================================
+
+📁 CLASS: Graph (line 26)
+   📝 High-level Graph interface with automatic Rust/Python backend selection
+   └── 🔧 __init__(self, nodes, edges, graph_attributes, backend, max_auto_states, directed) (line 29)
+       📞 Calls: ┌─ _core.FastGraph, _core.GraphStore, deque
+              │  get_current_backend, self._init_python_backend
+              │  self._init_rust_backend
+              └─
+   └── 🔧 _init_rust_backend(self, nodes, edges, graph_attributes) (line 73)
+       📞 Calls: *.add_edges, *.add_nodes, edges.values, nodes.items
+       💬 Initialize Rust backend
+   └── 🔧 _init_python_backend(self, nodes, edges, graph_attributes) (line 83)
+       📞 Calls: dict
+       💬 Initialize Python backend (fallback)
+   └── 🔧 _invalidate_cache(self) (line 99)
+       📞 Calls: *.clear
+       💬 Invalidate the cache when graph structure changes
+   └── 🔧 empty(cls, backend) (line 110)
+       📞 Calls: cls
+       💬 Create an empty graph
+   └── 🔧 from_node_list(cls, node_ids, node_attrs, backend) (line 115)
+       📞 Calls: Node, cls, enumerate, len, node_attrs.items
+       💬 Create graph from vectorized node data (NumPy-style)
+   └── 🔧 from_edge_list(cls, edges, node_attrs, edge_attrs, backend) (line 132)
+       📞 Calls: ┌─ Edge, Node, cls, edge_attrs.items, enumerate, len
+              │  node_attrs.items, node_set.add, set, sorted
+              └─
+       💬 Create graph from edge list (NetworkX-style)
+   └── 🔧 nodes(self) (line 169)
+       📞 Calls: ┌─ *.get_node_attributes, *.get_node_ids, Node
+              │  NodeView, self._get_effective_data
+              └─
+       💬 Access nodes as a lazy dict-like interface
+   └── 🔧 edges(self) (line 186)
+       📞 Calls: ┌─ *.get_edge_attributes, *.get_edge_ids, Edge
+              │  EdgeView, edge_id.split, self._get_effective_data
+              └─
+       💬 Access edges as a lazy dict-like interface
+   └── 🔧 states(self) (line 206)
+       📞 Calls: ┌─ *.get_current_hash, *.get_stats, *.list_branches
+              │  all_state_hashes.append, getattr, len, list, set
+              │  stats.get
+              └─
+       💬 Get all states with their hashes (lazy-loaded view into backend)
+   └── 🔧 branches(self) (line 242)
+       📞 Calls: *.list_branches, getattr
+       💬 Get current branches from backend (lazy-loaded view)
+   └── 🔧 add_node(self, node_id) (line 254)
+       📞 Calls: ┌─ *.add_node, Node, self._init_delta
+              │  self._invalidate_cache
+              │  self._update_cache_for_node_add, str, uuid.uuid4
+              └─
+       💬 Add a node to the graph
+   └── 🔧 add_edge(self, source, target) (line 283)
+       📞 Calls: ┌─ *.add_edge, Edge, Node, self._get_effective_data
+              │  self._init_delta, self._invalidate_cache
+              │  self._update_cache_for_edge_add, self.add_node, str
+              └─
+       💬 Add an edge to the graph
+   └── 🔧 batch_operations(self) (line 329)
+       📞 Calls: BatchOperationContext
+       💬 Context manager for efficient batch operations
+   └── 🔧 node_count(self) (line 333)
+       📞 Calls: *.node_count, len, self._get_effective_data
+       💬 Get the number of nodes
+   └── 🔧 edge_count(self) (line 341)
+       📞 Calls: *.edge_count, len, self._get_effective_data
+       💬 Get the number of edges
+   └── 🔧 get_node(self, node_id) (line 349)
+       📞 Calls: ┌─ *.get_node_attributes, Node, effective_nodes.get
+              │  self._get_effective_data, str
+              └─
+       💬 Get a specific node by ID
+   └── 🔧 get_edge(self, source, target) (line 361)
+       📞 Calls: ┌─ *.get_edge_attributes, Edge, effective_edges.get
+              │  self._get_effective_data, str
+              └─
+       💬 Get a specific edge by source and target node IDs
+   └── 🔧 has_edge(self, source, target) (line 375)
+       📞 Calls: *.has_edge, self._get_effective_data, str
+       💬 Check if an edge exists between source and target nodes
+   └── 🔧 has_node(self, node_id) (line 386)
+       📞 Calls: *.has_node, self._get_effective_data, str
+       💬 Check if a node exists in the graph
+   └── 🔧 is_directed(self) (line 395)
+       💬 Check if the graph is directed
+   └── 🔧 get_node_ids(self) (line 399)
+       📞 Calls: ┌─ *.get_node_ids, effective_nodes.keys, list
+              │  self._get_effective_data
+              └─
+       💬 Get all node IDs
+   └── 🔧 node_id_to_index(self) (line 408)
+       📞 Calls: ┌─ effective_nodes.keys, enumerate
+              │  self._get_effective_data
+              └─
+       💬 Get node ID to internal index mapping for debugging (Python backend only)
+   └── 🔧 get_neighbors(self, node_id, direction) (line 417)
+       📞 Calls: ┌─ *.get_all_neighbors, *.get_incoming_neighbors
+              │  *.get_neighbors, *.get_outgoing_neighbors
+              │  effective_edges.values, list, neighbors.add
+              │  self._get_effective_data, set, str
+              └─
+       💬 Get neighbors of a node
+   └── 🔧 get_outgoing_neighbors(self, node_id) (line 460)
+       📞 Calls: ┌─ *.get_outgoing_neighbors, effective_edges.values
+              │  list, neighbors.add, self._get_effective_data, set
+              │  str
+              └─
+       💬 Get outgoing neighbors of a node (for directed graphs)
+   └── 🔧 get_incoming_neighbors(self, node_id) (line 475)
+       📞 Calls: ┌─ *.get_incoming_neighbors, effective_edges.values
+              │  list, neighbors.add, self._get_effective_data, set
+              │  str
+              └─
+       💬 Get incoming neighbors of a node (for directed graphs)
+   └── 🔧 get_all_neighbors(self, node_id) (line 490)
+       📞 Calls: ┌─ *.get_all_neighbors, effective_edges.values, list
+              │  neighbors.add, self._get_effective_data, set, str
+              └─
+       💬 Get all neighbors of a node (both incoming and outgoing)
+   └── 🔧 filter_nodes(self, filter_func, return_subgraph) (line 508)
+       📞 Calls: ┌─ QueryCompiler.compile_node_query, ValueError
+              │  isinstance, list, self._create_subgraph_from_nodes
+              │  self._filter_nodes_by_dict_vectorized
+              │  self._filter_nodes_vectorized
+              │  self._try_optimized_string_filter_nodes
+              │  self.get_node_ids
+              └─
+       💬 Filter nodes by lambda function, attribute values, string query, or keyword arguments
+   └── 🔧 filter_edges(self, filter_func, return_subgraph) (line 578)
+       📞 Calls: ┌─ *.keys, QueryCompiler.compile_edge_query, ValueError
+              │  isinstance, list, self._create_subgraph_from_edges
+              │  self._filter_edges_by_dict_vectorized
+              │  self._filter_edges_vectorized
+              │  self._try_optimized_string_filter_edges
+              └─
+       💬 Filter edges by lambda function, attribute values, string query, or keyword arguments
+   └── 🔧 set_node_attribute(self, node_id, attribute, value) (line 647)
+       📞 Calls: ┌─ *.set_node_attribute, KeyError, hasattr
+              │  self._invalidate_cache, str
+              └─
+       💬 Set a single attribute on a node
+   └── 🔧 set_edge_attribute(self, source, target, attribute, value) (line 668)
+       📞 Calls: ┌─ *.set_edge_attribute, KeyError, hasattr
+              │  self._invalidate_cache, str
+              └─
+       💬 Set a single attribute on an edge
+   └── 🔧 set_node_attributes(self, node_id, attributes) (line 692)
+       📞 Calls: attributes.items, self.set_node_attribute
+       💬 Set multiple attributes on a node
+   └── 🔧 set_edge_attributes(self, source, target, attributes) (line 702)
+       📞 Calls: attributes.items, self.set_edge_attribute
+       💬 Set multiple attributes on an edge
+   └── 🔧 set_nodes_attributes_batch(self, node_attrs) (line 713)
+       📞 Calls: ┌─ *.set_nodes_attributes_batch, node_attrs.items
+              │  self._invalidate_cache, self.set_node_attributes, str
+              └─
+       💬 Set attributes on multiple nodes efficiently
+   └── 🔧 set_edges_attributes_batch(self, edge_attrs) (line 732)
+       📞 Calls: ┌─ *.set_edges_attributes_batch, edge_attrs.items
+              │  self._invalidate_cache, self.set_edge_attributes, str
+              └─
+       💬 Set attributes on multiple edges efficiently
+   └── 🔧 get_node_attributes(self, node_id) (line 751)
+       📞 Calls: KeyError, dict, self.get_node
+       💬 Get all attributes of a node
+   └── 🔧 get_edge_attributes(self, source, target) (line 766)
+       📞 Calls: KeyError, dict, self.get_edge, str
+       💬 Get all attributes of an edge
+   └── 🔧 get_nodes_attribute(self, node_ids, attr_name) (line 785)
+       📞 Calls: *.get_nodes_attribute, self.get_node, str
+       💬 Get a specific attribute for multiple nodes efficiently
+   └── 🔧 get_nodes_attributes(self, node_ids) (line 808)
+       📞 Calls: *.get_nodes_attributes, dict, self.get_node, str
+       💬 Get all attributes for multiple nodes efficiently
+   └── 🔧 get_all_nodes_attribute(self, attr_name) (line 830)
+       📞 Calls: ┌─ *.get_all_nodes_attribute, effective_nodes.items
+              │  self._get_effective_data
+              └─
+       💬 Get a specific attribute for all nodes efficiently (useful for statistics)
+   └── 🔧 get_edges_attribute(self, edge_endpoints, attr_name) (line 851)
+       📞 Calls: *.get_edges_attribute, self.get_edge, str
+       💬 Get a specific attribute for multiple edges efficiently
+   └── 🔧 get_all_edges_attribute(self, attr_name) (line 874)
+       📞 Calls: ┌─ *.get_all_edges_attribute, effective_edges.items
+              │  self._get_effective_data
+              └─
+       💬 Get a specific attribute for all edges efficiently (useful for statistics)
+   └── 🔧 get_edge_ids(self) (line 895)
+       📞 Calls: ┌─ *.get_edge_ids, effective_edges.keys, list
+              │  self._get_effective_data
+              └─
+       💬 Get all edge IDs in the graph
+   └── 🔧 to_dataframe(self, attr_names, node_ids, library) (line 909)
+       📞 Calls: ┌─ ImportError, NotImplementedError, ValueError
+              │  pd.DataFrame, pl.DataFrame
+              │  self.get_dataframe_data_fast
+              └─
+       💬 Convert graph node data to DataFrame format for efficient analysis
+   └── 🔧 get_dataframe_data_fast(self, attr_names, node_ids) (line 947)
+       📞 Calls: *.get_dataframe_data, NotImplementedError, str
+       💬 Ultra-fast DataFrame data retrieval using vectorized Rust backend
+   └── 🔧 get_bulk_node_attribute_vectors(self, attr_names, node_ids) (line 971)
+       📞 Calls: ┌─ *.get_bulk_node_attribute_vectors
+              │  NotImplementedError, str
+              └─
+       💬 Ultra-fast vectorized bulk attribute retrieval using columnar store optimization
+   └── 🔧 get_single_attribute_vectorized(self, attr_name, node_ids) (line 995)
+       📞 Calls: ┌─ *.get_single_attribute_vectorized
+              │  NotImplementedError, str
+              └─
+       💬 Ultra-fast single attribute column retrieval using vectorized columnar operations
+   └── 🔧 export_node_dataframe_optimized(self, attr_names, node_ids) (line 1019)
+       📞 Calls: ┌─ *.export_node_dataframe_optimized
+              │  NotImplementedError, str
+              └─
+       💬 Ultra-fast DataFrame-style bulk data export optimized for pandas/polars
+   └── 🔧 add_nodes_chunked(self, nodes_data, chunk_size) (line 1045)
+       📞 Calls: ┌─ *.add_nodes_chunked, node_data.items
+              │  rust_nodes.append, self._invalidate_cache
+              │  self.add_nodes, str
+              └─
+       💬 High-performance chunked node creation for very large datasets
+   └── 🔧 set_node_attributes_chunked(self, updates, chunk_size) (line 1072)
+       📞 Calls: ┌─ *.set_node_attributes_chunked, *.update, len, list
+              │  range, self._get_effective_data, self._init_delta
+              │  self._invalidate_cache, str, updates.items
+              └─
+       💬 High-performance chunked attribute updates for large datasets
+   └── 🔧 get_attribute_column(self, attr_name, node_ids) (line 1110)
+       📞 Calls: ┌─ *.get_single_attribute_vectorized
+              │  effective_nodes.items, result_ids.append
+              │  result_values.append, self._get_effective_data, str
+              └─
+       💬 Ultra-fast single attribute column retrieval
+   └── 🔧 filter_nodes_multi_criteria(self, exact_matches, numeric_comparisons, string_comparisons) (line 1143)
+       📞 Calls: ┌─ *.filter_nodes_multi_criteria, abs
+              │  effective_nodes.items, effective_nodes.keys
+              │  exact_matches.items, float, list, matching.add
+              │  node_val.endswith, node_val.startswith
+              │  self._get_effective_data, set, str
+              └─
+       💬 Advanced multi-criteria node filtering with high performance
+   └── 🔧 update_node(self, node_id, attributes) (line 1251)
+       📞 Calls: ┌─ *.set_node_attribute, *.update, Node
+              │  combined_attrs.items, combined_attrs.update
+              │  self._init_delta, self._invalidate_cache
+              │  self._update_cache_for_node_add, str
+              └─
+       💬 Update node attributes with a user-friendly interface
+   └── 🔧 update_edge(self, source, target, attributes) (line 1288)
+       📞 Calls: ┌─ *.set_edge_attributes, *.update, Edge
+              │  combined_attrs.update, self._init_delta
+              │  self._invalidate_cache
+              │  self._update_cache_for_edge_add, str
+              └─
+       💬 Update edge attributes with a user-friendly interface
+   └── 🔧 add_nodes(self, nodes_data) (line 1328)
+       📞 Calls: ┌─ *.add_nodes, Node, node_data.items
+              │  rust_nodes.append, self._init_delta
+              │  self._invalidate_cache
+              │  self._update_cache_for_node_add, str
+              └─
+       💬 Add multiple nodes efficiently in a single operation
+   └── 🔧 add_edges(self, edges_data) (line 1364)
+       📞 Calls: ┌─ *.add_edges, Edge, Node, edge_data.items
+              │  rust_edges.append, self._get_effective_data
+              │  self._init_delta, self._invalidate_cache
+              │  self._update_cache_for_edge_add, str
+              └─
+       💬 Add multiple edges efficiently in a single operation
+   └── 🔧 update_nodes(self, updates) (line 1410)
+       📞 Calls: ┌─ *.set_nodes_attributes_batch, Node
+              │  self._get_effective_data, self._init_delta
+              │  self._invalidate_cache
+              │  self._update_cache_for_node_add, str, updates.items
+              └─
+       💬 Update multiple nodes efficiently in a single operation
+   └── 🔧 remove_node(self, node_id) (line 1455)
+       📞 Calls: ┌─ *.add, *.remove_node, edges_to_remove.append
+              │  effective_edges.items, self._get_effective_data
+              │  self._init_delta, self._invalidate_cache, str
+              └─
+       💬 Remove a node from the graph
+   └── 🔧 remove_edge(self, source, target) (line 1494)
+       📞 Calls: ┌─ *.add, *.remove_edge, self._get_effective_data
+              │  self._init_delta, self._invalidate_cache, str
+              └─
+       💬 Remove an edge from the graph
+   └── 🔧 remove_nodes(self, node_ids) (line 1524)
+       📞 Calls: ┌─ *.add, *.remove_nodes, edges_to_remove.append
+              │  effective_edges.items, self._get_effective_data
+              │  self._init_delta, self._invalidate_cache, str
+              └─
+       💬 Remove multiple nodes efficiently
+   └── 🔧 remove_edges(self, edge_pairs) (line 1564)
+       📞 Calls: ┌─ *.add, *.remove_edges, self._get_effective_data
+              │  self._init_delta, self._invalidate_cache, str
+              └─
+       💬 Remove multiple edges efficiently
+   └── 🔧 subgraph(self, node_ids, edge_ids, include_edges) (line 1596)
+       📞 Calls: ┌─ ValueError, self._create_subgraph_from_edges
+              │  self._create_subgraph_from_nodes, str
+              └─
+       💬 Create a single subgraph from specified nodes or edges
+   └── 🔧 subgraphs(self, group_by) (line 1632)
+       📞 Calls: ┌─ *.join, ValueError, filter_criteria.update
+              │  filters.items, group_by.items, groups.items
+              │  isinstance, iter, len, matching_nodes.append, next
+              │  self._create_subgraph_from_nodes, self.filter_nodes
+              │  self.get_node, set, str, unique_values.add
+              └─
+       💬 Create multiple subgraphs grouped by attribute values
+   └── 🔧 _filter_nodes_vectorized(self, filter_func) (line 1760)
+       📞 Calls: ┌─ *.get_node_ids, *.get_nodes_attributes
+              │  all_attributes.get, effective_nodes.items
+              │  filter_func, filtered_node_ids.append
+              │  self._get_effective_data
+              └─
+       💬 Vectorized node filtering for better performance on large graphs.
+   └── 🔧 _filter_edges_vectorized(self, filter_func) (line 1801)
+       📞 Calls: ┌─ *.get_edge_ids, *.get_edges_attributes
+              │  all_attributes.get, edge_endpoints.append
+              │  edge_id.split, effective_edges.items, enumerate
+              │  filter_func, filtered_edge_ids.append, len
+              │  self._get_effective_data
+              └─
+       💬 Vectorized edge filtering for better performance on large graphs.
+   └── 🔧 _filter_nodes_optimized(self, filter_func) (line 1851)
+       📞 Calls: ┌─ QueryCompiler.compile_node_query, ValueError
+              │  callable, isinstance, list
+              │  self._filter_nodes_by_dict_vectorized
+              │  self._filter_nodes_vectorized, self.get_node_ids
+              │  type
+              └─
+       💬 Highly optimized node filtering that detects filter patterns and applies
+   └── 🔧 _filter_nodes_by_dict_vectorized(self, filter_dict) (line 1882)
+       📞 Calls: ┌─ *.filter_nodes_by_attributes
+              │  *.filter_nodes_multi_criteria, *.get, all
+              │  effective_nodes.items, filter_dict.items
+              │  filter_dict.values, filtered_ids.append, float
+              │  isinstance, len, list, numeric_comparisons.append
+              │  self._get_effective_data, self.get_node_ids, str
+              │  string_comparisons.append
+              └─
+       💬 Super-optimized filtering for dictionary-based filters.
+   └── 🔧 _filter_edges_optimized(self, filter_func) (line 1964)
+       📞 Calls: ┌─ *.keys, QueryCompiler.compile_edge_query, ValueError
+              │  callable, isinstance, list
+              │  self._filter_edges_by_dict_vectorized
+              │  self._filter_edges_vectorized, type
+              └─
+       💬 Highly optimized edge filtering that detects filter patterns and applies
+   └── 🔧 _filter_edges_by_dict_vectorized(self, filter_dict) (line 1995)
+       📞 Calls: ┌─ *.filter_edges_by_attributes
+              │  *.filter_edges_multi_criteria, *.get, *.keys, all
+              │  effective_edges.items, filter_dict.items
+              │  filter_dict.values, filtered_ids.append, float
+              │  isinstance, len, list, numeric_comparisons.append
+              │  self._get_effective_data, str
+              │  string_comparisons.append
+              └─
+       💬 Super-optimized filtering for dictionary-based edge filters.
+   └── 🔧 _try_optimized_string_filter_nodes(self, query_str) (line 2077)
+       📞 Calls: ┌─ *.filter_nodes_by_numeric_comparison
+              │  *.filter_nodes_by_string_comparison, float
+              │  match.groups, re.match
+              └─
+       💬 Try to optimize simple string queries using fast Rust backend operations.
+   └── 🔧 _try_optimized_string_filter_edges(self, query_str) (line 2110)
+       📞 Calls: ┌─ *.filter_edges_by_numeric_comparison
+              │  *.filter_edges_by_string_comparison, float
+              │  match.groups, re.match
+              └─
+       💬 Try to optimize simple string queries for edges using fast Rust backend operations.
+
+============================================================
+FILE: groggy/graph/subgraph.py
+============================================================
+
+📁 CLASS: Subgraph (line 11)
+   📝 A Subgraph is a Graph with additional metadata about its origin.
+   └── 🔧 __init__(self, parent_graph, filter_criteria, metadata) (line 21)
+       📞 Calls: *.__init__, super
+       💬 Initialize a Subgraph.
+   └── 🔧 __repr__(self) (line 40)
+       📞 Calls: *.__repr__, super
+       💬 String representation of the subgraph.
+   └── 🔧 get_metadata(self) (line 47)
+       💬 Get all metadata about this subgraph.
+
+============================================================
+FILE: groggy/graph/state.py
+============================================================
+
+📁 CLASS: StateMixin (line 8)
+   📝 Mixin class providing state management functionality
+   └── 🔧 save_state(self, message) (line 11)
+       📞 Calls: ┌─ *.append, *.list_branches, *.store_current_graph
+              │  NotImplementedError, hasattr, len
+              └─
+       💬 Save the current graph state to storage
+   └── 🔧 commit(self, message) (line 37)
+       📞 Calls: self.save_state
+       💬 Legacy alias for save_state
+   └── 🔧 create_branch(self, branch_name, from_hash, switch) (line 41)
+       📞 Calls: ┌─ *.create_branch, NotImplementedError
+              │  self.switch_branch
+              └─
+       💬 Create a new branch (delegated to Rust)
+   └── 🔧 get_storage_stats(self) (line 51)
+       📞 Calls: *.get_stats
+       💬 Get storage statistics (delegated to Rust)
+   └── 🔧 load_state(self, state_hash) (line 58)
+       📞 Calls: ┌─ *.get_current_hash, *.get_graph_from_state
+              │  NotImplementedError, print, self._invalidate_cache
+              └─
+       💬 Load a previous state of the graph
+   └── 🔧 get_state_info(self, state_hash) (line 87)
+       📞 Calls: ┌─ *.get_current_hash, *.items, NotImplementedError
+              │  branches_for_state.append, hasattr
+              └─
+       💬 Get detailed information about a specific state or current state
+   └── 🔧 switch_branch(self, branch_name) (line 115)
+       📞 Calls: ┌─ NotImplementedError, branches.keys, list, print
+              │  self.load_state
+              └─
+       💬 Switch to a different branch
+
+============================================================
+SUMMARY: Analyzed 10 files
+============================================================
