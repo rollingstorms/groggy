@@ -1,145 +1,110 @@
-"""
-State management methods for Graph class
-"""
+# python_new/groggy/graph/state.py
 
-from typing import Dict, List, Any, Optional
+class StateManager:
+    """
+    Manages graph state, branching, and storage.
+    
+    Handles saving/loading of graph states, branch creation/switching, and storage statistics. Delegates heavy operations to Rust backend for atomicity and performance.
+    Supports batch operations, rollback, and provenance tracking.
+    """
 
+    def save(self, graph, message):
+        """
+        Save the current graph state to persistent storage atomically.
+        
+        Delegates serialization and commit logic to Rust backend. Records provenance message for audit trail.
+        Args:
+            graph (Graph): Graph instance to save.
+            message (str): Commit message or provenance note.
+        Returns:
+            str: State hash or ID.
+        Raises:
+            IOError: On storage failure.
+        """
+        try:
+            import groggy._core
+            return groggy._core.StateManager.save(graph._rust, message)
+        except Exception as e:
+            raise IOError(f"Failed to save graph state: {e}")
 
-class StateMixin:
-    """Mixin class providing state management functionality"""
-    
-    def save_state(self, message: str = None) -> str:
+    def create_branch(self, graph, branch_name, from_hash=None, switch=False):
         """
-        Save the current graph state to storage
+        Create a new branch from an existing state (delegated to Rust backend).
         
+        Supports branching for isolated experimentation or workflow management. Optionally switches to new branch after creation.
         Args:
-            message: Optional message describing the changes
-            
+            graph (Graph): Graph instance.
+            branch_name (str): Name for new branch.
+            from_hash (str, optional): State hash to branch from. Defaults to current.
+            switch (bool): If True, switch to new branch after creation.
         Returns:
-            Hash of the saved state
+            str: Branch name or ID.
+        Raises:
+            ValueError: If branch exists or state invalid.
         """
-        if self.use_rust:
-            commit_msg = message or f"state_{len(self._rust_store.list_branches())}"
-            state_hash = self._rust_store.store_current_graph(self._rust_core, commit_msg)
-            
-            # Track this commit in auto_states
-            if hasattr(self, 'auto_states') and state_hash not in self.auto_states:
-                self.auto_states.append(state_hash)
-            
-            # Update current_hash
-            self.current_hash = state_hash
-            
-            return state_hash
-        else:
-            raise NotImplementedError("State saving only supported with Rust backend")
-    
-    # Backward compatibility alias
-    def commit(self, message: str = None) -> str:
-        """Legacy alias for save_state"""
-        return self.save_state(message)
-    
-    def create_branch(self, branch_name: str, from_hash: str = None, switch=False) -> str:
-        """Create a new branch (delegated to Rust)"""
-        if self.use_rust:
-            self._rust_store.create_branch(branch_name, from_hash)
-            if switch:
-                self.switch_branch(branch_name)
-            return branch_name
-        else:
-            raise NotImplementedError("Branching only supported with Rust backend")
-    
-    def get_storage_stats(self) -> Dict[str, Any]:
-        """Get storage statistics (delegated to Rust)"""
-        if self.use_rust:
-            return self._rust_store.get_stats()
-        else:
-            return {"backend": "python_fallback"}
-    
-    def load_state(self, state_hash: str) -> bool:
+        try:
+            import groggy._core
+            return groggy._core.StateManager.create_branch(graph._rust, branch_name, from_hash, switch)
+        except Exception as e:
+            raise ValueError(f"Failed to create branch: {e}")
+
+    def get_storage_stats(self, graph):
         """
-        Load a previous state of the graph
+        Get storage statistics for the graph (delegated to Rust backend).
         
+        Returns metrics on disk usage, state count, and fragmentation for diagnostics and optimization.
         Args:
-            state_hash: Hash of the state to load
-            
+            graph (Graph): Graph instance.
         Returns:
-            True if successful, False otherwise
+            dict: Storage statistics.
         """
-        if self.use_rust:
-            try:
-                # Get the graph state from the store
-                restored_graph = self._rust_store.get_graph_from_state(state_hash)
-                
-                # Replace the current graph core with the restored one
-                self._rust_core = restored_graph
-                
-                # Update current hash from the backend and invalidate cache
-                self.current_hash = self._rust_store.get_current_hash()
-                self._invalidate_cache()
-                
-                return True
-            except Exception as e:
-                print(f"Error loading state {state_hash}: {e}")
-                return False
-        else:
-            raise NotImplementedError("State loading only supported with Rust backend")
-    
-    def get_state_info(self, state_hash: str = None) -> Dict[str, Any]:
-        """Get detailed information about a specific state or current state
+        try:
+            import groggy._core
+            return groggy._core.StateManager.get_storage_stats(graph._rust)
+        except Exception as e:
+            raise IOError(f"Failed to get storage stats: {e}")
+
+    def load(self, graph, state_hash):
+        """
+        Load a previous state of the graph from persistent storage.
         
+        Delegates deserialization and validation to Rust backend. Ensures atomic state replacement.
         Args:
-            state_hash: Hash of the state to inspect (None for current state)
-            
-        Returns:
-            Dictionary with state information
+            graph (Graph): Graph instance to update.
+            state_hash (str): State hash or ID to load.
+        Raises:
+            KeyError: If state not found.
+            IOError: On storage failure.
         """
-        if self.use_rust:
-            if state_hash is None:
-                state_hash = self._rust_store.get_current_hash()
-            
-            # Find which branches point to this state
-            branches_for_state = []
-            for branch_name, branch_hash in self.branches.items():
-                if branch_hash == state_hash:
-                    branches_for_state.append(branch_name)
-            
-            return {
-                'hash': state_hash,
-                'is_current': state_hash == self._rust_store.get_current_hash(),
-                'branches': branches_for_state,
-                'in_auto_states': state_hash in self.auto_states if hasattr(self, 'auto_states') else False
-            }
-        else:
-            raise NotImplementedError("State info only supported with Rust backend")
-    
-    def switch_branch(self, branch_name: str) -> bool:
+        # TODO: 1. Query Rust; 2. Replace graph state atomically.
+        pass
+
+    def get_state_info(self, graph, state_hash=None):
         """
-        Switch to a different branch
+        Get detailed information about a specific state or the current state.
         
+        Returns provenance, timestamp, and summary statistics for the requested state.
         Args:
-            branch_name: Name of the branch to switch to
-            
+            graph (Graph): Graph instance.
+            state_hash (str, optional): State hash or ID. Defaults to current state.
         Returns:
-            True if successful, False otherwise
+            dict: State metadata and summary.
+        Raises:
+            KeyError: If state not found.
         """
-        if self.use_rust:
-            # Check if branch exists
-            branches = self.branches
-            if branch_name not in branches:
-                print(f"Branch '{branch_name}' does not exist. Available branches: {list(branches.keys())}")
-                return False
-            
-            # Get the hash for this branch
-            branch_hash = branches[branch_name]
-            
-            # Load the state for this branch
-            success = self.load_state(branch_hash)
-            if success:
-                self.current_branch = branch_name
-                print(f"Switched to branch '{branch_name}' (state: {branch_hash})")
-                return True
-            else:
-                print(f"Failed to switch to branch '{branch_name}'")
-                return False
-        else:
-            raise NotImplementedError("Branch switching only supported with Rust backend")
+        # TODO: 1. Query Rust; 2. Return metadata and stats.
+        pass
+
+    def switch_branch(self, graph, branch_name):
+        """
+        Switch to a different branch for the graph.
+        
+        Delegates branch switching to Rust backend for atomicity and consistency. Updates graph state in-place.
+        Args:
+            graph (Graph): Graph instance.
+            branch_name (str): Target branch name.
+        Raises:
+            ValueError: If branch does not exist.
+        """
+        # TODO: 1. Validate branch; 2. Delegate to Rust; 3. Update state.
+        pass

@@ -1,53 +1,45 @@
-"""
-Subgraph module for GLI.
+# python_new/groggy/graph/subgraph.py
 
-A simple Subgraph class that extends Graph with metadata about its origin.
-"""
-
-from typing import Optional, Dict, Any
-from .core import Graph
-
-
-class Subgraph(Graph):
+class Subgraph:
     """
     A Subgraph is a Graph with additional metadata about its origin.
     
-    This is a simple extension of Graph that tracks:
-    - The parent graph it was created from
-    - The filter criteria used to create it
-    - Any additional metadata
+    Represents a filtered or derived view of a parent graph, with explicit provenance and filter criteria stored as metadata.
+    Supports composable subgraph creation and metadata inspection.
     """
-    
-    def __init__(self, parent_graph: Optional[Graph] = None, 
-                 filter_criteria: Optional[str] = None,
-                 metadata: Optional[Dict[str, Any]] = None,
-                 **kwargs):
+
+    def __init__(self, parent_graph, filter_criteria, metadata):
         """
-        Initialize a Subgraph.
+        Initialize a Subgraph with parent graph, filter criteria, and metadata.
         
         Args:
-            parent_graph: The Graph this subgraph was created from
-            filter_criteria: The filter string/criteria used to create this subgraph
-            metadata: Additional metadata about this subgraph
-            **kwargs: Arguments passed to the parent Graph constructor
+            parent_graph (Graph): The parent graph instance.
+            filter_criteria (dict or callable): Criteria used to derive the subgraph.
+            metadata (dict): Provenance and creation metadata.
         """
-        super().__init__(**kwargs)
-        
         self.parent_graph = parent_graph
         self.filter_criteria = filter_criteria
         self.metadata = metadata or {}
-    
+        # Filtered collections: assume parent_graph.nodes/edges support filter()
+        self.nodes = parent_graph.nodes.filter(**filter_criteria) if filter_criteria else parent_graph.nodes
+        self.edges = parent_graph.edges.filter(**filter_criteria) if filter_criteria else parent_graph.edges
+
     def __repr__(self):
-        """String representation of the subgraph."""
-        base_repr = super().__repr__()
-        if self.filter_criteria:
-            return f"Subgraph(filter='{self.filter_criteria}', {base_repr})"
-        return f"Subgraph({base_repr})"
-    
-    def get_metadata(self) -> Dict[str, Any]:
-        """Get all metadata about this subgraph."""
-        return {
-            'parent_graph': self.parent_graph,
-            'filter_criteria': self.filter_criteria,
-            'metadata': self.metadata
-        }
+        """
+        Return a string representation of the subgraph, including metadata summary.
+        
+        Useful for diagnostics and provenance inspection.
+        Returns:
+            str: Summary string.
+        """
+        meta = {k: v for k, v in self.metadata.items()}
+        return f"<Subgraph nodes={len(self.nodes)} edges={len(self.edges)} meta={meta}>"
+
+    def get_metadata(self):
+        """
+        Get all provenance and creation metadata for this subgraph.
+        
+        Returns:
+            dict: Metadata dictionary.
+        """
+        return self.metadata

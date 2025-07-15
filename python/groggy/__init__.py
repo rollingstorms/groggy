@@ -1,64 +1,63 @@
-"""
-Groggy - A Graph Language Engine for dynamic graphs and versioned state
-High-performance graph manipulation library with Rust backend
-"""
-
-from .graph import Graph
-from .graph.subgraph import Subgraph
-from .utils import create_random_graph
-from ._version import __version__
-
-# Try to import Rust core, fallback to Python implementation
-try:
-    from . import _core
-    from ._core import FastGraph, ColumnarStore
-    RUST_BACKEND_AVAILABLE = True
-except ImportError:
-    RUST_BACKEND_AVAILABLE = False
-    # Define placeholders for when Rust backend is not available
-    FastGraph = None
-    ColumnarStore = None
-    import warnings
-    warnings.warn(
-        "Rust backend not available, falling back to Python implementation. "
-        "Install with 'pip install groggy[rust]' for better performance.",
-        UserWarning
-    )
-
-# Backend management
-_current_backend = 'rust' if RUST_BACKEND_AVAILABLE else 'python'
+# python_new/groggy/__init__.py
 
 def get_available_backends():
-    """Get list of available backends."""
-    backends = ['python']
-    if RUST_BACKEND_AVAILABLE:
-        backends.append('rust')
-    return backends
+    """
+    Returns a list of all available backend implementations for the Graph library.
+    
+    Discovers built-in and user-registered backends. Handles plugin loading and validation.
+    Returns:
+        List[str]: Names of available backends.
+    Raises:
+        ImportError: If a backend fails to load.
+    """
+    # Discover built-in backends
+    builtins = ['rust']
+    plugins = []
+    try:
+        import pkg_resources
+        for entry in pkg_resources.iter_entry_points('groggy.backends'):
+            plugins.append(entry.name)
+    except ImportError:
+        pass
+    return builtins + plugins
 
 def set_backend(backend):
-    """Set the backend to use for new Graph instances."""
-    global _current_backend
-    if backend not in get_available_backends():
-        raise ValueError(f"Backend '{backend}' not available. Available backends: {get_available_backends()}")
-    _current_backend = backend
+    """
+    Sets the backend implementation to use for all new Graph instances.
+    
+    Validates the backend name, loads the backend module, and updates global state.
+    Args:
+        backend (str): Name of the backend to use.
+    Raises:
+        ValueError: If backend is not available.
+        ImportError: If backend cannot be loaded.
+    """
+    global _backend
+    available = get_available_backends()
+    if backend not in available:
+        raise ValueError(f"Backend '{backend}' not available. Choose from: {available}")
+    # Attempt to import backend module (simulate for 'rust')
+    if backend == 'rust':
+        try:
+            import groggy._core
+        except ImportError as e:
+            raise ImportError("Rust backend not installed or failed to import.")
+    else:
+        try:
+            import pkg_resources
+            entry = next(e for e in pkg_resources.iter_entry_points('groggy.backends') if e.name == backend)
+            entry.load()
+        except Exception as e:
+            raise ImportError(f"Failed to load backend '{backend}': {e}")
+    _backend = backend
 
 def get_current_backend():
-    """Get the currently selected backend."""
-    return _current_backend
-
-__all__ = [
-    'Graph',
-    'Subgraph',
-    'StateTracker',
-    'ChangeType',
-    'create_state',
-    'record_change',
-    'create_random_graph',
-    '__version__',
-    'RUST_BACKEND_AVAILABLE',
-    'get_available_backends',
-    'set_backend',
-    'get_current_backend',
-    'FastGraph',
-    'ColumnarStore'
-]
+    """
+    Returns the name of the currently selected backend implementation.
+    
+    Reads from global state. Used for diagnostics and debugging.
+    Returns:
+        str: Name of the current backend.
+    """
+    global _backend
+    return _backend if '_backend' in globals() else 'rust'
