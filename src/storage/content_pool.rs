@@ -1,25 +1,26 @@
+// src_new/storage/content_pool.rs
 #![allow(non_local_definitions)]
-use crate::graph::types::{LegacyEdgeData, LegacyNodeData};
-use crate::utils::hash::fast_hash;
+// High-performance content-addressed storage for graph components
+/// Content pool for high-performance batch operations
 use dashmap::DashMap;
-use pyo3::prelude::*;
 use std::sync::Arc;
+use serde_json::Value;
+use crate::graph::types::{NodeId, EdgeId};
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct ContentHash(pub u64);
+// Using JSON Value as generic storage for now
+pub type NodeType = Value;
+pub type EdgeType = Value;
+pub type ContentHash = u64;
 
-/// High-performance content-addressed storage for graph components
-#[pyclass]
 pub struct ContentPool {
-    nodes: DashMap<ContentHash, Arc<LegacyNodeData>>,
-    edges: DashMap<ContentHash, Arc<LegacyEdgeData>>,
+    nodes: DashMap<ContentHash, Arc<NodeType>>,
+    edges: DashMap<ContentHash, Arc<EdgeType>>,
     node_refs: DashMap<ContentHash, usize>,
     edge_refs: DashMap<ContentHash, usize>,
 }
 
-#[pymethods]
+
 impl ContentPool {
-    #[new]
     pub fn new() -> Self {
         Self {
             nodes: DashMap::new(),
@@ -29,134 +30,160 @@ impl ContentPool {
         }
     }
 
-    /// Get storage statistics
-    pub fn get_stats(&self) -> std::collections::HashMap<String, usize> {
-        let mut stats = std::collections::HashMap::new();
-        stats.insert("pooled_nodes".to_string(), self.nodes.len());
-        stats.insert("pooled_edges".to_string(), self.edges.len());
-        stats.insert("node_refs_tracked".to_string(), self.node_refs.len());
-        stats.insert("edge_refs_tracked".to_string(), self.edge_refs.len());
-        stats
+    /// Interns a batch of nodes in a single operation.
+    pub fn batch_intern_nodes(&self, nodes: Vec<NodeType>) -> Vec<ContentHash> {
+        nodes.into_iter().map(|node| self.intern_node(node)).collect()
     }
-}
-
-impl ContentPool {
-    /// Hash a node for content addressing
-    pub fn hash_node(node: &LegacyNodeData) -> ContentHash {
-        let serialized = serde_json::to_string(node).unwrap_or_default();
-        ContentHash(fast_hash(serialized.as_bytes()))
+    /// Interns a batch of edges in a single operation.
+    pub fn batch_intern_edges(&self, edges: Vec<EdgeType>) -> Vec<ContentHash> {
+        edges.into_iter().map(|edge| self.intern_edge(edge)).collect()
     }
-
-    /// Hash an edge for content addressing
-    pub fn hash_edge(edge: &LegacyEdgeData) -> ContentHash {
-        let serialized = serde_json::to_string(edge).unwrap_or_default();
-        ContentHash(fast_hash(serialized.as_bytes()))
-    }
-
     /// Store node in pool and return its content hash
-    pub fn intern_node(&self, node: LegacyNodeData) -> ContentHash {
-        let hash = Self::hash_node(&node);
+    pub fn intern_node(&self, node: NodeType) -> ContentHash {
+        let hash = crate::utils::hash::hash_node(&node);
         let arc_node = Arc::new(node);
-
-        // Insert or get existing
-        self.nodes.entry(hash.clone()).or_insert(arc_node);
-
-        // Increment reference count
-        *self.node_refs.entry(hash.clone()).or_insert(0) += 1;
-
+        self.nodes.entry(hash).or_insert(arc_node);
+        *self.node_refs.entry(hash).or_insert(0) += 1;
         hash
     }
-
     /// Store edge in pool and return its content hash
-    pub fn intern_edge(&self, edge: LegacyEdgeData) -> ContentHash {
-        let hash = Self::hash_edge(&edge);
+    pub fn intern_edge(&self, edge: EdgeType) -> ContentHash {
+        let hash = crate::utils::hash::hash_edge(&edge);
         let arc_edge = Arc::new(edge);
-
-        // Insert or get existing
-        self.edges.entry(hash.clone()).or_insert(arc_edge);
-
-        // Increment reference count
-        *self.edge_refs.entry(hash.clone()).or_insert(0) += 1;
-
+        self.edges.entry(hash).or_insert(arc_edge);
+        *self.edge_refs.entry(hash).or_insert(0) += 1;
         hash
     }
-
-    /// Get node by content hash
-    pub fn get_node(&self, hash: &ContentHash) -> Option<Arc<LegacyNodeData>> {
-        self.nodes.get(hash).map(|entry| entry.clone())
+    /// Synchronizes the content pool with persistent storage.
+    pub fn sync(&self) {
+        // Stub: Implement backend flush/consistency logic here
     }
-
-    /// Get edge by content hash
-    pub fn get_edge(&self, hash: &ContentHash) -> Option<Arc<LegacyEdgeData>> {
-        self.edges.get(hash).map(|entry| entry.clone())
+    /// Returns all node hashes in the pool.
+    pub fn all_node_hashes(&self) -> Vec<ContentHash> {
+        self.nodes.iter().map(|entry| *entry.key()).collect()
     }
-
-    /// Release a node reference (for garbage collection)
-    pub fn release_node(&self, hash: &ContentHash) {
-        if let Some(mut entry) = self.node_refs.get_mut(hash) {
-            *entry -= 1;
-            let count = *entry;
-            drop(entry);
-
-            if count == 0 {
-                self.nodes.remove(hash);
-                self.node_refs.remove(hash);
+    /// Returns all edge hashes in the pool.
+    pub fn all_edge_hashes(&self) -> Vec<ContentHash> {
+        self.edges.iter().map(|entry| *entry.key()).collect()
+    }
+    /// Returns the number of nodes in the pool.
+    pub fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+    /// Returns the number of edges in the pool.
+    pub fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+    /// Checks if a node exists by hash.
+    pub fn has_node_hash(&self, hash: &ContentHash) -> bool {
+        self.nodes.contains_key(hash)
+    }
+    /// Checks if an edge exists by hash.
+    pub fn has_edge_hash(&self, hash: &ContentHash) -> bool {
+        self.edges.contains_key(hash)
+    }
+    /// Adds nodes by hash (increments refcount or inserts if not present).
+    pub fn add_node_hashes(&self, hashes: &[ContentHash]) {
+        for hash in hashes {
+            self.node_refs.entry(*hash).and_modify(|c| *c += 1).or_insert(1);
+            self.nodes.entry(*hash).or_insert_with(|| Arc::new(Value::Null));
+        }
+    }
+    /// Adds edges by hash (increments refcount or inserts if not present).
+    pub fn add_edge_hashes(&self, hashes: &[ContentHash]) {
+        for hash in hashes {
+            self.edge_refs.entry(*hash).and_modify(|c| *c += 1).or_insert(1);
+            self.edges.entry(*hash).or_insert_with(|| Arc::new(Value::Null));
+        }
+    }
+    /// Removes nodes by hash (decrements refcount and removes if zero).
+    pub fn remove_node_hashes(&self, hashes: &[ContentHash]) {
+        for hash in hashes {
+            if let Some(mut refcount) = self.node_refs.get_mut(hash) {
+                if *refcount > 1 {
+                    *refcount -= 1;
+                } else {
+                    self.node_refs.remove(hash);
+                    self.nodes.remove(hash);
+                }
+            }
+        }
+    }
+    /// Removes edges by hash (decrements refcount and removes if zero).
+    pub fn remove_edge_hashes(&self, hashes: &[ContentHash]) {
+        for hash in hashes {
+            if let Some(mut refcount) = self.edge_refs.get_mut(hash) {
+                if *refcount > 1 {
+                    *refcount -= 1;
+                } else {
+                    self.edge_refs.remove(hash);
+                    self.edges.remove(hash);
+                }
             }
         }
     }
 
-    /// Release an edge reference (for garbage collection)
-    pub fn release_edge(&self, hash: &ContentHash) {
-        if let Some(mut entry) = self.edge_refs.get_mut(hash) {
-            *entry -= 1;
-            let count = *entry;
-            drop(entry);
+    // --- Ergonomic NodeId/EdgeId wrappers ---
 
-            if count == 0 {
-                self.edges.remove(hash);
-                self.edge_refs.remove(hash);
+    /// Returns all NodeIds in the pool (best-effort, expects stored Value to be a string or object with "id").
+    pub fn all_node_ids(&self) -> Vec<NodeId> {
+        self.nodes.iter().filter_map(|entry| {
+            let value = entry.value();
+            if let Some(s) = value.as_str() {
+                Some(NodeId(s.to_string()))
+            } else if let Some(obj) = value.as_object() {
+                obj.get("id").and_then(|v| v.as_str()).map(|s| NodeId(s.to_string()))
+            } else {
+                None
             }
-        }
+        }).collect()
+    }
+    /// Returns all EdgeIds in the pool (best-effort, expects stored Value to be an object with "source" and "target").
+    pub fn all_edge_ids(&self) -> Vec<EdgeId> {
+        self.edges.iter().filter_map(|entry| {
+            let value = entry.value();
+            if let Some(obj) = value.as_object() {
+                let source = obj.get("source").and_then(|v| v.as_str());
+                let target = obj.get("target").and_then(|v| v.as_str());
+                match (source, target) {
+                    (Some(s), Some(t)) => Some(EdgeId(NodeId(s.to_string()), NodeId(t.to_string()))),
+                    _ => None
+                }
+            } else {
+                None
+            }
+        }).collect()
+    }
+    /// Checks if a node exists by NodeId.
+    pub fn has_node(&self, node_id: &NodeId) -> bool {
+        let hash = crate::utils::hash::hash_node(&node_id.0);
+        self.has_node_hash(&hash)
+    }
+    /// Checks if an edge exists by EdgeId.
+    pub fn has_edge(&self, edge_id: &EdgeId) -> bool {
+        let hash = crate::utils::hash::hash_edge(&edge_id.0.0, &edge_id.1.0);
+        self.has_edge_hash(&hash)
+    }
+    /// Adds nodes by NodeId.
+    pub fn add_nodes(&self, node_ids: &[NodeId]) {
+        let hashes: Vec<ContentHash> = node_ids.iter().map(|id| crate::utils::hash::hash_node(&id.0)).collect();
+        self.add_node_hashes(&hashes);
+    }
+    /// Adds edges by EdgeId.
+    pub fn add_edges(&self, edge_ids: &[EdgeId]) {
+        let hashes: Vec<ContentHash> = edge_ids.iter().map(|id| crate::utils::hash::hash_edge(&id.0.0, &id.1.0)).collect();
+        self.add_edge_hashes(&hashes);
+    }
+    /// Removes nodes by NodeId.
+    pub fn remove_nodes(&self, node_ids: &[NodeId]) {
+        let hashes: Vec<ContentHash> = node_ids.iter().map(|id| crate::utils::hash::hash_node(&id.0)).collect();
+        self.remove_node_hashes(&hashes);
+    }
+    /// Removes edges by EdgeId.
+    pub fn remove_edges(&self, edge_ids: &[EdgeId]) {
+        let hashes: Vec<ContentHash> = edge_ids.iter().map(|id| crate::utils::hash::hash_edge(&id.0.0, &id.1.0)).collect();
+        self.remove_edge_hashes(&hashes);
     }
 
-    /// Compact the pool by removing unreferenced items
-    pub fn compact(&self) -> usize {
-        let mut removed = 0;
-
-        // Remove nodes with zero references
-        let node_hashes_to_remove: Vec<_> = self
-            .node_refs
-            .iter()
-            .filter(|entry| *entry.value() == 0)
-            .map(|entry| entry.key().clone())
-            .collect();
-
-        for hash in node_hashes_to_remove {
-            self.nodes.remove(&hash);
-            self.node_refs.remove(&hash);
-            removed += 1;
-        }
-
-        // Remove edges with zero references
-        let edge_hashes_to_remove: Vec<_> = self
-            .edge_refs
-            .iter()
-            .filter(|entry| *entry.value() == 0)
-            .map(|entry| entry.key().clone())
-            .collect();
-
-        for hash in edge_hashes_to_remove {
-            self.edges.remove(&hash);
-            self.edge_refs.remove(&hash);
-            removed += 1;
-        }
-
-        removed
-    }
 }
 
-impl Default for ContentPool {
-    fn default() -> Self {
-        Self::new()
-    }
-}
