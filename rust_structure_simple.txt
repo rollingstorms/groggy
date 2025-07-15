@@ -1,0 +1,477 @@
+ CODE STRUCTURE ANALYSIS
+Directory: ../groggy/src
+Generated: rust_structure_simple.txt
+============================================================
+
+============================================================
+FILE: lib.rs
+============================================================
+
+⚙️  FUNCTION: _core() (line 12)
+   🏷️  #pymodule
+
+============================================================
+FILE: graph/core.rs
+============================================================
+
+🏗️  STRUCT: FastGraph (line 14)
+   🏷️  #pyclass
+
+🔧 IMPL: FastGraph (line 33)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 35)
+       🏷️  #new
+   └── ⚙️  add_node() (line 53)
+       💬 Add a single node with optional attributes
+   └── ⚙️  add_edge() (line 85)
+       💬 Add a single edge with optional attributes
+   └── ⚙️  node_count() (line 132)
+       💬 Get node count
+   └── ⚙️  edge_count() (line 137)
+       💬 Get edge count
+   └── ⚙️  get_node_ids() (line 142)
+       💬 Get all node IDs
+   └── ⚙️  has_node() (line 147)
+       💬 Check if node exists
+   └── ⚙️  has_edge() (line 152)
+       💬 Check if edge exists
+   └── ⚙️  get_neighbors() (line 164)
+       💬 Get neighbors of a node (for directed graphs, returns only outgoing neighbors)
+   └── ⚙️  get_outgoing_neighbors() (line 187)
+       💬 Get outgoing neighbors of a node (for directed graphs)
+   └── ⚙️  get_incoming_neighbors() (line 204)
+       💬 Get incoming neighbors of a node (for directed graphs)
+   └── ⚙️  get_all_neighbors() (line 221)
+       💬 Get all neighbors of a node (both incoming and outgoing)
+   └── ⚙️  get_node_attributes() (line 252)
+       💬 Get node attributes - retrieve from columnar store
+   └── ⚙️  get_edge_attributes() (line 283)
+       💬 Get edge attributes - retrieve from columnar store
+   └── ⚙️  is_directed() (line 323)
+       💬 Check if the graph is directed
+   └── ⚙️  get_edge_ids() (line 328)
+       💬 Get edge IDs
+   └── ⚙️  set_node_attribute() (line 344)
+       💬 Set a single node attribute
+   └── ⚙️  set_edge_attribute() (line 365)
+       💬 Set a single edge attribute
+   └── ⚙️  set_edge_attributes() (line 406)
+       💬 Set multiple edge attributes at once
+   └── ⚙️  set_nodes_attributes_batch() (line 448)
+       💬 Set batch node attributes - efficiently set attributes for multiple nodes
+   └── ⚙️  set_edges_attributes_batch() (line 477)
+       💬 Set batch edge attributes - efficiently set attributes for multiple edges
+   └── ⚙️  remove_node() (line 522)
+       💬 Remove a node and all its edges
+   └── ⚙️  remove_edge() (line 564)
+       💬 Remove an edge
+   └── ⚙️  remove_nodes() (line 589)
+       💬 Remove multiple nodes - delegates to single node removal
+   └── ⚙️  remove_edges() (line 600)
+       💬 Remove multiple edges - delegates to single edge removal
+   └── ⚙️  add_nodes() (line 611)
+       💬 Add multiple nodes in batch - now uses optimized bulk operations internally
+   └── ⚙️  add_edges() (line 629)
+       💬 Add multiple edges in batch - now uses optimized bulk operations internally
+   └── ⚙️  filter_nodes_by_attributes() (line 650)
+       💬 Filter nodes by attribute dictionary - Python interface to columnar filtering
+   └── ⚙️  filter_edges_by_attributes() (line 689)
+       💬 Filter edges by attribute dictionary - Python interface to columnar filtering
+   └── ⚙️  filter_nodes_by_numeric_comparison() (line 733)
+       💬 Filter nodes by numeric comparison - Python interface to columnar filtering
+   └── ⚙️  filter_nodes_by_string_comparison() (line 758)
+       💬 Filter nodes by string comparison - Python interface to columnar filtering
+   └── ⚙️  filter_edges_by_numeric_comparison() (line 783)
+       💬 Filter edges by numeric comparison - Python interface to columnar filtering
+   └── ⚙️  filter_edges_by_string_comparison() (line 813)
+       💬 Filter edges by string comparison - Python interface to columnar filtering
+   └── ⚙️  filter_nodes_by_attributes_sparse() (line 843)
+       💬 Filter nodes with sparse algorithm - Python interface to optimized sparse filtering
+   └── ⚙️  filter_nodes_multi_criteria() (line 882)
+       💬 Optimized multi-criteria node filtering - all intersection logic in Rust
+   └── ⚙️  filter_edges_multi_criteria() (line 930)
+       💬 Optimized multi-criteria edge filtering - all intersection logic in Rust
+   └── ⚙️  get_nodes_attribute() (line 983)
+       💬 Get a specific attribute for multiple nodes efficiently
+   └── ⚙️  get_nodes_attributes() (line 1008)
+       💬 Get all attributes for multiple nodes efficiently
+   └── ⚙️  get_all_nodes_attribute() (line 1037)
+       💬 Get a specific attribute for all nodes efficiently (useful for statistics)
+   └── ⚙️  get_edges_attribute() (line 1059)
+       💬 Get a specific attribute for multiple edges efficiently
+   └── ⚙️  get_all_edges_attribute() (line 1089)
+       💬 Get a specific attribute for all edges efficiently (useful for statistics)
+
+🔧 IMPL: FastGraph (line 1119)
+   └── ⚙️  get_node_weight() (line 1121)
+       💬 Get node weight by index (internal use)
+   └── ⚙️  get_edge_weight() (line 1126)
+       💬 Get edge weight by index (internal use)
+   └── ⚙️  get_edge_indices() (line 1131)
+       💬 Get all edge indices (internal use)
+   └── ⚙️  get_edge_endpoints() (line 1136)
+       💬 Get edge endpoints (internal use)
+   └── ⚙️  add_node_to_graph_public() (line 1144)
+       💬 Add node directly to graph (internal use)
+   └── ⚙️  add_edge_to_graph_public() (line 1149)
+       💬 Add edge directly to graph (internal use)
+   └── ⚙️  get_neighbors_public() (line 1159)
+       💬 Get neighbors by index (internal use)
+   └── ⚙️  get_edges_directed() (line 1167)
+       💬 Get directed edges (internal use)
+
+============================================================
+FILE: graph/types.rs
+============================================================
+
+🏗️  STRUCT: NodeData (line 10)
+   🏷️  #derive(Debug, Clone, Serialize, Deserialize)
+
+🏗️  STRUCT: EdgeData (line 18)
+   🏷️  #derive(Debug, Clone, Serialize, Deserialize)
+
+🏗️  STRUCT: LegacyNodeData (line 28)
+   🏷️  #derive(Debug, Clone, Serialize, Deserialize)
+
+🏗️  STRUCT: LegacyEdgeData (line 34)
+   🏷️  #derive(Debug, Clone, Serialize, Deserialize)
+
+🔢 ENUM: GraphType (line 62)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: GraphType (line 67)
+   └── ⚙️  new_directed() (line 68)
+   └── ⚙️  new_undirected() (line 72)
+   └── ⚙️  node_count() (line 76)
+   └── ⚙️  edge_count() (line 83)
+   └── ⚙️  add_node() (line 90)
+   └── ⚙️  add_edge() (line 97)
+   └── ⚙️  remove_node() (line 109)
+   └── ⚙️  remove_edge() (line 116)
+   └── ⚙️  find_edge() (line 123)
+   └── ⚙️  neighbors() (line 134)
+   └── ⚙️  node_weight() (line 141)
+   └── ⚙️  node_weight_mut() (line 148)
+   └── ⚙️  edge_weight() (line 155)
+   └── ⚙️  edge_weight_mut() (line 162)
+   └── ⚙️  edge_indices() (line 172)
+   └── ⚙️  edges_directed() (line 179)
+   └── ⚙️  neighbors_directed() (line 190)
+   └── ⚙️  edge_endpoints() (line 201)
+   └── ⚙️  clear() (line 211)
+
+⚙️  FUNCTION: from() (line 42)
+
+⚙️  FUNCTION: from() (line 51)
+
+============================================================
+FILE: graph/algorithms.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 5)
+   └── ⚙️  bfs() (line 7)
+       💬 Breadth-First Search from a starting node
+   └── ⚙️  dfs() (line 34)
+       💬 Depth-First Search from a starting node
+   └── ⚙️  shortest_path() (line 67)
+       💬 Find shortest path between two nodes (BFS-based)
+   └── ⚙️  clustering_coefficient() (line 117)
+       💬 Calculate clustering coefficient for a node
+   └── ⚙️  average_clustering_coefficient() (line 153)
+       💬 Calculate average clustering coefficient for the entire graph
+
+============================================================
+FILE: graph/bulk_operations.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 10)
+   └── ⚙️  bulk_add_nodes_internal() (line 12)
+       💬 Bulk add nodes with optimized columnar storage - INTERNAL USE ONLY
+   └── ⚙️  bulk_add_edges_internal() (line 61)
+       💬 Bulk add edges with optimized columnar storage - INTERNAL USE ONLY
+   └── ⚙️  create_nodes_from_list() (line 115)
+       💬 Create nodes from Python list - PYTHON INTERFACE ONLY
+   └── ⚙️  create_edges_from_list() (line 148)
+       💬 Create edges from Python list - PYTHON INTERFACE ONLY
+   └── ⚙️  bulk_set_node_attributes_by_uid() (line 180)
+       💬 Bulk set node attributes using attribute UIDs for efficiency
+   └── ⚙️  bulk_set_edge_attributes_by_uid() (line 200)
+       💬 Bulk set edge attributes using attribute UIDs for efficiency
+
+============================================================
+FILE: graph/views.rs
+============================================================
+
+🏗️  STRUCT: GraphView (line 11)
+   🏷️  #pyclass
+
+🏗️  STRUCT: NodeView (line 51)
+   🏷️  #pyclass
+
+🏗️  STRUCT: AttributeView (line 91)
+   🏷️  #pyclass
+
+🏗️  STRUCT: ViewManager (line 123)
+   🏷️  #pyclass
+
+🔧 IMPL: GraphView (line 23)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 25)
+       🏷️  #new
+   └── ⚙️  topology_stats() (line 41)
+       💬 Get graph topology statistics
+
+🔧 IMPL: NodeView (line 60)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 62)
+       🏷️  #new
+   └── ⚙️  node_stats() (line 71)
+       💬 Get node statistics
+
+🔧 IMPL: Default for NodeView (line 83)
+   └── ⚙️  default() (line 84)
+
+🔧 IMPL: AttributeView (line 97)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 99)
+       🏷️  #new
+   └── ⚙️  get_attribute_names() (line 106)
+       💬 Get all attribute names
+
+🔧 IMPL: Default for AttributeView (line 115)
+   └── ⚙️  default() (line 116)
+
+🔧 IMPL: ViewManager (line 130)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 132)
+       🏷️  #new
+   └── ⚙️  stats() (line 145)
+       💬 Get unified statistics
+
+============================================================
+FILE: graph/operations.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 6)
+   📝 High-level graph operations (subgraphs, algorithms, etc.) This module contains ONLY complex operations that operate on the full graph structure
+   └── ⚙️  parallel_subgraph_by_node_ids() (line 8)
+       💬 Create subgraph with parallel node filtering - HIGH-LEVEL OPERATION ONLY
+   └── ⚙️  create_subgraph_by_node_filter() (line 78)
+       💬 Create subgraph by filtering nodes with specific attributes - HIGH-LEVEL OPERATION
+   └── ⚙️  filter_nodes_by_degree() (line 99)
+       💬 Degree-based node filtering - HIGH-LEVEL OPERATION
+   └── ⚙️  get_node_degree() (line 126)
+       💬 Get node degree - HIGH-LEVEL OPERATION
+
+============================================================
+FILE: utils/conversion.rs
+============================================================
+
+⚙️  FUNCTION: python_dict_to_json_map() (line 7)
+   📝 Convert Python dictionary to JSON map
+
+⚙️  FUNCTION: python_to_json_value() (line 20)
+   📝 Convert Python value to JSON value
+
+⚙️  FUNCTION: json_value_to_python() (line 52)
+   📝 Convert JSON value to Python value
+
+⚙️  FUNCTION: python_value_to_json() (line 86)
+   📝 Convert Python value to JSON (alias for python_to_json_value)
+
+⚙️  FUNCTION: python_pyobject_to_json() (line 91)
+   📝 Convert PyObject to JSON value
+
+============================================================
+FILE: utils/hash.rs
+============================================================
+
+⚙️  FUNCTION: fast_hash() (line 5)
+   📝 Fast hash function using xxHash
+
+⚙️  FUNCTION: hash_string() (line 10)
+   📝 Hash a string
+
+⚙️  FUNCTION: hash_to_hex() (line 15)
+   📝 Create a hex string from hash
+
+============================================================
+FILE: storage/columnar.rs
+============================================================
+
+🏗️  STRUCT: ColumnarStore (line 18)
+   🏷️  #pyclass
+
+🏗️  STRUCT: ComplexQuery (line 716)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: Default for ColumnarStore (line 44)
+   └── ⚙️  default() (line 45)
+
+🔧 IMPL: ColumnarStore (line 51)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 53)
+       🏷️  #new
+   └── ⚙️  get_stats() (line 69)
+       💬 Get storage statistics
+
+🔧 IMPL: ColumnarStore (line 95)
+   └── ⚙️  get_or_create_attr_uid() (line 97)
+       💬 Get or create an attribute UID for a given attribute name
+   └── ⚙️  get_attr_name() (line 114)
+       💬 Get attribute name from UID
+   └── ⚙️  set_node_attribute() (line 119)
+       💬 Set node attribute (simplified approach)
+   └── ⚙️  get_node_attribute() (line 149)
+       💬 Get node attribute
+   └── ⚙️  filter_nodes_by_attribute() (line 160)
+       💬 Fast attribute-based filtering using bitmaps (builds on-demand)
+   └── ⚙️  ensure_bitmap_exists() (line 185)
+       💬 Ensure a bitmap exists for the given key
+   └── ⚙️  filter_nodes_by_attributes() (line 230)
+       💬 Multi-attribute filtering with bitmap intersection (builds bitmaps on-demand)
+   └── ⚙️  get_node_attributes_by_uids() (line 277)
+       💬 Get all attributes for a node using attr_uids from NodeData
+   └── ⚙️  get_edge_attributes_by_uids() (line 294)
+       💬 Get all attributes for an edge using attr_uids from EdgeData
+   └── ⚙️  get_node_attributes() (line 312)
+       💬 Get all attributes for a node (legacy interface - looks up attr_uids from NodeData) This method will need to be called with the actual node data to get attr_uids
+   └── ⚙️  get_edge_attributes() (line 332)
+       💬 Get all attributes for an edge (legacy interface)
+   └── ⚙️  filter_nodes_by_numeric_comparison() (line 351)
+       💬 Filter nodes by numeric comparison (optimized implementation)
+   └── ⚙️  filter_nodes_by_string_comparison() (line 396)
+       💬 Filter nodes by string comparison (optimized implementation)
+   └── ⚙️  remove_node() (line 436)
+       💬 Remove node and clean up attribute storage
+   └── ⚙️  remove_node_legacy() (line 456)
+       💬 Remove node and clean up attribute storage (legacy interface - finds attr_uids automatically)
+
+🔧 IMPL: ColumnarStore (line 475)
+   📝 Edge storage methods (simplified, same pattern as nodes)
+   └── ⚙️  set_edge_attribute() (line 477)
+       💬 Set edge attribute (simplified approach)
+   └── ⚙️  get_edge_attribute() (line 507)
+       💬 Get edge attribute
+   └── ⚙️  filter_edges_by_attributes() (line 518)
+       💬 Fast edge filtering using bitmaps (builds on-demand)
+   └── ⚙️  filter_edges_by_numeric_comparison() (line 565)
+       💬 Filter edges by numeric comparison (optimized implementation)
+   └── ⚙️  filter_edges_by_string_comparison() (line 610)
+       💬 Filter edges by string comparison (optimized implementation)
+   └── ⚙️  remove_edge() (line 650)
+       💬 Remove edge and clean up attribute storage
+   └── ⚙️  remove_edge_legacy() (line 670)
+       💬 Remove edge and clean up attribute storage (legacy interface)
+
+🔧 IMPL: Clone for ColumnarStore (line 688)
+   └── ⚙️  clone() (line 689)
+
+🔧 IMPL: ComplexQuery (line 725)
+   └── ⚙️  new() (line 726)
+   └── ⚙️  with_exact() (line 735)
+       💬 Add exact value filter
+   └── ⚙️  with_numeric() (line 741)
+       💬 Add numeric comparison filter
+   └── ⚙️  with_string() (line 747)
+       💬 Add string comparison filter
+
+🔧 IMPL: ColumnarStore (line 753)
+   └── ⚙️  batch_set_node_attributes() (line 756)
+       💬 Batch set node attributes for multiple nodes efficiently Uses attr_uid mapping and value deduplication
+   └── ⚙️  batch_set_edge_attributes() (line 815)
+       💬 Batch set edge attributes for multiple edges efficiently
+   └── ⚙️  filter_nodes_sparse() (line 875)
+       💬 High-performance multi-attribute filtering using sparse intersection Instead of building full bitmaps, directly intersect sparse attribute maps
+   └── ⚙️  get_unique_values_for_attribute() (line 932)
+       💬 Get unique values for an attribute (for analytics and optimization)
+   └── ⚙️  get_value_distribution() (line 955)
+       💬 Get value distribution for an attribute (useful for query optimization)
+   └── ⚙️  bulk_set_node_attributes() (line 978)
+       💬 Bulk set node attributes for efficient batch operations
+   └── ⚙️  bulk_set_edge_attributes() (line 1008)
+       💬 Bulk set edge attributes for efficient batch operations
+   └── ⚙️  bulk_set_multiple_node_attributes() (line 1038)
+       💬 Bulk set multiple node attributes efficiently - optimized for graph creation
+   └── ⚙️  bulk_set_multiple_edge_attributes() (line 1068)
+       💬 Bulk set multiple edge attributes efficiently - optimized for graph creation
+   └── ⚙️  filter_nodes_multi_criteria() (line 1099)
+       💬 Optimized multi-criteria filtering that handles exact matches, numeric comparisons, and string comparisons All filtering and intersection logic is done in Rust to avoid Python overhead
+   └── ⚙️  filter_edges_multi_criteria() (line 1165)
+       💬 Similar multi-criteria filtering for edges
+
+============================================================
+FILE: storage/graph_store.rs
+============================================================
+
+🏗️  STRUCT: GraphState (line 15)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: GraphStore (line 26)
+   🏷️  #pyclass
+
+🔧 IMPL: GraphStore (line 34)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 36)
+       🏷️  #new
+   └── ⚙️  get_current_hash() (line 50)
+       💬 Get current graph hash
+   └── ⚙️  get_stats() (line 55)
+       💬 Get storage statistics
+   └── ⚙️  create_branch() (line 63)
+       💬 Create a new branch
+   └── ⚙️  list_branches() (line 81)
+       💬 List all branches
+   └── ⚙️  store_current_graph() (line 89)
+       💬 Store a graph and return its state hash (exposed to Python)
+   └── ⚙️  get_graph_from_state() (line 94)
+       💬 Reconstruct graph from state hash (exposed to Python)
+
+🔧 IMPL: GraphStore (line 99)
+   └── ⚙️  create_initial_state() (line 101)
+       💬 Create initial empty state
+   └── ⚙️  store_graph() (line 123)
+       💬 Store a graph and return its state hash
+   └── ⚙️  reconstruct_graph() (line 184)
+       💬 Reconstruct graph from state hash
+
+============================================================
+FILE: storage/content_pool.rs
+============================================================
+
+🏗️  STRUCT: ContentPool (line 13)
+   🏷️  #pyclass
+
+🔧 IMPL: ContentPool (line 21)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 23)
+       🏷️  #new
+   └── ⚙️  get_stats() (line 33)
+       💬 Get storage statistics
+
+🔧 IMPL: ContentPool (line 43)
+   └── ⚙️  hash_node() (line 45)
+       💬 Hash a node for content addressing
+   └── ⚙️  hash_edge() (line 51)
+       💬 Hash an edge for content addressing
+   └── ⚙️  intern_node() (line 57)
+       💬 Store node in pool and return its content hash
+   └── ⚙️  intern_edge() (line 71)
+       💬 Store edge in pool and return its content hash
+   └── ⚙️  get_node() (line 85)
+       💬 Get node by content hash
+   └── ⚙️  get_edge() (line 90)
+       💬 Get edge by content hash
+   └── ⚙️  release_node() (line 95)
+       💬 Release a node reference (for garbage collection)
+   └── ⚙️  release_edge() (line 109)
+       💬 Release an edge reference (for garbage collection)
+   └── ⚙️  compact() (line 123)
+       💬 Compact the pool by removing unreferenced items
+
+🔧 IMPL: Default for ContentPool (line 158)
+   └── ⚙️  default() (line 159)
+
+============================================================
+SUMMARY: Analyzed 12 files
+============================================================

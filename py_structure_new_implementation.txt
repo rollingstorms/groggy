@@ -1,0 +1,389 @@
+ CODE STRUCTURE ANALYSIS - NEW IMPLEMENTATION
+Directory: ../groggy/python
+Generated: py_structure_new_implementation.txt
+============================================================
+
+============================================================
+FILE: groggy/__init__.py
+============================================================
+
+⚙️  FUNCTION: get_available_backends() (line 31)
+   📝 Get list of available backends.
+
+⚙️  FUNCTION: set_backend(backend) (line 38)
+   📝 Set the backend to use for new Graph instances.
+
+⚙️  FUNCTION: get_current_backend() (line 45)
+   📝 Get the currently selected backend.
+
+📁 CLASS: Graph (line 55)
+   📝 Main Graph class with new collection-based API
+   └── 🔧 __init__(self, directed=False, backend=None) (line 60)
+       📝 Initialize graph with optional backend selection
+   └── 🔧 info(self) (line 75)
+       📝 Get comprehensive graph information
+   └── 🔧 size(self) (line 85)
+       📝 Get total size (nodes + edges)
+   └── 🔧 is_directed(self) (line 95)
+       📝 Check if graph is directed
+   └── 🔧 nodes(self) (line 105)
+       📝 Property: returns NodeCollection instance
+   └── 🔧 edges(self) (line 115)
+       📝 Property: returns EdgeCollection instance
+   └── 🔧 subgraph(self, node_filter=None, edge_filter=None) (line 125)
+       📝 Create subgraph with node/edge filters
+   └── 🔧 subgraphs(self) (line 145)
+       📝 Get all subgraphs according to a given attr
+
+============================================================
+FILE: groggy/collections/__init__.py
+============================================================
+
+📝 Import statements for collection classes
+
+============================================================
+FILE: groggy/collections/nodes.py
+============================================================
+
+📁 CLASS: NodeCollection (line 15)
+   📝 Collection interface for graph nodes
+   └── 🔧 __init__(self, graph) (line 25)
+       📝 Initialize with reference to parent graph
+   └── 🔧 add(self, node_data) (line 35)
+       📝 Add single node, list of nodes, or dict of node_data
+   └── 🔧 remove(self, node_ids) (line 65)
+       📝 Remove single node or list of nodes
+   └── 🔧 filter(self, *args, **kwargs) (line 85)
+       📝 Filter nodes by dict, kwargs, or query string
+   └── 🔧 size(self) (line 115)
+       📝 Get node count
+   └── 🔧 ids(self) (line 125)
+       📝 Get all node IDs
+   └── 🔧 has(self, node_id) (line 135)
+       📝 Check if node exists
+   └── 🔧 attr(self) (line 145)
+       📝 Property: returns NodeAttributeManager
+   └── 🔧 __iter__(self) (line 155)
+       📝 Iterator support for nodes
+   └── 🔧 __getitem__(self, node_id) (line 165)
+       📝 Index access → returns NodeProxy
+   └── 🔧 __len__(self) (line 175)
+       📝 Length support (calls size())
+
+📁 CLASS: NodeAttributeManager (line 185)
+   📝 Batch attribute management for nodes
+   └── 🔧 __init__(self, node_collection) (line 195)
+       📝 Initialize with parent collection
+   └── 🔧 get(self, node_ids=None, attr_names=None) (line 205)
+       📝 Get attrs for node(s), optionally filtered by attr names
+   └── 🔧 set(self, attr_data) (line 235)
+       📝 Set attrs using dict format
+   └── 🔧 set_type(self, attr_name, attr_type) (line 265)
+       📝 Set attribute type for validation
+
+📁 CLASS: NodeProxy (line 275)
+   📝 Individual node interface with attributes
+   └── 🔧 __init__(self, node_id, graph) (line 285)
+       📝 Initialize with node ID and graph reference
+   └── 🔧 degree(self, direction='both') (line 295)
+       📝 Get node degree
+   └── 🔧 neighbors(self, direction='both') (line 305)
+       📝 Get neighbors (with direction params)
+   └── 🔧 get_attr(self, attr_names) (line 325)
+       📝 Get single attr or list of attrs
+   └── 🔧 set_attr(self, attr_data) (line 345)
+       📝 Set single attr or list of attr tuples
+   └── 🔧 attrs(self) (line 365)
+       📝 Get all attributes
+   └── 🔧 attr(self) (line 375)
+       📝 Property: returns NodeProxyAttributeManager
+   └── 🔧 __str__(self) (line 385)
+       📝 String representation
+   └── 🔧 __repr__(self) (line 395)
+       📝 Representation
+
+📁 CLASS: NodeProxyAttributeManager (line 405)
+   📝 Single node attribute management
+   └── 🔧 __init__(self, node_proxy) (line 415)
+       📝 Initialize with parent proxy
+   └── 🔧 get(self, attr_name) (line 425)
+       📝 Get attribute for this node
+   └── 🔧 set(self, attr_name, value) (line 435)
+       📝 Set attribute for this node
+   └── 🔧 __getitem__(self, attr_name) (line 445)
+       📝 Dict-like access for getting
+   └── 🔧 __setitem__(self, attr_name, value) (line 455)
+       📝 Dict-like access for setting
+
+============================================================
+FILE: groggy/collections/edges.py
+============================================================
+
+📁 CLASS: EdgeCollection (line 15)
+   📝 Collection interface for graph edges
+   └── 🔧 __init__(self, graph) (line 25)
+       📝 Initialize with reference to parent graph
+   └── 🔧 add(self, edge_data) (line 35)
+       📝 Add single edge, list of edges, or dict of edge_data
+   └── 🔧 remove(self, edge_ids) (line 65)
+       📝 Remove single edge or list of edges
+   └── 🔧 filter(self, *args, **kwargs) (line 85)
+       📝 Filter edges by dict, kwargs, or query string
+   └── 🔧 size(self) (line 115)
+       📝 Get edge count
+   └── 🔧 ids(self) (line 125)
+       📝 Get all edge IDs
+   └── 🔧 has(self, edge_id) (line 135)
+       📝 Check if edge exists
+   └── 🔧 attr(self) (line 145)
+       📝 Property: returns EdgeAttributeManager
+   └── 🔧 nodes(self) (line 155)
+       📝 Property: returns filtered NodeCollection
+   └── 🔧 node_ids(self) (line 165)
+       📝 Property: returns node IDs from filtered edges
+   └── 🔧 __iter__(self) (line 175)
+       📝 Iterator support for edges
+   └── 🔧 __getitem__(self, edge_id) (line 185)
+       📝 Index access → returns EdgeProxy
+   └── 🔧 __len__(self) (line 195)
+       📝 Length support (calls size())
+
+📁 CLASS: EdgeAttributeManager (line 205)
+   📝 Batch attribute management for edges
+   └── 🔧 __init__(self, edge_collection) (line 215)
+       📝 Initialize with parent collection
+   └── 🔧 get(self, edge_ids=None, attr_names=None) (line 225)
+       📝 Get attrs for edge(s), optionally filtered by attr names
+   └── 🔧 set(self, attr_data) (line 255)
+       📝 Set attrs using dict format
+   └── 🔧 set_type(self, attr_name, attr_type) (line 285)
+       📝 Set attribute type for validation
+
+📁 CLASS: EdgeProxy (line 295)
+   📝 Individual edge interface with attributes
+   └── 🔧 __init__(self, edge_id, graph) (line 305)
+       📝 Initialize with edge ID and graph reference
+   └── 🔧 endpoints(self) (line 315)
+       📝 Get edge endpoints
+   └── 🔧 source(self) (line 325)
+       📝 Get source node
+   └── 🔧 target(self) (line 335)
+       📝 Get target node
+   └── 🔧 get_attr(self, attr_names) (line 345)
+       📝 Get single attr or list of attrs
+   └── 🔧 set_attr(self, attr_data) (line 365)
+       📝 Set single attr or list of attr tuples
+   └── 🔧 attrs(self) (line 385)
+       📝 Get all attributes
+   └── 🔧 attr(self) (line 395)
+       📝 Property: returns EdgeProxyAttributeManager
+   └── 🔧 __str__(self) (line 405)
+       📝 String representation
+   └── 🔧 __repr__(self) (line 415)
+       📝 Representation
+
+📁 CLASS: EdgeProxyAttributeManager (line 425)
+   📝 Single edge attribute management
+   └── 🔧 __init__(self, edge_proxy) (line 435)
+       📝 Initialize with parent proxy
+   └── 🔧 get(self, attr_name) (line 445)
+       📝 Get attribute for this edge
+   └── 🔧 set(self, attr_name, value) (line 455)
+       📝 Set attribute for this edge
+   └── 🔧 __getitem__(self, attr_name) (line 465)
+       📝 Dict-like access for getting
+   └── 🔧 __setitem__(self, attr_name, value) (line 475)
+       📝 Dict-like access for setting
+
+============================================================
+FILE: groggy/algorithms.py
+============================================================
+
+⚙️  FUNCTION: bfs(graph, start_node, **kwargs) (line 15)
+   📝 Breadth-first search algorithm
+
+⚙️  FUNCTION: dfs(graph, start_node, **kwargs) (line 35)
+   📝 Depth-first search algorithm
+
+⚙️  FUNCTION: shortest_path(graph, source, target, **kwargs) (line 55)
+   📝 Shortest path algorithms
+
+⚙️  FUNCTION: connected_components(graph) (line 85)
+   📝 Find connected components
+
+⚙️  FUNCTION: clustering_coefficient(graph, node=None) (line 105)
+   📝 Calculate clustering coefficient
+
+⚙️  FUNCTION: pagerank(graph, **kwargs) (line 125)
+   📝 PageRank algorithm
+
+⚙️  FUNCTION: betweenness_centrality(graph, **kwargs) (line 145)
+   📝 Betweenness centrality calculation
+
+============================================================
+FILE: groggy/analysis.py
+============================================================
+
+⚙️  FUNCTION: show_changes(graph_or_entity, graph, branch_name) (line 20)
+   📝 Analyze changes across saved states.
+
+⚙️  FUNCTION: _show_graph_changes(graph, branch_name) (line 50)
+   📝 Show all changes across states in a branch.
+
+⚙️  FUNCTION: _show_entity_changes(entity_id, graph, branch_name) (line 98)
+   📝 Show changes for a specific entity across states.
+
+⚙️  FUNCTION: _get_saved_states(graph) (line 192)
+   📝 Get list of saved states from the graph storage.
+
+⚙️  FUNCTION: _analyze_state_diff(graph, prev_hash, curr_hash) (line 209)
+   📝 Analyze differences between two states by loading and comparing them.
+
+⚙️  FUNCTION: _empty_diff() (line 279)
+   📝 Return an empty diff structure.
+
+⚙️  FUNCTION: _compare_graph_states(prev_nodes, prev_edges, curr_nodes, curr_edges) (line 290)
+   📝 Compare two graph states and return the differences.
+
+⚙️  FUNCTION: _print_changes(changes) (line 328)
+   📝 Print formatted change summary.
+
+⚙️  FUNCTION: _print_entity_timeline(entity_id, timeline) (line 343)
+   📝 Print formatted entity timeline.
+
+⚙️  FUNCTION: show_entity_changes(entity_id, graph, branch_name) (line 379)
+   📝 Convenience function for entity-specific analysis.
+
+⚙️  FUNCTION: show_graph_changes(graph, branch_name) (line 383)
+   📝 Convenience function for graph-wide analysis.
+
+⚙️  FUNCTION: track_attribute_changes(graph, attribute_name, branch_name) (line 387)
+   📝 Track changes to a specific attribute across all entities over time
+
+============================================================
+FILE: groggy/utils.py
+============================================================
+
+⚙️  FUNCTION: create_random_graph(n_nodes, edge_probability, use_rust) (line 10)
+   📝 Create a random graph efficiently using vectorized operations
+
+⚙️  FUNCTION: create_clustering_workflow(store, graph, algorithms) (line 25)
+   📝 Create branches for different clustering algorithms
+
+⚙️  FUNCTION: create_subgraph_branch(store, subgraph, branch_name, description) (line 42)
+   📝 Create a branch from a subgraph for isolated processing
+
+⚙️  FUNCTION: convert_networkx_graph(nx_graph) (line 60)
+   📝 Convert NetworkX graph to Groggy graph
+
+⚙️  FUNCTION: convert_to_networkx(groggy_graph) (line 80)
+   📝 Convert Groggy graph to NetworkX format
+
+⚙️  FUNCTION: benchmark_performance(graph, operations) (line 100)
+   📝 Benchmark graph operations performance
+
+============================================================
+FILE: groggy/views.py
+============================================================
+
+📁 CLASS: GraphView (line 15)
+   📝 Read-only graph view with filtered access
+   └── 🔧 __init__(self, graph, node_filter=None, edge_filter=None) (line 25)
+       📝 Initialize view with optional filters
+   └── 🔧 snapshot(self) (line 45)
+       📝 Create immutable snapshot
+   └── 🔧 filter_view(self, node_filter=None, edge_filter=None) (line 65)
+       📝 Create additional filtered view
+   └── 🔧 nodes(self) (line 85)
+       📝 Property: returns filtered NodeCollection
+   └── 🔧 edges(self) (line 95)
+       📝 Property: returns filtered EdgeCollection
+   └── 🔧 info(self) (line 105)
+       📝 Get view information
+
+📁 CLASS: GraphSnapshot (line 115)
+   📝 Immutable graph snapshot
+   └── 🔧 __init__(self, graph_state) (line 125)
+       📝 Initialize with graph state
+   └── 🔧 nodes(self) (line 135)
+       📝 Property: returns immutable NodeCollection
+   └── 🔧 edges(self) (line 145)
+       📝 Property: returns immutable EdgeCollection
+   └── 🔧 info(self) (line 155)
+       📝 Get snapshot information
+
+============================================================
+FILE: groggy/data_structures.py
+============================================================
+
+📁 CLASS: Node (line 13)
+   📝 Legacy Graph node with attributes - DEPRECATED
+   📝 Use NodeProxy from collections.nodes instead
+   └── 🔧 get_attribute(self, key, default) (line 18)
+   └── 🔧 set_attribute(self, key, value) (line 21)
+   └── 🔧 get(self, key, default) (line 27)
+   └── 🔧 __getitem__(self, key) (line 30)
+   └── 🔧 __setitem__(self, key, value) (line 33)
+   └── 🔧 __contains__(self, key) (line 36)
+   └── 🔧 keys(self) (line 39)
+   └── 🔧 values(self) (line 42)
+   └── 🔧 items(self) (line 45)
+   └── 🔧 __iter__(self) (line 48)
+
+📁 CLASS: Edge (line 53)
+   📝 Legacy Graph edge with attributes - DEPRECATED
+   📝 Use EdgeProxy from collections.edges instead
+   └── 🔧 id(self) (line 60)
+   └── 🔧 get_attribute(self, key, default) (line 63)
+   └── 🔧 set_attribute(self, key, value) (line 66)
+   └── 🔧 get(self, key, default) (line 72)
+   └── 🔧 __getitem__(self, key) (line 75)
+   └── 🔧 __setitem__(self, key, value) (line 78)
+   └── 🔧 __contains__(self, key) (line 81)
+   └── 🔧 keys(self) (line 84)
+   └── 🔧 values(self) (line 87)
+   └── 🔧 items(self) (line 90)
+
+============================================================
+FILE: groggy/compatibility.py
+============================================================
+
+📁 CLASS: LegacyGraphAdapter (line 15)
+   📝 Adapter for backward compatibility with old API
+   └── 🔧 __init__(self, graph) (line 25)
+       📝 Initialize with new Graph instance
+   └── 🔧 add_node(self, node_id, **attrs) (line 35)
+       📝 Legacy add_node method → delegates to graph.nodes.add()
+   └── 🔧 add_edge(self, source, target, **attrs) (line 45)
+       📝 Legacy add_edge method → delegates to graph.edges.add()
+   └── 🔧 remove_node(self, node_id) (line 55)
+       📝 Legacy remove_node method → delegates to graph.nodes.remove()
+   └── 🔧 remove_edge(self, source, target) (line 65)
+       📝 Legacy remove_edge method → delegates to graph.edges.remove()
+   └── 🔧 get_node_attributes(self, node_id) (line 75)
+       📝 Legacy get_node_attributes → delegates to graph.nodes[node_id].attrs()
+   └── 🔧 set_node_attribute(self, node_id, attr_name, value) (line 85)
+       📝 Legacy set_node_attribute → delegates to graph.nodes[node_id].attr.set()
+   └── 🔧 get_edge_attributes(self, source, target) (line 95)
+       📝 Legacy get_edge_attributes → delegates to graph.edges[(source, target)].attrs()
+   └── 🔧 set_edge_attribute(self, source, target, attr_name, value) (line 105)
+       📝 Legacy set_edge_attribute → delegates to graph.edges[(source, target)].attr.set()
+   └── 🔧 has_node(self, node_id) (line 115)
+       📝 Legacy has_node → delegates to graph.nodes.has()
+   └── 🔧 has_edge(self, source, target) (line 125)
+       📝 Legacy has_edge → delegates to graph.edges.has()
+   └── 🔧 get_neighbors(self, node_id) (line 135)
+       📝 Legacy get_neighbors → delegates to graph.nodes[node_id].neighbors()
+   └── 🔧 node_count(self) (line 145)
+       📝 Legacy node_count → delegates to graph.nodes.size()
+   └── 🔧 edge_count(self) (line 155)
+       📝 Legacy edge_count → delegates to graph.edges.size()
+
+⚙️  FUNCTION: create_legacy_graph(*args, **kwargs) (line 165)
+   📝 Factory function to create graph with legacy adapter
+
+============================================================
+FILE: groggy/_version.py
+============================================================
+
+📝 Version information and metadata

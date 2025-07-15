@@ -1,0 +1,610 @@
+ CODE STRUCTURE ANALYSIS - NEW IMPLEMENTATION
+Directory: ../groggy/src
+Generated: rust_structure_new_implementation.txt
+============================================================
+
+============================================================
+FILE: lib.rs
+============================================================
+
+⚙️  FUNCTION: _core() (line 12)
+   🏷️  #pymodule
+   📝 Main Python module entry point
+
+============================================================
+FILE: graph/core.rs
+============================================================
+
+🏗️  STRUCT: FastGraph (line 14)
+   🏷️  #pyclass
+   📝 Main graph structure with delegated collections
+
+🔧 IMPL: FastGraph (line 33)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 35)
+       🏷️  #new
+       📝 Constructor for new graph instance
+   └── ⚙️  info() (line 53)
+       📝 Get comprehensive graph information
+   └── ⚙️  size() (line 65)
+       📝 Get total size (nodes + edges)
+   └── ⚙️  is_directed() (line 70)
+       📝 Check if graph is directed
+   └── ⚙️  nodes() (line 75)
+       📝 Property: returns NodeCollection instance
+   └── ⚙️  edges() (line 85)
+       📝 Property: returns EdgeCollection instance
+   └── ⚙️  subgraph() (line 95)
+       📝 Create subgraph with node/edge filters
+   └── ⚙️  subgraphs() (line 115)
+       📝 Get all subgraphs according to a given attr groups
+
+============================================================
+FILE: graph/nodes/mod.rs
+============================================================
+
+📝 Module declarations for node-related structures
+
+============================================================
+FILE: graph/collections/base.rs
+============================================================
+
+🏗️  TRAIT: BaseCollection (line 10)
+   📝 Trait for shared collection interface for nodes and edges
+   └── ⚙️  add()
+   └── ⚙️  remove()
+   └── ⚙️  filter()
+   └── ⚙️  size()
+   └── ⚙️  ids()
+   └── ⚙️  has()
+   └── ⚙️  attr()
+   └── ⚙️  __iter__()
+   └── ⚙️  __getitem__()
+
+🏗️  STRUCT: BaseCollectionImpl (line 25)
+   📝 Default implementation for shared collection logic (can be composed or used via delegation)
+
+============================================================
+FILE: graph/nodes/collection.rs
+============================================================
+
+🏗️  STRUCT: NodeCollection (line 15)
+   📝 Implements BaseCollection trait for node collections
+
+   🏷️  #pyclass
+   📝 Collection interface for graph nodes
+
+🔧 IMPL: NodeCollection (line 35)
+   🏷️  #pymethods
+   └── ⚙️  add() (line 45)
+       📝 Add nodes → delegates to columnar.bulk_set_internal() for attrs
+   └── ⚙️  remove() (line 75)
+       📝 Remove nodes → marks deleted in columnar, lazy cleanup
+   └── ⚙️  filter() (line 95)
+       📝 Property: returns FilterManager with columnar context
+   └── ⚙️  size() (line 125)
+       📝 Get node count → from columnar metadata (O(1))
+   └── ⚙️  ids() (line 135)
+       📝 Get all node IDs → from columnar index
+   └── ⚙️  has() (line 145)
+       📝 Check if node exists → columnar index lookup (O(1))
+   └── ⚙️  attr() (line 155)
+       📝 Property: returns AttributeManager with node context
+   └── ⚙️  __iter__() (line 165)
+       📝 Iterator → lazy iteration over columnar data
+   └── ⚙️  __getitem__() (line 175)
+       📝 Index access → NodeProxy with columnar reference
+
+🔧 IMPL: NodeCollection (line 185)
+   📝 Internal methods for storage integration
+   └── ⚙️  get_columnar_slice() (line 195)
+       📝 Get view into columnar storage for this collection
+   └── ⚙️  batch_add_internal() (line 205)
+       📝 High-performance batch addition → content_pool.batch_intern()
+   └── ⚙️  sync_with_storage() (line 215)
+       📝 Sync with graph_store + content_pool + columnar
+   └── ⚙️  lazy_load_from_store() (line 225)
+       📝 Load entities from graph_store on demand
+   └── ⚙️  persist_to_store() (line 235)
+       📝 Persist changes to graph_store
+
+============================================================
+FILE: graph/nodes/proxy.rs
+============================================================
+
+🏗️  STRUCT: NodeProxy (line 15)
+   🏷️  #pyclass
+   📝 Individual node interface with attributes
+
+🔧 IMPL: NodeProxy (line 35)
+   🏷️  #pymethods
+   └── ⚙️  degree() (line 45)
+       📝 Get node degree
+   └── ⚙️  neighbors() (line 55)
+       📝 Get neighbors (with direction params)
+   └── ⚙️  get_attr() (line 75)
+       📝 Get single attr or list of attrs
+   └── ⚙️  set_attr() (line 95)
+       📝 Set single attr or list of attr tuples
+   └── ⚙️  attrs() (line 115)
+       📝 Get all attributes
+   └── ⚙️  attr() (line 125)
+       📝 Property: returns ProxyAttributeManager
+   └── ⚙️  __str__() (line 135)
+       📝 String representation
+
+🏗️  STRUCT: ProxyAttributeManager (line 145)
+   🏷️  #pyclass
+   📝 Single node attribute management
+
+🔧 IMPL: ProxyAttributeManager (line 165)
+   🏷️  #pymethods
+   └── ⚙️  get() (line 175)
+       📝 Get attribute for this node
+   └── ⚙️  set() (line 185)
+       📝 Set attribute for this node
+
+============================================================
+FILE: graph/edges/mod.rs
+============================================================
+
+📝 Module declarations for edge-related structures
+
+============================================================
+FILE: graph/edges/collection.rs
+============================================================
+
+🏗️  STRUCT: EdgeCollection (line 15)
+   🏷️  #pyclass
+   📝 Collection interface for graph edges
+
+🔧 IMPL: EdgeCollection (line 35)
+   🏷️  #pymethods
+   └── ⚙️  add() (line 45)
+       📝 Add single edge, list of edges, or dict of edge_data
+   └── ⚙️  remove() (line 75)
+       📝 Remove single edge or list of edges
+   └── ⚙️  filter() (line 95)
+       📝 Property: returns FilterManager
+   └── ⚙️  size() (line 125)
+       📝 Get edge count
+   └── ⚙️  ids() (line 135)
+       📝 Get all edge IDs
+   └── ⚙️  has() (line 145)
+       📝 Check if edge exists
+   └── ⚙️  attr() (line 155)
+       📝 Property: returns AttributeManager
+   └── ⚙️  nodes() (line 165)
+       📝 Property: returns filtered NodeCollection
+   └── ⚙️  node_ids() (line 175)
+       📝 Property: returns node IDs from filtered edges
+   └── ⚙️  __iter__() (line 185)
+       📝 Iterator support for edges
+   └── ⚙️  __getitem__() (line 195)
+       📝 Index access → returns EdgeProxy
+
+🔧 IMPL: EdgeCollection (line 205)
+   📝 Internal methods for storage integration
+   └── ⚙️  get_columnar_slice() (line 215)
+       📝 Get view into columnar storage for this collection
+   └── ⚙️  batch_add_internal() (line 225)
+       📝 High-performance batch addition → content_pool.batch_intern()
+   └── ⚙️  sync_with_storage() (line 235)
+       📝 Sync with graph_store + content_pool + columnar
+   └── ⚙️  lazy_load_from_store() (line 245)
+       📝 Load entities from graph_store on demand
+   └── ⚙️  persist_to_store() (line 255)
+       📝 Persist changes to graph_store
+
+🏗️  STRUCT: EdgeProxy (line 15)
+   🏷️  #pyclass
+   📝 Individual edge interface with attributes
+
+🔧 IMPL: EdgeProxy (line 35)
+   🏷️  #pymethods
+   └── ⚙️  endpoints() (line 45)
+       📝 Get edge endpoints
+   └── ⚙️  source() (line 55)
+       📝 Get source node
+   └── ⚙️  target() (line 65)
+       📝 Get target node
+   └── ⚙️  get_attr() (line 75)
+       📝 Get single attr or list of attrs
+   └── ⚙️  set_attr() (line 95)
+       📝 Set single attr or list of attr tuples
+   └── ⚙️  attrs() (line 115)
+       📝 Get all attributes
+   └── ⚙️  attr() (line 125)
+       📝 Property: returns ProxyAttributeManager
+   └── ⚙️  __str__() (line 135)
+       📝 String representation
+
+🏗️  STRUCT: ProxyAttributeManager (line 145)
+   🏷️  #pyclass
+   📝 Single edge attribute management
+
+🔧 IMPL: ProxyAttributeManager (line 165)
+   🏷️  #pymethods
+   └── ⚙️  get() (line 175)
+       📝 Get attribute for this edge
+   └── ⚙️  set() (line 185)
+       📝 Set attribute for this edge
+
+============================================================
+FILE: graph/mod.rs
+============================================================
+
+📝 Module declarations:
+   - pub mod core;
+   - pub mod nodes;
+   - pub mod edges;
+   - pub mod managers;
+   - pub mod algorithms;
+   - pub mod bulk_operations;
+   - pub mod operations;
+   - pub mod types;
+   - pub mod views;
+
+============================================================
+FILE: graph/managers/mod.rs
+============================================================
+
+📝 Module declarations for shared managers
+
+⚙️  FUNCTION: optimize_columnar_access() (line 15)
+   📝 Optimize data access patterns for columnar storage
+
+⚙️  FUNCTION: batch_operation_coordinator() (line 25)
+   📝 Coordinate batch operations across managers
+
+============================================================
+FILE: graph/managers/attributes.rs
+============================================================
+
+🏗️  STRUCT: AttributeManager (line 15)
+   🏷️  #pyclass
+   📝 Unified attribute management for nodes and edges (columnar)
+
+🔧 IMPL: AttributeManager (line 35)
+   🏷️  #pymethods
+   └── ⚙️  get() (line 45)
+       📝 Get attrs for entity(s) → delegates to columnar.bulk_get_internal()
+   └── ⚙️  set() (line 75)
+       📝 Set attrs using dict → delegates to columnar.bulk_set_internal()
+   └── ⚙️  set_type() (line 105)
+       📝 Set attribute type → updates columnar schema
+   └── ⚙️  get_schema() (line 125)
+       📝 Get attribute schema → from columnar metadata
+   └── ⚙️  bulk_update() (line 145)
+       📝 Bulk update → direct columnar.bulk_set_internal() call
+
+🔧 IMPL: AttributeManager (line 165)
+   📝 Internal methods for performance
+   └── ⚙️  get_fast() (line 175)
+       📝 Direct columnar access, no Python overhead
+   └── ⚙️  set_fast() (line 185)
+       📝 Direct columnar mutation, no Python overhead
+   └── ⚙️  batch_operation() (line 195)
+       📝 Vectorized operations on columnar data
+
+🏗️  STRUCT: ProxyAttributeManager (line 165)
+   🏷️  #pyclass
+   📝 Single entity attribute management
+
+🔧 IMPL: ProxyAttributeManager (line 185)
+   🏷️  #pymethods
+   └── ⚙️  get() (line 195)
+       📝 Get attribute for this entity
+   └── ⚙️  set() (line 205)
+       📝 Set attribute for this entity
+   └── ⚙️  has() (line 215)
+       📝 Check if attribute exists
+   └── ⚙️  remove() (line 225)
+       📝 Remove attribute
+
+============================================================
+FILE: graph/managers/filters.rs
+============================================================
+
+🏗️  STRUCT: FilterManager (line 15)
+   🏷️  #pyclass
+   📝 Unified filtering interface for nodes and edges
+
+🔧 IMPL: FilterManager (line 35)
+   🏷️  #pymethods
+   └── ⚙️  by_dict() (line 45)
+       📝 Filter by dict → builds columnar filter plan
+   └── ⚙️  by_kwargs() (line 65)
+       📝 Filter by kwargs → converts to dict, uses columnar
+   └── ⚙️  by_query() (line 85)
+       📝 Filter by query → parses to columnar operations
+   └── ⚙️  by_attribute() (line 105)
+       📝 Filter by attribute → direct columnar.filter_column_internal()
+   └── ⚙️  by_range() (line 125)
+       📝 Filter by range → vectorized columnar range check
+   └── ⚙️  by_function() (line 145)
+       📝 Filter by function → applies to columnar chunks
+   └── ⚙️  by_ids() (line 165)
+       📝 Filter by IDs → index-based columnar access
+   └── ⚙️  chain() (line 185)
+       📝 Chain filters → builds composite columnar plan
+   └── ⚙️  apply() (line 205)
+       📝 Apply filters → executes columnar filter plan
+   └── ⚙️  count() (line 225)
+       📝 Count matches → columnar aggregation, no collection
+
+🔧 IMPL: FilterManager (line 245)
+   📝 Internal filter execution methods
+   └── ⚙️  execute_filter_plan() (line 255)
+       📝 Execute optimized columnar filter operations
+   └── ⚙️  build_index_mask() (line 265)
+       📝 Build boolean mask from columnar data
+   └── ⚙️  vectorized_comparison() (line 275)
+       📝 SIMD comparisons on columnar data
+
+============================================================
+FILE: graph/algorithms.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 15)
+   📝 Algorithm implementations
+   └── ⚙️  bfs() (line 25)
+       📝 Breadth-first search
+   └── ⚙️  dfs() (line 45)
+       📝 Depth-first search
+   └── ⚙️  shortest_path() (line 65)
+       📝 Shortest path algorithms
+   └── ⚙️  connected_components() (line 85)
+       📝 Find connected components
+   └── ⚙️  clustering_coefficient() (line 105)
+       📝 Calculate clustering coefficient
+
+============================================================
+FILE: graph/bulk_operations.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 15)
+   📝 Bulk operation implementations
+   └── ⚙️  add_nodes_batch() (line 25)
+       📝 Batch node addition
+   └── ⚙️  add_edges_batch() (line 45)
+       📝 Batch edge addition
+   └── ⚙️  remove_nodes_batch() (line 65)
+       📝 Batch node removal
+   └── ⚙️  remove_edges_batch() (line 85)
+       📝 Batch edge removal
+
+============================================================
+FILE: graph/operations.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 15)
+   📝 Core graph operations
+   └── ⚙️  merge_graphs() (line 25)
+       📝 Merge multiple graphs
+   └── ⚙️  graph_union() (line 45)
+       📝 Union of graphs
+   └── ⚙️  graph_intersection() (line 65)
+       📝 Intersection of graphs
+
+============================================================
+FILE: graph/types.rs
+============================================================
+
+🏗️  STRUCT: NodeId (line 15)
+   📝 Node identifier type
+
+🏗️  STRUCT: EdgeId (line 25)
+   📝 Edge identifier type
+
+🏗️  STRUCT: GraphInfo (line 35)
+   📝 Graph metadata and statistics
+
+============================================================
+FILE: graph/views.rs
+============================================================
+
+🏗️  STRUCT: GraphView (line 15)
+   🏷️  #pyclass
+   📝 Read-only graph view
+
+🔧 IMPL: GraphView (line 35)
+   🏷️  #pymethods
+   └── ⚙️  snapshot() (line 45)
+       📝 Create immutable snapshot
+   └── ⚙️  filter_view() (line 55)
+       📝 Create filtered view
+
+============================================================
+FILE: storage/mod.rs
+============================================================
+
+📝 Module declarations for storage components
+
+⚙️  FUNCTION: coordinate_storage_operations() (line 15)
+   📝 Coordinate operations across content_pool, columnar, graph_store
+
+⚙️  FUNCTION: optimize_storage_layout() (line 25)
+   📝 Optimize data layout across storage components
+
+
+============================================================
+FILE: storage/columnar.rs
+============================================================
+
+🏗️  STRUCT: ColumnarStore (line 15)
+   🏷️  #pyclass
+   📝 Columnar storage for attributes with efficient bulk operations
+
+🔧 IMPL: ColumnarStore (line 35)
+   📝 Internal methods (not exposed to Python)
+   └── ⚙️  get_column_internal() (line 45)
+       📝 Fast column access for internal use
+   └── ⚙️  set_column_internal() (line 55)
+       📝 Fast column mutation for internal use
+   └── ⚙️  bulk_get_internal() (line 65)
+       📝 Bulk attribute retrieval (vectorized)
+   └── ⚙️  bulk_set_internal() (line 75)
+       📝 Bulk attribute setting (vectorized)
+   └── ⚙️  filter_column_internal() (line 85)
+       📝 Fast column filtering with SIMD
+   └── ⚙️  get_typed_column() (line 95)
+       📝 Type-safe column access
+   └── ⚙️  ensure_column_capacity() (line 105)
+       📝 Pre-allocate column space
+
+🔧 IMPL: ColumnarStore (line 115)
+   🏷️  #pymethods
+   📝 External Python API methods
+   └── ⚙️  get_attribute() (line 125)
+       📝 Get single attribute (delegates to internal)
+   └── ⚙️  set_attribute() (line 135)
+       📝 Set single attribute (delegates to internal)
+   └── ⚙️  get_attributes_batch() (line 145)
+       📝 Get multiple attributes (delegates to bulk_get_internal)
+   └── ⚙️  set_attributes_batch() (line 155)
+       📝 Set multiple attributes (delegates to bulk_set_internal)
+   └── ⚙️  get_column_stats() (line 165)
+       📝 Column statistics and metadata
+   └── ⚙️  compact_columns() (line 175)
+       📝 Defragment and optimize storage
+
+============================================================
+FILE: storage/content_pool.rs
+============================================================
+
+🏗️  STRUCT: ContentPool (line 15)
+   🏷️  #pyclass
+   📝 Content pooling for memory efficiency
+
+============================================================
+FILE: storage/graph_store.rs
+============================================================
+
+🏗️  STRUCT: GraphState (line 15)
+   🏷️  #derive(Debug, Clone)
+   📝 Immutable graph state snapshot
+
+🏗️  STRUCT: GraphStore (line 25)
+   🏷️  #pyclass
+   📝 Versioned graph storage with branching
+
+🔧 IMPL: GraphStore (line 45)
+   🏷️  #pymethods
+   📝 External Python API methods
+   └── ⚙️  new() (line 55)
+       🏷️  #new
+       📝 Create new graph store
+   └── ⚙️  get_current_hash() (line 65)
+       📝 Get current graph hash
+   └── ⚙️  get_stats() (line 75)
+       📝 Get storage statistics
+   └── ⚙️  create_branch() (line 85)
+       📝 Create a new branch
+   └── ⚙️  list_branches() (line 95)
+       📝 List all branches
+   └── ⚙️  store_current_graph() (line 105)
+       📝 Store graph → delegates to store_graph_internal()
+   └── ⚙️  get_graph_from_state() (line 115)
+       📝 Reconstruct graph → delegates to reconstruct_graph_internal()
+
+🔧 IMPL: GraphStore (line 125)
+   📝 Internal methods for efficient operations
+   └── ⚙️  store_graph_internal() (line 135)
+       📝 Store graph with content-addressable hashing
+   └── ⚙️  reconstruct_graph_internal() (line 155)
+       📝 Reconstruct from content pool + columnar store
+   └── ⚙️  create_state_snapshot() (line 175)
+       📝 Create immutable state from current graph
+   └── ⚙️  diff_states() (line 195)
+       📝 Compute difference between two states
+   └── ⚙️  merge_states() (line 215)
+       📝 Merge multiple graph states
+   └── ⚙️  integrate_with_collections() (line 235)
+       📝 Sync store with node/edge collections
+
+============================================================
+FILE: storage/content_pool.rs
+============================================================
+
+🏗️  STRUCT: ContentPool (line 15)
+   🏷️  #pyclass
+   📝 Content-addressable storage for graph entities
+
+🔧 IMPL: ContentPool (line 35)
+   🏷️  #pymethods
+   📝 External Python API methods
+   └── ⚙️  new() (line 45)
+       🏷️  #new
+       📝 Create new content pool
+   └── ⚙️  get_stats() (line 55)
+       📝 Get storage statistics
+
+🔧 IMPL: ContentPool (line 65)
+   📝 Core content pool operations (existing implementation)
+   └── ⚙️  hash_node() (line 75)
+       📝 Hash a node for content addressing
+   └── ⚙️  hash_edge() (line 85)
+       📝 Hash an edge for content addressing
+   └── ⚙️  intern_node() (line 95)
+       📝 Store node in pool and return its content hash
+   └── ⚙️  intern_edge() (line 105)
+       📝 Store edge in pool and return its content hash
+   └── ⚙️  get_node() (line 115)
+       📝 Get node by content hash
+   └── ⚙️  get_edge() (line 125)
+       📝 Get edge by content hash
+   └── ⚙️  release_node() (line 135)
+       📝 Release a node reference (for garbage collection)
+   └── ⚙️  release_edge() (line 145)
+       📝 Release an edge reference (for garbage collection)
+   └── ⚙️  compact() (line 155)
+       📝 Compact the pool by removing unreferenced items
+
+🔧 IMPL: ContentPool (line 165)
+   📝 Collection integration methods (delegates to existing methods)
+   └── ⚙️  batch_intern_nodes() (line 175)
+       📝 Batch node storage → calls intern_node() in loop with optimization
+   └── ⚙️  batch_intern_edges() (line 185)
+       📝 Batch edge storage → calls intern_edge() in loop with optimization
+   └── ⚙️  batch_release_nodes() (line 195)
+       📝 Batch node release → calls release_node() in loop
+   └── ⚙️  batch_release_edges() (line 205)
+       📝 Batch edge release → calls release_edge() in loop
+   └── ⚙️  sync_with_collections() (line 215)
+       📝 Coordinate with node/edge collections
+
+============================================================
+FILE: utils/mod.rs
+============================================================
+
+📝 Module declarations for utility functions
+
+============================================================
+FILE: utils/conversion.rs
+============================================================
+
+⚙️  FUNCTION: convert_node_types() (line 15)
+   📝 Type conversion utilities for nodes
+
+⚙️  FUNCTION: convert_edge_types() (line 35)
+   📝 Type conversion utilities for edges
+
+⚙️  FUNCTION: python_dict_to_json_map() (line 7)
+   📝 Convert Python dictionary to JSON map
+
+⚙️  FUNCTION: python_to_json_value() (line 20)
+   📝 Convert Python value to JSON value
+
+⚙️  FUNCTION: json_value_to_python() (line 52)
+   📝 Convert JSON value to Python value
+
+============================================================
+FILE: utils/hash.rs
+============================================================
+
+⚙️  FUNCTION: hash_node() (line 15)
+   📝 Node hashing functions
+
+⚙️  FUNCTION: hash_edge() (line 25)
+   📝 Edge hashing functions
