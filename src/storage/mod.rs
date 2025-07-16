@@ -1,7 +1,6 @@
-pub mod columnar;
-pub mod content_pool;
-pub mod graph_store;
+// src_new/storage/mod.rs
 
-pub use columnar::ColumnarStore;
-pub use content_pool::{ContentHash, ContentPool};
-pub use graph_store::GraphStore;
+// Module declarations for storage (graph_store, content_pool, etc.)
+pub mod graph_store;
+pub mod content_pool;
+pub mod columnar;

@@ -2,89 +2,192 @@
 //! NodeCollection: concrete implementation of BaseCollection for node storage in Groggy graphs.
 //! Provides batch operations, columnar backend, and agent/LLM-friendly APIs.
 
+use pyo3::prelude::*;
+use pyo3::{types::{PyAny, PyDict, PyString}, Python};
 use crate::graph::types::NodeId;
 use crate::graph::managers::attributes::AttributeManager;
 // use crate::graph::columnar::NodeColumnarStore; // Uncomment when available
 
 #[pyclass]
+#[derive(Clone)]
 pub struct NodeCollection {
-    // pub columnar: NodeColumnarStore, // Uncomment when available
+    #[pyo3(get)]
     pub attribute_manager: AttributeManager,
-    // pub node_index: ...,
-    // TODO: Add additional fields for columnar storage, index, and metadata
+    #[pyo3(get)]
+    pub node_ids: Vec<NodeId>,
+    #[pyo3(get)]
+    pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
 
 
 #[pymethods]
 impl NodeCollection {
-    /// Add one or more nodes to the collection.
-    ///
-    /// Accepts a single node or a batch (e.g., Vec or slice). Delegates to columnar.bulk_set_internal()
-    /// for efficient batch attribute storage. Handles type checking, batching, and error propagation.
-    /// If a batch is detected, ensures atomicity and minimizes locking overhead.
-    pub fn add(&mut self /*, nodes: ... */) {
-        // TODO: 1. Detect single vs batch; 2. Delegate to columnar.bulk_set_internal();
-        // 3. Handle errors, rollback on failure if atomic; 4. Update indices/metadata.
+    /// Flexible filter method: supports dict, string, or chaining.
+    #[pyo3(signature = (*args, **kwargs))]
+    pub fn filter_py(&self, py: Python, args: &pyo3::types::PyTuple, kwargs: Option<&PyDict>) -> Self {
+        let mut filtered_ids = self.node_ids.clone();
+        // 1. If first arg is dict
+        if let Some(first) = args.get_item(0).ok() {
+            if let Ok(d) = first.downcast::<PyDict>() {
+                filtered_ids = filter_nodes_by_dict(&self.attribute_manager, &filtered_ids, d, py);
+            } else if let Ok(s) = first.downcast::<PyString>() {
+                let query = s.to_str().unwrap_or("");
+                filtered_ids = filter_nodes_by_query(&self.attribute_manager, &filtered_ids, query);
+            }
+        } else if let Some(d) = kwargs {
+            filtered_ids = filter_nodes_by_dict(&self.attribute_manager, &filtered_ids, d, py);
+        }
+        Self {
+            attribute_manager: self.attribute_manager.clone(),
+            node_ids: filtered_ids,
+        }
     }
 
-    /// Remove one or more nodes from the collection.
-    ///
-    /// Accepts a node ID or batch of IDs. Marks nodes as deleted in columnar storage for lazy cleanup.
-    /// Batch operations are optimized to minimize index updates. May trigger background cleanup.
-    pub fn remove(&mut self /*, node_ids: ... */) {
-        // TODO: 1. Accept single or batch; 2. Mark as deleted; 3. Schedule cleanup if needed.
+    #[new]
+    pub fn new(attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>, node_ids: Option<Vec<NodeId>>) -> Self {
+        let ids = node_ids.unwrap_or_else(|| graph_store.all_node_ids());
+        Self { attribute_manager, node_ids: ids, graph_store }
     }
 
-    /// Returns a FilterManager bound to this collection's columnar context.
-    ///
-    /// Allows chaining and composing filter operations that will be executed efficiently
-    /// via columnar backends. Enables vectorized, zero-copy filtering.
-    pub fn filter(&self) {
-        // TODO: 1. Instantiate FilterManager; 2. Bind columnar context; 3. Return manager.
+    /// Add one or more nodes to the collection (batch-oriented).
+    pub fn add(&mut self, nodes: Vec<NodeId>) -> Result<(), String> {
+        self.graph_store.add_nodes(&nodes);
+        self.node_ids = self.graph_store.all_node_ids();
+        Ok(())
+    }
+
+    /// Remove one or more nodes from the collection (batch-oriented).
+    pub fn remove(&mut self, node_ids: Vec<NodeId>) -> Result<(), String> {
+        self.graph_store.remove_nodes(&node_ids);
+        self.node_ids = self.graph_store.all_node_ids();
+        Ok(())
     }
 
     /// Returns the number of nodes in this collection.
-    ///
-    /// Fast O(1) lookup from columnar metadata; does not require iterating nodes.
     pub fn size(&self) -> usize {
-        // TODO: 1. Query columnar metadata for node count.
-        0
+        self.graph_store.node_count()
     }
 
     /// Returns all node IDs in this collection.
-    ///
-    /// Reads directly from the columnar index for efficiency. May return a view or a copy.
-    pub fn ids(&self) /* -> Vec<NodeId> */ {
-        // TODO: 1. Access columnar index; 2. Return IDs.
+    pub fn ids(&self) -> Vec<NodeId> {
+        self.graph_store.all_node_ids()
     }
 
     /// Check if a node exists in the collection.
-    ///
-    /// Performs an O(1) lookup in the columnar index. Returns true if the node is present and not marked deleted.
-    pub fn has(&self /*, node_id: ... */) -> bool {
-        // TODO: 1. Lookup node_id in index; 2. Check deleted flag.
-        false
+    pub fn has(&self, node_id: NodeId) -> bool {
+        self.graph_store.has_node(&node_id)
     }
 
     /// Returns an AttributeManager for node attributes.
-    ///
-    /// Provides access to fast, vectorized attribute operations for all nodes in this collection.
-    pub fn attr(&self) {
-        // TODO: 1. Instantiate AttributeManager; 2. Bind node context.
+    pub fn attr(&self) -> AttributeManager {
+        self.attribute_manager.clone()
     }
 
-    /// Returns an iterator over nodes in this collection.
+    /// Returns a FilterManager for this collection, pre-configured for nodes.
     ///
-    /// Supports lazy iteration over columnar data, yielding NodeProxy objects or raw IDs as needed.
-    pub fn iter(&self) {
-        // TODO: 1. Create iterator; 2. Yield proxies or IDs.
+    /// Usage:
+    /// let mut fm = collection.filter();
+    /// fm.add_filter(...);
+    /// let result_ids = fm.apply(collection.ids());
+    pub fn filter(&self) -> crate::graph::managers::filter::FilterManager {
+        let mut parent: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        crate::graph::managers::filter::FilterManager::new(self.attribute_manager.clone(), true)
     }
 
-    /// Returns a NodeProxy for the given node ID.
-    ///
-    /// Provides indexed access to node data and attributes, referencing columnar storage directly.
-    /// Returns None or errors if the node does not exist.
-    pub fn get(&self /*, node_id: ... */) {
-        // TODO: 1. Lookup node_id; 2. Return NodeProxy or error.
+    /// Returns an iterator over node IDs in this collection.
+    pub fn iter(&self) -> Vec<NodeId> {
+        self.node_ids.clone()
+    }
+
+    /// Get a NodeProxy for this node if it exists.
+    pub fn get(&self, node_id: NodeId) -> Option<crate::graph::nodes::proxy::NodeProxy> {
+        if self.has(node_id.clone()) {
+            Some(crate::graph::nodes::proxy::NodeProxy::new(node_id, self.attribute_manager.clone()))
+        } else {
+            None
+        }
     }
 }
+
+// Helper: filter by Python dict
+fn filter_nodes_by_dict(
+    attr_manager: &AttributeManager,
+    node_ids: &Vec<NodeId>,
+    d: &pyo3::types::PyDict,
+    py: pyo3::Python,
+) -> Vec<NodeId> {
+    let mut filtered = Vec::new();
+    'outer: for node_id in node_ids {
+        let mut keep = true;
+        for (k, v) in d.iter() {
+            let attr = k.extract::<String>().unwrap_or_default();
+            let val = attr_manager.get_node_value(attr.clone(), node_id.0 as usize);
+            if let Ok(tup) = v.extract::<(String, pyo3::PyObject)>() {
+                // e.g. (">", 100000)
+                let op = tup.0.as_str();
+                let cmp_val = tup.1.extract::<i64>(py).unwrap_or(0);
+                let actual = val.as_ref().and_then(|j| j.as_i64()).unwrap_or(0);
+                match op {
+                    ">" => if !(actual > cmp_val) { keep = false; break; },
+                    "<" => if !(actual < cmp_val) { keep = false; break; },
+                    ">=" => if !(actual >= cmp_val) { keep = false; break; },
+                    "<=" => if !(actual <= cmp_val) { keep = false; break; },
+                    "==" => if !(actual == cmp_val) { keep = false; break; },
+                    _ => { keep = false; break; }
+                }
+            } else if let Ok(val_expected) = v.extract::<i64>() {
+                // Numeric equality
+                if val.as_ref().and_then(|j| j.as_i64()) != Some(val_expected) {
+                    keep = false; break;
+                }
+            } else if let Ok(val_expected) = v.extract::<bool>() {
+                if val.as_ref().and_then(|j| j.as_bool()) != Some(val_expected) {
+                    keep = false; break;
+                }
+            } else if let Ok(val_expected) = v.extract::<String>() {
+                if val.as_ref().and_then(|j| j.as_str()) != Some(val_expected.as_str()) {
+                    keep = false; break;
+                }
+            } else {
+                keep = false; break;
+            }
+        }
+        if keep { filtered.push(node_id.clone()); }
+    }
+    filtered
+}
+
+// Helper: filter by simple query string (e.g. "salary > 100000")
+fn filter_nodes_by_query(
+    attr_manager: &AttributeManager,
+    node_ids: &Vec<NodeId>,
+    query: &str,
+) -> Vec<NodeId> {
+    // Very basic: support "attr > value" or "attr == value"
+    let parts: Vec<&str> = query.split_whitespace().collect();
+    if parts.len() == 3 {
+        let attr = parts[0];
+        let op = parts[1];
+        let val = parts[2];
+        let int_val = val.parse::<i64>().ok();
+        let str_val = val.trim_matches('"').trim_matches('\'').to_string();
+        node_ids.iter().filter(|node_id| {
+            let v = attr_manager.get_node_value(attr.to_string(), node_id.0 as usize);
+            match op {
+                ">" => int_val.map(|i| v.as_ref().and_then(|j| j.as_i64()).map_or(false, |x| x > i)).unwrap_or(false),
+                "<" => int_val.map(|i| v.as_ref().and_then(|j| j.as_i64()).map_or(false, |x| x < i)).unwrap_or(false),
+                "==" => {
+                    if let Some(i) = int_val {
+                        v.as_ref().and_then(|j| j.as_i64()) == Some(i)
+                    } else {
+                        v.as_ref().and_then(|j| j.as_str()) == Some(str_val.as_str())
+                    }
+                },
+                _ => false
+            }
+        }).cloned().collect()
+    } else {
+        node_ids.clone() // fallback: no filtering
+    }
+}
+

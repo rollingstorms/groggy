@@ -1,5 +1,7 @@
 // src_new/graph/operations.rs
 
+use crate::graph::core::FastGraph;
+
 /// Graph-level operations
 impl FastGraph {
     /// Merges another graph into this one, combining nodes, edges, and attributes.

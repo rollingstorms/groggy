@@ -1,25 +1,21 @@
-use pyo3::prelude::*;
+// src_new/lib.rs
+
+use pyo3::pymodule;
 
 mod graph;
 mod storage;
 mod utils;
 
-use graph::FastGraph;
-use storage::{ColumnarStore, ContentPool, GraphStore};
-
-/// Groggy Core - High-performance graph operations implemented in Rust
+/// Main Python module entry point
 #[pymodule]
-fn _core(_py: Python, m: &PyModule) -> PyResult<()> {
-    // Unified hybrid/columnar graph implementation
-    m.add_class::<FastGraph>()?;
-
-    // Storage implementations
-    m.add_class::<ContentPool>()?;
-    m.add_class::<GraphStore>()?;
-    m.add_class::<ColumnarStore>()?;
-
-    // Add version info
-    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
-
+pub fn _core(py: pyo3::Python, m: &pyo3::types::PyModule) -> pyo3::PyResult<()> {
+    m.add_class::<crate::graph::nodes::collection::NodeCollection>()?;
+    m.add_class::<crate::graph::edges::collection::EdgeCollection>()?;
+    m.add_class::<crate::graph::nodes::proxy::NodeProxy>()?;
+    m.add_class::<crate::graph::edges::proxy::EdgeProxy>()?;
+    m.add_class::<crate::graph::managers::attributes::AttributeManager>()?;
+    m.add_class::<crate::graph::managers::filters::FilterManager>()?;
+    m.add_class::<crate::graph::core::FastGraph>()?;
+    // Add any other core classes or submodules here as needed
     Ok(())
 }

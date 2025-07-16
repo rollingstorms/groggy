@@ -1,11 +1,13 @@
- CODE STRUCTURE ANALYSIS - NEW IMPLEMENTATION
+ CODE STRUCTURE ANALYSIS - NEW IMPLEMENTATION (MODULAR, MODERN)
 Directory: ../groggy/src
 Generated: rust_structure_new_implementation.txt
 ============================================================
 
-============================================================
+=================== CORE MODULES ==========================
+ 
 FILE: lib.rs
-============================================================
+  ⚙️  FUNCTION: _core() (public, #pymodule)
+    📝 Main Python module entry point
 
 ⚙️  FUNCTION: _core() (line 12)
    🏷️  #pymodule

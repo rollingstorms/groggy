@@ -102,13 +102,13 @@ impl ColumnarStore {
 }
 
 impl ColumnarStore {
-    #[new]
     pub fn new() -> Self {
         Self {
             attr_name_to_uid: DashMap::new(),
             attr_uid_to_name: DashMap::new(),
             next_attr_uid: std::sync::atomic::AtomicU64::new(1),
-            columns: DashMap::new(),
+            attr_schema: DashMap::new(),
+        columns: DashMap::new(),
             node_attributes: DashMap::new(),
             edge_attributes: DashMap::new(),
             node_value_bitmaps: DashMap::new(),
@@ -120,7 +120,6 @@ impl ColumnarStore {
     }
 
     /// Registers an attribute name and returns its UID. If already present, returns existing UID.
-    #[pyo3(text_signature = "($self, attr_name)")]
     pub fn register_attr(&self, attr_name: String) -> u64 {
         if let Some(uid) = self.attr_name_to_uid.get(&attr_name) {
             return uid.0;
@@ -187,8 +186,7 @@ impl ColumnarStore {
             return Err("Type mismatch: attribute is not Int".to_string());
         }
         let mut col = self.columns.get_mut(&(ColumnKind::Node, uid.clone())).ok_or("Column not found")?;
-        match col {
-    ColumnData::Int(ref vec) =>
+        match &mut *col {
             ColumnData::Int(vec) => {
                 if idx >= vec.len() {
                     vec.resize(idx + 1, None);
@@ -208,9 +206,8 @@ impl ColumnarStore {
             return None;
         }
         let col = self.columns.get(&(ColumnKind::Node, uid.clone()))?;
-        match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Int(vec) => vec.get(idx).and_then(|v| *v),
+        match *col {
+            ColumnData::Int(ref vec) => vec.get(idx).and_then(|v| *v),
             _ => None,
         }
     }
@@ -226,8 +223,7 @@ impl ColumnarStore {
             return Err("Type mismatch: attribute is not Int".to_string());
         }
         let mut col = self.columns.get_mut(&(ColumnKind::Node, uid.clone())).ok_or("Column not found")?;
-        match col {
-    ColumnData::Int(ref vec) =>
+        match &mut *col {
             ColumnData::Int(vec) => {
                 for (&idx, &value) in indices.iter().zip(values.iter()) {
                     if idx >= vec.len() {
@@ -251,7 +247,6 @@ impl ColumnarStore {
         let binding = self.node_columns();
         let col = binding.iter().find(|(k,_)| *k == *uid).map(|(_,c)| c)?;
         match col {
-    ColumnData::Int(ref vec) =>
             ColumnData::Int(vec) => Some(indices.iter().map(|&idx| vec.get(idx).copied().flatten()).collect()),
             _ => None,
         }
@@ -267,9 +262,8 @@ impl ColumnarStore {
             return Err("Type mismatch: attribute is not Float".to_string());
         }
         let mut col = self.columns.get_mut(&(ColumnKind::Node, uid.clone())).ok_or("Column not found")?;
-        match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Float(ref vec) => {
+        match &mut *col {
+            ColumnData::Float(vec) => {
                 if idx >= vec.len() {
                     vec.resize(idx + 1, None);
                 }
@@ -288,8 +282,7 @@ impl ColumnarStore {
             return None;
         }
         let col = self.columns.get(&(ColumnKind::Node, uid.clone()))?;
-        match col {
-    ColumnData::Int(ref vec) =>
+        match *col {
             ColumnData::Float(ref vec) => vec.get(idx).and_then(|v| *v),
             _ => None,
         }
@@ -303,9 +296,8 @@ impl ColumnarStore {
             return Err("Type mismatch: attribute is not Bool".to_string());
         }
         let mut col = self.columns.get_mut(&(ColumnKind::Node, uid.clone())).ok_or("Column not found")?;
-        match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Bool(ref vec) => {
+        match &mut *col {
+            ColumnData::Bool(vec) => {
                 if idx >= vec.len() {
                     vec.resize(idx + 1, None);
                 }
@@ -324,8 +316,7 @@ impl ColumnarStore {
             return None;
         }
         let col = self.columns.get(&(ColumnKind::Node, uid.clone()))?;
-        match col {
-    ColumnData::Int(ref vec) =>
+        match *col {
             ColumnData::Bool(ref vec) => vec.get(idx).and_then(|v| *v),
             _ => None,
         }
@@ -339,9 +330,8 @@ impl ColumnarStore {
             return Err("Type mismatch: attribute is not Str".to_string());
         }
         let mut col = self.columns.get_mut(&(ColumnKind::Node, uid.clone())).ok_or("Column not found")?;
-        match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Str(ref vec) => {
+        match &mut *col {
+            ColumnData::Str(vec) => {
                 if idx >= vec.len() {
                     vec.resize(idx + 1, None);
                 }
@@ -360,8 +350,7 @@ impl ColumnarStore {
             return None;
         }
         let col = self.columns.get(&(ColumnKind::Node, uid.clone()))?;
-        match col {
-    ColumnData::Int(ref vec) =>
+        match *col {
             ColumnData::Str(ref vec) => vec.get(idx).and_then(|v| v.clone()),
             _ => None,
         }
@@ -375,9 +364,8 @@ impl ColumnarStore {
             return Err("Type mismatch: attribute is not Json".to_string());
         }
         let mut col = self.columns.get_mut(&(ColumnKind::Node, uid.clone())).ok_or("Column not found")?;
-        match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Json(ref map) => {
+        match &mut *col {
+            ColumnData::Json(map) => {
                 map.insert(idx, value);
                 Ok(())
             }
@@ -393,8 +381,7 @@ impl ColumnarStore {
             return None;
         }
         let col = self.columns.get(&(ColumnKind::Node, uid.clone()))?;
-        match col {
-    ColumnData::Int(ref vec) =>
+        match *col {
             ColumnData::Json(ref map) => map.get(&idx).cloned(),
             _ => None,
         }
@@ -412,7 +399,6 @@ impl ColumnarStore {
         let mut binding = self.edge_columns();
         let col = binding.iter_mut().find(|(k,_)| *k == uid).map(|(_,c)| c).ok_or("Column not found")?;
         match col {
-    ColumnData::Int(ref vec) =>
             ColumnData::Int(vec) => {
                 if idx >= vec.len() {
                     vec.resize(idx + 1, None);
@@ -434,7 +420,6 @@ impl ColumnarStore {
         let binding = self.edge_columns();
         let col = binding.iter().find(|(k,_)| *k == *uid).map(|(_,c)| c)?;
         match col {
-    ColumnData::Int(ref vec) =>
             ColumnData::Int(vec) => vec.get(idx).and_then(|v| *v),
             _ => None,
         }
@@ -448,9 +433,8 @@ impl ColumnarStore {
             return Err("Type mismatch: attribute is not Float".to_string());
         }
         let mut col = self.columns.get_mut(&(ColumnKind::Edge, uid.clone())).ok_or("Column not found")?;
-        match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Float(ref vec) => {
+        match &mut *col {
+            ColumnData::Float(vec) => {
                 if idx >= vec.len() {
                     vec.resize(idx + 1, None);
                 }
@@ -469,8 +453,7 @@ impl ColumnarStore {
             return None;
         }
         let col = self.columns.get(&(ColumnKind::Edge, uid.clone()))?;
-        match col {
-    ColumnData::Int(ref vec) =>
+        match *col {
             ColumnData::Float(ref vec) => vec.get(idx).and_then(|v| *v),
             _ => None,
         }
@@ -484,9 +467,8 @@ impl ColumnarStore {
             return Err("Type mismatch: attribute is not Bool".to_string());
         }
         let mut col = self.columns.get_mut(&(ColumnKind::Edge, uid.clone())).ok_or("Column not found")?;
-        match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Bool(ref vec) => {
+        match &mut *col {
+            ColumnData::Bool(vec) => {
                 if idx >= vec.len() {
                     vec.resize(idx + 1, None);
                 }
@@ -505,8 +487,7 @@ impl ColumnarStore {
             return None;
         }
         let col = self.columns.get(&(ColumnKind::Edge, uid.clone()))?;
-        match col {
-    ColumnData::Int(ref vec) =>
+        match *col {
             ColumnData::Bool(ref vec) => vec.get(idx).and_then(|v| *v),
             _ => None,
         }
@@ -520,9 +501,8 @@ impl ColumnarStore {
             return Err("Type mismatch: attribute is not Str".to_string());
         }
         let mut col = self.columns.get_mut(&(ColumnKind::Edge, uid.clone())).ok_or("Column not found")?;
-        match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Str(ref vec) => {
+        match &mut *col {
+            ColumnData::Str(vec) => {
                 if idx >= vec.len() {
                     vec.resize(idx + 1, None);
                 }
@@ -541,8 +521,7 @@ impl ColumnarStore {
             return None;
         }
         let col = self.columns.get(&(ColumnKind::Edge, uid.clone()))?;
-        match col {
-    ColumnData::Int(ref vec) =>
+        match *col {
             ColumnData::Str(ref vec) => vec.get(idx).and_then(|v| v.clone()),
             _ => None,
         }
@@ -556,9 +535,8 @@ impl ColumnarStore {
             return Err("Type mismatch: attribute is not Json".to_string());
         }
         let mut col = self.columns.get_mut(&(ColumnKind::Edge, uid.clone())).ok_or("Column not found")?;
-        match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Json(ref map) => {
+        match &mut *col {
+            ColumnData::Json(map) => {
                 map.insert(idx, value);
                 Ok(())
             }
@@ -574,8 +552,7 @@ impl ColumnarStore {
             return None;
         }
         let col = self.columns.get(&(ColumnKind::Edge, uid.clone()))?;
-        match col {
-    ColumnData::Int(ref vec) =>
+        match *col {
             ColumnData::Json(ref map) => map.get(&idx).cloned(),
             _ => None,
         }
@@ -602,7 +579,6 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
             None => return Vec::new(),
         };
         match col {
-    ColumnData::Int(ref vec) =>
             ColumnData::Int(vec) => vec.iter().enumerate().filter_map(|(i, v)| v.filter(|&x| x == value).map(|_| i)).collect(),
             _ => Vec::new(),
         }
@@ -705,8 +681,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let mut binding = self.node_columns();
         let col = binding.iter_mut().find(|(k,_)| *k == uid).map(|(_,c)| c).ok_or("Column not found")?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Float(ref vec) => {
+            ColumnData::Float(vec) => {
                 for (&idx, &val) in indices.iter().zip(values.iter()) {
                     if idx >= vec.len() {
                         vec.resize(idx + 1, None);
@@ -727,8 +702,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let binding = self.node_columns();
         let col = binding.iter().find(|(k,_)| *k == *uid).map(|(_,c)| c)?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Float(ref vec) => Some(indices.iter().map(|&idx| vec.get(idx).copied().flatten()).collect()),
+            ColumnData::Float(vec) => Some(indices.iter().map(|&idx| vec.get(idx).copied().flatten()).collect()),
             _ => None,
         }
     }
@@ -745,8 +719,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let mut binding = self.node_columns();
         let col = binding.iter_mut().find(|(k,_)| *k == uid).map(|(_,c)| c).ok_or("Column not found")?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Bool(ref vec) => {
+            ColumnData::Bool(vec) => {
                 for (&idx, &val) in indices.iter().zip(values.iter()) {
                     if idx >= vec.len() {
                         vec.resize(idx + 1, None);
@@ -767,8 +740,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let binding = self.node_columns();
         let col = binding.iter().find(|(k,_)| *k == *uid).map(|(_,c)| c)?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Bool(ref vec) => Some(indices.iter().map(|&idx| vec.get(idx).copied().flatten()).collect()),
+            ColumnData::Bool(vec) => Some(indices.iter().map(|&idx| vec.get(idx).copied().flatten()).collect()),
             _ => None,
         }
     }
@@ -785,8 +757,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let mut binding = self.node_columns();
         let col = binding.iter_mut().find(|(k,_)| *k == uid).map(|(_,c)| c).ok_or("Column not found")?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Str(ref vec) => {
+            ColumnData::Str(vec) => {
                 for (idx, val) in indices.iter().zip(values.iter()) {
                     if *idx >= vec.len() {
                         vec.resize(*idx + 1, None);
@@ -807,8 +778,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let binding = self.node_columns();
         let col = binding.iter().find(|(k,_)| *k == *uid).map(|(_,c)| c)?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Str(ref vec) => Some(indices.iter().map(|&idx| vec.get(idx).and_then(|v| v.clone())).collect()),
+            ColumnData::Str(vec) => Some(indices.iter().map(|&idx| vec.get(idx).and_then(|v| v.clone())).collect()),
             _ => None,
         }
     }
@@ -825,8 +795,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let mut binding = self.edge_columns();
         let col = binding.iter_mut().find(|(k,_)| *k == uid).map(|(_,c)| c).ok_or("Column not found")?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Float(ref vec) => {
+            ColumnData::Float(vec) => {
                 for (&idx, &val) in indices.iter().zip(values.iter()) {
                     if idx >= vec.len() {
                         vec.resize(idx + 1, None);
@@ -847,8 +816,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let binding = self.edge_columns();
         let col = binding.iter().find(|(k,_)| *k == *uid).map(|(_,c)| c)?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Float(ref vec) => Some(indices.iter().map(|&idx| vec.get(idx).copied().flatten()).collect()),
+            ColumnData::Float(vec) => Some(indices.iter().map(|&idx| vec.get(idx).copied().flatten()).collect()),
             _ => None,
         }
     }
@@ -864,8 +832,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let mut binding = self.edge_columns();
         let col = binding.iter_mut().find(|(k,_)| *k == uid).map(|(_,c)| c).ok_or("Column not found")?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Bool(ref vec) => {
+            ColumnData::Bool(vec) => {
                 for (&idx, &val) in indices.iter().zip(values.iter()) {
                     if idx >= vec.len() {
                         vec.resize(idx + 1, None);
@@ -886,8 +853,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let binding = self.edge_columns();
         let col = binding.iter().find(|(k,_)| *k == *uid).map(|(_,c)| c)?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Bool(ref vec) => Some(indices.iter().map(|&idx| vec.get(idx).copied().flatten()).collect()),
+            ColumnData::Bool(vec) => Some(indices.iter().map(|&idx| vec.get(idx).copied().flatten()).collect()),
             _ => None,
         }
     }
@@ -903,8 +869,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let mut binding = self.edge_columns();
         let col = binding.iter_mut().find(|(k,_)| *k == uid).map(|(_,c)| c).ok_or("Column not found")?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Str(ref vec) => {
+            ColumnData::Str(vec) => {
                 for (idx, val) in indices.iter().zip(values.iter()) {
                     if *idx >= vec.len() {
                         vec.resize(*idx + 1, None);
@@ -925,8 +890,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
         let binding = self.edge_columns();
         let col = binding.iter().find(|(k,_)| *k == *uid).map(|(_,c)| c)?;
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Str(ref vec) => Some(indices.iter().map(|&idx| vec.get(idx).and_then(|v| v.clone())).collect()),
+            ColumnData::Str(vec) => Some(indices.iter().map(|&idx| vec.get(idx).and_then(|v| v.clone())).collect()),
             _ => None,
         }
     }
@@ -951,8 +915,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
             None => return Vec::new(),
         };
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Bool(ref vec) => vec.iter().enumerate().filter_map(|(i, v)| v.filter(|&x| x == value).map(|_| i)).collect(),
+            ColumnData::Bool(vec) => vec.iter().enumerate().filter_map(|(i, v)| v.filter(|&x| x == value).map(|_| i)).collect(),
             _ => Vec::new(),
         }
     }
@@ -976,8 +939,7 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
             None => return Vec::new(),
         };
         match col {
-    ColumnData::Int(ref vec) =>
-            ColumnData::Str(ref vec) => vec.iter().enumerate().filter_map(|(i, v)| v.as_ref().filter(|x| **x == value).map(|_| i)).collect(),
+            ColumnData::Str(vec) => vec.iter().enumerate().filter_map(|(i, v)| v.as_ref().filter(|x| **x == value).map(|_| i)).collect(),
             _ => Vec::new(),
         }
     }

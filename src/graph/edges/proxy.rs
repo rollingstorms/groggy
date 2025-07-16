@@ -2,95 +2,77 @@
 //! EdgeProxy: Per-edge interface for attribute access, endpoints, and graph operations in Groggy.
 //! Designed for agent/LLM workflows and backend extensibility.
 
+use pyo3::prelude::*;
 use crate::graph::types::{EdgeId, NodeId};
 use crate::graph::managers::attributes::AttributeManager;
+use crate::graph::proxy::base::EdgeProxyAttributeManager;
+use serde_json::Value;
 
 #[pyclass]
 pub struct EdgeProxy {
+    #[pyo3(get)]
     pub edge_id: EdgeId,
+    #[pyo3(get)]
     pub source: NodeId,
+    #[pyo3(get)]
     pub target: NodeId,
+    #[pyo3(get)]
     pub attribute_manager: AttributeManager,
-    // TODO: Add reference to parent EdgeCollection, etc.
+    #[pyo3(get)]
+    pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
-
 
 #[pymethods]
 impl EdgeProxy {
-    /// Returns the endpoints (source and target node IDs) of this edge.
-    ///
-    /// Efficiently queries edge storage for endpoints. Handles directed/undirected cases.
-    pub fn endpoints(&self) {
-        // TODO: 1. Query edge storage; 2. Return (source, target) tuple.
+    #[new]
+    pub fn new(edge_id: EdgeId, source: NodeId, target: NodeId, attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>) -> Self {
+        Self { edge_id, source, target, attribute_manager, graph_store }
     }
-    /// Returns the source node ID of this edge.
-    ///
-    /// For directed graphs, returns the start node. For undirected, may return either endpoint.
-    pub fn source(&self) {
-        // TODO: 1. Query edge storage for source node.
+
+    /// Returns a ProxyAttributeManager for this edge (per-attribute API).
+    pub fn attr_manager(&self) -> EdgeProxyAttributeManager {
+        EdgeProxyAttributeManager::new(self.edge_id.clone(), self.attribute_manager.clone())
     }
-    /// Returns the target node ID of this edge.
-    ///
-    /// For directed graphs, returns the end node. For undirected, may return either endpoint.
-    pub fn target(&self) {
-        // TODO: 1. Query edge storage for target node.
+
+    /// Get the value of a single attribute for this edge (JSON).
+    pub fn get_attr(&self, attr_name: String) -> Option<serde_json::Value> {
+        if let Some(index) = self.graph_store.edge_index(&self.edge_id) {
+            self.attribute_manager.get_edge_value(attr_name, index)
+        } else {
+            None
+        }
     }
-    /// Returns the value(s) for one or more attributes on this edge.
-    ///
-    /// Accepts a single attribute name or a batch. Delegates to AttributeManager for fast columnar lookup.
-    /// Handles missing attributes, type conversion, and error propagation.
-    pub fn get_attr(&self /*, attr_names: ... */) {
-        // TODO: 1. Accept single or batch; 2. Delegate to AttributeManager; 3. Handle errors.
+
+    /// Set the value of a single attribute for this edge (JSON).
+    pub fn set_attr(&mut self, attr_name: String, value: serde_json::Value) -> Result<(), String> {
+        if let Some(index) = self.graph_store.edge_index(&self.edge_id) {
+            self.attribute_manager.set_edge_value(attr_name, index, value);
+            Ok(())
+        } else {
+            Err("Edge not found in graph".to_string())
+        }
     }
-    /// Sets one or more attributes on this edge.
-    ///
-    /// Accepts a single (name, value) or a batch. Delegates to AttributeManager for fast, atomic updates.
-    /// Handles type checking, batch validation, and error propagation. May trigger schema update if needed.
-    pub fn set_attr(&mut self /*, attr_data: ... */) {
-        // TODO: 1. Accept single or batch; 2. Delegate to AttributeManager; 3. Validate and update.
+
+    /// Get all attributes for this edge as a map (JSON).
+    pub fn attrs(&self) -> Option<serde_json::Map<String, serde_json::Value>> {
+        if let Some(index) = self.graph_store.edge_index(&self.edge_id) {
+            // Collect all present attributes for this edge
+            let mut map = serde_json::Map::new();
+            for attr in self.attribute_manager.columnar.edge_attr_names() {
+                if let Some(val) = self.attribute_manager.get_edge_value(attr.clone(), index) {
+                    map.insert(attr, val);
+                }
+            }
+            Some(map)
+        } else {
+            None
+        }
     }
-    /// Returns all attributes for this edge as a key-value map.
-    ///
-    /// Delegates to AttributeManager for efficient retrieval. May use columnar slice for zero-copy access.
-    pub fn attrs(&self) {
-        // TODO: 1. Delegate to AttributeManager; 2. Return map or view.
-    }
-    /// Returns a ProxyAttributeManager for this edge.
-    ///
-    /// Allows fine-grained attribute operations (get/set/has/remove) on this edge only.
-    pub fn attr(&self) {
-        // TODO: 1. Instantiate ProxyAttributeManager; 2. Bind to edge context.
-    }
+
     /// Returns a string representation of this edge (for debugging or display).
-    ///
-    /// May include edge ID, endpoints, key attributes, or summary statistics.
     pub fn __str__(&self) -> String {
-        // TODO: 1. Format edge ID, endpoints, and attributes for display.
-        String::new()
+        format!("EdgeProxy({}, {} -> {})", self.edge_id, self.source, self.target)
     }
 }
 
-/// ProxyAttributeManager: Per-edge attribute interface for fine-grained get/set operations.
-#[pyclass]
-pub struct ProxyAttributeManager {
-    pub edge_id: EdgeId,
-    pub attribute_manager: AttributeManager,
-    // TODO: Add reference to parent EdgeProxy if needed
-}
-
-
-#[pymethods]
-impl ProxyAttributeManager {
-    /// Returns the value of the specified attribute for this edge.
-    ///
-    /// Delegates to AttributeManager for fast lookup. Handles missing attributes and type conversion.
-    pub fn get(&self /*, attr_name: ... */) {
-        // TODO: 1. Delegate to AttributeManager; 2. Handle missing attribute.
-    }
-    /// Sets the value of the specified attribute for this edge.
-    ///
-    /// Delegates to AttributeManager for atomic update. Handles type checking and schema enforcement.
-    pub fn set(&mut self /*, attr_name: ..., value: ... */) {
-        // TODO: 1. Delegate to AttributeManager; 2. Validate and update.
-    }
-}
+// Helper: EdgeProxy factory methods: (create new edges with attribute/type-guided construction)

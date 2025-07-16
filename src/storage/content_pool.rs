@@ -161,7 +161,7 @@ impl ContentPool {
     }
     /// Checks if an edge exists by EdgeId.
     pub fn has_edge(&self, edge_id: &EdgeId) -> bool {
-        let hash = crate::utils::hash::hash_edge(&edge_id.0.0, &edge_id.1.0);
+        let hash = crate::utils::hash::hash_edge(edge_id);
         self.has_edge_hash(&hash)
     }
     /// Adds nodes by NodeId.
@@ -171,7 +171,7 @@ impl ContentPool {
     }
     /// Adds edges by EdgeId.
     pub fn add_edges(&self, edge_ids: &[EdgeId]) {
-        let hashes: Vec<ContentHash> = edge_ids.iter().map(|id| crate::utils::hash::hash_edge(&id.0.0, &id.1.0)).collect();
+        let hashes: Vec<ContentHash> = edge_ids.iter().map(|id| crate::utils::hash::hash_edge(id)).collect();
         self.add_edge_hashes(&hashes);
     }
     /// Removes nodes by NodeId.
@@ -181,7 +181,7 @@ impl ContentPool {
     }
     /// Removes edges by EdgeId.
     pub fn remove_edges(&self, edge_ids: &[EdgeId]) {
-        let hashes: Vec<ContentHash> = edge_ids.iter().map(|id| crate::utils::hash::hash_edge(&id.0.0, &id.1.0)).collect();
+        let hashes: Vec<ContentHash> = edge_ids.iter().map(|id| crate::utils::hash::hash_edge(id)).collect();
         self.remove_edge_hashes(&hashes);
     }
 

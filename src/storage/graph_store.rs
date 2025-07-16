@@ -9,6 +9,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct GraphState {
     pub hash: String,
     pub parent_hash: Option<String>,
@@ -19,6 +20,10 @@ pub struct GraphState {
 }
 
 pub struct GraphStore {
+    pub node_id_to_index: DashMap<crate::graph::types::NodeId, usize>,
+    pub index_to_node_id: DashMap<usize, crate::graph::types::NodeId>,
+    pub edge_id_to_index: DashMap<crate::graph::types::EdgeId, usize>,
+    pub index_to_edge_id: DashMap<usize, crate::graph::types::EdgeId>,
     states: DashMap<String, GraphState>,
     content_pool: Arc<crate::storage::content_pool::ContentPool>,
     current_hash: RwLock<Option<String>>,
@@ -27,8 +32,24 @@ pub struct GraphStore {
 
 
 impl GraphStore {
+    pub fn node_index(&self, id: &crate::graph::types::NodeId) -> Option<usize> {
+        self.node_id_to_index.get(id).map(|v| *v)
+    }
+    pub fn node_id(&self, idx: usize) -> Option<crate::graph::types::NodeId> {
+        self.index_to_node_id.get(&idx).map(|v| v.clone())
+    }
+    pub fn edge_index(&self, id: &crate::graph::types::EdgeId) -> Option<usize> {
+        self.edge_id_to_index.get(id).map(|v| *v)
+    }
+    pub fn edge_id(&self, idx: usize) -> Option<crate::graph::types::EdgeId> {
+        self.index_to_edge_id.get(&idx).map(|v| v.clone())
+    }
     pub fn new() -> Self {
         let store = Self {
+            node_id_to_index: DashMap::new(),
+            index_to_node_id: DashMap::new(),
+            edge_id_to_index: DashMap::new(),
+            index_to_edge_id: DashMap::new(),
             states: DashMap::new(),
             content_pool: Arc::new(crate::storage::content_pool::ContentPool::new()),
             current_hash: RwLock::new(None),
@@ -57,7 +78,7 @@ impl GraphStore {
     }
     /// Loads a graph state by its ID from persistent storage.
     pub fn load_state(&self, state_id: &str) -> Option<GraphState> {
-        self.states.get(state_id).map(|entry| entry.clone())
+        self.states.get(state_id).map(|entry| entry.value().clone())
     }
     /// Creates a new branch from the current graph state.
     pub fn branch(&self, branch_name: String, from_hash: Option<String>) {

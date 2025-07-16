@@ -1,0 +1,226 @@
+Updated API Structure
+graph/core.rs - FastGraph
+rust🏗️  STRUCT: FastGraph
+   🏷️  #pyclass
+   
+🔧 IMPL: FastGraph
+   🏷️  #pymethods
+   └── ⚙️  new() - Constructor
+   └── ⚙️  info() - Get graph information
+   └── ⚙️  size() - Get total size (nodes + edges)
+   └── ⚙️  is_directed() - Check if directed
+   └── ⚙️  nodes() - Property: returns NodeCollection
+   └── ⚙️  edges() - Property: returns EdgeCollection
+   └── ⚙️  subgraph() - Create subgraph with node/edge filters
+   └── ⚙️  subgraphs() - Get all connected components
+graph/nodes/collection.rs - NodeCollection
+rust🏗️  STRUCT: NodeCollection
+   🏷️  #pyclass
+   
+🔧 IMPL: NodeCollection
+   🏷️  #pymethods
+   └── ⚙️  add() - Add single node, list of nodes, or dict of node_data
+   └── ⚙️  remove() - Remove single node or list of nodes
+   └── ⚙️  filter() - Filter nodes by dict, kwargs, or query string
+   └── ⚙️  size() - Get node count
+   └── ⚙️  ids() - Get all node IDs
+   └── ⚙️  has() - Check if node exists
+   └── ⚙️  attr() - Property: returns NodeAttributeManager
+   └── ⚙️  __iter__() - Iterator support
+   └── ⚙️  __getitem__() - Index access → returns NodeProxy
+   
+🏗️  STRUCT: NodeAttributeManager
+   🏷️  #pyclass
+   
+🔧 IMPL: NodeAttributeManager
+   🏷️  #pymethods
+   └── ⚙️  get() - Get attrs for node(s), optionally filtered by attr names
+   └── ⚙️  set() - Set attrs using dict format
+   └── ⚙️  set_type() - Set attribute type for validation
+   
+🏗️  STRUCT: NodeProxy
+   🏷️  #pyclass
+   
+🔧 IMPL: NodeProxy
+   🏷️  #pymethods
+   └── ⚙️  degree() - Get node degree
+   └── ⚙️  neighbors() - Get neighbors (with direction params)
+   └── ⚙️  get_attr() - Get single attr or list of attrs
+   └── ⚙️  set_attr() - Set single attr or list of attr tuples
+   └── ⚙️  attrs() - Get all attributes
+   └── ⚙️  attr() - Property: returns NodeProxyAttributeManager
+   └── ⚙️  __str__() - String representation
+   
+🏗️  STRUCT: NodeProxyAttributeManager
+   🏷️  #pyclass
+   
+🔧 IMPL: NodeProxyAttributeManager
+   🏷️  #pymethods
+   └── ⚙️  get() - Get attribute for this node
+   └── ⚙️  set() - Set attribute for this node
+graph/edges/collection.rs - EdgeCollection
+rust🏗️  STRUCT: EdgeCollection
+   🏷️  #pyclass
+   
+🔧 IMPL: EdgeCollection
+   🏷️  #pymethods
+   └── ⚙️  add() - Add single edge, list of edges, or dict of edge_data
+   └── ⚙️  remove() - Remove single edge or list of edges
+   └── ⚙️  filter() - Filter edges by dict, kwargs, or query string
+   └── ⚙️  size() - Get edge count
+   └── ⚙️  ids() - Get all edge IDs
+   └── ⚙️  has() - Check if edge exists
+   └── ⚙️  attr() - Property: returns EdgeAttributeManager
+   └── ⚙️  nodes() - Property: returns filtered NodeCollection
+   └── ⚙️  node_ids() - Property: returns node IDs from filtered edges
+   └── ⚙️  __iter__() - Iterator support
+   └── ⚙️  __getitem__() - Index access → returns EdgeProxy
+   
+🏗️  STRUCT: EdgeAttributeManager
+   🏷️  #pyclass
+   
+🔧 IMPL: EdgeAttributeManager
+   🏷️  #pymethods
+   └── ⚙️  get() - Get attrs for edge(s), optionally filtered by attr names
+   └── ⚙️  set() - Set attrs using dict format
+   └── ⚙️  set_type() - Set attribute type for validation
+   
+🏗️  STRUCT: EdgeProxy
+   🏷️  #pyclass
+   
+🔧 IMPL: EdgeProxy
+   🏷️  #pymethods
+   └── ⚙️  endpoints() - Get edge endpoints
+   └── ⚙️  source() - Get source node
+   └── ⚙️  target() - Get target node
+   └── ⚙️  get_attr() - Get single attr or list of attrs
+   └── ⚙️  set_attr() - Set single attr or list of attr tuples
+   └── ⚙️  attrs() - Get all attributes
+   └── ⚙️  attr() - Property: returns EdgeProxyAttributeManager
+   └── ⚙️  __str__() - String representation
+   
+🏗️  STRUCT: EdgeProxyAttributeManager
+   🏷️  #pyclass
+   
+🔧 IMPL: EdgeProxyAttributeManager
+   🏷️  #pymethods
+   └── ⚙️  get() - Get attribute for this edge
+   └── ⚙️  set() - Set attribute for this edge
+Migration Strategy
+Methods to Move:
+From FastGraph to NodeCollection:
+
+add_node() → nodes.add()
+remove_node() → nodes.remove()
+set_node_attribute() → nodes.set_attr()
+get_node_attributes() → nodes[node_id].attrs()
+filter_nodes_*() → nodes.filter()
+get_node_ids() → nodes.ids()
+has_node() → nodes.has()
+get_neighbors() → nodes[node_id].neighbors()
+get_node_degree() → nodes[node_id].degree()
+
+From FastGraph to EdgeCollection:
+
+add_edge() → edges.add()
+remove_edge() → edges.remove()
+set_edge_attribute() → edges.set_attr()
+get_edge_attributes() → edges[edge_id].attrs()
+filter_edges_*() → edges.filter()
+get_edge_ids() → edges.ids()
+has_edge() → edges.has()
+get_edge_endpoints() → edges[edge_id].endpoints()
+
+Keep in FastGraph:
+
+info(), size(), is_directed()
+subgraph(), subgraphs()
+Algorithm methods (bfs, dfs, etc.)
+Bulk operations that cross nodes/edges
+
+Example Usage
+pythonG = Graph()
+
+# Basic graph operations
+G.info()
+G.size()
+
+# Node operations
+G.nodes.add("A")
+G.nodes.add(["A","B","C"])  # batch operation triggered by list
+G.nodes.add(node_data)  # batch operation triggered by dict, node_data is a dictionary containing the nodes and node_attributes
+G.nodes.remove("A")
+G.nodes.remove(["A","B","C"])  # batch operation triggered by list
+G.nodes.size()
+G.nodes.ids()
+G.nodes.has("A")
+
+# Node indexing and properties
+node_a = G.nodes["A"]
+node_a.degree()
+node_a.neighbors()  # parameters for directed/undirected etc
+node_a.get_attr("color")
+node_a.get_attr(["color","size","shape"])
+node_a.set_attr("color", "red")
+node_a.set_attr([("color","red"), ("size", 10)])
+node_a.attrs()  # get all attr
+
+# Node attribute management
+G.nodes.attr.get("A")  # retrieve all attr for A
+G.nodes.attr.get(["A","B"])  # retrieve all attr for A and B
+G.nodes.attr.get(["A"], ["color"])  # retrieve selected attributes for selected nodes
+G.nodes.attr.set({"A":("color", "red")})
+G.nodes.attr.set({"A":{"color":"red", "size":10}, "B":{"color":"blue", "size":1}})
+
+# Node proxy attribute management
+node_a.attr.get("weight")
+node_a.attr.set("weight", 1.0)
+
+# Set attribute types
+G.nodes.attr.set_type("size", int)
+G.nodes.attr.set_type("weight", float)
+
+# Edge operations
+G.edges.add("A", "B")
+G.edges.add(edge_data)
+G.edges.remove("A", "B")
+G.edges.size()
+G.edges.ids()
+G.edges.has("A", "B")
+
+# Edge indexing and properties
+edge_ab = G.edges[("A", "B")]  # or edge_id
+edge_ab.endpoints()
+edge_ab.source()
+edge_ab.target()
+edge_ab.attr.get("weight")
+edge_ab.attr.set("weight", 1.0)
+edge_ab.attrs()
+
+# Filtering
+red_nodes = G.nodes.filter({"color": "red", "size":5})
+red_nodes = G.nodes.filter(color="red")
+heavy_edges = G.edges.filter("weight > 1.0")
+
+# Method chaining for complex queries
+heavy_red_node_ids = G.edges.filter("weight > 1.0") \
+                          .nodes.filter("color = 'red'") \
+                          .node_ids
+
+# Iteration
+for node in G.nodes:
+    print(node)
+
+for edge in G.edges:
+    print(edge)
+Implementation Notes
+
+Smart Type Detection: add() methods detect input type (single item, list, dict) and route to appropriate handlers
+Attribute Management: Dedicated AttributeManager classes handle batch operations and type validation
+Method Chaining: Filter results return new collection objects that support further chaining
+Flexible Filtering: Support dict-based, kwarg-based, and query string filtering
+Shared State: All collections and proxies share references to the same graph and store
+Lazy Creation: Collections created on first access
+Proxy Objects: NodeProxy and EdgeProxy provide attribute access for individual items
+Backward Compatibility: Keep existing methods with deprecation warnings
+Type Safety: Attribute type validation and enforcement

@@ -2,71 +2,61 @@
 //! NodeProxy: Per-node interface for attribute access, neighbors, and graph operations in Groggy.
 //! Designed for agent/LLM workflows and backend extensibility.
 
+use pyo3::prelude::*;
 use crate::graph::types::NodeId;
 use crate::graph::managers::attributes::AttributeManager;
 
 #[pyclass]
 pub struct NodeProxy {
+    #[pyo3(get)]
     pub node_id: NodeId,
+    #[pyo3(get)]
     pub attribute_manager: AttributeManager,
-    // TODO: Add reference to parent NodeCollection, edge indices, etc.
+    #[pyo3(get)]
+    pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
 
 
 #[pymethods]
 impl NodeProxy {
-    /// Returns the degree of the node.
-    ///
-    /// Supports specifying direction (in/out/total). Efficiently queries edge indices or columnar metadata.
-    /// Handles error cases (e.g., node not found). May delegate to EdgeCollection for neighbor counting.
-    pub fn degree(&self /*, direction: ... */) {
-        // TODO: 1. Parse direction; 2. Query edge indices; 3. Return degree or error.
+    #[new]
+    pub fn new(node_id: NodeId, attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>) -> Self {
+        Self { node_id, attribute_manager, graph_store }
     }
 
-    /// Returns the neighbors of the node.
-    ///
-    /// Supports directionality and may return either IDs or NodeProxy objects. Delegates to EdgeCollection or
-    /// uses columnar join for efficient neighbor retrieval. Handles batch queries for large graphs.
-    pub fn neighbors(&self /*, direction: ... */) {
-        // TODO: 1. Parse direction; 2. Join with edges; 3. Return neighbors.
+    /// Returns a ProxyAttributeManager for this node (per-attribute API).
+    pub fn attr_manager(&self) -> crate::graph::nodes::proxy::ProxyAttributeManager {
+        crate::graph::nodes::proxy::ProxyAttributeManager {
+            node_id: self.node_id.clone(),
+            attribute_manager: self.attribute_manager.clone(),
+        }
     }
 
-    /// Returns the value(s) for one or more attributes on this node.
-    ///
-    /// Accepts a single attribute name or a batch. Delegates to AttributeManager for fast columnar lookup.
-    /// Handles missing attributes, type conversion, and error propagation.
-    pub fn get_attr(&self /*, attr_names: ... */) {
-        // TODO: 1. Accept single or batch; 2. Delegate to AttributeManager; 3. Handle errors.
+    /// Get the value of a single attribute for this node (JSON).
+    pub fn get_attr(&self, attr_name: String) -> Option<serde_json::Value> {
+        self.attr_manager().get(attr_name)
     }
 
-    /// Sets one or more attributes on this node.
-    ///
-    /// Accepts a single (name, value) or a batch. Delegates to AttributeManager for fast, atomic updates.
-    /// Handles type checking, batch validation, and error propagation. May trigger schema update if needed.
-    pub fn set_attr(&mut self /*, attr_data: ... */) {
-        // TODO: 1. Accept single or batch; 2. Delegate to AttributeManager; 3. Validate and update.
+    /// Set the value of a single attribute for this node (JSON).
+    pub fn set_attr(&mut self, attr_name: String, value: serde_json::Value) -> Result<(), String> {
+        self.attr_manager().set(attr_name, value)
     }
 
-    /// Returns all attributes for this node as a key-value map.
-    ///
-    /// Delegates to AttributeManager for efficient retrieval. May use columnar slice for zero-copy access.
-    pub fn attrs(&self) {
-        // TODO: 1. Delegate to AttributeManager; 2. Return map or view.
-    }
-
-    /// Returns a ProxyAttributeManager for this node.
-    ///
-    /// Allows fine-grained attribute operations (get/set/has/remove) on this node only.
-    pub fn attr(&self) {
-        // TODO: 1. Instantiate ProxyAttributeManager; 2. Bind to node context.
+    /// Get all attributes for this node as a map (JSON).
+    pub fn attrs(&self) -> Option<serde_json::Map<String, serde_json::Value>> {
+        // Collect all present attributes for this node
+        let mut map = serde_json::Map::new();
+        for attr in self.attribute_manager.columnar.node_attr_names() {
+            if let Some(val) = self.attr_manager().get(attr.clone()) {
+                map.insert(attr, val);
+            }
+        }
+        Some(map)
     }
 
     /// Returns a string representation of this node (for debugging or display).
-    ///
-    /// May include node ID, key attributes, or summary statistics.
     pub fn __str__(&self) -> String {
-        // TODO: 1. Format node ID and attributes for display.
-        String::new()
+        format!("NodeProxy({})", self.node_id)
     }
 }
 
@@ -75,22 +65,130 @@ impl NodeProxy {
 pub struct ProxyAttributeManager {
     pub node_id: NodeId,
     pub attribute_manager: AttributeManager,
-    // TODO: Add reference to parent NodeProxy if needed
 }
-
 
 #[pymethods]
 impl ProxyAttributeManager {
-    /// Returns the value of the specified attribute for this node.
-    ///
-    /// Delegates to AttributeManager for fast lookup. Handles missing attributes and type conversion.
-    pub fn get(&self /*, attr_name: ... */) {
-        // TODO: 1. Delegate to AttributeManager; 2. Handle missing attribute.
+    /// Returns the value of the specified attribute for this node as JSON.
+    pub fn get(&self, attr_name: String) -> Option<serde_json::Value> {
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.get_node_value(attr_name, index)
+        } else {
+            None
+        }
     }
-    /// Sets the value of the specified attribute for this node.
-    ///
-    /// Delegates to AttributeManager for atomic update. Handles type checking and schema enforcement.
-    pub fn set(&mut self /*, attr_name: ..., value: ... */) {
-        // TODO: 1. Delegate to AttributeManager; 2. Validate and update.
+
+    /// Sets the value of the specified attribute for this node (JSON, type-checked).
+    pub fn set(&mut self, attr_name: String, value: serde_json::Value) -> Result<(), String> {
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.set_node_value(attr_name, index, value);
+            Ok(())
+        } else {
+            Err("Node not found in graph".to_string())
+        }
+    }
+
+    /// Returns the value of the specified int attribute for this node.
+    pub fn get_int(&self, attr_name: String) -> Option<i64> {
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.columnar.get_node_int(attr_name, index)
+        } else {
+            None
+        }
+    }
+    /// Sets the value of the specified int attribute for this node.
+    pub fn set_int(&mut self, attr_name: String, value: i64) -> Result<(), String> {
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.columnar.set_node_int(attr_name, index, value)
+        } else {
+            Err("Node not found in graph".to_string())
+        }
+    }
+    /// Returns the value of the specified float attribute for this node.
+    pub fn get_float(&self, attr_name: String) -> Option<f64> {
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.columnar.get_node_float(attr_name, index)
+        } else {
+            None
+        }
+    }
+    /// Sets the value of the specified float attribute for this node.
+    pub fn set_float(&mut self, attr_name: String, value: f64) -> Result<(), String> {
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.columnar.set_node_float(attr_name, index, value)
+        } else {
+            Err("Node not found in graph".to_string())
+        }
+    }
+    /// Returns the value of the specified bool attribute for this node.
+    pub fn get_bool(&self, attr_name: String) -> Option<bool> {
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.columnar.get_node_bool(attr_name, index)
+        } else {
+            None
+        }
+    }
+    /// Sets the value of the specified bool attribute for this node.
+    pub fn set_bool(&mut self, attr_name: String, value: bool) -> Result<(), String> {
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.columnar.set_node_bool(attr_name, index, value)
+        } else {
+            Err("Node not found in graph".to_string())
+        }
+    }
+    /// Returns the value of the specified string attribute for this node.
+    pub fn get_str(&self, attr_name: String) -> Option<String> {
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.columnar.get_node_str(attr_name, index)
+        } else {
+            None
+        }
+    }
+    /// Sets the value of the specified string attribute for this node.
+    pub fn set_str(&mut self, attr_name: String, value: String) -> Result<(), String> {
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.columnar.set_node_str(attr_name, index, value)
+        } else {
+            Err("Node not found in graph".to_string())
+        }
+    }
+    /// Checks if the specified attribute exists for this node.
+    pub fn has(&self, attr_name: String) -> bool {
+        self.attribute_manager.columnar.node_attr_names().contains(&attr_name)
+    }
+    /// Removes the specified attribute for this node (sets to None if present).
+    pub fn remove(&mut self, attr_name: String) -> Result<(), String> {
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            // Remove value for this node (set to None in the column, do not drop schema)
+            let uid = match self.attribute_manager.columnar.attr_name_to_uid.get(&attr_name) {
+                Some(u) => u.clone(),
+                None => return Err("Attribute not found".to_string()),
+            };
+            let mut col = match self.attribute_manager.columnar.columns.get_mut(&(crate::storage::columnar::ColumnKind::Node, uid.clone())) {
+                Some(c) => c,
+                None => return Err("Column not found".to_string()),
+            };
+            match &mut *col {
+                crate::storage::columnar::ColumnData::Int(vec) => {
+                    if index < vec.len() { vec[index] = None; }
+                }
+                crate::storage::columnar::ColumnData::Float(vec) => {
+                    if index < vec.len() { vec[index] = None; }
+                }
+                crate::storage::columnar::ColumnData::Bool(vec) => {
+                    if index < vec.len() { vec[index] = None; }
+                }
+                crate::storage::columnar::ColumnData::Str(vec) => {
+                    if index < vec.len() { vec[index] = None; }
+                }
+                crate::storage::columnar::ColumnData::Json(map) => {
+                    map.remove(&index);
+                }
+            }
+            Ok(())
+        } else {
+            Err("Node not found in graph".to_string())
+        }
     }
 }
+

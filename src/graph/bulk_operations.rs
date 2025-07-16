@@ -1,5 +1,7 @@
 // src_new/graph/bulk_operations.rs
 
+use crate::graph::core::FastGraph;
+
 /// Batch add/remove nodes and edges
 impl FastGraph {
     /// Adds a batch of nodes in a single operation.
