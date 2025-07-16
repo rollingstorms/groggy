@@ -32,12 +32,6 @@ impl FilterManager {
         Self { filters: Vec::new(), last_result: None, is_node, attr_manager }
     }
 
-    /// Adds a filter expression to the manager.
-    /// Allows chaining multiple filters for complex queries.
-    pub fn add_filter(&mut self, expr: FilterExpr) {
-        self.filters.push(expr);
-    }
-
     /// Applies all filters to the target collection of IDs.
     /// Returns a filtered view or set of IDs. Supports vectorized execution.
     pub fn apply(&mut self, ids: Vec<usize>) -> Vec<usize> {
@@ -72,5 +66,13 @@ impl FilterManager {
     /// Returns the current set of filtered IDs or objects.
     pub fn results(&self) -> Option<Vec<usize>> {
         self.last_result.clone()
+    }
+}
+
+impl FilterManager {
+    /// Adds a filter expression to the manager (internal method, not exposed to Python).
+    /// Allows chaining multiple filters for complex queries.
+    pub fn add_filter(&mut self, expr: FilterExpr) {
+        self.filters.push(expr);
     }
 }

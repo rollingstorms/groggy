@@ -18,10 +18,6 @@ pub struct NodeProxy {
 
 #[pymethods]
 impl NodeProxy {
-    pub fn new(node_id: NodeId, attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>) -> Self {
-        Self { node_id, attribute_manager, graph_store }
-    }
-
     /// Create a new NodeProxy from Python (simplified constructor)
     #[new]
     pub fn py_new(node_id: NodeId, attribute_manager: AttributeManager) -> Self {
@@ -48,8 +44,12 @@ impl NodeProxy {
     pub fn set_attr(&mut self, attr_name: String, value: String) -> PyResult<()> {
         let json_value: serde_json::Value = serde_json::from_str(&value)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid JSON: {}", e)))?;
-        self.attr_manager().set(attr_name, json_value)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.set_node_value(attr_name, index, json_value);
+            Ok(())
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("Node not found in graph"))
+        }
     }
 
     /// Get all attributes for this node as a map (JSON string).
@@ -58,7 +58,9 @@ impl NodeProxy {
         let mut map = serde_json::Map::new();
         for attr in self.attribute_manager.columnar.node_attr_names() {
             if let Some(val) = self.attr_manager().get(attr.clone()) {
-                map.insert(attr, val);
+                if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&val) {
+                    map.insert(attr, json_val);
+                }
             }
         }
         if map.is_empty() {
@@ -71,6 +73,13 @@ impl NodeProxy {
     /// Returns a string representation of this node (for debugging or display).
     pub fn __str__(&self) -> String {
         format!("NodeProxy({})", self.node_id)
+    }
+}
+
+impl NodeProxy {
+    /// Regular Rust constructor - not exposed to Python
+    pub fn new(node_id: NodeId, attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>) -> Self {
+        Self { node_id, attribute_manager, graph_store }
     }
 }
 
@@ -115,11 +124,12 @@ impl ProxyAttributeManager {
         }
     }
     /// Sets the value of the specified int attribute for this node.
-    pub fn set_int(&mut self, attr_name: String, value: i64) -> Result<(), String> {
+    pub fn set_int(&mut self, attr_name: String, value: i64) -> PyResult<()> {
         if let Some(index) = self.graph_store.node_index(&self.node_id) {
             self.attribute_manager.columnar.set_node_int(attr_name, index, value)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
         } else {
-            Err("Node not found in graph".to_string())
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("Node not found in graph"))
         }
     }
     /// Returns the value of the specified float attribute for this node.
@@ -131,11 +141,12 @@ impl ProxyAttributeManager {
         }
     }
     /// Sets the value of the specified float attribute for this node.
-    pub fn set_float(&mut self, attr_name: String, value: f64) -> Result<(), String> {
+    pub fn set_float(&mut self, attr_name: String, value: f64) -> PyResult<()> {
         if let Some(index) = self.graph_store.node_index(&self.node_id) {
             self.attribute_manager.columnar.set_node_float(attr_name, index, value)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
         } else {
-            Err("Node not found in graph".to_string())
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("Node not found in graph"))
         }
     }
     /// Returns the value of the specified bool attribute for this node.
@@ -147,11 +158,12 @@ impl ProxyAttributeManager {
         }
     }
     /// Sets the value of the specified bool attribute for this node.
-    pub fn set_bool(&mut self, attr_name: String, value: bool) -> Result<(), String> {
+    pub fn set_bool(&mut self, attr_name: String, value: bool) -> PyResult<()> {
         if let Some(index) = self.graph_store.node_index(&self.node_id) {
             self.attribute_manager.columnar.set_node_bool(attr_name, index, value)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
         } else {
-            Err("Node not found in graph".to_string())
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("Node not found in graph"))
         }
     }
     /// Returns the value of the specified string attribute for this node.
@@ -163,11 +175,12 @@ impl ProxyAttributeManager {
         }
     }
     /// Sets the value of the specified string attribute for this node.
-    pub fn set_str(&mut self, attr_name: String, value: String) -> Result<(), String> {
+    pub fn set_str(&mut self, attr_name: String, value: String) -> PyResult<()> {
         if let Some(index) = self.graph_store.node_index(&self.node_id) {
             self.attribute_manager.columnar.set_node_str(attr_name, index, value)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
         } else {
-            Err("Node not found in graph".to_string())
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("Node not found in graph"))
         }
     }
     /// Checks if the specified attribute exists for this node.
@@ -175,16 +188,16 @@ impl ProxyAttributeManager {
         self.attribute_manager.columnar.node_attr_names().contains(&attr_name)
     }
     /// Removes the specified attribute for this node (sets to None if present).
-    pub fn remove(&mut self, attr_name: String) -> Result<(), String> {
+    pub fn remove(&mut self, attr_name: String) -> PyResult<()> {
         if let Some(index) = self.graph_store.node_index(&self.node_id) {
             // Remove value for this node (set to None in the column, do not drop schema)
             let uid = match self.attribute_manager.columnar.attr_name_to_uid.get(&attr_name) {
                 Some(u) => u.clone(),
-                None => return Err("Attribute not found".to_string()),
+                None => return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("Attribute not found")),
             };
             let mut col = match self.attribute_manager.columnar.columns.get_mut(&(crate::storage::columnar::ColumnKind::Node, uid.clone())) {
                 Some(c) => c,
-                None => return Err("Column not found".to_string()),
+                None => return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("Column not found")),
             };
             match &mut *col {
                 crate::storage::columnar::ColumnData::Int(vec) => {
@@ -205,7 +218,7 @@ impl ProxyAttributeManager {
             }
             Ok(())
         } else {
-            Err("Node not found in graph".to_string())
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("Node not found in graph"))
         }
     }
 }

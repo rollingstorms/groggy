@@ -1196,23 +1196,62 @@ impl ColumnarStore {
             }
         }
     }
-}
 
-impl Clone for ColumnarStore {
-    fn clone(&self) -> Self {
-        Self {
-            attr_name_to_uid: self.attr_name_to_uid.clone(),
-            attr_uid_to_name: self.attr_uid_to_name.clone(),
-            next_attr_uid: std::sync::atomic::AtomicU64::new(self.next_attr_uid.load(std::sync::atomic::Ordering::Relaxed)),
-            attr_schema: self.attr_schema.clone(),
-            columns: self.columns.clone(),
-            node_attributes: self.node_attributes.clone(),
-            edge_attributes: self.edge_attributes.clone(),
-            node_value_bitmaps: self.node_value_bitmaps.clone(),
-            edge_value_bitmaps: self.edge_value_bitmaps.clone(),
-            bitmaps_dirty: std::sync::atomic::AtomicBool::new(self.bitmaps_dirty.load(std::sync::atomic::Ordering::Relaxed)),
-            max_node_index: std::sync::atomic::AtomicUsize::new(self.max_node_index.load(std::sync::atomic::Ordering::Relaxed)),
-            max_edge_index: std::sync::atomic::AtomicUsize::new(self.max_edge_index.load(std::sync::atomic::Ordering::Relaxed)),
+
+    /// Get all values for a node attribute by name (Python API)
+    pub fn get_node_attr(&self, attr_name: String) -> Option<HashMap<usize, JsonValue>> {
+        let uid = self.attr_name_to_uid.get(&attr_name)?.clone();
+        self.node_attributes.get(&uid).map(|m| m.clone())
+    }
+
+    /// Set all values for a node attribute by name (Python API)
+    pub fn set_node_attr(&self, attr_name: String, data: HashMap<usize, JsonValue>) {
+        let uid = self.register_attr(attr_name);
+        self.node_attributes.insert(AttrUID(uid), data);
+        self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Get a single value for a node attribute and entity index
+    pub fn get_node_value(&self, attr_name: String, idx: usize) -> Option<JsonValue> {
+        let uid = self.attr_name_to_uid.get(&attr_name)?.clone();
+        self.node_attributes.get(&uid)?.get(&idx).cloned()
+    }
+
+    /// Set a single value for a node attribute and entity index
+    pub fn set_node_value(&self, attr_name: String, idx: usize, value: JsonValue) {
+        let uid = self.register_attr(attr_name);
+        self.node_attributes.entry(AttrUID(uid)).or_default().insert(idx, value);
+        self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Filter edges by bool value for a column
+    pub fn filter_edges_by_bool(&self, attr_name: String, value: bool) -> Vec<usize> {
+        let uid = match self.attr_name_to_uid.get(&attr_name) {
+            Some(u) => u.clone(),
+            None => return Vec::new(),
+        };
+        let schema = match self.attr_schema.get(&uid) {
+            Some(s) => *s,
+            None => return Vec::new(),
+        };
+        if schema != AttributeType::Bool {
+            return Vec::new();
         }
+        let binding = self.edge_columns();
+        let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
+            Some(c) => c,
+            None => return Vec::new(),
+        };
+        match col {
+            ColumnData::Bool(vec) => vec.iter().enumerate().filter_map(|(i, v)| v.filter(|&x| x == value).map(|_| i)).collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// Get edge endpoints (source, target) by edge ID - placeholder implementation
+    pub fn edge_endpoints(&self, _edge_id: &crate::graph::types::EdgeId) -> Option<(crate::graph::types::NodeId, crate::graph::types::NodeId)> {
+        // TODO: Implement proper edge endpoint storage and retrieval
+        // For now, return a placeholder to prevent compilation errors
+        None
     }
 }

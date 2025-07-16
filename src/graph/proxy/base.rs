@@ -34,7 +34,6 @@ impl NodeProxyAttributeManager {
 }
 
 #[pyclass]
-#[pyclass]
 pub struct EdgeProxyAttributeManager {
     #[pyo3(get)]
     pub id: EdgeId,

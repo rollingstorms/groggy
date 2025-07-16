@@ -4,7 +4,7 @@
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
-use crate::graph::types::{EdgeId, NodeId};
+use crate::graph::types::EdgeId;
 use crate::graph::managers::attributes::AttributeManager;
 // use crate::graph::columnar::EdgeColumnarStore; // Uncomment when available
 
@@ -39,12 +39,8 @@ impl EdgeCollection {
         Self {
             attribute_manager: self.attribute_manager.clone(),
             edge_ids: filtered_ids,
+            graph_store: self.graph_store.clone(),
         }
-    }
-
-    pub fn new(attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>, edge_ids: Option<Vec<EdgeId>>) -> Self {
-        let ids = edge_ids.unwrap_or_else(|| graph_store.all_edge_ids());
-        Self { attribute_manager, edge_ids: ids, graph_store }
     }
 
     /// Create a new EdgeCollection from Python (simplified constructor)
@@ -116,10 +112,19 @@ impl EdgeCollection {
                 src,
                 tgt,
                 self.attribute_manager.clone(),
+                self.graph_store.clone(),
             ))
         } else {
             None
         }
+    }
+}
+
+impl EdgeCollection {
+    /// Regular Rust constructor - not exposed to Python
+    pub fn new(attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>, edge_ids: Option<Vec<EdgeId>>) -> Self {
+        let ids = edge_ids.unwrap_or_else(|| graph_store.all_edge_ids());
+        Self { attribute_manager, edge_ids: ids, graph_store }
     }
 }
 
@@ -132,7 +137,7 @@ fn filter_edges_by_dict(
     graph_store: &std::sync::Arc<crate::storage::graph_store::GraphStore>,
 ) -> Vec<EdgeId> {
     let mut filtered = Vec::new();
-    'outer: for edge_id in edge_ids {
+    for edge_id in edge_ids {
         let mut keep = true;
         for (k, v) in d.iter() {
             let attr = k.extract::<String>().unwrap_or_default();

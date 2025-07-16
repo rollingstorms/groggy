@@ -71,6 +71,7 @@ impl FastGraph {
         }
         Self {
             attribute_manager: self.attribute_manager.clone(),
+            graph_store: self.graph_store.clone(),
             node_collection,
             edge_collection,
             directed: self.directed,

@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 use crate::graph::types::{EdgeId, NodeId};
 use crate::graph::managers::attributes::AttributeManager;
 use crate::graph::proxy::base::EdgeProxyAttributeManager;
-use serde_json::Value;
+// use serde_json::Value; // Currently unused
 
 #[pyclass]
 pub struct EdgeProxy {
@@ -23,10 +23,6 @@ pub struct EdgeProxy {
 
 #[pymethods]
 impl EdgeProxy {
-    pub fn new(edge_id: EdgeId, source: NodeId, target: NodeId, attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>) -> Self {
-        Self { edge_id, source, target, attribute_manager, graph_store }
-    }
-
     /// Create a new EdgeProxy from Python (simplified constructor)
     #[new]
     pub fn py_new(edge_id: EdgeId, source: NodeId, target: NodeId, attribute_manager: AttributeManager) -> Self {
@@ -84,6 +80,13 @@ impl EdgeProxy {
     /// Returns a string representation of this edge (for debugging or display).
     pub fn __str__(&self) -> String {
         format!("EdgeProxy({}, {} -> {})", self.edge_id, self.source, self.target)
+    }
+}
+
+impl EdgeProxy {
+    /// Regular Rust constructor - not exposed to Python
+    pub fn new(edge_id: EdgeId, source: NodeId, target: NodeId, attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>) -> Self {
+        Self { edge_id, source, target, attribute_manager, graph_store }
     }
 }
 

@@ -73,21 +73,21 @@ pub struct GraphInfo {
     pub directed: bool,
     pub node_count: usize,
     pub edge_count: usize,
-    pub attributes: std::collections::HashMap<String, serde_json::Value>,
+    pub attributes: std::collections::HashMap<String, String>,
 }
 
 #[pymethods]
 impl GraphInfo {
     #[new]
     #[pyo3(signature = (name=None, directed=false, node_count=0, edge_count=0, attributes=std::collections::HashMap::new()))]
-    pub fn new(name: Option<String>, directed: bool, node_count: usize, edge_count: usize, attributes: std::collections::HashMap<String, serde_json::Value>) -> Self {
+    pub fn new(name: Option<String>, directed: bool, node_count: usize, edge_count: usize, attributes: std::collections::HashMap<String, String>) -> Self {
         Self { name, directed, node_count, edge_count, attributes }
     }
     pub fn name(&self) -> Option<String> { self.name.clone() }
     pub fn directed(&self) -> bool { self.directed }
     pub fn node_count(&self) -> usize { self.node_count }
     pub fn edge_count(&self) -> usize { self.edge_count }
-    pub fn attributes(&self) -> std::collections::HashMap<String, serde_json::Value> { self.attributes.clone() }
+    pub fn attributes(&self) -> std::collections::HashMap<String, String> { self.attributes.clone() }
 }
 
 impl Default for GraphInfo {

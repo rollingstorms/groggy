@@ -27,11 +27,9 @@ impl FilterCore {
 #[pyclass]
 #[derive(Clone)]
 pub struct FilterManager {
-    #[pyo3(get)]
     pub core: FilterCore,
     #[pyo3(get)]
     pub ids: Vec<usize>,
-    #[pyo3(get)]
     pub filter_plan: Vec<FilterOp>,
 }
 
@@ -118,19 +116,34 @@ impl FilterManager {
         let py_list = filters.downcast::<pyo3::types::PyList>()?;
         for obj in py_list.iter() {
             let dict = obj.downcast::<pyo3::types::PyDict>()?;
-            let filter_type: String = dict.get_item("type").unwrap().extract()?;
-            let attr: String = dict.get_item("attr").unwrap().extract()?;
+            let filter_type: String = match dict.get_item("type")? {
+                Some(item) => item.extract()?,
+                None => return Err(pyo3::exceptions::PyKeyError::new_err("Missing 'type' key")),
+            };
+            let attr: String = match dict.get_item("attr")? {
+                Some(item) => item.extract()?,
+                None => return Err(pyo3::exceptions::PyKeyError::new_err("Missing 'attr' key")),
+            };
             match filter_type.as_str() {
                 "int" => {
-                    let value: i64 = dict.get_item("value").unwrap().extract()?;
+                    let value: i64 = match dict.get_item("value")? {
+                        Some(item) => item.extract()?,
+                        None => return Err(pyo3::exceptions::PyKeyError::new_err("Missing 'value' key")),
+                    };
                     self.core.add_filter(crate::graph::managers::filter::FilterExpr::IntEquals { attr, value });
                 }
                 "bool" => {
-                    let value: bool = dict.get_item("value").unwrap().extract()?;
+                    let value: bool = match dict.get_item("value")? {
+                        Some(item) => item.extract()?,
+                        None => return Err(pyo3::exceptions::PyKeyError::new_err("Missing 'value' key")),
+                    };
                     self.core.add_filter(crate::graph::managers::filter::FilterExpr::BoolEquals { attr, value });
                 }
                 "str" => {
-                    let value: String = dict.get_item("value").unwrap().extract()?;
+                    let value: String = match dict.get_item("value")? {
+                        Some(item) => item.extract()?,
+                        None => return Err(pyo3::exceptions::PyKeyError::new_err("Missing 'value' key")),
+                    };
                     self.core.add_filter(crate::graph::managers::filter::FilterExpr::StrEquals { attr, value });
                 }
                 _ => {}
