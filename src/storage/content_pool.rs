@@ -21,6 +21,53 @@ pub struct ContentPool {
 
 
 impl ContentPool {
+    /// Estimate the total heap memory usage in bytes for this ContentPool.
+    pub fn memory_usage_bytes(&self) -> usize {
+        use std::mem::size_of;
+        let mut total = 0usize;
+        // Estimate DashMap overhead per entry (very rough)
+        let dashmap_entry_overhead = 32;
+
+        // nodes: DashMap<ContentHash, Arc<NodeType>>
+        total += self.nodes.len() * (size_of::<ContentHash>() + size_of::<Arc<NodeType>>() + dashmap_entry_overhead);
+        // edges: DashMap<ContentHash, Arc<EdgeType>>
+        total += self.edges.len() * (size_of::<ContentHash>() + size_of::<Arc<EdgeType>>() + dashmap_entry_overhead);
+        // node_refs: DashMap<ContentHash, usize>
+        total += self.node_refs.len() * (size_of::<ContentHash>() + size_of::<usize>() + dashmap_entry_overhead);
+        // edge_refs: DashMap<ContentHash, usize>
+        total += self.edge_refs.len() * (size_of::<ContentHash>() + size_of::<usize>() + dashmap_entry_overhead);
+
+        // Approximate heap usage for the actual node/edge data (JSON Value)
+        // This is expensive, so only sum the first N and extrapolate
+        let sample = 10.max(self.nodes.len().min(100));
+        if self.nodes.len() > 0 {
+            let mut sample_size = 0usize;
+            let mut count = 0usize;
+            for entry in self.nodes.iter().take(sample) {
+                if let Ok(json) = serde_json::to_vec(entry.value().as_ref()) {
+                    sample_size += json.len();
+                    count += 1;
+                }
+            }
+            if count > 0 {
+                total += sample_size * self.nodes.len() / count;
+            }
+        }
+        if self.edges.len() > 0 {
+            let mut sample_size = 0usize;
+            let mut count = 0usize;
+            for entry in self.edges.iter().take(sample) {
+                if let Ok(json) = serde_json::to_vec(entry.value().as_ref()) {
+                    sample_size += json.len();
+                    count += 1;
+                }
+            }
+            if count > 0 {
+                total += sample_size * self.edges.len() / count;
+            }
+        }
+        total
+    }
     pub fn new() -> Self {
         Self {
             nodes: DashMap::new(),

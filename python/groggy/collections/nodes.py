@@ -24,6 +24,40 @@ class NodeCollection(BaseCollection):
         self._rust = graph._rust.nodes()
         self.attr = self._rust.attr()
 
+    def add(self, node_data):
+        """
+        Adds one or more nodes to the collection.
+        Supports single or batch addition. Returns proxy object(s) for added nodes.
+        """
+        from .. import NodeId
+        
+        # Handle single vs batch input
+        is_single = not isinstance(node_data, (list, tuple))
+        if is_single:
+            node_data = [node_data]
+        
+        # Convert strings to NodeId objects
+        node_ids = []
+        for node in node_data:
+            if isinstance(node, str):
+                node_ids.append(NodeId(node))
+            elif isinstance(node, NodeId):
+                node_ids.append(node)
+            else:
+                raise ValueError(f"Expected string or NodeId, got {type(node)}")
+        
+        # Add to Rust backend
+        try:
+            self._rust.add(node_ids)
+        except Exception as e:
+            raise ValueError(f"Failed to add nodes: {e}")
+        
+        # Return proxy object(s)
+        if is_single:
+            return self.get(node_ids[0])
+        else:
+            return [self.get(node_id) for node_id in node_ids]
+
     def remove(self, node_ids):
         """
         Removes one or more nodes from the collection.
@@ -96,6 +130,25 @@ class NodeCollection(BaseCollection):
             int: Node count.
         """
         return self.size
+
+    def get(self, node_id):
+        """
+        Returns a NodeProxy for the given node ID.
+        
+        Args:
+            node_id: The node ID to retrieve.
+        Returns:
+            NodeProxy: Proxy object for the node, or None if not found.
+        """
+        try:
+            rust_proxy = self._rust.get(node_id)
+            if rust_proxy:
+                # Import the Python wrapper that handles JSON serialization
+                from .. import NodeProxy as PythonNodeProxy
+                return PythonNodeProxy(rust_proxy)
+            return None
+        except:
+            return None
 
 class NodeAttributeManager:
     """

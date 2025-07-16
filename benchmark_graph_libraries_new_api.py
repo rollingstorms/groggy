@@ -24,6 +24,12 @@ sys.path = [p for p in sys.path if 'groggy' not in p.lower()]
 local_groggy_path = '/Users/michaelroth/Documents/Code/groggy/python'
 sys.path.insert(0, local_groggy_path)
 
+# Debug: Print import path for groggy.graph and sys.path
+import sys
+import importlib
+spec = importlib.util.find_spec('groggy.graph')
+print('groggy.graph file:', spec.origin if spec else 'NOT FOUND')
+print('sys.path:', sys.path)
 # Import libraries
 import groggy as gr
 
@@ -119,8 +125,8 @@ class GroggyBenchmark:
         
         # Create graph with new clean API
         self.graph = gr.Graph()
-        self.nodes_collection = self.graph.nodes()
-        self.edges_collection = self.graph.edges()
+        self.nodes_collection = self.graph.nodes
+        self.edges_collection = self.graph.edges
         
         # Convert data to NodeId/EdgeId objects and add them
         self.node_ids = []
@@ -158,6 +164,7 @@ class GroggyBenchmark:
         self.creation_time = time.time() - start
         print(f"   Created {len(self.node_ids)} nodes and {len(self.edge_ids)} edges in {self.creation_time:.3f}s")
         print(f"   Memory usage: {format_memory(self.memory_usage)}")
+        print("   Groggy g.info():", self.graph.info())
     
     def filter_nodes_by_role(self):
         """Filter nodes by role (simulated since attributes aren't working yet)"""
@@ -209,9 +216,12 @@ class GroggyBenchmark:
     
     def get_stats(self):
         """Get graph statistics"""
+        # Handle inconsistency: NodeCollection.size is a property, EdgeCollection.size() is a method
+        node_count = self.nodes_collection.size
+        edge_count = self.edges_collection.size() if callable(self.edges_collection.size) else self.edges_collection.size
         return {
-            'nodes': self.nodes_collection.size(),
-            'edges': self.edges_collection.size(),
+            'nodes': node_count,
+            'edges': edge_count,
             'node_ids_created': len(self.node_ids),
             'edge_ids_created': len(self.edge_ids)
         }
@@ -286,34 +296,37 @@ class IGraphBenchmark:
         memory_before = get_memory_usage()
         start = time.time()
         
-        # Create vertex list and edge list
-        vertices = [node['id'] for node in nodes_data]
-        edges = [(edge['source'], edge['target']) for edge in edges_data]
+        # Create a mapping from node ID to index
+        node_id_to_index = {node['id']: i for i, node in enumerate(nodes_data)}
         
-        # Create graph
-        self.graph = ig.Graph.TupleList(edges, directed=True)
+        # Create vertex list and edge list with indices
+        vertices = list(range(len(nodes_data)))
+        edges = []
+        valid_edges_data = []
         
-        # Add vertex attributes
-        for i, node in enumerate(nodes_data):
-            for attr, value in node.items():
-                if attr != 'id':
-                    if attr not in self.graph.vs.attributes():
-                        self.graph.vs[attr] = [None] * len(self.graph.vs)
-                    # Find vertex by name
-                    try:
-                        vertex_idx = self.graph.vs.find(name=node['id']).index
-                        self.graph.vs[vertex_idx][attr] = value
-                    except ValueError:
-                        continue
+        for edge in edges_data:
+            src_idx = node_id_to_index.get(edge['source'])
+            tgt_idx = node_id_to_index.get(edge['target'])
+            if src_idx is not None and tgt_idx is not None:
+                edges.append((src_idx, tgt_idx))
+                valid_edges_data.append(edge)
+        
+        # Create graph with explicit vertex count
+        self.graph = ig.Graph(n=len(nodes_data), edges=edges, directed=True)
+        
+        # Add vertex attributes - now we have exact mapping
+        for attr in ['role', 'department', 'salary', 'active', 'level', 'value']:
+            attr_values = [node.get(attr) for node in nodes_data]
+            self.graph.vs[attr] = attr_values
+        
+        # Add node IDs as names
+        self.graph.vs['name'] = [node['id'] for node in nodes_data]
         
         # Add edge attributes
-        for i, edge in enumerate(edges_data):
-            for attr, value in edge.items():
-                if attr not in ['source', 'target']:
-                    if attr not in self.graph.es.attributes():
-                        self.graph.es[attr] = [None] * len(self.graph.es)
-                    if i < len(self.graph.es):
-                        self.graph.es[i][attr] = value
+        for attr in ['relationship', 'strength', 'weight']:
+            attr_values = [edge.get(attr) for edge in valid_edges_data]
+            if attr_values:  # Only add if we have values
+                self.graph.es[attr] = attr_values
         
         # Measure memory after creation
         memory_after = get_memory_usage()
@@ -345,12 +358,14 @@ class IGraphBenchmark:
         """Complex multi-attribute filter"""
         start = time.time()
         try:
+            # Use the correct way to access attributes in igraph
             result = self.graph.vs.select(lambda v: 
-                v.get('role') == 'engineer' and 
-                v.get('salary', 0) > 80000 and
-                v.get('active', False)
+                v['role'] == 'engineer' and 
+                v['salary'] > 80000 and
+                v['active'] == True
             )
-        except:
+        except Exception as e:
+            print(f"     Debug: Complex filter error: {e}")
             result = []
         return time.time() - start, len(result)
     
@@ -443,9 +458,9 @@ def main():
     
     # Test sizes
     test_sizes = [
-        (1000, 500),     # 1K nodes, 500 edges
-        (10000, 5000),   # 10K nodes, 5K edges
-        (50000, 25000)   # 50K nodes, 25K edges
+        (10000, 5000),     # 1K nodes, 500 edges
+        (100000, 50000),   # 10K nodes, 5K edges
+        (500000, 250000)   # 50K nodes, 25K edges
     ]
     
     for num_nodes, num_edges in test_sizes:

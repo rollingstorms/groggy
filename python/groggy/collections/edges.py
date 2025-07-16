@@ -150,6 +150,20 @@ class EdgeCollection(BaseCollection):
         """
         return self.size()
 
+    def get(self, edge_id):
+        """
+        Returns an EdgeProxy for the given edge ID.
+        
+        Args:
+            edge_id: The edge ID to retrieve.
+        Returns:
+            EdgeProxy: Proxy object for the edge, or None if not found.
+        """
+        try:
+            return self._rust.get(edge_id)
+        except:
+            return None
+
 class EdgeAttributeManager:
     """
     Batch attribute management for edges.

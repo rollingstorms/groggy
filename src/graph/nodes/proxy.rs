@@ -10,8 +10,7 @@ use crate::graph::managers::attributes::AttributeManager;
 pub struct NodeProxy {
     #[pyo3(get)]
     pub node_id: NodeId,
-    #[pyo3(get)]
-    pub attribute_manager: AttributeManager,
+    pub attribute_manager: std::sync::Arc<AttributeManager>,
     pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
 
@@ -22,7 +21,7 @@ impl NodeProxy {
     #[new]
     pub fn py_new(node_id: NodeId, attribute_manager: AttributeManager) -> Self {
         let graph_store = std::sync::Arc::new(crate::storage::graph_store::GraphStore::new());
-        Self { node_id, attribute_manager, graph_store }
+        Self { node_id, attribute_manager: std::sync::Arc::new(attribute_manager), graph_store }
     }
 
     /// Returns a ProxyAttributeManager for this node (per-attribute API).
@@ -36,8 +35,12 @@ impl NodeProxy {
 
     /// Get the value of a single attribute for this node (JSON).
     pub fn get_attr(&self, attr_name: String) -> Option<String> {
-        self.attr_manager().get(attr_name)
-            .map(|v| serde_json::to_string(&v).unwrap_or_default())
+        if let Some(index) = self.graph_store.node_index(&self.node_id) {
+            self.attribute_manager.get_node_value(attr_name, index)
+                .map(|v| serde_json::to_string(&v).unwrap_or_default())
+        } else {
+            None
+        }
     }
 
     /// Set the value of a single attribute for this node (JSON).
@@ -78,7 +81,7 @@ impl NodeProxy {
 
 impl NodeProxy {
     /// Regular Rust constructor - not exposed to Python
-    pub fn new(node_id: NodeId, attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>) -> Self {
+    pub fn new(node_id: NodeId, attribute_manager: std::sync::Arc<AttributeManager>, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>) -> Self {
         Self { node_id, attribute_manager, graph_store }
     }
 }
@@ -87,7 +90,7 @@ impl NodeProxy {
 #[pyclass]
 pub struct ProxyAttributeManager {
     pub node_id: NodeId,
-    pub attribute_manager: AttributeManager,
+    pub attribute_manager: std::sync::Arc<AttributeManager>,
     pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
 

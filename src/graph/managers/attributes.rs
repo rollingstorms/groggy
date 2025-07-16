@@ -3,6 +3,7 @@
 //! Supports columnar storage, schema enforcement, and agent/LLM-friendly APIs.
 
 use pyo3::prelude::*;
+use pyo3::PyTypeInfo;
 // use crate::graph::types::{NodeId, EdgeId}; // Currently unused
 // use crate::graph::columnar::{NodeColumnarStore, EdgeColumnarStore}; // Uncomment when available
 
@@ -67,6 +68,11 @@ impl AttributeManager {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
     }
 
+    /// Returns a breakdown of memory usage per attribute (name, type, node/edge, bytes used)
+    pub fn memory_usage_breakdown(&self) -> std::collections::HashMap<String, usize> {
+        self.columnar.memory_usage_breakdown()
+    }
+
     /// Registers an attribute and returns its UID.
     pub fn register_attr(&self, attr_name: String) -> u64 {
         self.columnar.register_attr(attr_name)
@@ -80,6 +86,31 @@ impl AttributeManager {
     /// Get all edge attribute names.
     pub fn edge_attr_names(&self) -> Vec<String> {
         self.columnar.edge_attr_names()
+    }
+
+    /// Returns the estimated heap memory usage in bytes for all attribute storage.
+    pub fn memory_usage_bytes(&self) -> usize {
+        self.columnar.memory_usage_bytes()
+    }
+    /// Expose set_type to Python to allow explicit schema setting from Python
+    #[pyo3(name = "set_type")]
+    pub fn py_set_type(&mut self, attr_name: String, py_type: &pyo3::types::PyType, is_node: bool, py: pyo3::Python) -> pyo3::PyResult<u64> {
+        // Map Python type to Rust AttributeType
+        let rust_type = if py_type.is_subclass(pyo3::types::PyLong::type_object(py)).unwrap_or(false) {
+            crate::storage::columnar::AttributeType::Int
+        } else if py_type.is_subclass(pyo3::types::PyFloat::type_object(py)).unwrap_or(false) {
+            crate::storage::columnar::AttributeType::Float
+        } else if py_type.is_subclass(pyo3::types::PyBool::type_object(py)).unwrap_or(false) {
+            crate::storage::columnar::AttributeType::Bool
+        } else if py_type.is_subclass(pyo3::types::PyString::type_object(py)).unwrap_or(false) {
+            crate::storage::columnar::AttributeType::Str
+        } else {
+            crate::storage::columnar::AttributeType::Json
+        };
+        match self.set_type(attr_name, rust_type, is_node) {
+            Ok(uid) => Ok(uid),
+            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(e)),
+        }
     }
 }
 

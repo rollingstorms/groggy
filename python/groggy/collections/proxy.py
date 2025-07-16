@@ -6,7 +6,13 @@ class EntityProxy:
     def __init__(self, collection, entity_id):
         self._collection = collection
         self._id = entity_id
-        self._attr = collection.attr()
+        # Handle both attr() method and attr property
+        if hasattr(collection, 'attr') and callable(collection.attr):
+            self._attr = collection.attr()
+        elif hasattr(collection, 'attr'):
+            self._attr = collection.attr
+        else:
+            raise ValueError("Collection must have an attr property or method")
 
     @property
     def id(self):

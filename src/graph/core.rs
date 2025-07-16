@@ -36,7 +36,36 @@ impl FastGraph {
 
     /// Get comprehensive graph information
     pub fn info(&self) -> crate::graph::types::GraphInfo {
-        self.info.clone()
+        let mut info = self.info.clone();
+        
+        // Update counts with current values from collections
+        info.node_count = self.node_collection.size();
+        info.edge_count = self.edge_collection.size();
+        
+        // Gather memory usage in bytes
+        let graph_store_bytes = self.graph_store.memory_usage_bytes();
+        let content_pool_bytes = self.graph_store.content_pool_memory_usage_bytes();
+        let columnar_bytes = self.attribute_manager.memory_usage_bytes();
+        // Convert to MB (floating point, 2 decimals)
+        let graph_store_mb = (graph_store_bytes as f64) / (1024.0 * 1024.0);
+        let content_pool_mb = (content_pool_bytes as f64) / (1024.0 * 1024.0);
+        let columnar_mb = (columnar_bytes as f64) / (1024.0 * 1024.0);
+        // Add to attributes hashmap as strings
+        info.attributes.insert("memory_graph_store_mb".to_string(), format!("{:.2}", graph_store_mb));
+        info.attributes.insert("memory_content_pool_mb".to_string(), format!("{:.2}", content_pool_mb));
+        info.attributes.insert("memory_columnar_store_mb".to_string(), format!("{:.2}", columnar_mb));
+        info
+    }
+
+    /// Returns a breakdown of memory usage per attribute (name, type, node/edge, bytes used)
+    pub fn memory_usage_breakdown(&self) -> std::collections::HashMap<String, usize> {
+        self.attribute_manager.memory_usage_breakdown()
+    }
+
+    /// Expose attribute_manager as a Python property
+    #[getter]
+    pub fn attribute_manager(&self) -> crate::graph::managers::attributes::AttributeManager {
+        self.attribute_manager.clone()
     }
 
     /// Get total size (nodes + edges)

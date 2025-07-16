@@ -32,6 +32,27 @@ pub struct GraphStore {
 
 
 impl GraphStore {
+    /// Estimate the total heap memory usage in bytes for this GraphStore (including ContentPool).
+    pub fn memory_usage_bytes(&self) -> usize {
+        use std::mem::size_of;
+        let dashmap_entry_overhead = 32;
+        let mut total = 0usize;
+        total += self.node_id_to_index.len() * (size_of::<crate::graph::types::NodeId>() + size_of::<usize>() + dashmap_entry_overhead);
+        total += self.index_to_node_id.len() * (size_of::<usize>() + size_of::<crate::graph::types::NodeId>() + dashmap_entry_overhead);
+        total += self.edge_id_to_index.len() * (size_of::<crate::graph::types::EdgeId>() + size_of::<usize>() + dashmap_entry_overhead);
+        total += self.index_to_edge_id.len() * (size_of::<usize>() + size_of::<crate::graph::types::EdgeId>() + dashmap_entry_overhead);
+        total += self.states.len() * (size_of::<String>() + size_of::<GraphState>() + dashmap_entry_overhead);
+        total += self.branches.len() * (size_of::<String>() * 2 + dashmap_entry_overhead);
+        // RwLock and Arc overheads are ignored for simplicity
+        // Add content_pool
+        total += self.content_pool.memory_usage_bytes();
+        total
+    }
+
+    /// Returns the estimated heap memory usage in bytes for the content pool only.
+    pub fn content_pool_memory_usage_bytes(&self) -> usize {
+        self.content_pool.memory_usage_bytes()
+    }
     pub fn node_index(&self, id: &crate::graph::types::NodeId) -> Option<usize> {
         self.node_id_to_index.get(id).map(|v| *v)
     }
@@ -120,7 +141,15 @@ impl GraphStore {
         self.content_pool.all_node_ids()
     }
     pub fn add_nodes(&self, node_ids: &[crate::graph::types::NodeId]) {
-        self.content_pool.add_nodes(node_ids)
+        self.content_pool.add_nodes(node_ids);
+        // Also populate the index maps for attribute storage
+        for node_id in node_ids {
+            if !self.node_id_to_index.contains_key(node_id) {
+                let next_index = self.node_id_to_index.len();
+                self.node_id_to_index.insert(node_id.clone(), next_index);
+                self.index_to_node_id.insert(next_index, node_id.clone());
+            }
+        }
     }
     pub fn remove_nodes(&self, node_ids: &[crate::graph::types::NodeId]) {
         self.content_pool.remove_nodes(node_ids)
@@ -135,7 +164,15 @@ impl GraphStore {
         self.content_pool.all_edge_ids()
     }
     pub fn add_edges(&self, edge_ids: &[crate::graph::types::EdgeId]) {
-        self.content_pool.add_edges(edge_ids)
+        self.content_pool.add_edges(edge_ids);
+        // Also populate the index maps for attribute storage  
+        for edge_id in edge_ids {
+            if !self.edge_id_to_index.contains_key(edge_id) {
+                let next_index = self.edge_id_to_index.len();
+                self.edge_id_to_index.insert(edge_id.clone(), next_index);
+                self.index_to_edge_id.insert(next_index, edge_id.clone());
+            }
+        }
     }
     pub fn remove_edges(&self, edge_ids: &[crate::graph::types::EdgeId]) {
         self.content_pool.remove_edges(edge_ids)

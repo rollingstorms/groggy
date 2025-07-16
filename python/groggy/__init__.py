@@ -32,6 +32,7 @@ class NodeProxy:
     
     def set_attr(self, key: str, value: Any) -> None:
         """Set an attribute on this node. Value is automatically JSON-serialized."""
+        # Convert Python value to proper JSON string that Rust can parse
         json_value = json.dumps(value)
         self._proxy.set_attr(key, json_value)
     
@@ -120,28 +121,8 @@ class EdgeCollection:
         return self._collection.ids()
 
 
-class Graph:
-    """
-    Main graph class with clean Python API.
-    
-    This wraps the Rust FastGraph with a more Pythonic interface
-    and automatic JSON handling for attributes.
-    """
-    
-    def __init__(self):
-        self._graph = _FastGraph()
-    
-    def nodes(self) -> NodeCollection:
-        """Get the node collection for this graph."""
-        return NodeCollection(self._graph.nodes())
-    
-    def edges(self) -> EdgeCollection:
-        """Get the edge collection for this graph."""
-        return EdgeCollection(self._graph.edges())
-    
-    def __repr__(self):
-        return f"Graph(nodes={self.nodes().size()}, edges={self.edges().size()})"
-
+# Import the complete Graph class from graph.py
+from groggy.graph import Graph
 
 # Export the ID types directly 
 NodeId = _NodeId

@@ -11,8 +11,7 @@ use crate::graph::managers::attributes::AttributeManager;
 #[pyclass]
 #[derive(Clone)]
 pub struct NodeCollection {
-    #[pyo3(get)]
-    pub attribute_manager: AttributeManager,
+    pub attribute_manager: std::sync::Arc<AttributeManager>,
     #[pyo3(get)]
     pub node_ids: Vec<NodeId>,
     pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
@@ -50,7 +49,7 @@ impl NodeCollection {
         // This will be properly initialized when used with a real graph
         let graph_store = std::sync::Arc::new(crate::storage::graph_store::GraphStore::new());
         Self { 
-            attribute_manager, 
+            attribute_manager: std::sync::Arc::new(attribute_manager), 
             node_ids: Vec::new(),
             graph_store,
         }
@@ -87,7 +86,7 @@ impl NodeCollection {
 
     /// Returns an AttributeManager for node attributes.
     pub fn attr(&self) -> AttributeManager {
-        self.attribute_manager.clone()
+        (*self.attribute_manager).clone()
     }
 
     /// Returns a FilterManager for this collection, pre-configured for nodes.
@@ -98,7 +97,7 @@ impl NodeCollection {
     /// let result_ids = fm.apply(collection.ids());
     pub fn filter(&self) -> crate::graph::managers::filter::FilterManager {
         let mut parent: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-        crate::graph::managers::filter::FilterManager::new(self.attribute_manager.clone(), true)
+        crate::graph::managers::filter::FilterManager::new((*self.attribute_manager).clone(), true)
     }
 
     /// Returns an iterator over node IDs in this collection.
@@ -120,7 +119,7 @@ impl NodeCollection {
     /// Regular Rust constructor - not exposed to Python
     pub fn new(attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>, node_ids: Option<Vec<NodeId>>) -> Self {
         let ids = node_ids.unwrap_or_else(|| graph_store.all_node_ids());
-        Self { attribute_manager, node_ids: ids, graph_store }
+        Self { attribute_manager: std::sync::Arc::new(attribute_manager), node_ids: ids, graph_store }
     }
 }
 

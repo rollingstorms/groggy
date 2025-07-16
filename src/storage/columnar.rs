@@ -1,5 +1,18 @@
-//! ColumnarStore: Columnar storage for attributes with efficient bulk operations
-//! Implements fast batch and vectorized access for Groggy graphs.
+// Helper to estimate heap size of a serde_json::Value
+fn estimate_json_value_size(val: &serde_json::Value) -> usize {
+    use std::mem::size_of;
+    use serde_json::Value;
+    match val {
+        Value::Null => 0,
+        Value::Bool(_) => size_of::<bool>(),
+        Value::Number(_) => size_of::<serde_json::Number>(),
+        Value::String(s) => s.capacity(),
+        Value::Array(arr) => arr.capacity() * size_of::<Value>() + arr.iter().map(estimate_json_value_size).sum::<usize>(),
+        Value::Object(map) => map.len() * (size_of::<String>() + size_of::<Value>()) + map.values().map(estimate_json_value_size).sum::<usize>(),
+    }
+}
+// ColumnarStore: Columnar storage for attributes with efficient bulk operations
+// Implements fast batch and vectorized access for Groggy graphs.
 
 use pyo3::prelude::*;
 use serde_json::Value;
@@ -137,6 +150,107 @@ impl ColumnarStore {
             max_edge_index: std::sync::atomic::AtomicUsize::new(0),
         }
     }
+
+    /// Estimate the total heap memory usage in bytes for this ColumnarStore.
+    pub fn memory_usage_bytes(&self) -> usize {
+        use std::mem::size_of;
+        let dashmap_entry_overhead = 32;
+        let mut total = 0usize;
+        // attr_name_to_uid: DashMap<String, AttrUID>
+        total += self.attr_name_to_uid.len() * (size_of::<String>() + size_of::<crate::storage::columnar::AttrUID>() + dashmap_entry_overhead);
+        // attr_uid_to_name: DashMap<AttrUID, String>
+        total += self.attr_uid_to_name.len() * (size_of::<crate::storage::columnar::AttrUID>() + size_of::<String>() + dashmap_entry_overhead);
+        // attr_schema: DashMap<AttrUID, AttributeType>
+        total += self.attr_schema.len() * (size_of::<crate::storage::columnar::AttrUID>() + size_of::<crate::storage::columnar::AttributeType>() + dashmap_entry_overhead);
+        // columns: DashMap<(ColumnKind, AttrUID), ColumnData>
+        for entry in self.columns.iter() {
+            total += size_of::<(crate::storage::columnar::ColumnKind, crate::storage::columnar::AttrUID)>() + dashmap_entry_overhead;
+            // Estimate heap usage for ColumnData
+            total += match entry.value() {
+                crate::storage::columnar::ColumnData::Int(vec) => vec.capacity() * size_of::<Option<i64>>(),
+                crate::storage::columnar::ColumnData::Float(vec) => vec.capacity() * size_of::<Option<f64>>(),
+                crate::storage::columnar::ColumnData::Bool(vec) => vec.capacity() * size_of::<Option<bool>>(),
+                crate::storage::columnar::ColumnData::Str(vec) => {
+                    vec.capacity() * size_of::<Option<String>>() + vec.iter().map(|opt| opt.as_ref().map_or(0, |s| s.capacity())).sum::<usize>()
+                },
+                crate::storage::columnar::ColumnData::Json(map) => {
+                    map.len() * (size_of::<usize>() + size_of::<serde_json::Value>()) + map.values().map(estimate_json_value_size).sum::<usize>()
+                },
+            };
+        }
+        // node_attributes: DashMap<AttrUID, HashMap<usize, JsonValue>>
+        for entry in self.node_attributes.iter() {
+            let map = entry.value();
+            total += map.len() * (size_of::<usize>() + size_of::<serde_json::Value>());
+            total += map.values().map(estimate_json_value_size).sum::<usize>();
+        }
+        // edge_attributes: DashMap<AttrUID, HashMap<usize, JsonValue>>
+        for entry in self.edge_attributes.iter() {
+            let map = entry.value();
+            total += map.len() * (size_of::<usize>() + size_of::<serde_json::Value>());
+            total += map.values().map(estimate_json_value_size).sum::<usize>();
+        }
+        // node_value_bitmaps: DashMap<(AttrUID, JsonValue), BitVec>
+        for entry in self.node_value_bitmaps.iter() {
+            total += size_of::<(crate::storage::columnar::AttrUID, serde_json::Value)>() + dashmap_entry_overhead;
+            total += entry.value().capacity() / 8 + 1; // bits to bytes
+        }
+        // edge_value_bitmaps: DashMap<(AttrUID, JsonValue), BitVec>
+        for entry in self.edge_value_bitmaps.iter() {
+            total += size_of::<(crate::storage::columnar::AttrUID, serde_json::Value)>() + dashmap_entry_overhead;
+            total += entry.value().capacity() / 8 + 1;
+        }
+        // next_attr_uid, bitmaps_dirty, max_node_index, max_edge_index: atomic types, negligible
+        total
+    }
+
+    /// Returns a breakdown of memory usage per attribute (name, type, node/edge, bytes used)
+    pub fn memory_usage_breakdown(&self) -> std::collections::HashMap<String, usize> {
+        use std::mem::size_of;
+        let mut breakdown = std::collections::HashMap::new();
+        // Node columns
+        for entry in self.columns.iter() {
+            let ((kind, uid), col) = entry.pair();
+            let name = self.attr_uid_to_name.get(uid).map(|n| n.clone()).unwrap_or_else(|| format!("uid_{}", uid.0));
+            let typ = self.attr_schema.get(uid).map(|t| format!("{:?}", t)).unwrap_or_else(|| "Unknown".to_string());
+            let prefix = match kind {
+                ColumnKind::Node => "node",
+                ColumnKind::Edge => "edge",
+            };
+            let key = format!("{}:{}:{}", prefix, name, typ);
+            let bytes = match col {
+                ColumnData::Int(vec) => vec.capacity() * size_of::<Option<i64>>(),
+                ColumnData::Float(vec) => vec.capacity() * size_of::<Option<f64>>(),
+                ColumnData::Bool(vec) => vec.capacity() * size_of::<Option<bool>>(),
+                ColumnData::Str(vec) => vec.capacity() * size_of::<Option<String>>() + vec.iter().map(|opt| opt.as_ref().map_or(0, |s| s.capacity())).sum::<usize>(),
+                ColumnData::Json(map) => map.len() * (size_of::<usize>() + size_of::<serde_json::Value>()) + map.values().map(estimate_json_value_size).sum::<usize>(),
+            };
+            breakdown.insert(key, bytes);
+        }
+        // Sparse node attributes
+        for entry in self.node_attributes.iter() {
+            let uid = entry.key();
+            let name = self.attr_uid_to_name.get(uid).map(|n| n.clone()).unwrap_or_else(|| format!("uid_{}", uid.0));
+            let typ = self.attr_schema.get(uid).map(|t| format!("{:?}", t)).unwrap_or_else(|| "Unknown".to_string());
+            let key = format!("node:{}:{}:sparse", name, typ);
+            let map = entry.value();
+            let bytes = map.len() * (size_of::<usize>() + size_of::<serde_json::Value>()) + map.values().map(estimate_json_value_size).sum::<usize>();
+            breakdown.insert(key, bytes);
+        }
+        // Sparse edge attributes
+        for entry in self.edge_attributes.iter() {
+            let uid = entry.key();
+            let name = self.attr_uid_to_name.get(uid).map(|n| n.clone()).unwrap_or_else(|| format!("uid_{}", uid.0));
+            let typ = self.attr_schema.get(uid).map(|t| format!("{:?}", t)).unwrap_or_else(|| "Unknown".to_string());
+            let key = format!("edge:{}:{}:sparse", name, typ);
+            let map = entry.value();
+            let bytes = map.len() * (size_of::<usize>() + size_of::<serde_json::Value>()) + map.values().map(estimate_json_value_size).sum::<usize>();
+            breakdown.insert(key, bytes);
+        }
+        breakdown
+    }
+
+
 
     /// Registers an attribute name and returns its UID. If already present, returns existing UID.
     pub fn register_attr(&self, attr_name: String) -> u64 {
@@ -1037,6 +1151,64 @@ let col = match binding.iter().find(|(k,_)| *k == uid).map(|(_,c)| c) {
 
     /// Set a single value for an edge attribute and entity index
     pub fn set_edge_value(&self, attr_name: String, idx: usize, value: JsonValue) {
+        // Try to detect type and use columnar storage when possible
+        let detected_type = match &value {
+            JsonValue::Number(n) if n.is_i64() => Some(AttributeType::Int),
+            JsonValue::Number(n) if n.is_f64() => Some(AttributeType::Float),
+            JsonValue::Bool(_) => Some(AttributeType::Bool),
+            JsonValue::String(_) => Some(AttributeType::Str),
+            _ => None,
+        };
+
+        if let Some(attr_type) = detected_type {
+            // Try to register with the detected type and use columnar storage
+            if let Ok(uid) = self.register_attr_with_type(attr_name.clone(), attr_type, false) {
+                let attr_uid = AttrUID(uid);
+                let key = (ColumnKind::Edge, attr_uid.clone());
+                
+                // Try to store in columnar format
+                if let Some(mut col) = self.columns.get_mut(&key) {
+                    let stored = match (&mut *col, &value) {
+                        (ColumnData::Int(vec), JsonValue::Number(n)) if n.is_i64() => {
+                            if idx >= vec.len() {
+                                vec.resize(idx + 1, None);
+                            }
+                            vec[idx] = n.as_i64();
+                            true
+                        },
+                        (ColumnData::Float(vec), JsonValue::Number(n)) if n.is_f64() => {
+                            if idx >= vec.len() {
+                                vec.resize(idx + 1, None);
+                            }
+                            vec[idx] = n.as_f64();
+                            true
+                        },
+                        (ColumnData::Bool(vec), JsonValue::Bool(b)) => {
+                            if idx >= vec.len() {
+                                vec.resize(idx + 1, None);
+                            }
+                            vec[idx] = Some(*b);
+                            true
+                        },
+                        (ColumnData::Str(vec), JsonValue::String(s)) => {
+                            if idx >= vec.len() {
+                                vec.resize(idx + 1, None);
+                            }
+                            vec[idx] = Some(s.clone());
+                            true
+                        },
+                        _ => false,
+                    };
+                    
+                    if stored {
+                        self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::SeqCst);
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // Fall back to sparse storage for complex types or if columnar storage failed
         let uid = self.register_attr(attr_name);
         self.edge_attributes.entry(AttrUID(uid)).or_default().insert(idx, value);
         self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -1214,11 +1386,99 @@ impl ColumnarStore {
     /// Get a single value for a node attribute and entity index
     pub fn get_node_value(&self, attr_name: String, idx: usize) -> Option<JsonValue> {
         let uid = self.attr_name_to_uid.get(&attr_name)?.clone();
+        
+        // First try columnar storage
+        if let Some(schema) = self.attr_schema.get(&uid) {
+            let key = (ColumnKind::Node, uid.clone());
+            if let Some(col) = self.columns.get(&key) {
+                let result = match (col.value(), *schema) {
+                    (ColumnData::Int(vec), AttributeType::Int) => {
+                        vec.get(idx).and_then(|v| *v).map(|v| JsonValue::Number(serde_json::Number::from(v)))
+                    },
+                    (ColumnData::Float(vec), AttributeType::Float) => {
+                        vec.get(idx).and_then(|v| *v).map(|v| JsonValue::Number(serde_json::Number::from_f64(v).unwrap_or(serde_json::Number::from(0))))
+                    },
+                    (ColumnData::Bool(vec), AttributeType::Bool) => {
+                        vec.get(idx).and_then(|v| *v).map(|v| JsonValue::Bool(v))
+                    },
+                    (ColumnData::Str(vec), AttributeType::Str) => {
+                        vec.get(idx).and_then(|v| v.clone()).map(|v| JsonValue::String(v))
+                    },
+                    (ColumnData::Json(map), AttributeType::Json) => {
+                        map.get(&idx).cloned()
+                    },
+                    _ => None,
+                };
+                if result.is_some() {
+                    return result;
+                }
+            }
+        }
+        
+        // Fall back to sparse storage
         self.node_attributes.get(&uid)?.get(&idx).cloned()
     }
 
     /// Set a single value for a node attribute and entity index
     pub fn set_node_value(&self, attr_name: String, idx: usize, value: JsonValue) {
+        // Try to detect type and use columnar storage when possible
+        let detected_type = match &value {
+            JsonValue::Number(n) if n.is_i64() => Some(AttributeType::Int),
+            JsonValue::Number(n) if n.is_f64() => Some(AttributeType::Float),
+            JsonValue::Bool(_) => Some(AttributeType::Bool),
+            JsonValue::String(_) => Some(AttributeType::Str),
+            _ => None,
+        };
+
+        if let Some(attr_type) = detected_type {
+            // Try to register with the detected type and use columnar storage
+            if let Ok(uid) = self.register_attr_with_type(attr_name.clone(), attr_type, true) {
+                let attr_uid = AttrUID(uid);
+                let key = (ColumnKind::Node, attr_uid.clone());
+                
+                // Try to store in columnar format
+                if let Some(mut col) = self.columns.get_mut(&key) {
+                    let stored = match (&mut *col, &value) {
+                        (ColumnData::Int(vec), JsonValue::Number(n)) if n.is_i64() => {
+                            if idx >= vec.len() {
+                                vec.resize(idx + 1, None);
+                            }
+                            vec[idx] = n.as_i64();
+                            true
+                        },
+                        (ColumnData::Float(vec), JsonValue::Number(n)) if n.is_f64() => {
+                            if idx >= vec.len() {
+                                vec.resize(idx + 1, None);
+                            }
+                            vec[idx] = n.as_f64();
+                            true
+                        },
+                        (ColumnData::Bool(vec), JsonValue::Bool(b)) => {
+                            if idx >= vec.len() {
+                                vec.resize(idx + 1, None);
+                            }
+                            vec[idx] = Some(*b);
+                            true
+                        },
+                        (ColumnData::Str(vec), JsonValue::String(s)) => {
+                            if idx >= vec.len() {
+                                vec.resize(idx + 1, None);
+                            }
+                            vec[idx] = Some(s.clone());
+                            true
+                        },
+                        _ => false,
+                    };
+                    
+                    if stored {
+                        self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::SeqCst);
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // Fall back to sparse storage for complex types or if columnar storage failed
         let uid = self.register_attr(attr_name);
         self.node_attributes.entry(AttrUID(uid)).or_default().insert(idx, value);
         self.bitmaps_dirty.store(true, std::sync::atomic::Ordering::SeqCst);

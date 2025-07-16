@@ -26,8 +26,8 @@ def test_clean_api():
     print(f"Created graph: {graph}")
     
     # Get node and edge collections
-    nodes = graph.nodes()
-    edges = graph.edges()
+    nodes = graph.nodes
+    edges = graph.edges
     print(f"Nodes collection: {nodes}")
     print(f"Edges collection: {edges}")
     
@@ -88,6 +88,37 @@ def test_clean_api():
             print("❌ Could not get node proxy")
     except Exception as e:
         print(f"❌ Failed with node attributes: {e}")
+    
+    # Print memory usage after setting node attributes
+    info = graph.info()
+    print(f"\n📊 Graph info: {info}")
+
+    # Force columnar type for 'value' attribute before stress test
+    print("\n🔧 Forcing columnar type for 'value' attribute...")
+    graph.attributes.set_type("value", int, True)
+
+    # Stress test: set 'value' for 1000 nodes and print memory usage breakdown
+    print("\n🧪 Stress test: setting 'value' for 1000 nodes...")
+    for i in range(1000):
+        node_id = gr.NodeId(f"node{i}")
+        nodes.add([node_id])
+        proxy = nodes.get(node_id)
+        if proxy:
+            proxy.set_attr("value", i)
+
+    # Print memory usage breakdown if available
+    print("\n🔍 Direct access test: graph.attributes")
+    print("type:", type(graph.attributes))
+    print("dir:", dir(graph.attributes))
+    try:
+        breakdown = graph.attributes.memory_usage_breakdown()
+        print("\n📊 Columnar memory usage breakdown:")
+        for k, v in breakdown.items():
+            print(f"{k}: {v} bytes")
+        print("\nNode attribute names:", graph.attributes.node_attr_names())
+        print("Total columnar memory usage (bytes):", graph.attributes.memory_usage_bytes())
+    except Exception as e:
+        print(f"Error calling memory_usage_breakdown: {e}")
     
     # Test edge attributes with clean API
     print("\n📝 Testing edge attributes with clean API...")

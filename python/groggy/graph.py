@@ -28,24 +28,24 @@ class Graph:
         if backend not in (None, 'rust'):
             raise ValueError(f"Unsupported backend: {backend}")
         self._rust = groggy._core.FastGraph()
-        if directed is not None:
-            self._rust.directed = directed
-        self.nodes = NodeCollection(self)
-        self.edges = EdgeCollection(self)
+        # Note: directed parameter is currently ignored as FastGraph defaults to directed=True
+        # TODO: Add support for setting directed in Rust FastGraph constructor
+        self._nodes = NodeCollection(self)
+        self._edges = EdgeCollection(self)
 
     def info(self):
         """
         Returns comprehensive information about the graph.
-        
-        Includes node/edge counts, backend info, and metadata. Useful for diagnostics and debugging.
-        Returns:
-            dict: Graph information summary.
         """
         info = self._rust.info()
-        # Convert Rust GraphInfo (pyo3) to Python dict if needed
-        if hasattr(info, 'to_dict'):
-            return info.to_dict()
-        return dict(info)
+        # Manually convert PyO3 GraphInfo to a Python dict
+        return {
+            "name": info.name() if hasattr(info, "name") else None,
+            "directed": info.directed() if hasattr(info, "directed") else None,
+            "node_count": info.node_count() if hasattr(info, "node_count") else None,
+            "edge_count": info.edge_count() if hasattr(info, "edge_count") else None,
+            "attributes": dict(info.attributes()) if hasattr(info, "attributes") else {},
+        }
 
     def size(self):
         """
@@ -67,6 +67,13 @@ class Graph:
         return self._rust.is_directed()
 
     @property
+    def attributes(self):
+        """
+        Expose the Rust attribute_manager for direct access to memory_usage_breakdown and other diagnostics.
+        """
+        return self._rust.attribute_manager
+
+    @property
     def nodes(self):
         """
         Returns the NodeCollection for this graph.
@@ -75,8 +82,7 @@ class Graph:
         Returns:
             NodeCollection: Node collection interface.
         """
-        from groggy.collections.nodes import NodeCollection
-        return NodeCollection(self)
+        return self._nodes
 
     @property
     def edges(self):
@@ -87,8 +93,7 @@ class Graph:
         Returns:
             EdgeCollection: Edge collection interface.
         """
-        from groggy.collections.edges import EdgeCollection
-        return EdgeCollection(self)
+        return self._edges
 
     def subgraph(self, node_filter=None, edge_filter=None):
         """
