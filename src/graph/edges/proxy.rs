@@ -18,14 +18,19 @@ pub struct EdgeProxy {
     pub target: NodeId,
     #[pyo3(get)]
     pub attribute_manager: AttributeManager,
-    #[pyo3(get)]
     pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
 
 #[pymethods]
 impl EdgeProxy {
-    #[new]
     pub fn new(edge_id: EdgeId, source: NodeId, target: NodeId, attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>) -> Self {
+        Self { edge_id, source, target, attribute_manager, graph_store }
+    }
+
+    /// Create a new EdgeProxy from Python (simplified constructor)
+    #[new]
+    pub fn py_new(edge_id: EdgeId, source: NodeId, target: NodeId, attribute_manager: AttributeManager) -> Self {
+        let graph_store = std::sync::Arc::new(crate::storage::graph_store::GraphStore::new());
         Self { edge_id, source, target, attribute_manager, graph_store }
     }
 
@@ -34,27 +39,30 @@ impl EdgeProxy {
         EdgeProxyAttributeManager::new(self.edge_id.clone(), self.attribute_manager.clone())
     }
 
-    /// Get the value of a single attribute for this edge (JSON).
-    pub fn get_attr(&self, attr_name: String) -> Option<serde_json::Value> {
+    /// Get the value of a single attribute for this edge (JSON string).
+    pub fn get_attr(&self, attr_name: String) -> Option<String> {
         if let Some(index) = self.graph_store.edge_index(&self.edge_id) {
             self.attribute_manager.get_edge_value(attr_name, index)
+                .map(|v| serde_json::to_string(&v).unwrap_or_default())
         } else {
             None
         }
     }
 
-    /// Set the value of a single attribute for this edge (JSON).
-    pub fn set_attr(&mut self, attr_name: String, value: serde_json::Value) -> Result<(), String> {
+    /// Set the value of a single attribute for this edge (JSON string).
+    pub fn set_attr(&mut self, attr_name: String, value: String) -> PyResult<()> {
+        let json_value: serde_json::Value = serde_json::from_str(&value)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid JSON: {}", e)))?;
         if let Some(index) = self.graph_store.edge_index(&self.edge_id) {
-            self.attribute_manager.set_edge_value(attr_name, index, value);
+            self.attribute_manager.set_edge_value(attr_name, index, json_value);
             Ok(())
         } else {
-            Err("Edge not found in graph".to_string())
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("Edge not found in graph"))
         }
     }
 
-    /// Get all attributes for this edge as a map (JSON).
-    pub fn attrs(&self) -> Option<serde_json::Map<String, serde_json::Value>> {
+    /// Get all attributes for this edge as a map (JSON string).
+    pub fn attrs(&self) -> Option<String> {
         if let Some(index) = self.graph_store.edge_index(&self.edge_id) {
             // Collect all present attributes for this edge
             let mut map = serde_json::Map::new();
@@ -63,7 +71,11 @@ impl EdgeProxy {
                     map.insert(attr, val);
                 }
             }
-            Some(map)
+            if map.is_empty() {
+                None
+            } else {
+                serde_json::to_string(&map).ok()
+            }
         } else {
             None
         }

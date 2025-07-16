@@ -15,7 +15,6 @@ pub struct EdgeCollection {
     pub attribute_manager: AttributeManager,
     #[pyo3(get)]
     pub edge_ids: Vec<EdgeId>,
-    #[pyo3(get)]
     pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
 
@@ -43,21 +42,31 @@ impl EdgeCollection {
         }
     }
 
-    #[new]
     pub fn new(attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>, edge_ids: Option<Vec<EdgeId>>) -> Self {
         let ids = edge_ids.unwrap_or_else(|| graph_store.all_edge_ids());
         Self { attribute_manager, edge_ids: ids, graph_store }
     }
 
+    /// Create a new EdgeCollection from Python (simplified constructor)
+    #[new]
+    pub fn py_new(attribute_manager: AttributeManager) -> Self {
+        let graph_store = std::sync::Arc::new(crate::storage::graph_store::GraphStore::new());
+        Self { 
+            attribute_manager, 
+            edge_ids: Vec::new(),
+            graph_store,
+        }
+    }
+
     /// Add one or more edges to the collection (batch-oriented).
-    pub fn add(&mut self, edges: Vec<EdgeId>) -> Result<(), String> {
+    pub fn add(&mut self, edges: Vec<EdgeId>) -> PyResult<()> {
         self.graph_store.add_edges(&edges);
         self.edge_ids = self.graph_store.all_edge_ids();
         Ok(())
     }
 
     /// Remove one or more edges from the collection (batch-oriented).
-    pub fn remove(&mut self, edge_ids: Vec<EdgeId>) -> Result<(), String> {
+    pub fn remove(&mut self, edge_ids: Vec<EdgeId>) -> PyResult<()> {
         self.graph_store.remove_edges(&edge_ids);
         self.edge_ids = self.graph_store.all_edge_ids();
         Ok(())

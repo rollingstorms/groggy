@@ -12,7 +12,6 @@ use crate::storage::columnar::ColumnarStore;
 #[pyclass]
 #[derive(Clone)]
 pub struct AttributeManager {
-    #[pyo3(get)]
     pub columnar: ColumnarStore,
 }
 
@@ -29,7 +28,7 @@ impl AttributeManager {
         // TODO: Implement real logic
         None
     }
-    pub fn set(&mut self, id: &str, attr: &str, value: serde_json::Value) -> Result<(), String> {
+    pub fn set(&mut self, id: &str, attr: &str, value: serde_json::Value) -> PyResult<()> {
         // TODO: Implement real logic
         Ok(())
     }

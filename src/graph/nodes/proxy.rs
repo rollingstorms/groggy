@@ -12,15 +12,20 @@ pub struct NodeProxy {
     pub node_id: NodeId,
     #[pyo3(get)]
     pub attribute_manager: AttributeManager,
-    #[pyo3(get)]
     pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
 
 
 #[pymethods]
 impl NodeProxy {
-    #[new]
     pub fn new(node_id: NodeId, attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>) -> Self {
+        Self { node_id, attribute_manager, graph_store }
+    }
+
+    /// Create a new NodeProxy from Python (simplified constructor)
+    #[new]
+    pub fn py_new(node_id: NodeId, attribute_manager: AttributeManager) -> Self {
+        let graph_store = std::sync::Arc::new(crate::storage::graph_store::GraphStore::new());
         Self { node_id, attribute_manager, graph_store }
     }
 
@@ -29,21 +34,26 @@ impl NodeProxy {
         crate::graph::nodes::proxy::ProxyAttributeManager {
             node_id: self.node_id.clone(),
             attribute_manager: self.attribute_manager.clone(),
+            graph_store: self.graph_store.clone(),
         }
     }
 
     /// Get the value of a single attribute for this node (JSON).
-    pub fn get_attr(&self, attr_name: String) -> Option<serde_json::Value> {
+    pub fn get_attr(&self, attr_name: String) -> Option<String> {
         self.attr_manager().get(attr_name)
+            .map(|v| serde_json::to_string(&v).unwrap_or_default())
     }
 
     /// Set the value of a single attribute for this node (JSON).
-    pub fn set_attr(&mut self, attr_name: String, value: serde_json::Value) -> Result<(), String> {
-        self.attr_manager().set(attr_name, value)
+    pub fn set_attr(&mut self, attr_name: String, value: String) -> PyResult<()> {
+        let json_value: serde_json::Value = serde_json::from_str(&value)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid JSON: {}", e)))?;
+        self.attr_manager().set(attr_name, json_value)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
     }
 
-    /// Get all attributes for this node as a map (JSON).
-    pub fn attrs(&self) -> Option<serde_json::Map<String, serde_json::Value>> {
+    /// Get all attributes for this node as a map (JSON string).
+    pub fn attrs(&self) -> Option<String> {
         // Collect all present attributes for this node
         let mut map = serde_json::Map::new();
         for attr in self.attribute_manager.columnar.node_attr_names() {
@@ -51,7 +61,11 @@ impl NodeProxy {
                 map.insert(attr, val);
             }
         }
-        Some(map)
+        if map.is_empty() {
+            None
+        } else {
+            serde_json::to_string(&map).ok()
+        }
     }
 
     /// Returns a string representation of this node (for debugging or display).
@@ -65,26 +79,30 @@ impl NodeProxy {
 pub struct ProxyAttributeManager {
     pub node_id: NodeId,
     pub attribute_manager: AttributeManager,
+    pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
 
 #[pymethods]
 impl ProxyAttributeManager {
-    /// Returns the value of the specified attribute for this node as JSON.
-    pub fn get(&self, attr_name: String) -> Option<serde_json::Value> {
+    /// Returns the value of the specified attribute for this node as JSON string.
+    pub fn get(&self, attr_name: String) -> Option<String> {
         if let Some(index) = self.graph_store.node_index(&self.node_id) {
             self.attribute_manager.get_node_value(attr_name, index)
+                .map(|v| serde_json::to_string(&v).unwrap_or_default())
         } else {
             None
         }
     }
 
-    /// Sets the value of the specified attribute for this node (JSON, type-checked).
-    pub fn set(&mut self, attr_name: String, value: serde_json::Value) -> Result<(), String> {
+    /// Sets the value of the specified attribute for this node (JSON string, type-checked).
+    pub fn set(&mut self, attr_name: String, value: String) -> PyResult<()> {
+        let json_value: serde_json::Value = serde_json::from_str(&value)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid JSON: {}", e)))?;
         if let Some(index) = self.graph_store.node_index(&self.node_id) {
-            self.attribute_manager.set_node_value(attr_name, index, value);
+            self.attribute_manager.set_node_value(attr_name, index, json_value);
             Ok(())
         } else {
-            Err("Node not found in graph".to_string())
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("Node not found in graph"))
         }
     }
 

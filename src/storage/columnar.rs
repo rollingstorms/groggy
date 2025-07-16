@@ -72,6 +72,25 @@ pub struct ColumnarStore {
     pub max_edge_index: std::sync::atomic::AtomicUsize,
 }
 
+impl Clone for ColumnarStore {
+    fn clone(&self) -> Self {
+        Self {
+            attr_name_to_uid: self.attr_name_to_uid.clone(),
+            attr_uid_to_name: self.attr_uid_to_name.clone(),
+            next_attr_uid: std::sync::atomic::AtomicU64::new(self.next_attr_uid.load(std::sync::atomic::Ordering::Relaxed)),
+            attr_schema: self.attr_schema.clone(),
+            columns: self.columns.clone(),
+            node_attributes: self.node_attributes.clone(),
+            edge_attributes: self.edge_attributes.clone(),
+            node_value_bitmaps: self.node_value_bitmaps.clone(),
+            edge_value_bitmaps: self.edge_value_bitmaps.clone(),
+            bitmaps_dirty: std::sync::atomic::AtomicBool::new(self.bitmaps_dirty.load(std::sync::atomic::Ordering::Relaxed)),
+            max_node_index: std::sync::atomic::AtomicUsize::new(self.max_node_index.load(std::sync::atomic::Ordering::Relaxed)),
+            max_edge_index: std::sync::atomic::AtomicUsize::new(self.max_edge_index.load(std::sync::atomic::Ordering::Relaxed)),
+        }
+    }
+}
+
 impl ColumnarStore {
     /// Returns all node columns as Vec<(AttrUID, ColumnData)> (cloned). For inspection/bulk ops only.
     pub fn node_columns(&self) -> Vec<(AttrUID, ColumnData)> {
@@ -1175,6 +1194,25 @@ impl ColumnarStore {
                     AttributeType::Json => ColumnData::Json(HashMap::with_capacity(capacity)),
                 });
             }
+        }
+    }
+}
+
+impl Clone for ColumnarStore {
+    fn clone(&self) -> Self {
+        Self {
+            attr_name_to_uid: self.attr_name_to_uid.clone(),
+            attr_uid_to_name: self.attr_uid_to_name.clone(),
+            next_attr_uid: std::sync::atomic::AtomicU64::new(self.next_attr_uid.load(std::sync::atomic::Ordering::Relaxed)),
+            attr_schema: self.attr_schema.clone(),
+            columns: self.columns.clone(),
+            node_attributes: self.node_attributes.clone(),
+            edge_attributes: self.edge_attributes.clone(),
+            node_value_bitmaps: self.node_value_bitmaps.clone(),
+            edge_value_bitmaps: self.edge_value_bitmaps.clone(),
+            bitmaps_dirty: std::sync::atomic::AtomicBool::new(self.bitmaps_dirty.load(std::sync::atomic::Ordering::Relaxed)),
+            max_node_index: std::sync::atomic::AtomicUsize::new(self.max_node_index.load(std::sync::atomic::Ordering::Relaxed)),
+            max_edge_index: std::sync::atomic::AtomicUsize::new(self.max_edge_index.load(std::sync::atomic::Ordering::Relaxed)),
         }
     }
 }

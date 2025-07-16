@@ -15,7 +15,6 @@ pub struct NodeCollection {
     pub attribute_manager: AttributeManager,
     #[pyo3(get)]
     pub node_ids: Vec<NodeId>,
-    #[pyo3(get)]
     pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
 
@@ -43,21 +42,33 @@ impl NodeCollection {
         }
     }
 
-    #[new]
     pub fn new(attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>, node_ids: Option<Vec<NodeId>>) -> Self {
         let ids = node_ids.unwrap_or_else(|| graph_store.all_node_ids());
         Self { attribute_manager, node_ids: ids, graph_store }
     }
 
+    /// Create a new NodeCollection from Python (simplified constructor)
+    #[new]
+    pub fn py_new(attribute_manager: AttributeManager) -> Self {
+        // For Python usage, create with empty node_ids and a placeholder graph_store
+        // This will be properly initialized when used with a real graph
+        let graph_store = std::sync::Arc::new(crate::storage::graph_store::GraphStore::new());
+        Self { 
+            attribute_manager, 
+            node_ids: Vec::new(),
+            graph_store,
+        }
+    }
+
     /// Add one or more nodes to the collection (batch-oriented).
-    pub fn add(&mut self, nodes: Vec<NodeId>) -> Result<(), String> {
+    pub fn add(&mut self, nodes: Vec<NodeId>) -> PyResult<()> {
         self.graph_store.add_nodes(&nodes);
         self.node_ids = self.graph_store.all_node_ids();
         Ok(())
     }
 
     /// Remove one or more nodes from the collection (batch-oriented).
-    pub fn remove(&mut self, node_ids: Vec<NodeId>) -> Result<(), String> {
+    pub fn remove(&mut self, node_ids: Vec<NodeId>) -> PyResult<()> {
         self.graph_store.remove_nodes(&node_ids);
         self.node_ids = self.graph_store.all_node_ids();
         Ok(())
