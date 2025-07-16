@@ -67,46 +67,43 @@ class EdgeCollection(BaseCollection):
         """
         return self._rust.size()
 
-    def ids(self):
+    def add(self, edge_data):
         """
-        Returns all edge IDs in the collection.
-        
-        Reads directly from storage index for efficiency. May return a view or copy.
-        Returns:
-            list: List of edge IDs.
+        Adds one or more edges to the collection.
+        Supports single, batch, or dict input. If dict, adds edges and sets attributes.
+        Returns proxy object(s) for added edges.
         """
-        return list(self._rust.ids())
-
-    def has(self, edge_id):
-        """
-        Checks if an edge exists in the collection.
-        
-        Fast O(1) lookup in storage index. Returns True if present and not deleted.
-        Args:
-            edge_id: Edge ID to check.
-        Returns:
-            bool: True if edge exists, False otherwise.
-        """
-        return self._rust.has(edge_id)
-
-    def attr(self):
-        """
-        Returns the EdgeAttributeManager for this collection.
-        
-        Provides access to fast, batch attribute operations for all edges.
-        Returns:
-            EdgeAttributeManager: Attribute manager interface.
-        """
-        return EdgeAttributeManager(self)
-
-    def nodes(self):
-        """
-        Returns a filtered NodeCollection for the endpoints of the edges in this collection.
-        
-        Useful for traversing or analyzing edge endpoints with the same filter context.
-        Returns:
-            NodeCollection: Filtered node collection.
-        """
+        from .. import EdgeId
+        # If dict, treat keys as (src, tgt) tuples and values as attribute dicts
+        if isinstance(edge_data, dict):
+            edge_ids = [EdgeId(src, tgt) for (src, tgt) in edge_data.keys()]
+            self._rust.add(edge_ids)
+            self.attr.set(edge_data)
+            return [self.get(eid) for eid in edge_ids]
+        is_single = not isinstance(edge_data, (list, tuple))
+        if is_single:
+            edge_data = [edge_data]
+        edge_ids = []
+        for edge in edge_data:
+            if isinstance(edge, tuple) and len(edge) in (2, 3):
+                src, tgt = edge[0], edge[1]
+                attrs = edge[2] if len(edge) == 3 else None
+                edge_ids.append(EdgeId(src, tgt))
+            elif isinstance(edge, EdgeId):
+                edge_ids.append(edge)
+            else:
+                raise ValueError(f"Expected tuple or EdgeId, got {type(edge)}")
+        try:
+            self._rust.add(edge_ids)
+        except Exception as e:
+            raise ValueError(f"Failed to add edges: {e}")
+        for edge, attrs in zip(edge_data, [e[2] if isinstance(e, tuple) and len(e) == 3 else None for e in edge_data]):
+            if attrs:
+                self.attr.set({(edge[0], edge[1]): attrs})
+        if is_single:
+            return self.get(edge_ids[0])
+        else:
+            return [self.get(edge_id) for edge_id in edge_ids]
         from groggy.collections.nodes import NodeCollection
         node_ids = self.node_ids()
         nc = NodeCollection(self.graph)

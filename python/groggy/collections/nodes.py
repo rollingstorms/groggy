@@ -3,6 +3,7 @@
 from .base import BaseCollection
 from .proxy import NodeProxy
 
+
 class NodeCollection(BaseCollection):
     """
     Collection interface for graph nodes (composes managers/helpers).
@@ -22,21 +23,27 @@ class NodeCollection(BaseCollection):
         super().__init__()
         self.graph = graph
         self._rust = graph._rust.nodes()
-        self.attr = self._rust.attr()
+        self.attr = NodeAttributeManager(self)
 
     def add(self, node_data):
         """
         Adds one or more nodes to the collection.
-        Supports single or batch addition. Returns proxy object(s) for added nodes.
+        Supports single, batch, or dict input. If dict, adds nodes and sets attributes.
+        Returns proxy object(s) for added nodes.
         """
         from .. import NodeId
-        
+        # If dict, treat keys as node IDs and values as attribute dicts
+        if isinstance(node_data, dict):
+            node_ids = list(node_data.keys())
+            # Add nodes
+            self._rust.add([NodeId(nid) for nid in node_ids])
+            # Set attributes
+            self.attr.set(node_data)
+            return [self.get(nid) for nid in node_ids]
         # Handle single vs batch input
         is_single = not isinstance(node_data, (list, tuple))
         if is_single:
             node_data = [node_data]
-        
-        # Convert strings to NodeId objects
         node_ids = []
         for node in node_data:
             if isinstance(node, str):
@@ -45,14 +52,10 @@ class NodeCollection(BaseCollection):
                 node_ids.append(node)
             else:
                 raise ValueError(f"Expected string or NodeId, got {type(node)}")
-        
-        # Add to Rust backend
         try:
             self._rust.add(node_ids)
         except Exception as e:
             raise ValueError(f"Failed to add nodes: {e}")
-        
-        # Return proxy object(s)
         if is_single:
             return self.get(node_ids[0])
         else:
@@ -198,7 +201,15 @@ class NodeAttributeManager:
             ValueError: On type mismatch or schema error.
         """
         try:
-            self._rust.set(attr_data)
+            # If dict, convert node_id keys to NodeId objects
+            from .. import NodeId
+            if isinstance(attr_data, dict):
+                converted = {}
+                for node_id, attrs in attr_data.items():
+                    converted[NodeId(node_id)] = attrs
+                self._rust.set(converted)
+            else:
+                self._rust.set(attr_data)
         except Exception as e:
             raise ValueError(f"Failed to set node attribute(s): {e}")
 

@@ -60,12 +60,30 @@ impl AttributeManager {
         self.get(id, attr).map(|v| serde_json::to_string(&v).unwrap_or_default())
     }
     
-    /// Basic Python-compatible set method (accepts JSON string)
-    pub fn set_py(&mut self, id: &str, attr: &str, value: String) -> PyResult<()> {
-        let json_value: serde_json::Value = serde_json::from_str(&value)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid JSON: {}", e)))?;
-        self.set(id, attr, json_value)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))
+    /// Expose set method to Python for batch attribute setting
+    #[pyo3(name = "set")]
+    pub fn py_set(&mut self, attr_data: &pyo3::types::PyAny) -> PyResult<()> {
+        use pyo3::types::PyDict;
+        // Accepts a dict of {node_id: {attr_name: value}}
+        if let Ok(dict) = attr_data.downcast::<PyDict>() {
+            for (node_id_obj, attrs_obj) in dict.iter() {
+                let node_id = node_id_obj.extract::<String>()?;
+                let attrs = attrs_obj.downcast::<PyDict>()?;
+                for (attr_name_obj, value_obj) in attrs.iter() {
+                    let attr_name = attr_name_obj.extract::<String>()?;
+                    // Convert Python object to JSON string, then parse to serde_json::Value
+                    let py = value_obj.py();
+                    let json_module = py.import("json")?;
+                    let value_str = json_module.call_method1("dumps", (value_obj,))?.extract::<String>()?;
+                    let value: serde_json::Value = serde_json::from_str(&value_str)
+                        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid JSON: {}", e)))?;
+                    self.set(&node_id, &attr_name, value).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+                }
+            }
+            Ok(())
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>("Expected a dict of {node_id: {attr_name: value}}"))
+        }
     }
 
     /// Returns a breakdown of memory usage per attribute (name, type, node/edge, bytes used)
