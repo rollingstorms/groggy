@@ -1,63 +1,151 @@
-# python_new/groggy/__init__.py
+# groggy/__init__.py
+"""
+Groggy: A high-performance graph library with Rust backend.
 
-def get_available_backends():
-    """
-    Returns a list of all available backend implementations for the Graph library.
-    
-    Discovers built-in and user-registered backends. Handles plugin loading and validation.
-    Returns:
-        List[str]: Names of available backends.
-    Raises:
-        ImportError: If a backend fails to load.
-    """
-    # Discover built-in backends
-    builtins = ['rust']
-    plugins = []
-    try:
-        import pkg_resources
-        for entry in pkg_resources.iter_entry_points('groggy.backends'):
-            plugins.append(entry.name)
-    except ImportError:
-        pass
-    return builtins + plugins
+This module provides a clean Python API for graph operations,
+backed by a fast Rust implementation with SIMD acceleration.
+"""
 
-def set_backend(backend):
-    """
-    Sets the backend implementation to use for all new Graph instances.
-    
-    Validates the backend name, loads the backend module, and updates global state.
-    Args:
-        backend (str): Name of the backend to use.
-    Raises:
-        ValueError: If backend is not available.
-        ImportError: If backend cannot be loaded.
-    """
-    global _backend
-    available = get_available_backends()
-    if backend not in available:
-        raise ValueError(f"Backend '{backend}' not available. Choose from: {available}")
-    # Attempt to import backend module (simulate for 'rust')
-    if backend == 'rust':
-        try:
-            import groggy._core
-        except ImportError as e:
-            raise ImportError("Rust backend not installed or failed to import.")
-    else:
-        try:
-            import pkg_resources
-            entry = next(e for e in pkg_resources.iter_entry_points('groggy.backends') if e.name == backend)
-            entry.load()
-        except Exception as e:
-            raise ImportError(f"Failed to load backend '{backend}': {e}")
-    _backend = backend
+import json
+from typing import Any, List, Union
 
-def get_current_backend():
-    """
-    Returns the name of the currently selected backend implementation.
+# Import the Rust backend
+try:
+    from groggy._core import (
+        FastGraph as _FastGraph,
+        NodeId as _NodeId, 
+        EdgeId as _EdgeId,
+        NodeCollection as _NodeCollection,
+        EdgeCollection as _EdgeCollection,
+        NodeProxy as _NodeProxy,
+        EdgeProxy as _EdgeProxy,
+    )
+except ImportError as e:
+    raise ImportError(f"Failed to import Rust backend: {e}")
+
+
+class NodeProxy:
+    """Python wrapper for NodeProxy that handles JSON serialization automatically."""
     
-    Reads from global state. Used for diagnostics and debugging.
-    Returns:
-        str: Name of the current backend.
+    def __init__(self, proxy: _NodeProxy):
+        self._proxy = proxy
+    
+    def set_attr(self, key: str, value: Any) -> None:
+        """Set an attribute on this node. Value is automatically JSON-serialized."""
+        json_value = json.dumps(value)
+        self._proxy.set_attr(key, json_value)
+    
+    def get_attr(self, key: str) -> Any:
+        """Get an attribute from this node. Returns the Python object."""
+        json_value = self._proxy.get_attr(key)
+        if json_value is None:
+            return None
+        return json.loads(json_value)
+    
+    def __repr__(self):
+        return f"NodeProxy({self._proxy})"
+
+
+class EdgeProxy:
+    """Python wrapper for EdgeProxy that handles JSON serialization automatically."""
+    
+    def __init__(self, proxy: _EdgeProxy):
+        self._proxy = proxy
+    
+    def set_attr(self, key: str, value: Any) -> None:
+        """Set an attribute on this edge. Value is automatically JSON-serialized."""
+        json_value = json.dumps(value)
+        self._proxy.set_attr(key, json_value)
+    
+    def get_attr(self, key: str) -> Any:
+        """Get an attribute from this edge. Returns the Python object."""
+        json_value = self._proxy.get_attr(key)
+        if json_value is None:
+            return None
+        return json.loads(json_value)
+    
+    def __repr__(self):
+        return f"EdgeProxy({self._proxy})"
+
+
+class NodeCollection:
+    """Python wrapper for NodeCollection with improved API."""
+    
+    def __init__(self, collection: _NodeCollection):
+        self._collection = collection
+    
+    def add(self, nodes: Union[List[_NodeId], _NodeId]) -> None:
+        """Add nodes to the collection."""
+        if isinstance(nodes, _NodeId):
+            nodes = [nodes]
+        self._collection.add(nodes)
+    
+    def get(self, node_id: _NodeId) -> NodeProxy:
+        """Get a node proxy for the given node ID."""
+        proxy = self._collection.get(node_id)
+        return NodeProxy(proxy) if proxy else None
+    
+    def size(self) -> int:
+        """Get the number of nodes in the collection."""
+        return self._collection.size()
+    
+    def ids(self) -> List[str]:
+        """Get all node IDs in the collection."""
+        return self._collection.ids()
+
+
+class EdgeCollection:
+    """Python wrapper for EdgeCollection with improved API."""
+    
+    def __init__(self, collection: _EdgeCollection):
+        self._collection = collection
+    
+    def add(self, edges: Union[List[_EdgeId], _EdgeId]) -> None:
+        """Add edges to the collection."""
+        if isinstance(edges, _EdgeId):
+            edges = [edges]
+        self._collection.add(edges)
+    
+    def get(self, edge_id: _EdgeId) -> EdgeProxy:
+        """Get an edge proxy for the given edge ID."""
+        proxy = self._collection.get(edge_id)
+        return EdgeProxy(proxy) if proxy else None
+    
+    def size(self) -> int:
+        """Get the number of edges in the collection."""
+        return self._collection.size()
+    
+    def ids(self) -> List[str]:
+        """Get all edge IDs in the collection."""
+        return self._collection.ids()
+
+
+class Graph:
     """
-    global _backend
-    return _backend if '_backend' in globals() else 'rust'
+    Main graph class with clean Python API.
+    
+    This wraps the Rust FastGraph with a more Pythonic interface
+    and automatic JSON handling for attributes.
+    """
+    
+    def __init__(self):
+        self._graph = _FastGraph()
+    
+    def nodes(self) -> NodeCollection:
+        """Get the node collection for this graph."""
+        return NodeCollection(self._graph.nodes())
+    
+    def edges(self) -> EdgeCollection:
+        """Get the edge collection for this graph."""
+        return EdgeCollection(self._graph.edges())
+    
+    def __repr__(self):
+        return f"Graph(nodes={self.nodes().size()}, edges={self.edges().size()})"
+
+
+# Export the ID types directly 
+NodeId = _NodeId
+EdgeId = _EdgeId
+
+# Export main classes
+__all__ = ['Graph', 'NodeId', 'EdgeId', 'NodeProxy', 'EdgeProxy', 'NodeCollection', 'EdgeCollection']
