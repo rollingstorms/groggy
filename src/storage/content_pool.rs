@@ -213,13 +213,25 @@ impl ContentPool {
     }
     /// Adds nodes by NodeId.
     pub fn add_nodes(&self, node_ids: &[NodeId]) {
-        let hashes: Vec<ContentHash> = node_ids.iter().map(|id| crate::utils::hash::hash_node(&id.0)).collect();
-        self.add_node_hashes(&hashes);
+        for node_id in node_ids {
+            let hash = crate::utils::hash::hash_node(&node_id.0);
+            self.node_refs.entry(hash).and_modify(|c| *c += 1).or_insert(1);
+            // Store the actual node ID as a JSON string value
+            self.nodes.entry(hash).or_insert_with(|| Arc::new(Value::String(node_id.0.clone())));
+        }
     }
     /// Adds edges by EdgeId.
     pub fn add_edges(&self, edge_ids: &[EdgeId]) {
-        let hashes: Vec<ContentHash> = edge_ids.iter().map(|id| crate::utils::hash::hash_edge(id)).collect();
-        self.add_edge_hashes(&hashes);
+        for edge_id in edge_ids {
+            let hash = crate::utils::hash::hash_edge(edge_id);
+            self.edge_refs.entry(hash).and_modify(|c| *c += 1).or_insert(1);
+            // Store the actual edge as JSON with source and target
+            let edge_value = serde_json::json!({
+                "source": edge_id.source().0,
+                "target": edge_id.target().0
+            });
+            self.edges.entry(hash).or_insert_with(|| Arc::new(edge_value));
+        }
     }
     /// Removes nodes by NodeId.
     pub fn remove_nodes(&self, node_ids: &[NodeId]) {

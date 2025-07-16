@@ -23,13 +23,13 @@ impl NodeProxyAttributeManager {
     }
 
     pub fn get(&self, attr_name: String, py: Python) -> Option<PyObject> {
-        self.attribute_manager.get(&self.id.to_string(), &attr_name)
+        self.attribute_manager.get_internal(&self.id.to_string(), &attr_name, true)
             .map(|v| json_value_to_python(&v, py))
     }
 
     pub fn set(&mut self, attr_name: String, py_value: &PyAny) -> bool {
         let value = python_to_json_value(py_value);
-        self.attribute_manager.set(&self.id.to_string(), &attr_name, value).is_ok()
+        self.attribute_manager.set_internal(&self.id.to_string(), &attr_name, value, true).is_ok()
     }
 }
 
@@ -49,12 +49,12 @@ impl EdgeProxyAttributeManager {
     }
 
     pub fn get(&self, attr_name: String, py: Python) -> Option<PyObject> {
-        self.attribute_manager.get(&self.id.to_string(), &attr_name)
+        self.attribute_manager.get_internal(&self.id.to_string(), &attr_name, true)
             .map(|v| json_value_to_python(&v, py))
     }
 
     pub fn set(&mut self, attr_name: String, py_value: &PyAny) -> bool {
         let value = python_to_json_value(py_value);
-        self.attribute_manager.set(&self.id.to_string(), &attr_name, value).is_ok()
+        self.attribute_manager.set_internal(&self.id.to_string(), &attr_name, value, true).is_ok()
     }
 }

@@ -125,105 +125,85 @@ class GroggyBenchmark:
         
         # Create graph with new clean API
         self.graph = gr.Graph()
-        self.nodes_collection = self.graph.nodes
-        self.edges_collection = self.graph.edges
-        
-        # Convert data to NodeId/EdgeId objects and add them
-        self.node_ids = []
-        self.edge_ids = []
-        self.node_lookup = {}  # Map string ID to NodeId object
-        
-        # Create and add nodes
-        for node_data in nodes_data:
-            node_id = gr.NodeId(node_data['id'])
-            self.node_ids.append(node_id)
-            self.node_lookup[node_data['id']] = node_id
-        
+
         # Add nodes in batch
-        self.nodes_collection.add(self.node_ids)
+        self.graph.nodes.add(nodes_data)
         
         # Create and add edges
-        for edge_data in edges_data:
-            source_id = self.node_lookup.get(edge_data['source'])
-            target_id = self.node_lookup.get(edge_data['target'])
-            if source_id and target_id:
-                edge_id = gr.EdgeId(source_id, target_id)
-                self.edge_ids.append(edge_id)
-        
-        # Add edges in batch
-        self.edges_collection.add(self.edge_ids)
-        
-        # Store node and edge data for filtering (since attributes aren't working yet)
-        self.nodes_data = {node['id']: node for node in nodes_data}
-        self.edges_data = edges_data
+        self.graph.edges.add(edges_data)
         
         # Measure memory after creation
         memory_after = get_memory_usage()
         self.memory_usage = memory_after - memory_before
         
         self.creation_time = time.time() - start
-        print(f"   Created {len(self.node_ids)} nodes and {len(self.edge_ids)} edges in {self.creation_time:.3f}s")
-        print(f"   Memory usage: {format_memory(self.memory_usage)}")
-        print("   Groggy g.info():", self.graph.info())
+
+        # --- Diagnostic: Delete data and force GC ---
+        import gc
+        try:
+            import objgraph
+        except ImportError:
+            objgraph = None
+
+        # Delete data and force GC
+        try:
+            del nodes_data
+            del edges_data
+        except Exception:
+            pass  # If not in scope
+        gc.collect()
+
+        print(f"Memory after cleanup: {get_memory_usage():.2f} MB")
+        print("Groggy g.info() after cleanup:", self.graph.info())
+        print("Python len(self.graph.nodes):", len(self.graph.nodes))
+
+        if objgraph:
+            print("\n--- Most common Python object types ---")
+            objgraph.show_most_common_types(limit=20)
+        else:
+            print("(objgraph not installed; skipping object type summary)")
     
     def filter_nodes_by_role(self):
         """Filter nodes by role (simulated since attributes aren't working yet)"""
         start = time.time()
-        # Simulate filtering by iterating through stored data
-        result = []
-        for node_id, node_data in self.nodes_data.items():
-            if node_data.get('role') == 'engineer':
-                result.append(node_id)
+        # filter the graph
+        result = self.graph.nodes.filter('role="engineer"')
         return time.time() - start, len(result)
     
     def filter_nodes_by_salary(self):
         """Filter nodes by salary > 100000"""
         start = time.time()
-        result = []
-        for node_id, node_data in self.nodes_data.items():
-            if node_data.get('salary', 0) > 100000:
-                result.append(node_id)
+        result = self.graph.nodes.filter('salary > 100000')
         return time.time() - start, len(result)
     
     def filter_nodes_complex(self):
         """Complex multi-attribute filter"""
         start = time.time()
-        result = []
-        for node_id, node_data in self.nodes_data.items():
-            if (node_data.get('role') == 'engineer' and 
-                node_data.get('active', False) and
-                node_data.get('salary', 0) > 80000):
-                result.append(node_id)
+        result = self.graph.nodes.filter('role="engineer" & active & salary > 80000')
         return time.time() - start, len(result)
     
     def filter_edges_by_relationship(self):
         """Filter edges by relationship"""
         start = time.time()
-        result = []
-        for edge_data in self.edges_data:
-            if edge_data.get('relationship') == 'reports_to':
-                result.append((edge_data['source'], edge_data['target']))
+        result = self.graph.edges.filter('relationship="reports_to"')
         return time.time() - start, len(result)
     
     def filter_edges_by_strength(self):
         """Filter edges by strength > 0.7"""
         start = time.time()
-        result = []
-        for edge_data in self.edges_data:
-            if edge_data.get('strength', 0) > 0.7:
-                result.append((edge_data['source'], edge_data['target']))
+        result = self.graph.edges.filter('strength > 0.7')
         return time.time() - start, len(result)
     
     def get_stats(self):
         """Get graph statistics"""
         # Handle inconsistency: NodeCollection.size is a property, EdgeCollection.size() is a method
-        node_count = self.nodes_collection.size
-        edge_count = self.edges_collection.size() if callable(self.edges_collection.size) else self.edges_collection.size
+        node_count = self.graph.nodes.size
+        edge_count = self.graph.edges.size
         return {
             'nodes': node_count,
             'edges': edge_count,
-            'node_ids_created': len(self.node_ids),
-            'edge_ids_created': len(self.edge_ids)
+            'node_ids_created': len(self.graph.nodes),
+            'edge_ids_created': len(self.graph.edges)
         }
 
 class NetworkXBenchmark:
@@ -458,9 +438,9 @@ def main():
     
     # Test sizes
     test_sizes = [
-        (10000, 5000),     # 1K nodes, 500 edges
-        (100000, 50000),   # 10K nodes, 5K edges
-        (500000, 250000)   # 50K nodes, 25K edges
+        (10000, 10000),     # 1K nodes, 500 edges
+        # (10000, 10000),   # 10K nodes, 5K edges
+        # (50000, 50000)   # 50K nodes, 25K edges
     ]
     
     for num_nodes, num_edges in test_sizes:

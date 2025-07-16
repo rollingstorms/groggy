@@ -25,41 +25,68 @@ class NodeCollection(BaseCollection):
         self._rust = graph._rust.nodes()
         self.attr = NodeAttributeManager(self)
 
-    def add(self, node_data):
+    def add(self, node_data, return_proxies=False):
         """
         Adds one or more nodes to the collection.
-        Supports single, batch, or dict input. If dict, adds nodes and sets attributes.
-        Returns proxy object(s) for added nodes.
+        Accepts:
+            - list of dicts: [{'id': ..., attr: ...}, ...]
+            - single dict: {'id': ..., attr: ...}
+            - list of IDs: ['n1', 'n2', ...]
+            - single ID: 'n1'
+        If attributes are present, sets them after adding nodes.
+        By default, returns a proxy only for single-node addition. For batch, returns None unless return_proxies=True.
         """
-        from .. import NodeId
-        # If dict, treat keys as node IDs and values as attribute dicts
-        if isinstance(node_data, dict):
-            node_ids = list(node_data.keys())
-            # Add nodes
-            self._rust.add([NodeId(nid) for nid in node_ids])
-            # Set attributes
-            self.attr.set(node_data)
-            return [self.get(nid) for nid in node_ids]
-        # Handle single vs batch input
+        import time
+        t0 = time.perf_counter()
+        # (1) Normalize input
         is_single = not isinstance(node_data, (list, tuple))
         if is_single:
             node_data = [node_data]
-        node_ids = []
-        for node in node_data:
-            if isinstance(node, str):
-                node_ids.append(NodeId(node))
-            elif isinstance(node, NodeId):
-                node_ids.append(node)
+        t1 = time.perf_counter()
+
+        # (2) Extract IDs and attributes
+        ids = []
+        attrs = {}
+        for item in node_data:
+            if isinstance(item, dict) and 'id' in item:
+                node_id = item['id']
+                ids.append(node_id)
+                attrs[node_id] = {k: v for k, v in item.items() if k != 'id'}
+            elif isinstance(item, str):
+                ids.append(item)
             else:
-                raise ValueError(f"Expected string or NodeId, got {type(node)}")
+                raise ValueError(f"Expected dict with 'id' or string node ID, got {type(item)}")
+        t2 = time.perf_counter()
+        print(f"[Groggy][Timing] NodeCollection.add: input normalization: {t1-t0:.6f}s, id/attr extraction: {t2-t1:.6f}s")
+
+        # (3) Rust add call
+        t3 = time.perf_counter()
         try:
-            self._rust.add(node_ids)
+            self._rust.add(ids)
         except Exception as e:
             raise ValueError(f"Failed to add nodes: {e}")
+        t4 = time.perf_counter()
+        print(f"[Groggy][Timing] NodeCollection.add: Rust add: {t4-t3:.6f}s")
+
+        # (4) Attribute set call
+        t5 = None
+        if attrs:
+            t5 = time.perf_counter()
+            self.attr.set(attrs)
+            t6 = time.perf_counter()
+            print(f"[Groggy][Timing] NodeCollection.add: attr.set: {t6-t5:.6f}s")
+
+        # (5) Total
+        total = time.perf_counter() - t0
         if is_single:
-            return self.get(node_ids[0])
+            print(f"[Groggy] NodeCollection.add: 1 node in {total:.6f} seconds")
+            return self.get(ids[0])
         else:
-            return [self.get(node_id) for node_id in node_ids]
+            print(f"[Groggy] NodeCollection.add: {len(ids)} nodes in {total:.6f} seconds")
+            if return_proxies:
+                return [self.get(node_id) for node_id in ids]
+            else:
+                return None
 
     def remove(self, node_ids):
         """
@@ -88,8 +115,8 @@ class NodeCollection(BaseCollection):
         Returns:
             NodeCollection: Filtered collection view.
         """
-        # For now, only support attribute equality via kwargs
-        filtered = self._rust.filter().by_kwargs(**kwargs)
+        # Call the filter method directly with args and kwargs
+        filtered = self._rust.filter(*args, **kwargs)
         # Return a new NodeCollection wrapping the filtered Rust NodeCollection
         nc = NodeCollection(self.graph)
         nc._rust = filtered
@@ -100,7 +127,7 @@ class NodeCollection(BaseCollection):
         """
         Returns the number of nodes in the collection.
         """
-        return self._rust.size()
+        return self._rust.size
 
     def ids(self):
         """
@@ -201,15 +228,8 @@ class NodeAttributeManager:
             ValueError: On type mismatch or schema error.
         """
         try:
-            # If dict, convert node_id keys to NodeId objects
-            from .. import NodeId
-            if isinstance(attr_data, dict):
-                converted = {}
-                for node_id, attrs in attr_data.items():
-                    converted[NodeId(node_id)] = attrs
-                self._rust.set(converted)
-            else:
-                self._rust.set(attr_data)
+            # Pass raw dict or batch to Rust, no conversion
+            self._rust.set(attr_data)
         except Exception as e:
             raise ValueError(f"Failed to set node attribute(s): {e}")
 

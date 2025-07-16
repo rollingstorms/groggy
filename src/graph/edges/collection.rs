@@ -4,7 +4,7 @@
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
-use crate::graph::types::EdgeId;
+use crate::graph::types::{EdgeId, NodeId};
 use crate::graph::managers::attributes::AttributeManager;
 // use crate::graph::columnar::EdgeColumnarStore; // Uncomment when available
 
@@ -18,9 +18,27 @@ pub struct EdgeCollection {
     pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
 
-
 #[pymethods]
 impl EdgeCollection {
+    /// Add one or more edges to the collection (batch-oriented).
+    pub fn py_add(&mut self, py_edge_ids: &pyo3::types::PyAny) -> pyo3::PyResult<()> {
+        // Fast path: accept pre-processed tuple list from Python layer
+        if let Ok(list) = py_edge_ids.extract::<Vec<(String, String)>>() {
+            let edge_ids: Vec<EdgeId> = list.into_iter().map(|(src, tgt)| EdgeId::new(NodeId::new(src), NodeId::new(tgt))).collect();
+            self.add_batch(edge_ids)?;
+            return Ok(());
+        }
+        
+        // Fallback: handle single tuple (for direct Rust usage)
+        if let Ok(single) = py_edge_ids.extract::<(String, String)>() {
+            let edge_ids = vec![EdgeId::new(NodeId::new(single.0), NodeId::new(single.1))];
+            self.add_batch(edge_ids)?;
+            return Ok(());
+        }
+        
+        return Err(pyo3::exceptions::PyTypeError::new_err("Invalid edge ID format; expected (src, tgt) tuple or list of tuples"));
+    }
+
     /// Flexible filter method: supports dict, string, or chaining.
     #[pyo3(signature = (*args, **kwargs))]
     pub fn filter_py(&self, py: Python, args: &pyo3::types::PyTuple, kwargs: Option<&PyDict>) -> Self {
@@ -45,42 +63,14 @@ impl EdgeCollection {
 
     /// Create a new EdgeCollection from Python (simplified constructor)
     #[new]
-    pub fn py_new(attribute_manager: AttributeManager) -> Self {
+    pub fn py_new() -> Self {
         let graph_store = std::sync::Arc::new(crate::storage::graph_store::GraphStore::new());
-        Self { 
-            attribute_manager, 
+        let attribute_manager = AttributeManager::new_with_graph_store(graph_store.clone());
+        Self {
+            attribute_manager,
             edge_ids: Vec::new(),
             graph_store,
         }
-    }
-
-    /// Add one or more edges to the collection (batch-oriented).
-    pub fn add(&mut self, edges: Vec<EdgeId>) -> PyResult<()> {
-        self.graph_store.add_edges(&edges);
-        self.edge_ids = self.graph_store.all_edge_ids();
-        Ok(())
-    }
-
-    /// Remove one or more edges from the collection (batch-oriented).
-    pub fn remove(&mut self, edge_ids: Vec<EdgeId>) -> PyResult<()> {
-        self.graph_store.remove_edges(&edge_ids);
-        self.edge_ids = self.graph_store.all_edge_ids();
-        Ok(())
-    }
-
-    /// Returns the number of edges in this collection.
-    pub fn size(&self) -> usize {
-        self.graph_store.edge_count()
-    }
-
-    /// Returns all edge IDs in this collection.
-    pub fn ids(&self) -> Vec<EdgeId> {
-        self.graph_store.all_edge_ids()
-    }
-
-    /// Check if an edge exists in the collection.
-    pub fn has(&self, edge_id: EdgeId) -> bool {
-        self.graph_store.has_edge(&edge_id)
     }
 
     /// Returns an AttributeManager for edge attributes.
@@ -88,43 +78,103 @@ impl EdgeCollection {
         self.attribute_manager.clone()
     }
 
-    /// Returns a FilterManager for this collection, pre-configured for edges.
-    ///
-    /// Usage:
-    /// let mut fm = collection.filter();
-    /// fm.add_filter(...);
-    /// let result_ids = fm.apply(collection.ids());
-    pub fn filter(&self) -> crate::graph::managers::filter::FilterManager {
-        crate::graph::managers::filter::FilterManager::new(self.attribute_manager.clone(), false)
+    /// Returns the number of edges in this collection.
+    #[getter]
+    pub fn size(&self) -> usize {
+        self.graph_store.edge_count()
     }
 
-    /// Returns an iterator over edge IDs in this collection.
+    /// Flexible filter method: supports dict, string, or chaining.
+    #[pyo3(name = "filter")]
+    #[pyo3(signature = (*args, **kwargs))]
+    pub fn filter(&self, py: Python, args: &pyo3::types::PyTuple, kwargs: Option<&PyDict>) -> Self {
+        self.filter_py(py, args, kwargs)
+    }
+
+    /// Returns all edge IDs in this collection.
+    pub fn ids(&self) -> Vec<String> {
+        self.graph_store.all_edge_ids().iter().map(|id| format!("{}", id)).collect()
+    }
+
+    /// Check if an edge exists in the collection.
+    pub fn has(&self, edge_id: String) -> bool {
+        // Parse edge_id string back to EdgeId - this is a simplified implementation
+        // In a real implementation, you'd want a proper EdgeId parser
+        if let Some((src, tgt)) = edge_id.split_once("->") {
+            let edge_id = EdgeId::new(NodeId::new(src.to_string()), NodeId::new(tgt.to_string()));
+            self.graph_store.has_edge(&edge_id)
+        } else {
+            false
+        }
+    }
+
+    /// Get an EdgeProxy for this edge if it exists.
+    pub fn get(&self, edge_id: String) -> Option<crate::graph::edges::proxy::EdgeProxy> {
+        if let Some((src, tgt)) = edge_id.split_once("->") {
+            let edge_id = EdgeId::new(NodeId::new(src.to_string()), NodeId::new(tgt.to_string()));
+            if self.graph_store.has_edge(&edge_id) {
+                Some(crate::graph::edges::proxy::EdgeProxy::new(
+                    edge_id,
+                    NodeId::new(src.to_string()),
+                    NodeId::new(tgt.to_string()),
+                    self.attribute_manager.clone(),
+                    self.graph_store.clone(),
+                ))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Add one or more edges to the collection.
+    #[pyo3(name = "add")]
+    pub fn add(&mut self, py_edge_ids: &pyo3::types::PyAny) -> pyo3::PyResult<()> {
+        self.py_add(py_edge_ids)
+    }
+}
+
+// --- Rust-only methods ---
+impl EdgeCollection {
+    /// Regular Rust constructor - not exposed to Python
+    pub fn new(attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>, edge_ids: Option<Vec<EdgeId>>) -> Self {
+        let ids = edge_ids.unwrap_or_else(|| graph_store.all_edge_ids());
+        Self { attribute_manager, edge_ids: ids, graph_store }
+    }
+
+    /// Add one or more edges to the collection (batch-oriented, internal use).
+    pub fn add_batch(&mut self, edges: Vec<EdgeId>) -> PyResult<()> {
+        self.graph_store.add_edges(&edges);
+        self.edge_ids = self.graph_store.all_edge_ids();
+        Ok(())
+    }
+
+    /// Remove one or more edges from the collection (batch-oriented, internal use).
+    pub fn remove_batch(&mut self, edge_ids: Vec<EdgeId>) -> PyResult<()> {
+        self.graph_store.remove_edges(&edge_ids);
+        self.edge_ids = self.graph_store.all_edge_ids();
+        Ok(())
+    }
+
+    /// Returns an iterator over edge IDs in this collection (internal use).
     pub fn iter(&self) -> Vec<EdgeId> {
         self.edge_ids.clone()
     }
 
-    /// Get an EdgeProxy for this edge if it exists.
-    pub fn get(&self, edge_id: EdgeId) -> Option<crate::graph::edges::proxy::EdgeProxy> {
-        if self.has(edge_id.clone()) {
-            let (src, tgt) = self.attribute_manager.columnar.edge_endpoints(&edge_id)?;
+    /// Get an EdgeProxy for this edge if it exists (internal use).
+    pub fn get_rust(&self, edge_id: EdgeId) -> Option<crate::graph::edges::proxy::EdgeProxy> {
+        if self.graph_store.has_edge(&edge_id) {
             Some(crate::graph::edges::proxy::EdgeProxy::new(
-                edge_id,
-                src,
-                tgt,
+                edge_id.clone(),
+                edge_id.source().clone(),
+                edge_id.target().clone(),
                 self.attribute_manager.clone(),
                 self.graph_store.clone(),
             ))
         } else {
             None
         }
-    }
-}
-
-impl EdgeCollection {
-    /// Regular Rust constructor - not exposed to Python
-    pub fn new(attribute_manager: AttributeManager, graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>, edge_ids: Option<Vec<EdgeId>>) -> Self {
-        let ids = edge_ids.unwrap_or_else(|| graph_store.all_edge_ids());
-        Self { attribute_manager, edge_ids: ids, graph_store }
     }
 }
 

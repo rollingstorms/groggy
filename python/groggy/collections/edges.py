@@ -51,8 +51,8 @@ class EdgeCollection(BaseCollection):
         Returns:
             EdgeCollection: Filtered collection view.
         """
-        # For now, only support attribute equality via kwargs
-        filtered = self._rust.filter().by_kwargs(**kwargs)
+        # Call the filter method directly with args and kwargs (like NodeCollection)
+        filtered = self._rust.filter(*args, **kwargs)
         ec = EdgeCollection(self.graph)
         ec._rust = filtered
         return ec
@@ -65,50 +65,79 @@ class EdgeCollection(BaseCollection):
         Returns:
             int: Edge count.
         """
-        return self._rust.size()
+        return self._rust.size
 
-    def add(self, edge_data):
+    def add(self, edge_data, return_proxies=False):
         """
         Adds one or more edges to the collection.
-        Supports single, batch, or dict input. If dict, adds edges and sets attributes.
-        Returns proxy object(s) for added edges.
+        Accepts a single dict or a list of dicts of the form:
+            {'source': <src>, 'target': <tgt>, ...attrs...}
+        By default, returns a proxy only for single-edge addition. For batch, returns None unless return_proxies=True.
+
+        Examples:
+            g.edges.add({'source': 'n1', 'target': 'n2', 'role': 'engineer'})
+            g.edges.add([
+                {'source': 'n1', 'target': 'n2', 'role': 'engineer', 'salary': 100000},
+                {'source': 'n2', 'target': 'n3', 'role': 'manager', 'salary': 150000}
+            ])
         """
-        from .. import EdgeId
-        # If dict, treat keys as (src, tgt) tuples and values as attribute dicts
-        if isinstance(edge_data, dict):
-            edge_ids = [EdgeId(src, tgt) for (src, tgt) in edge_data.keys()]
-            self._rust.add(edge_ids)
-            self.attr.set(edge_data)
-            return [self.get(eid) for eid in edge_ids]
+        import time
+        t0 = time.perf_counter()
+        from .. import EdgeId, NodeId
+
+        # (1) Normalize input
         is_single = not isinstance(edge_data, (list, tuple))
         if is_single:
             edge_data = [edge_data]
+        t1 = time.perf_counter()
+
+        # (2) Extract IDs and attributes
         edge_ids = []
-        for edge in edge_data:
-            if isinstance(edge, tuple) and len(edge) in (2, 3):
-                src, tgt = edge[0], edge[1]
-                attrs = edge[2] if len(edge) == 3 else None
-                edge_ids.append(EdgeId(src, tgt))
-            elif isinstance(edge, EdgeId):
-                edge_ids.append(edge)
-            else:
-                raise ValueError(f"Expected tuple or EdgeId, got {type(edge)}")
+        attrs_to_set = {}
+        for item in edge_data:
+            if not isinstance(item, dict) or 'source' not in item or 'target' not in item:
+                raise ValueError("Each edge must be a dict with 'source' and 'target' keys")
+            src = NodeId(item['source'])
+            tgt = NodeId(item['target'])
+            eid = EdgeId(src, tgt)
+            edge_ids.append(eid)
+            attr = {k: v for k, v in item.items() if k not in ('source', 'target')}
+            if attr:
+                key = f"{src}->{tgt}"
+                attrs_to_set[key] = attr
+        t2 = time.perf_counter()
+        print(f"[Groggy][Timing] EdgeCollection.add: input normalization: {t1-t0:.6f}s, id/attr extraction: {t2-t1:.6f}s")
+
+        # (3) Rust add call
+        t3 = time.perf_counter()
+        edge_tuples = [(eid.source().value, eid.target().value) for eid in edge_ids]
         try:
-            self._rust.add(edge_ids)
+            self._rust.add(edge_tuples)
         except Exception as e:
             raise ValueError(f"Failed to add edges: {e}")
-        for edge, attrs in zip(edge_data, [e[2] if isinstance(e, tuple) and len(e) == 3 else None for e in edge_data]):
-            if attrs:
-                self.attr.set({(edge[0], edge[1]): attrs})
+        t4 = time.perf_counter()
+        print(f"[Groggy][Timing] EdgeCollection.add: Rust add: {t4-t3:.6f}s")
+
+        # (4) Attribute set call
+        t5 = None
+        if attrs_to_set:
+            t5 = time.perf_counter()
+            self.attr.set(attrs_to_set)
+            t6 = time.perf_counter()
+            print(f"[Groggy][Timing] EdgeCollection.add: attr.set: {t6-t5:.6f}s")
+
+        # (5) Total
+        total = time.perf_counter() - t0
         if is_single:
-            return self.get(edge_ids[0])
+            print(f"[Groggy] EdgeCollection.add: 1 edge in {total:.6f} seconds")
+            return self.get((edge_ids[0].source().value, edge_ids[0].target().value))
         else:
-            return [self.get(edge_id) for edge_id in edge_ids]
-        from groggy.collections.nodes import NodeCollection
-        node_ids = self.node_ids()
-        nc = NodeCollection(self.graph)
-        nc._rust = self.graph._rust.nodes().filter().by_ids(node_ids)
-        return nc
+            print(f"[Groggy] EdgeCollection.add: {len(edge_ids)} edges in {total:.6f} seconds")
+            if return_proxies:
+                return [self.get((eid.source().value, eid.target().value)) for eid in edge_ids]
+            else:
+                return None
+
 
     def node_ids(self):
         """

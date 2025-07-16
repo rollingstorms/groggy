@@ -43,46 +43,187 @@ pub enum BatchResult {
 #[pyclass]
 #[derive(Clone)]
 pub struct AttributeManager {
-    pub columnar: ColumnarStore,
+    pub columnar: std::sync::Arc<ColumnarStore>,
+    pub graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>,
 }
 
 #[pymethods]
 impl AttributeManager {
     #[new]
     pub fn new() -> Self {
+        let graph_store = std::sync::Arc::new(crate::storage::graph_store::GraphStore::new());
         Self {
-            columnar: ColumnarStore::new(),
+            columnar: std::sync::Arc::new(ColumnarStore::new()),
+            graph_store,
         }
     }
 
     /// Basic Python-compatible get method (returns JSON string)
     pub fn get_py(&self, id: &str, attr: &str) -> Option<String> {
-        self.get(id, attr).map(|v| serde_json::to_string(&v).unwrap_or_default())
+        self.get_internal(id, attr, true).map(|v| serde_json::to_string(&v).unwrap_or_default())
+    }
+
+    /// Get method exposed to Python (supports flexible parameter formats)
+    #[pyo3(signature = (node_ids = None, attr_names = None))]
+    pub fn get(&self, py: pyo3::Python, node_ids: Option<&pyo3::types::PyAny>, attr_names: Option<&pyo3::types::PyAny>) -> PyResult<pyo3::PyObject> {
+        use pyo3::types::{PyList, PyDict};
+        
+        // Handle single node_id, single attr_name case
+        if let (Some(node_id_obj), Some(attr_name_obj)) = (node_ids, attr_names) {
+            if let (Ok(node_id), Ok(attr_name)) = (node_id_obj.extract::<String>(), attr_name_obj.extract::<String>()) {
+                if let Some(value) = self.get_internal(&node_id, &attr_name, true) {
+                    return Ok(serde_json::to_string(&value).unwrap_or_default().into_py(py));
+                } else {
+                    return Ok(py.None());
+                }
+            }
+        }
+        
+        // Handle batch operations
+        let timing_start = std::time::Instant::now();
+        
+        // Parse node_ids
+        let node_id_list: Vec<String> = if let Some(node_ids_obj) = node_ids {
+            if let Ok(ids) = node_ids_obj.extract::<Vec<String>>() {
+                ids
+            } else if let Ok(single_id) = node_ids_obj.extract::<String>() {
+                vec![single_id]
+            } else {
+                return Err(pyo3::exceptions::PyValueError::new_err("node_ids must be a string or list of strings"));
+            }
+        } else {
+            return Err(pyo3::exceptions::PyValueError::new_err("node_ids parameter is required"));
+        };
+        
+        // Parse attr_names
+        let attr_name_list: Vec<String> = if let Some(attr_names_obj) = attr_names {
+            if let Ok(names) = attr_names_obj.extract::<Vec<String>>() {
+                names
+            } else if let Ok(single_name) = attr_names_obj.extract::<String>() {
+                vec![single_name]
+            } else {
+                return Err(pyo3::exceptions::PyValueError::new_err("attr_names must be a string or list of strings"));
+            }
+        } else {
+            return Err(pyo3::exceptions::PyValueError::new_err("attr_names parameter is required"));
+        };
+        
+        // Create result dictionary
+        let result_dict = PyDict::new(py);
+        
+        // Batch get operations by attribute name
+        for attr_name in attr_name_list {
+            if let Some(all_values) = self.get_node_attr(attr_name.clone()) {
+                let attr_dict = PyDict::new(py);
+                
+                // Filter to only requested node IDs
+                for node_id in &node_id_list {
+                    let is_node = !node_id.contains("->");
+                    if let Some(index) = if is_node {
+                        use crate::graph::types::NodeId;
+                        let node_id_typed = NodeId::new(node_id.clone());
+                        self.graph_store.node_index(&node_id_typed)
+                    } else {
+                        use crate::graph::types::{NodeId, EdgeId};
+                        let parts: Vec<&str> = node_id.split("->").collect();
+                        if parts.len() == 2 {
+                            let source = NodeId::new(parts[0].to_string());
+                            let target = NodeId::new(parts[1].to_string());
+                            let edge_id = EdgeId::new(source, target);
+                            self.graph_store.edge_index(&edge_id)
+                        } else {
+                            None
+                        }
+                    } {
+                        if let Some(value) = all_values.get(&index) {
+                            let value_str = serde_json::to_string(value).unwrap_or_default();
+                            attr_dict.set_item(node_id, value_str)?;
+                        }
+                    }
+                }
+                
+                result_dict.set_item(&attr_name, attr_dict)?;
+            }
+        }
+        
+        let elapsed = timing_start.elapsed();
+        println!("[Groggy][Timing][Rust] get: batch operation took {:.6}s", elapsed.as_secs_f64());
+        
+        Ok(result_dict.into())
     }
     
-    /// Expose set method to Python for batch attribute setting
+    /// Expose set method to Python for batch attribute setting.
+    /// Accepts a dict of {entity_id: {attr_name: value}} where entity_id may be node or edge (e.g., "n1" or "n1->n2").
     #[pyo3(name = "set")]
     pub fn py_set(&mut self, attr_data: &pyo3::types::PyAny) -> PyResult<()> {
         use pyo3::types::PyDict;
-        // Accepts a dict of {node_id: {attr_name: value}}
+        // Accepts a dict of {entity_id: {attr_name: value}}
         if let Ok(dict) = attr_data.downcast::<PyDict>() {
-            for (node_id_obj, attrs_obj) in dict.iter() {
-                let node_id = node_id_obj.extract::<String>()?;
+            let timing_start = std::time::Instant::now();
+            
+            // Group by is_node and attribute name for batch operations
+            let mut node_batches: std::collections::HashMap<String, std::collections::HashMap<usize, serde_json::Value>> = std::collections::HashMap::new();
+            let mut edge_batches: std::collections::HashMap<String, std::collections::HashMap<usize, serde_json::Value>> = std::collections::HashMap::new();
+            
+            for (entity_id_obj, attrs_obj) in dict.iter() {
+                let entity_id: String = entity_id_obj.extract()?;
+                let is_node = !entity_id.contains("->");
                 let attrs = attrs_obj.downcast::<PyDict>()?;
+                
+                // Get the entity index
+                let index = if is_node {
+                    use crate::graph::types::NodeId;
+                    let node_id = NodeId::new(entity_id.clone());
+                    self.graph_store.node_index(&node_id)
+                } else {
+                    use crate::graph::types::{NodeId, EdgeId};
+                    let parts: Vec<&str> = entity_id.split("->").collect();
+                    if parts.len() == 2 {
+                        let source = NodeId::new(parts[0].to_string());
+                        let target = NodeId::new(parts[1].to_string());
+                        let edge_id = EdgeId::new(source, target);
+                        self.graph_store.edge_index(&edge_id)
+                    } else {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid edge ID format: {}", entity_id)));
+                    }
+                };
+                
+                let entity_index = match index {
+                    Some(idx) => idx,
+                    None => return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!("{} ID not found: {}", if is_node {"Node"} else {"Edge"}, entity_id))),
+                };
+                
+                // Process each attribute for this entity
                 for (attr_name_obj, value_obj) in attrs.iter() {
-                    let attr_name = attr_name_obj.extract::<String>()?;
-                    // Convert Python object to JSON string, then parse to serde_json::Value
+                    let attr_name: String = attr_name_obj.extract()?;
                     let py = value_obj.py();
                     let json_module = py.import("json")?;
                     let value_str = json_module.call_method1("dumps", (value_obj,))?.extract::<String>()?;
                     let value: serde_json::Value = serde_json::from_str(&value_str)
                         .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid JSON: {}", e)))?;
-                    self.set(&node_id, &attr_name, value).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+                    
+                    // Add to the appropriate batch
+                    if is_node {
+                        node_batches.entry(attr_name).or_default().insert(entity_index, value);
+                    } else {
+                        edge_batches.entry(attr_name).or_default().insert(entity_index, value);
+                    }
                 }
             }
+            
+            // Execute batch operations
+            for (attr_name, data) in node_batches {
+                self.set_node_attr(attr_name, data);
+            }
+            for (attr_name, data) in edge_batches {
+                self.set_edge_attr(attr_name, data);
+            }
+            
+            let elapsed = timing_start.elapsed();
+            println!("[Groggy][Timing][Rust] py_set: batch operation took {:.6}s", elapsed.as_secs_f64());
             Ok(())
         } else {
-            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>("Expected a dict of {node_id: {attr_name: value}}"))
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>("Expected a dict of {entity_id: {attr_name: value}}"))
         }
     }
 
@@ -134,13 +275,38 @@ impl AttributeManager {
 
 // Internal methods for performance (not exposed to Python)
 impl AttributeManager {
+    /// Internal constructor for Rust usage
+    pub fn new_with_graph_store(graph_store: std::sync::Arc<crate::storage::graph_store::GraphStore>) -> Self {
+        Self {
+            columnar: std::sync::Arc::new(ColumnarStore::new()),
+            graph_store,
+        }
+    }
+
     /// Internal get method using serde_json::Value
-    pub fn get(&self, id: &str, attr: &str) -> Option<serde_json::Value> {
-        // Parse the ID to get the index
-        if let Ok(index) = id.parse::<usize>() {
-            // Try as node first, then as edge
-            if let Some(value) = self.columnar.get_node_value(attr.to_string(), index) {
-                Some(value)
+    pub fn get_internal(&self, id: &str, attr: &str, is_node: bool) -> Option<serde_json::Value> {
+        use crate::graph::types::{NodeId, EdgeId};
+        let index = match is_node {
+            true => {
+                let node_id = NodeId::new(id.to_string());
+                self.graph_store.node_index(&node_id)
+            },
+            false => {
+                // Parse edge id string "source->target"
+                let parts: Vec<&str> = id.split("->").collect();
+                if parts.len() == 2 {
+                    let source = NodeId::new(parts[0].to_string());
+                    let target = NodeId::new(parts[1].to_string());
+                    let edge_id = EdgeId::new(source, target);
+                    self.graph_store.edge_index(&edge_id)
+                } else {
+                    return None;
+                }
+            },
+        };
+        if let Some(index) = index {
+            if is_node {
+                self.columnar.get_node_value(attr.to_string(), index)
             } else {
                 self.columnar.get_edge_value(attr.to_string(), index)
             }
@@ -150,14 +316,40 @@ impl AttributeManager {
     }
     
     /// Internal set method using serde_json::Value
-    pub fn set(&mut self, id: &str, attr: &str, value: serde_json::Value) -> Result<(), String> {
-        // Parse the ID to get the index
-        if let Ok(index) = id.parse::<usize>() {
-            // For now, assume it's a node - in a real implementation, you'd need to know the entity type
-            self.columnar.set_node_value(attr.to_string(), index, value);
+    pub fn set_internal(&self, id: &str, attr: &str, value: serde_json::Value, is_node: bool) -> Result<(), String> {
+        let timing_start = std::time::Instant::now();
+        use crate::graph::types::{NodeId, EdgeId};
+        let index = match is_node {
+            true => {
+                let node_id = NodeId::new(id.to_string());
+                self.graph_store.node_index(&node_id)
+            },
+            false => {
+                // Parse edge id string "source->target"
+                let parts: Vec<&str> = id.split("->").collect();
+                if parts.len() == 2 {
+                    let source = NodeId::new(parts[0].to_string());
+                    let target = NodeId::new(parts[1].to_string());
+                    let edge_id = EdgeId::new(source, target);
+                    self.graph_store.edge_index(&edge_id)
+                } else {
+                    return Err(format!("Invalid edge ID format: {}", id));
+                }
+            },
+        };
+        if let Some(index) = index {
+            if is_node {
+                self.columnar.set_node_value(attr.to_string(), index, value);
+                let elapsed = timing_start.elapsed();
+                println!("[Groggy][Timing][Rust] set_internal: node {} attr '{}' took {:.6}s", id, attr, elapsed.as_secs_f64());
+            } else {
+                self.columnar.set_edge_value(attr.to_string(), index, value);
+                let elapsed = timing_start.elapsed();
+                println!("[Groggy][Timing][Rust] set_internal: edge {} attr '{}' took {:.6}s", id, attr, elapsed.as_secs_f64());
+            }
             Ok(())
         } else {
-            Err(format!("Invalid ID format: {}", id))
+            Err(format!("{} ID not found: {}", if is_node {"Node"} else {"Edge"}, id))
         }
     }
 
@@ -168,7 +360,10 @@ impl AttributeManager {
 
     /// Set all values for a node attribute by name.
     pub fn set_node_attr(&self, attr_name: String, data: std::collections::HashMap<usize, serde_json::Value>) {
-        self.columnar.set_node_attr(attr_name, data);
+        let timing_start = std::time::Instant::now();
+        self.columnar.set_node_attr(attr_name.clone(), data);
+        let elapsed = timing_start.elapsed();
+        println!("[Groggy][Timing][Rust] set_node_attr: batch node attr '{}' took {:.6}s", attr_name, elapsed.as_secs_f64());
     }
 
     /// Get a single value for a node attribute and entity index.
@@ -178,6 +373,10 @@ impl AttributeManager {
 
     /// Set a single value for a node attribute and entity index.
     pub fn set_node_value(&self, attr_name: String, idx: usize, value: serde_json::Value) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
+        let call_num = CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+        let timing_start = std::time::Instant::now();
         self.columnar.set_node_value(attr_name, idx, value);
     }
 
@@ -208,7 +407,15 @@ impl AttributeManager {
 
     /// Set a single value for an edge attribute and entity index.
     pub fn set_edge_value(&self, attr_name: String, idx: usize, value: serde_json::Value) {
-        self.columnar.set_edge_value(attr_name, idx, value);
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
+        let call_num = CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+        let timing_start = std::time::Instant::now();
+        self.columnar.set_edge_value(attr_name.clone(), idx, value);
+        let elapsed = timing_start.elapsed();
+        if call_num < 5 || (call_num > 0 && call_num % 10000 == 0) || call_num >= 5 && call_num % 10000 == 9995 {
+            println!("[Groggy][Timing][Rust] set_edge_value: edge idx {} attr '{}' took {:.6}s (call #{})", idx, attr_name, elapsed.as_secs_f64(), call_num + 1);
+        }
     }
 
     /// Get column stats for edge attributes.

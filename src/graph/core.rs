@@ -19,8 +19,8 @@ impl FastGraph {
     /// Constructor for new graph instance
     #[new]
     pub fn new() -> Self {
-        let attribute_manager = crate::graph::managers::attributes::AttributeManager::new();
         let graph_store = std::sync::Arc::new(crate::storage::graph_store::GraphStore::new());
+        let attribute_manager = crate::graph::managers::attributes::AttributeManager::new_with_graph_store(graph_store.clone());
         let node_collection = crate::graph::nodes::collection::NodeCollection::new(attribute_manager.clone(), graph_store.clone(), None);
         let edge_collection = crate::graph::edges::collection::EdgeCollection::new(attribute_manager.clone(), graph_store.clone(), None);
         let info = crate::graph::types::GraphInfo::default();
@@ -80,7 +80,10 @@ impl FastGraph {
 
     /// Returns NodeCollection instance
     pub fn nodes(&self) -> crate::graph::nodes::collection::NodeCollection {
-        self.node_collection.clone()
+        let mut collection = self.node_collection.clone();
+        // Ensure the node_ids are up to date with the graph store
+        collection.node_ids = self.graph_store.all_node_ids();
+        collection
     }
 
     /// Returns EdgeCollection instance

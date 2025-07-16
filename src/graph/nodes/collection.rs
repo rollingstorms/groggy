@@ -3,7 +3,8 @@
 //! Provides batch operations, columnar backend, and agent/LLM-friendly APIs.
 
 use pyo3::prelude::*;
-use pyo3::{types::{PyDict, PyString}, Python};
+use pyo3::types::{PyDict, PyString};
+use pyo3::Python;
 use crate::graph::types::NodeId;
 use crate::graph::managers::attributes::AttributeManager;
 // use crate::graph::columnar::NodeColumnarStore; // Uncomment when available
@@ -20,6 +21,31 @@ pub struct NodeCollection {
 
 #[pymethods]
 impl NodeCollection {
+    pub fn add(&mut self, py_node_ids: &pyo3::types::PyAny) -> pyo3::PyResult<()> {
+        // Fast path: accept pre-processed string list from Python layer
+        if let Ok(list) = py_node_ids.extract::<Vec<String>>() {
+            let node_ids: Vec<NodeId> = list.into_iter().map(NodeId::new).collect();
+            self.add_batch(node_ids)?;
+            return Ok(());
+        }
+        
+        // Fallback: handle other types (for direct Rust usage)
+        let node_ids: Vec<NodeId> = if let Ok(list) = py_node_ids.extract::<Vec<i64>>() {
+            list.into_iter().map(|i| NodeId::new(i.to_string())).collect()
+        } else if let Ok(single) = py_node_ids.extract::<String>() {
+            vec![NodeId::new(single)]
+        } else if let Ok(single) = py_node_ids.extract::<i64>() {
+            vec![NodeId::new(single.to_string())]
+        } else {
+            let actual_type = py_node_ids.get_type().name().unwrap_or("unknown");
+            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                "Invalid node ID format: must be str, int, list[str], or list[int]. Got type: {}",
+                actual_type
+            )));
+        };
+        self.add_batch(node_ids)?;
+        Ok(())
+    }
     /// Flexible filter method: supports dict, string, or chaining.
     #[pyo3(signature = (*args, **kwargs))]
     pub fn filter_py(&self, py: Python, args: &pyo3::types::PyTuple, kwargs: Option<&PyDict>) -> Self {
@@ -44,19 +70,61 @@ impl NodeCollection {
 
     /// Create a new NodeCollection from Python (simplified constructor)
     #[new]
-    pub fn py_new(attribute_manager: AttributeManager) -> Self {
-        // For Python usage, create with empty node_ids and a placeholder graph_store
-        // This will be properly initialized when used with a real graph
+    pub fn py_new() -> Self {
         let graph_store = std::sync::Arc::new(crate::storage::graph_store::GraphStore::new());
-        Self { 
-            attribute_manager: std::sync::Arc::new(attribute_manager), 
+        let attribute_manager = AttributeManager::new_with_graph_store(graph_store.clone());
+        Self {
+            attribute_manager: std::sync::Arc::new(attribute_manager),
             node_ids: Vec::new(),
             graph_store,
         }
     }
 
-    /// Add one or more nodes to the collection (batch-oriented).
-    pub fn add(&mut self, nodes: Vec<NodeId>) -> PyResult<()> {
+    /// Returns an AttributeManager for node attributes.
+    pub fn attr(&self) -> AttributeManager {
+        (*self.attribute_manager).clone()
+    }
+
+    /// Returns the number of nodes in this collection.
+    #[getter]
+    pub fn size(&self) -> usize {
+        self.node_ids.len()
+    }
+
+    /// Flexible filter method: supports dict, string, or chaining.
+    #[pyo3(name = "filter")]
+    #[pyo3(signature = (*args, **kwargs))]
+    pub fn filter(&self, py: Python, args: &pyo3::types::PyTuple, kwargs: Option<&PyDict>) -> Self {
+        self.filter_py(py, args, kwargs)
+    }
+
+    /// Returns all node IDs in this collection.
+    pub fn ids(&self) -> Vec<String> {
+        self.node_ids.iter().map(|id| id.0.clone()).collect()
+    }
+
+    /// Check if a node exists in the collection.
+    pub fn has(&self, node_id: String) -> bool {
+        let node_id = crate::graph::types::NodeId::new(node_id);
+        self.graph_store.has_node(&node_id)
+    }
+
+    /// Get a NodeProxy for this node if it exists.
+    pub fn get(&self, node_id: String) -> Option<crate::graph::nodes::proxy::NodeProxy> {
+        let node_id = crate::graph::types::NodeId::new(node_id);
+        if self.graph_store.has_node(&node_id) {
+            Some(crate::graph::nodes::proxy::NodeProxy::new(node_id, self.graph_store.clone()))
+        } else {
+            None
+        }
+    }
+
+}
+
+// --- Rust-only methods ---
+impl NodeCollection {
+    /// Add one or more nodes to the collection (batch-oriented, Rust only).
+    pub fn add_batch(&mut self, nodes: Vec<NodeId>) -> PyResult<()> {
         self.graph_store.add_nodes(&nodes);
         self.node_ids = self.graph_store.all_node_ids();
         Ok(())
@@ -69,33 +137,13 @@ impl NodeCollection {
         Ok(())
     }
 
-    /// Returns the number of nodes in this collection.
-    pub fn size(&self) -> usize {
-        self.graph_store.node_count()
-    }
-
-    /// Returns all node IDs in this collection.
-    pub fn ids(&self) -> Vec<NodeId> {
-        self.graph_store.all_node_ids()
-    }
-
-    /// Check if a node exists in the collection.
-    pub fn has(&self, node_id: NodeId) -> bool {
-        self.graph_store.has_node(&node_id)
-    }
-
-    /// Returns an AttributeManager for node attributes.
-    pub fn attr(&self) -> AttributeManager {
-        (*self.attribute_manager).clone()
-    }
-
     /// Returns a FilterManager for this collection, pre-configured for nodes.
     ///
     /// Usage:
-    /// let mut fm = collection.filter();
+    /// let mut fm = collection.filter_manager();
     /// fm.add_filter(...);
     /// let result_ids = fm.apply(collection.ids());
-    pub fn filter(&self) -> crate::graph::managers::filter::FilterManager {
+    pub fn filter_manager(&self) -> crate::graph::managers::filter::FilterManager {
         let mut parent: std::collections::HashMap<String, String> = std::collections::HashMap::new();
         crate::graph::managers::filter::FilterManager::new((*self.attribute_manager).clone(), true)
     }
@@ -105,10 +153,10 @@ impl NodeCollection {
         self.node_ids.clone()
     }
 
-    /// Get a NodeProxy for this node if it exists.
-    pub fn get(&self, node_id: NodeId) -> Option<crate::graph::nodes::proxy::NodeProxy> {
-        if self.has(node_id.clone()) {
-            Some(crate::graph::nodes::proxy::NodeProxy::new(node_id, self.attribute_manager.clone(), self.graph_store.clone()))
+    /// Get a NodeProxy for this node if it exists (Rust-only method).
+    pub fn get_rust(&self, node_id: NodeId) -> Option<crate::graph::nodes::proxy::NodeProxy> {
+        if self.graph_store.has_node(&node_id) {
+            Some(crate::graph::nodes::proxy::NodeProxy::new(node_id, self.graph_store.clone()))
         } else {
             None
         }
@@ -153,8 +201,15 @@ fn filter_nodes_by_dict(
                     }
                 } else if let Ok(val_expected) = v.extract::<i64>() {
                     // Numeric equality
-                    if val.as_ref().and_then(|j| j.as_i64()) != Some(val_expected) {
-                        keep = false; break;
+                    match val.as_ref().and_then(|j| j.as_i64()) {
+                        Some(actual_val) => {
+                            if actual_val != val_expected {
+                                keep = false; break;
+                            }
+                        }
+                        None => {
+                            keep = false; break;
+                        }
                     }
                 } else if let Ok(val_expected) = v.extract::<bool>() {
                     if val.as_ref().and_then(|j| j.as_bool()) != Some(val_expected) {

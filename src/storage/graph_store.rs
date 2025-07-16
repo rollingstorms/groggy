@@ -6,6 +6,7 @@
 /// Persistent graph storage backend
 use dashmap::DashMap;
 use parking_lot::RwLock;
+use pyo3::pyclass;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -19,6 +20,7 @@ pub struct GraphState {
     pub edge_hashes: HashMap<String, u64>,
 }
 
+#[pyclass]
 pub struct GraphStore {
     pub node_id_to_index: DashMap<crate::graph::types::NodeId, usize>,
     pub index_to_node_id: DashMap<usize, crate::graph::types::NodeId>,

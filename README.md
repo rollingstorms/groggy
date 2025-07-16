@@ -20,46 +20,26 @@ Groggy is a powerful, easy-to-use graph language engine written in Rust with a P
 
 ### Main Graph Class
 ```python
-from groggy import Graph
-G = Graph(directed=True)
-G.nodes.add({'n1': {'type': 'A'}, 'n2': {'type': 'B'}})
-G.edges.add([('n1', 'n2', {'weight': 1.0})])
-paths = G.shortest_path('n1', 'n2')
+import groggy as gr
+g = gr.Graph(directed=True)
+g.nodes.add({'n1': {'type': 'A'}, 'n2': {'type': 'B'}})
+g.edges.add([('n1', 'n2', {'weight': 1.0})])
+print('memory stats:', g.info())
 ```
 
 ### Node & Edge Collections
 ```python
-G.nodes.add({'n3': {'attr': 'X'}})
-G.nodes.remove(['n1'])
-G.nodes.filter(type='A')
-G.edges.add([('n2', 'n3')])
-G.edges.filter(weight__gt=0.5)
+g.nodes.add({'n3': {'attr': 'X'}})
+g.nodes.remove(['n1'])
+g.nodes.filter('type="A"')
+g.edges.add([('n2', 'n3')])
+g.edges.filter('weight > 0.5')
 ```
 
 ### Attribute Management
 ```python
-G.nodes.attr.set({'n2': {'score': 0.8}})
-attrs = G.nodes.attr.get(['n2'], ['score'])
-```
-
-### Subgraphs & Snapshots
-```python
-subG = G.subgraph(node_filter='type==A')
-snap = G.snapshot()
-```
-
-### Algorithms
-```python
-G.bfs('n1')
-G.dfs('n2')
-G.connected_components()
-G.pagerank()
-```
-
-### Utilities
-```python
-from groggy.utils import create_random_graph, convert_networkx_graph
-G2 = create_random_graph(100, 0.1, use_rust=True)
+g.nodes.attr.set({'n2': {'score': 0.8}})
+attrs = g.nodes.attr.get(['n2'], ['score'])
 ```
 
 ---

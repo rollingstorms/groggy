@@ -3,6 +3,7 @@
 //! Designed for agent/LLM workflows and backend extensibility.
 
 use pyo3::prelude::*;
+use pyo3::types::PyString;
 use crate::graph::types::{EdgeId, NodeId};
 use crate::graph::managers::attributes::AttributeManager;
 use crate::graph::proxy::base::EdgeProxyAttributeManager;
@@ -25,9 +26,27 @@ pub struct EdgeProxy {
 impl EdgeProxy {
     /// Create a new EdgeProxy from Python (simplified constructor)
     #[new]
-    pub fn py_new(edge_id: EdgeId, source: NodeId, target: NodeId, attribute_manager: AttributeManager) -> Self {
+    pub fn py_new(_py_edge_id: &PyAny, py_source: &PyAny, py_target: &PyAny) -> PyResult<Self> {
+        // Extract source and target NodeId
+        let source: NodeId = if let Ok(id_str) = py_source.extract::<String>() {
+            NodeId::new(id_str)
+        } else if let Ok(id_int) = py_source.extract::<i64>() {
+            NodeId::new(id_int.to_string())
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>("Source NodeId must be str or int"));
+        };
+        let target: NodeId = if let Ok(id_str) = py_target.extract::<String>() {
+            NodeId::new(id_str)
+        } else if let Ok(id_int) = py_target.extract::<i64>() {
+            NodeId::new(id_int.to_string())
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>("Target NodeId must be str or int"));
+        };
+        let edge_id = EdgeId::new(source.clone(), target.clone());
+        // For demo/test, create new GraphStore and AttributeManager internally
         let graph_store = std::sync::Arc::new(crate::storage::graph_store::GraphStore::new());
-        Self { edge_id, source, target, attribute_manager, graph_store }
+        let attribute_manager = AttributeManager::new_with_graph_store(graph_store.clone());
+        Ok(Self { edge_id, source, target, attribute_manager, graph_store })
     }
 
     /// Returns a ProxyAttributeManager for this edge (per-attribute API).
@@ -36,19 +55,38 @@ impl EdgeProxy {
     }
 
     /// Get the value of a single attribute for this edge (JSON string).
-    pub fn get_attr(&self, attr_name: String) -> Option<String> {
+    pub fn get_attr(&self, py_attr_name: &PyAny, py: Python) -> PyResult<Option<PyObject>> {
+        let attr_name: String = py_attr_name.extract()?;
         if let Some(index) = self.graph_store.edge_index(&self.edge_id) {
-            self.attribute_manager.get_edge_value(attr_name, index)
-                .map(|v| serde_json::to_string(&v).unwrap_or_default())
+            if let Some(val) = self.attribute_manager.get_edge_value(attr_name, index) {
+                let py_val = PyString::new(py, &serde_json::to_string(&val).unwrap_or_default()).into_py(py);
+                Ok(Some(py_val))
+            } else {
+                Ok(None)
+            }
         } else {
-            None
+            Ok(None)
         }
     }
 
     /// Set the value of a single attribute for this edge (JSON string).
-    pub fn set_attr(&mut self, attr_name: String, value: String) -> PyResult<()> {
-        let json_value: serde_json::Value = serde_json::from_str(&value)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid JSON: {}", e)))?;
+    pub fn set_attr(&mut self, py_attr_name: &PyAny, py_value: &PyAny, py: Python) -> PyResult<()> {
+        let attr_name: String = py_attr_name.extract()?;
+        // Convert Python value to serde_json::Value
+        let json_value = if let Ok(s) = py_value.extract::<String>() {
+            serde_json::Value::String(s)
+        } else if let Ok(i) = py_value.extract::<i64>() {
+            serde_json::Value::Number(i.into())
+        } else if let Ok(f) = py_value.extract::<f64>() {
+            serde_json::Number::from_f64(f).map(serde_json::Value::Number).unwrap_or(serde_json::Value::Null)
+        } else if let Ok(b) = py_value.extract::<bool>() {
+            serde_json::Value::Bool(b)
+        } else {
+            // Fallback: use Python's json.dumps
+            let json_mod = py.import("json")?;
+            let json_str: String = json_mod.call_method1("dumps", (py_value,))?.extract()?;
+            serde_json::from_str(&json_str).unwrap_or(serde_json::Value::Null)
+        };
         if let Some(index) = self.graph_store.edge_index(&self.edge_id) {
             self.attribute_manager.set_edge_value(attr_name, index, json_value);
             Ok(())
@@ -58,22 +96,22 @@ impl EdgeProxy {
     }
 
     /// Get all attributes for this edge as a map (JSON string).
-    pub fn attrs(&self) -> Option<String> {
+    pub fn attrs(&self, py: Python) -> PyResult<PyObject> {
         if let Some(index) = self.graph_store.edge_index(&self.edge_id) {
-            // Collect all present attributes for this edge
             let mut map = serde_json::Map::new();
             for attr in self.attribute_manager.columnar.edge_attr_names() {
                 if let Some(val) = self.attribute_manager.get_edge_value(attr.clone(), index) {
                     map.insert(attr, val);
                 }
             }
-            if map.is_empty() {
-                None
-            } else {
-                serde_json::to_string(&map).ok()
+            let py_dict = pyo3::types::PyDict::new(py);
+            for (k, v) in map {
+                let py_val = pyo3::types::PyString::new(py, &serde_json::to_string(&v).unwrap_or_default());
+                py_dict.set_item(k, py_val)?;
             }
+            Ok(py_dict.into())
         } else {
-            None
+            Ok(pyo3::types::PyDict::new(py).into())
         }
     }
 

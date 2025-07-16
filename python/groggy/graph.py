@@ -3,6 +3,7 @@
 import groggy._core
 from groggy.collections.nodes import NodeCollection
 from groggy.collections.edges import EdgeCollection
+import time
 
 class Graph:
     """
@@ -13,6 +14,8 @@ class Graph:
     """
 
     def __init__(self, directed=False, backend=None):
+
+    
         """
         Initializes a new Graph instance.
         
@@ -24,6 +27,7 @@ class Graph:
         Raises:
             ValueError: If backend is invalid or unavailable.
         """
+        start = time.perf_counter()
         # Only Rust backend is supported for now
         if backend not in (None, 'rust'):
             raise ValueError(f"Unsupported backend: {backend}")
@@ -32,6 +36,9 @@ class Graph:
         # TODO: Add support for setting directed in Rust FastGraph constructor
         self._nodes = NodeCollection(self)
         self._edges = EdgeCollection(self)
+        
+        elapsed = time.perf_counter() - start
+        print(f"[Groggy] Graph.__init__: constructed in {elapsed:.6f} seconds")
 
     def info(self):
         """

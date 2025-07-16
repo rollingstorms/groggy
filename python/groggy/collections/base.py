@@ -102,7 +102,7 @@ class BaseCollection:
             dict: Collection summary.
         """
         summary = {
-            "size": self.size(),
+            "size": self.size,
             "ids_sample": self.ids()[:5],
             "attributes": getattr(self._rust, "schema", lambda: None)(),
         }
