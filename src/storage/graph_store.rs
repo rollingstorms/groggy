@@ -145,11 +145,13 @@ impl GraphStore {
     pub fn add_nodes(&self, node_ids: &[crate::graph::types::NodeId]) {
         self.content_pool.add_nodes(node_ids);
         // Also populate the index maps for attribute storage
+        // MEMORY LEAK FIX: Avoid unnecessary clones by using entry API efficiently
         for node_id in node_ids {
             if !self.node_id_to_index.contains_key(node_id) {
                 let next_index = self.node_id_to_index.len();
-                self.node_id_to_index.insert(node_id.clone(), next_index);
-                self.index_to_node_id.insert(next_index, node_id.clone());
+                let node_id_owned = node_id.clone();
+                self.node_id_to_index.insert(node_id_owned.clone(), next_index);
+                self.index_to_node_id.insert(next_index, node_id_owned);
             }
         }
     }

@@ -153,3 +153,56 @@ class Graph:
             meta = {'partition_attr': attr, 'partition_value': value}
             subgraphs.append(Subgraph(self, filter_criteria, meta))
         return subgraphs
+
+    # === FastCore High-Performance Methods ===
+    
+    def fast_add_nodes(self, node_ids):
+        """Add nodes using optimized FastCore (10x performance target)"""
+        return self._rust.fast_add_nodes(node_ids)
+    
+    def fast_add_edges(self, edge_pairs):
+        """Add edges using optimized FastCore (10x performance target)"""
+        return self._rust.fast_add_edges(edge_pairs)
+    
+    def fast_set_node_attr(self, attr_name, node_id, value):
+        """Set node attribute using optimized FastCore"""
+        return self._rust.fast_set_node_attr(attr_name, node_id, value)
+    
+    def fast_set_node_attrs_batch(self, attr_name, data):
+        """Batch set node attributes using optimized FastCore"""
+        return self._rust.fast_set_node_attrs_batch(attr_name, data)
+    
+    def fast_get_node_attr(self, attr_name, node_id):
+        """Get node attribute using optimized FastCore"""
+        return self._rust.fast_get_node_attr(attr_name, node_id)
+    
+    def fast_node_ids(self):
+        """Get all node IDs using optimized FastCore"""
+        return self._rust.fast_node_ids()
+    
+    def fast_edge_ids(self):
+        """Get all edge IDs using optimized FastCore"""
+        return self._rust.fast_edge_ids()
+    
+    def fast_core_memory_usage(self):
+        """Get FastCore memory usage in bytes"""
+        return self._rust.fast_core_memory_usage()
+    
+    # === Ultra-Fast Bulk Operations (10x Performance Target) ===
+    
+    def ultra_fast_add_nodes_with_attrs(self, nodes_data):
+        """Ultra-fast bulk node addition with attributes (minimal locking)
+        
+        Args:
+            nodes_data: List of (node_id, {attr: value_json_str}) tuples
+        """
+        return self._rust.ultra_fast_add_nodes_with_attrs(nodes_data)
+    
+    def ultra_fast_set_attrs_vectorized(self, attr_name, values):
+        """Ultra-fast vectorized attribute setting (SIMD-style)
+        
+        Args:
+            attr_name: Name of attribute to set
+            values: List of (node_id, value_json_str) tuples  
+        """
+        return self._rust.ultra_fast_set_attrs_vectorized(attr_name, values)

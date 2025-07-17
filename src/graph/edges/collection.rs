@@ -98,8 +98,7 @@ impl EdgeCollection {
 
     /// Check if an edge exists in the collection.
     pub fn has(&self, edge_id: String) -> bool {
-        // Parse edge_id string back to EdgeId - this is a simplified implementation
-        // In a real implementation, you'd want a proper EdgeId parser
+        // PHASE 2 OPTIMIZATION: Use split_once instead of parsing - already optimized
         if let Some((src, tgt)) = edge_id.split_once("->") {
             let edge_id = EdgeId::new(NodeId::new(src.to_string()), NodeId::new(tgt.to_string()));
             self.graph_store.has_edge(&edge_id)
@@ -146,20 +145,23 @@ impl EdgeCollection {
     /// Add one or more edges to the collection (batch-oriented, internal use).
     pub fn add_batch(&mut self, edges: Vec<EdgeId>) -> PyResult<()> {
         self.graph_store.add_edges(&edges);
-        self.edge_ids = self.graph_store.all_edge_ids();
+        // MEMORY LEAK FIX: Extend existing Vec instead of replacing entire Vec
+        self.edge_ids.extend(edges);
         Ok(())
     }
 
     /// Remove one or more edges from the collection (batch-oriented, internal use).
     pub fn remove_batch(&mut self, edge_ids: Vec<EdgeId>) -> PyResult<()> {
         self.graph_store.remove_edges(&edge_ids);
-        self.edge_ids = self.graph_store.all_edge_ids();
+        // MEMORY LEAK FIX: Remove specific edges instead of replacing entire Vec
+        self.edge_ids.retain(|edge_id| !edge_ids.contains(edge_id));
         Ok(())
     }
 
     /// Returns an iterator over edge IDs in this collection (internal use).
-    pub fn iter(&self) -> Vec<EdgeId> {
-        self.edge_ids.clone()
+    pub fn iter(&self) -> &Vec<EdgeId> {
+        // MEMORY LEAK FIX: Return reference instead of cloning entire Vec
+        &self.edge_ids
     }
 
     /// Get an EdgeProxy for this edge if it exists (internal use).

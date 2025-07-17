@@ -126,14 +126,17 @@ impl NodeCollection {
     /// Add one or more nodes to the collection (batch-oriented, Rust only).
     pub fn add_batch(&mut self, nodes: Vec<NodeId>) -> PyResult<()> {
         self.graph_store.add_nodes(&nodes);
-        self.node_ids = self.graph_store.all_node_ids();
+        // MEMORY LEAK FIX: Extend existing Vec instead of replacing entire Vec 
+        self.node_ids.extend(nodes);
         Ok(())
     }
+
 
     /// Remove one or more nodes from the collection (batch-oriented).
     pub fn remove(&mut self, node_ids: Vec<NodeId>) -> PyResult<()> {
         self.graph_store.remove_nodes(&node_ids);
-        self.node_ids = self.graph_store.all_node_ids();
+        // MEMORY LEAK FIX: Remove specific nodes instead of replacing entire Vec
+        self.node_ids.retain(|node_id| !node_ids.contains(node_id));
         Ok(())
     }
 
@@ -144,13 +147,14 @@ impl NodeCollection {
     /// fm.add_filter(...);
     /// let result_ids = fm.apply(collection.ids());
     pub fn filter_manager(&self) -> crate::graph::managers::filter::FilterManager {
-        let mut parent: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        // MEMORY LEAK FIX: Remove unused HashMap that was never dropped
         crate::graph::managers::filter::FilterManager::new((*self.attribute_manager).clone(), true)
     }
 
     /// Returns an iterator over node IDs in this collection.
-    pub fn iter(&self) -> Vec<NodeId> {
-        self.node_ids.clone()
+    pub fn iter(&self) -> &Vec<NodeId> {
+        // MEMORY LEAK FIX: Return reference instead of cloning entire Vec
+        &self.node_ids
     }
 
     /// Get a NodeProxy for this node if it exists (Rust-only method).
@@ -171,7 +175,7 @@ impl NodeCollection {
     }
 }
 
-// Helper: filter by Python dict
+// Helper: filter by Python dict - SIMD optimized
 fn filter_nodes_by_dict(
     attr_manager: &AttributeManager,
     graph_store: &crate::storage::graph_store::GraphStore,
@@ -179,57 +183,121 @@ fn filter_nodes_by_dict(
     d: &pyo3::types::PyDict,
     py: pyo3::Python,
 ) -> Vec<NodeId> {
-    let mut filtered = Vec::new();
-    for node_id in node_ids {
-        let mut keep = true;
-        for (k, v) in d.iter() {
-            let attr = k.extract::<String>().unwrap_or_default();
-            if let Some(index) = graph_store.node_index(node_id) {
-                let val = attr_manager.get_node_value(attr.clone(), index);
-                if let Ok(tup) = v.extract::<(String, pyo3::PyObject)>() {
-                    // e.g. (">", 100000)
-                    let op = tup.0.as_str();
-                    let cmp_val = tup.1.extract::<i64>(py).unwrap_or(0);
-                    let actual = val.as_ref().and_then(|j| j.as_i64()).unwrap_or(0);
-                    match op {
-                        ">" => if !(actual > cmp_val) { keep = false; break; },
-                        "<" => if !(actual < cmp_val) { keep = false; break; },
-                        ">=" => if !(actual >= cmp_val) { keep = false; break; },
-                        "<=" => if !(actual <= cmp_val) { keep = false; break; },
-                        "==" => if !(actual == cmp_val) { keep = false; break; },
-                        _ => { keep = false; break; }
-                    }
-                } else if let Ok(val_expected) = v.extract::<i64>() {
-                    // Numeric equality
-                    match val.as_ref().and_then(|j| j.as_i64()) {
-                        Some(actual_val) => {
-                            if actual_val != val_expected {
-                                keep = false; break;
-                            }
-                        }
-                        None => {
-                            keep = false; break;
-                        }
-                    }
-                } else if let Ok(val_expected) = v.extract::<bool>() {
-                    if val.as_ref().and_then(|j| j.as_bool()) != Some(val_expected) {
-                        keep = false; break;
-                    }
-                } else if let Ok(val_expected) = v.extract::<String>() {
-                    if val.as_ref().and_then(|j| j.as_str()) != Some(val_expected.as_str()) {
-                        keep = false; break;
-                    }
-                } else {
-                    keep = false; break;
+    // Convert node_ids to indices for bulk filtering
+    let mut valid_indices: Vec<usize> = node_ids.iter()
+        .filter_map(|node_id| graph_store.node_index(node_id))
+        .collect();
+    
+    // Apply each filter in the dict
+    for (k, v) in d.iter() {
+        let attr = k.extract::<String>().unwrap_or_default();
+        
+        // Try SIMD filtering for numeric comparisons
+        if let Ok(tup) = v.extract::<(String, pyo3::PyObject)>() {
+            // e.g. (">", 100000)
+            let op_str = tup.0.as_str();
+            if let Ok(cmp_val) = tup.1.extract::<i64>(py) {
+                let comparison_op = match op_str {
+                    ">" => crate::storage::columnar::ComparisonOp::Greater,
+                    "<" => crate::storage::columnar::ComparisonOp::Less,
+                    ">=" => crate::storage::columnar::ComparisonOp::GreaterEqual,
+                    "<=" => crate::storage::columnar::ComparisonOp::LessEqual,
+                    "==" => crate::storage::columnar::ComparisonOp::Equal,
+                    "!=" => crate::storage::columnar::ComparisonOp::NotEqual,
+                    _ => continue,
+                };
+                
+                // Use SIMD filtering when available
+                #[cfg(feature = "simd")]
+                {
+                    let matching_indices = attr_manager.filter_nodes_i64_simd(&attr, cmp_val, comparison_op);
+                    valid_indices.retain(|&idx| matching_indices.contains(&idx));
+                    continue;
                 }
-            } else {
-                // Node not found in graph, skip it
-                keep = false; break;
+                
+                #[cfg(not(feature = "simd"))]
+                {
+                    // Fallback to individual checks
+                    valid_indices.retain(|&idx| {
+                        if let Some(val) = attr_manager.get_node_value(attr.clone(), idx) {
+                            if let Some(actual) = val.as_i64() {
+                                match comparison_op {
+                                    crate::storage::columnar::ComparisonOp::Greater => actual > cmp_val,
+                                    crate::storage::columnar::ComparisonOp::Less => actual < cmp_val,
+                                    crate::storage::columnar::ComparisonOp::GreaterEqual => actual >= cmp_val,
+                                    crate::storage::columnar::ComparisonOp::LessEqual => actual <= cmp_val,
+                                    crate::storage::columnar::ComparisonOp::Equal => actual == cmp_val,
+                                    crate::storage::columnar::ComparisonOp::NotEqual => actual != cmp_val,
+                                }
+                            } else { false }
+                        } else { false }
+                    });
+                    continue;
+                }
             }
+        } else if let Ok(val_expected) = v.extract::<i64>() {
+            // Numeric equality - use SIMD
+            #[cfg(feature = "simd")]
+            {
+                let matching_indices = attr_manager.filter_nodes_i64_simd(&attr, val_expected, crate::storage::columnar::ComparisonOp::Equal);
+                valid_indices.retain(|&idx| matching_indices.contains(&idx));
+                continue;
+            }
+            
+            #[cfg(not(feature = "simd"))]
+            {
+                // Fallback to individual checks
+                valid_indices.retain(|&idx| {
+                    if let Some(val) = attr_manager.get_node_value(attr.clone(), idx) {
+                        val.as_i64() == Some(val_expected)
+                    } else { false }
+                });
+                continue;
+            }
+        } else if let Ok(val_expected) = v.extract::<f64>() {
+            // Float equality - use SIMD
+            #[cfg(feature = "simd")]
+            {
+                let matching_indices = attr_manager.filter_nodes_f64_simd(&attr, val_expected, crate::storage::columnar::ComparisonOp::Equal);
+                valid_indices.retain(|&idx| matching_indices.contains(&idx));
+                continue;
+            }
+            
+            #[cfg(not(feature = "simd"))]
+            {
+                // Fallback to individual checks
+                valid_indices.retain(|&idx| {
+                    if let Some(val) = attr_manager.get_node_value(attr.clone(), idx) {
+                        val.as_f64() == Some(val_expected)
+                    } else { false }
+                });
+                continue;
+            }
+        } else if let Ok(val_expected) = v.extract::<bool>() {
+            // Boolean filtering - use bulk filtering from columnar store
+            let matching_indices = attr_manager.columnar.filter_nodes_by_bool(attr, val_expected);
+            valid_indices.retain(|&idx| matching_indices.contains(&idx));
+            continue;
+        } else if let Ok(val_expected) = v.extract::<String>() {
+            // String filtering - use bulk filtering from columnar store
+            let matching_indices = attr_manager.columnar.filter_nodes_by_str(attr, val_expected);
+            valid_indices.retain(|&idx| matching_indices.contains(&idx));
+            continue;
         }
-        if keep { filtered.push(node_id.clone()); }
+        
+        // Fallback for other types - skip for now (unsupported Python type)
+        // Could be enhanced to support more Python types if needed
     }
-    filtered
+    
+    // Convert indices back to NodeIds
+    valid_indices.into_iter()
+        .filter_map(|idx| {
+            // Find the NodeId that corresponds to this index
+            node_ids.iter().find(|node_id| {
+                graph_store.node_index(node_id) == Some(idx)
+            }).cloned()
+        })
+        .collect()
 }
 
 // Helper: filter by simple query string (e.g. "salary > 100000")

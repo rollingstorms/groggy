@@ -44,14 +44,23 @@ class NodeCollection(BaseCollection):
             node_data = [node_data]
         t1 = time.perf_counter()
 
-        # (2) Extract IDs and attributes
+        # (2) Extract IDs and attributes - OPTIMIZED for Phase 2
         ids = []
         attrs = {}
         for item in node_data:
             if isinstance(item, dict) and 'id' in item:
                 node_id = item['id']
                 ids.append(node_id)
-                attrs[node_id] = {k: v for k, v in item.items() if k != 'id'}
+                # OPTIMIZATION: Only extract attributes if present, avoid dict comprehension overhead
+                has_attrs = len(item) > 1
+                if has_attrs:
+                    # OPTIMIZATION: Use direct iteration instead of dict comprehension
+                    node_attrs = {}
+                    for k, v in item.items():
+                        if k != 'id':
+                            node_attrs[k] = v
+                    if node_attrs:  # Only add if non-empty
+                        attrs[node_id] = node_attrs
             elif isinstance(item, str):
                 ids.append(item)
             else:
@@ -228,8 +237,23 @@ class NodeAttributeManager:
             ValueError: On type mismatch or schema error.
         """
         try:
-            # Pass raw dict or batch to Rust, no conversion
-            self._rust.set(attr_data)
+            # PHASE 2 OPTIMIZATION: Pre-serialize JSON in Python for faster Rust processing
+            import json
+            if isinstance(attr_data, dict):
+                # Convert {node_id: {attr: value}} to {node_id: {attr: json_str}}
+                serialized_data = {}
+                for node_id, attrs in attr_data.items():
+                    if isinstance(attrs, dict):
+                        serialized_attrs = {}
+                        for attr_name, value in attrs.items():
+                            serialized_attrs[attr_name] = json.dumps(value)
+                        serialized_data[node_id] = serialized_attrs
+                    else:
+                        serialized_data[node_id] = attrs
+                self._rust.set(serialized_data)
+            else:
+                # Pass raw dict or batch to Rust, no conversion
+                self._rust.set(attr_data)
         except Exception as e:
             raise ValueError(f"Failed to set node attribute(s): {e}")
 

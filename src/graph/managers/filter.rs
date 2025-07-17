@@ -38,12 +38,30 @@ impl FilterManager {
         let mut result = ids;
         for expr in &self.filters {
             result = match (self.is_node, expr) {
-                (true, FilterExpr::IntEquals { attr, value }) =>
-                    self.attr_manager.columnar.filter_nodes_int_simd(attr.clone(), *value)
-                        .into_iter().filter(|i| result.contains(i)).collect(),
-                (false, FilterExpr::IntEquals { attr, value }) =>
-                    self.attr_manager.columnar.filter_edges_int_simd(attr.clone(), *value)
-                        .into_iter().filter(|i| result.contains(i)).collect(),
+                (true, FilterExpr::IntEquals { attr, value }) => {
+                    #[cfg(feature = "simd")]
+                    {
+                        self.attr_manager.filter_nodes_i64_simd(attr, *value, crate::storage::columnar::ComparisonOp::Equal)
+                            .into_iter().filter(|i| result.contains(i)).collect()
+                    }
+                    #[cfg(not(feature = "simd"))]
+                    {
+                        self.attr_manager.filter_nodes_by_value(attr.clone(), serde_json::Value::Number((*value).into()))
+                            .into_iter().filter(|i| result.contains(i)).collect()
+                    }
+                },
+                (false, FilterExpr::IntEquals { attr, value }) => {
+                    #[cfg(feature = "simd")]
+                    {
+                        self.attr_manager.filter_edges_i64_simd(attr, *value, crate::storage::columnar::ComparisonOp::Equal)
+                            .into_iter().filter(|i| result.contains(i)).collect()
+                    }
+                    #[cfg(not(feature = "simd"))]
+                    {
+                        self.attr_manager.filter_edges_by_value(attr.clone(), serde_json::Value::Number((*value).into()))
+                            .into_iter().filter(|i| result.contains(i)).collect()
+                    }
+                },
                 (true, FilterExpr::BoolEquals { attr, value }) =>
                     self.attr_manager.columnar.filter_nodes_by_bool(attr.clone(), *value)
                         .into_iter().filter(|i| result.contains(i)).collect(),

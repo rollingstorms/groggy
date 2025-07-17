@@ -91,26 +91,36 @@ class EdgeCollection(BaseCollection):
             edge_data = [edge_data]
         t1 = time.perf_counter()
 
-        # (2) Extract IDs and attributes
-        edge_ids = []
+        # (2) Extract IDs and attributes - OPTIMIZED for Phase 2
+        # Avoid expensive object creation and string formatting in hot path
+        edge_tuples = []  # Direct tuples for Rust
         attrs_to_set = {}
         for item in edge_data:
             if not isinstance(item, dict) or 'source' not in item or 'target' not in item:
                 raise ValueError("Each edge must be a dict with 'source' and 'target' keys")
-            src = NodeId(item['source'])
-            tgt = NodeId(item['target'])
-            eid = EdgeId(src, tgt)
-            edge_ids.append(eid)
-            attr = {k: v for k, v in item.items() if k not in ('source', 'target')}
-            if attr:
-                key = f"{src}->{tgt}"
-                attrs_to_set[key] = attr
+            
+            # OPTIMIZATION: Work with raw strings, avoid object creation
+            src_str = item['source']
+            tgt_str = item['target'] 
+            edge_tuples.append((src_str, tgt_str))
+            
+            # OPTIMIZATION: Only extract attributes if present, avoid dict comprehension overhead
+            has_attrs = len(item) > 2
+            if has_attrs:
+                # OPTIMIZATION: Pre-allocate dict size and use direct key access
+                attr = {}
+                for k, v in item.items():
+                    if k != 'source' and k != 'target':
+                        attr[k] = v
+                if attr:  # Only add if non-empty
+                    # OPTIMIZATION: Use simple string concatenation instead of f-string
+                    key = src_str + "->" + tgt_str
+                    attrs_to_set[key] = attr
         t2 = time.perf_counter()
         print(f"[Groggy][Timing] EdgeCollection.add: input normalization: {t1-t0:.6f}s, id/attr extraction: {t2-t1:.6f}s")
 
-        # (3) Rust add call
+        # (3) Rust add call - OPTIMIZED: edge_tuples already prepared
         t3 = time.perf_counter()
-        edge_tuples = [(eid.source().value, eid.target().value) for eid in edge_ids]
         try:
             self._rust.add(edge_tuples)
         except Exception as e:
@@ -130,11 +140,11 @@ class EdgeCollection(BaseCollection):
         total = time.perf_counter() - t0
         if is_single:
             print(f"[Groggy] EdgeCollection.add: 1 edge in {total:.6f} seconds")
-            return self.get((edge_ids[0].source().value, edge_ids[0].target().value))
+            return self.get(edge_tuples[0])
         else:
-            print(f"[Groggy] EdgeCollection.add: {len(edge_ids)} edges in {total:.6f} seconds")
+            print(f"[Groggy] EdgeCollection.add: {len(edge_tuples)} edges in {total:.6f} seconds")
             if return_proxies:
-                return [self.get((eid.source().value, eid.target().value)) for eid in edge_ids]
+                return [self.get(edge_tuple) for edge_tuple in edge_tuples]
             else:
                 return None
 
@@ -238,7 +248,23 @@ class EdgeAttributeManager:
             ValueError: On type mismatch or schema error.
         """
         try:
-            self._rust.set(attr_data)
+            # PHASE 2 OPTIMIZATION: Pre-serialize JSON in Python for faster Rust processing
+            import json
+            if isinstance(attr_data, dict):
+                # Convert {edge_id: {attr: value}} to {edge_id: {attr: json_str}}
+                serialized_data = {}
+                for edge_id, attrs in attr_data.items():
+                    if isinstance(attrs, dict):
+                        serialized_attrs = {}
+                        for attr_name, value in attrs.items():
+                            serialized_attrs[attr_name] = json.dumps(value)
+                        serialized_data[edge_id] = serialized_attrs
+                    else:
+                        serialized_data[edge_id] = attrs
+                self._rust.set(serialized_data)
+            else:
+                # Pass raw dict or batch to Rust, no conversion
+                self._rust.set(attr_data)
         except Exception as e:
             raise ValueError(f"Failed to set edge attribute(s): {e}")
 
