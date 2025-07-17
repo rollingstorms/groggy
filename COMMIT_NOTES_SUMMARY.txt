@@ -1,0 +1,71 @@
+b6c9dc9 2025-07-17 Memory optimization attempts and architecture analysis
+28baa62 2025-07-16 WIP: Save current changes before main branch comparison
+1f249d5 2025-07-16 working on stuff
+6a59dc3 2025-07-16 fixing the input criteria for adding node data
+91f7256 2025-07-16 Expose explicit attribute schema setting to Python API; improve diagnostics
+6f40929 2025-07-15 Implement clean Python API with automatic JSON handling and comprehensive benchmarking
+d01bd57 2025-07-15 Fix all compilation errors and implement full SIMD support
+f90f273 2025-07-15 Fix all E0277 trait bound errors
+8f8b91f 2025-07-15 Fix all E0308 type mismatch errors
+53dc9f6 2025-07-15 Fix ColumnarStore batch get/set deref patterns, prep for type-safe DashMap/Ref usage; partial fixes for build errors in columnar.rs, content_pool.rs, graph_store.rs
+30e5d63 2025-07-15 Complete Groggy Python API: batch attribute access, core algorithms, views, analysis, utils, docs. Production-ready agent/LLM API.
+a6f8006 2025-07-15 Scaffold node/edge collections, proxies, attribute and filter managers for modular, agent/LLM-friendly Rust graph backend. Includes robust doc comments, type-safe fields, and extensible method stubs for all major components.
+2cf95a5 2025-07-15 Add per-module README files for Python API; expand agents.md with comprehensive agent/LLM usage examples
+5a9ea2c 2025-07-14 Add new API documentation: readme_new.md and agents.md; enhance all Python modules with detailed docstrings for agent/LLM and developer clarity
+de13c37 2025-07-14 Save structure implementation outlines (simple and new, Rust and Python) before further changes
+740e5e6 2025-07-11 feat: Add comprehensive batch attribute operations and edge attribute methods
+abe2ddc 2025-07-10 🚀 Optimize filtering performance: Move intersection logic to Rust
+ca7a5c9 2025-07-10 Major performance optimizations for filtering operations
+91d452e 2025-07-10 Fix filtering architecture: restore tuple syntax support and proper Rust backend routing
+fbac38e 2025-07-10 deleted old code
+b020d22 2025-07-10 deleted old code
+6fc94e1 2025-07-10 Major optimization: Refactor bulk operations and fix efficiency issues
+3c13e65 2025-07-10 Bump version to 0.2.1 for alpha demo release
+76edc4d 2025-07-10 Remove .DS_Store files from tracking
+6c3f634 2025-07-10 Bump version to 0.2.1
+728d6b4 2025-07-10 Add *.so files to .gitignore as they are build artifacts
+becc5f1 2025-07-10 Rename Rust crate from groggy-core to groggy for consistency
+87db38b 2025-07-10 Fix division by zero error in stress test
+b0e44eb 2025-07-10 Fix Windows virtual environment and pip upgrade issues
+f017f2f 2025-07-10 Fix virtual environment setup in ci.yml workflow
+a82b00e 2025-07-10 Fix virtual environment activation in test workflow
+eeea7f8 2025-07-10 Fix virtual environment setup for Ubuntu in test workflow
+3735703 2025-07-10 Fix CI issues: clippy warnings and virtual environment setup
+66b42bf 2025-07-10 Fix cargo fmt formatting issues
+77075ce 2025-07-10 fix: final clippy and formatting fixes
+6ef2e83 2025-07-10 fix: resolve clippy warnings and errors
+1b5cabe 2025-07-10 fix: add virtual environment setup for maturin build
+301298c 2025-07-10 fix: remove target specification to avoid Python interpreter issues
+828a8c9 2025-07-10 fix: simplify PyPI workflow to avoid virtualenv issues
+491b8ec 2025-07-10 fix: create new PyPI workflow without virtual environment requirements
+679c9a5 2025-07-10 fix: simplify PyPI workflow to use direct maturin build commands
+4ed00a6 2025-07-10 fix: rewrite PyPI workflow using standard maturin-action pattern
+4e3e4f5 2025-07-10 fix: update maturin GitHub Actions workflow to use proper build commands
+a3c6891 2025-07-10 fix: update PyPI deployment workflow and add Cargo metadata
+618350d 2025-07-10 fix: update Cargo.toml version to match pyproject.toml (0.2.0)
+0923b79 2025-07-10 Update Sphinx documentation for unified columnar architecture
+ae41901 2025-07-10 cleanup: remove temporary files and documentation artifacts
+be0159e 2025-07-10 feat: major performance optimization - unified architecture with fast filtering
+0d88b0f 2025-06-28 added subgraph creation from graph
+745ea18 2025-06-28 adding tests
+b98f3b0 2025-06-28 fixed README case
+12d6231 2025-06-28 delete readme
+faf57f6 2025-06-28 Fix README case and simplify readthedocs config
+ac57d0a 2025-06-27 adding readthedocs
+e9730cc 2025-06-27 adding readthedocs
+c7a954c 2025-06-27 fix typos
+834e737 2025-06-27 adding workflows
+bfd584c 2025-06-27 finalizing groggy public release
+5a658ce 2025-06-27 finished name change
+4be5d7c 2025-06-27 some fixes
+c3fc994 2025-06-27 added query system for filtering, subgraph support, tracking support, and undirected graphs
+2381c66 2025-06-27 added more inuitive usage, merged graph and graphstore
+0a20b3d 2025-06-26 added support for batch filter nodes and edges
+3a94a49 2025-06-26 adding rust support for fast filtering
+1d017da 2025-06-26 fixed attribute support in rust backend
+42f07c6 2025-06-25 Complete README overhaul: user-focused documentation
+23370f2 2025-06-25 Add comprehensive GLI tutorial and test documentation
+503e171 2025-06-25 Organize repository: add .gitignore and move tests to dedicated folder
+330ca7c 2025-06-25 adding rust backend
+99758e9 2025-06-25 added branches
+8bdba54 2025-06-25 init commit

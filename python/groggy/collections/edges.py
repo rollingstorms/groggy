@@ -21,7 +21,7 @@ class EdgeCollection(BaseCollection):
         """
         super().__init__()
         self.graph = graph
-        self._rust = graph._rust.edges()
+        self._rust = graph._rust.edges
         self.attr = EdgeAttributeManager(self)
 
     def remove(self, edge_ids):
@@ -196,7 +196,7 @@ class EdgeAttributeManager:
             edge_collection (EdgeCollection): The parent edge collection.
         """
         self.collection = edge_collection
-        self._rust = edge_collection._rust.attr()
+        self._rust = edge_collection._rust.attr
 
     def get(self, edge_ids=None, attr_names=None):
         """

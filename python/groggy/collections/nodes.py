@@ -22,7 +22,7 @@ class NodeCollection(BaseCollection):
         """
         super().__init__()
         self.graph = graph
-        self._rust = graph._rust.nodes()
+        self._rust = graph._rust.nodes
         self.attr = NodeAttributeManager(self)
 
     def add(self, node_data, return_proxies=False):
@@ -189,7 +189,7 @@ class NodeAttributeManager:
             node_collection (NodeCollection): The parent node collection.
         """
         self.collection = node_collection
-        self._rust = node_collection._rust.attr()
+        self._rust = node_collection._rust.attr
 
     def get(self, node_ids=None, attr_names=None):
         """
