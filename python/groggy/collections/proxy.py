@@ -1,18 +1,26 @@
+import weakref
+
 class EntityProxy:
     """
     Generic proxy for a graph entity (node or edge).
     Provides attribute access and mutation via the collection's attribute manager.
     """
     def __init__(self, collection, entity_id):
-        self._collection = collection
+        # Use weak reference to avoid circular references and reduce memory usage
+        self._collection_ref = weakref.ref(collection)
         self._id = entity_id
-        # Handle both attr() method and attr property
-        if hasattr(collection, 'attr') and callable(collection.attr):
-            self._attr = collection.attr()
-        elif hasattr(collection, 'attr'):
-            self._attr = collection.attr
+        # Cache the attribute manager reference to avoid repeated lookups
+        collection_obj = self._collection_ref()
+        if collection_obj:
+            # Handle both attr() method and attr property
+            if hasattr(collection_obj, 'attr') and callable(collection_obj.attr):
+                self._attr = collection_obj.attr()
+            elif hasattr(collection_obj, 'attr'):
+                self._attr = collection_obj.attr
+            else:
+                raise ValueError("Collection must have an attr property or method")
         else:
-            raise ValueError("Collection must have an attr property or method")
+            raise ValueError("Collection reference is invalid")
 
     @property
     def id(self):
