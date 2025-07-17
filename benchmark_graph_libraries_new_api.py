@@ -122,13 +122,18 @@ class GroggyBenchmark:
         # Measure memory before creation
         memory_before = get_memory_usage()
         start = time.time()
+
+        print('starting')
         
         # Create graph with new clean API
         self.graph = gr.Graph()
 
+        print('created graph')
+
         # Add nodes in batch
         self.graph.nodes.add(nodes_data)
         
+        print('added nodes')
         # Create and add edges
         self.graph.edges.add(edges_data)
         

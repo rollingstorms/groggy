@@ -31,7 +31,7 @@ class Graph:
         # Only Rust backend is supported for now
         if backend not in (None, 'rust'):
             raise ValueError(f"Unsupported backend: {backend}")
-        self._rust = groggy._core.FastGraph()
+        self._rust = groggy._core.Graph()
         # Note: directed parameter is currently ignored as FastGraph defaults to directed=True
         # TODO: Add support for setting directed in Rust FastGraph constructor
         self._nodes = NodeCollection(self)

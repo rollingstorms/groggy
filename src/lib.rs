@@ -24,8 +24,10 @@ pub fn _core(py: pyo3::Python, m: &pyo3::types::PyModule) -> pyo3::PyResult<()> 
     m.add_class::<crate::graph::managers::attributes::AttributeManager>()?;
     m.add_class::<crate::graph::managers::filters::FilterManager>()?;
     
-    // Main graph
-    m.add_class::<crate::graph::core::FastGraph>()?;
+    // Main graph - NOW USING COLUMNAR IMPLEMENTATION
+    m.add_class::<crate::graph::columnar_graph::ColumnarGraph>()?;
+    m.add_class::<crate::graph::columnar_collections::NodeCollection>()?;
+    m.add_class::<crate::graph::columnar_collections::EdgeCollection>()?;
     
     Ok(())
 }
