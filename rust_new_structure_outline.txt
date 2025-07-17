@@ -1,0 +1,1510 @@
+CODE STRUCTURE ANALYSIS
+Directory: ../groggy/src
+Generated: rust_new_structure_outline.txt
+============================================================
+
+============================================================
+FILE: lib.rs
+============================================================
+
+⚙️  FUNCTION: _core() (line 11)
+   🏷️  #pymodule
+
+============================================================
+FILE: graph/native_proxy.rs
+============================================================
+
+🏗️  STRUCT: NativeNodeProxy (line 11)
+   🏷️  #pyclass
+   🏷️  #derive(Clone)
+
+🏗️  STRUCT: NativeEdgeProxy (line 70)
+   🏷️  #pyclass
+   🏷️  #derive(Clone)
+
+🔧 IMPL: NativeNodeProxy (line 17)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 19)
+       🏷️  #new
+   └── ⚙️  get_attr() (line 27)
+       💬 Get an attribute value
+   └── ⚙️  set_attr() (line 33)
+       💬 Set an attribute value (direct Python object, no JSON)
+   └── ⚙️  get_attrs() (line 50)
+       💬 Get all attributes for this node
+   └── ⚙️  id() (line 57)
+       🏷️  #getter
+   └── ⚙️  __repr__() (line 62)
+       💬 String representation
+
+🔧 IMPL: NativeEdgeProxy (line 76)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 78)
+       🏷️  #new
+   └── ⚙️  get_attr() (line 86)
+       💬 Get an attribute value
+   └── ⚙️  set_attr() (line 92)
+       💬 Set an attribute value (direct Python object, no JSON)
+   └── ⚙️  get_attrs() (line 109)
+       💬 Get all attributes for this edge
+   └── ⚙️  id() (line 116)
+       🏷️  #getter
+   └── ⚙️  __repr__() (line 121)
+       💬 String representation
+
+============================================================
+FILE: graph/core.rs
+============================================================
+
+🏗️  STRUCT: FastGraph (line 10)
+   🏷️  #pyclass
+
+🔧 IMPL: FastGraph (line 22)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 25)
+       🏷️  #new
+   └── ⚙️  info() (line 44)
+       💬 Get comprehensive graph information
+   └── ⚙️  memory_usage_breakdown() (line 77)
+       💬 Returns a breakdown of memory usage per attribute (name, type, node/edge, bytes used)
+   └── ⚙️  attribute_manager() (line 83)
+       🏷️  #getter
+   └── ⚙️  size() (line 88)
+       💬 Get total size (nodes + edges)
+   └── ⚙️  is_directed() (line 93)
+       💬 Check if graph is directed
+   └── ⚙️  nodes() (line 98)
+       💬 Returns NodeCollection instance
+   └── ⚙️  edges() (line 106)
+       💬 Returns EdgeCollection instance
+   └── ⚙️  subgraph() (line 111)
+       💬 Create subgraph with node/edge filters
+   └── ⚙️  subgraphs() (line 132)
+       💬 Get all subgraphs according to a given attr groups
+   └── ⚙️  fast_add_nodes() (line 139)
+       💬 Add nodes using fast core (optimized batch operation)
+   └── ⚙️  fast_add_edges() (line 147)
+       💬 Add edges using fast core (optimized batch operation)
+   └── ⚙️  fast_set_node_attr() (line 157)
+       💬 Set node attribute using fast core (optimized)
+   └── ⚙️  fast_set_node_attrs_batch() (line 167)
+       💬 Batch set node attributes using fast core (optimized)
+   └── ⚙️  fast_get_node_attr() (line 183)
+       💬 Get node attribute using fast core (optimized)
+   └── ⚙️  fast_node_ids() (line 189)
+       💬 Get fast core node IDs (optimized)
+   └── ⚙️  fast_edge_ids() (line 194)
+       💬 Get fast core edge IDs (optimized)
+   └── ⚙️  fast_core_memory_usage() (line 199)
+       💬 Get fast core memory usage in bytes
+   └── ⚙️  ultra_fast_add_nodes_with_attrs() (line 206)
+       💬 Ultra-fast bulk node addition with attributes (minimal locking)
+   └── ⚙️  ultra_fast_set_attrs_vectorized() (line 226)
+       💬 Ultra-fast vectorized attribute setting (SIMD-style)
+   └── ⚙️  zero_copy_bulk_add() (line 244)
+       💬 Zero-copy bulk node generation (minimal allocations)
+   └── ⚙️  set_i64_attrs_native() (line 251)
+       💬 Native integer attribute setting (no JSON)
+   └── ⚙️  set_string_attrs_native() (line 258)
+       💬 Native string attribute setting (no JSON)
+   └── ⚙️  generate_pattern_attrs() (line 265)
+       💬 Ultra-fast pattern attribute generation
+   └── ⚙️  get_atomic_stats() (line 272)
+       💬 Get atomic stats (lock-free)
+
+============================================================
+FILE: graph/native_attributes.rs
+============================================================
+
+🏗️  STRUCT: NativeAttributeManager (line 12)
+   🏷️  #pyclass
+   🏷️  #derive(Clone)
+
+🔧 IMPL: NativeAttributeManager (line 22)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 24)
+       🏷️  #new
+   └── ⚙️  set_node_attributes() (line 34)
+       💬 Set attributes for nodes (batch operation) Expected format: {"node_id": {"attr_name": value, ...}, ...}
+   └── ⚙️  set_edge_attributes() (line 61)
+       💬 Set attributes for edges (batch operation) Expected format: {"edge_id": {"attr_name": value, ...}, ...}
+   └── ⚙️  get_node_attribute() (line 87)
+       💬 Get node attribute
+   └── ⚙️  get_edge_attribute() (line 97)
+       💬 Get edge attribute
+   └── ⚙️  get_node_attributes() (line 107)
+       💬 Get all attributes for a node
+   └── ⚙️  get_edge_attributes() (line 120)
+       💬 Get all attributes for an edge
+   └── ⚙️  get_memory_usage() (line 133)
+       💬 Get memory usage in bytes
+   └── ⚙️  clear() (line 138)
+       💬 Clear all attributes
+   └── ⚙️  get_stats() (line 145)
+       💬 Get statistics
+
+🔧 IMPL: Default for NativeAttributeManager (line 158)
+   └── ⚙️  default() (line 159)
+
+============================================================
+FILE: graph/native_graph.rs
+============================================================
+
+🏗️  STRUCT: NativeGraph (line 14)
+   🏷️  #pyclass
+
+🔧 IMPL: NativeGraph (line 28)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 30)
+       🏷️  #new
+   └── ⚙️  add_node() (line 41)
+       💬 Add a single node
+   └── ⚙️  add_nodes() (line 47)
+       💬 Add multiple nodes
+   └── ⚙️  add_edge() (line 55)
+       💬 Add an edge
+   └── ⚙️  add_edges() (line 74)
+       💬 Add multiple edges
+   └── ⚙️  get_node() (line 82)
+       💬 Get node proxy
+   └── ⚙️  get_edge() (line 93)
+       💬 Get edge proxy
+   └── ⚙️  set_node_attributes() (line 106)
+       💬 Set node attributes (batch)
+   └── ⚙️  set_edge_attributes() (line 112)
+       💬 Set edge attributes (batch)
+   └── ⚙️  get_node_ids() (line 118)
+       💬 Get all node IDs
+   └── ⚙️  get_edges() (line 123)
+       💬 Get all edges as (source, target) tuples
+   └── ⚙️  get_neighbors() (line 134)
+       💬 Get neighbors of a node
+   └── ⚙️  get_predecessors() (line 143)
+       💬 Get predecessors of a node
+   └── ⚙️  node_count() (line 152)
+       💬 Get node count
+   └── ⚙️  edge_count() (line 157)
+       💬 Get edge count
+   └── ⚙️  has_node() (line 162)
+       💬 Check if node exists
+   └── ⚙️  has_edge() (line 167)
+       💬 Check if edge exists
+   └── ⚙️  info() (line 176)
+       💬 Get graph statistics
+   └── ⚙️  clear() (line 197)
+       💬 Clear all data
+   └── ⚙️  __repr__() (line 206)
+       💬 String representation
+
+============================================================
+FILE: graph/types.rs
+============================================================
+
+🏗️  STRUCT: GraphInfo (line 71)
+   🏷️  #pyclass
+   🏷️  #derive(Debug, Clone, serde::Serialize, serde::Deserialize)
+
+🔧 IMPL: NodeId (line 12)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 14)
+       🏷️  #new
+   └── ⚙️  __str__() (line 18)
+   └── ⚙️  __repr__() (line 22)
+
+🔧 IMPL: GraphInfo (line 80)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 83)
+       🏷️  #new
+       🏷️  #pyo3(signature = (name=None, directed=false, node_count=0, edge_count=0, attributes=std::collections::HashMap::new()))
+   └── ⚙️  name() (line 86)
+   └── ⚙️  directed() (line 87)
+   └── ⚙️  node_count() (line 88)
+   └── ⚙️  edge_count() (line 89)
+   └── ⚙️  attributes() (line 90)
+
+🔧 IMPL: Default for GraphInfo (line 93)
+   └── ⚙️  default() (line 94)
+
+⚙️  FUNCTION: fmt() (line 28)
+
+============================================================
+FILE: graph/columnar_graph.rs
+============================================================
+
+🏗️  STRUCT: ColumnStore (line 14)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: ColumnarGraph (line 132)
+   🏷️  #pyclass(name = "Graph")
+
+🔧 IMPL: ColumnStore (line 27)
+   └── ⚙️  new() (line 28)
+   └── ⚙️  set() (line 39)
+       💬 Add or update a value for an entity
+   └── ⚙️  get() (line 55)
+       💬 Get value for an entity
+   └── ⚙️  remove() (line 68)
+       💬 Remove value for an entity
+   └── ⚙️  get_entity_ids() (line 76)
+       💬 Get all entity IDs that have this attribute
+   └── ⚙️  filter() (line 91)
+       💬 Filter entities based on a predicate
+   └── ⚙️  memory_usage() (line 112)
+       💬 Get memory usage in bytes
+
+🔧 IMPL: ColumnarGraph (line 153)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 155)
+       🏷️  #new
+   └── ⚙️  add_nodes() (line 168)
+       💬 Add nodes efficiently
+   └── ⚙️  add_edges() (line 180)
+       💬 Add edges efficiently
+   └── ⚙️  set_node_attributes() (line 205)
+       💬 Set node attributes in batch (columnar)
+   └── ⚙️  set_edge_attributes() (line 232)
+       💬 Set edge attributes in batch (columnar)
+   └── ⚙️  get_node_attribute() (line 254)
+       💬 Get node attribute value
+   └── ⚙️  get_edge_attribute() (line 264)
+       💬 Get edge attribute value
+   └── ⚙️  filter_nodes_by_string() (line 274)
+       💬 FAST: Filter nodes by attribute value (pure Rust)
+   └── ⚙️  filter_nodes_by_int_gt() (line 289)
+       💬 FAST: Filter nodes by integer comparison (pure Rust)
+   └── ⚙️  filter_nodes_by_bool() (line 304)
+       💬 FAST: Filter nodes by boolean value (pure Rust)
+   └── ⚙️  filter_nodes_complex() (line 319)
+       💬 FAST: Complex filter with multiple conditions (pure Rust)
+   └── ⚙️  get_node_ids() (line 362)
+       💬 Get all node IDs
+   └── ⚙️  get_edge_list() (line 367)
+       💬 Get all edges as (source, target) pairs
+   └── ⚙️  node_count() (line 374)
+       💬 Get node count
+   └── ⚙️  edge_count() (line 379)
+       💬 Get edge count
+   └── ⚙️  memory_stats() (line 384)
+       💬 Get memory usage statistics
+   └── ⚙️  nodes_add() (line 415)
+       💬 Add nodes directly - collection API
+   └── ⚙️  edges_add() (line 469)
+       💬 Add edges directly - collection API
+   └── ⚙️  nodes() (line 531)
+       🏷️  #getter
+   └── ⚙️  edges() (line 537)
+       🏷️  #getter
+   └── ⚙️  info() (line 542)
+       💬 Get graph info
+   └── ⚙️  __repr__() (line 561)
+       💬 String representation
+
+============================================================
+FILE: graph/algorithms.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 8)
+   └── ⚙️  bfs() (line 11)
+       💬 Breadth-First Search (BFS) traversal from a given node. Returns the order of visited node IDs.
+   └── ⚙️  dfs() (line 31)
+       💬 Depth-First Search (DFS) traversal from a given node. Returns the order of visited node IDs.
+   └── ⚙️  shortest_path() (line 52)
+       💬 Finds the shortest path (unweighted) between two nodes using BFS. Returns the path as a vector of NodeId, or empty if unreachable.
+   └── ⚙️  connected_components() (line 83)
+       💬 Finds all connected components (for undirected graphs). Returns a vector of components, each a vector of NodeId.
+   └── ⚙️  clustering_coefficient() (line 111)
+       💬 Computes the clustering coefficient for each node (simple version). Returns a map from NodeId to clustering coefficient (f64).
+
+============================================================
+FILE: graph/bulk_operations.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 6)
+   📝 Batch add/remove nodes and edges
+   └── ⚙️  add_nodes_batch() (line 11)
+       💬 Adds a batch of nodes in a single operation. Delegates to NodeCollection and columnar storage for efficient, atomic insertion. Minimizes locking and updates indices/metadata in bulk. Handles errors and rolls back on failure.
+   └── ⚙️  remove_nodes_batch() (line 18)
+       💬 Removes a batch of nodes in a single operation. Marks nodes as deleted in columnar storage. Schedules cleanup and updates indices in bulk. Ensures atomicity and handles errors/rollback.
+   └── ⚙️  add_edges_batch() (line 25)
+       💬 Adds a batch of edges in a single operation. Delegates to EdgeCollection and columnar storage for efficient, atomic insertion. Minimizes locking and updates indices/metadata in bulk. Handles errors and rolls back on failure.
+   └── ⚙️  remove_edges_batch() (line 32)
+       💬 Removes a batch of edges in a single operation. Marks edges as deleted in columnar storage. Schedules cleanup and updates indices in bulk. Ensures atomicity and handles errors/rollback.
+
+============================================================
+FILE: graph/attribute_value.rs
+============================================================
+
+🔢 ENUM: AttributeValue (line 10)
+   🏷️  #derive(Debug, Clone, PartialEq)
+
+🔧 IMPL: AttributeValue (line 20)
+   └── ⚙️  to_python() (line 22)
+       💬 Convert to Python object
+   └── ⚙️  memory_size() (line 47)
+       💬 Get memory size estimate for this value
+
+🔧 IMPL: ToPyObject for AttributeValue (line 103)
+   📝 Convert AttributeValue to Python object
+   └── ⚙️  to_object() (line 104)
+
+🔧 IMPL: AttributeValue (line 110)
+   📝 For backwards compatibility with existing JSON-based code
+   └── ⚙️  from_json() (line 112)
+       💬 Create from JSON string (for migration)
+   └── ⚙️  from_json_value() (line 118)
+       💬 Create from serde_json::Value (for migration)
+   └── ⚙️  to_json() (line 146)
+       💬 Convert to JSON string (for migration)
+   └── ⚙️  to_json_value() (line 151)
+       💬 Convert to serde_json::Value (for migration)
+
+⚙️  FUNCTION: extract() (line 68)
+
+============================================================
+FILE: graph/columnar_collections.rs
+============================================================
+
+🏗️  STRUCT: NodeCollection (line 11)
+   🏷️  #pyclass(name = "NodeCollection")
+
+🏗️  STRUCT: EdgeCollection (line 165)
+   🏷️  #pyclass(name = "EdgeCollection")
+
+🔧 IMPL: NodeCollection (line 15)
+   └── ⚙️  new() (line 17)
+       💬 Create a new collection facade
+
+🔧 IMPL: NodeCollection (line 23)
+   🏷️  #pymethods
+   └── ⚙️  add() (line 25)
+       💬 Add nodes - supports the same API as original
+   └── ⚙️  filter() (line 124)
+       💬 Filter nodes - uses fast Rust filtering
+   └── ⚙️  __iter__() (line 146)
+       💬 Get all node IDs
+   └── ⚙️  __len__() (line 152)
+       💬 Get node count
+   └── ⚙️  count() (line 158)
+       💬 Get node count (API compatibility)
+
+🔧 IMPL: EdgeCollection (line 169)
+   └── ⚙️  new() (line 171)
+       💬 Create a new collection - each has its own graph for now
+
+🔧 IMPL: EdgeCollection (line 180)
+   🏷️  #pymethods
+   └── ⚙️  add() (line 182)
+       💬 Add edges - supports the same API as original
+   └── ⚙️  filter() (line 251)
+       💬 Filter edges - placeholder implementation
+   └── ⚙️  __iter__() (line 264)
+       💬 Get all edges
+   └── ⚙️  __len__() (line 270)
+       💬 Get edge count
+   └── ⚙️  count() (line 276)
+       💬 Get edge count (API compatibility)
+
+============================================================
+FILE: graph/direct_collections.rs
+============================================================
+
+🏗️  STRUCT: DirectNodeCollection (line 11)
+   🏷️  #pyclass
+
+🏗️  STRUCT: DirectEdgeCollection (line 210)
+   🏷️  #pyclass
+
+🔧 IMPL: DirectNodeCollection (line 15)
+   └── ⚙️  new_with_graph() (line 17)
+       💬 Create a new collection with a shared graph
+
+🔧 IMPL: DirectNodeCollection (line 23)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 25)
+       🏷️  #new
+   └── ⚙️  add() (line 34)
+       💬 Add nodes directly (no Python wrapper overhead)
+   └── ⚙️  ids() (line 133)
+       💬 Get node IDs directly
+   └── ⚙️  count() (line 139)
+       💬 Get node count directly
+   └── ⚙️  has() (line 145)
+       💬 Check if node exists
+   └── ⚙️  filter_by_string() (line 151)
+       💬 FAST: Filter nodes by string attribute (pure Rust)
+   └── ⚙️  filter_by_int_gt() (line 157)
+       💬 FAST: Filter nodes by integer comparison (pure Rust)
+   └── ⚙️  filter_by_bool() (line 163)
+       💬 FAST: Filter nodes by boolean (pure Rust)
+   └── ⚙️  filter_complex() (line 169)
+       💬 FAST: Complex filter (pure Rust)
+   └── ⚙️  get_attr() (line 179)
+       💬 Get attribute value directly
+   └── ⚙️  set_attr() (line 185)
+       💬 Set attribute value directly
+   └── ⚙️  __len__() (line 198)
+       💬 Python length
+   └── ⚙️  __iter__() (line 203)
+       💬 Python iteration
+
+🔧 IMPL: DirectEdgeCollection (line 214)
+   └── ⚙️  new_with_graph() (line 216)
+       💬 Create a new collection with a shared graph
+
+🔧 IMPL: DirectEdgeCollection (line 222)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 224)
+       🏷️  #new
+   └── ⚙️  add() (line 233)
+       💬 Add edges directly (no Python wrapper overhead)
+   └── ⚙️  get_edges() (line 344)
+       💬 Get all edges as (source, target) tuples
+   └── ⚙️  count() (line 350)
+       💬 Get edge count directly
+   └── ⚙️  get_attr() (line 356)
+       💬 Get attribute value directly
+   └── ⚙️  set_attr() (line 363)
+       💬 Set attribute value directly
+   └── ⚙️  __len__() (line 377)
+       💬 Python length
+   └── ⚙️  __iter__() (line 382)
+       💬 Python iteration
+
+============================================================
+FILE: graph/operations.rs
+============================================================
+
+🔧 IMPL: FastGraph (line 6)
+   📝 Graph-level operations
+   └── ⚙️  merge() (line 11)
+       💬 Merges another graph into this one, combining nodes, edges, and attributes. Delegates to NodeCollection, EdgeCollection, and AttributeManager for merging logic. Handles ID conflicts, attribute resolution, and ensures atomicity. Rolls back on failure.
+   └── ⚙️  union() (line 18)
+       💬 Returns the union of this graph with another graph. Produces a new graph containing all nodes, edges, and attributes from both graphs. Delegates to collections for efficient union. Handles duplicates and attribute resolution.
+   └── ⚙️  intersection() (line 25)
+       💬 Returns the intersection of this graph with another graph. Produces a new graph containing only nodes, edges, and attributes present in both graphs. Delegates to collections for efficient intersection. Handles attribute merging and consistency.
+
+============================================================
+FILE: graph/proxy/base.rs
+============================================================
+
+🏗️  STRUCT: NodeProxyAttributeManager (line 11)
+   🏷️  #pyclass
+
+🏗️  STRUCT: EdgeProxyAttributeManager (line 37)
+   🏷️  #pyclass
+
+🔧 IMPL: NodeProxyAttributeManager (line 19)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 21)
+       🏷️  #new
+   └── ⚙️  get() (line 25)
+   └── ⚙️  set() (line 30)
+
+🔧 IMPL: EdgeProxyAttributeManager (line 45)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 47)
+       🏷️  #new
+   └── ⚙️  get() (line 51)
+   └── ⚙️  set() (line 56)
+
+============================================================
+FILE: graph/nodes/proxy.rs
+============================================================
+
+🏗️  STRUCT: NodeProxy (line 11)
+   🏷️  #pyclass
+
+🏗️  STRUCT: ProxyAttributeManager (line 120)
+   🏷️  #pyclass
+
+🔧 IMPL: NodeProxy (line 20)
+   🏷️  #pymethods
+   └── ⚙️  py_new() (line 23)
+       🏷️  #new
+   └── ⚙️  attr_manager() (line 39)
+       💬 Returns a ProxyAttributeManager for this node (per-attribute API).
+   └── ⚙️  get_attr() (line 48)
+       💬 Get the value of a single attribute for this node (JSON).
+   └── ⚙️  set_attr() (line 63)
+       💬 Set the value of a single attribute for this node (JSON).
+   └── ⚙️  attrs() (line 89)
+       💬 Get all attributes for this node as a map (JSON string).
+   └── ⚙️  __str__() (line 105)
+       💬 Returns a string representation of this node (for debugging or display).
+
+🔧 IMPL: NodeProxy (line 110)
+   └── ⚙️  new() (line 112)
+       💬 Regular Rust constructor - not exposed to Python
+
+🔧 IMPL: ProxyAttributeManager (line 127)
+   🏷️  #pymethods
+   └── ⚙️  get() (line 129)
+       💬 Returns the value of the specified attribute for this node as JSON string.
+   └── ⚙️  set() (line 139)
+       💬 Sets the value of the specified attribute for this node (JSON string, type-checked).
+   └── ⚙️  get_int() (line 151)
+       💬 Returns the value of the specified int attribute for this node.
+   └── ⚙️  set_int() (line 159)
+       💬 Sets the value of the specified int attribute for this node.
+   └── ⚙️  get_float() (line 168)
+       💬 Returns the value of the specified float attribute for this node.
+   └── ⚙️  set_float() (line 176)
+       💬 Sets the value of the specified float attribute for this node.
+   └── ⚙️  get_bool() (line 185)
+       💬 Returns the value of the specified bool attribute for this node.
+   └── ⚙️  set_bool() (line 193)
+       💬 Sets the value of the specified bool attribute for this node.
+   └── ⚙️  get_str() (line 202)
+       💬 Returns the value of the specified string attribute for this node.
+   └── ⚙️  set_str() (line 210)
+       💬 Sets the value of the specified string attribute for this node.
+   └── ⚙️  has() (line 219)
+       💬 Checks if the specified attribute exists for this node.
+   └── ⚙️  remove() (line 223)
+       💬 Removes the specified attribute for this node (sets to None if present).
+
+============================================================
+FILE: graph/nodes/collection.rs
+============================================================
+
+🏗️  STRUCT: NodeCollection (line 14)
+   🏷️  #pyclass
+   🏷️  #derive(Clone)
+
+🔧 IMPL: NodeCollection (line 23)
+   🏷️  #pymethods
+   └── ⚙️  add() (line 24)
+   └── ⚙️  filter_py() (line 51)
+       🏷️  #pyo3(signature = (*args, **kwargs))
+   └── ⚙️  py_new() (line 73)
+       🏷️  #new
+   └── ⚙️  attr() (line 84)
+       💬 Returns an AttributeManager for node attributes.
+   └── ⚙️  size() (line 90)
+       🏷️  #getter
+   └── ⚙️  filter() (line 97)
+       🏷️  #pyo3(name = "filter")
+       🏷️  #pyo3(signature = (*args, **kwargs))
+   └── ⚙️  ids() (line 102)
+       💬 Returns all node IDs in this collection.
+   └── ⚙️  has() (line 107)
+       💬 Check if a node exists in the collection.
+   └── ⚙️  get() (line 113)
+       💬 Get a NodeProxy for this node if it exists.
+
+🔧 IMPL: NodeCollection (line 125)
+   └── ⚙️  add_batch() (line 127)
+       💬 Add one or more nodes to the collection (batch-oriented, Rust only).
+   └── ⚙️  remove() (line 136)
+       💬 Remove one or more nodes from the collection (batch-oriented).
+   └── ⚙️  filter_manager() (line 149)
+       💬 Returns a FilterManager for this collection, pre-configured for nodes. Usage: let mut fm = collection.filter_manager(); fm.add_filter(...); let result_ids = fm.apply(collection.ids());
+   └── ⚙️  iter() (line 155)
+       💬 Returns an iterator over node IDs in this collection.
+   └── ⚙️  get_rust() (line 161)
+       💬 Get a NodeProxy for this node if it exists (Rust-only method).
+
+🔧 IMPL: NodeCollection (line 170)
+   └── ⚙️  new() (line 172)
+       💬 Regular Rust constructor - not exposed to Python
+
+⚙️  FUNCTION: filter_nodes_by_dict() (line 179)
+
+⚙️  FUNCTION: filter_nodes_by_query() (line 304)
+
+============================================================
+FILE: graph/managers/attributes.rs
+============================================================
+
+🏗️  STRUCT: AttributeManager (line 45)
+   🏷️  #pyclass
+   🏷️  #derive(Clone)
+
+🏗️  STRUCT: ProxyAttributeManager (line 825)
+   🏷️  #pyclass
+
+🔢 ENUM: BatchOperation (line 15)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: BatchResult (line 35)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: AttributeManager (line 53)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 55)
+       🏷️  #new
+   └── ⚙️  with_hyper_core() (line 66)
+       🏷️  #staticmethod
+   └── ⚙️  get_py() (line 82)
+       💬 Basic Python-compatible get method (returns JSON string)
+   └── ⚙️  get() (line 88)
+       🏷️  #pyo3(signature = (node_ids = None, attr_names = None))
+   └── ⚙️  py_set() (line 178)
+       🏷️  #pyo3(name = "set")
+   └── ⚙️  memory_usage_breakdown() (line 318)
+       💬 Returns a breakdown of memory usage per attribute (name, type, node/edge, bytes used)
+   └── ⚙️  register_attr() (line 323)
+       💬 Registers an attribute and returns its UID.
+   └── ⚙️  node_attr_names() (line 328)
+       💬 Get all node attribute names.
+   └── ⚙️  edge_attr_names() (line 333)
+       💬 Get all edge attribute names.
+   └── ⚙️  memory_usage_bytes() (line 338)
+       💬 Returns the estimated heap memory usage in bytes for all attribute storage.
+   └── ⚙️  py_set_type() (line 343)
+       🏷️  #pyo3(name = "set_type")
+
+🔧 IMPL: AttributeManager (line 364)
+   └── ⚙️  new_with_graph_store() (line 366)
+       💬 Internal constructor for Rust usage
+   └── ⚙️  get_internal() (line 375)
+       💬 Internal get method using serde_json::Value (optimized with Cow patterns)
+   └── ⚙️  set_internal() (line 409)
+       💬 Internal set method using serde_json::Value (optimized with split_once)
+   └── ⚙️  get_node_attr() (line 446)
+       💬 Get all values for a node attribute by name.
+   └── ⚙️  set_node_attr() (line 451)
+       💬 Set all values for a node attribute by name.
+   └── ⚙️  get_node_value() (line 461)
+       💬 Get a single value for a node attribute and entity index.
+   └── ⚙️  set_node_value() (line 466)
+       💬 Set a single value for a node attribute and entity index.
+   └── ⚙️  get_node_column_stats() (line 475)
+       💬 Get column stats for node attributes.
+   └── ⚙️  filter_nodes_by_value() (line 481)
+       💬 Filter nodes by attribute value (returns indices). Automatically uses SIMD acceleration for numeric values when available
+   └── ⚙️  hyper_filter_nodes_i64() (line 506)
+       💬 Ultra-fast filtering with comparison operators (hyper-optimized)
+   └── ⚙️  convert_node_ids_to_indices() (line 545)
+       💬 Convert node IDs to indices for compatibility
+   └── ⚙️  get_edge_attr() (line 555)
+       💬 Get all values for an edge attribute by name.
+   └── ⚙️  set_edge_attr() (line 560)
+       💬 Set all values for an edge attribute by name.
+   └── ⚙️  get_edge_value() (line 567)
+       💬 Get a single value for an edge attribute and entity index.
+   └── ⚙️  set_edge_value() (line 572)
+       💬 Set a single value for an edge attribute and entity index.
+   └── ⚙️  get_edge_column_stats() (line 585)
+       💬 Get column stats for edge attributes.
+   └── ⚙️  filter_edges_by_value() (line 591)
+       💬 Filter edges by attribute value (returns indices). Automatically uses SIMD acceleration for numeric values when available
+   └── ⚙️  set_type() (line 608)
+       💬 Sets the type/schema for a given attribute across all entities.
+   └── ⚙️  get_schema() (line 613)
+       💬 Returns the attribute schema (type information) for all managed attributes.
+   └── ⚙️  bulk_update() (line 626)
+       💬 Performs a bulk update of attributes for multiple entities.
+   └── ⚙️  get_fast() (line 641)
+       💬 Fast-path: retrieves attribute(s) with minimal overhead, bypassing Python wrappers.
+   └── ⚙️  set_fast() (line 651)
+       💬 Fast-path: sets attribute(s) with minimal overhead, bypassing Python wrappers.
+   └── ⚙️  get_node_i64() (line 662)
+       💬 Get native i64 value directly without JSON overhead (PHASE 3 optimization)
+   └── ⚙️  get_node_f64() (line 667)
+       💬 Get native f64 value directly without JSON overhead (PHASE 3 optimization)
+   └── ⚙️  get_node_bool() (line 672)
+       💬 Get native bool value directly without JSON overhead (PHASE 3 optimization)
+   └── ⚙️  get_node_string() (line 677)
+       💬 Get native String value directly without JSON overhead (PHASE 3 optimization)
+   └── ⚙️  get_edge_i64() (line 682)
+       💬 Get native i64 value for edges directly without JSON overhead (PHASE 3 optimization)
+   └── ⚙️  get_edge_f64() (line 687)
+       💬 Get native f64 value for edges directly without JSON overhead (PHASE 3 optimization)
+   └── ⚙️  get_edge_bool() (line 692)
+       💬 Get native bool value for edges directly without JSON overhead (PHASE 3 optimization)
+   └── ⚙️  get_edge_string() (line 697)
+       💬 Get native String value for edges directly without JSON overhead (PHASE 3 optimization)
+   └── ⚙️  filter_nodes_i64_simd() (line 704)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  filter_nodes_f64_simd() (line 711)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  filter_edges_i64_simd() (line 737)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  filter_edges_f64_simd() (line 763)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  batch_operation() (line 787)
+       💬 Executes a vectorized batch operation on attributes.
+
+🔧 IMPL: ProxyAttributeManager (line 832)
+   🏷️  #pymethods
+   └── ⚙️  get() (line 834)
+       💬 Returns the value of the specified attribute for this entity as JSON string.
+   └── ⚙️  set() (line 844)
+       💬 Sets the value of the specified attribute for this entity (JSON string).
+   └── ⚙️  has() (line 857)
+       💬 Checks if the specified attribute exists for this entity. Fast lookup in columnar metadata. Returns true if attribute is present.
+   └── ⚙️  remove() (line 867)
+       💬 Removes the specified attribute from this entity. Updates columnar metadata and clears value. Handles schema update if last reference.
+
+============================================================
+FILE: graph/managers/filters.rs
+============================================================
+
+🏗️  STRUCT: FilterCore (line 7)
+   🏷️  #derive(Clone)
+
+🏗️  STRUCT: FilterManager (line 29)
+   🏷️  #pyclass
+   🏷️  #derive(Clone)
+
+🏗️  STRUCT: ColumnarData (line 228)
+   🏷️  #derive(Clone)
+
+🔢 ENUM: FilterOp (line 221)
+   🏷️  #derive(Clone)
+
+🔧 IMPL: FilterCore (line 11)
+   └── ⚙️  new() (line 12)
+   └── ⚙️  add_filter() (line 16)
+   └── ⚙️  apply() (line 20)
+
+🔧 IMPL: FilterManager (line 39)
+   🏷️  #pymethods
+   └── ⚙️  by_dict() (line 43)
+       💬 Filters the collection using a dictionary of attribute-value pairs. Builds a columnar filter plan for efficient execution. Supports batch filtering and vectorized operations.
+   └── ⚙️  by_kwargs() (line 65)
+       🏷️  #pyo3(signature = (**kwargs))
+   └── ⚙️  by_query() (line 76)
+       💬 Filters the collection using a query string or expression. Parses query to columnar filter operations. Supports advanced filtering (e.g., range, regex).
+   └── ⚙️  by_attribute() (line 85)
+       💬 Filters the collection by a single attribute value. Directly calls columnar.filter_column_internal() for fast, vectorized filtering.
+   └── ⚙️  by_range() (line 100)
+       💬 Filters the collection by a range of attribute values. Uses vectorized columnar range check for high performance. Handles numeric and date ranges.
+   └── ⚙️  by_ids() (line 108)
+       💬 Filters the collection by a list of IDs. Uses index-based columnar access for efficient filtering. Supports batch operations.
+   └── ⚙️  chain() (line 115)
+       💬 Chains multiple filters together to build a composite filter plan. Enables complex, multi-stage filtering. Plans are executed in sequence for efficiency.
+   └── ⚙️  apply() (line 158)
+       💬 Applies the constructed filter plan to the collection. Executes all chained filters in an optimized order. Returns filtered collection or IDs.
+   └── ⚙️  count() (line 165)
+       💬 Counts the number of items matching the current filter plan. Uses columnar aggregation for fast counting. Does not materialize the filtered collection.
+
+🔧 IMPL: FilterManager (line 171)
+   └── ⚙️  execute_filter_plan() (line 175)
+       💬 Executes the current filter plan on columnar data. Used internally for optimized filter execution. May leverage SIMD or parallelism.
+   └── ⚙️  build_index_mask() (line 192)
+       💬 Builds a boolean mask from columnar data for filtering. Used for vectorized filtering and fast selection.
+   └── ⚙️  vectorized_comparison() (line 211)
+       💬 Performs a vectorized comparison on columnar data. Uses SIMD or hardware acceleration for high-throughput filtering.
+
+============================================================
+FILE: graph/managers/filter.rs
+============================================================
+
+🏗️  STRUCT: FilterManager (line 12)
+   🏷️  #pyclass
+
+🔢 ENUM: FilterExpr (line 20)
+   🏷️  #derive(Clone)
+
+🔧 IMPL: FilterManager (line 28)
+   🏷️  #pymethods
+   └── ⚙️  new() (line 31)
+       🏷️  #new
+   └── ⚙️  apply() (line 37)
+       💬 Applies all filters to the target collection of IDs. Returns a filtered view or set of IDs. Supports vectorized execution.
+   └── ⚙️  results() (line 85)
+       💬 Returns the current set of filtered IDs or objects.
+
+🔧 IMPL: FilterManager (line 90)
+   └── ⚙️  add_filter() (line 93)
+       💬 Adds a filter expression to the manager (internal method, not exposed to Python). Allows chaining multiple filters for complex queries.
+
+============================================================
+FILE: graph/edges/proxy.rs
+============================================================
+
+🏗️  STRUCT: EdgeProxy (line 13)
+   🏷️  #pyclass
+
+🔧 IMPL: EdgeProxy (line 26)
+   🏷️  #pymethods
+   └── ⚙️  py_new() (line 29)
+       🏷️  #new
+   └── ⚙️  attr_manager() (line 53)
+       💬 Returns a ProxyAttributeManager for this edge (per-attribute API).
+   └── ⚙️  get_attr() (line 58)
+       💬 Get the value of a single attribute for this edge (JSON string).
+   └── ⚙️  set_attr() (line 73)
+       💬 Set the value of a single attribute for this edge (JSON string).
+   └── ⚙️  attrs() (line 99)
+       💬 Get all attributes for this edge as a map (JSON string).
+   └── ⚙️  __str__() (line 119)
+       💬 Returns a string representation of this edge (for debugging or display).
+
+🔧 IMPL: EdgeProxy (line 124)
+   └── ⚙️  new() (line 126)
+       💬 Regular Rust constructor - not exposed to Python
+
+============================================================
+FILE: graph/edges/collection.rs
+============================================================
+
+🏗️  STRUCT: EdgeCollection (line 13)
+   🏷️  #pyclass
+   🏷️  #derive(Clone)
+
+🔧 IMPL: EdgeCollection (line 22)
+   🏷️  #pymethods
+   └── ⚙️  py_add() (line 24)
+       💬 Add one or more edges to the collection (batch-oriented).
+   └── ⚙️  filter_py() (line 44)
+       🏷️  #pyo3(signature = (*args, **kwargs))
+   └── ⚙️  py_new() (line 66)
+       🏷️  #new
+   └── ⚙️  attr() (line 77)
+       💬 Returns an AttributeManager for edge attributes.
+   └── ⚙️  size() (line 83)
+       🏷️  #getter
+   └── ⚙️  filter() (line 90)
+       🏷️  #pyo3(name = "filter")
+       🏷️  #pyo3(signature = (*args, **kwargs))
+   └── ⚙️  ids() (line 95)
+       💬 Returns all edge IDs in this collection.
+   └── ⚙️  has() (line 100)
+       💬 Check if an edge exists in the collection.
+   └── ⚙️  get() (line 111)
+       💬 Get an EdgeProxy for this edge if it exists.
+   └── ⚙️  add() (line 132)
+       🏷️  #pyo3(name = "add")
+
+🔧 IMPL: EdgeCollection (line 138)
+   └── ⚙️  new() (line 140)
+       💬 Regular Rust constructor - not exposed to Python
+   └── ⚙️  add_batch() (line 146)
+       💬 Add one or more edges to the collection (batch-oriented, internal use).
+   └── ⚙️  remove_batch() (line 154)
+       💬 Remove one or more edges from the collection (batch-oriented, internal use).
+   └── ⚙️  iter() (line 162)
+       💬 Returns an iterator over edge IDs in this collection (internal use).
+   └── ⚙️  get_rust() (line 168)
+       💬 Get an EdgeProxy for this edge if it exists (internal use).
+
+⚙️  FUNCTION: filter_edges_by_dict() (line 184)
+
+⚙️  FUNCTION: filter_edges_by_query() (line 238)
+
+============================================================
+FILE: graph/collections/base.rs
+============================================================
+
+🎭 TRAIT: BaseCollection (line 7)
+   📝 Trait for shared collection interface for nodes and edges. Provides a common API for batch operations, filtering, attribute access, and iteration. Designed for agent/LLM friendliness and modular backend delegation.
+
+⚙️  FUNCTION: add() (line 15)
+   📝 Add one or more elements to the collection. Returns Ok(()) if all elements were added, or an error message otherwise.
+
+⚙️  FUNCTION: remove() (line 19)
+   📝 Remove one or more elements from the collection. Returns Ok(()) if all elements were removed, or an error message otherwise.
+
+⚙️  FUNCTION: filter() (line 23)
+   📝 Filter elements in the collection, returning matching IDs. The predicate receives a reference to each ID and returns true if it should be included.
+
+⚙️  FUNCTION: size() (line 28)
+   📝 Get the number of elements in the collection.
+
+⚙️  FUNCTION: ids() (line 31)
+   📝 Get all element IDs in the collection.
+
+⚙️  FUNCTION: has() (line 34)
+   📝 Check if an element exists in the collection.
+
+⚙️  FUNCTION: attr() (line 37)
+   📝 Get the attribute manager for this collection.
+
+⚙️  FUNCTION: iter() (line 40)
+   📝 Get an iterator over the collection.
+
+⚙️  FUNCTION: get() (line 148)
+
+============================================================
+FILE: utils/json.rs
+============================================================
+
+⚙️  FUNCTION: python_dict_to_json_map() (line 9)
+   📝 Convert Python dictionary to JSON map
+
+⚙️  FUNCTION: python_to_json_value() (line 20)
+   📝 Convert Python value to JSON value
+
+⚙️  FUNCTION: json_value_to_python() (line 46)
+   📝 Convert JSON value to Python value
+
+============================================================
+FILE: utils/hash.rs
+============================================================
+
+⚙️  FUNCTION: hash_node() (line 9)
+   📝 Node hashing functions
+
+⚙️  FUNCTION: hash_edge() (line 16)
+   📝 Edge hashing functions
+
+============================================================
+FILE: storage/arena_core.rs
+============================================================
+
+🏗️  STRUCT: PackedAttributeValue (line 11)
+   🏷️  #derive(Debug, Clone, Copy)
+   🏷️  #repr(C, packed)
+
+🏗️  STRUCT: AttributeArena (line 21)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: ArenaGraphCore (line 272)
+   🏷️  #derive(Debug)
+
+🔢 ENUM: ComparisonOp (line 261)
+   🏷️  #derive(Debug, Clone, Copy)
+
+🔧 IMPL: AttributeArena (line 32)
+   └── ⚙️  new() (line 33)
+   └── ⚙️  with_capacity() (line 44)
+       💬 Pre-allocate arena for known size
+   └── ⚙️  add_i64() (line 55)
+       💬 Add attribute value to arena (packed, cache-friendly)
+   └── ⚙️  add_f64() (line 72)
+       💬 Add float attribute value
+   └── ⚙️  add_string_id() (line 88)
+       💬 Add string attribute value (as string pool ID)
+   └── ⚙️  update_indices() (line 104)
+       💬 Update index structures for fast lookup
+   └── ⚙️  get_entity_values() (line 125)
+       💬 Get all values for an entity (cache-friendly iteration)
+   └── ⚙️  get_attribute_values() (line 136)
+       💬 Get all values for an attribute (vectorized operations)
+   └── ⚙️  filter_i64_bulk() (line 141)
+       💬 SIMD-friendly bulk filtering for i64 attributes
+   └── ⚙️  filter_f64_bulk() (line 167)
+       💬 SIMD-friendly bulk filtering for f64 attributes
+   └── ⚙️  memory_usage_bytes() (line 192)
+       💬 Memory usage in bytes
+   └── ⚙️  defragment() (line 199)
+       💬 Defragment arena for optimal cache performance
+   └── ⚙️  rebuild_indices() (line 214)
+
+🔧 IMPL: Iterator (line 136)
+   📝 Get all values for an attribute (vectorized operations)
+
+🔧 IMPL: ArenaGraphCore (line 283)
+   └── ⚙️  new() (line 284)
+   └── ⚙️  with_capacity() (line 296)
+       💬 Pre-allocate for expected graph size
+   └── ⚙️  add_node_i64() (line 311)
+       💬 Add node attribute with optimal memory layout
+   └── ⚙️  add_edge_i64() (line 317)
+       💬 Add edge attribute with optimal memory layout
+   └── ⚙️  filter_nodes_i64() (line 323)
+       💬 Bulk filter nodes with arena-optimized performance
+   └── ⚙️  filter_edges_i64() (line 329)
+       💬 Bulk filter edges with arena-optimized performance
+   └── ⚙️  optimize_layout() (line 335)
+       💬 Defragment for optimal cache performance
+   └── ⚙️  memory_usage_bytes() (line 344)
+       💬 Get total memory usage
+
+============================================================
+FILE: storage/fast_core.rs
+============================================================
+
+🏗️  STRUCT: StringPool (line 12)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: FastGraphCore (line 190)
+   🏷️  #derive(Debug)
+
+🔢 ENUM: Column (line 84)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: StringPool (line 17)
+   └── ⚙️  new() (line 18)
+   └── ⚙️  intern() (line 26)
+       💬 Get or create string ID (intern string) - optimized to avoid double allocation
+   └── ⚙️  hash_string() (line 48)
+       🏷️  #inline(always)
+   └── ⚙️  get() (line 56)
+       💬 Get string by ID
+   └── ⚙️  len() (line 61)
+       💬 Get all strings (for debugging)
+   └── ⚙️  memory_usage_bytes() (line 66)
+       💬 Estimate memory usage in bytes
+
+🔧 IMPL: Column (line 92)
+   └── ⚙️  len() (line 93)
+   └── ⚙️  memory_usage_bytes() (line 103)
+   └── ⚙️  get_json() (line 114)
+       💬 Get value at index as JSON
+   └── ⚙️  set_json() (line 128)
+       💬 Set value at index, growing if necessary
+
+🔧 IMPL: FastGraphCore (line 201)
+   └── ⚙️  new() (line 202)
+   └── ⚙️  add_nodes() (line 215)
+       💬 Add nodes by string IDs (batch operation) - vectorized for performance
+   └── ⚙️  add_edges() (line 244)
+       💬 Add edges by string ID pairs (batch operation) - vectorized for performance
+   └── ⚙️  set_node_attr() (line 275)
+       💬 Set node attribute (creates column if needed)
+   └── ⚙️  set_node_attrs_batch() (line 300)
+       💬 Batch set node attributes
+   └── ⚙️  get_node_attr() (line 329)
+       💬 Get node attribute
+   └── ⚙️  node_ids() (line 342)
+       💬 Get all node IDs as strings
+   └── ⚙️  edge_ids() (line 353)
+       💬 Get all edge IDs as string pairs
+   └── ⚙️  memory_usage_bytes() (line 367)
+       💬 Get memory usage stats
+   └── ⚙️  node_count() (line 394)
+       💬 Get counts
+   └── ⚙️  edge_count() (line 398)
+   └── ⚙️  bulk_add_nodes_with_attrs() (line 405)
+       💬 Ultra-fast bulk node addition with minimal locking
+   └── ⚙️  bulk_set_attrs_vectorized() (line 443)
+       💬 Ultra-fast bulk attribute setting with SIMD-style vectorization
+   └── ⚙️  zero_copy_bulk_add() (line 509)
+       💬 Zero-copy bulk node addition (bypasses JSON serialization)
+   └── ⚙️  get_atomic_stats() (line 532)
+       💬 Lock-free atomic counters for high-concurrency scenarios
+   └── ⚙️  set_i64_attrs_native() (line 542)
+       💬 Set integer attributes directly (no JSON serialization)
+   └── ⚙️  set_string_attrs_native() (line 564)
+       💬 Set string attributes directly using string pool IDs
+   └── ⚙️  generate_pattern_attrs() (line 586)
+       💬 Ultra-fast pattern generation (for benchmarking)
+
+🔧 IMPL: StringPool (line 617)
+   └── ⚙️  get_string_id() (line 618)
+   └── ⚙️  reserve() (line 624)
+       💬 Pre-allocate string pool capacity for better performance
+   └── ⚙️  bulk_intern() (line 630)
+       💬 Bulk string interning with pre-allocation
+
+============================================================
+FILE: storage/hyper_core.rs
+============================================================
+
+🏗️  STRUCT: HyperGraphCore (line 18)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: MemoryStats (line 284)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: HyperGraphCore (line 32)
+   └── ⚙️  new() (line 33)
+   └── ⚙️  with_capacity() (line 45)
+   └── ⚙️  add_node() (line 58)
+       💬 Add node with automatic ID assignment
+   └── ⚙️  add_edge() (line 73)
+       💬 Add edge with automatic ID assignment
+   └── ⚙️  get_attr_id() (line 92)
+       💬 Get or create attribute ID
+   └── ⚙️  set_node_i64() (line 115)
+       💬 Set node attribute (i64) with arena allocation
+   └── ⚙️  set_node_f64() (line 122)
+       💬 Set node attribute (f64) with arena allocation
+   └── ⚙️  hyper_filter_nodes_i64() (line 131)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  simd_filter_arena_i64() (line 152)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  hyper_filter_nodes_i64() (line 222)
+       🏷️  #cfg(not(feature = "simd"))
+   └── ⚙️  bulk_add_nodes_i64() (line 238)
+       💬 Bulk add nodes with attributes (optimal for large datasets)
+   └── ⚙️  memory_stats() (line 259)
+       💬 Get memory statistics
+   └── ⚙️  estimate_index_memory() (line 268)
+   └── ⚙️  estimate_fragmentation() (line 277)
+
+⚙️  FUNCTION: fmt() (line 292)
+
+============================================================
+FILE: storage/columnar.rs
+============================================================
+
+🏗️  STRUCT: ColumnarStore (line 73)
+
+🔢 ENUM: AttributeType (line 31)
+   🏷️  #derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)
+
+🔢 ENUM: ComparisonOp (line 41)
+   🏷️  #derive(Debug, Clone, Copy, PartialEq, Eq)
+
+🔢 ENUM: ColumnData (line 58)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: ColumnKind (line 68)
+   🏷️  #derive(Debug, Clone, Copy, PartialEq, Eq, Hash)
+
+🔧 IMPL: Clone for ColumnarStore (line 103)
+   └── ⚙️  clone() (line 104)
+
+🔧 IMPL: ColumnarStore (line 122)
+   └── ⚙️  node_columns() (line 124)
+       💬 Returns all node columns as Vec<(AttrUID, ColumnData)> (cloned). For inspection/bulk ops only.
+   └── ⚙️  edge_columns() (line 137)
+       💬 Returns all edge columns as Vec<(AttrUID, ColumnData)> (cloned). For inspection/bulk ops only.
+
+🔧 IMPL: ColumnarStore (line 151)
+   └── ⚙️  new() (line 152)
+   └── ⚙️  memory_usage_bytes() (line 170)
+       💬 Estimate the total heap memory usage in bytes for this ColumnarStore.
+   └── ⚙️  memory_usage_breakdown() (line 223)
+       💬 Returns a breakdown of memory usage per attribute (name, type, node/edge, bytes used)
+   └── ⚙️  register_attr() (line 271)
+       💬 Registers an attribute name and returns its UID. If already present, returns existing UID.
+   └── ⚙️  register_attr_with_type() (line 285)
+       💬 Registers an attribute name and type, returning its UID. If already present, enforces type match.
+   └── ⚙️  set_node_int() (line 330)
+       💬 Set a single int value for a node attribute and entity index
+   └── ⚙️  get_node_int() (line 350)
+       💬 Get a single int value for a node attribute and entity index
+   └── ⚙️  set_node_int_batch() (line 364)
+       💬 Batch set int values for a node attribute
+   └── ⚙️  get_node_int_batch() (line 389)
+       💬 Batch get int values for a node attribute
+   └── ⚙️  set_node_float() (line 406)
+       💬 Set a single float value for a node attribute and entity index
+   └── ⚙️  get_node_float() (line 426)
+       💬 Get a single float value for a node attribute and entity index
+   └── ⚙️  set_node_bool() (line 440)
+       💬 Set a single bool value for a node attribute and entity index
+   └── ⚙️  get_node_bool() (line 460)
+       💬 Get a single bool value for a node attribute and entity index
+   └── ⚙️  set_node_str() (line 474)
+       💬 Set a single string value for a node attribute and entity index
+   └── ⚙️  get_node_str() (line 494)
+       💬 Get a single string value for a node attribute and entity index
+   └── ⚙️  set_node_json() (line 508)
+       💬 Set a single value for a node attribute and entity index (Json fallback)
+   └── ⚙️  get_node_json() (line 525)
+       💬 Get a single value for a node attribute and entity index (Json fallback)
+   └── ⚙️  set_edge_int() (line 541)
+       💬 Set a single int value for an edge attribute and entity index
+   └── ⚙️  get_edge_int() (line 562)
+       💬 Get a single int value for an edge attribute and entity index
+   └── ⚙️  set_edge_float() (line 577)
+       💬 Set a single float value for an edge attribute and entity index
+   └── ⚙️  get_edge_float() (line 597)
+       💬 Get a single float value for an edge attribute and entity index
+   └── ⚙️  set_edge_bool() (line 611)
+       💬 Set a single bool value for an edge attribute and entity index
+   └── ⚙️  get_edge_bool() (line 631)
+       💬 Get a single bool value for an edge attribute and entity index
+   └── ⚙️  get_node_i64_native() (line 647)
+       💬 Get native i64 value directly without JSON conversion (PHASE 3 optimization)
+   └── ⚙️  get_node_f64_native() (line 657)
+       💬 Get native f64 value directly without JSON conversion (PHASE 3 optimization)
+   └── ⚙️  get_node_bool_native() (line 666)
+       💬 Get native bool value directly without JSON conversion (PHASE 3 optimization)
+   └── ⚙️  get_node_string_native() (line 675)
+       💬 Get native String value directly without JSON conversion (PHASE 3 optimization)
+   └── ⚙️  get_edge_i64_native() (line 681)
+       💬 Get native i64 value for edges directly without JSON conversion (PHASE 3 optimization)
+   └── ⚙️  get_edge_f64_native() (line 690)
+       💬 Get native f64 value for edges directly without JSON conversion (PHASE 3 optimization)
+   └── ⚙️  get_edge_bool_native() (line 699)
+       💬 Get native bool value for edges directly without JSON conversion (PHASE 3 optimization)
+   └── ⚙️  get_edge_string_native() (line 708)
+       💬 Get native String value for edges directly without JSON conversion (PHASE 3 optimization)
+   └── ⚙️  get_node_i64_bulk() (line 716)
+       💬 Get all i64 values for a node attribute (bulk operation without JSON overhead)
+   └── ⚙️  get_node_f64_bulk() (line 730)
+       💬 Get all f64 values for a node attribute (bulk operation without JSON overhead)
+   └── ⚙️  get_node_bool_bulk() (line 744)
+       💬 Get all bool values for a node attribute (bulk operation without JSON overhead)
+   └── ⚙️  get_edge_i64_bulk() (line 758)
+       💬 Get all i64 values for an edge attribute (bulk operation without JSON overhead)
+   └── ⚙️  get_edge_f64_bulk() (line 772)
+       💬 Get all f64 values for an edge attribute (bulk operation without JSON overhead)
+   └── ⚙️  get_edge_bool_bulk() (line 786)
+       💬 Get all bool values for an edge attribute (bulk operation without JSON overhead)
+   └── ⚙️  set_edge_str() (line 800)
+       💬 Set a single string value for an edge attribute and entity index
+   └── ⚙️  get_edge_str() (line 820)
+       💬 Get a single string value for an edge attribute and entity index
+   └── ⚙️  set_edge_json() (line 834)
+       💬 Set a single value for an edge attribute and entity index (Json fallback)
+   └── ⚙️  get_edge_json() (line 851)
+       💬 Get a single value for an edge attribute and entity index (Json fallback)
+   └── ⚙️  filter_nodes_by_int() (line 867)
+       💬 Filter node indices by int value for a column (scalar fallback)
+   └── ⚙️  filter_node_f64_simd() (line 893)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  filter_edge_i64_simd() (line 903)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  filter_edge_f64_simd() (line 913)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  set_node_float_batch() (line 923)
+       💬 Batch set/get for node float columns
+   └── ⚙️  get_node_float_batch() (line 947)
+   └── ⚙️  set_node_bool_batch() (line 961)
+       💬 Batch set/get for node bool columns
+   └── ⚙️  get_node_bool_batch() (line 985)
+   └── ⚙️  set_node_str_batch() (line 999)
+       💬 Batch set/get for node str columns
+   └── ⚙️  get_node_str_batch() (line 1023)
+   └── ⚙️  set_edge_float_batch() (line 1037)
+   └── ⚙️  get_edge_float_batch() (line 1061)
+   └── ⚙️  set_edge_bool_batch() (line 1074)
+   └── ⚙️  get_edge_bool_batch() (line 1098)
+   └── ⚙️  set_edge_str_batch() (line 1111)
+   └── ⚙️  get_edge_str_batch() (line 1135)
+   └── ⚙️  filter_nodes_by_bool() (line 1151)
+       💬 Filter node indices by bool value for a column
+   └── ⚙️  filter_nodes_by_str() (line 1175)
+       💬 Filter node indices by string value for a column
+   └── ⚙️  node_attr_names() (line 1200)
+       💬 Get all node attribute names
+   └── ⚙️  get_column_stats() (line 1205)
+       💬 Get column stats for node attributes (Python API)
+   └── ⚙️  rebuild_node_bitmaps() (line 1216)
+       💬 Rebuild all node bitmaps (Python API)
+   └── ⚙️  filter_nodes_by_value() (line 1233)
+       💬 Filter nodes by attribute value (returns indices)
+   └── ⚙️  get_edge_attr() (line 1252)
+       💬 Get all values for an edge attribute by name (Python API)
+   └── ⚙️  set_edge_attr() (line 1258)
+       💬 Set all values for an edge attribute by name (Python API)
+   └── ⚙️  get_edge_value() (line 1265)
+       💬 Get a single value for an edge attribute and entity index
+   └── ⚙️  set_edge_value() (line 1271)
+       💬 Set a single value for an edge attribute and entity index
+   └── ⚙️  edge_attr_names() (line 1336)
+       💬 Get all edge attribute names
+   └── ⚙️  get_edge_column_stats() (line 1348)
+       💬 Get column stats for edge attributes (Python API)
+   └── ⚙️  rebuild_edge_bitmaps() (line 1359)
+       💬 Rebuild all edge bitmaps (Python API)
+   └── ⚙️  filter_edges_by_value() (line 1376)
+       💬 Filter edges by attribute value (returns indices)
+
+🔧 IMPL: ColumnarStore (line 1393)
+   └── ⚙️  get_column_internal() (line 1396)
+       💬 Fast column access for internal use Fast column access for internal use
+   └── ⚙️  set_column_internal() (line 1405)
+       💬 Fast column mutation for internal use
+   └── ⚙️  bulk_get_internal() (line 1425)
+       💬 Bulk attribute retrieval (vectorized) Bulk attribute retrieval (vectorized)
+   └── ⚙️  bulk_set_internal() (line 1439)
+       💬 Bulk attribute setting (vectorized)
+   └── ⚙️  filter_column_internal() (line 1460)
+       💬 Fast column filtering with SIMD (placeholder)
+   └── ⚙️  get_typed_column() (line 1466)
+       💬 Type-safe column access (placeholder)
+   └── ⚙️  ensure_column_capacity() (line 1472)
+       💬 Pre-allocate column space (placeholder)
+   └── ⚙️  get_node_attr() (line 1492)
+       💬 Get all values for a node attribute by name (Python API)
+   └── ⚙️  set_node_attr() (line 1498)
+       💬 Set all values for a node attribute by name (Python API)
+   └── ⚙️  get_node_value() (line 1505)
+       💬 Get a single value for a node attribute and entity index
+   └── ⚙️  set_node_value() (line 1541)
+       💬 Set a single value for a node attribute and entity index
+   └── ⚙️  filter_edges_by_bool() (line 1606)
+       💬 Filter edges by bool value for a column
+   └── ⚙️  edge_endpoints() (line 1630)
+       💬 Get edge endpoints (source, target) by edge ID - placeholder implementation
+   └── ⚙️  simd_filter_i64() (line 1640)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  simd_filter_f64() (line 1665)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  simd_add_i64_bulk() (line 1693)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  simd_add_f64_bulk() (line 1746)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  simd_mul_i64_bulk() (line 1799)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  simd_filter_i64_bulk() (line 1852)
+       🏷️  #cfg(feature = "simd")
+   └── ⚙️  simd_add_i64_bulk() (line 1939)
+       🏷️  #cfg(not(feature = "simd"))
+   └── ⚙️  simd_add_f64_bulk() (line 1949)
+       🏷️  #cfg(not(feature = "simd"))
+   └── ⚙️  simd_mul_i64_bulk() (line 1959)
+       🏷️  #cfg(not(feature = "simd"))
+   └── ⚙️  simd_filter_i64_bulk() (line 1969)
+       🏷️  #cfg(not(feature = "simd"))
+
+⚙️  FUNCTION: estimate_json_value_size() (line 2)
+
+============================================================
+FILE: storage/lockfree_core.rs
+============================================================
+
+🏗️  STRUCT: LockFreeAttributeStore (line 52)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: AttributeData (line 70)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: LockFreeStats (line 265)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: LockFreeStringPool (line 281)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: StringPoolData (line 287)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: LockFreeBatchProcessor (line 336)
+   🏷️  #derive(Debug)
+
+🔢 ENUM: LockFreeBatchOp (line 12)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: AttributeValue (line 32)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: ComparisonOp (line 41)
+   🏷️  #derive(Debug, Clone, Copy)
+
+🔧 IMPL: LockFreeAttributeStore (line 78)
+   └── ⚙️  new() (line 79)
+   └── ⚙️  next_attr_id() (line 98)
+       💬 Get next attribute ID atomically
+   └── ⚙️  next_entity_id() (line 103)
+       💬 Get next entity ID atomically
+   └── ⚙️  queue_operation() (line 108)
+       💬 Queue attribute operation (lock-free)
+   └── ⚙️  process_batch() (line 115)
+       💬 Process batch operations (single writer pattern)
+   └── ⚙️  apply_batch_updates() (line 138)
+       💬 Apply batch updates atomically (single writer)
+   └── ⚙️  get_node_attr() (line 183)
+       💬 Lock-free read of node attribute
+   └── ⚙️  get_edge_attr() (line 190)
+       💬 Lock-free read of edge attribute
+   └── ⚙️  filter_nodes() (line 197)
+       💬 Lock-free filtering of nodes
+   └── ⚙️  compare_values() (line 214)
+       💬 Compare attribute values for filtering
+   └── ⚙️  get_stats() (line 253)
+       💬 Get queue statistics
+
+🔧 IMPL: LockFreeStringPool (line 292)
+   └── ⚙️  new() (line 293)
+   └── ⚙️  intern() (line 306)
+       💬 Intern string atomically (may require fallback to slower path for new strings)
+   └── ⚙️  get_string() (line 326)
+       💬 Get string by ID (lock-free read)
+
+🔧 IMPL: LockFreeBatchProcessor (line 342)
+   └── ⚙️  new() (line 343)
+   └── ⚙️  queue_operation() (line 352)
+       💬 Queue operation for batch processing
+   └── ⚙️  process_batch() (line 357)
+       💬 Process a batch of operations
+   └── ⚙️  get_stats() (line 363)
+       💬 Get processing statistics
+   └── ⚙️  configure() (line 368)
+       💬 Set batch processing parameters
+
+⚙️  FUNCTION: fmt() (line 273)
+
+============================================================
+FILE: storage/graph_store.rs
+============================================================
+
+🏗️  STRUCT: GraphState (line 14)
+   🏷️  #derive(Clone)
+
+🏗️  STRUCT: GraphStore (line 24)
+   🏷️  #pyclass
+
+🔧 IMPL: GraphStore (line 36)
+   └── ⚙️  memory_usage_bytes() (line 38)
+       💬 Estimate the total heap memory usage in bytes for this GraphStore (including ContentPool).
+   └── ⚙️  content_pool_memory_usage_bytes() (line 55)
+       💬 Returns the estimated heap memory usage in bytes for the content pool only.
+   └── ⚙️  node_index() (line 58)
+   └── ⚙️  node_id() (line 61)
+   └── ⚙️  edge_index() (line 64)
+   └── ⚙️  edge_id() (line 67)
+   └── ⚙️  new() (line 70)
+   └── ⚙️  save_state() (line 86)
+       💬 Saves the current graph state to persistent storage.
+   └── ⚙️  load_state() (line 103)
+       💬 Loads a graph state by its ID from persistent storage.
+   └── ⚙️  branch() (line 107)
+       💬 Creates a new branch from the current graph state.
+   └── ⚙️  list_branches() (line 114)
+       💬 Lists all available graph states and branches in storage.
+   └── ⚙️  switch_branch() (line 118)
+       💬 Switches to a different graph state or branch by ID.
+   └── ⚙️  delete_branch() (line 124)
+       💬 Deletes a branch by its ID.
+   └── ⚙️  create_initial_state() (line 127)
+   └── ⚙️  all_node_ids() (line 142)
+   └── ⚙️  add_nodes() (line 145)
+   └── ⚙️  remove_nodes() (line 158)
+   └── ⚙️  node_count() (line 161)
+   └── ⚙️  has_node() (line 164)
+   └── ⚙️  all_edge_ids() (line 167)
+   └── ⚙️  add_edges() (line 170)
+   └── ⚙️  remove_edges() (line 181)
+   └── ⚙️  edge_count() (line 184)
+   └── ⚙️  has_edge() (line 187)
+
+============================================================
+FILE: storage/content_pool.rs
+============================================================
+
+🏗️  STRUCT: ContentPool (line 16)
+
+🔧 IMPL: ContentPool (line 29)
+   └── ⚙️  memory_usage_bytes() (line 31)
+       💬 Optimized memory usage calculation
+   └── ⚙️  new() (line 55)
+   └── ⚙️  batch_intern_nodes() (line 67)
+       💬 Optimized batch node interning with minimal locking
+   └── ⚙️  batch_intern_edges() (line 87)
+       💬 Optimized batch edge interning with minimal locking
+   └── ⚙️  intern_node() (line 107)
+       💬 Store node in pool and return its content hash
+   └── ⚙️  intern_edge() (line 125)
+       💬 Store edge in pool and return its content hash
+   └── ⚙️  sync() (line 142)
+       💬 Synchronizes the content pool with persistent storage.
+   └── ⚙️  all_node_hashes() (line 146)
+       💬 Returns all node hashes in the pool.
+   └── ⚙️  all_edge_hashes() (line 150)
+       💬 Returns all edge hashes in the pool.
+   └── ⚙️  node_count() (line 154)
+       💬 Returns the number of nodes in the pool.
+   └── ⚙️  edge_count() (line 158)
+       💬 Returns the number of edges in the pool.
+   └── ⚙️  has_node_hash() (line 162)
+       💬 Checks if a node exists by hash.
+   └── ⚙️  has_edge_hash() (line 166)
+       💬 Checks if an edge exists by hash.
+   └── ⚙️  add_node_hashes() (line 170)
+       💬 Adds nodes by hash (increments refcount or inserts if not present).
+   └── ⚙️  add_edge_hashes() (line 180)
+       💬 Adds edges by hash (increments refcount or inserts if not present).
+   └── ⚙️  remove_node_hashes() (line 190)
+       💬 Removes nodes by hash (decrements refcount and removes if zero).
+   └── ⚙️  remove_edge_hashes() (line 206)
+       💬 Removes edges by hash (decrements refcount and removes if zero).
+   └── ⚙️  all_node_ids() (line 225)
+       💬 Returns all NodeIds in the pool (best-effort, expects stored Value to be a string or object with "id").
+   └── ⚙️  all_edge_ids() (line 239)
+       💬 Returns all EdgeIds in the pool (best-effort, expects stored Value to be an object with "source" and "target").
+   └── ⚙️  has_node() (line 256)
+       💬 Checks if a node exists by NodeId.
+   └── ⚙️  has_edge() (line 261)
+       💬 Checks if an edge exists by EdgeId.
+   └── ⚙️  add_nodes() (line 266)
+       💬 Adds nodes by NodeId.
+   └── ⚙️  add_edges() (line 278)
+       💬 Adds edges by EdgeId.
+   └── ⚙️  remove_nodes() (line 294)
+       💬 Removes nodes by NodeId.
+   └── ⚙️  remove_edges() (line 299)
+       💬 Removes edges by EdgeId.
+
+============================================================
+SUMMARY: Analyzed 31 files
+============================================================
