@@ -4,6 +4,21 @@ Groggy is a powerful, easy-to-use graph language engine written in Rust with a P
 
 ---
 
+## About this Branch: `new-structure-design`
+
+This branch represents a major architectural and experimental iteration. It documents the full process, learnings, and problem-solving approaches undertaken while exploring new directions for Groggy's design. The work here includes:
+
+- Starting from a detailed outline and initial plan
+- Using pseudocode and comments to drive early development
+- Iterative implementation and debugging in both Python and Rust
+- Extensive documentation and commit messages capturing design decisions, experiments, and discoveries
+- Key learnings and what could have been done differently
+- Problems solved, dead ends reached, and rationale for a future redesign
+
+For the full, unabridged summary of this branch—including detailed notes, learnings, and references to all relevant documentation—see [`BRANCH_SUMMARY.md`](./BRANCH_SUMMARY.md).
+
+---
+
 ## Architecture Overview
 
 - **Graph**: Entry point; exposes node/edge collections and graph-wide operations.

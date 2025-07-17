@@ -1,0 +1,354 @@
+CODE STRUCTURE ANALYSIS
+Directory: ../groggy/python
+Generated: python_new_structure_outline.txt
+============================================================
+
+============================================================
+FILE: groggy/algorithms.py
+============================================================
+
+⚙️  FUNCTION: get_nodes_attribute(graph, node_ids, attr_name) (line 3)
+   📝 Get a specific attribute for multiple nodes efficiently (Rust backend).
+
+⚙️  FUNCTION: get_nodes_attributes(graph, node_ids) (line 15)
+   📝 Get all attributes for multiple nodes efficiently (Rust backend).
+
+⚙️  FUNCTION: get_edges_attribute(graph, edge_ids, attr_name) (line 26)
+   📝 Get a specific attribute for multiple edges efficiently (Rust backend).
+
+⚙️  FUNCTION: get_edges_attributes(graph, edge_ids) (line 38)
+   📝 Get all attributes for multiple edges efficiently (Rust backend).
+
+⚙️  FUNCTION: bfs(graph, start_node) (line 49)
+   📝 Performs a breadth-first search (BFS) traversal starting from a given node.
+
+⚙️  FUNCTION: dfs(graph, start_node) (line 66)
+   📝 Performs a depth-first search (DFS) traversal starting from a given node.
+
+⚙️  FUNCTION: shortest_path(graph, source, target) (line 83)
+   📝 Computes the shortest path between two nodes using the selected algorithm.
+
+⚙️  FUNCTION: connected_components(graph) (line 104)
+   📝 Finds all connected components in the graph.
+
+⚙️  FUNCTION: clustering_coefficient(graph, node) (line 116)
+   📝 Calculates the clustering coefficient for the graph or a specific node.
+
+⚙️  FUNCTION: pagerank(graph) (line 133)
+   📝 Computes PageRank scores for all nodes in the graph.
+
+⚙️  FUNCTION: betweenness_centrality(graph) (line 146)
+   📝 Computes betweenness centrality for all nodes or edges in the graph.
+
+⚙️  FUNCTION: label_propagation(graph) (line 159)
+   📝 Performs community detection using the label propagation algorithm.
+
+⚙️  FUNCTION: louvain(graph) (line 172)
+   📝 Detects communities using the Louvain modularity maximization algorithm.
+
+⚙️  FUNCTION: modularity(graph) (line 185)
+   📝 Calculates the modularity score of a given labeling or partitioning.
+
+============================================================
+FILE: groggy/analysis.py
+============================================================
+
+⚙️  FUNCTION: show_changes(graph_or_entity, graph, branch_name) (line 3)
+   📝 Analyze changes to a graph or entity across saved states in a branch.
+
+⚙️  FUNCTION: _show_graph_changes(graph, branch_name) (line 22)
+   📝 Show all changes to the graph across saved states in the given branch.
+
+⚙️  FUNCTION: _show_entity_changes(entity_id, graph, branch_name) (line 42)
+   📝 Show changes for a specific entity (node or edge) across saved states in a branch.
+
+⚙️  FUNCTION: _get_saved_states(graph) (line 65)
+   📝 Retrieve the list of saved states (snapshots) from the graph storage backend.
+
+⚙️  FUNCTION: _analyze_state_diff(graph, prev_hash, curr_hash) (line 78)
+   📝 Analyze differences between two graph states by loading and comparing them.
+
+⚙️  FUNCTION: _empty_diff() (line 98)
+   📝 Return an empty diff structure for use as a default or placeholder.
+
+⚙️  FUNCTION: _compare_graph_states(prev_nodes, prev_edges, curr_nodes, curr_edges) (line 108)
+   📝 Compare two graph states and return the differences in nodes and edges.
+
+⚙️  FUNCTION: _print_changes(changes) (line 122)
+   📝 Print a formatted summary of changes for diagnostics or user feedback.
+
+⚙️  FUNCTION: _print_entity_timeline(entity_id, timeline) (line 133)
+   📝 Print a formatted timeline of changes for a specific entity.
+
+⚙️  FUNCTION: show_entity_changes(entity_id, graph, branch_name) (line 145)
+   📝 Convenience function for entity-specific change analysis.
+
+⚙️  FUNCTION: show_graph_changes(graph, branch_name) (line 160)
+   📝 Convenience function for graph-wide change analysis.
+
+⚙️  FUNCTION: track_attribute_changes(graph, attribute_name, branch_name) (line 174)
+   📝 Track changes to a specific attribute across all entities over time.
+
+============================================================
+FILE: groggy/graph.py
+============================================================
+
+📁 CLASS: Graph (line 8)
+   📝 Main Graph class with new collection-based API.
+   └── 🔧 __init__(self, directed, backend) (line 16)
+       💬 Initializes a new Graph instance.
+   └── 🔧 info(self) (line 43)
+       💬 Returns comprehensive information about the graph.
+   └── 🔧 size(self) (line 57)
+       💬 Returns the total number of entities in the graph (nodes + edges).
+   └── 🔧 is_directed(self) (line 67)
+       💬 Checks whether the graph is directed.
+   └── 🔧 attributes(self) (line 77)
+       💬 Expose the Rust attribute_manager for direct access to memory_usage_breakdown and other diagnostics.
+   └── 🔧 nodes(self) (line 84)
+       💬 Returns the NodeCollection for this graph.
+   └── 🔧 edges(self) (line 95)
+       💬 Returns the EdgeCollection for this graph.
+   └── 🔧 subgraph(self, node_filter, edge_filter) (line 105)
+       💬 Creates a subgraph view using node and/or edge filters.
+   └── 🔧 subgraphs(self) (line 125)
+       💬 Returns all subgraphs partitioned by a given attribute or property.
+   └── 🔧 fast_add_nodes(self, node_ids) (line 159)
+       💬 Add nodes using optimized FastCore (10x performance target)
+   └── 🔧 fast_add_edges(self, edge_pairs) (line 163)
+       💬 Add edges using optimized FastCore (10x performance target)
+   └── 🔧 fast_set_node_attr(self, attr_name, node_id, value) (line 167)
+       💬 Set node attribute using optimized FastCore
+   └── 🔧 fast_set_node_attrs_batch(self, attr_name, data) (line 171)
+       💬 Batch set node attributes using optimized FastCore
+   └── 🔧 fast_get_node_attr(self, attr_name, node_id) (line 175)
+       💬 Get node attribute using optimized FastCore
+   └── 🔧 fast_node_ids(self) (line 179)
+       💬 Get all node IDs using optimized FastCore
+   └── 🔧 fast_edge_ids(self) (line 183)
+       💬 Get all edge IDs using optimized FastCore
+   └── 🔧 fast_core_memory_usage(self) (line 187)
+       💬 Get FastCore memory usage in bytes
+   └── 🔧 ultra_fast_add_nodes_with_attrs(self, nodes_data) (line 193)
+       💬 Ultra-fast bulk node addition with attributes (minimal locking)
+   └── 🔧 ultra_fast_set_attrs_vectorized(self, attr_name, values) (line 201)
+       💬 Ultra-fast vectorized attribute setting (SIMD-style)
+
+============================================================
+FILE: groggy/utils.py
+============================================================
+
+⚙️  FUNCTION: create_random_graph(n_nodes, edge_probability, use_rust) (line 3)
+   📝 Create a random graph efficiently using vectorized operations or Rust backend.
+
+⚙️  FUNCTION: create_clustering_workflow(store, graph, algorithms) (line 35)
+   📝 Create branches for different clustering algorithms and run each in isolation.
+
+⚙️  FUNCTION: create_subgraph_branch(store, subgraph, branch_name, description) (line 57)
+   📝 Create a new branch from a subgraph for isolated processing or experimentation.
+
+⚙️  FUNCTION: convert_networkx_graph(nx_graph) (line 75)
+   📝 Convert a NetworkX graph to a Groggy graph.
+
+⚙️  FUNCTION: convert_to_networkx(groggy_graph) (line 101)
+   📝 Convert a Groggy graph to NetworkX format for interoperability.
+
+⚙️  FUNCTION: benchmark_performance(graph, operations) (line 122)
+   📝 Benchmark the performance of graph operations for profiling or regression testing.
+
+============================================================
+FILE: groggy/views.py
+============================================================
+
+📁 CLASS: GraphView (line 3)
+   📝 Read-only graph view with filtered access.
+   └── 🔧 __init__(self, graph, node_filter, edge_filter) (line 11)
+       💬 Initialize a GraphView with optional node and edge filters.
+   └── 🔧 snapshot(self) (line 27)
+       💬 Create an immutable snapshot of the current view.
+   └── 🔧 filter_view(self, node_filter, edge_filter) (line 41)
+       💬 Create an additional filtered view layered on top of this view.
+   └── 🔧 nodes(self) (line 61)
+       💬 Returns the filtered NodeCollection for this view.
+   └── 🔧 edges(self) (line 72)
+       💬 Returns the filtered EdgeCollection for this view.
+   └── 🔧 info(self) (line 82)
+       💬 Get information about the current view (size, filters, summary stats).
+
+📁 CLASS: GraphSnapshot (line 97)
+   📝 Immutable graph snapshot.
+   └── 🔧 __init__(self, graph_state) (line 104)
+       💬 Initialize a GraphSnapshot with a captured graph state.
+   └── 🔧 nodes(self) (line 115)
+       💬 Returns the immutable NodeCollection for this snapshot.
+   └── 🔧 edges(self) (line 127)
+       💬 Returns the immutable EdgeCollection for this snapshot.
+   └── 🔧 info(self) (line 138)
+       💬 Get information about the snapshot (size, timestamp, summary stats).
+
+============================================================
+FILE: groggy/graph/subgraph.py
+============================================================
+
+📁 CLASS: Subgraph (line 3)
+   📝 A Subgraph is a Graph with additional metadata about its origin.
+   └── 🔧 __init__(self, parent_graph, filter_criteria, metadata) (line 11)
+       💬 Initialize a Subgraph with parent graph, filter criteria, and metadata.
+   └── 🔧 __repr__(self) (line 27)
+       💬 Return a string representation of the subgraph, including metadata summary.
+   └── 🔧 get_metadata(self) (line 38)
+       💬 Get all provenance and creation metadata for this subgraph.
+
+============================================================
+FILE: groggy/graph/state.py
+============================================================
+
+📁 CLASS: StateManager (line 3)
+   📝 Manages graph state, branching, and storage.
+   └── 🔧 save(self, graph, message) (line 11)
+       💬 Save the current graph state to persistent storage atomically.
+   └── 🔧 create_branch(self, graph, branch_name, from_hash, switch) (line 30)
+       💬 Create a new branch from an existing state (delegated to Rust backend).
+   └── 🔧 get_storage_stats(self, graph) (line 51)
+       💬 Get storage statistics for the graph (delegated to Rust backend).
+   └── 🔧 load(self, graph, state_hash) (line 67)
+       💬 Load a previous state of the graph from persistent storage.
+   └── 🔧 get_state_info(self, graph, state_hash) (line 82)
+       💬 Get detailed information about a specific state or the current state.
+   └── 🔧 switch_branch(self, graph, branch_name) (line 98)
+       💬 Switch to a different branch for the graph.
+
+============================================================
+FILE: groggy/collections/proxy.py
+============================================================
+
+📁 CLASS: EntityProxy (line 3)
+   📝 Generic proxy for a graph entity (node or edge).
+   └── 🔧 __init__(self, collection, entity_id) (line 8)
+   └── 🔧 id(self) (line 26)
+   └── 🔧 get(self, attr_name) (line 29)
+   └── 🔧 set(self, attr_name, value) (line 32)
+   └── 🔧 __getitem__(self, attr_name) (line 35)
+   └── 🔧 __setitem__(self, attr_name, value) (line 38)
+   └── 🔧 attrs(self) (line 42)
+       💬 Returns all attributes for this entity as a dict.
+   └── 🔧 __repr__(self) (line 54)
+
+📁 CLASS: NodeProxy (line 57)
+   📝 Proxy for a node entity.
+
+📁 CLASS: EdgeProxy (line 61)
+   📝 Proxy for an edge entity.
+   └── 🔧 attrs(self) (line 64)
+       💬 Returns all attributes for this edge as a dict.
+
+============================================================
+FILE: groggy/collections/edges.py
+============================================================
+
+📁 CLASS: EdgeCollection (line 6)
+   📝 Collection interface for graph edges.
+   └── 🔧 __init__(self, graph) (line 14)
+       💬 Initializes an EdgeCollection for the given graph.
+   └── 🔧 remove(self, edge_ids) (line 27)
+       💬 Removes one or more edges from the collection.
+   └── 🔧 filter(self) (line 44)
+       💬 Returns a filtered EdgeCollection view based on attribute values or custom predicates.
+   └── 🔧 size(self) (line 60)
+       💬 Returns the number of edges in the collection.
+   └── 🔧 add(self, edge_data, return_proxies) (line 70)
+       💬 Adds one or more edges to the collection.
+   └── 🔧 node_ids(self) (line 132)
+       💬 Returns node IDs from the filtered edges in this collection.
+   └── 🔧 __iter__(self) (line 143)
+       💬 Returns an iterator over edges in the collection.
+   └── 🔧 __getitem__(self, key) (line 155)
+   └── 🔧 __len__(self) (line 160)
+       💬 Returns the number of edges in the collection (calls size()).
+   └── 🔧 get(self, edge_id) (line 169)
+       💬 Returns an EdgeProxy for the given edge ID.
+
+📁 CLASS: EdgeAttributeManager (line 183)
+   📝 Batch attribute management for edges.
+   └── 🔧 __init__(self, edge_collection) (line 191)
+       💬 Initializes an EdgeAttributeManager for the given edge collection.
+   └── 🔧 get(self, edge_ids, attr_names) (line 201)
+       💬 Retrieves one or more attributes for the given edge(s).
+   └── 🔧 set(self, attr_data) (line 219)
+       💬 Sets one or more attributes for the given edge(s).
+   └── 🔧 set_type(self, attr_name, attr_type) (line 248)
+       💬 Sets the type/schema for a given attribute across all edges.
+
+============================================================
+FILE: groggy/collections/nodes.py
+============================================================
+
+📁 CLASS: NodeCollection (line 7)
+   📝 Collection interface for graph nodes (composes managers/helpers).
+   └── 🔧 __init__(self, graph) (line 15)
+       💬 Initializes a NodeCollection for the given graph.
+   └── 🔧 add(self, node_data, return_proxies) (line 28)
+       💬 Adds one or more nodes to the collection.
+   └── 🔧 remove(self, node_ids) (line 84)
+       💬 Removes one or more nodes from the collection.
+   └── 🔧 filter(self) (line 101)
+       💬 Returns a filtered NodeCollection view based on attribute values or custom predicates.
+   └── 🔧 size(self) (line 119)
+       💬 Returns the number of nodes in the collection.
+   └── 🔧 ids(self) (line 125)
+       💬 Returns all node IDs in the collection.
+   └── 🔧 has(self, node_id) (line 131)
+       💬 Checks if a node exists in the collection.
+   └── 🔧 __iter__(self) (line 137)
+       💬 Returns an iterator over nodes in the collection.
+   └── 🔧 __getitem__(self, key) (line 143)
+   └── 🔧 __len__(self) (line 148)
+       💬 Returns the number of nodes in the collection (calls size()).
+   └── 🔧 get(self, node_id) (line 157)
+       💬 Returns a NodeProxy for the given node ID.
+
+📁 CLASS: NodeAttributeManager (line 176)
+   📝 Batch attribute management for nodes.
+   └── 🔧 __init__(self, node_collection) (line 184)
+       💬 Initializes a NodeAttributeManager for the given node collection.
+   └── 🔧 get(self, node_ids, attr_names) (line 194)
+       💬 Retrieves one or more attributes for the given node(s).
+   └── 🔧 set(self, attr_data) (line 212)
+       💬 Sets one or more attributes for the given node(s).
+   └── 🔧 set_type(self, attr_name, attr_type) (line 241)
+       💬 Sets the type/schema for a given attribute across all nodes.
+
+📁 CLASS: NodeProxy (line 257)
+   └── 🔧 attrs(self) (line 261)
+       💬 Returns all attributes for the node as a dictionary.
+
+============================================================
+FILE: groggy/collections/base.py
+============================================================
+
+📁 CLASS: BaseCollection (line 3)
+   📝 Abstract base for NodeCollection/EdgeCollection (composition, not inheritance).
+   └── 🔧 add(self, entity_data) (line 11)
+       💬 Adds one or more entities (nodes/edges) to the collection.
+   └── 🔧 remove(self, entity_ids) (line 23)
+       💬 Removes one or more entities (nodes/edges) from the collection.
+   └── 🔧 filter(self) (line 35)
+       💬 Returns a filtered view of the collection based on attribute values or custom predicates.
+   └── 🔧 size(self) (line 47)
+       💬 Returns the number of entities in the collection.
+   └── 🔧 ids(self) (line 53)
+       💬 Returns all IDs in the collection.
+   └── 🔧 has(self, entity_id) (line 59)
+       💬 Checks if an entity exists in the collection.
+   └── 🔧 attr(self) (line 65)
+       💬 Returns the attribute manager for this collection.
+   └── 🔧 __iter__(self) (line 72)
+       💬 Returns an iterator over entities in the collection.
+   └── 🔧 __getitem__(self, key) (line 78)
+       💬 Returns a proxy or data object for the given entity ID.
+   └── 🔧 describe(self) (line 96)
+       💬 Returns a summary of the collection, including size, attribute schema, and sample data.
+
+============================================================
+SUMMARY: Analyzed 11 files
+============================================================
