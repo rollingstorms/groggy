@@ -36,25 +36,21 @@ class NodeCollection(BaseCollection):
         If attributes are present, sets them after adding nodes.
         By default, returns a proxy only for single-node addition. For batch, returns None unless return_proxies=True.
         """
-        import time
-        t0 = time.perf_counter()
         # (1) Normalize input
         is_single = not isinstance(node_data, (list, tuple))
         if is_single:
             node_data = [node_data]
-        t1 = time.perf_counter()
 
-        # (2) Extract IDs and attributes - OPTIMIZED for Phase 2
+        # (2) Extract IDs and attributes
         ids = []
         attrs = {}
         for item in node_data:
             if isinstance(item, dict) and 'id' in item:
                 node_id = item['id']
                 ids.append(node_id)
-                # OPTIMIZATION: Only extract attributes if present, avoid dict comprehension overhead
+                # Only extract attributes if present
                 has_attrs = len(item) > 1
                 if has_attrs:
-                    # OPTIMIZATION: Use direct iteration instead of dict comprehension
                     node_attrs = {}
                     for k, v in item.items():
                         if k != 'id':
@@ -65,33 +61,21 @@ class NodeCollection(BaseCollection):
                 ids.append(item)
             else:
                 raise ValueError(f"Expected dict with 'id' or string node ID, got {type(item)}")
-        t2 = time.perf_counter()
-        print(f"[Groggy][Timing] NodeCollection.add: input normalization: {t1-t0:.6f}s, id/attr extraction: {t2-t1:.6f}s")
 
         # (3) Rust add call
-        t3 = time.perf_counter()
         try:
             self._rust.add(ids)
         except Exception as e:
             raise ValueError(f"Failed to add nodes: {e}")
-        t4 = time.perf_counter()
-        print(f"[Groggy][Timing] NodeCollection.add: Rust add: {t4-t3:.6f}s")
 
         # (4) Attribute set call
-        t5 = None
         if attrs:
-            t5 = time.perf_counter()
             self.attr.set(attrs)
-            t6 = time.perf_counter()
-            print(f"[Groggy][Timing] NodeCollection.add: attr.set: {t6-t5:.6f}s")
 
-        # (5) Total
-        total = time.perf_counter() - t0
+        # (5) Return results
         if is_single:
-            print(f"[Groggy] NodeCollection.add: 1 node in {total:.6f} seconds")
             return self.get(ids[0])
         else:
-            print(f"[Groggy] NodeCollection.add: {len(ids)} nodes in {total:.6f} seconds")
             if return_proxies:
                 return [self.get(node_id) for node_id in ids]
             else:
@@ -159,7 +143,7 @@ class NodeCollection(BaseCollection):
     def __getitem__(self, key):
         if not self.has(key):
             raise KeyError(f"Node {key} not found in collection.")
-        return NodeProxy(self, key)
+        return self.get(key)
 
     def __len__(self):
         """
@@ -180,11 +164,11 @@ class NodeCollection(BaseCollection):
             NodeProxy: Proxy object for the node, or None if not found.
         """
         try:
+            # Get the Rust proxy and wrap it with the Python JSON-handling wrapper
             rust_proxy = self._rust.get(node_id)
             if rust_proxy:
-                # Import the Python wrapper that handles JSON serialization
-                from .. import NodeProxy as PythonNodeProxy
-                return PythonNodeProxy(rust_proxy)
+                from .. import NodeProxy as JSONNodeProxy
+                return JSONNodeProxy(rust_proxy)
             return None
         except:
             return None
@@ -237,22 +221,19 @@ class NodeAttributeManager:
             ValueError: On type mismatch or schema error.
         """
         try:
-            # PHASE 2 OPTIMIZATION: Pre-serialize JSON in Python for faster Rust processing
+            # Rust side expects JSON strings - serialize in Python but more efficiently
             import json
             if isinstance(attr_data, dict):
-                # Convert {node_id: {attr: value}} to {node_id: {attr: json_str}}
+                # Pre-serialize values to JSON - more efficient than duplicate processing
                 serialized_data = {}
                 for node_id, attrs in attr_data.items():
                     if isinstance(attrs, dict):
-                        serialized_attrs = {}
-                        for attr_name, value in attrs.items():
-                            serialized_attrs[attr_name] = json.dumps(value)
+                        serialized_attrs = {k: json.dumps(v) for k, v in attrs.items()}
                         serialized_data[node_id] = serialized_attrs
                     else:
                         serialized_data[node_id] = attrs
                 self._rust.set(serialized_data)
             else:
-                # Pass raw dict or batch to Rust, no conversion
                 self._rust.set(attr_data)
         except Exception as e:
             raise ValueError(f"Failed to set node attribute(s): {e}")
