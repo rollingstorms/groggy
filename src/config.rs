@@ -26,6 +26,8 @@ KEY DESIGN DECISIONS:
 - Environment variable overrides for deployment flexibility
 */
 
+use crate::core::strategies::StorageStrategyType;
+
 /// The main configuration structure for the entire graph system
 /// 
 /// RESPONSIBILITIES:
@@ -35,6 +37,7 @@ KEY DESIGN DECISIONS:
 /// - Enable/disable features consistently across components
 /// 
 /// CONFIGURATION CATEGORIES:
+/// - Temporal Storage: Strategy selection for different workloads
 /// - Memory Management: Limits, garbage collection thresholds
 /// - Performance Tuning: Cache sizes, optimization levels
 /// - History System: Snapshot frequency, retention policies
@@ -63,6 +66,17 @@ pub struct GraphConfig {
     
     /// How often to run garbage collection (in commits)
     pub gc_frequency: u32,
+    
+    /*
+    === TEMPORAL STORAGE STRATEGY ===
+    Configuration for different temporal storage approaches
+    */
+    
+    /// Which temporal storage strategy to use
+    /// Different strategies optimize for different workloads:
+    /// - IndexDeltas: Efficient for frequent small changes (default)
+    /// - Future: FullSnapshots, Hybrid, Compressed, etc.
+    pub temporal_storage_strategy: StorageStrategyType,
     
     /*
     === HISTORY SYSTEM CONFIGURATION ===
@@ -168,70 +182,69 @@ pub struct GraphConfig {
 impl GraphConfig {
     /// Create a new configuration with reasonable defaults
     pub fn new() -> Self {
-        // TODO: Initialize all fields with balanced default values
-        // TODO: Consider the target use case (general purpose)
-        // TODO: Set memory limits based on available system memory
+        // TODO: Initialize all other fields with balanced default values
+        // For now, create a minimal config with the default strategy
+        Self {
+            temporal_storage_strategy: StorageStrategyType::default(),
+            // TODO: Initialize remaining fields with reasonable defaults
+            max_memory_usage: 1024 * 1024 * 1024, // 1GB placeholder
+            memory_pressure_threshold: 80,
+            enable_auto_gc: true,
+            gc_frequency: 100,
+            snapshot_frequency: 100,
+            max_delta_chain: 50,
+            max_history_size: None,
+            enable_deduplication: true,
+            enable_query_cache: true,
+            query_cache_size: 64 * 1024 * 1024, // 64MB
+            query_timeout_ms: 30000, // 30 seconds
+            max_query_results: 100000,
+            enable_compression: false,
+            compression_level: 6,
+            enable_auto_backup: false,
+            backup_frequency: 1000,
+            enable_adjacency_cache: true,
+            enable_attribute_indexing: true,
+            worker_threads: 0, // auto-detect
+            enable_parallel_processing: true,
+            enable_metrics: false,
+            enable_debug_logging: false,
+            enable_validation: false,
+            enable_crash_recovery: true,
+        }
     }
     
     /// Create a configuration optimized for low memory usage
     /// 
     /// USE CASE: Embedded systems, resource-constrained environments
     /// OPTIMIZATIONS:
+    /// - Index-based deltas (minimal memory overhead)
     /// - Aggressive garbage collection
     /// - Minimal caching
     /// - High compression
     /// - Frequent snapshots to keep delta chains short
     pub fn memory_optimized() -> Self {
-        // TODO:
-        // GraphConfig {
-        //     max_memory_usage: 128 * 1024 * 1024, // 128MB
-        //     memory_pressure_threshold: 70,
-        //     enable_auto_gc: true,
-        //     gc_frequency: 10,
-        //     snapshot_frequency: 25,
-        //     max_delta_chain: 15,
-        //     enable_deduplication: true,
-        //     enable_query_cache: false,
-        //     query_cache_size: 0,
-        //     enable_compression: true,
-        //     compression_level: 9,
-        //     enable_adjacency_cache: false,
-        //     enable_attribute_indexing: false,
-        //     worker_threads: 1,
-        //     enable_parallel_processing: false,
-        //     // ... other fields
-        // }
+        // TODO: Implement with all fields
+        let mut config = Self::new();
+        config.temporal_storage_strategy = StorageStrategyType::IndexDeltas; // Most memory efficient
+        config
     }
     
     /// Create a configuration optimized for maximum performance
     /// 
     /// USE CASE: High-performance computing, real-time applications
     /// OPTIMIZATIONS:
+    /// - Index-based deltas (fastest commits)
     /// - Large memory buffers
     /// - Extensive caching
     /// - No compression
     /// - Parallel processing
     /// - Minimal garbage collection
     pub fn performance_optimized() -> Self {
-        // TODO:
-        // GraphConfig {
-        //     max_memory_usage: 8 * 1024 * 1024 * 1024, // 8GB
-        //     memory_pressure_threshold: 95,
-        //     enable_auto_gc: false,
-        //     gc_frequency: 1000,
-        //     snapshot_frequency: 500,
-        //     max_delta_chain: 200,
-        //     enable_deduplication: false,
-        //     enable_query_cache: true,
-        //     query_cache_size: 1024 * 1024 * 1024, // 1GB
-        //     enable_compression: false,
-        //     compression_level: 1,
-        //     enable_adjacency_cache: true,
-        //     enable_attribute_indexing: true,
-        //     worker_threads: 0, // auto-detect
-        //     enable_parallel_processing: true,
-        //     // ... other fields
-        // }
+        // TODO: Implement with all fields
+        let mut config = Self::new();
+        config.temporal_storage_strategy = StorageStrategyType::IndexDeltas; // Fastest commits
+        config
     }
     
     /// Create a configuration optimized for development/debugging
@@ -259,22 +272,16 @@ impl GraphConfig {
     /// 
     /// USE CASE: Production systems, stable deployments
     /// FEATURES:
+    /// - Index-based deltas (proven and stable)
     /// - Balanced performance and reliability
     /// - Automatic backup and recovery
     /// - Moderate resource usage
     /// - Error handling without debug overhead
     pub fn production_optimized() -> Self {
-        // TODO:
-        // GraphConfig {
-        //     enable_auto_backup: true,
-        //     backup_frequency: 100,
-        //     enable_crash_recovery: true,
-        //     enable_validation: false, // Performance
-        //     enable_debug_logging: false,
-        //     enable_metrics: true, // For monitoring
-        //     // Balanced defaults for other settings
-        //     // ... other fields
-        // }
+        // TODO: Implement with all fields
+        let mut config = Self::new();
+        config.temporal_storage_strategy = StorageStrategyType::IndexDeltas; // Proven and stable
+        config
     }
     
     /*
@@ -329,6 +336,12 @@ impl GraphConfig {
     /// Create a new configuration with updated worker thread count
     pub fn with_worker_threads(mut self, threads: usize) -> Self {
         // TODO: self.worker_threads = threads; self
+    }
+    
+    /// Create a new configuration with specific temporal storage strategy
+    pub fn with_storage_strategy(mut self, strategy: StorageStrategyType) -> Self {
+        self.temporal_storage_strategy = strategy;
+        self
     }
     
     /*
