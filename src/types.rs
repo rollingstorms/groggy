@@ -3,6 +3,8 @@
 //! DESIGN PRINCIPLE: Keep types simple and focused. The Graph should be the main
 //! manager that coordinates between components, not layers calling layers.
 
+use std::hash::{Hash, Hasher};
+
 /*
 === FUNDAMENTAL TYPES ===
 These are the core primitives that everything else builds on.

@@ -115,29 +115,17 @@ pub mod config;
 pub mod errors;
 pub mod util;
 
-// Core graph data structures
+// Core graph data structures and components
 pub mod core {
     pub mod delta;
     pub mod change_tracker;
     pub mod pool;
     pub mod space;
-}
-
-// History management
-pub mod history {
-    pub mod state;
-    pub mod forest;
-}
-
-// Read-only views and queries
-pub mod view {
-    pub mod view;
     pub mod query;
-}
-
-// Branch and reference management
-pub mod refs {
+    pub mod history;
+    pub mod state;
     pub mod ref_manager;
+    pub mod strategies;
 }
 
 // Public API
@@ -146,19 +134,18 @@ pub mod api {
 }
 
 // Re-export commonly used types and the main API
-pub use types::{NodeIndex, EdgeIndex, AttrName, AttrValue, StateId, BranchName};
+pub use types::{NodeId, EdgeId, AttrName, AttrValue, StateId, BranchName};
 pub use config::GraphConfig;
-pub use errors::{GraphError, GraphResult, MergeError};
-pub use api::graph::{Graph, GraphStats};
-pub use view::view::{StateView, ViewSummary};
-pub use view::query::{
-    AttributeFilter, NumericComparison, StringComparison, MultiCriteria, Criterion,
-    filter_nodes_by_attributes, filter_edges_by_attributes,
-    filter_by_numeric_comparison, filter_by_string_comparison, filter_by_multi_criteria,
-};
-pub use refs::ref_manager::{RefManager, Branch, BranchInfo, TagInfo};
-pub use history::state::{StateObject, StateMetadata};
-pub use history::forest::HistoryForest;
+pub use errors::{GraphError, GraphResult};
+pub use api::graph::Graph;
+pub use core::history::{HistoricalView, ViewSummary, HistoryForest};
+// pub use core::query::{
+//     AttributeFilter, NumericComparison, StringComparison, MultiCriteria, Criterion,
+//     filter_nodes_by_attributes, filter_edges_by_attributes,
+//     filter_by_numeric_comparison, filter_by_string_comparison, filter_by_multi_criteria,
+// };
+pub use core::ref_manager::{RefManager, Branch, BranchInfo, TagInfo};
+pub use core::state::{StateObject, StateMetadata};
 
 // Re-export core types for advanced usage
 pub use core::delta::{ColumnDelta, DeltaObject};

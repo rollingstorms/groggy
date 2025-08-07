@@ -32,9 +32,77 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
-use crate::types::{AttrName, AttrValue};
+use crate::types::{AttrName, AttrValue, NodeId, EdgeId};
 
-/// Columnar delta storage for efficient bulk operations
+/// Index-based columnar delta for efficient temporal versioning
+#[derive(Debug, Clone)]
+pub struct ColumnIndexDelta {
+    /// Entity indices that changed (sorted)
+    pub entity_indices: Vec<usize>,
+    /// Previous column indices (None = attribute was new)
+    pub old_column_indices: Vec<Option<usize>>,
+    /// New column indices
+    pub new_column_indices: Vec<usize>,
+}
+
+impl ColumnIndexDelta {
+    /// Create a new empty index delta
+    pub fn new() -> Self {
+        Self {
+            entity_indices: Vec::new(),
+            old_column_indices: Vec::new(),
+            new_column_indices: Vec::new(),
+        }
+    }
+    
+    /// Add an index change at the specified entity index
+    pub fn add_index_change(&mut self, entity_index: usize, old_idx: Option<usize>, new_idx: usize) {
+        // Find insertion point to maintain sorted order by entity_index
+        let pos = self.entity_indices.binary_search(&entity_index).unwrap_or_else(|e| e);
+        
+        if pos < self.entity_indices.len() && self.entity_indices[pos] == entity_index {
+            // Update existing change - keep original old_idx, update to latest new_idx
+            self.new_column_indices[pos] = new_idx;
+        } else {
+            // Insert new change
+            self.entity_indices.insert(pos, entity_index);
+            self.old_column_indices.insert(pos, old_idx);
+            self.new_column_indices.insert(pos, new_idx);
+        }
+    }
+    
+    /// Get the change at a specific entity index
+    pub fn get_change(&self, entity_index: usize) -> Option<(Option<usize>, usize)> {
+        self.entity_indices.binary_search(&entity_index)
+            .ok()
+            .map(|pos| (self.old_column_indices[pos], self.new_column_indices[pos]))
+    }
+    
+    /// Check if this delta has changes at the given entity index
+    pub fn has_change(&self, entity_index: usize) -> bool {
+        self.entity_indices.binary_search(&entity_index).is_ok()
+    }
+    
+    /// Get the number of changes in this delta
+    pub fn len(&self) -> usize {
+        self.entity_indices.len()
+    }
+    
+    /// Check if this delta is empty
+    pub fn is_empty(&self) -> bool {
+        self.entity_indices.is_empty()
+    }
+}
+
+impl Hash for ColumnIndexDelta {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.entity_indices.hash(state);
+        self.old_column_indices.hash(state);
+        self.new_column_indices.hash(state);
+    }
+}
+
+/// Columnar delta storage for efficient bulk operations (legacy - stores values)
 #[derive(Debug, Clone)]
 pub struct ColumnDelta {
     /// Sorted indices where changes occurred
@@ -176,6 +244,30 @@ impl DeltaObject {
             content_hash: hash,
             ..delta
         }
+    }
+    
+    /// Create a new index-based delta object (placeholder for future full implementation)
+    /// Currently adapts to existing value-based structure
+    pub fn new_with_indices(
+        node_attr_indices: HashMap<AttrName, ColumnIndexDelta>,
+        edge_attr_indices: HashMap<AttrName, ColumnIndexDelta>,
+        nodes_added: Vec<NodeId>,
+        nodes_removed: Vec<NodeId>,
+        edges_added: Vec<(EdgeId, NodeId, NodeId)>,
+        edges_removed: Vec<EdgeId>,
+    ) -> Self {
+        // NOTE: This is a temporary adapter implementation
+        // In a full implementation, we'd have a separate IndexDeltaObject
+        // or modify DeltaObject to natively support index-based deltas
+        
+        // For now, create an empty value-based delta
+        // The index information is preserved in the ChangeTracker
+        Self::new(
+            HashMap::new(), // Would need Pool access to resolve indices to values
+            HashMap::new(),
+            ColumnDelta::new(),
+            ColumnDelta::new(),
+        )
     }
 
     /// Create an empty delta object

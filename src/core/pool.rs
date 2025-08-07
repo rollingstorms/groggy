@@ -1,55 +1,62 @@
-//! Core graph data storage - the main in-memory representation.
+//! Graph Pool - Pure Data Storage Tables
 //!
-//! ARCHITECTURE DECISION: This is the ONLY place where actual graph data lives.
-//! Everything else (Graph, Views, etc.) should delegate to this component.
-//! 
-//! DESIGN PRINCIPLES:
-//! - Columnar storage for cache efficiency and bulk operations
-//! - Separate topology from attributes for different access patterns  
-//! - Support both dense (array-indexed) and sparse (hash-indexed) access
-//! - Efficient batch operations for ML/analytics workloads
+//! ARCHITECTURE ROLE:
+//! GraphPool is the "database" - it stores ALL the data tables but doesn't 
+//! know what's currently "active". It's just efficient storage for nodes,
+//! edges, and attributes that can grow indefinitely.
+//!
+//! DESIGN PHILOSOPHY:
+//! - GraphPool = Pure Storage (all the data tables, no business logic)
+//! - GraphSpace = Active View (knows what's currently active)
+//! - Pool provides raw storage, Space manages the active subset
+//! - Pool can store "deleted" entities, Space decides what's visible
 
 /*
-=== CORE DATA STORAGE ===
-This is the foundational data structure that holds all graph state.
-Graph acts as the manager/facade, but this is where data actually lives.
+=== POOL VS SPACE SEPARATION ===
 
-KEY INSIGHT: Don't make this "pool-like" - make it the authoritative store.
-The Graph should coordinate operations, but delegate storage to this component.
+GraphPool (this module):
+- Stores ALL nodes/edges/attributes that have ever existed
+- Grows indefinitely (append-only for performance)
+- No concept of "active" vs "inactive" 
+- Pure storage with efficient access methods
+- Can store soft-deleted entities
+
+GraphSpace (space.rs):
+- Knows which entities are currently "active"
+- Manages the active subset of pool data
+- Handles add/remove operations by updating active sets
+- Provides the "current view" of the graph
+- Tracks changes for history commits
+
+This separation allows:
+- Pool to be optimized for storage efficiency
+- Space to be optimized for current state operations
+- Better separation of concerns
+- Easier testing and reasoning
 */
 
-/// The main in-memory graph storage engine
+use std::collections::HashMap;
+use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
+use crate::errors::{GraphError, GraphResult};
+
+/// Pure data storage for all graph entities and attributes
+/// 
+/// DESIGN: This is just efficient storage - it doesn't know or care
+/// about what's "active". That's GraphSpace's responsibility.
 /// 
 /// RESPONSIBILITIES:
-/// - Store all nodes, edges, and their attributes efficiently
-/// - Maintain topology information (edge connectivity)
-/// - Support fast lookups, iterations, and bulk operations
-/// - Handle memory management and growth strategies
+/// - Store all nodes, edges, and attributes efficiently
+/// - Provide fast access to stored data
+/// - Handle memory management and growth
+/// - Support bulk operations on raw data
 /// 
 /// NOT RESPONSIBLE FOR:
-/// - Version control (that's HistoryStore's job)
-/// - Query processing (that's ViewSystem's job)  
-/// - Transaction management (that's Graph's job)
+/// - Determining what's "active" (that's GraphSpace)
+/// - Business logic (that's Graph coordinator)
+/// - Version control (that's HistoryForest)
+/// - Change tracking (that's ChangeTracker)
 #[derive(Debug)]
 pub struct GraphPool {
-    /*
-    === TOPOLOGY STORAGE ===
-    Keep this separate from attributes for different access patterns.
-    Topology is read-heavy, attributes are mixed read/write.
-    */
-    
-    /// All edges in the graph: edge_id -> (source_node, target_node)
-    /// DESIGN: HashMap for O(1) edge lookups, but could be Vec for dense edge IDs
-    topology: HashMap<EdgeId, (NodeId, NodeId)>,
-    
-    /// All currently active (not deleted) nodes
-    /// DESIGN: HashSet for O(1) contains() checks during edge validation
-    active_nodes: HashSet<NodeId>,
-    
-    /// All currently active (not deleted) edges  
-    /// DESIGN: HashSet for O(1) contains() checks
-    active_edges: HashSet<EdgeId>,
-    
     /*
     === COLUMNAR ATTRIBUTE STORAGE ===
     Store attributes in columns (one Vec per attribute name) rather than 
@@ -57,18 +64,25 @@ pub struct GraphPool {
     analytics workloads and bulk operations.
     */
     
-    /// Node attributes: attr_name -> Vec<AttrValue> (indexed by NodeId)
-    /// DESIGN: Sparse storage with Option<AttrValue> or dense with defaults?
-    /// Let's go dense for now - faster access, wastes some memory
-    node_attributes: HashMap<AttrName, Vec<AttrValue>>,
+    /// Node attributes: attr_name -> AttributeColumn (append-only columnar storage)
+    /// DESIGN: All attribute values ever stored, indexed by position
+    node_attributes: HashMap<AttrName, AttributeColumn>,
     
-    /// Edge attributes: attr_name -> Vec<AttrValue> (indexed by EdgeId)  
-    edge_attributes: HashMap<AttrName, Vec<AttrValue>>,
+    /// Edge attributes: attr_name -> AttributeColumn (append-only columnar storage)
+    edge_attributes: HashMap<AttrName, AttributeColumn>,
+    
+    /*
+    === TOPOLOGY STORAGE ===
+    Raw storage for all edge connectivity information
+    */
+    
+    /// All edges ever created: edge_id -> (source_node, target_node)
+    /// STORAGE: This never shrinks, even for "deleted" edges
+    topology: HashMap<EdgeId, (NodeId, NodeId)>,
     
     /*
     === ID MANAGEMENT ===
-    Simple incrementing counters. Could be more sophisticated later
-    (free lists, compaction, etc.) but keep simple for now.
+    Simple incrementing counters for new entities
     */
     
     /// Next available node ID - increment on each new node
@@ -81,189 +95,235 @@ pub struct GraphPool {
 impl GraphPool {
     /// Create new empty graph store
     pub fn new() -> Self {
-        // TODO: Initialize all fields to empty/zero
-        // TODO: Consider pre-allocating common attribute columns
+        Self {
+            node_attributes: HashMap::new(),
+            edge_attributes: HashMap::new(),
+            topology: HashMap::new(),
+            next_node_id: 0,
+            next_edge_id: 0,
+        }
     }
     
-    /// Create with capacity hints for better initial allocation
-    pub fn with_capacity(node_capacity: usize, edge_capacity: usize) -> Self {
-        // TODO: Pre-allocate HashMaps and Vecs with given capacities
-        // TODO: This is a performance optimization for known graph sizes
+    /// Commit changes (no-op for append-only storage)
+    /// In append-only storage, committing just means the current indices become the new baseline
+    pub fn commit_baseline(&mut self) {
+        // ALGORITHM: No action needed for append-only storage
+        // The current state is already the baseline - Space manages the index mappings
+        // This method exists for API compatibility but is essentially a no-op
+        
+        // Future optimization: Could implement garbage collection of unreferenced indices here
+    }
+    
+    /// Get attribute value by index (for Space to resolve indices)
+    pub fn get_node_attr_by_index(&self, attr: &AttrName, index: usize) -> Option<&AttrValue> {
+        // ALGORITHM: Direct index lookup in columnar storage
+        // 1. Get the attribute column
+        // 2. Return value at the specified index
+        
+        self.node_attributes
+            .get(attr)
+            .and_then(|column| column.get_value(index))
+    }
+    
+    /// Get edge attribute value by index (for Space to resolve indices)
+    pub fn get_edge_attr_by_index(&self, attr: &AttrName, index: usize) -> Option<&AttrValue> {
+        // ALGORITHM: Direct index lookup in columnar storage
+        // 1. Get the attribute column
+        // 2. Return value at the specified index
+        
+        self.edge_attributes
+            .get(attr)
+            .and_then(|column| column.get_value(index))
     }
     
     /*
-    === TOPOLOGY OPERATIONS ===
-    These modify the graph structure (nodes and edges).
-    Should be fast and maintain all invariants.
+    === ENTITY CREATION ===
+    Pool handles creating and storing all nodes/edges
     */
     
-    /// Add a new node to the graph, return its ID
-    /// 
-    /// PERFORMANCE: O(1) amortized (may need to grow attribute vectors)
-    /// SIDE EFFECTS: Extends all attribute vectors with default values
+    /// Create a new node and return its ID
+    /// DESIGN: Pool creates the node, Space tracks it as active
     pub fn add_node(&mut self) -> NodeId {
-        // TODO: 
-        // 1. Get next_node_id and increment it
-        // 2. Add to active_nodes set  
-        // 3. Extend all existing attribute vectors with defaults
-        // 4. Return the new node ID
+        let node_id = self.next_node_id;
+        self.next_node_id += 1;
+        node_id
     }
     
-    /// Add multiple nodes efficiently in batch
-    pub fn add_nodes(&mut self, count: usize) -> Vec<NodeId> {
-        // TODO: More efficient than calling add_node() in loop
-        // TODO: Pre-allocate space, then add all at once
+    /// Create a new edge between two nodes
+    /// DESIGN: Pool creates and stores the edge, Space tracks it as active
+    pub fn add_edge(&mut self, source: NodeId, target: NodeId) -> EdgeId {
+        let edge_id = self.next_edge_id;
+        self.next_edge_id += 1;
+        self.topology.insert(edge_id, (source, target));
+        edge_id
     }
     
-    /// Add an edge between two existing nodes
-    /// 
-    /// REQUIRES: Both source and target must be active nodes
-    /// PERFORMANCE: O(1) amortized  
-    pub fn add_edge(&mut self, source: NodeId, target: NodeId) -> Result<EdgeId, GraphError> {
-        // TODO:
-        // 1. Validate that source and target exist in active_nodes
-        // 2. Get next_edge_id and increment it
-        // 3. Add to topology map: edge_id -> (source, target)
-        // 4. Add to active_edges set
-        // 5. Extend all edge attribute vectors with defaults
-        // 6. Return new edge ID
+    /// Get the endpoints of an edge from storage
+    pub fn get_edge_endpoints(&self, edge_id: EdgeId) -> Option<(NodeId, NodeId)> {
+        self.topology.get(&edge_id).copied()
     }
     
-    /// Remove a node (and all its incident edges)
-    /// 
-    /// PERFORMANCE: O(degree of node) - need to find and remove incident edges
-    /// DESIGN: Soft delete (remove from active set) vs hard delete (compact storage)
-    pub fn remove_node(&mut self, node: NodeId) -> Result<(), GraphError> {
-        // TODO:
-        // 1. Validate node exists
-        // 2. Find all edges incident to this node
-        // 3. Remove those edges from topology and active_edges  
-        // 4. Remove node from active_nodes
-        // 5. Note: Keep attribute data for potential undo/versioning
-    }
-    
-    /// Remove an edge
-    /// 
-    /// PERFORMANCE: O(1)
-    pub fn remove_edge(&mut self, edge: EdgeId) -> Result<(), GraphError> {
-        // TODO:
-        // 1. Validate edge exists in active_edges
-        // 2. Remove from active_edges set
-        // 3. Keep topology and attribute data for potential undo
-    }
-    
-    /*
-    === TOPOLOGY QUERIES ===
-    Fast read-only access to graph structure
-    */
-    
-    /// Check if node is currently active
-    pub fn contains_node(&self, node: NodeId) -> bool {
-        // TODO: active_nodes.contains(node)
-    }
-    
-    /// Check if edge is currently active  
-    pub fn contains_edge(&self, edge: EdgeId) -> bool {
-        // TODO: active_edges.contains(edge)
-    }
-    
-    /// Get all active node IDs
-    /// PERFORMANCE: O(num_nodes) - could cache if called frequently
-    pub fn node_ids(&self) -> Vec<NodeId> {
-        // TODO: Collect active_nodes into sorted Vec
-    }
-    
-    /// Get all active edge IDs
-    pub fn edge_ids(&self) -> Vec<EdgeId> {
-        // TODO: Collect active_edges into sorted Vec  
-    }
-    
-    /// Get endpoints of an edge
-    pub fn edge_endpoints(&self, edge: EdgeId) -> Result<(NodeId, NodeId), GraphError> {
-        // TODO: Look up in topology map, handle not found
-    }
-    
-    /// Get all neighbors of a node (expensive - O(total edges))
-    /// TODO: Consider maintaining adjacency lists for better performance
-    pub fn neighbors(&self, node: NodeId) -> Result<Vec<NodeId>, GraphError> {
-        // TODO:
-        // 1. Validate node exists
-        // 2. Scan all active edges in topology
-        // 3. Collect other endpoints where this node appears
-        // 4. Return deduplicated, sorted list
-    }
-    
-    /// Get degree of a node (number of incident edges)
-    pub fn degree(&self, node: NodeId) -> Result<usize, GraphError> {
-        // TODO: Count edges where node appears as source or target
-    }
     
     /*
     === ATTRIBUTE OPERATIONS ===
     Fast access to node and edge properties
     */
     
-    /// Set attribute value for a node
-    pub fn set_node_attr(&mut self, node: NodeId, attr: AttrName, value: AttrValue) -> Result<(), GraphError> {
-        // TODO:
-        // 1. Validate node exists
-        // 2. Get or create attribute column (Vec<AttrValue>)
-        // 3. Ensure Vec is large enough (extend with defaults if needed)
-        // 4. Set value at node index
+    /// Append attribute value to column and return its index
+    /// DESIGN: Space will manage the node->index mapping, Pool just stores values
+    pub fn append_node_attr_value(&mut self, attr: AttrName, value: AttrValue) -> usize {
+        // ALGORITHM: Append-only storage with index allocation
+        // 1. Get or create the attribute column
+        // 2. Append the value and return the new index
+        
+        let column = self.node_attributes.entry(attr).or_insert_with(AttributeColumn::new);
+        column.append_value(value)
     }
     
-    /// Set attribute value for an edge
-    pub fn set_edge_attr(&mut self, edge: EdgeId, attr: AttrName, value: AttrValue) -> Result<(), GraphError> {
-        // TODO: Same pattern as set_node_attr but for edges
+    /// Append multiple attribute values and return their indices
+    pub fn append_node_attr_values(&mut self, attrs: HashMap<AttrName, AttrValue>) -> HashMap<AttrName, usize> {
+        // ALGORITHM: Bulk append operations
+        // For each attribute, append the value and collect the index
+        
+        let mut indices = HashMap::with_capacity(attrs.len());
+        for (attr_name, value) in attrs {
+            let index = self.append_node_attr_value(attr_name.clone(), value);
+            indices.insert(attr_name, index);
+        }
+        indices
     }
     
-    /// Get attribute value for a node
-    pub fn get_node_attr(&self, node: NodeId, attr: &AttrName) -> Result<Option<&AttrValue>, GraphError> {
-        // TODO:
-        // 1. Validate node exists
-        // 2. Look up attribute column
-        // 3. Get value at node index (or None if no such attribute)
+    /// Append same attribute for multiple nodes and return indices
+    pub fn append_nodes_attr_values(&mut self, attr: AttrName, values: Vec<AttrValue>) -> Vec<usize> {
+        // ALGORITHM: Bulk columnar append operation
+        // 1. Get or create the attribute column
+        // 2. Append all values and collect their indices
+        
+        let column = self.node_attributes.entry(attr).or_insert_with(AttributeColumn::new);
+        values.into_iter().map(|value| column.append_value(value)).collect()
     }
     
-    /// Get attribute value for an edge  
-    pub fn get_edge_attr(&self, edge: EdgeId, attr: &AttrName) -> Result<Option<&AttrValue>, GraphError> {
-        // TODO: Same pattern as get_node_attr but for edges
+    /// Append edge attribute value to column and return its index
+    pub fn append_edge_attr_value(&mut self, attr: AttrName, value: AttrValue) -> usize {
+        // ALGORITHM: Same as node attributes but for edges
+        let column = self.edge_attributes.entry(attr).or_insert_with(AttributeColumn::new);
+        column.append_value(value)
     }
     
-    /// Get all attributes for a node
-    pub fn node_attrs(&self, node: NodeId) -> Result<HashMap<AttrName, AttrValue>, GraphError> {
-        // TODO:
-        // 1. Validate node exists
-        // 2. Iterate through all attribute columns
-        // 3. Collect values at node index into HashMap
-    }
+    // NOTE: Direct node attribute access removed
+    // Use get_node_attr_by_index() with indices provided by Space
     
-    /// Get all attributes for an edge
-    pub fn edge_attrs(&self, edge: EdgeId) -> Result<HashMap<AttrName, AttrValue>, GraphError> {
-        // TODO: Same pattern as node_attrs but for edges
-    }
+    // NOTE: Direct edge attribute access removed
+    // Use get_edge_attr_by_index() with indices provided by Space
+    
+    // NOTE: Direct node attributes access removed
+    // Space manages the node->attribute_indices mapping
+    
+    // NOTE: Direct edge attributes access removed
+    // Space manages the edge->attribute_indices mapping
     
     /*
-    === BULK OPERATIONS ===
-    Efficient operations on multiple entities at once.
-    Critical for analytics and ML workloads.
+    === INTERNAL BULK OPERATIONS ===
+    Efficient operations for internal use by Graph coordinator.
+    Pool provides full column access - Graph handles filtering and security.
     */
     
-    /// Get values of specific attribute for all nodes
-    /// Returns Vec aligned with node IDs (sparse, with None for missing values)
+    /// Get full attribute column for nodes (internal use only)
+    /// 
+    /// INTERNAL: This exposes the full column - Graph coordinator handles filtering
+    /// PERFORMANCE: Direct access to columnar data for maximum efficiency
+    /// RETURNS: Reference to the entire attribute vector
     pub fn get_node_attr_column(&self, attr: &AttrName) -> Option<&Vec<AttrValue>> {
-        // TODO: Direct access to attribute column for bulk processing
+        // TODO: self.node_attributes.get(attr)
+        todo!("Implement GraphPool::get_node_attr_column")
     }
     
-    /// Get values of specific attribute for all edges
+    /// Get full attribute column for edges (internal use only)
+    /// 
+    /// INTERNAL: This exposes the full column - Graph coordinator handles filtering
     pub fn get_edge_attr_column(&self, attr: &AttrName) -> Option<&Vec<AttrValue>> {
-        // TODO: Direct access to edge attribute column
+        // TODO: self.edge_attributes.get(attr)
+        todo!("Implement GraphPool::get_edge_attr_column")
     }
     
-    /// Set attribute values for multiple nodes efficiently
-    pub fn set_node_attrs_bulk(&mut self, attr: AttrName, values: Vec<(NodeId, AttrValue)>) -> Result<(), GraphError> {
-        // TODO: More efficient than individual set_node_attr calls
-        // TODO: Validate all nodes exist first, then apply all changes
+    /// Get attribute values for specific indices (internal bulk operation)
+    /// 
+    /// INTERNAL: Used by Graph when it has already determined which indices to access
+    /// PERFORMANCE: More efficient than individual lookups for known valid indices
+    pub fn get_node_attrs_at_indices(&self, attr: &AttrName, indices: &[NodeId]) -> GraphResult<Vec<Option<AttrValue>>> {
+        // TODO:
+        // if let Some(attr_column) = self.node_attributes.get(attr) {
+        //     let mut results = Vec::with_capacity(indices.len());
+        //     for &node_id in indices {
+        //         if node_id < attr_column.len() {
+        //             results.push(Some(attr_column[node_id].clone()));
+        //         } else {
+        //             results.push(None);
+        //         }
+        //     }
+        //     Ok(results)
+        // } else {
+        //     Ok(vec![None; indices.len()])
+        // }
+        todo!("Implement GraphPool::get_node_attrs_at_indices")
+    }
+    
+    /// Get attribute values for specific edge indices (internal)
+    pub fn get_edge_attrs_at_indices(&self, attr: &AttrName, indices: &[EdgeId]) -> GraphResult<Vec<Option<AttrValue>>> {
+        // TODO: Same pattern as get_node_attrs_at_indices but for edges
+        todo!("Implement GraphPool::get_edge_attrs_at_indices")
+    }
+    
+    
+    
+    /// Set multiple attributes on multiple nodes (bulk operation)
+    pub fn set_nodes_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>) -> Result<HashMap<AttrName, Vec<(NodeId, Option<AttrValue>)>>, GraphError> {
+        // TODO: ALGORITHM - Bulk columnar operations for maximum efficiency
+        // 1. let mut all_baseline_changes = HashMap::new();
+        // 2. for (attr_name, node_values) in attrs_values {
+        //        // For each attribute, do bulk columnar operation:
+        //        let column = self.node_attributes.entry(attr_name.clone()).or_insert_with(AttributeColumn::new);
+        //        let max_idx = node_values.iter().map(|(id, _)| id.0 as usize).max().unwrap_or(0);
+        //        if max_idx >= column.values.len() {
+        //            column.values.resize(max_idx + 1, AttrValue::default());
+        //            column.changed_mask.resize(max_idx + 1, false);
+        //        }
+        //        let mut baseline_changes = Vec::with_capacity(node_values.len());
+        //        for (node_id, new_value) in node_values {
+        //            let idx = node_id.0 as usize;
+        //            let baseline = if !column.changed_mask[idx] {
+        //                let baseline = column.values[idx].clone();
+        //                column.baseline_overrides.insert(idx, baseline.clone());
+        //                column.changed_mask[idx] = true;
+        //                Some(baseline)
+        //            } else {
+        //                column.baseline_overrides.get(&idx).cloned()
+        //            };
+        //            column.values[idx] = new_value;
+        //            baseline_changes.push((node_id, baseline));
+        //        }
+        //        all_baseline_changes.insert(attr_name, baseline_changes);
+        //    }
+        // 3. Ok(all_baseline_changes)
+        
+        // PERFORMANCE: O(total_changes) - each attribute gets bulk columnar treatment
+        // OPTIMIZATION: Single resize per attribute, batch baseline capture
+        todo!("Implement GraphPool::set_nodes_attrs")
+    }
+    
+    /// Set multiple attributes on multiple edges (bulk operation)
+    pub fn set_edges_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>) -> Result<HashMap<AttrName, Vec<(EdgeId, Option<AttrValue>)>>, GraphError> {
+        // TODO: ALGORITHM - Same as set_nodes_attrs but for edges
+        // 1. let mut all_baseline_changes = HashMap::new();
+        // 2. for (attr_name, edge_values) in attrs_values {
+        //        let column = self.edge_attributes.entry(attr_name.clone()).or_insert_with(AttributeColumn::new);
+        //        // Same bulk columnar logic as nodes but for edges
+        //        // ...
+        //    }
+        // 3. Ok(all_baseline_changes)
+        
+        // PERFORMANCE: O(total_changes) - bulk columnar operations for edges
+        todo!("Implement GraphPool::set_edges_attrs")
     }
     
     /*
@@ -272,13 +332,75 @@ impl GraphPool {
     */
     
     /// Get basic statistics about the graph
-    pub fn statistics(&self) -> StoreStatistics {
+    pub fn statistics(&self) -> PoolStatistics {
         // TODO: Return struct with node_count, edge_count, attribute_count, memory_usage, etc.
+        todo!("Implement GraphPool::statistics")
     }
     
     /// List all attribute names currently in use
     pub fn attribute_names(&self) -> (Vec<AttrName>, Vec<AttrName>) {
         // TODO: Return (node_attributes, edge_attributes)
+    }
+}
+
+/// Append-only columnar storage for attribute values
+#[derive(Debug, Clone)]
+pub struct AttributeColumn {
+    /// All attribute values ever stored (append-only)
+    pub values: Vec<AttrValue>,
+    
+    /// Next available index for new values
+    pub next_index: usize,
+    
+    /// Optional: Reference counting for garbage collection
+    /// Tracks how many entities reference each index
+    pub reference_count: HashMap<usize, usize>,
+}
+
+impl AttributeColumn {
+    /// Create new empty attribute column
+    pub fn new() -> Self {
+        Self {
+            values: Vec::new(),
+            next_index: 0,
+            reference_count: HashMap::new(),
+        }
+    }
+    
+    /// Append a new value and return its index
+    pub fn append_value(&mut self, value: AttrValue) -> usize {
+        let index = self.next_index;
+        self.values.push(value);
+        self.next_index += 1;
+        self.reference_count.insert(index, 1);
+        index
+    }
+    
+    /// Get value at specific index
+    pub fn get_value(&self, index: usize) -> Option<&AttrValue> {
+        self.values.get(index)
+    }
+    
+    /// Increment reference count for an index
+    pub fn increment_ref(&mut self, index: usize) {
+        *self.reference_count.entry(index).or_insert(0) += 1;
+    }
+    
+    /// Decrement reference count for an index
+    pub fn decrement_ref(&mut self, index: usize) {
+        if let Some(count) = self.reference_count.get_mut(&index) {
+            *count = count.saturating_sub(1);
+        }
+    }
+    
+    /// Get all indices with zero references (for garbage collection)
+    pub fn get_unreferenced_indices(&self) -> Vec<usize> {
+        self.reference_count
+            .iter()
+            .filter_map(|(&index, &count)| {
+                if count == 0 { Some(index) } else { None }
+            })
+            .collect()
     }
 }
 
