@@ -157,19 +157,8 @@ impl ChangeTracker {
         }
     }
     
-    /// Helper method to update change metadata
-    fn update_change_metadata(&mut self) {
-        self.total_changes += 1;
-        if self.first_change_timestamp.is_none() {
-            self.first_change_timestamp = Some(self.current_timestamp());
-        }
-    }
-    
-    /// Get current timestamp (placeholder - would use actual time in real implementation)
-    fn current_timestamp(&self) -> u64 {
-        // TODO: In real implementation, use std::time::SystemTime or similar
-        0
-    }
+    // NOTE: update_change_metadata and current_timestamp are now handled by the strategy
+    // These methods have been moved to IndexDeltaStrategy in strategies.rs
     
     /*
     === BULK CHANGE RECORDING ===
@@ -237,19 +226,7 @@ impl ChangeTracker {
         self.strategy.change_count()
     }
     
-    /// Get a summary of what has changed
-    pub fn change_summary(&self) -> ChangeSummary {
-        ChangeSummary {
-            nodes_added: self.nodes_added.len(),
-            nodes_removed: self.nodes_removed.len(),
-            edges_added: self.edges_added.len(),
-            edges_removed: self.edges_removed.len(),
-            node_attr_changes: self.node_attr_index_changes.len(),
-            edge_attr_changes: self.edge_attr_index_changes.len(),
-            total_changes: self.total_changes,
-            first_change_time: self.first_change_timestamp,
-        }
-    }
+    // NOTE: change_summary is now handled by the strategy-based implementation below (line ~318)
     
     /// Get all nodes that have been modified (added, removed, or attrs changed)
     pub fn get_modified_nodes(&self) -> HashSet<NodeId> {
