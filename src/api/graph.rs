@@ -7,11 +7,9 @@
 //! DESIGN PHILOSOPHY:
 //! - Graph = Smart Coordinator (knows about all components, delegates wisely)
 //! - Graphpool = Pure Data Storage (no business logic, just efficient storage)
-//! - HistorySystem = Version Control (immutable snapshots, branching)
+//! - GraphSpace = Active Set + Change Tracking (minimal responsibility)
+//! - HistoryForest = Version Control (immutable snapshots, branching)
 //! - QueryEngine = Read-only Analysis (filtering, aggregation, views)
-//! 
-//! NO MORE: Graph -> Space -> Pool -> Storage (too many layers!)
-//! YES: Graph -> {pool, History, Queries} (direct coordination)
 
 /*
 === THE GRAPH: MASTER COORDINATOR ===
@@ -25,7 +23,6 @@ This is the main API that users interact with. It's responsible for:
 Key insight: Graph should be SMART about how it uses its components,
 not just a thin wrapper that passes calls through layers.
 
-
 */
 
 /// The main Graph structure - your primary interface for all graph operations
@@ -38,8 +35,9 @@ not just a thin wrapper that passes calls through layers.
 /// - Optimize cross-component operations
 /// 
 /// COMPONENTS IT MANAGES:
-/// - Graphpool: Core data storage (nodes, edges, attributes)
-/// - HistorySystem: Version control and branching  
+/// - GraphSpace: Active topology and change tracking (nodes, edges, modifications)
+/// - GraphPool: Core attribute storage (columnar data for nodes and edges)
+/// - HistoryForest: Version control and branching  
 /// - QueryEngine: Read-only views and analysis
 /// - Configuration: Settings and performance tuning
 #[derive(Debug)]
@@ -48,8 +46,8 @@ pub struct Graph {
     === CORE DATA STORAGE ===
     The source of truth for current graph state
     */
-    /// Main data storage - holds all nodes, edges, attributes
-    /// This is where the actual data lives
+    /// Attribute storage - holds columnar data for node and edge attributes
+    /// This is where the actual attribute data lives
     pool: GraphPool,
     
     /*
@@ -58,7 +56,7 @@ pub struct Graph {
     */
     /// Immutable history of graph states
     /// Manages snapshots, branching, merging
-    history: HistorySystem,
+    history: HistoryForest,
     
     /// Current branch and commit information
     /// Tracks where we are in the version history
@@ -78,8 +76,10 @@ pub struct Graph {
     Track what's changed since last commit
     */
     /// What's been modified since the last commit
-    /// Used for efficient history snapshots
-    change_tracker: ChangeTracker,
+    /// This is the active state tracker
+    /// Active nodes and edges are tracked here
+    /// as well as attr changes
+    space: GraphSpace,
     
     /*
     === CONFIGURATION ===
@@ -117,63 +117,62 @@ impl Graph {
     /// Add a new node to the graph
     /// 
     /// ALGORITHM:
-    /// 1. Ask pool to create the node and get its ID
-    /// 2. Record the change in change_tracker
+    /// 1. Pool creates and stores the node
+    /// 2. Space tracks it as active
     /// 3. Return the node ID to caller
     /// 
     /// PERFORMANCE: O(1) amortized
     pub fn add_node(&mut self) -> NodeId {
-        // TODO:
-        // let node_id = self.pool.add_node();
-        // self.change_tracker.record_node_addition(node_id);
-        // node_id
+        // TODO: let node_id = self.pool.add_node();        // Pool creates and stores
+        // TODO: self.space.activate_node(node_id);         // Space tracks as active
+        // TODO: node_id
+        todo!("Implement Graph::add_node")
     }
     
     /// Add multiple nodes efficiently
     /// More efficient than calling add_node() in a loop
     pub fn add_nodes(&mut self, count: usize) -> Vec<NodeId> {
-        // TODO: Use pool.add_nodes() for batch efficiency
-        // TODO: Record all changes in change_tracker
+        // TODO: self.space.add_nodes(count)
+        todo!("Implement Graph::add_nodes")
     }
     
     /// Add an edge between two existing nodes
     /// 
     /// ALGORITHM:
-    /// 1. Validate that both nodes exist (ask pool)
-    /// 2. Ask pool to create the edge
-    /// 3. Record the change in change_tracker
+    /// 1. Validate nodes exist in active set
+    /// 2. Pool creates and stores the edge
+    /// 3. Space tracks it as active
     /// 4. Return edge ID
     pub fn add_edge(&mut self, source: NodeId, target: NodeId) -> Result<EdgeId, GraphError> {
-        // TODO:
-        // Validate nodes exist first
-        // let edge_id = self.pool.add_edge(source, target)?;
-        // self.change_tracker.record_edge_addition(edge_id, source, target);
-        // Ok(edge_id)
+        // TODO: if !self.space.contains_node(source) || !self.space.contains_node(target) {
+        // TODO:     return Err(GraphError::InvalidNodes { source, target });
+        // TODO: }
+        // TODO: let edge_id = self.pool.add_edge(source, target);  // Pool creates and stores
+        // TODO: self.space.activate_edge(edge_id);                 // Space tracks as active
+        // TODO: Ok(edge_id)
+        todo!("Implement Graph::add_edge")
+    }
+
+    /// Add multiple edges efficiently
+    /// More efficient than calling add_edge() in a loop
+    pub fn add_edges(&mut self, edges: &[(NodeId, NodeId)]) -> Vec<EdgeId> {
+        // TODO: Use pool.add_edges() for batch efficiency
+        // TODO: Record all changes through space
     }
     
     /// Remove a node and all its incident edges
     /// 
     /// ALGORITHM:
-    /// 1. Find all edges incident to this node (ask pool)
-    /// 2. Remove all those edges (record each change)
-    /// 3. Remove the node itself (record change)
-    /// 
-    /// This is more complex because it affects multiple entities
+    /// 1. Ask space to remove the node (it handles incident edges)
     pub fn remove_node(&mut self, node: NodeId) -> Result<(), GraphError> {
-        // TODO:
-        // let incident_edges = self.pool.get_incident_edges(node)?;
-        // for edge in incident_edges {
-        //     self.pool.remove_edge(edge)?;
-        //     self.change_tracker.record_edge_removal(edge);
-        // }
-        // self.pool.remove_node(node)?;
-        // self.change_tracker.record_node_removal(node);
-        // Ok(())
+        // TODO: self.space.remove_node(node)
+        todo!("Implement Graph::remove_node")
     }
     
     /// Remove an edge
     pub fn remove_edge(&mut self, edge: EdgeId) -> Result<(), GraphError> {
-        // TODO: Similar to remove_node but simpler
+        // TODO: self.space.remove_edge(edge)
+        todo!("Implement Graph::remove_edge")
     }
     
     /*
@@ -185,25 +184,74 @@ impl Graph {
     /// Set an attribute value on a node
     ///
     /// ALGORITHM:
-    /// 1. Ask pool to get the current value
-    /// 2. Ask pool to set the new value
-    /// 3. Record the change in change_tracker
+    /// 1. Pool sets value and returns baseline (integrated change tracking)
+    /// 2. Space records the change for commit delta
     pub fn set_node_attr(&mut self, node: NodeId, attr: AttrName, value: AttrValue) -> Result<(), GraphError> {
-        // TODO:
-        // let old_value = self.pool.get_node_attr(node, &attr)?;
-        // self.pool.set_node_attr(node, attr.clone(), value.clone())?;
-        // self.change_tracker.record_node_attr_change(node, attr, old_value, value);
-        // Ok(())
+        // TODO: ALGORITHM - Coordinator pattern with efficient baseline capture
+        // 1. let baseline_value = self.pool.set_node_attr(node, attr.clone(), value.clone())?;
+        // 2. self.space.record_node_attr_change(node, attr, baseline_value, value);
+        // 3. Ok(())
+        
+        // PERFORMANCE: O(1) - Pool handles efficient baseline capture
+        // COORDINATOR: Pool stores + captures baseline, Space records for delta
+        todo!("Implement Graph::set_node_attr")
+    }
+    
+    
+    
+    /// Set node attributes in bulk (handles multiple nodes and multiple attributes efficiently)
+    pub fn set_node_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>) -> Result<(), GraphError> {
+        // TODO: ALGORITHM - Loop over attributes using bulk columnar operations
+        // 1. let all_baseline_changes = self.pool.set_nodes_attrs(attrs_values.clone())?;
+        // 2. for (attr_name, baseline_changes) in all_baseline_changes {
+        //        // Convert to format for Space's bulk recording
+        //        let changes_for_space: Vec<(NodeId, Option<AttrValue>, AttrValue)> = baseline_changes.into_iter()
+        //            .map(|(node_id, baseline)| {
+        //                let new_value = attrs_values.get(&attr_name).unwrap()
+        //                    .iter().find(|(id, _)| *id == node_id).unwrap().1.clone();
+        //                (node_id, baseline, new_value)
+        //            }).collect();
+        //        self.space.record_node_attr_changes(attr_name, &changes_for_space);
+        //    }
+        // 3. Ok(())
+        
+        // PERFORMANCE: O(total_changes) - each attribute gets bulk columnar treatment
+        // USAGE: Maximum efficiency for large-scale attribute operations
+        todo!("Implement Graph::set_nodes_attrs")
     }
     
     /// Set an attribute value on an edge
     ///
     /// ALGORITHM:
-    /// 1. Ask pool to get the current value
-    /// 2. Ask pool to set the new value
-    /// 3. Record the change in change_tracker
+    /// 1. Pool sets value and returns baseline (integrated change tracking)
+    /// 2. Space records the change for commit delta
     pub fn set_edge_attr(&mut self, edge: EdgeId, attr: AttrName, value: AttrValue) -> Result<(), GraphError> {
-        // TODO: Same pattern as set_node_attr
+        // TODO: ALGORITHM - Same coordinator pattern as set_node_attr but for edges
+        // 1. let baseline_value = self.pool.set_edge_attr(edge, attr.clone(), value.clone())?;
+        // 2. self.space.record_edge_attr_change(edge, attr, baseline_value, value);
+        // 3. Ok(())
+        
+        // PERFORMANCE: O(1) - Pool handles efficient baseline capture
+        todo!("Implement Graph::set_edge_attr")
+    }
+    
+    /// Set edge attributes in bulk (handles multiple edges and multiple attributes efficiently)
+    pub fn set_edge_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>) -> Result<(), GraphError> {
+        // TODO: ALGORITHM - Bulk coordinator for edge attributes
+        // 1. let all_baseline_changes = self.pool.set_edges_attrs(attrs_values.clone())?;
+        // 2. for (attr_name, baseline_changes) in all_baseline_changes {
+        //        let changes_for_space: Vec<(EdgeId, Option<AttrValue>, AttrValue)> = baseline_changes.into_iter()
+        //            .map(|(edge_id, baseline)| {
+        //                let new_value = attrs_values.get(&attr_name).unwrap()
+        //                    .iter().find(|(id, _)| *id == edge_id).unwrap().1.clone();
+        //                (edge_id, baseline, new_value)
+        //            }).collect();
+        //        self.space.record_edge_attr_changes(attr_name, &changes_for_space);
+        //    }
+        // 3. Ok(())
+        
+        // PERFORMANCE: O(total_changes) - bulk efficiency for edge attributes
+        todo!("Implement Graph::set_edges_attrs")
     }
     
     /// Get an attribute value from a node
@@ -244,82 +292,123 @@ impl Graph {
     }
     
     /*
-    === BULK OPERATIONS ===
-    Efficient operations on multiple entities.
-    Critical for ML/analytics workloads.
+    === EFFICIENT BULK OPERATIONS ===
+    Graph provides secure external API while using efficient internal operations.
+    
+    ARCHITECTURE:
+    - Pool: Provides full column access internally for efficiency
+    - Graph: Filters by active entities and provides secure external API
+    - Users: Only see data for entities they specify and that are active
+    
+    SECURITY: External API requires explicit indices and only returns active entity data
+    PERFORMANCE: Internal implementation uses efficient full column access
+    
+    USAGE EXAMPLES:
+    ```rust
+    // Get attributes for specific active nodes
+    let user_ids = vec![alice, bob, charlie];
+    let ages = graph.get_nodes_attrs("age", &user_ids)?;
+
+    ```
     */
     
-    /// Set the same attribute on multiple nodes efficiently
-    pub fn set_node_attrs(&mut self, attr: AttrName, values: Vec<(NodeId, AttrValue)>) -> Result<(), GraphError> {
-        // TODO: Use pool.set_node_attrs_bulk() for efficiency
-        // TODO: Record changes in bulk for change_tracker
+    /// Get attribute values for specific nodes (secure and efficient)
+    /// 
+    /// ALGORITHM:
+    /// 1. Filter requested nodes to only active ones
+    /// 2. Get full attribute column from pool (efficient)
+    /// 3. Extract values at active indices only
+    /// 4. Return results aligned with requested nodes
+    /// 
+    /// SECURITY: Only returns data for active nodes that were explicitly requested
+    /// PERFORMANCE: Uses efficient column access internally
+    pub fn get_nodes_attrs(&self, attr: &AttrName, requested_nodes: &[NodeId]) -> GraphResult<Vec<Option<AttrValue>>> {
+        // TODO:
+        // // 1. Filter to only active nodes
+        // let active_requested: Vec<NodeId> = requested_nodes.iter()
+        //     .filter(|&&id| self.space.contains_node(id))
+        //     .cloned()
+        //     .collect();
+        //
+        // // 2. Get full column efficiently from pool
+        // if let Some(attr_column) = self.pool.get_node_attr_column(attr) {
+        //     // 3. Extract values at requested active indices
+        //     let mut results = Vec::with_capacity(requested_nodes.len());
+        //     for &node_id in requested_nodes {
+        //         if self.space.contains_node(node_id) && node_id < attr_column.len() {
+        //             results.push(Some(attr_column[node_id].clone()));
+        //         } else {
+        //             results.push(None);
+        //         }
+        //     }
+        //     Ok(results)
+        // } else {
+        //     Ok(vec![None; requested_nodes.len()])
+        // }
+        todo!("Implement Graph::get_nodes_attrs")
     }
     
-    /// Get attribute values for all nodes (returns full column)
-    /// This is very efficient for analytics workloads
-    pub fn get_node_attrs(&self, attr: &AttrName) -> Option<&Vec<AttrValue>> {
-        // TODO: Direct access to pool's columnar data
-        // self.pool.get_node_attr_column(attr)
+    /// Get attribute values for specific edges (secure and efficient)
+    pub fn get_edges_attrs(&self, attr: &AttrName, requested_edges: &[EdgeId]) -> GraphResult<Vec<Option<AttrValue>>> {
+        // TODO: Same pattern as get_nodes_attrs but for edges
+        todo!("Implement Graph::get_edges_attrs")
     }
     
-    /// Set the same attribute on multiple edges efficiently
-    pub fn set_edge_attrs(&mut self, attr: AttrName, values: Vec<(EdgeId, AttrValue)>) -> Result<(), GraphError> {
-        // TODO: Use pool.set_edge_attrs_bulk() for efficiency
-        // TODO: Record changes in bulk for change_tracker
-    }
+    // NOTE: Removed set_node_attr_bulk - use set_node_attrs for all bulk operations
     
-    /// Get attribute values for all edges (returns full column)
-    /// This is very efficient for analytics workloads
-    pub fn get_edge_attrs(&self, attr: &AttrName) -> Option<&Vec<AttrValue>> {
-        // TODO: Direct access to pool's columnar data
-        // self.pool.get_edge_attr_column(attr)
-    }
+    // NOTE: Removed set_edge_attr_bulk - use set_edge_attrs for all bulk operations
     
     /*
     === TOPOLOGY QUERIES ===
     Read-only operations about graph structure.
-    These delegate to pool but could be optimized by query_engine later.
+    These delegate to space for the active graph topology.
     */
     
     /// Check if a node exists in the graph
     pub fn contains_node(&self, node: NodeId) -> bool {
-        // TODO: self.pool.contains_node(node)
+        // TODO: self.space.contains_node(node)
+        todo!("Implement Graph::contains_node")
     }
     
     /// Check if an edge exists in the graph
     pub fn contains_edge(&self, edge: EdgeId) -> bool {
-        // TODO: self.pool.contains_edge(edge)
+        // TODO: self.space.contains_edge(edge)
+        todo!("Implement Graph::contains_edge")
     }
     
     /// Get all node IDs currently in the graph
     pub fn node_ids(&self) -> Vec<NodeId> {
-        // TODO: self.pool.node_ids()
+        // TODO: self.space.node_ids()
+        todo!("Implement Graph::node_ids")
     }
     
     /// Get all edge IDs currently in the graph
     pub fn edge_ids(&self) -> Vec<EdgeId> {
-        // TODO: self.pool.edge_ids()
+        // TODO: self.space.edge_ids()
+        todo!("Implement Graph::edge_ids")
     }
     
     /// Get the endpoints of an edge
     pub fn edge_endpoints(&self, edge: EdgeId) -> Result<(NodeId, NodeId), GraphError> {
-        // TODO: self.pool.edge_endpoints(edge)
+        // TODO: self.space.edge_endpoints(edge)
+        todo!("Implement Graph::edge_endpoints")
     }
     
     /// Get all neighbors of a node
     pub fn neighbors(&self, node: NodeId) -> Result<Vec<NodeId>, GraphError> {
-        // TODO: self.pool.neighbors(node)
-        // NOTE: This could be optimized by maintaining adjacency lists
+        // TODO: self.space.neighbors(node)
+        todo!("Implement Graph::neighbors")
     }
     
     /// Get the degree (number of incident edges) of a node
     pub fn degree(&self, node: NodeId) -> Result<usize, GraphError> {
-        // TODO: self.pool.degree(node)
+        // TODO: self.space.degree(node)
+        todo!("Implement Graph::degree")
     }
     
     /// Get basic statistics about the current graph
     pub fn statistics(&self) -> GraphStatistics {
-        // TODO: Combine stats from pool, history, change_tracker
+        // TODO: Combine stats from pool, history, space
         // TODO: Include memory usage, performance metrics, etc.
     }
     
@@ -331,25 +420,25 @@ impl Graph {
     
     /// Check if there are uncommitted changes
     pub fn has_uncommitted_changes(&self) -> bool {
-        // TODO: self.change_tracker.has_changes()
+        // TODO: self.space.has_uncommitted_changes()
     }
     
     /// Commit current changes to history
     /// 
     /// ALGORITHM:
-    /// 1. Create a snapshot of current changes (ask change_tracker)
+    /// 1. Create a snapshot of current changes (ask space)
     /// 2. pool the snapshot in history system with metadata
     /// 3. Update current commit pointer
     /// 4. Clear change tracker
     /// 5. Return new commit ID
     pub fn commit(&mut self, message: String, author: String) -> Result<StateId, GraphError> {
         // TODO:
-        // let changes = self.change_tracker.create_snapshot();
+        // let changes = self.space.create_change_delta();
         // let new_state_id = self.history.create_commit(
         //     changes, message, author, self.current_commit
         // )?;
         // self.current_commit = new_state_id;
-        // self.change_tracker.clear();
+        // self.space.reset_hard();
         // self.history.update_branch_head(&self.current_branch, new_state_id)?;
         // Ok(new_state_id)
     }
@@ -357,7 +446,7 @@ impl Graph {
     /// Reset all uncommitted changes
     pub fn reset_hard(&mut self) -> Result<(), GraphError> {
         // TODO:
-        // self.change_tracker.clear();
+        // self.space.reset_hard();
         // Repool pool to match current_commit state
         // self.repool_to_commit(self.current_commit)?;
         // Ok(())
@@ -468,27 +557,7 @@ impl Graph {
 These are the types that the Graph API uses for its operations.
 */
 
-/// Configuration for graph behavior and performance
-#[derive(Debug, Clone)]
-pub struct GraphConfig {
-    /// Initial capacity hints
-    pub initial_node_capacity: usize,
-    pub initial_edge_capacity: usize,
-    
-    /// Performance tuning
-    pub enable_query_caching: bool,
-    pub enable_adjacency_lists: bool,
-    
-    /// History management
-    pub max_history_size: Option<usize>,
-    pub auto_gc_threshold: Option<usize>,
-}
-
-impl Default for GraphConfig {
-    fn default() -> Self {
-        // TODO: Reasonable defaults for most use cases
-    }
-}
+// NOTE: GraphConfig is defined in config.rs - removed duplicate definition
 
 /// Statistics about the current graph state
 #[derive(Debug, Clone)]
@@ -533,7 +602,7 @@ impl Default for Graph {
 
 COMPONENT COORDINATION:
 - Graph should be smart about when to use which component
-- Some operations might touch multiple components (e.g., commit touches pool + history + change_tracker)
+- Some operations might touch multiple components (e.g., commit touches pool + history + space)
 - Graph should handle all the complex interactions
 
 PERFORMANCE OPTIMIZATIONS:

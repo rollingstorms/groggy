@@ -1,0 +1,94 @@
+digraph graph_api_structure {
+    rankdir=TB;
+    node [shape=box, style=filled, fontname="Arial"];
+    
+    // Main API
+    Graph [fillcolor=lightblue, label="Graph API\n(Clean, No Duplicates)"];
+    
+    // API Categories
+    subgraph cluster_construction {
+        label="Construction (3 functions)";
+        style=filled;
+        color=lightgreen;
+        
+        new [label="new()"];
+        with_config [label="with_config()"];
+        load_from_path [label="load_from_path()"];
+    }
+    
+    subgraph cluster_entities {
+        label="Entity Operations (6 functions)";
+        style=filled;
+        color=lightcyan;
+        
+        add_node [label="add_node()"];
+        add_nodes [label="add_nodes()"];
+        add_edge [label="add_edge()"];
+        add_edges [label="add_edges()"];
+        remove_node [label="remove_node()"];
+        remove_edge [label="remove_edge()"];
+    }
+    
+    subgraph cluster_attributes {
+        label="Attribute Operations (10 functions)\nCLEANED: No more duplicates!";
+        style=filled;
+        color=gold;
+        
+        // Single operations
+        set_node_attr [label="set_node_attr()\n(single)"];
+        set_edge_attr [label="set_edge_attr()\n(single)"];
+        
+        // Bulk operations (simplified!)
+        set_node_attrs [label="set_node_attrs()\n(bulk - handles all cases)", fillcolor=lightgreen];
+        set_edge_attrs [label="set_edge_attrs()\n(bulk - handles all cases)", fillcolor=lightgreen];
+        
+        // Getters
+        get_node_attr [label="get_node_attr()"];
+        get_edge_attr [label="get_edge_attr()"];
+        get_node_attrs [label="get_node_attrs()"];
+        get_edge_attrs [label="get_edge_attrs()"];
+        get_nodes_attrs [label="get_nodes_attrs()"];
+        get_edges_attrs [label="get_edges_attrs()"];
+    }
+    
+    subgraph cluster_topology {
+        label="Topology Queries (6 functions)";
+        style=filled;
+        color=lightcyan;
+        
+        contains_node [label="contains_node()"];
+        contains_edge [label="contains_edge()"];
+        node_ids [label="node_ids()"];
+        edge_ids [label="edge_ids()"];
+        neighbors [label="neighbors()"];
+        degree [label="degree()"];
+    }
+    
+    subgraph cluster_version_control {
+        label="Version Control (2 functions)";
+        style=filled;
+        color=lightyellow;
+        
+        commit [label="commit()"];
+        create_branch [label="create_branch()"];
+    }
+    
+    // Connections
+    Graph -> new;
+    Graph -> add_node;
+    Graph -> set_node_attrs;
+    Graph -> contains_node;
+    Graph -> commit;
+    
+    // Highlight cleaned functions
+    removed1 [shape=ellipse, fillcolor=lightcoral, label="❌ set_node_attr_bulk\n(REMOVED)"];
+    removed2 [shape=ellipse, fillcolor=lightcoral, label="❌ set_multiple_node_attrs\n(REMOVED)"];
+    removed3 [shape=ellipse, fillcolor=lightcoral, label="❌ set_edge_attr_bulk\n(REMOVED)"];
+    removed4 [shape=ellipse, fillcolor=lightcoral, label="❌ set_multiple_edge_attrs\n(REMOVED)"];
+    
+    // Show what was cleaned up
+    removed1 -> set_node_attrs [label="consolidated into", style=dashed, color=red];
+    removed2 -> set_node_attrs [label="consolidated into", style=dashed, color=red];
+    removed3 -> set_edge_attrs [label="consolidated into", style=dashed, color=red];
+    removed4 -> set_edge_attrs [label="consolidated into", style=dashed, color=red];
+}
