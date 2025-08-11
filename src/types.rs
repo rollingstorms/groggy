@@ -59,34 +59,80 @@ pub enum AttrValue {
 // - Use f32.to_bits() for consistent hashing of floats
 // - Sort hash inputs to ensure deterministic ordering
 impl Hash for AttrValue {
-    // TODO: Implement hash using discriminant + to_bits() for floats
-    // TODO: Ensure deterministic hashing for Vec<f32>
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            AttrValue::Float(f) => {
+                0u8.hash(state);  // Discriminant for Float variant
+                f.to_bits().hash(state);  // Use to_bits() for consistent float hashing
+            }
+            AttrValue::Int(i) => {
+                1u8.hash(state);  // Discriminant for Int variant
+                i.hash(state);
+            }
+            AttrValue::Text(s) => {
+                2u8.hash(state);  // Discriminant for Text variant
+                s.hash(state);
+            }
+            AttrValue::FloatVec(v) => {
+                3u8.hash(state);  // Discriminant for FloatVec variant
+                v.len().hash(state);  // Hash length first
+                for f in v {
+                    f.to_bits().hash(state);  // Hash each float using to_bits()
+                }
+            }
+            AttrValue::Bool(b) => {
+                4u8.hash(state);  // Discriminant for Bool variant
+                b.hash(state);
+            }
+        }
+    }
 }
 
 impl AttrValue {
     /// Get runtime type information as string
     pub fn type_name(&self) -> &'static str {
-        // TODO: Return "Float", "Int", "Text", "FloatVec", "Bool"
+        match self {
+            AttrValue::Float(_) => "Float",
+            AttrValue::Int(_) => "Int", 
+            AttrValue::Text(_) => "Text",
+            AttrValue::FloatVec(_) => "FloatVec",
+            AttrValue::Bool(_) => "Bool",
+        }
     }
     
     /// Try to convert to specific type with error handling
     pub fn as_float(&self) -> Option<f32> {
-        // TODO: Return Some(f) if Float variant, None otherwise
+        match self {
+            AttrValue::Float(f) => Some(*f),
+            _ => None,
+        }
     }
     
     pub fn as_int(&self) -> Option<i64> {
-        // TODO: Return Some(i) if Int variant, None otherwise  
+        match self {
+            AttrValue::Int(i) => Some(*i),
+            _ => None,
+        }
     }
     
     pub fn as_text(&self) -> Option<&str> {
-        // TODO: Return Some(s) if Text variant, None otherwise
+        match self {
+            AttrValue::Text(s) => Some(s),
+            _ => None,
+        }
     }
     
     pub fn as_float_vec(&self) -> Option<&[f32]> {
-        // TODO: Return Some(slice) if FloatVec variant, None otherwise
+        match self {
+            AttrValue::FloatVec(v) => Some(v),
+            _ => None,
+        }
     }
     
     pub fn as_bool(&self) -> Option<bool> {
-        // TODO: Return Some(b) if Bool variant, None otherwise
+        match self {
+            AttrValue::Bool(b) => Some(*b),
+            _ => None,
+        }
     }
 }

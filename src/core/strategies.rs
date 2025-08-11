@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
+use crate::core::change_tracker::ChangeSet;
 use crate::core::delta::DeltaObject;
 
 /*
@@ -35,7 +36,7 @@ The strategy pattern allows runtime selection based on workload characteristics.
 /// DESIGN: Each strategy implements a different approach to storing and reconstructing
 /// temporal graph states. The trait provides a common interface that ChangeTracker
 /// and History systems can work with regardless of the underlying storage strategy.
-pub trait TemporalStorageStrategy {
+pub trait TemporalStorageStrategy: std::fmt::Debug {
     /*
     === CHANGE RECORDING ===
     How this strategy tracks modifications
@@ -80,6 +81,9 @@ pub trait TemporalStorageStrategy {
     /// Create a delta object representing all current changes
     /// This is used when committing to history
     fn create_delta(&self) -> DeltaObject;
+    
+    /// Create a change set that can be passed to HistoryForest
+    fn create_change_set(&self) -> ChangeSet;
     
     /*
     === CHANGE MANAGEMENT ===
@@ -388,6 +392,40 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
             self.edges_added.clone(),
             self.edges_removed.clone(),
         )
+    }
+    
+    fn create_change_set(&self) -> ChangeSet {
+        // Convert index-based changes to ChangeSet format for HistoryForest
+        let mut node_attr_changes = Vec::new();
+        for (node_id, attr_name, _old_index, _new_index) in &self.node_attr_index_changes {
+            // For now, we don't have the actual values, so we use placeholder values
+            // In a full implementation, we would resolve the indices to actual values
+            node_attr_changes.push((
+                *node_id,
+                attr_name.clone(),
+                None, // old_value - would need to resolve from old_index
+                AttrValue::Text(format!("index_{}", _new_index)) // placeholder new value
+            ));
+        }
+        
+        let mut edge_attr_changes = Vec::new();
+        for (edge_id, attr_name, _old_index, _new_index) in &self.edge_attr_index_changes {
+            edge_attr_changes.push((
+                *edge_id,
+                attr_name.clone(),
+                None, // old_value
+                AttrValue::Text(format!("index_{}", _new_index)) // placeholder new value
+            ));
+        }
+        
+        ChangeSet {
+            nodes_added: self.nodes_added.clone(),
+            nodes_removed: self.nodes_removed.clone(),
+            edges_added: self.edges_added.clone(),
+            edges_removed: self.edges_removed.clone(),
+            node_attr_changes,
+            edge_attr_changes,
+        }
     }
     
     fn has_changes(&self) -> bool {

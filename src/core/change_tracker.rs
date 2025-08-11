@@ -48,7 +48,12 @@ pub struct ChangeTracker {
     strategy: Box<dyn TemporalStorageStrategy>,
 }
 
+use std::collections::{HashMap, HashSet};
+use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
 use crate::core::strategies::{TemporalStorageStrategy, StorageStrategyType, StorageCharacteristics, create_strategy, IndexDeltaStrategy};
+use crate::core::delta::DeltaObject;
+use crate::core::pool::GraphPool;
+use crate::errors::GraphError;
 
 impl ChangeTracker {
     /// Create a new change tracker with default strategy (IndexDeltas)
@@ -104,7 +109,7 @@ impl ChangeTracker {
         &mut self, 
         changes: &[(T, AttrName, Option<usize>, usize)],
         is_node: bool
-    ) where T: Into<u64> + Copy {
+    ) where T: Into<usize> + Copy {
         // Delegate to strategy for bulk recording
         for &(entity_id, ref attr_name, old_index, new_index) in changes {
             let id = entity_id.into();
@@ -124,7 +129,7 @@ impl ChangeTracker {
         old_index: Option<usize>,
         new_index: usize,
         is_node: bool
-    ) where T: Into<u64> + Copy {
+    ) where T: Into<usize> + Copy {
         self.record_attr_changes(&[(entity_id, attr_name, old_index, new_index)], is_node);
     }
     
@@ -138,8 +143,9 @@ impl ChangeTracker {
     
     /// Record multiple node additions efficiently
     pub fn record_node_additions(&mut self, node_ids: &[NodeId]) {
-        // TODO: More efficient than calling record_node_addition in a loop
-        // TODO: Single timestamp update, bulk vector operations
+        for &node_id in node_ids {
+            self.record_node_addition(node_id);
+        }
     }
     
     // NOTE: Bulk change recording methods moved above as main API
@@ -169,27 +175,28 @@ impl ChangeTracker {
     
     /// Get all nodes that have been modified (added, removed, or attrs changed)
     pub fn get_modified_nodes(&self) -> HashSet<NodeId> {
-        // TODO:
-        // 1. Start with nodes_added and nodes_removed
-        // 2. Add all nodes that have attribute changes
-        // 3. Return deduplicated set
+        // Basic implementation returns empty - full implementation would query the strategy
+        HashSet::new()
     }
     
     /// Get all edges that have been modified
     pub fn get_modified_edges(&self) -> HashSet<EdgeId> {
-        // TODO: Similar to get_modified_nodes but for edges
+        // Basic implementation returns empty - full implementation would query the strategy
+        HashSet::new()
     }
     
     /// Check if a specific node has been modified
     pub fn is_node_modified(&self, node_id: NodeId) -> bool {
-        // TODO:
-        // 1. Check if in nodes_added or nodes_removed
-        // 2. Check if any attribute changes reference this node
+        let _ = node_id; // Silence unused parameter warning
+        // Basic implementation returns false - full implementation would query the strategy
+        false
     }
     
     /// Check if a specific edge has been modified
     pub fn is_edge_modified(&self, edge_id: EdgeId) -> bool {
-        // TODO: Similar to is_node_modified but for edges
+        let _ = edge_id; // Silence unused parameter warning
+        // Basic implementation returns false - full implementation would query the strategy
+        false
     }
     
     /*
@@ -209,8 +216,12 @@ impl ChangeTracker {
     
     /// Create a change set that can be passed to HistoryForest
     pub fn create_change_set(&self) -> ChangeSet {
-        // TODO: Convert internal representation to ChangeSet format
-        // TODO: This might be the same as create_delta() depending on design
+        self.strategy.create_change_set()
+    }
+    
+    /// Alias for create_change_set (backward compatibility)
+    pub fn create_changeset(&self) -> ChangeSet {
+        self.create_change_set()
     }
     
     /*
@@ -243,8 +254,8 @@ impl ChangeTracker {
     
     /// Get a summary of what has changed (compatibility method)
     pub fn change_summary(&self) -> ChangeSummary {
-        // For now, create a basic summary
-        // TODO: This could be enhanced based on strategy-specific information
+        // Basic implementation creates a summary with basic information
+        // Full implementation would use strategy-specific information
         ChangeSummary {
             nodes_added: 0, // Strategy doesn't expose these details yet
             nodes_removed: 0,
@@ -260,11 +271,8 @@ impl ChangeTracker {
     /// Generate the reverse operations needed to undo all changes
     /// This is useful for implementing rollback functionality
     pub fn generate_reverse_operations(&self) -> Vec<ReverseOperation> {
-        // TODO:
-        // 1. For each node addition, generate node removal
-        // 2. For each node removal, generate node addition
-        // 3. For each attribute change, generate reverse attribute change
-        // 4. Return list of operations that would undo all changes
+        // Basic implementation returns empty - full implementation would analyze changes and generate reverses
+        Vec::new()
     }
     
     /*
@@ -275,16 +283,22 @@ impl ChangeTracker {
     /// Merge changes from another change tracker
     /// This is complex because changes might conflict
     pub fn merge(&mut self, other: &ChangeTracker) -> Result<(), MergeConflict> {
-        // TODO:
-        // 1. Detect conflicts (same entity modified in both trackers)
-        // 2. For non-conflicting changes, merge them
-        // 3. For conflicts, return error with details
-        // 4. This is needed for branch merging functionality
+        let _ = other; // Silence unused parameter warning
+        // Basic implementation returns error - merging not yet implemented
+        Err(MergeConflict {
+            conflict_type: ConflictType::NodeAttributeConflict,
+            entity_id: 0,
+            attribute: None,
+            our_change: "not implemented".to_string(),
+            their_change: "not implemented".to_string(),
+        })
     }
     
     /// Check if merging with another change tracker would cause conflicts
     pub fn would_conflict_with(&self, other: &ChangeTracker) -> Vec<MergeConflict> {
-        // TODO: Analyze both change sets and return list of conflicts
+        let _ = other; // Silence unused parameter warning
+        // Basic implementation returns empty - conflict analysis not yet implemented
+        Vec::new()
     }
     
     /*
@@ -296,15 +310,13 @@ impl ChangeTracker {
     /// For example, if a node attribute is changed multiple times,
     /// we only need to track the final change
     pub fn optimize(&mut self) {
-        // TODO:
-        // 1. For each (entity, attribute) pair, keep only the final change
-        // 2. Remove add/remove pairs that cancel each other out
-        // 3. This reduces memory usage and makes deltas smaller
+        // Basic implementation is a no-op - optimization not yet implemented
     }
     
     /// Estimate the memory usage of the change tracker
     pub fn memory_usage(&self) -> usize {
-        // TODO: Calculate approximate bytes used by all vectors and data
+        // Basic implementation returns 0 - memory usage calculation not yet implemented
+        0
     }
     
     /*
@@ -314,18 +326,62 @@ impl ChangeTracker {
     
     /// Get statistics about the changes
     pub fn statistics(&self) -> ChangeStatistics {
-        // TODO: Return comprehensive stats about what's been tracked
+        ChangeStatistics {
+            change_summary: self.change_summary(),
+            memory_usage_bytes: self.memory_usage(),
+            average_changes_per_node: 0.0,
+            average_changes_per_edge: 0.0,
+            most_changed_nodes: Vec::new(),
+            most_changed_edges: Vec::new(),
+            change_rate_per_second: 0.0,
+        }
     }
     
     /// Get the time elapsed since the first change
     pub fn time_since_first_change(&self) -> Option<u64> {
-        // TODO: Calculate seconds since first_change_timestamp
+        // Basic implementation returns None - time tracking not yet implemented
+        None
     }
 }
 
 /*
 === SUPPORTING DATA STRUCTURES ===
 */
+
+/// A set of changes that can be committed to history
+#[derive(Debug, Clone)]
+pub struct ChangeSet {
+    pub nodes_added: Vec<NodeId>,
+    pub nodes_removed: Vec<NodeId>,
+    pub edges_added: Vec<(EdgeId, NodeId, NodeId)>,
+    pub edges_removed: Vec<EdgeId>,
+    pub node_attr_changes: Vec<(NodeId, AttrName, Option<AttrValue>, AttrValue)>,
+    pub edge_attr_changes: Vec<(EdgeId, AttrName, Option<AttrValue>, AttrValue)>,
+}
+
+impl ChangeSet {
+    /// Create an empty change set
+    pub fn new() -> Self {
+        Self {
+            nodes_added: Vec::new(),
+            nodes_removed: Vec::new(),
+            edges_added: Vec::new(),
+            edges_removed: Vec::new(),
+            node_attr_changes: Vec::new(),
+            edge_attr_changes: Vec::new(),
+        }
+    }
+    
+    /// Check if the change set is empty
+    pub fn is_empty(&self) -> bool {
+        self.nodes_added.is_empty() &&
+        self.nodes_removed.is_empty() &&
+        self.edges_added.is_empty() &&
+        self.edges_removed.is_empty() &&
+        self.node_attr_changes.is_empty() &&
+        self.edge_attr_changes.is_empty()
+    }
+}
 
 /// Summary of all changes in the tracker
 #[derive(Debug, Clone)]
@@ -343,12 +399,15 @@ pub struct ChangeSummary {
 impl ChangeSummary {
     /// Check if any changes have been made
     pub fn is_empty(&self) -> bool {
-        // TODO: Return true if total_changes == 0
+        self.total_changes == 0
     }
     
     /// Get a human-readable description of the changes
     pub fn description(&self) -> String {
-        // TODO: Return something like "+5 nodes, -2 edges, 12 attr changes"
+        format!("+{} nodes, -{} nodes, +{} edges, -{} edges, {} node attrs, {} edge attrs",
+                self.nodes_added, self.nodes_removed, 
+                self.edges_added, self.edges_removed,
+                self.node_attr_changes, self.edge_attr_changes)
     }
 }
 
@@ -377,7 +436,34 @@ pub enum ReverseOperation {
 impl ReverseOperation {
     /// Execute this reverse operation on a graph pool
     pub fn execute(&self, pool: &mut GraphPool) -> Result<(), GraphError> {
-        // TODO: Apply this reverse operation to undo a change
+        let _ = pool; // Silence unused parameter warning
+        // For now return not implemented error
+        match self {
+            ReverseOperation::RemoveNode(_) => Err(GraphError::NotImplemented {
+                feature: "reverse operations".to_string(),
+                tracking_issue: None,
+            }),
+            ReverseOperation::AddNode(_, _) => Err(GraphError::NotImplemented {
+                feature: "reverse operations".to_string(),
+                tracking_issue: None,
+            }),
+            ReverseOperation::RemoveEdge(_) => Err(GraphError::NotImplemented {
+                feature: "reverse operations".to_string(),
+                tracking_issue: None,
+            }),
+            ReverseOperation::AddEdge(_, _, _, _) => Err(GraphError::NotImplemented {
+                feature: "reverse operations".to_string(),
+                tracking_issue: None,
+            }),
+            ReverseOperation::RestoreNodeAttr(_, _, _) => Err(GraphError::NotImplemented {
+                feature: "reverse operations".to_string(),
+                tracking_issue: None,
+            }),
+            ReverseOperation::RestoreEdgeAttr(_, _, _) => Err(GraphError::NotImplemented {
+                feature: "reverse operations".to_string(),
+                tracking_issue: None,
+            }),
+        }
     }
 }
 
@@ -418,36 +504,6 @@ pub struct ChangeStatistics {
     pub change_rate_per_second: f64,               // Changes per second since first change
 }
 
-/// A set of changes that can be passed to the history system
-/// This might be the same as Delta, depending on the design
-#[derive(Debug, Clone)]
-pub struct ChangeSet {
-    pub nodes_added: Vec<NodeId>,
-    pub nodes_removed: Vec<NodeId>,
-    pub edges_added: Vec<(EdgeId, NodeId, NodeId)>,
-    pub edges_removed: Vec<EdgeId>,
-    pub node_attr_changes: Vec<(NodeId, AttrName, Option<AttrValue>, AttrValue)>,
-    pub edge_attr_changes: Vec<(EdgeId, AttrName, Option<AttrValue>, AttrValue)>,
-}
-
-// Import the Pool and DeltaObject for efficient change tracking
-use crate::core::pool::GraphPool;
-use crate::core::delta::DeltaObject;
-use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
-use std::collections::{HashMap, HashSet};
-use crate::errors::GraphError;
-
-impl ChangeSet {
-    /// Check if this change set is empty
-    pub fn is_empty(&self) -> bool {
-        // TODO: Check if all vectors are empty
-    }
-    
-    /// Get the total number of changes in this set
-    pub fn change_count(&self) -> usize {
-        // TODO: Sum the lengths of all vectors
-    }
-}
 
 impl Default for ChangeTracker {
     fn default() -> Self {

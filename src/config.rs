@@ -257,15 +257,19 @@ impl GraphConfig {
     /// - Metrics collection
     /// - Conservative resource usage
     pub fn development_optimized() -> Self {
-        // TODO:
-        // GraphConfig {
-        //     enable_metrics: true,
-        //     enable_debug_logging: true,
-        //     enable_validation: true,
-        //     enable_crash_recovery: true,
-        //     // Conservative defaults for other settings
-        //     // ... other fields
-        // }
+        GraphConfig {
+            max_memory_usage: 1024 * 1024 * 512, // 512MB
+            memory_pressure_threshold: 80,
+            enable_auto_gc: true,
+            gc_frequency: 100,
+            enable_query_cache: true,
+            query_cache_size: 1024 * 1024, // 1MB for query cache
+            enable_debug_logging: true,
+            enable_validation: true,
+            enable_metrics: true,
+            worker_threads: 2,
+            ..Self::default()
+        }
     }
     
     /// Create a configuration for production deployment
@@ -291,31 +295,43 @@ impl GraphConfig {
     
     /// Validate the configuration and return errors if invalid
     pub fn validate(&self) -> Result<(), ConfigError> {
-        // TODO: Implement comprehensive validation
-        // Examples of checks:
-        // - max_memory_usage > 0
-        // - memory_pressure_threshold between 0-100
-        // - snapshot_frequency > 0
-        // - compression_level between 1-9
-        // - query_timeout_ms reasonable (not too high/low)
-        // - worker_threads reasonable for system
+        // Basic validation of critical settings
+        if self.max_memory_usage == 0 {
+            return Err(ConfigError::InvalidConfiguration {
+                setting: "max_memory_usage".to_string(),
+                value: "0".to_string(),
+                reason: "Memory limit must be greater than 0".to_string(),
+                valid_values: vec!["Any positive integer".to_string()],
+            });
+        }
+        
+        if self.query_cache_size == 0 && self.enable_query_cache {
+            return Err(ConfigError::InvalidConfiguration {
+                setting: "query_cache_size".to_string(),
+                value: "0".to_string(),
+                reason: "Query cache size must be greater than 0 when caching is enabled".to_string(),
+                valid_values: vec!["Any positive integer".to_string()],
+            });
+        }
+        
+        Ok(())
     }
     
     /// Get the effective number of worker threads
     /// (resolves 0 to actual CPU count)
     pub fn effective_worker_threads(&self) -> usize {
-        // TODO:
-        // if self.worker_threads == 0 {
-        //     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1)
-        // } else {
-        //     self.worker_threads
-        // }
+        if self.worker_threads == 0 {
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1)
+        } else {
+            self.worker_threads
+        }
     }
     
     /// Calculate the memory threshold for triggering cleanup
     pub fn memory_cleanup_threshold(&self) -> usize {
-        // TODO:
-        // (self.max_memory_usage * self.memory_pressure_threshold as usize) / 100
+        (self.max_memory_usage * self.memory_pressure_threshold as usize) / 100
     }
     
     /*
@@ -325,17 +341,21 @@ impl GraphConfig {
     
     /// Create a new configuration with updated memory limit
     pub fn with_memory_limit(mut self, limit: usize) -> Self {
-        // TODO: self.max_memory_usage = limit; self
+        self.max_memory_usage = limit;
+        self
     }
     
     /// Create a new configuration with updated cache settings
     pub fn with_cache_settings(mut self, enable_query_cache: bool, cache_size: usize) -> Self {
-        // TODO: Update cache-related fields and return self
+        self.enable_query_cache = enable_query_cache;
+        self.query_cache_size = cache_size;
+        self
     }
     
     /// Create a new configuration with updated worker thread count
     pub fn with_worker_threads(mut self, threads: usize) -> Self {
-        // TODO: self.worker_threads = threads; self
+        self.worker_threads = threads;
+        self
     }
     
     /// Create a new configuration with specific temporal storage strategy
@@ -357,24 +377,31 @@ impl GraphConfig {
     /// - GROGGY_ENABLE_DEBUG: Enable debug logging (true/false)
     /// - GROGGY_COMPRESSION_LEVEL: Compression level (1-9)
     pub fn from_environment(mut self) -> Self {
-        // TODO:
-        // if let Ok(memory) = std::env::var("GROGGY_MAX_MEMORY") {
-        //     if let Ok(bytes) = memory.parse::<usize>() {
-        //         self.max_memory_usage = bytes;
-        //     }
-        // }
-        // 
-        // if let Ok(threads) = std::env::var("GROGGY_WORKER_THREADS") {
-        //     if let Ok(count) = threads.parse::<usize>() {
-        //         self.worker_threads = count;
-        //     }
-        // }
-        // 
-        // if let Ok(debug) = std::env::var("GROGGY_ENABLE_DEBUG") {
-        //     self.enable_debug_logging = debug.to_lowercase() == "true";
-        // }
-        // 
-        // self
+        if let Ok(memory) = std::env::var("GROGGY_MAX_MEMORY") {
+            if let Ok(bytes) = memory.parse::<usize>() {
+                self.max_memory_usage = bytes;
+            }
+        }
+        
+        if let Ok(threads) = std::env::var("GROGGY_WORKER_THREADS") {
+            if let Ok(count) = threads.parse::<usize>() {
+                self.worker_threads = count;
+            }
+        }
+        
+        if let Ok(debug) = std::env::var("GROGGY_ENABLE_DEBUG") {
+            self.enable_debug_logging = debug.to_lowercase() == "true";
+        }
+        
+        if let Ok(level) = std::env::var("GROGGY_COMPRESSION_LEVEL") {
+            if let Ok(compression) = level.parse::<u8>() {
+                if compression >= 1 && compression <= 9 {
+                    self.compression_level = compression;
+                }
+            }
+        }
+        
+        self
     }
     
     /// Save current configuration to environment variables
@@ -407,6 +434,9 @@ pub enum ConfigError {
     
     /// Incompatible configuration options
     IncompatibleOptions { option1: String, option2: String, reason: String },
+    
+    /// Invalid configuration setting
+    InvalidConfiguration { setting: String, value: String, reason: String, valid_values: Vec<String> },
 }
 
 impl std::fmt::Display for ConfigError {
@@ -431,6 +461,10 @@ impl std::fmt::Display for ConfigError {
             ConfigError::IncompatibleOptions { option1, option2, reason } => {
                 write!(f, "Incompatible configuration: {} and {} cannot both be enabled ({})", 
                        option1, option2, reason)
+            },
+            ConfigError::InvalidConfiguration { setting, value, reason, valid_values } => {
+                write!(f, "Invalid configuration for {}: '{}' - {} (valid values: {})", 
+                       setting, value, reason, valid_values.join(", "))
             },
         }
     }
