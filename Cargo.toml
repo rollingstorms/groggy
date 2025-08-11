@@ -10,7 +10,27 @@ documentation = "https://groggy.readthedocs.io"
 
 [lib]
 name = "groggy"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "test_basic"
+path = "test_basic.rs"
+
+[[bin]]
+name = "test_transactions" 
+path = "test_transactions.rs"
+
+[[bin]]
+name = "comprehensive_test"
+path = "comprehensive_test.rs"
+
+[[bin]]
+name = "git_like_test"
+path = "git_like_test.rs"
+
+[[bin]]
+name = "query_test"
+path = "query_test.rs"
 
 [dependencies]
 pyo3 = { version = "0.20", features = ["extension-module"] }

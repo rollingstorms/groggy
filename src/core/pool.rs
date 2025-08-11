@@ -39,6 +39,60 @@ use std::collections::HashMap;
 use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
 use crate::errors::{GraphError, GraphResult};
 
+/// Columnar storage for attribute values
+/// 
+/// DESIGN: Store attribute values in a single vector for cache efficiency.
+/// This is much faster for bulk operations and analytics workloads compared
+/// to storing attributes per-entity.
+/// 
+/// USAGE: Each entity gets an index into this column. When the entity's
+/// attribute changes, we append the new value and update the index.
+#[derive(Debug, Clone)]
+pub struct AttributeColumn {
+    /// All values ever stored for this attribute (append-only)
+    values: Vec<AttrValue>,
+}
+
+impl AttributeColumn {
+    /// Create a new empty attribute column
+    pub fn new() -> Self {
+        Self {
+            values: Vec::new(),
+        }
+    }
+    
+    /// Append a new value and return its index
+    /// 
+    /// PERFORMANCE: O(1) amortized append
+    pub fn push(&mut self, value: AttrValue) -> usize {
+        let index = self.values.len();
+        self.values.push(value);
+        index
+    }
+    
+    /// Get value at a specific index
+    /// 
+    /// PERFORMANCE: O(1) random access
+    pub fn get(&self, index: usize) -> Option<&AttrValue> {
+        self.values.get(index)
+    }
+    
+    /// Get the number of values stored
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+    
+    /// Check if the column is empty
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+    
+    /// Get all values as a slice (for bulk operations)
+    pub fn as_slice(&self) -> &[AttrValue] {
+        &self.values
+    }
+}
+
 /// Pure data storage for all graph entities and attributes
 /// 
 /// DESIGN: This is just efficient storage - it doesn't know or care
@@ -128,7 +182,7 @@ impl GraphPool {
         
         column_map
             .get(attr)
-            .and_then(|column| column.get_value(index))
+            .and_then(|column| column.get(index))
     }
     
     /*
@@ -175,7 +229,7 @@ impl GraphPool {
         } else {
             self.edge_attributes.entry(attr).or_insert_with(AttributeColumn::new)
         };
-        column.append_value(value)
+        column.push(value)
     }
     
     /// Set multiple attributes on single entity (appends to columns and returns indices)
@@ -202,7 +256,7 @@ impl GraphPool {
         } else {
             self.edge_attributes.entry(attr).or_insert_with(AttributeColumn::new)
         };
-        values.into_iter().map(|value| column.append_value(value)).collect()
+        values.into_iter().map(|value| column.push(value)).collect()
     }
     
     /// Set multiple attributes on multiple entities (bulk operation)
@@ -234,13 +288,13 @@ impl GraphPool {
     /// INTERNAL: This exposes the full column - Graph coordinator handles filtering
     /// PERFORMANCE: Direct access to columnar data for maximum efficiency
     /// RETURNS: Reference to the entire attribute vector
-    pub fn get_attr_column(&self, attr: &AttrName, is_node: bool) -> Option<&Vec<AttrValue>> {
+    pub fn get_attr_column(&self, attr: &AttrName, is_node: bool) -> Option<&[AttrValue]> {
         let column_map = if is_node {
             &self.node_attributes
         } else {
             &self.edge_attributes
         };
-        column_map.get(attr).map(|column| &column.values)
+        column_map.get(attr).map(|column| column.as_slice())
     }
     
     /// Get attribute values for specific indices (internal bulk operation)
@@ -279,76 +333,31 @@ impl GraphPool {
     
     /// Get basic statistics about the graph
     pub fn statistics(&self) -> PoolStatistics {
-        // TODO: Return struct with node_count, edge_count, attribute_count, memory_usage, etc.
-        todo!("Implement GraphPool::statistics")
+        // Calculate memory usage approximations
+        let node_attrs_size = self.node_attributes.iter()
+            .map(|(_, column)| column.len() * std::mem::size_of::<AttrValue>())
+            .sum::<usize>();
+        let edge_attrs_size = self.edge_attributes.iter()
+            .map(|(_, column)| column.len() * std::mem::size_of::<AttrValue>())
+            .sum::<usize>();
+        
+        PoolStatistics {
+            node_count: self.next_node_id,
+            edge_count: self.next_edge_id,
+            node_attribute_count: self.node_attributes.len(),
+            edge_attribute_count: self.edge_attributes.len(),
+        }
     }
     
     /// List all attribute names currently in use
     pub fn attribute_names(&self) -> (Vec<AttrName>, Vec<AttrName>) {
-        // TODO: Return (node_attributes, edge_attributes)
+        let node_attrs = self.node_attributes.keys().cloned().collect();
+        let edge_attrs = self.edge_attributes.keys().cloned().collect();
+        (node_attrs, edge_attrs)
     }
 }
 
-/// Append-only columnar storage for attribute values
-#[derive(Debug, Clone)]
-pub struct AttributeColumn {
-    /// All attribute values ever stored (append-only)
-    pub values: Vec<AttrValue>,
-    
-    /// Next available index for new values
-    pub next_index: usize,
-    
-    /// Optional: Reference counting for garbage collection
-    /// Tracks how many entities reference each index
-    pub reference_count: HashMap<usize, usize>,
-}
 
-impl AttributeColumn {
-    /// Create new empty attribute column
-    pub fn new() -> Self {
-        Self {
-            values: Vec::new(),
-            next_index: 0,
-            reference_count: HashMap::new(),
-        }
-    }
-    
-    /// Append a new value and return its index
-    pub fn append_value(&mut self, value: AttrValue) -> usize {
-        let index = self.next_index;
-        self.values.push(value);
-        self.next_index += 1;
-        self.reference_count.insert(index, 1);
-        index
-    }
-    
-    /// Get value at specific index
-    pub fn get_value(&self, index: usize) -> Option<&AttrValue> {
-        self.values.get(index)
-    }
-    
-    /// Increment reference count for an index
-    pub fn increment_ref(&mut self, index: usize) {
-        *self.reference_count.entry(index).or_insert(0) += 1;
-    }
-    
-    /// Decrement reference count for an index
-    pub fn decrement_ref(&mut self, index: usize) {
-        if let Some(count) = self.reference_count.get_mut(&index) {
-            *count = count.saturating_sub(1);
-        }
-    }
-    
-    /// Get all indices with zero references (for garbage collection)
-    pub fn get_unreferenced_indices(&self) -> Vec<usize> {
-        self.reference_count
-            .iter()
-            .filter_map(|(&index, &count)| {
-                if count == 0 { Some(index) } else { None }
-            })
-            .collect()
-    }
-}
 
 /// Statistics about the current state of the graph store
 #[derive(Debug, Clone)]

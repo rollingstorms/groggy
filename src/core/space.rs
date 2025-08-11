@@ -36,9 +36,8 @@ WHAT DOESN'T BELONG HERE:
 */
 
 use std::collections::{HashMap, HashSet};
-use crate::types::{NodeId, EdgeId, AttrName, AttrValue, StateId};
+use crate::types::{NodeId, EdgeId, AttrName, StateId};
 // NOTE: ChangeTracker import removed - Graph manages it directly now
-use crate::core::strategies::StorageStrategyType;
 use crate::errors::{GraphError, GraphResult};
 use crate::core::pool::GraphPool;
 use crate::core::delta::DeltaObject;
@@ -187,7 +186,7 @@ impl GraphSpace {
     
     /// Update the current attribute index for any entity (called by Graph after Pool storage)
     pub fn set_attr_index<T>(&mut self, entity_id: T, attr_name: AttrName, new_index: usize, is_node: bool) 
-    where T: Into<u64> + Copy {
+    where T: Into<usize> + Copy {
         let id = entity_id.into();
         if is_node {
             self.node_attribute_indices
@@ -204,7 +203,7 @@ impl GraphSpace {
     
     /// Get current attribute index for any entity (used by Graph for change tracking)
     pub fn get_attr_index<T>(&self, entity_id: T, attr_name: &AttrName, is_node: bool) -> Option<usize> 
-    where T: Into<u64> + Copy {
+    where T: Into<usize> + Copy {
         let id = entity_id.into();
         let attribute_map = if is_node {
             &self.node_attribute_indices
@@ -216,6 +215,42 @@ impl GraphSpace {
             .get(&id)
             .and_then(|attrs| attrs.get(attr_name))
             .copied()
+    }
+    
+    /// Convenience method: Get current attribute index for a node
+    pub fn get_node_attr_index(&self, node_id: NodeId, attr_name: &AttrName) -> Option<usize> {
+        self.get_attr_index(node_id, attr_name, true)
+    }
+    
+    /// Convenience method: Set current attribute index for a node
+    pub fn set_node_attr_index(&mut self, node_id: NodeId, attr_name: AttrName, new_index: usize) {
+        self.set_attr_index(node_id, attr_name, new_index, true)
+    }
+    
+    /// Convenience method: Get current attribute index for an edge
+    pub fn get_edge_attr_index(&self, edge_id: EdgeId, attr_name: &AttrName) -> Option<usize> {
+        self.get_attr_index(edge_id, attr_name, false)
+    }
+    
+    /// Convenience method: Set current attribute index for an edge  
+    pub fn set_edge_attr_index(&mut self, edge_id: EdgeId, attr_name: AttrName, new_index: usize) {
+        self.set_attr_index(edge_id, attr_name, new_index, false)
+    }
+    
+    /// Get all attribute names and indices for a node
+    pub fn get_node_attr_indices(&self, node_id: NodeId) -> HashMap<AttrName, usize> {
+        self.node_attribute_indices
+            .get(&(node_id as usize))
+            .cloned()
+            .unwrap_or_default()
+    }
+    
+    /// Get all attribute names and indices for an edge
+    pub fn get_edge_attr_indices(&self, edge_id: EdgeId) -> HashMap<AttrName, usize> {
+        self.edge_attribute_indices
+            .get(&(edge_id as usize))
+            .cloned()
+            .unwrap_or_default()
     }
 
     /*
@@ -247,7 +282,7 @@ impl GraphSpace {
     pub fn get_active_nodes(&self) -> &HashSet<NodeId> {
         &self.active_nodes
     }
-
+    
     /// Get all active edge IDs (for iteration)
     pub fn get_active_edges(&self) -> &HashSet<EdgeId> {
         &self.active_edges
@@ -260,14 +295,12 @@ impl GraphSpace {
 
     /// Get all active node IDs as a vector
     pub fn node_ids(&self) -> Vec<NodeId> {
-        // TODO: self.active_nodes.iter().copied().collect()
-        todo!("Implement GraphSpace::node_ids")
+        self.active_nodes.iter().copied().collect()
     }
 
     /// Get all active edge IDs as a vector
     pub fn edge_ids(&self) -> Vec<EdgeId> {
-        // TODO: self.active_edges.iter().copied().collect()
-        todo!("Implement GraphSpace::edge_ids")
+        self.active_edges.iter().copied().collect()
     }
     
     /// NOTE: Topology queries (neighbors, degree, connectivity) now handled by
@@ -280,47 +313,44 @@ impl GraphSpace {
 
     /// Check if there are uncommitted changes
     pub fn has_uncommitted_changes(&self) -> bool {
-        // TODO: Space no longer tracks changes directly
-        todo!("Implement GraphSpace::has_uncommitted_changes")
+        // NOTE: Graph manages change tracking now - Space doesn't track changes
+        false
     }
 
     /// Get the number of uncommitted changes
     pub fn uncommitted_change_count(&self) -> usize {
-        // TODO: Graph tracks changes now
-        todo!("Implement GraphSpace::uncommitted_change_count")
+        // NOTE: Graph manages change tracking now - Space doesn't count changes
+        0
     }
 
     /// Get summary of uncommitted changes
-    pub fn change_summary(&self) -> ChangeSummary {
-        // TODO: Graph provides change summary now
-        todo!("Implement GraphSpace::change_summary")
+    pub fn change_summary(&self) -> String {
+        // TODO: Graph provides change summary now - placeholder for now
+        "No changes tracked in Space".to_string()
     }
 
     /// Get the base state this workspace is built on
     pub fn get_base_state(&self) -> StateId {
-        // TODO: self.base_state
-        todo!("Implement GraphSpace::get_base_state")
+        self.base_state
     }
 
     /// Create a delta object representing current changes
     /// USAGE: Called when committing changes to history
-    pub fn create_change_delta(&self, pool: &GraphPool) -> DeltaObject {
-        // TODO: ALGORITHM - Efficient delta creation using Pool's change tracking
-        // NOTE: Graph creates delta via ChangeTracker now
-        
-        // PERFORMANCE: O(changed_entities) - leverages Pool's efficient iteration
-        // INTEGRATION: ChangeTracker uses Pool's BitVec-based change detection
-        todo!("Implement GraphSpace::create_change_delta")
+    pub fn create_change_delta(&self, _pool: &GraphPool) -> DeltaObject {
+        // NOTE: Graph creates delta via ChangeTracker now - Space doesn't track changes
+        // Return empty delta as placeholder
+        DeltaObject::empty()
     }
 
     /// Clear all uncommitted changes (reset to base state)
     /// WARNING: This loses all work since the last commit
     pub fn reset_hard(&mut self) -> GraphResult<()> {
-        // TODO:
-        // 1. Clear active sets (reload from base_state)
-        // 2. Clear change tracker
-        // NOTE: Graph manages change state now
-        todo!("Implement GraphSpace::reset_hard")
+        // NOTE: Graph manages change state now - Space just clears active sets
+        self.active_nodes.clear();
+        self.active_edges.clear();
+        self.node_attribute_indices.clear();
+        self.edge_attribute_indices.clear();
+        Ok(())
     }
 }
 

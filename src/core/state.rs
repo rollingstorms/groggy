@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use crate::types::{StateId, NodeId, EdgeId, AttrName, AttrValue};
 use crate::core::delta::DeltaObject;
+use crate::core::history::Delta;
 use crate::util::timestamp_now;
 use crate::errors::{GraphError, GraphResult};
 
@@ -249,15 +250,13 @@ pub struct GraphSnapshot {
 impl GraphSnapshot {
     /// Create an empty snapshot for the given state
     pub fn empty(state_id: StateId) -> Self {
-        // TODO:
-        // Self {
-        //     active_nodes: Vec::new(),
-        //     edges: HashMap::new(),
-        //     node_attributes: HashMap::new(),
-        //     edge_attributes: HashMap::new(),
-        //     state_id,
-        // }
-        todo!("Implement GraphSnapshot::empty")
+        Self {
+            active_nodes: Vec::new(),
+            edges: HashMap::new(),
+            node_attributes: HashMap::new(),
+            edge_attributes: HashMap::new(),
+            state_id,
+        }
     }
     
     /// Apply a delta to this snapshot to create a new snapshot
@@ -271,36 +270,47 @@ impl GraphSnapshot {
     /// 6. Return the new snapshot
     /// 
     /// PERFORMANCE: O(changes in delta + size of current snapshot for cloning)
-    pub fn apply_delta(&self, delta: &DeltaObject, target_state: StateId) -> Self {
-        // TODO:
-        // let mut new_snapshot = self.clone();
-        // new_snapshot.state_id = target_state;
-        // 
-        // // Apply node changes
-        // for node_id in &delta.nodes_added {
-        //     new_snapshot.active_nodes.push(*node_id);
-        // }
-        // for node_id in &delta.nodes_removed {
-        //     new_snapshot.active_nodes.retain(|&id| id != *node_id);
-        //     new_snapshot.node_attributes.remove(node_id);
-        // }
-        // 
-        // // Apply edge changes
-        // for &(edge_id, source, target) in &delta.edges_added {
-        //     new_snapshot.edges.insert(edge_id, (source, target));
-        // }
-        // for edge_id in &delta.edges_removed {
-        //     new_snapshot.edges.remove(edge_id);
-        //     new_snapshot.edge_attributes.remove(edge_id);
-        // }
-        // 
-        // // Apply attribute changes
-        // for attr_change in &delta.attribute_changes {
-        //     // ... complex attribute change logic
-        // }
-        // 
-        // new_snapshot
-        todo!("Implement GraphSnapshot::apply_delta")
+    pub fn apply_delta(&self, delta: &Delta, target_state: StateId) -> Self {
+        let mut new_snapshot = self.clone();
+        new_snapshot.state_id = target_state;
+        
+        // Apply node additions
+        for &node_id in &delta.nodes_added {
+            if !new_snapshot.active_nodes.contains(&node_id) {
+                new_snapshot.active_nodes.push(node_id);
+            }
+        }
+        
+        // Apply node removals
+        for &node_id in &delta.nodes_removed {
+            new_snapshot.active_nodes.retain(|&id| id != node_id);
+            new_snapshot.node_attributes.remove(&node_id);
+        }
+        
+        // Apply edge additions
+        for &(edge_id, source, target) in &delta.edges_added {
+            new_snapshot.edges.insert(edge_id, (source, target));
+        }
+        
+        // Apply edge removals
+        for &edge_id in &delta.edges_removed {
+            new_snapshot.edges.remove(&edge_id);
+            new_snapshot.edge_attributes.remove(&edge_id);
+        }
+        
+        // Apply node attribute changes
+        for (node_id, attr_name, _old_value, new_value) in &delta.node_attr_changes {
+            let attrs = new_snapshot.node_attributes.entry(*node_id).or_insert_with(HashMap::new);
+            attrs.insert(attr_name.clone(), new_value.clone());
+        }
+        
+        // Apply edge attribute changes
+        for (edge_id, attr_name, _old_value, new_value) in &delta.edge_attr_changes {
+            let attrs = new_snapshot.edge_attributes.entry(*edge_id).or_insert_with(HashMap::new);
+            attrs.insert(attr_name.clone(), new_value.clone());
+        }
+        
+        new_snapshot
     }
     
     /// Create a snapshot by applying a sequence of deltas
@@ -313,19 +323,17 @@ impl GraphSnapshot {
     /// USAGE: This is the main reconstruction function used by HistoryForest
     pub fn reconstruct_from_deltas(
         base: Option<&GraphSnapshot>, 
-        deltas: &[(DeltaObject, StateId)]
+        deltas: &[(Delta, StateId)]
     ) -> GraphResult<Self> {
-        // TODO:
-        // let mut current = base.cloned().unwrap_or_else(|| {
-        //     GraphSnapshot::empty(StateId(0))
-        // });
-        // 
-        // for (delta, target_state) in deltas {
-        //     current = current.apply_delta(delta, *target_state);
-        // }
-        // 
-        // Ok(current)
-        todo!("Implement GraphSnapshot::reconstruct_from_deltas")
+        let mut current = base.cloned().unwrap_or_else(|| {
+            GraphSnapshot::empty(0)
+        });
+        
+        for (delta, target_state) in deltas {
+            current = current.apply_delta(delta, *target_state);
+        }
+        
+        Ok(current)
     }
     
     /// Compare this snapshot with another to produce a diff

@@ -233,6 +233,7 @@ mod tests {
         
         // Filtering
         use std::collections::HashMap;
+        use crate::core::query::AttributeFilter;
         let mut filters = HashMap::new();
         filters.insert("name".to_string(), AttributeFilter::Equals(AttrValue::Text("Alice".to_string())));
         let filtered = graph.filter_nodes(&filters).unwrap();

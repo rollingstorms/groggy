@@ -49,22 +49,20 @@ Functions for generating content hashes and deduplication
 /// PERFORMANCE: O(size of data), very fast hashing
 /// COLLISION RESISTANCE: Good for practical purposes, not cryptographic
 pub fn content_hash<T: Hash>(data: &T) -> [u8; 32] {
-    // TODO:
-    // let mut hasher = DefaultHasher::new();
-    // data.hash(&mut hasher);
-    // let hash_u64 = hasher.finish();
-    // 
-    // // Expand 64-bit hash to 256-bit for better distribution
-    // let mut result = [0u8; 32];
-    // let bytes = hash_u64.to_le_bytes();
-    // 
-    // // Repeat the 8-byte pattern 4 times
-    // for chunk in result.chunks_mut(8) {
-    //     chunk.copy_from_slice(&bytes);
-    // }
-    // 
-    // result
-    todo!("Implement content_hash function")
+    let mut hasher = DefaultHasher::new();
+    data.hash(&mut hasher);
+    let hash_u64 = hasher.finish();
+    
+    // Expand 64-bit hash to 256-bit for better distribution
+    let mut result = [0u8; 32];
+    let bytes = hash_u64.to_le_bytes();
+    
+    // Repeat the 8-byte pattern 4 times
+    for chunk in result.chunks_mut(8) {
+        chunk.copy_from_slice(&bytes);
+    }
+    
+    result
 }
 
 /// Fast hash function optimized specifically for attribute values
@@ -72,36 +70,34 @@ pub fn content_hash<T: Hash>(data: &T) -> [u8; 32] {
 /// OPTIMIZATION: This can be faster than generic hashing because
 /// we know the structure of AttrValue and can optimize accordingly
 pub fn attr_value_hash(value: &AttrValue) -> u64 {
-    // TODO:
-    // match value {
-    //     AttrValue::Int(i) => {
-    //         // Fast path for integers - just use the value directly
-    //         *i as u64
-    //     },
-    //     AttrValue::Float(f) => {
-    //         // Convert float to bits for consistent hashing
-    //         f.to_bits() as u64
-    //     },
-    //     AttrValue::Bool(b) => {
-    //         // Simple hash for booleans
-    //         if *b { 1 } else { 0 }
-    //     },
-    //     AttrValue::Text(s) => {
-    //         // Use standard string hashing
-    //         let mut hasher = DefaultHasher::new();
-    //         s.hash(&mut hasher);
-    //         hasher.finish()
-    //     },
-    //     AttrValue::FloatVec(v) => {
-    //         // Hash vector by combining element hashes
-    //         let mut hasher = DefaultHasher::new();
-    //         for &element in v {
-    //             element.to_bits().hash(&mut hasher);
-    //         }
-    //         hasher.finish()
-    //     },
-    // }
-    todo!("Implement attr_value_hash function")
+    match value {
+        AttrValue::Int(i) => {
+            // Fast path for integers - just use the value directly
+            *i as u64
+        },
+        AttrValue::Float(f) => {
+            // Convert float to bits for consistent hashing
+            f.to_bits() as u64
+        },
+        AttrValue::Bool(b) => {
+            // Simple hash for booleans
+            if *b { 1 } else { 0 }
+        },
+        AttrValue::Text(s) => {
+            // Use standard string hashing
+            let mut hasher = DefaultHasher::new();
+            s.hash(&mut hasher);
+            hasher.finish()
+        },
+        AttrValue::FloatVec(v) => {
+            // Hash vector by combining element hashes
+            let mut hasher = DefaultHasher::new();
+            for &element in v {
+                element.to_bits().hash(&mut hasher);
+            }
+            hasher.finish()
+        },
+    }
 }
 
 /// Merge two sorted vectors while maintaining order and removing duplicates
@@ -114,32 +110,30 @@ pub fn attr_value_hash(value: &AttrValue) -> u64 {
 /// PERFORMANCE: O(n + m) time, O(n + m) space
 /// USE CASES: Merging index lists, combining sorted query results
 pub fn merge_sorted_indices(a: &[usize], b: &[usize]) -> Vec<usize> {
-    // TODO:
-    // let mut result = Vec::with_capacity(a.len() + b.len());
-    // let mut i = 0;
-    // let mut j = 0;
-    // 
-    // while i < a.len() && j < b.len() {
-    //     if a[i] < b[j] {
-    //         result.push(a[i]);
-    //         i += 1;
-    //     } else if a[i] > b[j] {
-    //         result.push(b[j]);
-    //         j += 1;
-    //     } else {
-    //         // Equal values - only add once
-    //         result.push(a[i]);
-    //         i += 1;
-    //         j += 1;
-    //     }
-    // }
-    // 
-    // // Add remaining elements
-    // result.extend_from_slice(&a[i..]);
-    // result.extend_from_slice(&b[j..]);
-    // 
-    // result
-    todo!("Implement merge_sorted_indices function")
+    let mut result = Vec::with_capacity(a.len() + b.len());
+    let mut i = 0;
+    let mut j = 0;
+    
+    while i < a.len() && j < b.len() {
+        if a[i] < b[j] {
+            result.push(a[i]);
+            i += 1;
+        } else if a[i] > b[j] {
+            result.push(b[j]);
+            j += 1;
+        } else {
+            // Equal values - only add once
+            result.push(a[i]);
+            i += 1;
+            j += 1;
+        }
+    }
+    
+    // Add remaining elements
+    result.extend_from_slice(&a[i..]);
+    result.extend_from_slice(&b[j..]);
+    
+    result
 }
 
 /// Find insertion point in sorted vector using binary search
@@ -147,12 +141,10 @@ pub fn merge_sorted_indices(a: &[usize], b: &[usize]) -> Vec<usize> {
 /// RETURNS: Index where value should be inserted to maintain sorted order
 /// If value already exists, returns the index of the existing element
 pub fn binary_search_insert_point(vec: &[usize], value: usize) -> usize {
-    // TODO:
-    // match vec.binary_search(&value) {
-    //     Ok(pos) => pos,      // Found - return existing position
-    //     Err(pos) => pos,     // Not found - return insertion position
-    // }
-    todo!("Implement binary_search_insert_point function")
+    match vec.binary_search(&value) {
+        Ok(pos) => pos,      // Found - return existing position
+        Err(pos) => pos,     // Not found - return insertion position
+    }
 }
 
 /// Check if two attribute values are type-compatible
@@ -160,10 +152,8 @@ pub fn binary_search_insert_point(vec: &[usize], value: usize) -> usize {
 /// USAGE: Before updating an attribute, check if the new value
 /// is compatible with the existing type
 pub fn validate_attr_compatibility(existing: &AttrValue, new: &AttrValue) -> bool {
-    // TODO:
     // Use discriminant comparison to check if they're the same variant
-    // std::mem::discriminant(existing) == std::mem::discriminant(new)
-    todo!("Implement validate_attr_compatibility function")
+    std::mem::discriminant(existing) == std::mem::discriminant(new)
 }
 
 /// Generate a Unix timestamp for the current time
@@ -171,12 +161,10 @@ pub fn validate_attr_compatibility(existing: &AttrValue, new: &AttrValue) -> boo
 /// PRECISION: Seconds since Unix epoch
 /// FALLBACK: Returns 0 if system time is unavailable
 pub fn timestamp_now() -> u64 {
-    // TODO:
-    // std::time::SystemTime::now()
-    //     .duration_since(std::time::UNIX_EPOCH)
-    //     .map(|d| d.as_secs())
-    //     .unwrap_or(0)
-    todo!("Implement timestamp_now function")
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 #[cfg(test)]

@@ -267,6 +267,9 @@ pub enum GraphError {
         valid_values: Vec<String>,
     },
     
+    /// General invalid input error  
+    InvalidInput(String),
+    
     /// Required configuration is missing
     MissingConfiguration {
         setting: String,
@@ -409,7 +412,8 @@ impl GraphError {
             GraphError::NoChangesToCommit |
             GraphError::EmptyGraph { .. } |
             GraphError::InvalidQuery { .. } |
-            GraphError::InvalidConfiguration { .. } => true,
+            GraphError::InvalidConfiguration { .. } |
+            GraphError::InvalidInput(_) => true,
             
             // System errors - something went wrong internally
             GraphError::CorruptedHistory { .. } |
@@ -457,7 +461,8 @@ impl GraphError {
             GraphError::InvalidEdgeEndpoints { .. } |
             GraphError::InvalidAttributeName { .. } |
             GraphError::InvalidQuery { .. } |
-            GraphError::InvalidConfiguration { .. } => ErrorCategory::InvalidInput,
+            GraphError::InvalidConfiguration { .. } |
+            GraphError::InvalidInput(_) => ErrorCategory::InvalidInput,
             
             GraphError::UncommittedChanges { .. } |
             GraphError::BranchAlreadyExists { .. } |
