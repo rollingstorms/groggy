@@ -53,23 +53,23 @@ pub trait TemporalStorageStrategy {
     /// Record that an edge was removed from the graph
     fn record_edge_removal(&mut self, edge_id: EdgeId);
     
-    /// Record that a node attribute changed
-    /// Strategy-specific: Some strategies store values, others store indices
+    /// Record that a node attribute changed (index-based)
+    /// All strategies now work with indices for consistency and efficiency
     fn record_node_attr_change(
         &mut self,
         node_id: NodeId,
         attr_name: AttrName,
-        old_value: Option<AttrValue>,
-        new_value: AttrValue,
+        old_index: Option<usize>,
+        new_index: usize,
     );
     
-    /// Record that an edge attribute changed
+    /// Record that an edge attribute changed (index-based)
     fn record_edge_attr_change(
         &mut self,
         edge_id: EdgeId,
         attr_name: AttrName,
-        old_value: Option<AttrValue>,
-        new_value: AttrValue,
+        old_index: Option<usize>,
+        new_index: usize,
     );
     
     /*
@@ -339,26 +339,24 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
     
     fn record_node_attr_change(
         &mut self,
-        _node_id: NodeId,
-        _attr_name: AttrName,
-        _old_value: Option<AttrValue>,
-        _new_value: AttrValue,
+        node_id: NodeId,
+        attr_name: AttrName,
+        old_index: Option<usize>,
+        new_index: usize,
     ) {
-        // NOTE: This is the generic trait method that receives values
-        // For IndexDeltaStrategy, the actual index-based recording happens
-        // through record_node_attr_index_change() which is called by Space
-        self.update_change_metadata();
+        // Now the trait method directly receives indices - much cleaner!
+        self.record_node_attr_index_change(node_id, attr_name, old_index, new_index);
     }
     
     fn record_edge_attr_change(
         &mut self,
-        _edge_id: EdgeId,
-        _attr_name: AttrName,
-        _old_value: Option<AttrValue>,
-        _new_value: AttrValue,
+        edge_id: EdgeId,
+        attr_name: AttrName,
+        old_index: Option<usize>,
+        new_index: usize,
     ) {
-        // Same note as record_node_attr_change
-        self.update_change_metadata();
+        // Same clean delegation to index-specific method
+        self.record_edge_attr_index_change(edge_id, attr_name, old_index, new_index);
     }
     
     fn create_delta(&self) -> DeltaObject {

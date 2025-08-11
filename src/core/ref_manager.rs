@@ -133,9 +133,9 @@ impl Branch {
 /// - Clean up stale references
 /// 
 /// NOT RESPONSIBLE FOR:
-/// - Actually storing graph states (that's HistorySystem's job)
+/// - Actually storing graph states (that's HistoryForest's job)
 /// - Performing merge operations (that's Graph's job)
-/// - Validating state existence (that's HistorySystem's job)
+/// - Validating state existence (that's HistoryForest's job)
 #[derive(Debug)]
 pub struct RefManager {
     /*
@@ -761,7 +761,7 @@ CONCURRENCY:
 
 INTEGRATION WITH HISTORY:
 - RefManager doesn't validate state existence
-- HistorySystem is responsible for state management
+- HistoryForest is responsible for state management
 - Cleanup operations bridge the two systems
 
 FUTURE ENHANCEMENTS:
