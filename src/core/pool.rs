@@ -115,23 +115,18 @@ impl GraphPool {
     }
     
     /// Get attribute value by index (for Space to resolve indices)
-    pub fn get_node_attr_by_index(&self, attr: &AttrName, index: usize) -> Option<&AttrValue> {
+    pub fn get_attr_by_index(&self, attr: &AttrName, index: usize, is_node: bool) -> Option<&AttrValue> {
         // ALGORITHM: Direct index lookup in columnar storage
-        // 1. Get the attribute column
+        // 1. Get the appropriate attribute column
         // 2. Return value at the specified index
         
-        self.node_attributes
-            .get(attr)
-            .and_then(|column| column.get_value(index))
-    }
-    
-    /// Get edge attribute value by index (for Space to resolve indices)
-    pub fn get_edge_attr_by_index(&self, attr: &AttrName, index: usize) -> Option<&AttrValue> {
-        // ALGORITHM: Direct index lookup in columnar storage
-        // 1. Get the attribute column
-        // 2. Return value at the specified index
+        let column_map = if is_node {
+            &self.node_attributes
+        } else {
+            &self.edge_attributes
+        };
         
-        self.edge_attributes
+        column_map
             .get(attr)
             .and_then(|column| column.get_value(index))
     }
@@ -166,61 +161,67 @@ impl GraphPool {
     
     /*
     === ATTRIBUTE OPERATIONS ===
-    Fast access to node and edge properties
+    Generic attribute storage - Graph decides which column (node/edge)
     */
     
-    /// Append attribute value to column and return its index
-    /// DESIGN: Space will manage the node->index mapping, Pool just stores values
-    pub fn append_node_attr_value(&mut self, attr: AttrName, value: AttrValue) -> usize {
+    /// Set single attribute value (appends to specified column and returns index)
+    pub fn set_attr(&mut self, attr: AttrName, value: AttrValue, is_node: bool) -> usize {
         // ALGORITHM: Append-only storage with index allocation
-        // 1. Get or create the attribute column
+        // 1. Get or create the appropriate attribute column
         // 2. Append the value and return the new index
         
-        let column = self.node_attributes.entry(attr).or_insert_with(AttributeColumn::new);
+        let column = if is_node {
+            self.node_attributes.entry(attr).or_insert_with(AttributeColumn::new)
+        } else {
+            self.edge_attributes.entry(attr).or_insert_with(AttributeColumn::new)
+        };
         column.append_value(value)
     }
     
-    /// Append multiple attribute values and return their indices
-    pub fn append_node_attr_values(&mut self, attrs: HashMap<AttrName, AttrValue>) -> HashMap<AttrName, usize> {
+    /// Set multiple attributes on single entity (appends to columns and returns indices)
+    pub fn set_attrs(&mut self, attrs: HashMap<AttrName, AttrValue>, is_node: bool) -> HashMap<AttrName, usize> {
         // ALGORITHM: Bulk append operations
         // For each attribute, append the value and collect the index
         
         let mut indices = HashMap::with_capacity(attrs.len());
         for (attr_name, value) in attrs {
-            let index = self.append_node_attr_value(attr_name.clone(), value);
+            let index = self.set_attr(attr_name.clone(), value, is_node);
             indices.insert(attr_name, index);
         }
         indices
     }
     
-    /// Append same attribute for multiple nodes and return indices
-    pub fn append_nodes_attr_values(&mut self, attr: AttrName, values: Vec<AttrValue>) -> Vec<usize> {
+    /// Set same attribute for multiple entities (appends to column and returns indices)
+    pub fn set_bulk_attr(&mut self, attr: AttrName, values: Vec<AttrValue>, is_node: bool) -> Vec<usize> {
         // ALGORITHM: Bulk columnar append operation
-        // 1. Get or create the attribute column
+        // 1. Get or create the appropriate attribute column
         // 2. Append all values and collect their indices
         
-        let column = self.node_attributes.entry(attr).or_insert_with(AttributeColumn::new);
+        let column = if is_node {
+            self.node_attributes.entry(attr).or_insert_with(AttributeColumn::new)
+        } else {
+            self.edge_attributes.entry(attr).or_insert_with(AttributeColumn::new)
+        };
         values.into_iter().map(|value| column.append_value(value)).collect()
     }
     
-    /// Append edge attribute value to column and return its index
-    pub fn append_edge_attr_value(&mut self, attr: AttrName, value: AttrValue) -> usize {
-        // ALGORITHM: Same as node attributes but for edges
-        let column = self.edge_attributes.entry(attr).or_insert_with(AttributeColumn::new);
-        column.append_value(value)
+    /// Set multiple attributes on multiple entities (bulk operation)
+    /// Returns the new indices for change tracking
+    pub fn set_bulk_attrs<T>(&mut self, attrs_values: HashMap<AttrName, Vec<(T, AttrValue)>>, is_node: bool) -> HashMap<AttrName, Vec<(T, usize)>> 
+    where T: Copy {
+        // ALGORITHM: Append values and return indices (entity-agnostic)
+        let mut all_index_changes = HashMap::new();
+        for (attr_name, entity_values) in attrs_values {
+            let mut index_changes = Vec::new();
+            for (entity_id, value) in entity_values {
+                // Use existing set_attr method
+                let new_index = self.set_attr(attr_name.clone(), value, is_node);
+                index_changes.push((entity_id, new_index));
+            }
+            all_index_changes.insert(attr_name, index_changes);
+        }
+        all_index_changes
     }
-    
-    // NOTE: Direct node attribute access removed
-    // Use get_node_attr_by_index() with indices provided by Space
-    
-    // NOTE: Direct edge attribute access removed
-    // Use get_edge_attr_by_index() with indices provided by Space
-    
-    // NOTE: Direct node attributes access removed
-    // Space manages the node->attribute_indices mapping
-    
-    // NOTE: Direct edge attributes access removed
-    // Space manages the edge->attribute_indices mapping
     
     /*
     === INTERNAL BULK OPERATIONS ===
@@ -228,103 +229,48 @@ impl GraphPool {
     Pool provides full column access - Graph handles filtering and security.
     */
     
-    /// Get full attribute column for nodes (internal use only)
+    /// Get full attribute column (internal use only)
     /// 
     /// INTERNAL: This exposes the full column - Graph coordinator handles filtering
     /// PERFORMANCE: Direct access to columnar data for maximum efficiency
     /// RETURNS: Reference to the entire attribute vector
-    pub fn get_node_attr_column(&self, attr: &AttrName) -> Option<&Vec<AttrValue>> {
-        // TODO: self.node_attributes.get(attr)
-        todo!("Implement GraphPool::get_node_attr_column")
-    }
-    
-    /// Get full attribute column for edges (internal use only)
-    /// 
-    /// INTERNAL: This exposes the full column - Graph coordinator handles filtering
-    pub fn get_edge_attr_column(&self, attr: &AttrName) -> Option<&Vec<AttrValue>> {
-        // TODO: self.edge_attributes.get(attr)
-        todo!("Implement GraphPool::get_edge_attr_column")
+    pub fn get_attr_column(&self, attr: &AttrName, is_node: bool) -> Option<&Vec<AttrValue>> {
+        let column_map = if is_node {
+            &self.node_attributes
+        } else {
+            &self.edge_attributes
+        };
+        column_map.get(attr).map(|column| &column.values)
     }
     
     /// Get attribute values for specific indices (internal bulk operation)
     /// 
     /// INTERNAL: Used by Graph when it has already determined which indices to access
     /// PERFORMANCE: More efficient than individual lookups for known valid indices
-    pub fn get_node_attrs_at_indices(&self, attr: &AttrName, indices: &[NodeId]) -> GraphResult<Vec<Option<AttrValue>>> {
-        // TODO:
-        // if let Some(attr_column) = self.node_attributes.get(attr) {
-        //     let mut results = Vec::with_capacity(indices.len());
-        //     for &node_id in indices {
-        //         if node_id < attr_column.len() {
-        //             results.push(Some(attr_column[node_id].clone()));
-        //         } else {
-        //             results.push(None);
-        //         }
-        //     }
-        //     Ok(results)
-        // } else {
-        //     Ok(vec![None; indices.len()])
-        // }
-        todo!("Implement GraphPool::get_node_attrs_at_indices")
-    }
-    
-    /// Get attribute values for specific edge indices (internal)
-    pub fn get_edge_attrs_at_indices(&self, attr: &AttrName, indices: &[EdgeId]) -> GraphResult<Vec<Option<AttrValue>>> {
-        // TODO: Same pattern as get_node_attrs_at_indices but for edges
-        todo!("Implement GraphPool::get_edge_attrs_at_indices")
-    }
-    
-    
-    
-    /// Set multiple attributes on multiple nodes (bulk operation)
-    pub fn set_nodes_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>) -> Result<HashMap<AttrName, Vec<(NodeId, Option<AttrValue>)>>, GraphError> {
-        // TODO: ALGORITHM - Bulk columnar operations for maximum efficiency
-        // 1. let mut all_baseline_changes = HashMap::new();
-        // 2. for (attr_name, node_values) in attrs_values {
-        //        // For each attribute, do bulk columnar operation:
-        //        let column = self.node_attributes.entry(attr_name.clone()).or_insert_with(AttributeColumn::new);
-        //        let max_idx = node_values.iter().map(|(id, _)| id.0 as usize).max().unwrap_or(0);
-        //        if max_idx >= column.values.len() {
-        //            column.values.resize(max_idx + 1, AttrValue::default());
-        //            column.changed_mask.resize(max_idx + 1, false);
-        //        }
-        //        let mut baseline_changes = Vec::with_capacity(node_values.len());
-        //        for (node_id, new_value) in node_values {
-        //            let idx = node_id.0 as usize;
-        //            let baseline = if !column.changed_mask[idx] {
-        //                let baseline = column.values[idx].clone();
-        //                column.baseline_overrides.insert(idx, baseline.clone());
-        //                column.changed_mask[idx] = true;
-        //                Some(baseline)
-        //            } else {
-        //                column.baseline_overrides.get(&idx).cloned()
-        //            };
-        //            column.values[idx] = new_value;
-        //            baseline_changes.push((node_id, baseline));
-        //        }
-        //        all_baseline_changes.insert(attr_name, baseline_changes);
-        //    }
-        // 3. Ok(all_baseline_changes)
+    pub fn get_attrs_at_indices(&self, attr: &AttrName, indices: &[usize], is_node: bool) -> GraphResult<Vec<Option<AttrValue>>> {
+        let column_map = if is_node {
+            &self.node_attributes
+        } else {
+            &self.edge_attributes
+        };
         
-        // PERFORMANCE: O(total_changes) - each attribute gets bulk columnar treatment
-        // OPTIMIZATION: Single resize per attribute, batch baseline capture
-        todo!("Implement GraphPool::set_nodes_attrs")
+        if let Some(attr_column) = column_map.get(attr) {
+            let mut results = Vec::with_capacity(indices.len());
+            for &index in indices {
+                if index < attr_column.values.len() {
+                    results.push(Some(attr_column.values[index].clone()));
+                } else {
+                    results.push(None);
+                }
+            }
+            Ok(results)
+        } else {
+            Ok(vec![None; indices.len()])
+        }
     }
     
-    /// Set multiple attributes on multiple edges (bulk operation)
-    pub fn set_edges_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>) -> Result<HashMap<AttrName, Vec<(EdgeId, Option<AttrValue>)>>, GraphError> {
-        // TODO: ALGORITHM - Same as set_nodes_attrs but for edges
-        // 1. let mut all_baseline_changes = HashMap::new();
-        // 2. for (attr_name, edge_values) in attrs_values {
-        //        let column = self.edge_attributes.entry(attr_name.clone()).or_insert_with(AttributeColumn::new);
-        //        // Same bulk columnar logic as nodes but for edges
-        //        // ...
-        //    }
-        // 3. Ok(all_baseline_changes)
-        
-        // PERFORMANCE: O(total_changes) - bulk columnar operations for edges
-        todo!("Implement GraphPool::set_edges_attrs")
-    }
+    
+    
     
     /*
     === STATISTICS & INTROSPECTION ===

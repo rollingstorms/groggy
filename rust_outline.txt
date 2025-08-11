@@ -1,0 +1,1173 @@
+CODE STRUCTURE ANALYSIS
+Directory: ../groggy/src
+Generated: rust_outline.txt
+============================================================
+
+============================================================
+FILE: types.rs
+============================================================
+
+🔢 ENUM: AttrValue (line 43)
+   🏷️  #derive(Debug, Clone, PartialEq)
+
+🔧 IMPL: Hash for AttrValue (line 61)
+
+🔧 IMPL: AttrValue (line 66)
+   └── ⚙️  type_name() (line 68)
+       💬 Get runtime type information as string
+   └── ⚙️  as_float() (line 73)
+       💬 Try to convert to specific type with error handling
+   └── ⚙️  as_int() (line 77)
+   └── ⚙️  as_text() (line 81)
+   └── ⚙️  as_float_vec() (line 85)
+   └── ⚙️  as_bool() (line 89)
+
+============================================================
+FILE: util.rs
+============================================================
+
+⚙️  FUNCTION: content_hash() (line 51)
+   📝 Generate a 256-bit content hash for deduplication and verification ALGORITHM: 1. Use DefaultHasher to generate u64 hash of input data 2. Expand to 256-bit by repeating the 64-bit hash 3. This provides good distribution while being fast PERFORMANCE: O(size of data), very fast hashing COLLISION RESISTANCE: Good for practical purposes, not cryptographic
+
+⚙️  FUNCTION: attr_value_hash() (line 74)
+   📝 Fast hash function optimized specifically for attribute values OPTIMIZATION: This can be faster than generic hashing because we know the structure of AttrValue and can optimize accordingly
+
+⚙️  FUNCTION: merge_sorted_indices() (line 116)
+   📝 Merge two sorted vectors while maintaining order and removing duplicates ALGORITHM: 1. Two-pointer technique to merge in O(n + m) time 2. Skip duplicates during merge to ensure uniqueness 3. Pre-allocate result vector for efficiency PERFORMANCE: O(n + m) time, O(n + m) space USE CASES: Merging index lists, combining sorted query results
+
+⚙️  FUNCTION: binary_search_insert_point() (line 149)
+   📝 Find insertion point in sorted vector using binary search RETURNS: Index where value should be inserted to maintain sorted order If value already exists, returns the index of the existing element
+
+⚙️  FUNCTION: validate_attr_compatibility() (line 162)
+   📝 Check if two attribute values are type-compatible USAGE: Before updating an attribute, check if the new value is compatible with the existing type
+
+⚙️  FUNCTION: timestamp_now() (line 173)
+   📝 Generate a Unix timestamp for the current time PRECISION: Seconds since Unix epoch FALLBACK: Returns 0 if system time is unavailable
+
+⚙️  FUNCTION: test_merge_sorted_indices() (line 187)
+   🏷️  #test
+
+⚙️  FUNCTION: test_merge_with_duplicates() (line 195)
+   🏷️  #test
+
+============================================================
+FILE: config.rs
+============================================================
+
+🏗️  STRUCT: GraphConfig (line 47)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: ConfigError (line 395)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: GraphConfig (line 182)
+   └── ⚙️  new() (line 184)
+       💬 Create a new configuration with reasonable defaults
+   └── ⚙️  memory_optimized() (line 226)
+       💬 Create a configuration optimized for low memory usage USE CASE: Embedded systems, resource-constrained environments OPTIMIZATIONS: - Index-based deltas (minimal memory overhead) - Aggressive garbage collection - Minimal caching - High compression - Frequent snapshots to keep delta chains short
+   └── ⚙️  performance_optimized() (line 243)
+       💬 Create a configuration optimized for maximum performance USE CASE: High-performance computing, real-time applications OPTIMIZATIONS: - Index-based deltas (fastest commits) - Large memory buffers - Extensive caching - No compression - Parallel processing - Minimal garbage collection
+   └── ⚙️  development_optimized() (line 259)
+       💬 Create a configuration optimized for development/debugging USE CASE: Development, testing, debugging FEATURES: - Extensive validation - Debug logging - Crash recovery - Metrics collection - Conservative resource usage
+   └── ⚙️  production_optimized() (line 280)
+       💬 Create a configuration for production deployment USE CASE: Production systems, stable deployments FEATURES: - Index-based deltas (proven and stable) - Balanced performance and reliability - Automatic backup and recovery - Moderate resource usage - Error handling without debug overhead
+   └── ⚙️  validate() (line 293)
+       💬 Validate the configuration and return errors if invalid
+   └── ⚙️  effective_worker_threads() (line 306)
+       💬 Get the effective number of worker threads (resolves 0 to actual CPU count)
+   └── ⚙️  memory_cleanup_threshold() (line 316)
+       💬 Calculate the memory threshold for triggering cleanup
+   └── ⚙️  with_memory_limit() (line 327)
+       💬 Create a new configuration with updated memory limit
+   └── ⚙️  with_cache_settings() (line 332)
+       💬 Create a new configuration with updated cache settings
+   └── ⚙️  with_worker_threads() (line 337)
+       💬 Create a new configuration with updated worker thread count
+   └── ⚙️  with_storage_strategy() (line 342)
+       💬 Create a new configuration with specific temporal storage strategy
+   └── ⚙️  from_environment() (line 359)
+       💬 Load configuration overrides from environment variables SUPPORTED VARIABLES: - GROGGY_MAX_MEMORY: Maximum memory usage in bytes - GROGGY_WORKER_THREADS: Number of worker threads - GROGGY_ENABLE_DEBUG: Enable debug logging (true/false) - GROGGY_COMPRESSION_LEVEL: Compression level (1-9)
+   └── ⚙️  to_environment() (line 381)
+       💬 Save current configuration to environment variables
+
+🔧 IMPL: Default for GraphConfig (line 387)
+   └── ⚙️  default() (line 388)
+
+⚙️  FUNCTION: fmt() (line 413)
+
+============================================================
+FILE: lib.rs
+============================================================
+
+🏗️  STRUCT: LibraryInfo (line 173)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: LibraryInfo (line 179)
+   └── ⚙️  banner() (line 181)
+       💬 Get a formatted string representation
+
+⚙️  FUNCTION: info() (line 163)
+   📝 Get library information
+
+⚙️  FUNCTION: test_library_info() (line 191)
+   🏷️  #test
+
+⚙️  FUNCTION: test_basic_integration() (line 199)
+   🏷️  #test
+
+⚙️  FUNCTION: test_error_handling() (line 251)
+   🏷️  #test
+
+⚙️  FUNCTION: test_configuration() (line 266)
+   🏷️  #test
+
+============================================================
+FILE: errors.rs
+============================================================
+
+🔢 ENUM: GraphError (line 35)
+   🏷️  #derive(Debug, Clone, PartialEq)
+
+🔢 ENUM: ErrorCategory (line 546)
+   🏷️  #derive(Debug, Clone, PartialEq, Eq)
+
+🔢 ENUM: EntityType (line 561)
+   🏷️  #derive(Debug, Clone, PartialEq, Eq)
+
+🔧 IMPL: GraphError (line 302)
+   └── ⚙️  node_not_found() (line 309)
+       💬 Create a NodeNotFound error with helpful context
+   └── ⚙️  edge_not_found() (line 318)
+       💬 Create an EdgeNotFound error with helpful context
+   └── ⚙️  state_not_found() (line 327)
+       💬 Create a StateNotFound error with available alternatives
+   └── ⚙️  branch_not_found() (line 336)
+       💬 Create a BranchNotFound error with available alternatives
+   └── ⚙️  uncommitted_changes() (line 345)
+       💬 Create an UncommittedChanges error with helpful context
+   └── ⚙️  attribute_not_found() (line 354)
+       💬 Create an AttributeNotFound error with available alternatives
+   └── ⚙️  internal() (line 369)
+       💬 Create an InternalError for unexpected conditions
+   └── ⚙️  internal_with_context() (line 378)
+       💬 Create an InternalError with additional context
+   └── ⚙️  is_user_error() (line 396)
+       💬 Check if this error indicates a user mistake (vs system problem)
+   └── ⚙️  is_recoverable() (line 428)
+       💬 Check if this error might be recoverable
+   └── ⚙️  category() (line 449)
+       💬 Get the error category for grouping similar errors
+   └── ⚙️  short_description() (line 493)
+       💬 Get a short description suitable for logging
+   └── ⚙️  suggestions() (line 509)
+       💬 Get actionable suggestions for resolving this error
+
+⚙️  FUNCTION: fmt() (line 570)
+
+⚙️  FUNCTION: source() (line 655)
+
+⚙️  FUNCTION: io_error_to_graph_error() (line 666)
+   📝 Convert a standard I/O error to a GraphError
+
+============================================================
+FILE: core/strategies.rs
+============================================================
+
+🏗️  STRUCT: IndexDeltaStrategy (line 215)
+   🏷️  #derive(Debug)
+
+🔢 ENUM: StorageStrategyType (line 144)
+   🏷️  #derive(Debug, Clone, Copy, PartialEq, Eq)
+
+🎭 TRAIT: TemporalStorageStrategy (line 38)
+   📝 Core trait for temporal storage strategies DESIGN: Each strategy implements a different approach to storing and reconstructing temporal graph states. The trait provides a common interface that ChangeTracker and History systems can work with regardless of the underlying storage strategy.
+
+🔧 IMPL: StorageStrategyType (line 160)
+   └── ⚙️  name() (line 162)
+       💬 Get a human-readable name for this strategy
+   └── ⚙️  description() (line 169)
+       💬 Get a description of this strategy
+
+🔧 IMPL: Default for StorageStrategyType (line 177)
+   └── ⚙️  default() (line 178)
+
+🔧 IMPL: IndexDeltaStrategy (line 245)
+   └── ⚙️  new() (line 247)
+       💬 Create a new empty index delta strategy
+   └── ⚙️  record_node_attr_index_change() (line 262)
+       💬 Record node attribute change with indices (strategy-specific API) This is the index-specific version that stores column indices
+   └── ⚙️  record_edge_attr_index_change() (line 283)
+       💬 Record edge attribute change with indices (strategy-specific API)
+   └── ⚙️  update_change_metadata() (line 302)
+       💬 Helper method to update change metadata
+   └── ⚙️  current_timestamp() (line 310)
+       💬 Get current timestamp (placeholder - would use actual time in real implementation)
+
+🔧 IMPL: TemporalStorageStrategy for IndexDeltaStrategy (line 315)
+   └── ⚙️  record_node_addition() (line 316)
+   └── ⚙️  record_node_removal() (line 321)
+   └── ⚙️  record_edge_addition() (line 328)
+   └── ⚙️  record_edge_removal() (line 333)
+   └── ⚙️  record_node_attr_change() (line 340)
+   └── ⚙️  record_edge_attr_change() (line 351)
+   └── ⚙️  create_delta() (line 362)
+   └── ⚙️  has_changes() (line 393)
+   └── ⚙️  change_count() (line 402)
+   └── ⚙️  clear_changes() (line 406)
+   └── ⚙️  strategy_name() (line 417)
+   └── ⚙️  storage_characteristics() (line 421)
+   └── ⚙️  as_any() (line 433)
+
+🔧 IMPL: Default for IndexDeltaStrategy (line 438)
+   └── ⚙️  default() (line 439)
+
+⚙️  FUNCTION: record_node_addition() (line 45)
+   📝 Record that a node was added to the graph
+
+⚙️  FUNCTION: record_node_removal() (line 48)
+   📝 Record that a node was removed from the graph
+
+⚙️  FUNCTION: record_edge_addition() (line 51)
+   📝 Record that an edge was added to the graph
+
+⚙️  FUNCTION: record_edge_removal() (line 54)
+   📝 Record that an edge was removed from the graph
+
+⚙️  FUNCTION: record_node_attr_change() (line 58)
+   📝 Record that a node attribute changed (index-based) All strategies now work with indices for consistency and efficiency
+
+⚙️  FUNCTION: record_edge_attr_change() (line 67)
+   📝 Record that an edge attribute changed (index-based)
+
+⚙️  FUNCTION: create_delta() (line 82)
+   📝 Create a delta object representing all current changes This is used when committing to history
+
+⚙️  FUNCTION: has_changes() (line 90)
+   📝 Check if there are any uncommitted changes
+
+⚙️  FUNCTION: change_count() (line 93)
+   📝 Get the total number of changes recorded
+
+⚙️  FUNCTION: clear_changes() (line 96)
+   📝 Clear all recorded changes (after successful commit)
+
+⚙️  FUNCTION: strategy_name() (line 104)
+   📝 Get the name of this strategy
+
+⚙️  FUNCTION: create_strategy() (line 187)
+   📝 Factory function to create a strategy instance DESIGN: This factory pattern allows the system to create strategy instances based on configuration without tight coupling to specific implementations.
+
+============================================================
+FILE: core/query.rs
+============================================================
+
+🏗️  STRUCT: QueryEngine (line 49)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: QueryConfig (line 308)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: DegreeFilter (line 431)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: NodePattern (line 439)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: NeighborPattern (line 452)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: StructureMatch (line 510)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: GraphQuery (line 523)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: AggregateOperation (line 569)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: OrderBy (line 625)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: GroupBy (line 638)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: AggregationResult (line 675)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: AggregationMetadata (line 692)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: DegreeDistribution (line 710)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: CachedQueryResult (line 724)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: AttributeStatistics (line 733)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: QueryPerformance (line 744)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: CacheStatistics (line 753)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: QueryPlan (line 770)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: AttributeFilter (line 333)
+   🏷️  #derive(Debug, Clone, PartialEq)
+
+🔢 ENUM: SimilarityType (line 385)
+   🏷️  #derive(Debug, Clone, PartialEq)
+
+🔢 ENUM: NodeFilter (line 394)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: EdgeFilter (line 414)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: PatternLogic (line 468)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: StructuralPattern (line 477)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: QueryOperation (line 539)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: CountTarget (line 561)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: AggregateTarget (line 577)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: AggregationType (line 584)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: AnalyticsOperation (line 597)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: CentralityType (line 608)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: CommunityAlgorithm (line 617)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: SortDirection (line 631)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: QueryResult (line 650)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: AggregationValue (line 683)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: AnalyticsResult (line 700)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: EntityType (line 763)
+   🏷️  #derive(Debug, Clone, PartialEq)
+
+🔢 ENUM: PlanOperation (line 777)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: QueryEngine (line 78)
+   └── ⚙️  new() (line 80)
+       💬 Create a new query engine with default configuration
+   └── ⚙️  with_config() (line 86)
+       💬 Create a query engine with custom configuration
+   └── ⚙️  find_nodes_by_attribute() (line 98)
+       💬 Find all nodes matching a simple attribute filter PERFORMANCE: O(n) where n = number of nodes, but can be optimized with indices
+   └── ⚙️  find_edges_by_attribute() (line 114)
+       💬 Find all edges matching a simple attribute filter
+   └── ⚙️  find_nodes_by_attributes() (line 124)
+       💬 Find nodes matching multiple attribute criteria (AND logic)
+   └── ⚙️  find_edges_by_attributes() (line 136)
+       💬 Find edges matching multiple attribute criteria (AND logic)
+   └── ⚙️  execute_query() (line 150)
+       💬 Execute a complex query with multiple steps and logic
+   └── ⚙️  find_nodes_by_pattern() (line 166)
+       💬 Find nodes matching a complex pattern For example: "nodes with attribute X > 5 AND connected to nodes with attribute Y = 'foo'"
+   └── ⚙️  find_structural_patterns() (line 179)
+       💬 Find structural patterns in the graph For example: "triangles where all nodes have attribute 'type' = 'person'"
+   └── ⚙️  aggregate_node_attribute() (line 193)
+       💬 Compute aggregate statistics for a node attribute
+   └── ⚙️  aggregate_edge_attribute() (line 207)
+       💬 Compute aggregate statistics for an edge attribute
+   └── ⚙️  group_nodes_by_attribute() (line 217)
+       💬 Group nodes by attribute value and compute aggregates for each group
+   └── ⚙️  update_statistics() (line 238)
+       💬 Update statistics about attribute distributions This is used for query optimization
+   └── ⚙️  clear_cache() (line 246)
+       💬 Clear the query cache (useful after large data changes)
+   └── ⚙️  cache_statistics() (line 251)
+       💬 Get cache statistics
+   └── ⚙️  optimize_query_plan() (line 256)
+       💬 Optimize a query plan before execution
+   └── ⚙️  count_nodes_matching() (line 270)
+       💬 Count entities matching a filter (more efficient than finding all matches)
+   └── ⚙️  any_nodes_match() (line 279)
+       💬 Check if any entities match a filter (even more efficient than counting)
+   └── ⚙️  get_unique_attribute_values() (line 288)
+       💬 Get unique values for an attribute across all entities
+
+🔧 IMPL: Default for QueryConfig (line 325)
+   └── ⚙️  default() (line 326)
+
+🔧 IMPL: AttributeFilter (line 371)
+   └── ⚙️  matches() (line 373)
+       💬 Check if a value matches this filter
+   └── ⚙️  estimated_selectivity() (line 378)
+       💬 Estimate the selectivity of this filter (0.0 = very selective, 1.0 = not selective)
+
+🔧 IMPL: Default for QueryEngine (line 784)
+   └── ⚙️  default() (line 785)
+
+============================================================
+FILE: core/history.rs
+============================================================
+
+🏗️  STRUCT: HistoryForest (line 49)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: Commit (line 319)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: Delta (line 371)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: CommitDiff (line 415)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: AttributeChange (line 427)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: HistoryStatistics (line 443)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: ViewSummary (line 853)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: EntityType (line 436)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: HistoryForest (line 94)
+   └── ⚙️  new() (line 96)
+       💬 Create a new empty history system
+   └── ⚙️  create_commit() (line 116)
+       💬 Create a new commit from a set of changes ALGORITHM: 1. Create Delta from the changes 2. Compute content hash of delta for deduplication 3. Check if we already have this exact delta (hash collision -> reuse) 4. Create Commit with metadata (parent, message, author, timestamp) 5. Update parent-child relationships 6. Store everything and return new state ID
+   └── ⚙️  create_merge_commit() (line 136)
+       💬 Create a merge commit (commit with multiple parents)
+   └── ⚙️  create_branch() (line 153)
+       💬 Create a new branch pointing to a specific commit
+   └── ⚙️  delete_branch() (line 161)
+       💬 Delete a branch (but not the commits it pointed to)
+   └── ⚙️  update_branch_head() (line 169)
+       💬 Update a branch to point to a different commit (e.g., after new commit)
+   └── ⚙️  list_branches() (line 176)
+       💬 List all branches with their head commits
+   └── ⚙️  get_branch_head() (line 181)
+       💬 Get the head commit of a branch
+   └── ⚙️  get_commit() (line 191)
+       💬 Get a specific commit by ID
+   └── ⚙️  get_commit_history() (line 196)
+       💬 Get all commits in chronological order
+   └── ⚙️  get_branch_history() (line 201)
+       💬 Get the commit history for a specific branch (following parent chain)
+   └── ⚙️  get_children() (line 209)
+       💬 Get all children of a commit
+   └── ⚙️  get_parents() (line 214)
+       💬 Get the parent(s) of a commit
+   └── ⚙️  is_ancestor() (line 219)
+       💬 Check if one commit is an ancestor of another
+   └── ⚙️  find_common_ancestor() (line 224)
+       💬 Find the lowest common ancestor of two commits (useful for merging)
+   └── ⚙️  diff_commits() (line 234)
+       💬 Compute the changes between two commits
+   └── ⚙️  get_commit_delta() (line 243)
+       💬 Get the delta (direct changes) introduced by a specific commit
+   └── ⚙️  reconstruct_state_at() (line 254)
+       💬 Reconstruct the complete graph state at a specific commit This is expensive but necessary for time-travel functionality
+   └── ⚙️  get_delta_sequence() (line 263)
+       💬 Get the sequence of deltas needed to go from one commit to another
+   └── ⚙️  find_reachable_commits() (line 273)
+       💬 Find all commits reachable from branches and tags
+   └── ⚙️  garbage_collect() (line 281)
+       💬 Remove unreachable commits and their deltas
+   └── ⚙️  statistics() (line 296)
+       💬 Get statistics about the history system
+   └── ⚙️  list_all_commits() (line 301)
+       💬 List all commit IDs in the system
+   └── ⚙️  has_commit() (line 306)
+       💬 Check if a commit exists
+
+🔧 IMPL: Commit (line 342)
+   └── ⚙️  new() (line 344)
+       💬 Create a new commit
+   └── ⚙️  is_root() (line 357)
+       💬 Check if this is a root commit (no parents)
+   └── ⚙️  is_merge() (line 362)
+       💬 Check if this is a merge commit (multiple parents)
+
+🔧 IMPL: Delta (line 394)
+   └── ⚙️  from_changes() (line 396)
+       💬 Create a delta from a change set
+   └── ⚙️  is_empty() (line 402)
+       💬 Check if this delta is empty (no changes)
+   └── ⚙️  summary() (line 407)
+       💬 Get a summary of what changed
+
+🔧 IMPL: Default for HistoryForest (line 453)
+   └── ⚙️  default() (line 454)
+
+🔧 IMPL: ViewSummary (line 864)
+   └── ⚙️  description() (line 866)
+       💬 Get a human-readable description of this view
+   └── ⚙️  age_seconds() (line 877)
+       💬 Get the age of this state in seconds
+
+============================================================
+FILE: core/state.rs
+============================================================
+
+🏗️  STRUCT: StateObject (line 23)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: StateMetadata (line 34)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: GraphSnapshot (line 228)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: StateDiff (line 428)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: AttributeChange (line 481)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: SnapshotStatistics (line 497)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: DiffSummary (line 507)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: EntityType (line 490)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: StateObject (line 49)
+   └── ⚙️  new() (line 51)
+       💬 Create a new state object
+   └── ⚙️  new_root() (line 75)
+       💬 Create a root state (no parent)
+   └── ⚙️  parent() (line 80)
+       💬 Get the parent state ID
+   └── ⚙️  delta() (line 85)
+       💬 Get the delta object
+   └── ⚙️  metadata() (line 90)
+       💬 Get the metadata
+   └── ⚙️  is_root() (line 95)
+       💬 Check if this is a root state (no parent)
+   └── ⚙️  content_hash() (line 100)
+       💬 Get the content hash
+   └── ⚙️  timestamp() (line 105)
+       💬 Get the timestamp
+   └── ⚙️  author() (line 110)
+       💬 Get the author
+   └── ⚙️  label() (line 115)
+       💬 Get the label
+   └── ⚙️  message() (line 120)
+       💬 Get the commit message
+   └── ⚙️  tags() (line 125)
+       💬 Get tags
+   └── ⚙️  add_tag() (line 130)
+       💬 Add a tag to this state's metadata
+   └── ⚙️  remove_tag() (line 138)
+       💬 Remove a tag from this state's metadata
+   └── ⚙️  has_tag() (line 145)
+       💬 Check if this state has a specific tag
+   └── ⚙️  set_label() (line 150)
+       💬 Update the label
+   └── ⚙️  set_message() (line 157)
+       💬 Update the message
+   └── ⚙️  delta_size() (line 164)
+       💬 Get the size of this state's delta in terms of change count
+   └── ⚙️  is_empty_delta() (line 169)
+       💬 Check if this state represents an empty delta
+
+🔧 IMPL: StateMetadata (line 174)
+   └── ⚙️  new() (line 176)
+       💬 Create new metadata
+   └── ⚙️  with_message() (line 188)
+       💬 Create metadata with a message
+   └── ⚙️  timestamp_string() (line 200)
+       💬 Get a human-readable timestamp
+   └── ⚙️  short_hash() (line 207)
+       💬 Get a short hash representation
+
+🔧 IMPL: GraphSnapshot (line 249)
+   └── ⚙️  empty() (line 251)
+       💬 Create an empty snapshot for the given state
+   └── ⚙️  apply_delta() (line 274)
+       💬 Apply a delta to this snapshot to create a new snapshot ALGORITHM: 1. Start with a copy of this snapshot 2. Apply node additions/removals from delta 3. Apply edge additions/removals from delta 4. Apply attribute changes from delta 5. Update state_id to target state 6. Return the new snapshot PERFORMANCE: O(changes in delta + size of current snapshot for cloning)
+   └── ⚙️  reconstruct_from_deltas() (line 314)
+       💬 Create a snapshot by applying a sequence of deltas ALGORITHM: 1. Start with base snapshot (or empty) 2. Apply each delta in sequence 3. Return final snapshot USAGE: This is the main reconstruction function used by HistoryForest
+   └── ⚙️  diff_with() (line 338)
+       💬 Compare this snapshot with another to produce a diff ALGORITHM: 1. Compare active nodes (added/removed) 2. Compare edges (added/removed) 3. Compare all attributes (changed values) 4. Return structured diff
+   └── ⚙️  statistics() (line 363)
+       💬 Get basic statistics about this snapshot
+   └── ⚙️  estimate_memory_usage() (line 378)
+       💬 Estimate memory usage of this snapshot in bytes
+   └── ⚙️  contains_node() (line 385)
+       💬 Check if a node exists in this snapshot
+   └── ⚙️  contains_edge() (line 391)
+       💬 Check if an edge exists in this snapshot
+   └── ⚙️  get_neighbors() (line 397)
+       💬 Get all neighbors of a node in this snapshot
+
+🔧 IMPL: StateDiff (line 438)
+   └── ⚙️  empty() (line 440)
+       💬 Create an empty diff between two states
+   └── ⚙️  is_empty() (line 455)
+       💬 Check if this diff represents any changes
+   └── ⚙️  summary() (line 466)
+       💬 Get a summary of the changes in this diff
+
+⚙️  FUNCTION: merge_snapshots() (line 526)
+   📝 Merge two snapshots (for branch merging) ALGORITHM: 1. Union of active nodes and edges 2. Merge attributes (conflict resolution needed) 3. Create new snapshot with merged state
+
+⚙️  FUNCTION: validate_snapshot() (line 543)
+   📝 Validate that a snapshot is internally consistent CHECKS: 1. All edges reference active nodes 2. All attribute maps reference active entities 3. No duplicate IDs
+
+⚙️  FUNCTION: test_state_object_creation() (line 565)
+   🏷️  #test
+
+⚙️  FUNCTION: test_state_tags() (line 580)
+   🏷️  #test
+
+============================================================
+FILE: core/space.rs
+============================================================
+
+🏗️  STRUCT: GraphSpace (line 63)
+   🏷️  #derive(Debug)
+
+🔧 IMPL: GraphSpace (line 104)
+   └── ⚙️  new() (line 106)
+       💬 Create a new empty graph space
+   └── ⚙️  activate_node() (line 123)
+       💬 Add a node to the active set (called by Graph.add_node())
+   └── ⚙️  deactivate_node() (line 129)
+       💬 Remove a node from the active set (called by Graph.remove_node())
+   └── ⚙️  activate_edge() (line 137)
+       💬 Add an edge to the active set (called by Graph.add_edge())
+   └── ⚙️  deactivate_edge() (line 143)
+       💬 Remove an edge from the active set (called by Graph.remove_edge())
+   └── ⚙️  set_node_attr_index() (line 157)
+       💬 Update the current attribute index for a node (called by Graph after Pool storage)
+   └── ⚙️  set_edge_attr_index() (line 165)
+       💬 Update the current attribute index for an edge (called by Graph after Pool storage)
+   └── ⚙️  get_node_attr_index() (line 173)
+       💬 Get current attribute index for a node (used by Graph for change tracking)
+   └── ⚙️  get_edge_attr_index() (line 181)
+       💬 Get current attribute index for an edge (used by Graph for change tracking)
+   └── ⚙️  node_count() (line 194)
+       💬 Get the number of active nodes
+   └── ⚙️  edge_count() (line 199)
+       💬 Get the number of active edges
+   └── ⚙️  contains_node() (line 204)
+       💬 Check if a node is currently active
+   └── ⚙️  contains_edge() (line 209)
+       💬 Check if an edge is currently active
+   └── ⚙️  get_active_nodes() (line 214)
+       💬 Get all active node IDs (for iteration)
+   └── ⚙️  get_active_edges() (line 219)
+       💬 Get all active edge IDs (for iteration)
+   └── ⚙️  node_ids() (line 229)
+       💬 Get all active node IDs as a vector
+   └── ⚙️  edge_ids() (line 235)
+       💬 Get all active edge IDs as a vector
+   └── ⚙️  has_uncommitted_changes() (line 249)
+       💬 Check if there are uncommitted changes
+   └── ⚙️  uncommitted_change_count() (line 255)
+       💬 Get the number of uncommitted changes
+   └── ⚙️  change_summary() (line 261)
+       💬 Get summary of uncommitted changes
+   └── ⚙️  get_base_state() (line 267)
+       💬 Get the base state this workspace is built on
+   └── ⚙️  create_change_delta() (line 274)
+       💬 Create a delta object representing current changes USAGE: Called when committing changes to history
+   └── ⚙️  reset_hard() (line 285)
+       💬 Clear all uncommitted changes (reset to base state) WARNING: This loses all work since the last commit
+
+============================================================
+FILE: core/change_tracker.rs
+============================================================
+
+🏗️  STRUCT: ChangeTracker (line 45)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: ChangeSummary (line 354)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: MergeConflict (line 408)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: ChangeStatistics (line 433)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: ChangeSet (line 446)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: ReverseOperation (line 379)
+   🏷️  #derive(Debug, Clone)
+
+🔢 ENUM: ConflictType (line 417)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: ChangeTracker (line 53)
+   └── ⚙️  new() (line 55)
+       💬 Create a new change tracker with default strategy (IndexDeltas)
+   └── ⚙️  with_strategy() (line 60)
+       💬 Create a new change tracker with specific strategy
+   └── ⚙️  with_custom_strategy() (line 67)
+       💬 Create a change tracker with a custom strategy instance
+   └── ⚙️  record_node_addition() (line 82)
+       💬 Record that a new node was added
+   └── ⚙️  record_node_removal() (line 87)
+       💬 Record that a node was removed
+   └── ⚙️  record_edge_addition() (line 92)
+       💬 Record that a new edge was added
+   └── ⚙️  record_edge_removal() (line 97)
+       💬 Record that an edge was removed
+   └── ⚙️  record_node_attr_changes() (line 103)
+       💬 Record node attribute changes (index-based, efficient bulk recording) This is the main API - all attribute changes are recorded as indices
+   └── ⚙️  record_node_attr_change() (line 117)
+       💬 Record single node attribute change (convenience wrapper)
+   └── ⚙️  record_edge_attr_changes() (line 129)
+       💬 Record edge attribute changes (index-based, efficient bulk recording) This is the main API - all attribute changes are recorded as indices
+   └── ⚙️  record_edge_attr_change() (line 143)
+       💬 Record single edge attribute change (convenience wrapper)
+   └── ⚙️  record_node_additions() (line 162)
+       💬 Record multiple node additions efficiently
+   └── ⚙️  has_changes() (line 181)
+       💬 Check if there are any uncommitted changes
+   └── ⚙️  change_count() (line 186)
+       💬 Get the total number of changes recorded
+   └── ⚙️  get_modified_nodes() (line 193)
+       💬 Get all nodes that have been modified (added, removed, or attrs changed)
+   └── ⚙️  get_modified_edges() (line 201)
+       💬 Get all edges that have been modified
+   └── ⚙️  is_node_modified() (line 206)
+       💬 Check if a specific node has been modified
+   └── ⚙️  is_edge_modified() (line 213)
+       💬 Check if a specific edge has been modified
+   └── ⚙️  create_delta() (line 228)
+       💬 Create a delta object representing all current changes This is used when committing to history
+   └── ⚙️  create_change_set() (line 233)
+       💬 Create a change set that can be passed to HistoryForest
+   └── ⚙️  clear() (line 248)
+       💬 Clear all recorded changes (rollback to last commit state)
+   └── ⚙️  strategy_name() (line 257)
+       💬 Get the name of the current strategy
+   └── ⚙️  storage_characteristics() (line 262)
+       💬 Get the storage characteristics of the current strategy
+   └── ⚙️  change_summary() (line 267)
+       💬 Get a summary of what has changed (compatibility method)
+   └── ⚙️  generate_reverse_operations() (line 284)
+       💬 Generate the reverse operations needed to undo all changes This is useful for implementing rollback functionality
+   └── ⚙️  merge() (line 299)
+       💬 Merge changes from another change tracker This is complex because changes might conflict
+   └── ⚙️  would_conflict_with() (line 308)
+       💬 Check if merging with another change tracker would cause conflicts
+   └── ⚙️  optimize() (line 320)
+       💬 Optimize the change log by removing redundant entries For example, if a node attribute is changed multiple times, we only need to track the final change
+   └── ⚙️  memory_usage() (line 328)
+       💬 Estimate the memory usage of the change tracker
+   └── ⚙️  statistics() (line 338)
+       💬 Get statistics about the changes
+   └── ⚙️  time_since_first_change() (line 343)
+       💬 Get the time elapsed since the first change
+
+🔧 IMPL: ChangeSummary (line 365)
+   └── ⚙️  is_empty() (line 367)
+       💬 Check if any changes have been made
+   └── ⚙️  description() (line 372)
+       💬 Get a human-readable description of the changes
+
+🔧 IMPL: ReverseOperation (line 399)
+   └── ⚙️  execute() (line 401)
+       💬 Execute this reverse operation on a graph pool
+
+🔧 IMPL: ChangeSet (line 462)
+   └── ⚙️  is_empty() (line 464)
+       💬 Check if this change set is empty
+   └── ⚙️  change_count() (line 469)
+       💬 Get the total number of changes in this set
+
+🔧 IMPL: Default for ChangeTracker (line 474)
+   └── ⚙️  default() (line 475)
+
+============================================================
+FILE: core/pool.rs
+============================================================
+
+🏗️  STRUCT: GraphPool (line 59)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: AttributeColumn (line 339)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: PoolStatistics (line 400)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: GraphPool (line 95)
+   └── ⚙️  new() (line 97)
+       💬 Create new empty graph store
+   └── ⚙️  commit_baseline() (line 109)
+       💬 Commit changes (no-op for append-only storage) In append-only storage, committing just means the current indices become the new baseline
+   └── ⚙️  get_node_attr_by_index() (line 118)
+       💬 Get attribute value by index (for Space to resolve indices)
+   └── ⚙️  get_edge_attr_by_index() (line 129)
+       💬 Get edge attribute value by index (for Space to resolve indices)
+   └── ⚙️  add_node() (line 146)
+       💬 Create a new node and return its ID DESIGN: Pool creates the node, Space tracks it as active
+   └── ⚙️  add_edge() (line 154)
+       💬 Create a new edge between two nodes DESIGN: Pool creates and stores the edge, Space tracks it as active
+   └── ⚙️  get_edge_endpoints() (line 162)
+       💬 Get the endpoints of an edge from storage
+   └── ⚙️  set_node_attr() (line 174)
+       💬 Set single node attribute value (appends to column and returns index) DESIGN: Space will manage the node->index mapping, Pool just stores values
+   └── ⚙️  set_node_attrs() (line 184)
+       💬 Set multiple attributes on single node (appends to columns and returns indices)
+   └── ⚙️  set_nodes_attr() (line 197)
+       💬 Set same attribute for multiple nodes (appends to column and returns indices)
+   └── ⚙️  set_edge_attr() (line 207)
+       💬 Set single edge attribute value (appends to column and returns index)
+   └── ⚙️  get_node_attr_column() (line 236)
+       💬 Get full attribute column for nodes (internal use only) INTERNAL: This exposes the full column - Graph coordinator handles filtering PERFORMANCE: Direct access to columnar data for maximum efficiency RETURNS: Reference to the entire attribute vector
+   └── ⚙️  get_edge_attr_column() (line 244)
+       💬 Get full attribute column for edges (internal use only) INTERNAL: This exposes the full column - Graph coordinator handles filtering
+   └── ⚙️  get_node_attrs_at_indices() (line 253)
+       💬 Get attribute values for specific indices (internal bulk operation) INTERNAL: Used by Graph when it has already determined which indices to access PERFORMANCE: More efficient than individual lookups for known valid indices
+   └── ⚙️  get_edge_attrs_at_indices() (line 272)
+       💬 Get attribute values for specific edge indices (internal)
+   └── ⚙️  set_nodes_attrs() (line 281)
+       💬 Set multiple attributes on multiple nodes (bulk operation) Returns the new indices for change tracking
+   └── ⚙️  set_edges_attrs() (line 302)
+       💬 Set multiple attributes on multiple edges (bulk operation) Returns the new indices for change tracking
+   └── ⚙️  statistics() (line 326)
+       💬 Get basic statistics about the graph
+   └── ⚙️  attribute_names() (line 332)
+       💬 List all attribute names currently in use
+
+🔧 IMPL: AttributeColumn (line 351)
+   └── ⚙️  new() (line 353)
+       💬 Create new empty attribute column
+   └── ⚙️  append_value() (line 362)
+       💬 Append a new value and return its index
+   └── ⚙️  get_value() (line 371)
+       💬 Get value at specific index
+   └── ⚙️  increment_ref() (line 376)
+       💬 Increment reference count for an index
+   └── ⚙️  decrement_ref() (line 381)
+       💬 Decrement reference count for an index
+   └── ⚙️  get_unreferenced_indices() (line 388)
+       💬 Get all indices with zero references (for garbage collection)
+
+🔧 IMPL: Default for GraphPool (line 408)
+   └── ⚙️  default() (line 409)
+
+============================================================
+FILE: core/delta.rs
+============================================================
+
+🏗️  STRUCT: ColumnIndexDelta (line 39)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: ColumnDelta (line 107)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: DeltaObject (line 187)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: ColumnIndexDelta (line 48)
+   └── ⚙️  new() (line 50)
+       💬 Create a new empty index delta
+   └── ⚙️  add_index_change() (line 59)
+       💬 Add an index change at the specified entity index
+   └── ⚙️  get_change() (line 75)
+       💬 Get the change at a specific entity index
+   └── ⚙️  has_change() (line 82)
+       💬 Check if this delta has changes at the given entity index
+   └── ⚙️  len() (line 87)
+       💬 Get the number of changes in this delta
+   └── ⚙️  is_empty() (line 92)
+       💬 Check if this delta is empty
+
+🔧 IMPL: Hash for ColumnIndexDelta (line 97)
+   └── ⚙️  hash() (line 98)
+
+🔧 IMPL: ColumnDelta (line 114)
+   └── ⚙️  new() (line 116)
+       💬 Create a new empty column delta
+   └── ⚙️  with_capacity() (line 124)
+       💬 Create a column delta with initial capacity
+   └── ⚙️  add_change() (line 132)
+       💬 Add a change at the specified index
+   └── ⚙️  get() (line 147)
+       💬 Get the value at a specific index, if it exists
+   └── ⚙️  has_change() (line 154)
+       💬 Check if this delta has changes at the given index
+   └── ⚙️  len() (line 159)
+       💬 Get the number of changes in this delta
+   └── ⚙️  is_empty() (line 164)
+       💬 Check if this delta is empty
+   └── ⚙️  merge() (line 169)
+       💬 Merge another column delta into this one
+
+🔧 IMPL: Hash for ColumnDelta (line 176)
+   └── ⚙️  hash() (line 177)
+
+🔧 IMPL: DeltaObject (line 200)
+   └── ⚙️  new() (line 202)
+       💬 Create a new delta object
+   └── ⚙️  new_with_indices() (line 251)
+       💬 Create a new index-based delta object (placeholder for future full implementation) Currently adapts to existing value-based structure
+   └── ⚙️  empty() (line 274)
+       💬 Create an empty delta object
+   └── ⚙️  is_empty() (line 284)
+       💬 Check if this delta is empty (no changes)
+   └── ⚙️  change_count() (line 292)
+       💬 Get the total number of changes in this delta
+
+🔧 IMPL: Hash for DeltaObject (line 300)
+   └── ⚙️  hash() (line 301)
+
+🔧 IMPL: PartialEq for DeltaObject (line 306)
+   └── ⚙️  eq() (line 307)
+
+🔧 IMPL: Eq for DeltaObject (line 312)
+
+⚙️  FUNCTION: test_column_delta_basic_operations() (line 319)
+   🏷️  #test
+
+⚙️  FUNCTION: test_column_delta_maintains_order() (line 334)
+   🏷️  #test
+
+============================================================
+FILE: core/ref_manager.rs
+============================================================
+
+🏗️  STRUCT: Branch (line 48)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: RefManager (line 140)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: BranchInfo (line 548)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: TagInfo (line 584)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: RefStatistics (line 591)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: Branch (line 70)
+   └── ⚙️  new() (line 72)
+       💬 Create a new branch pointing to a specific state
+   └── ⚙️  with_description() (line 85)
+       💬 Create a branch with a description
+   └── ⚙️  update_head() (line 105)
+       💬 Update the head of this branch to a new state USAGE: Called when new commits are made on this branch
+   └── ⚙️  set_description() (line 111)
+       💬 Set or update the description
+   └── ⚙️  is_older_than_days() (line 117)
+       💬 Check if this branch is older than a certain number of days
+
+🔧 IMPL: RefManager (line 167)
+   └── ⚙️  new() (line 169)
+       💬 Create a new reference manager with a default branch
+   └── ⚙️  with_default_branch() (line 192)
+       💬 Create a new reference manager with a custom default branch name
+   └── ⚙️  create_branch() (line 208)
+       💬 Create a new branch pointing to a specific state ALGORITHM: 1. Check that branch name doesn't already exist 2. Validate that the target state exists (optional check) 3. Create Branch object with metadata 4. Add to branches map
+   └── ⚙️  checkout_branch() (line 240)
+       💬 Switch to a different branch (checkout) ALGORITHM: 1. Verify the target branch exists 2. Update current_branch pointer 3. Return the state ID that should be loaded
+   └── ⚙️  delete_branch() (line 261)
+       💬 Delete a branch RESTRICTIONS: - Cannot delete the default branch - Cannot delete the currently checked out branch - Branch must exist
+   └── ⚙️  list_branches() (line 289)
+       💬 List all branches with their metadata
+   └── ⚙️  get_current_branch() (line 306)
+       💬 Get the currently checked out branch
+   └── ⚙️  get_branch() (line 318)
+       💬 Get a specific branch by name
+   └── ⚙️  update_current_branch_head() (line 332)
+       💬 Update the head of the current branch USAGE: Called after making a new commit
+   └── ⚙️  update_branch_head() (line 349)
+       💬 Update the head of a specific branch
+   └── ⚙️  create_tag() (line 371)
+       💬 Create a new tag pointing to a specific state IMMUTABILITY: Tags cannot be moved once created
+   └── ⚙️  delete_tag() (line 385)
+       💬 Delete a tag
+   └── ⚙️  list_tags() (line 399)
+       💬 List all tags
+   └── ⚙️  get_tag() (line 411)
+       💬 Get the state ID for a specific tag
+   └── ⚙️  get_referenced_states() (line 423)
+       💬 Get all state IDs referenced by branches and tags USAGE: For garbage collection - these states should not be deleted
+   └── ⚙️  prune_invalid_branches() (line 448)
+       💬 Clean up branches that point to non-existent states USAGE: After garbage collection in the history system RETURNS: Number of branches that were removed
+   └── ⚙️  prune_invalid_tags() (line 470)
+       💬 Clean up tags that point to non-existent states RETURNS: Number of tags that were removed
+   └── ⚙️  statistics() (line 490)
+       💬 Get basic information about the reference manager
+   └── ⚙️  list_branch_names() (line 506)
+       💬 Get list of all branch names (for error messages)
+   └── ⚙️  current_branch_name() (line 512)
+       💬 Get the current branch name
+   └── ⚙️  default_branch_name() (line 518)
+       💬 Get the default branch name
+   └── ⚙️  has_branch() (line 524)
+       💬 Check if a branch exists
+   └── ⚙️  has_tag() (line 530)
+       💬 Check if a tag exists
+
+🔧 IMPL: Default for RefManager (line 536)
+   └── ⚙️  default() (line 537)
+
+🔧 IMPL: BranchInfo (line 558)
+   └── ⚙️  display_name() (line 560)
+       💬 Get a human-readable description of this branch
+   └── ⚙️  age_days() (line 574)
+       💬 Get the age of this branch in days
+
+⚙️  FUNCTION: test_ref_manager_creation() (line 607)
+   🏷️  #test
+
+⚙️  FUNCTION: test_branch_creation_and_deletion() (line 621)
+   🏷️  #test
+
+⚙️  FUNCTION: test_branch_checkout() (line 649)
+   🏷️  #test
+
+⚙️  FUNCTION: test_tag_operations() (line 668)
+   🏷️  #test
+
+⚙️  FUNCTION: test_reference_cleanup() (line 692)
+   🏷️  #test
+
+⚙️  FUNCTION: test_error_handling() (line 712)
+   🏷️  #test
+
+============================================================
+FILE: api/graph.rs
+============================================================
+
+🏗️  STRUCT: Graph (line 46)
+   🏷️  #derive(Debug)
+
+🏗️  STRUCT: GraphStatistics (line 590)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: BranchInfo (line 602)
+   🏷️  #derive(Debug, Clone)
+
+🏗️  STRUCT: CommitInfo (line 611)
+   🏷️  #derive(Debug, Clone)
+
+🔧 IMPL: Graph (line 96)
+   └── ⚙️  new() (line 98)
+       💬 Create a new empty graph with default settings
+   └── ⚙️  with_config() (line 105)
+       💬 Create a graph with custom configuration
+   └── ⚙️  load_from_path() (line 110)
+       💬 Load an existing graph from storage
+   └── ⚙️  add_node() (line 129)
+       💬 Add a new node to the graph ALGORITHM: 1. Pool creates and stores the node 2. Space tracks it as active 3. Return the node ID to caller PERFORMANCE: O(1) amortized
+   └── ⚙️  add_nodes() (line 138)
+       💬 Add multiple nodes efficiently More efficient than calling add_node() in a loop
+   └── ⚙️  add_edge() (line 150)
+       💬 Add an edge between two existing nodes ALGORITHM: 1. Validate nodes exist in active set 2. Pool creates and stores the edge 3. Space tracks it as active 4. Return edge ID
+   └── ⚙️  add_edges() (line 162)
+       💬 Add multiple edges efficiently More efficient than calling add_edge() in a loop
+   └── ⚙️  remove_node() (line 171)
+       💬 Remove a node and all its incident edges ALGORITHM: 1. Ask space to remove the node (it handles incident edges)
+   └── ⚙️  remove_edge() (line 177)
+       💬 Remove an edge
+   └── ⚙️  set_node_attr() (line 193)
+       💬 Set an attribute value on a node ALGORITHM: 1. Pool sets value and returns baseline (integrated change tracking) 2. Space records the change for commit delta
+   └── ⚙️  set_node_attrs() (line 218)
+       💬 Set node attributes in bulk (handles multiple nodes and multiple attributes efficiently)
+   └── ⚙️  set_edge_attr() (line 244)
+       💬 Set an attribute value on an edge ALGORITHM: 1. Pool sets value and returns baseline (integrated change tracking) 2. Space records the change for commit delta
+   └── ⚙️  set_edge_attrs() (line 264)
+       💬 Set edge attributes in bulk (handles multiple edges and multiple attributes efficiently)
+   └── ⚙️  get_node_attr() (line 288)
+       💬 Get an attribute value from a node ALGORITHM: 1. Ask pool to get the current value 2. Return the value
+   └── ⚙️  get_edge_attr() (line 298)
+       💬 Get an attribute value from an edge ALGORITHM: 1. Ask pool to get the current value 2. Return the value
+   └── ⚙️  get_node_attrs() (line 307)
+       💬 Get all attributes for a node efficiently ALGORITHM: 1. Ask pool to get the node attributes 2. Return the attributes
+   └── ⚙️  get_edge_attrs() (line 316)
+       💬 Get all attributes for an edge efficiently ALGORITHM: 1. Ask pool to get the edge attributes 2. Return the attributes
+   └── ⚙️  get_nodes_attrs() (line 351)
+       💬 Get attribute values for specific nodes (secure and efficient) ALGORITHM: 1. Filter requested nodes to only active ones 2. Get full attribute column from pool (efficient) 3. Extract values at active indices only 4. Return results aligned with requested nodes SECURITY: Only returns data for active nodes that were explicitly requested PERFORMANCE: Uses efficient column access internally
+   └── ⚙️  get_edges_attrs() (line 378)
+       💬 Get attribute values for specific edges (secure and efficient)
+   └── ⚙️  contains_node() (line 394)
+       💬 Check if a node exists in the graph
+   └── ⚙️  contains_edge() (line 400)
+       💬 Check if an edge exists in the graph
+   └── ⚙️  node_ids() (line 406)
+       💬 Get all node IDs currently in the graph
+   └── ⚙️  edge_ids() (line 412)
+       💬 Get all edge IDs currently in the graph
+   └── ⚙️  edge_endpoints() (line 418)
+       💬 Get the endpoints of an edge
+   └── ⚙️  neighbors() (line 424)
+       💬 Get all neighbors of a node
+   └── ⚙️  degree() (line 430)
+       💬 Get the degree (number of incident edges) of a node
+   └── ⚙️  statistics() (line 436)
+       💬 Get basic statistics about the current graph
+   └── ⚙️  has_uncommitted_changes() (line 448)
+       💬 Check if there are uncommitted changes
+   └── ⚙️  commit() (line 460)
+       💬 Commit current changes to history ALGORITHM: 1. Create a snapshot of current changes (ask space) 2. pool the snapshot in history system with metadata 3. Update current commit pointer 4. Clear change tracker 5. Return new commit ID
+   └── ⚙️  reset_hard() (line 473)
+       💬 Reset all uncommitted changes
+   └── ⚙️  create_branch() (line 482)
+       💬 Create a new branch from current state
+   └── ⚙️  checkout_branch() (line 489)
+       💬 Switch to a different branch
+   └── ⚙️  list_branches() (line 502)
+       💬 List all branches
+   └── ⚙️  commit_history() (line 507)
+       💬 Get the commit history
+   └── ⚙️  find_nodes() (line 518)
+       💬 Find nodes matching attribute criteria
+   └── ⚙️  find_edges() (line 523)
+       💬 Find edges matching attribute criteria
+   └── ⚙️  query() (line 528)
+       💬 Run a complex query with multiple criteria
+   └── ⚙️  create_view() (line 533)
+       💬 Create a read-only view of the graph for analysis
+   └── ⚙️  view_at_commit() (line 544)
+       💬 Create a read-only view of the graph at a specific commit
+   └── ⚙️  diff_commits() (line 549)
+       💬 Compare two commits and show differences
+   └── ⚙️  optimize() (line 559)
+       💬 Optimize internal data structures for better performance
+   └── ⚙️  gc_history() (line 568)
+       💬 Garbage collect unreferenced historical states
+   └── ⚙️  save_to_path() (line 576)
+       💬 Save graph to persistent storage
+
+🔧 IMPL: Default for Graph (line 620)
+   └── ⚙️  default() (line 621)
+
+============================================================
+SUMMARY: Analyzed 15 files
+============================================================

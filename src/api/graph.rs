@@ -1,4 +1,6 @@
 //! Main Graph API - the primary facade and coordinator for all graph operations.
+
+use crate::core::change_tracker::ChangeTracker;
 //!
 //! *** ARCHITECTURE OVERVIEW ***
 //! The Graph is the MAIN MANAGER and single entry point for all operations.
@@ -75,11 +77,13 @@ pub struct Graph {
     === TRANSACTION MANAGEMENT ===
     Track what's changed since last commit
     */
-    /// What's been modified since the last commit
-    /// This is the active state tracker
-    /// Active nodes and edges are tracked here
-    /// as well as attr changes
+    /// Current active state (which entities exist, current attribute indices)
+    /// Space ONLY manages current state, not change deltas
     space: GraphSpace,
+    
+    /// Tracks changes for history commits (deltas between states)
+    /// ChangeTracker ONLY manages deltas, not current state
+    change_tracker: ChangeTracker,
     
     /*
     === CONFIGURATION ===
@@ -132,7 +136,7 @@ impl Graph {
     /// Add multiple nodes efficiently
     /// More efficient than calling add_node() in a loop
     pub fn add_nodes(&mut self, count: usize) -> Vec<NodeId> {
-        // TODO: self.space.add_nodes(count)
+        // TODO: self.space.activate_nodes(count)
         todo!("Implement Graph::add_nodes")
     }
     
@@ -156,7 +160,7 @@ impl Graph {
     /// Add multiple edges efficiently
     /// More efficient than calling add_edge() in a loop
     pub fn add_edges(&mut self, edges: &[(NodeId, NodeId)]) -> Vec<EdgeId> {
-        // TODO: Use pool.add_edges() for batch efficiency
+        // TODO: Use pool.activate_edges() for batch efficiency
         // TODO: Record all changes through space
     }
     
@@ -165,14 +169,26 @@ impl Graph {
     /// ALGORITHM:
     /// 1. Ask space to remove the node (it handles incident edges)
     pub fn remove_node(&mut self, node: NodeId) -> Result<(), GraphError> {
-        // TODO: self.space.remove_node(node)
+        // TODO: self.space.deactivate_node(node)
         todo!("Implement Graph::remove_node")
     }
     
     /// Remove an edge
     pub fn remove_edge(&mut self, edge: EdgeId) -> Result<(), GraphError> {
-        // TODO: self.space.remove_edge(edge)
+        // TODO: self.space.deactivate_edge(edge)
         todo!("Implement Graph::remove_edge")
+    }
+
+    /// Remove multiple edges efficiently
+    pub fn remove_edges(&mut self, edges: &[EdgeId]) -> Result<(), GraphError> {
+        // TODO: Use space.deactivate_edges() for batch efficiency
+        // TODO: Record all changes through space
+    }
+
+    /// Remove multiple nodes efficiently
+    pub fn remove_nodes(&mut self, nodes: &[NodeId]) -> Result<(), GraphError> {
+        // TODO: Use space.deactivate_nodes() for batch efficiency
+        // TODO: Record all changes through space
     }
     
     /*
@@ -187,13 +203,24 @@ impl Graph {
     /// 1. Pool sets value and returns baseline (integrated change tracking)
     /// 2. Space records the change for commit delta
     pub fn set_node_attr(&mut self, node: NodeId, attr: AttrName, value: AttrValue) -> Result<(), GraphError> {
-        // TODO: ALGORITHM - Coordinator pattern with efficient baseline capture
-        // 1. let baseline_value = self.pool.set_node_attr(node, attr.clone(), value.clone())?;
-        // 2. self.space.record_node_attr_change(node, attr, baseline_value, value);
-        // 3. Ok(())
+        // TODO: ALGORITHM - Clean separation: Pool stores, Space maps, ChangeTracker tracks
+        // 1. Validate node is active
+        // if !self.space.contains_node(node) {
+        //     return Err(GraphError::NodeNotFound(node));
+        // }
+        // 
+        // 2. Get old index for change tracking
+        // let old_index = self.space.get_attr_index(node, &attr, true);
+        // 
+        // 3. Pool stores value and returns new index (is_node = true)
+        // let new_index = self.pool.set_attr(attr.clone(), value, true);
+        // 
+        // 4. Space updates current mapping
+        // self.space.set_attr_index(node, attr.clone(), new_index, true);
+        //
+        // 5. ChangeTracker records the delta
+        // self.change_tracker.record_attr_change(node, attr, old_index, new_index, true);
         
-        // PERFORMANCE: O(1) - Pool handles efficient baseline capture
-        // COORDINATOR: Pool stores + captures baseline, Space records for delta
         todo!("Implement Graph::set_node_attr")
     }
     
@@ -201,23 +228,26 @@ impl Graph {
     
     /// Set node attributes in bulk (handles multiple nodes and multiple attributes efficiently)
     pub fn set_node_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>) -> Result<(), GraphError> {
-        // TODO: ALGORITHM - Loop over attributes using bulk columnar operations
-        // 1. let all_baseline_changes = self.pool.set_nodes_attrs(attrs_values.clone())?;
-        // 2. for (attr_name, baseline_changes) in all_baseline_changes {
-        //        // Convert to format for Space's bulk recording
-        //        let changes_for_space: Vec<(NodeId, Option<AttrValue>, AttrValue)> = baseline_changes.into_iter()
-        //            .map(|(node_id, baseline)| {
-        //                let new_value = attrs_values.get(&attr_name).unwrap()
-        //                    .iter().find(|(id, _)| *id == node_id).unwrap().1.clone();
-        //                (node_id, baseline, new_value)
-        //            }).collect();
-        //        self.space.record_node_attr_changes(attr_name, &changes_for_space);
-        //    }
+        // TODO: ALGORITHM - Clean bulk delegation
+        // 1. Pool handles bulk storage (is_node = true)
+        // let index_changes = self.pool.set_bulk_attrs(attrs_values, true);
+        // 
+        // 2. For each attribute, coordinate Space and ChangeTracker
+        // for (attr_name, node_indices) in index_changes {
+        //     let changes: Vec<_> = node_indices.iter()
+        //         .map(|&(node_id, new_index)| {
+        //             let old_index = self.space.get_attr_index(node_id, &attr_name, true);
+        //             self.space.set_attr_index(node_id, attr_name.clone(), new_index, true);
+        //             (node_id, attr_name.clone(), old_index, new_index)
+        //         })
+        //         .collect();
+        //     self.change_tracker.record_attr_changes(&changes, true);
+        // }
         // 3. Ok(())
         
-        // PERFORMANCE: O(total_changes) - each attribute gets bulk columnar treatment
-        // USAGE: Maximum efficiency for large-scale attribute operations
-        todo!("Implement Graph::set_nodes_attrs")
+        // PERFORMANCE: O(total_changes) - bulk Pool storage + bulk Space tracking
+        // CLEAN: Pool stores, Space tracks, Graph coordinates
+        todo!("Implement Graph::set_node_attrs")
     }
     
     /// Set an attribute value on an edge
@@ -226,32 +256,49 @@ impl Graph {
     /// 1. Pool sets value and returns baseline (integrated change tracking)
     /// 2. Space records the change for commit delta
     pub fn set_edge_attr(&mut self, edge: EdgeId, attr: AttrName, value: AttrValue) -> Result<(), GraphError> {
-        // TODO: ALGORITHM - Same coordinator pattern as set_node_attr but for edges
-        // 1. let baseline_value = self.pool.set_edge_attr(edge, attr.clone(), value.clone())?;
-        // 2. self.space.record_edge_attr_change(edge, attr, baseline_value, value);
-        // 3. Ok(())
+        // TODO: ALGORITHM - Clean separation: Pool stores, Space maps, ChangeTracker tracks
+        // 1. Validate edge is active
+        // if !self.space.contains_edge(edge) {
+        //     return Err(GraphError::EdgeNotFound(edge));
+        // }
+        // 
+        // 2. Get old index for change tracking
+        // let old_index = self.space.get_attr_index(edge, &attr, false);
+        // 
+        // 3. Pool stores value and returns new index (is_node = false)
+        // let new_index = self.pool.set_attr(attr.clone(), value, false);
+        // 
+        // 4. Space updates current mapping
+        // self.space.set_attr_index(edge, attr.clone(), new_index, false);
+        //
+        // 5. ChangeTracker records the delta
+        // self.change_tracker.record_attr_change(edge, attr, old_index, new_index, false);
         
-        // PERFORMANCE: O(1) - Pool handles efficient baseline capture
         todo!("Implement Graph::set_edge_attr")
     }
     
     /// Set edge attributes in bulk (handles multiple edges and multiple attributes efficiently)
     pub fn set_edge_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>) -> Result<(), GraphError> {
-        // TODO: ALGORITHM - Bulk coordinator for edge attributes
-        // 1. let all_baseline_changes = self.pool.set_edges_attrs(attrs_values.clone())?;
-        // 2. for (attr_name, baseline_changes) in all_baseline_changes {
-        //        let changes_for_space: Vec<(EdgeId, Option<AttrValue>, AttrValue)> = baseline_changes.into_iter()
-        //            .map(|(edge_id, baseline)| {
-        //                let new_value = attrs_values.get(&attr_name).unwrap()
-        //                    .iter().find(|(id, _)| *id == edge_id).unwrap().1.clone();
-        //                (edge_id, baseline, new_value)
-        //            }).collect();
-        //        self.space.record_edge_attr_changes(attr_name, &changes_for_space);
-        //    }
+        // TODO: ALGORITHM - Clean bulk delegation for edges
+        // 1. Pool handles bulk storage (is_node = false)
+        // let index_changes = self.pool.set_bulk_attrs(attrs_values, false);
+        // 
+        // 2. For each attribute, coordinate Space and ChangeTracker
+        // for (attr_name, edge_indices) in index_changes {
+        //     let changes: Vec<_> = edge_indices.iter()
+        //         .map(|&(edge_id, new_index)| {
+        //             let old_index = self.space.get_attr_index(edge_id, &attr_name, false);
+        //             self.space.set_attr_index(edge_id, attr_name.clone(), new_index, false);
+        //             (edge_id, attr_name.clone(), old_index, new_index)
+        //         })
+        //         .collect();
+        //     self.change_tracker.record_attr_changes(&changes, false);
+        // }
         // 3. Ok(())
         
-        // PERFORMANCE: O(total_changes) - bulk efficiency for edge attributes
-        todo!("Implement Graph::set_edges_attrs")
+        // PERFORMANCE: O(total_changes) - bulk Pool storage + bulk Space tracking
+        // CLEAN: Pool stores, Space tracks, Graph coordinates
+        todo!("Implement Graph::set_edge_attrs")
     }
     
     /// Get an attribute value from a node

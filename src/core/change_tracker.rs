@@ -98,63 +98,34 @@ impl ChangeTracker {
         self.strategy.record_edge_removal(edge_id);
     }
     
-    /// Record that a node attribute changed (generic trait method)
-    pub fn record_node_attr_change(
-        &mut self,
-        node_id: NodeId,
-        attr_name: AttrName,
-        old_value: Option<AttrValue>,
-        new_value: AttrValue,
-    ) {
-        self.strategy.record_node_attr_change(node_id, attr_name, old_value, new_value);
-    }
-    
-    /// Record that a node attribute index was changed (strategy-specific)
-    /// This is preferred for IndexDeltaStrategy
-    pub fn record_node_attr_index_change(
+    /// Record attribute changes for any entity type (index-based, efficient bulk recording)
+    /// This is the main API - all attribute changes are recorded as indices
+    pub fn record_attr_changes<T>(
         &mut self, 
-        node_id: NodeId, 
-        attr_name: AttrName, 
-        old_index: Option<usize>, 
-        new_index: usize
-    ) {
-        // Delegate to IndexDeltaStrategy if that's what we're using
-        if let Some(index_strategy) = self.strategy.as_any().downcast_mut::<IndexDeltaStrategy>() {
-            index_strategy.record_node_attr_index_change(node_id, attr_name, old_index, new_index);
-        } else {
-            // For other strategies, this would need to be handled differently
-            // For now, we'll just record it as a generic change
-            // TODO: Convert indices to values if needed
+        changes: &[(T, AttrName, Option<usize>, usize)],
+        is_node: bool
+    ) where T: Into<u64> + Copy {
+        // Delegate to strategy for bulk recording
+        for &(entity_id, ref attr_name, old_index, new_index) in changes {
+            let id = entity_id.into();
+            if is_node {
+                self.strategy.record_node_attr_change(id, attr_name.clone(), old_index, new_index);
+            } else {
+                self.strategy.record_edge_attr_change(id, attr_name.clone(), old_index, new_index);
+            }
         }
     }
     
-    /// Record that an edge attribute changed (generic trait method)
-    pub fn record_edge_attr_change(
+    /// Record single attribute change (convenience wrapper)
+    pub fn record_attr_change<T>(
         &mut self,
-        edge_id: EdgeId,
+        entity_id: T,
         attr_name: AttrName,
-        old_value: Option<AttrValue>,
-        new_value: AttrValue,
-    ) {
-        self.strategy.record_edge_attr_change(edge_id, attr_name, old_value, new_value);
-    }
-    
-    /// Record that an edge attribute index was changed (strategy-specific)
-    /// This is preferred for IndexDeltaStrategy
-    pub fn record_edge_attr_index_change(
-        &mut self, 
-        edge_id: EdgeId, 
-        attr_name: AttrName, 
-        old_index: Option<usize>, 
-        new_index: usize
-    ) {
-        // Delegate to IndexDeltaStrategy if that's what we're using
-        if let Some(index_strategy) = self.strategy.as_any().downcast_mut::<IndexDeltaStrategy>() {
-            index_strategy.record_edge_attr_index_change(edge_id, attr_name, old_index, new_index);
-        } else {
-            // For other strategies, this would need to be handled differently
-            // TODO: Convert indices to values if needed
-        }
+        old_index: Option<usize>,
+        new_index: usize,
+        is_node: bool
+    ) where T: Into<u64> + Copy {
+        self.record_attr_changes(&[(entity_id, attr_name, old_index, new_index)], is_node);
     }
     
     // NOTE: update_change_metadata and current_timestamp are now handled by the strategy
@@ -171,39 +142,7 @@ impl ChangeTracker {
         // TODO: Single timestamp update, bulk vector operations
     }
     
-    /// Record multiple attribute changes efficiently
-    pub fn record_node_attr_changes(
-        &mut self, 
-        changes: &[(NodeId, AttrName, Option<AttrValue>, AttrValue)]
-    ) {
-        // TODO: ALGORITHM - Efficient bulk recording
-        // 1. self.node_attr_changes.extend(changes.iter().cloned());
-        // 2. self.total_changes += changes.len();
-        // 3. if self.first_change_timestamp.is_none() {
-        //        self.first_change_timestamp = Some(current_timestamp());
-        //    }
-        
-        // PERFORMANCE: O(n) where n = number of changes - single extend operation
-        // USAGE: Called by Graph after Pool's bulk operations
-        todo!("Implement ChangeTracker::record_node_attr_changes")
-    }
-
-    /// Record multiple attribute changes efficiently
-    pub fn record_edge_attra_changes(
-        &mut self, 
-        changes: &[(EdgeId, AttrName, Option<AttrValue>, AttrValue)]
-    ) {
-        // TODO: ALGORITHM - Efficient bulk recording
-        // 1. self.edge_attr_changes.extend(changes.iter().cloned());
-        // 2. self.total_changes += changes.len();
-        // 3. if self.first_change_timestamp.is_none() {
-        //        self.first_change_timestamp = Some(current_timestamp());
-        //    }
-        
-        // PERFORMANCE: O(n) where n = number of changes - single extend operation
-        // USAGE: Called by Graph after Pool's bulk operations
-        todo!("Implement ChangeTracker::record_edge_attr_changes")
-    }
+    // NOTE: Bulk change recording methods moved above as main API
 
     
     /*

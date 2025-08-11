@@ -24,9 +24,9 @@ KEY RESPONSIBILITIES:
 
 WHAT BELONGS HERE:
 - active_nodes, active_edges HashSets
-- change_tracker methods
+- NOTE: change tracking moved to Graph for cleaner separation
 - Simple queries: node_count(), contains_node(), etc.
-- Workspace management: has_changes(), reset(), etc.
+- Workspace management: reset(), state queries, etc.
 
 WHAT DOESN'T BELONG HERE:
 - Graph operations like add_node(), set_attr() (that's Graph's job)
@@ -37,7 +37,7 @@ WHAT DOESN'T BELONG HERE:
 
 use std::collections::{HashMap, HashSet};
 use crate::types::{NodeId, EdgeId, AttrName, AttrValue, StateId};
-use crate::core::change_tracker::ChangeTracker;
+// NOTE: ChangeTracker import removed - Graph manages it directly now
 use crate::core::strategies::StorageStrategyType;
 use crate::errors::{GraphError, GraphResult};
 use crate::core::pool::GraphPool;
@@ -97,31 +97,19 @@ pub struct GraphSpace {
     /// Used for computing deltas when committing
     base_state: StateId,
     
-    /// Tracks all modifications since the last commit
-    /// Used to create deltas for history storage
-    change_tracker: ChangeTracker,
-    
-    /// Whether this workspace has been modified
-    /// Optimization to avoid change tracking overhead
-    has_changes: bool,
+    // NOTE: ChangeTracker moved to Graph for cleaner separation
+    // Graph coordinates between Space (current state) and ChangeTracker (deltas)
 }
 
 impl GraphSpace {
-    /// Create a new empty graph space with default strategy
+    /// Create a new empty graph space 
     pub fn new(base_state: StateId) -> Self {
-        Self::with_strategy(base_state, StorageStrategyType::default())
-    }
-    
-    /// Create a new graph space with specific temporal storage strategy
-    pub fn with_strategy(base_state: StateId, strategy: StorageStrategyType) -> Self {
         Self {
             active_nodes: HashSet::new(),
             active_edges: HashSet::new(),
             node_attribute_indices: HashMap::new(),
             edge_attribute_indices: HashMap::new(),
             base_state,
-            change_tracker: ChangeTracker::with_strategy(strategy),
-            has_changes: false,
         }
     }
 
@@ -134,8 +122,23 @@ impl GraphSpace {
     /// Add a node to the active set (called by Graph.add_node())
     pub fn activate_node(&mut self, node_id: NodeId) {
         self.active_nodes.insert(node_id);
-        self.change_tracker.record_node_addition(node_id);
-        self.has_changes = true;
+        // NOTE: Graph calls ChangeTracker directly for cleaner separation
+    }
+
+    /// Add multiple nodes to the active set (called by Graph.add_nodes())
+    pub fn activate_nodes(&mut self, nodes: &[NodeId]) {
+        self.active_nodes.extend(nodes);
+        // NOTE: Graph calls ChangeTracker directly for cleaner separation
+    }
+
+    /// Remove multiple nodes from the active set (called by Graph.remove_nodes())
+    pub fn deactivate_nodes(&mut self, nodes: &[NodeId]) {
+        self.active_nodes.retain(|node| !nodes.contains(node));
+        // Also remove all attribute indices for these nodes
+        for node in nodes {
+            self.node_attribute_indices.remove(node);
+        }
+        // NOTE: Graph calls ChangeTracker directly for cleaner separation
     }
 
     /// Remove a node from the active set (called by Graph.remove_node())
@@ -143,15 +146,13 @@ impl GraphSpace {
         self.active_nodes.remove(&node_id);
         // Also remove all attribute indices for this node
         self.node_attribute_indices.remove(&node_id);
-        self.change_tracker.record_node_removal(node_id);
-        self.has_changes = true;
+        // NOTE: Graph calls ChangeTracker directly for cleaner separation
     }
 
     /// Add an edge to the active set (called by Graph.add_edge())
     pub fn activate_edge(&mut self, edge_id: EdgeId, source: NodeId, target: NodeId) {
         self.active_edges.insert(edge_id);
-        self.change_tracker.record_edge_addition(edge_id, source, target);
-        self.has_changes = true;
+        // NOTE: Graph calls ChangeTracker directly for cleaner separation
     }
 
     /// Remove an edge from the active set (called by Graph.remove_edge())
@@ -159,112 +160,62 @@ impl GraphSpace {
         self.active_edges.remove(&edge_id);
         // Also remove all attribute indices for this edge
         self.edge_attribute_indices.remove(&edge_id);
-        self.change_tracker.record_edge_removal(edge_id);
-        self.has_changes = true;
+        // NOTE: Graph calls ChangeTracker directly for cleaner separation
+    }
+
+    /// Add multiple edges to the active set (called by Graph.add_edges())
+    pub fn activate_edges(&mut self, edges: &[EdgeId]) {
+        self.active_edges.extend(edges);
+        // NOTE: Graph calls ChangeTracker directly for cleaner separation
+    }
+
+    /// Remove multiple edges from the active set (called by Graph.remove_edges())
+    pub fn deactivate_edges(&mut self, edges: &[EdgeId]) {
+        self.active_edges.retain(|edge| !edges.contains(edge));
+        // Also remove all attribute indices for these edges
+        for edge in edges {
+            self.edge_attribute_indices.remove(edge);
+        }
+        // NOTE: Graph calls ChangeTracker directly for cleaner separation
     }
 
     /*
-    === ATTRIBUTE INDEX MANAGEMENT ===
-    Methods for managing node/edge -> attribute -> index mappings
+    === CURRENT INDEX MAPPINGS ===
+    Space ONLY manages which entities have which current attribute indices
+    Graph coordinates between Space (current state) and ChangeTracker (deltas)
     */
     
-    /// Set node attribute using index-based storage
-    pub fn set_node_attr(&mut self, pool: &mut GraphPool, node_id: NodeId, attr_name: AttrName, value: AttrValue) -> GraphResult<()> {
-        // ALGORITHM: Index-based attribute setting
-        // 1. Get current index (if any) for change tracking
-        // 2. Append new value to Pool and get new index
-        // 3. Update our index mapping
-        // 4. Record the index change for history
-        
-        let old_index = self.node_attribute_indices
-            .get(&node_id)
-            .and_then(|attrs| attrs.get(&attr_name))
-            .copied();
-        
-        // Append new value to pool and get new index
-        let new_index = pool.append_node_attr_value(attr_name.clone(), value);
-        
-        // Update our index mapping
-        self.node_attribute_indices
-            .entry(node_id)
-            .or_insert_with(HashMap::new)
-            .insert(attr_name.clone(), new_index);
-        
-        // Record the change with indices instead of values
-        self.change_tracker.record_node_attr_index_change(node_id, attr_name, old_index, new_index);
-        self.has_changes = true;
-        
-        Ok(())
+    /// Update the current attribute index for any entity (called by Graph after Pool storage)
+    pub fn set_attr_index<T>(&mut self, entity_id: T, attr_name: AttrName, new_index: usize, is_node: bool) 
+    where T: Into<u64> + Copy {
+        let id = entity_id.into();
+        if is_node {
+            self.node_attribute_indices
+                .entry(id)
+                .or_insert_with(HashMap::new)
+                .insert(attr_name, new_index);
+        } else {
+            self.edge_attribute_indices
+                .entry(id)
+                .or_insert_with(HashMap::new)
+                .insert(attr_name, new_index);
+        }
     }
     
-    /// Get node attribute by resolving index through pool
-    pub fn get_node_attr(&self, pool: &GraphPool, node_id: NodeId, attr_name: &AttrName) -> GraphResult<Option<&AttrValue>> {
-        // ALGORITHM: Index resolution
-        // 1. Get the index for this node/attribute combination
-        // 2. Use Pool to resolve index to value
+    /// Get current attribute index for any entity (used by Graph for change tracking)
+    pub fn get_attr_index<T>(&self, entity_id: T, attr_name: &AttrName, is_node: bool) -> Option<usize> 
+    where T: Into<u64> + Copy {
+        let id = entity_id.into();
+        let attribute_map = if is_node {
+            &self.node_attribute_indices
+        } else {
+            &self.edge_attribute_indices
+        };
         
-        if let Some(attrs) = self.node_attribute_indices.get(&node_id) {
-            if let Some(&index) = attrs.get(attr_name) {
-                return Ok(pool.get_node_attr_by_index(attr_name, index));
-            }
-        }
-        Ok(None)
-    }
-
-    /// Set edge attribute using index-based storage
-    pub fn set_edge_attr(&mut self, pool: &mut GraphPool, edge_id: EdgeId, attr_name: AttrName, value: AttrValue) -> GraphResult<()> {
-        let old_index = self.edge_attribute_indices
-            .get(&edge_id)
-            .and_then(|attrs| attrs.get(&attr_name))
-            .copied();
-        
-        let new_index = pool.append_edge_attr_value(attr_name.clone(), value);
-        
-        self.edge_attribute_indices
-            .entry(edge_id)
-            .or_insert_with(HashMap::new)
-            .insert(attr_name.clone(), new_index);
-        
-        self.change_tracker.record_edge_attr_index_change(edge_id, attr_name, old_index, new_index);
-        self.has_changes = true;
-        
-        Ok(())
-    }
-    
-    /// Get edge attribute by resolving index through pool
-    pub fn get_edge_attr(&self, pool: &GraphPool, edge_id: EdgeId, attr_name: &AttrName) -> GraphResult<Option<&AttrValue>> {
-        if let Some(attrs) = self.edge_attribute_indices.get(&edge_id) {
-            if let Some(&index) = attrs.get(attr_name) {
-                return Ok(pool.get_edge_attr_by_index(attr_name, index));
-            }
-        }
-        Ok(None)
-    }
-    
-    /// Get all attributes for a node by resolving indices through pool
-    pub fn get_all_node_attrs(&self, pool: &GraphPool, node_id: NodeId) -> HashMap<AttrName, AttrValue> {
-        let mut result = HashMap::new();
-        if let Some(attrs) = self.node_attribute_indices.get(&node_id) {
-            for (attr_name, &index) in attrs {
-                if let Some(value) = pool.get_node_attr_by_index(attr_name, index) {
-                    result.insert(attr_name.clone(), value.clone());
-                }
-            }
-        }
-        result
-    }
-    
-    /// Get all attributes for an edge by resolving indices through pool
-    pub fn get_all_edge_attrs(&self, pool: &GraphPool, edge_id: EdgeId) -> HashMap<AttrName, AttrValue> {
-        let mut result = HashMap::new();
-        if let Some(attrs) = self.edge_attribute_indices.get(&edge_id) {
-            for (attr_name, &index) in attrs {
-                if let Some(value) = pool.get_edge_attr_by_index(attr_name, index) {
-                    result.insert(attr_name.clone(), value.clone());
-                }
-            }
-        }
-        result
+        attribute_map
+            .get(&id)
+            .and_then(|attrs| attrs.get(attr_name))
+            .copied()
     }
 
     /*
@@ -329,19 +280,19 @@ impl GraphSpace {
 
     /// Check if there are uncommitted changes
     pub fn has_uncommitted_changes(&self) -> bool {
-        // TODO: self.has_changes
+        // TODO: Space no longer tracks changes directly
         todo!("Implement GraphSpace::has_uncommitted_changes")
     }
 
     /// Get the number of uncommitted changes
     pub fn uncommitted_change_count(&self) -> usize {
-        // TODO: self.change_tracker.change_count()
+        // TODO: Graph tracks changes now
         todo!("Implement GraphSpace::uncommitted_change_count")
     }
 
     /// Get summary of uncommitted changes
     pub fn change_summary(&self) -> ChangeSummary {
-        // TODO: self.change_tracker.change_summary()
+        // TODO: Graph provides change summary now
         todo!("Implement GraphSpace::change_summary")
     }
 
@@ -355,7 +306,7 @@ impl GraphSpace {
     /// USAGE: Called when committing changes to history
     pub fn create_change_delta(&self, pool: &GraphPool) -> DeltaObject {
         // TODO: ALGORITHM - Efficient delta creation using Pool's change tracking
-        // 1. self.change_tracker.create_delta(pool)
+        // NOTE: Graph creates delta via ChangeTracker now
         
         // PERFORMANCE: O(changed_entities) - leverages Pool's efficient iteration
         // INTEGRATION: ChangeTracker uses Pool's BitVec-based change detection
@@ -368,7 +319,7 @@ impl GraphSpace {
         // TODO:
         // 1. Clear active sets (reload from base_state)
         // 2. Clear change tracker
-        // 3. Reset has_changes flag
+        // NOTE: Graph manages change state now
         todo!("Implement GraphSpace::reset_hard")
     }
 }
@@ -377,7 +328,7 @@ impl GraphSpace {
 === SUPPORTING DATA STRUCTURES ===
 */
 
-use crate::core::change_tracker::ChangeSummary;
+// NOTE: ChangeSummary import removed - Graph manages change tracking directly now
 
 /*
 === IMPLEMENTATION NOTES ===

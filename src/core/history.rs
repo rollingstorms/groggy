@@ -10,6 +10,11 @@
 //! - Git-like branching model (lightweight branches, merge capabilities)
 //! - Efficient diff-based storage (only store what changed)
 
+use std::collections::HashMap;
+use crate::types::{StateId, NodeId, EdgeId, AttrName, AttrValue};
+use crate::core::state::{StateObject, StateMetadata, GraphSnapshot, StateDiff};
+use crate::errors::{GraphError, GraphResult};
+
 /*
 === HISTORY SYSTEM OVERVIEW ===
 
@@ -41,7 +46,7 @@ KEY INSIGHTS:
 /// - Query processing (that's QueryEngine's job)
 /// - Change tracking (that's ChangeTracker's job)
 #[derive(Debug)]
-pub struct HistorySystem {
+pub struct HistoryForest {
     /*
     === COMMIT STORAGE ===
     The DAG of all commits in the system
@@ -53,7 +58,7 @@ pub struct HistorySystem {
     
     /// Content-addressed storage for deltas (automatic deduplication)
     /// If two commits have identical changes, they share the same delta
-    deltas_by_hash: HashMap<[u8; 32], Arc<Delta>>,
+    deltas: HashMap<[u8; 32], Arc<Delta>>,
     
     /*
     === BRANCH MANAGEMENT ===
@@ -86,7 +91,7 @@ pub struct HistorySystem {
     next_state_id: StateId,
 }
 
-impl HistorySystem {
+impl HistoryForest {
     /// Create a new empty history system
     pub fn new() -> Self {
         // TODO: Initialize all HashMaps/Sets
@@ -118,7 +123,7 @@ impl HistorySystem {
         // TODO:
         // 1. let delta = Delta::from_changes(changes);
         // 2. let content_hash = delta.compute_hash();
-        // 3. let delta_arc = self.deltas_by_hash.entry(content_hash)
+        // 3. let delta_arc = self.deltas.entry(content_hash)
         //                       .or_insert_with(|| Arc::new(delta));
         // 4. let commit = Commit::new(self.next_state_id, parent, delta_arc.clone(), message, author);
         // 5. self.commits.insert(self.next_state_id, Arc::new(commit));
@@ -278,7 +283,7 @@ impl HistorySystem {
         // 1. Find commits not in keep_commits
         // 2. Remove them from self.commits
         // 3. Check if their deltas are still referenced by other commits
-        // 4. Remove unreferenced deltas from self.deltas_by_hash
+        // 4. Remove unreferenced deltas from self.deltas
         // 5. Update children index
         // 6. Return number of commits removed
     }
@@ -404,33 +409,6 @@ impl Delta {
     }
 }
 
-/// A complete snapshot of graph state at a point in time
-/// 
-/// This is expensive to compute but useful for time-travel queries
-#[derive(Debug, Clone)]
-pub struct GraphSnapshot {
-    /// All nodes that exist at this point
-    pub nodes: HashSet<NodeId>,
-    
-    /// All edges that exist at this point  
-    pub edges: HashMap<EdgeId, (NodeId, NodeId)>,
-    
-    /// All node attributes at this point
-    pub node_attributes: HashMap<NodeId, HashMap<AttrName, AttrValue>>,
-    
-    /// All edge attributes at this point
-    pub edge_attributes: HashMap<EdgeId, HashMap<AttrName, AttrValue>>,
-    
-    /// The commit this snapshot represents
-    pub commit_id: StateId,
-}
-
-impl GraphSnapshot {
-    /// Apply a delta to this snapshot to get a new snapshot
-    pub fn apply_delta(&self, delta: &Delta) -> Self {
-        // TODO: Apply all changes in delta to create new snapshot
-    }
-}
 
 /// Difference between two commits
 #[derive(Debug, Clone)]
@@ -472,9 +450,435 @@ pub struct HistoryStatistics {
     pub newest_commit_age: u64,  // Seconds since newest commit
 }
 
-impl Default for HistorySystem {
+impl Default for HistoryForest {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/*
+=== HISTORICAL VIEW SYSTEM ===
+Read-only views of the graph at specific points in history
+*/
+
+/// Read-only view of a graph at a specific point in history
+/// 
+/// DESIGN: This provides a read-only interface to a historical graph state.
+/// It uses lazy loading to reconstruct the state only when needed, and
+/// caches the results for subsequent access.
+/// 
+/// LIFETIME: The view holds a reference to the history system, so it
+/// cannot outlive the system that created it.
+/// 
+/// PERFORMANCE:
+/// - First access triggers state reconstruction: O(depth * changes)
+/// - Subsequent accesses use cached data: O(1) or O(log n)
+/// - Memory usage: Only stores what's been accessed
+#[derive(Debug)]
+pub struct HistoricalView<'a> {
+    /*
+    === HISTORY REFERENCE ===
+    Connection to the history system for data access
+    */
+    
+    /// Reference to the history system that contains the state data
+    /// LIFETIME: View cannot outlive this reference
+    history: &'a HistoryForest,
+    
+    /// The specific state ID this view represents
+    /// IMMUTABLE: Views always represent the same state
+    state_id: StateId,
+    
+    /*
+    === CACHED RECONSTRUCTION ===
+    Lazily-built snapshot of the graph at this state
+    */
+    
+    /// Cached snapshot of the complete graph state
+    /// LAZY: Only built when first accessed
+    /// CACHING: Kept for subsequent operations
+    cached_snapshot: Option<GraphSnapshot>,
+    
+    /*
+    === ACCESS OPTIMIZATION ===
+    Tracking what's been loaded for selective reconstruction
+    */
+    
+    /// Which node attributes have been loaded
+    /// OPTIMIZATION: Avoid loading unused attributes
+    loaded_node_attrs: HashMap<AttrName, bool>,
+    
+    /// Which edge attributes have been loaded
+    /// OPTIMIZATION: Avoid loading unused attributes  
+    loaded_edge_attrs: HashMap<AttrName, bool>,
+}
+
+impl<'a> HistoricalView<'a> {
+    /// Create a new historical view for a specific commit
+    /// 
+    /// VALIDATION: Ensures the state exists in the history
+    /// LAZY: Doesn't reconstruct the state until needed
+    pub fn new(history: &'a HistoryForest, state_id: StateId) -> GraphResult<Self> {
+        // TODO:
+        // if !history.has_state(state_id) {
+        //     return Err(GraphError::state_not_found(
+        //         state_id, 
+        //         "create view", 
+        //         history.list_all_states()
+        //     ));
+        // }
+        // 
+        // Ok(Self {
+        //     history,
+        //     state_id,
+        //     cached_snapshot: None,
+        //     loaded_node_attrs: HashMap::new(),
+        //     loaded_edge_attrs: HashMap::new(),
+        // })
+        todo!("Implement HistoricalView::new")
+    }
+    
+    /*
+    === SNAPSHOT MANAGEMENT ===
+    Lazy loading and caching of the complete graph state
+    */
+    
+    /// Get the complete snapshot, reconstructing if necessary
+    /// 
+    /// ALGORITHM:
+    /// 1. If snapshot is cached, return it
+    /// 2. Otherwise, reconstruct from history deltas
+    /// 3. Cache the result for future use
+    /// 4. Return reference to cached snapshot
+    /// 
+    /// PERFORMANCE: O(depth * changes) first time, O(1) after caching
+    fn get_snapshot(&mut self) -> GraphResult<&GraphSnapshot> {
+        // TODO:
+        // if self.cached_snapshot.is_none() {
+        //     let snapshot = self.history.reconstruct_state_at(self.state_id)?;
+        //     self.cached_snapshot = Some(snapshot);
+        // }
+        // 
+        // Ok(self.cached_snapshot.as_ref().unwrap())
+        todo!("Implement HistoricalView::get_snapshot")
+    }
+    
+    /// Clear the cached snapshot to free memory
+    /// 
+    /// USAGE: Call this if memory usage is a concern and the view
+    /// won't be accessed again soon
+    pub fn clear_cache(&mut self) {
+        // TODO:
+        // self.cached_snapshot = None;
+        // self.loaded_node_attrs.clear();
+        // self.loaded_edge_attrs.clear();
+        todo!("Implement HistoricalView::clear_cache")
+    }
+    
+    /// Check if the snapshot is currently cached
+    pub fn is_cached(&self) -> bool {
+        // TODO: self.cached_snapshot.is_some()
+        todo!("Implement HistoricalView::is_cached")
+    }
+    
+    /*
+    === NODE OPERATIONS ===
+    Read-only access to nodes and their attributes
+    */
+    
+    /// Get all active node IDs at this state
+    pub fn get_node_ids(&mut self) -> GraphResult<Vec<NodeId>> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // Ok(snapshot.active_nodes.clone())
+        todo!("Implement HistoricalView::get_node_ids")
+    }
+    
+    /// Check if a specific node exists at this state
+    pub fn has_node(&mut self, node: NodeId) -> GraphResult<bool> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // Ok(snapshot.active_nodes.contains(&node))
+        todo!("Implement HistoricalView::has_node")
+    }
+    
+    /// Get the number of active nodes at this state
+    pub fn node_count(&mut self) -> GraphResult<usize> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // Ok(snapshot.active_nodes.len())
+        todo!("Implement HistoricalView::node_count")
+    }
+    
+    /// Get a specific attribute value for a node
+    /// 
+    /// OPTIMIZATION: This could potentially avoid loading the full snapshot
+    /// by reconstructing only the requested attribute
+    pub fn get_node_attribute(&mut self, node: NodeId, attr_name: &AttrName) -> GraphResult<Option<AttrValue>> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // if !snapshot.active_nodes.contains(&node) {
+        //     return Err(GraphError::node_not_found(node, "get attribute"));
+        // }
+        // 
+        // Ok(snapshot.node_attributes
+        //     .get(&node)
+        //     .and_then(|attrs| attrs.get(attr_name))
+        //     .cloned())
+        todo!("Implement HistoricalView::get_node_attribute")
+    }
+    
+    /// Get all attributes for a specific node
+    pub fn get_node_attributes(&mut self, node: NodeId) -> GraphResult<HashMap<AttrName, AttrValue>> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // if !snapshot.active_nodes.contains(&node) {
+        //     return Err(GraphError::node_not_found(node, "get attributes"));
+        // }
+        // 
+        // Ok(snapshot.node_attributes
+        //     .get(&node)
+        //     .cloned()
+        //     .unwrap_or_default())
+        todo!("Implement HistoricalView::get_node_attributes")
+    }
+    
+    /*
+    === EDGE OPERATIONS ===
+    Read-only access to edges and their attributes
+    */
+    
+    /// Get all active edge IDs at this state
+    pub fn get_edge_ids(&mut self) -> GraphResult<Vec<EdgeId>> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // Ok(snapshot.edges.keys().cloned().collect())
+        todo!("Implement HistoricalView::get_edge_ids")
+    }
+    
+    /// Check if a specific edge exists at this state
+    pub fn has_edge(&mut self, edge: EdgeId) -> GraphResult<bool> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // Ok(snapshot.edges.contains_key(&edge))
+        todo!("Implement HistoricalView::has_edge")
+    }
+    
+    /// Get the number of active edges at this state
+    pub fn edge_count(&mut self) -> GraphResult<usize> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // Ok(snapshot.edges.len())
+        todo!("Implement HistoricalView::edge_count")
+    }
+    
+    /// Get the endpoints of an edge
+    pub fn get_edge_endpoints(&mut self, edge: EdgeId) -> GraphResult<(NodeId, NodeId)> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // snapshot.edges.get(&edge)
+        //     .ok_or_else(|| GraphError::edge_not_found(edge, "get endpoints"))
+        //     .map(|&endpoints| endpoints)
+        todo!("Implement HistoricalView::get_edge_endpoints")
+    }
+    
+    /// Get a specific attribute value for an edge
+    pub fn get_edge_attribute(&mut self, edge: EdgeId, attr_name: &AttrName) -> GraphResult<Option<AttrValue>> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // if !snapshot.edges.contains_key(&edge) {
+        //     return Err(GraphError::edge_not_found(edge, "get attribute"));
+        // }
+        // 
+        // Ok(snapshot.edge_attributes
+        //     .get(&edge)
+        //     .and_then(|attrs| attrs.get(attr_name))
+        //     .cloned())
+        todo!("Implement HistoricalView::get_edge_attribute")
+    }
+    
+    /// Get all attributes for a specific edge
+    pub fn get_edge_attributes(&mut self, edge: EdgeId) -> GraphResult<HashMap<AttrName, AttrValue>> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // if !snapshot.edges.contains_key(&edge) {
+        //     return Err(GraphError::edge_not_found(edge, "get attributes"));
+        // }
+        // 
+        // Ok(snapshot.edge_attributes
+        //     .get(&edge)
+        //     .cloned()
+        //     .unwrap_or_default())
+        todo!("Implement HistoricalView::get_edge_attributes")
+    }
+    
+    /*
+    === GRAPH TOPOLOGY OPERATIONS ===
+    Structural queries about the graph
+    */
+    
+    /// Get all neighbors of a node at this state
+    pub fn get_neighbors(&mut self, node: NodeId) -> GraphResult<Vec<NodeId>> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // if !snapshot.active_nodes.contains(&node) {
+        //     return Err(GraphError::node_not_found(node, "get neighbors"));
+        // }
+        // 
+        // let mut neighbors = Vec::new();
+        // for (&edge_id, &(source, target)) in &snapshot.edges {
+        //     if source == node {
+        //         neighbors.push(target);
+        //     } else if target == node {
+        //         neighbors.push(source);
+        //     }
+        // }
+        // 
+        // neighbors.sort();
+        // neighbors.dedup();
+        // Ok(neighbors)
+        todo!("Implement HistoricalView::get_neighbors")
+    }
+    
+    /// Get the degree (number of incident edges) of a node
+    pub fn get_degree(&mut self, node: NodeId) -> GraphResult<usize> {
+        // TODO:
+        // let neighbors = self.get_neighbors(node)?;
+        // Ok(neighbors.len())
+        todo!("Implement HistoricalView::get_degree")
+    }
+    
+    /// Check if two nodes are connected by an edge
+    pub fn are_connected(&mut self, node1: NodeId, node2: NodeId) -> GraphResult<bool> {
+        // TODO:
+        // let snapshot = self.get_snapshot()?;
+        // for &(source, target) in snapshot.edges.values() {
+        //     if (source == node1 && target == node2) || 
+        //        (source == node2 && target == node1) {
+        //         return Ok(true);
+        //     }
+        // }
+        // Ok(false)
+        todo!("Implement HistoricalView::are_connected")
+    }
+    
+    /*
+    === METADATA AND INTROSPECTION ===
+    Information about the view and the state it represents
+    */
+    
+    /// Get the state ID this view represents
+    pub fn state_id(&self) -> StateId {
+        // TODO: self.state_id
+        todo!("Implement HistoricalView::state_id")
+    }
+    
+    /// Get metadata about the state this view represents
+    pub fn get_state_metadata(&self) -> GraphResult<&StateMetadata> {
+        // TODO:
+        // let state = self.history.get_state(self.state_id)?;
+        // Ok(state.metadata())
+        todo!("Implement HistoricalView::get_state_metadata")
+    }
+    
+    /// Check if this view represents a root state (no parent)
+    pub fn is_root(&self) -> GraphResult<bool> {
+        // TODO:
+        // let state = self.history.get_state(self.state_id)?;
+        // Ok(state.is_root())
+        todo!("Implement HistoricalView::is_root")
+    }
+    
+    /// Get the parent state ID, if any
+    pub fn get_parent(&self) -> GraphResult<Option<StateId>> {
+        // TODO:
+        // let state = self.history.get_state(self.state_id)?;
+        // Ok(state.parent())
+        todo!("Implement HistoricalView::get_parent")
+    }
+    
+    /// Get all child state IDs
+    pub fn get_children(&self) -> Vec<StateId> {
+        // TODO: self.history.get_children(self.state_id)
+        todo!("Implement HistoricalView::get_children")
+    }
+    
+    /// Get a summary of this view's state
+    pub fn summary(&mut self) -> GraphResult<ViewSummary> {
+        // TODO:
+        // let metadata = self.get_state_metadata()?;
+        // let node_count = self.node_count()?;
+        // let edge_count = self.edge_count()?;
+        // let children = self.get_children();
+        // 
+        // Ok(ViewSummary {
+        //     state_id: self.state_id,
+        //     node_count,
+        //     edge_count,
+        //     label: metadata.label.clone(),
+        //     author: metadata.author.clone(),
+        //     timestamp: metadata.timestamp,
+        //     is_root: self.is_root()?,
+        //     has_children: !children.is_empty(),
+        // })
+        todo!("Implement HistoricalView::summary")
+    }
+    
+    /*
+    === COMPARISON OPERATIONS ===
+    Compare this view with other states
+    */
+    
+    /// Compare this view with another view to find differences
+    pub fn diff_with(&mut self, other: &mut HistoricalView) -> GraphResult<StateDiff> {
+        // TODO:
+        // let our_snapshot = self.get_snapshot()?;
+        // let their_snapshot = other.get_snapshot()?;
+        // 
+        // Ok(our_snapshot.diff_with(their_snapshot))
+        todo!("Implement HistoricalView::diff_with")
+    }
+    
+    /// Get the path of changes from this state to another state
+    pub fn path_to(&self, target_state: StateId) -> GraphResult<Vec<StateId>> {
+        // TODO:
+        // Find the shortest path through the commit DAG
+        // This is useful for understanding how to get from one state to another
+        todo!("Implement HistoricalView::path_to")
+    }
+}
+
+/// Summary information about a historical view
+#[derive(Debug, Clone)]
+pub struct ViewSummary {
+    pub state_id: StateId,
+    pub node_count: usize,
+    pub edge_count: usize,
+    pub label: String,
+    pub author: String,
+    pub timestamp: u64,
+    pub is_root: bool,
+    pub has_children: bool,
+}
+
+impl ViewSummary {
+    /// Get a human-readable description of this view
+    pub fn description(&self) -> String {
+        // TODO:
+        // format!(
+        //     "State {}: '{}' by {} ({} nodes, {} edges)",
+        //     self.state_id, self.label, self.author, 
+        //     self.node_count, self.edge_count
+        // )
+        todo!("Implement ViewSummary::description")
+    }
+    
+    /// Get the age of this state in seconds
+    pub fn age_seconds(&self) -> u64 {
+        // TODO:
+        // let now = crate::util::timestamp_now();
+        // now.saturating_sub(self.timestamp)
+        todo!("Implement ViewSummary::age_seconds")
     }
 }
 

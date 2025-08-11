@@ -18,7 +18,6 @@ The query engine provides sophisticated read-only operations on graph data:
 1. FILTERING: Find nodes/edges matching specific criteria
 2. AGGREGATION: Compute statistics across sets of entities
 3. PATTERN MATCHING: Find complex structural patterns in the graph
-4. ANALYTICS: Advanced analysis operations for ML/data science workloads
 
 KEY DESIGN DECISIONS:
 - Separate from core data structures (pure analysis layer)
@@ -45,7 +44,7 @@ use crate::errors::{GraphResult, GraphError};
 /// NOT RESPONSIBLE FOR:
 /// - Modifying the graph (read-only operations only)
 /// - Managing graph storage (that's GraphPool's job)
-/// - Version control (that's HistorySystem's job)
+/// - Version control (that's HistoryForest's job)
 #[derive(Debug)]
 pub struct QueryEngine {
     /*
@@ -227,63 +226,6 @@ impl QueryEngine {
         // 2. Group nodes by group_by_attr value
         // 3. For each group, compute aggregation on aggregate_attr
         // 4. Return map of group_value -> aggregation_result
-    }
-    
-    /*
-    === GRAPH ANALYTICS OPERATIONS ===
-    Advanced analysis for understanding graph structure
-    */
-    
-    /// Compute degree distribution of the graph
-    pub fn degree_distribution(&self, pool: &GraphPool) -> GraphResult<DegreeDistribution> {
-        // TODO:
-        // 1. For each node, compute its degree
-        // 2. Count how many nodes have each degree value
-        // 3. Return histogram of degree -> count
-    }
-    
-    /// Find connected components in the graph
-    pub fn connected_components(&self, pool: &GraphPool) -> GraphResult<Vec<Vec<NodeId>>> {
-        // TODO:
-        // 1. Use DFS/BFS to find connected components
-        // 2. Return list of components (each component is list of nodes)
-    }
-    
-    /// Compute shortest path between two nodes
-    pub fn shortest_path(
-        &self,
-        pool: &GraphPool,
-        source: NodeId,
-        target: NodeId
-    ) -> GraphResult<Option<Vec<NodeId>>> {
-        // TODO:
-        // 1. Use BFS to find shortest path
-        // 2. Return None if no path exists
-        // 3. Return Some(path) with intermediate nodes
-    }
-    
-    /// Find nodes within a certain distance of a source node
-    pub fn nodes_within_distance(
-        &self,
-        pool: &GraphPool,
-        source: NodeId,
-        max_distance: usize
-    ) -> GraphResult<HashMap<NodeId, usize>> {
-        // TODO:
-        // 1. Use BFS with distance tracking
-        // 2. Return map of reachable_node -> distance
-    }
-    
-    /// Compute centrality measures for nodes
-    pub fn compute_centrality(
-        &self,
-        pool: &GraphPool,
-        centrality_type: CentralityType
-    ) -> GraphResult<HashMap<NodeId, f64>> {
-        // TODO:
-        // 1. Implement different centrality algorithms
-        // 2. Degree centrality, betweenness centrality, closeness centrality, etc.
-        // 3. Return map of node -> centrality_score
     }
     
     /*
