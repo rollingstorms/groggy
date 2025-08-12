@@ -17,7 +17,7 @@ use crate::types::{StateId, NodeId, EdgeId, AttrName, AttrValue};
 use crate::core::delta::DeltaObject;
 use crate::core::history::Delta;
 use crate::util::timestamp_now;
-use crate::errors::{GraphError, GraphResult};
+use crate::errors::{GraphResult, GraphError};
 
 /// Immutable state object - a point in the graph's history
 #[derive(Debug, Clone)]
@@ -344,83 +344,208 @@ impl GraphSnapshot {
     /// 3. Compare all attributes (changed values)
     /// 4. Return structured diff
     pub fn diff_with(&self, other: &GraphSnapshot) -> StateDiff {
-        // TODO:
-        // let nodes_added = other.active_nodes.iter()
-        //     .filter(|&&node| !self.active_nodes.contains(&node))
-        //     .cloned()
-        //     .collect();
-        // 
-        // let nodes_removed = self.active_nodes.iter()
-        //     .filter(|&&node| !other.active_nodes.contains(&node))
-        //     .cloned()
-        //     .collect();
-        // 
-        // // Similar logic for edges and attributes...
-        // 
-        // StateDiff {
-        //     from_state: self.state_id,
-        //     to_state: other.state_id,
-        //     nodes_added,
-        //     nodes_removed,
-        //     // ... other fields
-        // }
-        todo!("Implement GraphSnapshot::diff_with")
+        use std::collections::HashSet;
+        
+        let self_nodes: HashSet<_> = self.active_nodes.iter().collect();
+        let other_nodes: HashSet<_> = other.active_nodes.iter().collect();
+        
+        let nodes_added = other.active_nodes.iter()
+            .filter(|&&node| !self_nodes.contains(&node))
+            .cloned()
+            .collect();
+        
+        let nodes_removed = self.active_nodes.iter()
+            .filter(|&&node| !other_nodes.contains(&node))
+            .cloned()
+            .collect();
+        
+        // Compare edges
+        let edges_added = other.edges.iter()
+            .filter(|(edge_id, _)| !self.edges.contains_key(edge_id))
+            .map(|(edge_id, &(source, target))| (*edge_id, source, target))
+            .collect();
+        
+        let edges_removed = self.edges.iter()
+            .filter(|(edge_id, _)| !other.edges.contains_key(edge_id))
+            .map(|(edge_id, _)| *edge_id)
+            .collect();
+        
+        // Compare attributes
+        let mut attribute_changes = Vec::new();
+        
+        // Node attribute changes
+        for &node_id in &other.active_nodes {
+            let self_attrs = self.node_attributes.get(&node_id).cloned().unwrap_or_default();
+            let other_attrs = other.node_attributes.get(&node_id).cloned().unwrap_or_default();
+            
+            for (attr_name, new_value) in &other_attrs {
+                let old_value = self_attrs.get(attr_name).cloned();
+                if old_value.as_ref() != Some(new_value) {
+                    attribute_changes.push(AttributeChange {
+                        entity_type: EntityType::Node,
+                        entity_id: node_id as u64,
+                        attr_name: attr_name.clone(),
+                        old_value,
+                        new_value: Some(new_value.clone()),
+                    });
+                }
+            }
+            
+            // Check for removed attributes
+            for (attr_name, old_value) in &self_attrs {
+                if !other_attrs.contains_key(attr_name) {
+                    attribute_changes.push(AttributeChange {
+                        entity_type: EntityType::Node,
+                        entity_id: node_id as u64,
+                        attr_name: attr_name.clone(),
+                        old_value: Some(old_value.clone()),
+                        new_value: None,
+                    });
+                }
+            }
+        }
+        
+        // Edge attribute changes
+        for &edge_id in other.edges.keys() {
+            let self_attrs = self.edge_attributes.get(&edge_id).cloned().unwrap_or_default();
+            let other_attrs = other.edge_attributes.get(&edge_id).cloned().unwrap_or_default();
+            
+            for (attr_name, new_value) in &other_attrs {
+                let old_value = self_attrs.get(attr_name).cloned();
+                if old_value.as_ref() != Some(new_value) {
+                    attribute_changes.push(AttributeChange {
+                        entity_type: EntityType::Edge,
+                        entity_id: edge_id as u64,
+                        attr_name: attr_name.clone(),
+                        old_value,
+                        new_value: Some(new_value.clone()),
+                    });
+                }
+            }
+            
+            // Check for removed attributes
+            for (attr_name, old_value) in &self_attrs {
+                if !other_attrs.contains_key(attr_name) {
+                    attribute_changes.push(AttributeChange {
+                        entity_type: EntityType::Edge,
+                        entity_id: edge_id as u64,
+                        attr_name: attr_name.clone(),
+                        old_value: Some(old_value.clone()),
+                        new_value: None,
+                    });
+                }
+            }
+        }
+        
+        StateDiff {
+            from_state: self.state_id,
+            to_state: other.state_id,
+            nodes_added,
+            nodes_removed,
+            edges_added,
+            edges_removed,
+            attribute_changes,
+        }
     }
     
     /// Get basic statistics about this snapshot
     pub fn statistics(&self) -> SnapshotStatistics {
-        // TODO:
-        // SnapshotStatistics {
-        //     node_count: self.active_nodes.len(),
-        //     edge_count: self.edges.len(),
-        //     node_attr_count: self.node_attributes.values()
-        //         .map(|attrs| attrs.len()).sum(),
-        //     edge_attr_count: self.edge_attributes.values()
-        //         .map(|attrs| attrs.len()).sum(),
-        //     memory_usage: self.estimate_memory_usage(),
-        // }
-        todo!("Implement GraphSnapshot::statistics")
+        SnapshotStatistics {
+            node_count: self.active_nodes.len(),
+            edge_count: self.edges.len(),
+            node_attr_count: self.node_attributes.values()
+                .map(|attrs| attrs.len()).sum(),
+            edge_attr_count: self.edge_attributes.values()
+                .map(|attrs| attrs.len()).sum(),
+            memory_usage: self.estimate_memory_usage(),
+        }
     }
     
     /// Estimate memory usage of this snapshot in bytes
     fn estimate_memory_usage(&self) -> usize {
-        // TODO: Calculate approximate bytes used by all data structures
-        // Include: Vec<NodeId>, HashMap storage, attribute values, etc.
-        todo!("Implement GraphSnapshot::estimate_memory_usage")
+        let mut total = 0;
+        
+        // Vec<NodeId>
+        total += self.active_nodes.len() * std::mem::size_of::<NodeId>();
+        
+        // HashMap<EdgeId, (NodeId, NodeId)>
+        total += self.edges.len() * (std::mem::size_of::<EdgeId>() + std::mem::size_of::<(NodeId, NodeId)>());
+        
+        // HashMap<NodeId, HashMap<AttrName, AttrValue>>
+        for (_, attrs) in &self.node_attributes {
+            total += std::mem::size_of::<NodeId>();
+            for (_name, value) in attrs {
+                total += std::mem::size_of::<AttrName>();
+                total += match value {
+                    AttrValue::Text(s) => s.len(),
+                    AttrValue::Int(_) => std::mem::size_of::<i64>(),
+                    AttrValue::Float(_) => std::mem::size_of::<f64>(),
+                    AttrValue::Bool(_) => std::mem::size_of::<bool>(),
+                    AttrValue::FloatVec(v) => v.len() * std::mem::size_of::<f32>(),
+                    AttrValue::CompactText(cs) => cs.memory_size(),
+                    AttrValue::SmallInt(_) => std::mem::size_of::<i32>(),
+                    AttrValue::Bytes(b) => b.len(),
+                    AttrValue::CompressedText(cd) => cd.memory_size(),
+                    AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+                };
+            }
+        }
+        
+        // HashMap<EdgeId, HashMap<AttrName, AttrValue>>
+        for (_, attrs) in &self.edge_attributes {
+            total += std::mem::size_of::<EdgeId>();
+            for (_name, value) in attrs {
+                total += std::mem::size_of::<AttrName>();
+                total += match value {
+                    AttrValue::Text(s) => s.len(),
+                    AttrValue::Int(_) => std::mem::size_of::<i64>(),
+                    AttrValue::Float(_) => std::mem::size_of::<f64>(),
+                    AttrValue::Bool(_) => std::mem::size_of::<bool>(),
+                    AttrValue::FloatVec(v) => v.len() * std::mem::size_of::<f32>(),
+                    AttrValue::CompactText(cs) => cs.memory_size(),
+                    AttrValue::SmallInt(_) => std::mem::size_of::<i32>(),
+                    AttrValue::Bytes(b) => b.len(),
+                    AttrValue::CompressedText(cd) => cd.memory_size(),
+                    AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+                };
+            }
+        }
+        
+        total
     }
     
     /// Check if a node exists in this snapshot
     pub fn contains_node(&self, node_id: NodeId) -> bool {
-        // TODO: self.active_nodes.contains(&node_id)
-        todo!("Implement GraphSnapshot::contains_node")
+        self.active_nodes.contains(&node_id)
     }
     
     /// Check if an edge exists in this snapshot
     pub fn contains_edge(&self, edge_id: EdgeId) -> bool {
-        // TODO: self.edges.contains_key(&edge_id)
-        todo!("Implement GraphSnapshot::contains_edge")
+        self.edges.contains_key(&edge_id)
     }
     
     /// Get all neighbors of a node in this snapshot
     pub fn get_neighbors(&self, node_id: NodeId) -> GraphResult<Vec<NodeId>> {
-        // TODO:
-        // if !self.contains_node(node_id) {
-        //     return Err(GraphError::NodeNotFound { node_id });
-        // }
-        // 
-        // let mut neighbors = Vec::new();
-        // for &(source, target) in self.edges.values() {
-        //     if source == node_id {
-        //         neighbors.push(target);
-        //     } else if target == node_id {
-        //         neighbors.push(source);
-        //     }
-        // }
-        // 
-        // neighbors.sort();
-        // neighbors.dedup();
-        // Ok(neighbors)
-        todo!("Implement GraphSnapshot::get_neighbors")
+        if !self.contains_node(node_id) {
+            return Err(GraphError::NodeNotFound {
+                node_id,
+                operation: "get neighbors".to_string(),
+                suggestion: "Check if node exists in this snapshot".to_string(),
+            });
+        }
+        
+        let mut neighbors = Vec::new();
+        for &(source, target) in self.edges.values() {
+            if source == node_id {
+                neighbors.push(target);
+            } else if target == node_id {
+                neighbors.push(source);
+            }
+        }
+        
+        neighbors.sort();
+        neighbors.dedup();
+        Ok(neighbors)
     }
 }
 
@@ -446,41 +571,35 @@ pub struct StateDiff {
 impl StateDiff {
     /// Create an empty diff between two states
     pub fn empty(from_state: StateId, to_state: StateId) -> Self {
-        // TODO:
-        // Self {
-        //     from_state,
-        //     to_state,
-        //     nodes_added: Vec::new(),
-        //     nodes_removed: Vec::new(),
-        //     edges_added: Vec::new(),
-        //     edges_removed: Vec::new(),
-        //     attribute_changes: Vec::new(),
-        // }
-        todo!("Implement StateDiff::empty")
+        Self {
+            from_state,
+            to_state,
+            nodes_added: Vec::new(),
+            nodes_removed: Vec::new(),
+            edges_added: Vec::new(),
+            edges_removed: Vec::new(),
+            attribute_changes: Vec::new(),
+        }
     }
     
     /// Check if this diff represents any changes
     pub fn is_empty(&self) -> bool {
-        // TODO:
-        // self.nodes_added.is_empty() && 
-        // self.nodes_removed.is_empty() &&
-        // self.edges_added.is_empty() &&
-        // self.edges_removed.is_empty() &&
-        // self.attribute_changes.is_empty()
-        todo!("Implement StateDiff::is_empty")
+        self.nodes_added.is_empty() && 
+        self.nodes_removed.is_empty() &&
+        self.edges_added.is_empty() &&
+        self.edges_removed.is_empty() &&
+        self.attribute_changes.is_empty()
     }
     
     /// Get a summary of the changes in this diff
     pub fn summary(&self) -> DiffSummary {
-        // TODO:
-        // DiffSummary {
-        //     from_state: self.from_state,
-        //     to_state: self.to_state,
-        //     nodes_changed: self.nodes_added.len() + self.nodes_removed.len(),
-        //     edges_changed: self.edges_added.len() + self.edges_removed.len(),
-        //     attributes_changed: self.attribute_changes.len(),
-        // }
-        todo!("Implement StateDiff::summary")
+        DiffSummary {
+            from_state: self.from_state,
+            to_state: self.to_state,
+            nodes_changed: self.nodes_added.len() + self.nodes_removed.len(),
+            edges_changed: self.edges_added.len() + self.edges_removed.len(),
+            attributes_changed: self.attribute_changes.len(),
+        }
     }
 }
 
@@ -532,10 +651,10 @@ Helper functions for working with states
 /// 2. Merge attributes (conflict resolution needed)
 /// 3. Create new snapshot with merged state
 pub fn merge_snapshots(
-    base: &GraphSnapshot,
-    branch1: &GraphSnapshot, 
-    branch2: &GraphSnapshot,
-    target_state: StateId
+    _base: &GraphSnapshot,
+    _branch1: &GraphSnapshot, 
+    _branch2: &GraphSnapshot,
+    _target_state: StateId
 ) -> GraphResult<GraphSnapshot> {
     // TODO: Complex merge algorithm
     // This is needed for git-like branch merging
@@ -548,7 +667,7 @@ pub fn merge_snapshots(
 /// 1. All edges reference active nodes
 /// 2. All attribute maps reference active entities
 /// 3. No duplicate IDs
-pub fn validate_snapshot(snapshot: &GraphSnapshot) -> GraphResult<()> {
+pub fn validate_snapshot(_snapshot: &GraphSnapshot) -> GraphResult<()> {
     // TODO:
     // // Check edge endpoints are active nodes
     // for &(source, target) in snapshot.edges.values() {

@@ -204,6 +204,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 AttrValue::Float(_) => "Float",
                 AttrValue::Bool(_) => "Bool",
                 AttrValue::FloatVec(_) => "FloatVec",
+                AttrValue::CompactText(_) => "CompactText",
+                AttrValue::SmallInt(_) => "SmallInt",
+                AttrValue::Bytes(_) => "Bytes",
+                AttrValue::CompressedText(_) => "CompressedText",
+                AttrValue::CompressedFloatVec(_) => "CompressedFloatVec",
             };
             *node_attr_types.entry(type_name).or_insert(0) += 1;
         }

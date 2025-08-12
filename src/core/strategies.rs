@@ -310,9 +310,12 @@ impl IndexDeltaStrategy {
         }
     }
     
-    /// Get current timestamp (placeholder - would use actual time in real implementation)
+    /// Get current timestamp
     fn current_timestamp(&self) -> u64 {
-        0 // TODO: In real implementation, use std::time::SystemTime or similar
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
     }
 }
 

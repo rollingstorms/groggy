@@ -32,6 +32,14 @@ path = "git_like_test.rs"
 name = "query_test"
 path = "query_test.rs"
 
+[[bin]]
+name = "comprehensive_test_v2"
+path = "comprehensive_test_v2.rs"
+
+[[bin]]
+name = "stress_test"
+path = "stress_test.rs"
+
 [dependencies]
 pyo3 = { version = "0.20", features = ["extension-module"] }
 petgraph = "0.6"
@@ -43,3 +51,4 @@ parking_lot = "0.12"  # High-performance locks
 dashmap = "5.4"       # Concurrent HashMap
 ahash = "0.8"         # Fast hash algorithm
 bitvec = "1.0"        # Efficient bit vectors for indexing
+wide = "0.7"          # SIMD operations

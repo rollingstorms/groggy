@@ -28,10 +28,9 @@ KEY INSIGHTS:
 - Immutable design: Safe for concurrent access and sharing
 */
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 use crate::types::{AttrName, AttrValue, NodeId, EdgeId};
 
 /// Index-based columnar delta for efficient temporal versioning
@@ -249,12 +248,12 @@ impl DeltaObject {
     /// Create a new index-based delta object (placeholder for future full implementation)
     /// Currently adapts to existing value-based structure
     pub fn new_with_indices(
-        node_attr_indices: HashMap<AttrName, ColumnIndexDelta>,
-        edge_attr_indices: HashMap<AttrName, ColumnIndexDelta>,
-        nodes_added: Vec<NodeId>,
-        nodes_removed: Vec<NodeId>,
-        edges_added: Vec<(EdgeId, NodeId, NodeId)>,
-        edges_removed: Vec<EdgeId>,
+        _node_attr_indices: HashMap<AttrName, ColumnIndexDelta>,
+        _edge_attr_indices: HashMap<AttrName, ColumnIndexDelta>,
+        _nodes_added: Vec<NodeId>,
+        _nodes_removed: Vec<NodeId>,
+        _edges_added: Vec<(EdgeId, NodeId, NodeId)>,
+        _edges_removed: Vec<EdgeId>,
     ) -> Self {
         // NOTE: This is a temporary adapter implementation
         // In a full implementation, we'd have a separate IndexDeltaObject

@@ -486,6 +486,7 @@ impl RefManager {
     */
 
     /// Get list of all branch names (for error messages)
+    #[allow(dead_code)]
     fn list_branch_names(&self) -> Vec<BranchName> {
         self.branches.keys().cloned().collect()
     }

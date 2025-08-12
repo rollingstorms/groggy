@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Add some nodes and edges
     let node1 = graph.add_node();
     let node2 = graph.add_node();
-    let edge = graph.add_edge(node1, node2)?;
+    let _edge = graph.add_edge(node1, node2)?;
     
     // Set some attributes
     graph.set_node_attr(node1, "name".to_string(), AttrValue::Text("Alice".to_string()))?;
