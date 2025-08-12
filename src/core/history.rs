@@ -1143,7 +1143,8 @@ impl<'a> HistoricalView<'a> {
     Structural queries about the graph
     */
     
-    /// Get all neighbors of a node at this state
+    /// Get all neighbors of a node at this historical state
+    /// NOTE: For current state, use Graph::neighbors() which is optimized with columnar topology
     pub fn get_neighbors(&mut self, node: NodeId) -> GraphResult<Vec<NodeId>> {
         let snapshot = self.get_snapshot()?;
         snapshot.get_neighbors(node)

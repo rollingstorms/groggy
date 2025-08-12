@@ -166,6 +166,9 @@ impl Hash for AttrValue {
     }
 }
 
+// Manual Eq implementation to handle f32 comparison
+impl Eq for AttrValue {}
+
 /// Compressed data storage for large values (Memory Optimization 3)
 /// Uses simple run-length encoding and basic compression
 #[derive(Debug, Clone, PartialEq)]

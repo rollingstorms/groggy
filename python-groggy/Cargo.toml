@@ -1,0 +1,12 @@
+[package]
+name = "python-groggy"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "groggy"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.20", features = ["extension-module"] }
+groggy = { path = "../" }  # Path to the main Rust library

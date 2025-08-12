@@ -15,7 +15,7 @@ use crate::core::change_tracker::ChangeTracker;
 use crate::core::pool::GraphPool;
 use crate::core::space::GraphSpace;
 use crate::core::history::{HistoryForest, HistoricalView, CommitDiff};
-use crate::core::query::{QueryEngine, NodeFilter, EdgeFilter, GraphQuery, QueryResult};
+use crate::core::query::{QueryEngine, NodeFilter, EdgeFilter};
 use crate::core::ref_manager::BranchInfo;
 use crate::config::GraphConfig;
 use crate::types::{NodeId, EdgeId, AttrName, AttrValue, StateId, BranchName, MemoryStatistics, MemoryEfficiency, CompressionStatistics};
@@ -595,7 +595,9 @@ impl Graph {
             })
     }
     
-    /// Get all neighbors of a node (OPTIMIZED: Cached columnar approach with vectorized operations)
+    /// Get all neighbors of a node (MAIN OPTIMIZED API)
+    /// Uses cached columnar topology with vectorized operations and automatic deduplication.
+    /// This is the primary neighbors method - other get_neighbors() methods are for internal/historical use.
     pub fn neighbors(&self, node: NodeId) -> Result<Vec<NodeId>, GraphError> {
         if !self.space.contains_node(node) {
             return Err(GraphError::NodeNotFound {
@@ -655,322 +657,6 @@ impl Graph {
         Ok(degree)
     }
     
-    /// SIMD-optimized neighbor finding for large graphs (Phase 2.1)
-    /// 
-    /// PERFORMANCE: Uses vectorized batch processing for better cache efficiency
-    /// when node count > 1000 and topology is dense enough to benefit
-    pub fn neighbors_simd(&self, node: NodeId) -> Result<Vec<NodeId>, GraphError> {
-        if !self.space.contains_node(node) {
-            return Err(GraphError::NodeNotFound {
-                node_id: node,
-                operation: "get neighbors (SIMD)".to_string(),
-                suggestion: "Check if node exists with contains_node()".to_string(),
-            });
-        }
-        
-        let (_edge_ids, sources, targets) = self.space.get_columnar_topology();
-        
-        // For small graphs, fall back to regular implementation
-        if sources.len() < 1000 {
-            return self.neighbors(node);
-        }
-        
-        // Vectorized batch processing for better cache efficiency
-        let mut neighbors = Vec::new();
-        
-        // Process in chunks of 8 for better cache utilization
-        let chunk_size = 8;
-        let chunks = sources.len() / chunk_size;
-        
-        for chunk_idx in 0..chunks {
-            let start_idx = chunk_idx * chunk_size;
-            
-            // Process 8 elements at once (compiler can optimize with SIMD)
-            for i in 0..chunk_size {
-                let idx = start_idx + i;
-                if sources[idx] == node {
-                    neighbors.push(targets[idx]);
-                } else if targets[idx] == node {
-                    neighbors.push(sources[idx]);
-                }
-            }
-        }
-        
-        // Handle remaining elements (not divisible by chunk_size)
-        for i in (chunks * chunk_size)..sources.len() {
-            if sources[i] == node {
-                neighbors.push(targets[i]);
-            } else if targets[i] == node {
-                neighbors.push(sources[i]);
-            }
-        }
-        
-        // Remove duplicates efficiently
-        if !neighbors.is_empty() {
-            neighbors.sort_unstable();
-            neighbors.dedup();
-        }
-        
-        Ok(neighbors)
-    }
-    
-    /// SIMD-optimized degree calculation for large graphs (Phase 2.1)
-    /// 
-    /// PERFORMANCE: Uses vectorized batch processing for better cache efficiency
-    pub fn degree_simd(&self, node: NodeId) -> Result<usize, GraphError> {
-        if !self.space.contains_node(node) {
-            return Err(GraphError::NodeNotFound {
-                node_id: node,
-                operation: "get degree (SIMD)".to_string(),
-                suggestion: "Check if node exists with contains_node()".to_string(),
-            });
-        }
-        
-        let (_edge_ids, sources, targets) = self.space.get_columnar_topology();
-        
-        // For small graphs, fall back to regular implementation
-        if sources.len() < 1000 {
-            return self.degree(node);
-        }
-        
-        // Vectorized batch processing for better cache efficiency
-        let mut degree = 0usize;
-        
-        // Process in chunks of 8 for better cache utilization
-        let chunk_size = 8;
-        let chunks = sources.len() / chunk_size;
-        
-        for chunk_idx in 0..chunks {
-            let start_idx = chunk_idx * chunk_size;
-            
-            // Process 8 elements at once (compiler can optimize with SIMD)
-            for i in 0..chunk_size {
-                let idx = start_idx + i;
-                if sources[idx] == node || targets[idx] == node {
-                    degree += 1;
-                }
-            }
-        }
-        
-        // Handle remaining elements
-        for i in (chunks * chunk_size)..sources.len() {
-            if sources[i] == node || targets[i] == node {
-                degree += 1;
-            }
-        }
-        
-        Ok(degree)
-    }
-    
-    /// Parallel bulk neighbor queries for multiple nodes (Phase 2.2)
-    /// 
-    /// PERFORMANCE: Uses manual chunking for parallel processing when node count > 100
-    pub fn neighbors_bulk_parallel(&self, nodes: &[NodeId]) -> Result<Vec<(NodeId, Vec<NodeId>)>, GraphError> {
-        // For small batches, use sequential processing
-        if nodes.len() < 100 {
-            return nodes.iter()
-                .map(|&node| self.neighbors(node).map(|neighbors| (node, neighbors)))
-                .collect();
-        }
-        
-        // For now, use optimized sequential processing
-        // (Thread safety requires more complex implementation)
-        nodes.iter()
-            .map(|&node| self.neighbors(node).map(|neighbors| (node, neighbors)))
-            .collect()
-    }
-    
-    /// Parallel bulk degree queries for multiple nodes (Phase 2.2)
-    /// 
-    /// PERFORMANCE: Uses manual chunking for parallel processing when node count > 100
-    pub fn degree_bulk_parallel(&self, nodes: &[NodeId]) -> Result<Vec<(NodeId, usize)>, GraphError> {
-        // For small batches, use sequential processing
-        if nodes.len() < 100 {
-            return nodes.iter()
-                .map(|&node| self.degree(node).map(|degree| (node, degree)))
-                .collect();
-        }
-        
-        // For now, use optimized sequential processing
-        // (Thread safety requires more complex implementation)
-        nodes.iter()
-            .map(|&node| self.degree(node).map(|degree| (node, degree)))
-            .collect()
-    }
-    
-    /// Parallel attribute setting for massive bulk operations (Phase 2.2)
-    /// 
-    /// PERFORMANCE: Uses optimized sequential processing for thread safety
-    pub fn set_node_attrs_parallel(&mut self, attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>>) -> Result<(), GraphError> {
-        // For now, use the existing optimized bulk method
-        // (True parallel processing requires Arc<Mutex<>> or other sync primitives)
-        self.set_node_attrs(attrs)
-    }
-    
-    /// Advanced bulk node creation with batch validation (Phase 2.3)
-    /// 
-    /// PERFORMANCE: Pre-validates entire batch, then uses vectorized insertion
-    pub fn add_nodes_advanced(&mut self, count: usize) -> Result<Vec<NodeId>, GraphError> {
-        // Batch validation: check if we can allocate this many nodes
-        if count == 0 {
-            return Ok(Vec::new());
-        }
-        
-        // Pre-allocate all structures for optimal performance
-        let (start_id, end_id, node_ids) = self.pool.add_nodes_bulk(count);
-        
-        // Vectorized activation in space
-        self.space.activate_nodes_bulk((start_id, end_id));
-        
-        // Bulk change tracking
-        self.change_tracker.record_nodes_addition(&node_ids);
-        
-        Ok(node_ids)
-    }
-    
-    /// Advanced bulk edge creation with comprehensive validation (Phase 2.3)
-    /// 
-    /// PERFORMANCE: Batch validates all edges, then uses vectorized insertion
-    pub fn add_edges_advanced(&mut self, edges: &[(NodeId, NodeId)]) -> Result<Vec<EdgeId>, GraphError> {
-        if edges.is_empty() {
-            return Ok(Vec::new());
-        }
-        
-        // PHASE 1: Batch validation - validate all edges before creating any
-        for &(source, target) in edges {
-            if !self.space.contains_node(source) {
-                return Err(GraphError::NodeNotFound {
-                    node_id: source,
-                    operation: "add edges (batch)".to_string(),
-                    suggestion: "Ensure all source nodes exist before bulk edge creation".to_string(),
-                });
-            }
-            if !self.space.contains_node(target) {
-                return Err(GraphError::NodeNotFound {
-                    node_id: target,
-                    operation: "add edges (batch)".to_string(),
-                    suggestion: "Ensure all target nodes exist before bulk edge creation".to_string(),
-                });
-            }
-        }
-        
-        // PHASE 2: Vectorized insertion - all validations passed
-        let edge_ids = self.pool.add_edges_bulk(edges);
-        
-        // PHASE 3: Bulk activation with topology cache update
-        let edges_with_ids: Vec<_> = edge_ids.iter().zip(edges.iter())
-            .map(|(&edge_id, &(source, target))| (edge_id, source, target))
-            .collect();
-        
-        self.space.activate_edges_bulk_with_topology(edges_with_ids.clone());
-        
-        // PHASE 4: Bulk change tracking
-        self.change_tracker.record_edges_addition(&edges_with_ids);
-        
-        Ok(edge_ids)
-    }
-    
-    /// Advanced bulk attribute retrieval with vectorized operations (Phase 2.3)
-    /// 
-    /// PERFORMANCE: Uses columnar access patterns and vectorized collection
-    pub fn get_node_attrs_advanced(&self, nodes: &[NodeId], attr_names: &[AttrName]) -> Result<HashMap<NodeId, HashMap<AttrName, Option<AttrValue>>>, GraphError> {
-        if nodes.is_empty() || attr_names.is_empty() {
-            return Ok(HashMap::new());
-        }
-        
-        // Pre-allocate result structure
-        let mut results = HashMap::with_capacity(nodes.len());
-        
-        // For each attribute, do a vectorized retrieval across all nodes
-        for attr_name in attr_names {
-            // Collect all indices for this attribute across all nodes
-            let mut indices = Vec::with_capacity(nodes.len());
-            for &node_id in nodes {
-                let index = self.space.get_node_attr_index(node_id, attr_name);
-                indices.push((node_id, index));
-            }
-            
-            // Bulk retrieve values from pool using columnar access
-            let valid_indices: Vec<_> = indices.iter()
-                .filter_map(|&(node_id, index)| index.map(|idx| (node_id, idx)))
-                .collect();
-            
-            if !valid_indices.is_empty() {
-                let idx_values: Vec<_> = valid_indices.iter().map(|(_, idx)| *idx).collect();
-                let values = self.pool.get_attrs_at_indices(attr_name, &idx_values, true)?;
-                
-                // Distribute values back to nodes
-                for (i, &(node_id, _)) in valid_indices.iter().enumerate() {
-                    results.entry(node_id)
-                        .or_insert_with(HashMap::new)
-                        .insert(attr_name.clone(), values[i].clone());
-                }
-            }
-            
-            // Fill in None values for nodes without this attribute
-            for &node_id in nodes {
-                if !results.get(&node_id)
-                    .map(|attrs| attrs.contains_key(attr_name))
-                    .unwrap_or(false) {
-                    results.entry(node_id)
-                        .or_insert_with(HashMap::new)
-                        .insert(attr_name.clone(), None);
-                }
-            }
-        }
-        
-        Ok(results)
-    }
-    
-    /// Advanced bulk topology analysis with vectorized processing (Phase 2.3)
-    /// 
-    /// PERFORMANCE: Single-pass analysis using columnar topology cache
-    pub fn analyze_topology_bulk(&self, nodes: &[NodeId]) -> Result<Vec<(NodeId, usize, Vec<NodeId>)>, GraphError> {
-        if nodes.is_empty() {
-            return Ok(Vec::new());
-        }
-        
-        // Get columnar topology once
-        let (_edge_ids, sources, targets) = self.space.get_columnar_topology();
-        
-        // Pre-allocate results
-        let mut results = Vec::with_capacity(nodes.len());
-        
-        // Single-pass vectorized analysis
-        for &node in nodes {
-            if !self.space.contains_node(node) {
-                return Err(GraphError::NodeNotFound {
-                    node_id: node,
-                    operation: "bulk topology analysis".to_string(),
-                    suggestion: "Ensure all nodes exist before analysis".to_string(),
-                });
-            }
-            
-            // Vectorized neighbor and degree calculation in single pass
-            let mut neighbors = Vec::new();
-            let mut degree = 0;
-            
-            for i in 0..sources.len() {
-                if sources[i] == node {
-                    neighbors.push(targets[i]);
-                    degree += 1;
-                } else if targets[i] == node {
-                    neighbors.push(sources[i]);
-                    degree += 1;
-                }
-            }
-            
-            // Optimize neighbor list
-            if !neighbors.is_empty() {
-                neighbors.sort_unstable();
-                neighbors.dedup();
-            }
-            
-            results.push((node, degree, neighbors));
-        }
-        
-        Ok(results)
-    }
     
     /// Get basic statistics about the current graph
     pub fn statistics(&self) -> GraphStatistics {
@@ -1247,33 +933,79 @@ impl Graph {
     
     /// Find nodes matching attribute criteria
     pub fn find_nodes(&mut self, filter: NodeFilter) -> Result<Vec<NodeId>, GraphError> {
-        self.query_engine.find_nodes_by_filter(&self.pool, &filter)
+        self.query_engine.find_nodes_by_filter_with_space(&self.pool, &self.space, &filter)
             .map_err(|e| e.into())
     }
     
     /// Find edges matching attribute criteria
     pub fn find_edges(&mut self, filter: EdgeFilter) -> Result<Vec<EdgeId>, GraphError> {
-        match filter {
-            EdgeFilter::Attribute(attr_name, attr_filter) => {
-                // Simple attribute filter - delegate to query engine
-                self.query_engine.find_edges_by_attribute(&self.pool, &attr_name, &attr_filter)
-                    .map_err(|e| e.into())
-            },
-            // TODO: Implement other filter types (And, Or, Not, endpoint filters, etc.)
-            _ => {
-                // For now, return empty results for unsupported filters
-                Ok(Vec::new())
-            }
-        }
+        self.query_engine.find_edges_by_filter_with_space(&self.pool, &self.space, &filter)
+            .map_err(|e| e.into())
     }
     
-    /// Run a complex query with multiple criteria
-    pub fn query(&self, query: GraphQuery) -> Result<QueryResult, GraphError> {
-        let _ = query; // Silence unused parameter warning
-        Err(GraphError::NotImplemented {
-            feature: "complex queries".to_string(),
-            tracking_issue: None,
-        })
+    /*
+    === GRAPH TRAVERSAL ALGORITHMS ===
+    High-level graph traversal and pathfinding operations
+    */
+    
+    /// Perform Breadth-First Search from a starting node
+    pub fn bfs(&mut self, start: NodeId, options: crate::core::traversal::TraversalOptions) -> Result<crate::core::traversal::TraversalResult, GraphError> {
+        self.query_engine.bfs(&self.pool, &mut self.space, start, options)
+            .map_err(|e| e.into())
+    }
+    
+    /// Perform Depth-First Search from a starting node
+    pub fn dfs(&mut self, start: NodeId, options: crate::core::traversal::TraversalOptions) -> Result<crate::core::traversal::TraversalResult, GraphError> {
+        self.query_engine.dfs(&self.pool, &mut self.space, start, options)
+            .map_err(|e| e.into())
+    }
+    
+    /// Find shortest path between two nodes
+    pub fn shortest_path(&mut self, start: NodeId, end: NodeId, options: crate::core::traversal::PathFindingOptions) -> Result<Option<crate::core::traversal::Path>, GraphError> {
+        self.query_engine.shortest_path(&self.pool, &mut self.space, start, end, options)
+            .map_err(|e| e.into())
+    }
+    
+    /// Find all simple paths between two nodes
+    pub fn all_paths(&mut self, start: NodeId, end: NodeId, max_length: usize) -> Result<Vec<crate::core::traversal::Path>, GraphError> {
+        self.query_engine.all_paths(&self.pool, &mut self.space, start, end, max_length)
+            .map_err(|e| e.into())
+    }
+    
+    /// Find all connected components in the graph
+    pub fn connected_components(&mut self, options: crate::core::traversal::TraversalOptions) -> Result<crate::core::traversal::ConnectedComponentsResult, GraphError> {
+        self.query_engine.connected_components(&self.pool, &mut self.space, options)
+            .map_err(|e| e.into())
+    }
+    
+    /// Get traversal performance statistics
+    pub fn traversal_statistics(&self) -> &crate::core::traversal::TraversalStats {
+        self.query_engine.traversal_statistics()
+    }
+    
+    /*
+    === PHASE 3.3: COMPLEX QUERY COMPOSITION ===
+    High-level complex query building and execution
+    */
+    
+    /// Create a new complex query builder
+    pub fn query(&self) -> crate::core::query::ComplexQueryBuilder {
+        self.query_engine.query_builder()
+    }
+    
+    /// Execute a complex query with optimization and caching
+    pub fn execute_query(&mut self, query: crate::core::query::ComplexQuery) -> Result<crate::core::query::ComplexQueryResult, GraphError> {
+        self.query_engine.execute_complex_query(&self.pool, &mut self.space, query)
+            .map_err(|e| e.into())
+    }
+    
+    /// Create and execute a query in one step (convenience method)
+    pub fn execute_query_builder<F>(&mut self, builder_fn: F) -> Result<crate::core::query::ComplexQueryResult, GraphError>
+    where
+        F: FnOnce(crate::core::query::ComplexQueryBuilder) -> crate::core::query::ComplexQuery,
+    {
+        let query = builder_fn(self.query());
+        self.execute_query(query)
     }
     
     /// Create a read-only view of the graph for analysis
@@ -1379,6 +1111,172 @@ impl Graph {
             feature: "save_to_path".to_string(),
             tracking_issue: None,
         })
+    }
+    
+    /*
+    === AGGREGATION AND ANALYTICS ===
+    Phase 3.4 implementation - comprehensive query result aggregation
+    */
+    
+    /// Compute aggregate statistics for a node attribute
+    pub fn aggregate_node_attribute(
+        &self,
+        attr_name: &AttrName,
+        aggregation: crate::core::query::AggregationType
+    ) -> Result<crate::core::query::AggregationResult, GraphError> {
+        self.query_engine.aggregate_node_attribute(&self.pool, &self.space, attr_name, aggregation)
+            .map_err(|e| GraphError::internal(&format!("Node aggregation failed: {}", e), "Graph::aggregate_node_attribute"))
+    }
+    
+    /// Compute aggregate statistics for an edge attribute  
+    pub fn aggregate_edge_attribute(
+        &self,
+        attr_name: &AttrName,
+        aggregation: crate::core::query::AggregationType
+    ) -> Result<crate::core::query::AggregationResult, GraphError> {
+        self.query_engine.aggregate_edge_attribute(&self.pool, &self.space, attr_name, aggregation)
+            .map_err(|e| GraphError::internal(&format!("Edge aggregation failed: {}", e), "Graph::aggregate_edge_attribute"))
+    }
+    
+    /// Group nodes by attribute value and compute aggregates for each group
+    pub fn group_nodes_by_attribute(
+        &self,
+        group_by_attr: &AttrName,
+        aggregate_attr: &AttrName,
+        aggregation: crate::core::query::AggregationType
+    ) -> Result<std::collections::HashMap<crate::types::AttrValue, crate::core::query::AggregationResult>, GraphError> {
+        self.query_engine.group_nodes_by_attribute(&self.pool, &self.space, group_by_attr, aggregate_attr, aggregation)
+            .map_err(|e| GraphError::internal(&format!("Node grouping failed: {}", e), "Graph::group_nodes_by_attribute"))
+    }
+    
+    /// Get comprehensive statistics for an attribute
+    pub fn compute_comprehensive_stats(
+        &self,
+        attr_name: &AttrName,
+        target: crate::core::query::AggregationTarget
+    ) -> Result<crate::core::query::ComprehensiveStats, GraphError> {
+        self.query_engine.compute_comprehensive_stats(&self.pool, &self.space, attr_name, target)
+            .map_err(|e| GraphError::internal(&format!("Comprehensive stats failed: {}", e), "Graph::compute_comprehensive_stats"))
+    }
+    
+    /// Create an analyzer for node attributes (fluent API)
+    pub fn analyze_node_attribute<'a>(&'a self, attr_name: &'a AttrName) -> NodeAttributeAnalyzer<'a> {
+        NodeAttributeAnalyzer::new(&self.query_engine, &self.pool, &self.space, attr_name)
+    }
+    
+    /// Create an analyzer for edge attributes (fluent API)  
+    pub fn analyze_edge_attribute<'a>(&'a self, attr_name: &'a AttrName) -> EdgeAttributeAnalyzer<'a> {
+        EdgeAttributeAnalyzer::new(&self.query_engine, &self.pool, &self.space, attr_name)
+    }
+}
+
+/// Fluent API for node attribute analysis
+pub struct NodeAttributeAnalyzer<'a> {
+    query_engine: &'a crate::core::query::QueryEngine,
+    pool: &'a crate::core::pool::GraphPool,
+    space: &'a crate::core::space::GraphSpace,
+    attr_name: &'a AttrName,
+}
+
+impl<'a> NodeAttributeAnalyzer<'a> {
+    pub fn new(
+        query_engine: &'a crate::core::query::QueryEngine,
+        pool: &'a crate::core::pool::GraphPool, 
+        space: &'a crate::core::space::GraphSpace,
+        attr_name: &'a AttrName
+    ) -> Self {
+        Self { query_engine, pool, space, attr_name }
+    }
+    
+    pub fn count(self) -> Result<i64, GraphError> {
+        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
+        analyzer.count(self.pool, self.space)
+            .map_err(|e| GraphError::internal(&format!("Count failed: {}", e), "NodeAttributeAnalyzer::count"))
+    }
+    
+    pub fn sum(self) -> Result<f64, GraphError> {
+        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
+        analyzer.sum(self.pool, self.space)
+            .map_err(|e| GraphError::internal(&format!("Sum failed: {}", e), "NodeAttributeAnalyzer::sum"))
+    }
+    
+    pub fn average(self) -> Result<f64, GraphError> {
+        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
+        analyzer.average(self.pool, self.space)
+            .map_err(|e| GraphError::internal(&format!("Average failed: {}", e), "NodeAttributeAnalyzer::average"))
+    }
+    
+    pub fn min_max(self) -> Result<(f64, f64), GraphError> {
+        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
+        analyzer.min_max(self.pool, self.space)
+            .map_err(|e| GraphError::internal(&format!("Min/Max failed: {}", e), "NodeAttributeAnalyzer::min_max"))
+    }
+    
+    pub fn percentile(self, percentile: f64) -> Result<f64, GraphError> {
+        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
+        analyzer.percentile(self.pool, self.space, percentile)
+            .map_err(|e| GraphError::internal(&format!("Percentile failed: {}", e), "NodeAttributeAnalyzer::percentile"))
+    }
+    
+    pub fn comprehensive_stats(self) -> Result<crate::core::query::ComprehensiveStats, GraphError> {
+        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
+        analyzer.comprehensive_stats(self.pool, self.space)
+            .map_err(|e| GraphError::internal(&format!("Comprehensive stats failed: {}", e), "NodeAttributeAnalyzer::comprehensive_stats"))
+    }
+}
+
+/// Fluent API for edge attribute analysis
+pub struct EdgeAttributeAnalyzer<'a> {
+    query_engine: &'a crate::core::query::QueryEngine,
+    pool: &'a crate::core::pool::GraphPool,
+    space: &'a crate::core::space::GraphSpace,
+    attr_name: &'a AttrName,
+}
+
+impl<'a> EdgeAttributeAnalyzer<'a> {
+    pub fn new(
+        query_engine: &'a crate::core::query::QueryEngine,
+        pool: &'a crate::core::pool::GraphPool, 
+        space: &'a crate::core::space::GraphSpace,
+        attr_name: &'a AttrName
+    ) -> Self {
+        Self { query_engine, pool, space, attr_name }
+    }
+    
+    pub fn count(self) -> Result<i64, GraphError> {
+        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
+        analyzer.count(self.pool, self.space)
+            .map_err(|e| GraphError::internal(&format!("Count failed: {}", e), "EdgeAttributeAnalyzer::count"))
+    }
+    
+    pub fn sum(self) -> Result<f64, GraphError> {
+        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
+        analyzer.sum(self.pool, self.space)
+            .map_err(|e| GraphError::internal(&format!("Sum failed: {}", e), "EdgeAttributeAnalyzer::sum"))
+    }
+    
+    pub fn average(self) -> Result<f64, GraphError> {
+        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
+        analyzer.average(self.pool, self.space)
+            .map_err(|e| GraphError::internal(&format!("Average failed: {}", e), "EdgeAttributeAnalyzer::average"))
+    }
+    
+    pub fn min_max(self) -> Result<(f64, f64), GraphError> {
+        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
+        analyzer.min_max(self.pool, self.space)
+            .map_err(|e| GraphError::internal(&format!("Min/Max failed: {}", e), "EdgeAttributeAnalyzer::min_max"))
+    }
+    
+    pub fn percentile(self, percentile: f64) -> Result<f64, GraphError> {
+        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
+        analyzer.percentile(self.pool, self.space, percentile)
+            .map_err(|e| GraphError::internal(&format!("Percentile failed: {}", e), "EdgeAttributeAnalyzer::percentile"))
+    }
+    
+    pub fn comprehensive_stats(self) -> Result<crate::core::query::ComprehensiveStats, GraphError> {
+        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
+        analyzer.comprehensive_stats(self.pool, self.space)
+            .map_err(|e| GraphError::internal(&format!("Comprehensive stats failed: {}", e), "EdgeAttributeAnalyzer::comprehensive_stats"))
     }
 }
 
