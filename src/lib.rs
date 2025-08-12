@@ -122,6 +122,7 @@ pub mod core {
     pub mod pool;
     pub mod space;
     pub mod query;
+    pub mod traversal;
     pub mod history;
     pub mod state;
     pub mod ref_manager;

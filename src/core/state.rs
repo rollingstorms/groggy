@@ -525,6 +525,7 @@ impl GraphSnapshot {
     }
     
     /// Get all neighbors of a node in this snapshot
+    /// NOTE: For current state, use Graph::neighbors() which is optimized with columnar topology
     pub fn get_neighbors(&self, node_id: NodeId) -> GraphResult<Vec<NodeId>> {
         if !self.contains_node(node_id) {
             return Err(GraphError::NodeNotFound {

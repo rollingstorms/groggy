@@ -17,6 +17,14 @@ name = "test_basic"
 path = "test_basic.rs"
 
 [[bin]]
+name = "basic_query_test"
+path = "basic_query_test.rs"
+
+[[bin]]
+name = "debug_query_test"
+path = "debug_query_test.rs"
+
+[[bin]]
 name = "test_transactions" 
 path = "test_transactions.rs"
 
@@ -40,7 +48,40 @@ path = "comprehensive_test_v2.rs"
 name = "stress_test"
 path = "stress_test.rs"
 
+[[bin]]
+name = "phase3_filtering_test"
+path = "phase3_filtering_test.rs"
+
+[[bin]]
+name = "phase3_traversal_test"
+path = "phase3_traversal_test.rs"
+
+[[bin]]
+name = "phase3_complex_queries_test"
+path = "phase3_complex_queries_test.rs"
+
+[[bin]]
+name = "debug_filtering"
+path = "debug_filtering.rs"
+
+[[bin]]
+name = "phase3_4_aggregation_test"
+path = "phase3_4_aggregation_test.rs"
+
+[[bin]]
+name = "phase3_4_test_simple"
+path = "phase3_4_test_simple.rs"
+
+[[bin]]
+name = "test_connected_components_fix"
+path = "test_connected_components_fix.rs"
+
+[[bin]]
+name = "stress_test_rust"
+path = "stress_test_rust.rs"
+
 [dependencies]
+fastrand = "2.0"
 pyo3 = { version = "0.20", features = ["extension-module"] }
 petgraph = "0.6"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }

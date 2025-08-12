@@ -159,12 +159,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     graph.set_node_attrs(bulk_attrs)?;
     let duration_bulk_attrs = start.elapsed().as_millis();
     
-    println!("✅ Set 50,000 attributes in bulk (5 attrs × 10,000 nodes): {} ({})",
+    println!("✅ Set {} attributes in bulk (5 attrs × 1,000,000 nodes): {} ({})",
+             bulk_nodes.len() * 5,
              format_duration(duration_bulk_attrs),
-             format_throughput(50000, duration_bulk_attrs));
+             format_throughput(bulk_nodes.len() * 5, duration_bulk_attrs));
     
     let attr_speedup = if duration_bulk_attrs > 0 {
-        (duration_individual_attrs as f64 / 6000.0) / (duration_bulk_attrs as f64 / 50000.0)
+        (duration_individual_attrs as f64 / (bulk_nodes.len() * 5) as f64) / (duration_bulk_attrs as f64 / 50000.0)
     } else {
         999.0
     };
@@ -196,7 +197,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     println!("✅ Set 60,000 edge attributes: {} ({})",
              format_duration(duration_edge_attrs),
-             format_throughput(60000, duration_edge_attrs));
+             format_throughput(bulk_edges.len() * 2, duration_edge_attrs));
     
     // STRESS TEST 5: Massive Bulk Retrieval
     println!("\n📤 STRESS TEST 5: Massive Bulk Retrieval");
@@ -215,9 +216,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let duration_bulk_retrieval = start.elapsed().as_millis();
     
-    println!("✅ Retrieved 300,000 attributes in bulk: {} ({})",
+    println!("✅ Retrieved {} attributes in bulk: {} ({})",
+             bulk_nodes.len() * 3,
              format_duration(duration_bulk_retrieval),
-             format_throughput(300000, duration_bulk_retrieval));
+             format_throughput(bulk_nodes.len() * 3, duration_bulk_retrieval));
     
     // Verify some results
     assert_eq!(all_bulk_names.len(), bulk_nodes.len());
