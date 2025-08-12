@@ -541,14 +541,6 @@ class Graph:
     
     # === FUTURE PHASES - TO BE IMPLEMENTED ===
     
-    def neighbors_simd(self, node: NodeId) -> List[NodeId]:
-        """Get neighbors using SIMD-optimized operations."""
-        raise NotImplementedError("neighbors_simd")
-    
-    def degree_simd(self, node: NodeId) -> int:
-        """Get degree using SIMD-optimized operations."""
-        raise NotImplementedError("degree_simd")
-    
     def commit(self, message: str, author: str) -> StateId:
         """Commit current changes to create a new state."""
         raise NotImplementedError("commit")
