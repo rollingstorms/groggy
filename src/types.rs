@@ -52,6 +52,62 @@ pub enum AttrValue {
     FloatVec(Vec<f32>),
     /// Boolean flag (active, enabled, etc.)
     Bool(bool),
+    /// Memory-optimized compact string for short text values (Memory Optimization 1)
+    /// Uses inline storage for strings <= 15 bytes, avoiding heap allocation
+    CompactText(CompactString),
+    /// Memory-optimized small integer for values that fit in smaller types
+    SmallInt(i32),
+    /// Byte array for binary data (more efficient than Vec<u8> as AttrValue)
+    Bytes(Vec<u8>),
+    /// Compressed large text data (Memory Optimization 3)
+    CompressedText(CompressedData),
+    /// Compressed large float vector (Memory Optimization 3)
+    CompressedFloatVec(CompressedData),
+}
+
+/// Memory-efficient string storage that avoids heap allocation for short strings
+/// MEMORY OPTIMIZATION: Stores strings <= 15 bytes inline, larger ones on heap
+#[derive(Debug, Clone, PartialEq)]
+pub enum CompactString {
+    /// Inline storage for strings up to 15 bytes (fits in 16 bytes total)
+    Inline { data: [u8; 15], len: u8 },
+    /// Heap storage for longer strings
+    Heap(String),
+}
+
+impl CompactString {
+    /// Create a new compact string from a regular string
+    pub fn new(s: &str) -> Self {
+        let bytes = s.as_bytes();
+        if bytes.len() <= 15 {
+            let mut data = [0u8; 15];
+            data[..bytes.len()].copy_from_slice(bytes);
+            CompactString::Inline { 
+                data, 
+                len: bytes.len() as u8 
+            }
+        } else {
+            CompactString::Heap(s.to_string())
+        }
+    }
+    
+    /// Get the string content as a &str
+    pub fn as_str(&self) -> &str {
+        match self {
+            CompactString::Inline { data, len } => {
+                std::str::from_utf8(&data[..*len as usize]).unwrap()
+            }
+            CompactString::Heap(s) => s.as_str(),
+        }
+    }
+    
+    /// Get the memory usage in bytes
+    pub fn memory_size(&self) -> usize {
+        match self {
+            CompactString::Inline { .. } => 16, // 15 bytes data + 1 byte length
+            CompactString::Heap(s) => std::mem::size_of::<String>() + s.capacity(),
+        }
+    }
 }
 
 // IMPLEMENTATION NOTES:
@@ -84,7 +140,224 @@ impl Hash for AttrValue {
                 4u8.hash(state);  // Discriminant for Bool variant
                 b.hash(state);
             }
+            AttrValue::CompactText(cs) => {
+                5u8.hash(state);  // Discriminant for CompactText variant
+                cs.as_str().hash(state);
+            }
+            AttrValue::SmallInt(i) => {
+                6u8.hash(state);  // Discriminant for SmallInt variant
+                i.hash(state);
+            }
+            AttrValue::Bytes(bytes) => {
+                7u8.hash(state);  // Discriminant for Bytes variant
+                bytes.hash(state);
+            }
+            AttrValue::CompressedText(cd) => {
+                8u8.hash(state);  // Discriminant for CompressedText variant
+                cd.data.hash(state);
+                cd.original_size.hash(state);
+            }
+            AttrValue::CompressedFloatVec(cd) => {
+                9u8.hash(state);  // Discriminant for CompressedFloatVec variant
+                cd.data.hash(state);
+                cd.original_size.hash(state);
+            }
         }
+    }
+}
+
+/// Compressed data storage for large values (Memory Optimization 3)
+/// Uses simple run-length encoding and basic compression
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompressedData {
+    /// Compressed bytes
+    pub data: Vec<u8>,
+    /// Original size before compression
+    original_size: usize,
+    /// Compression algorithm used
+    algorithm: CompressionAlgorithm,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CompressionAlgorithm {
+    /// No compression (passthrough)
+    None,
+    /// Simple run-length encoding for repetitive data
+    RunLength,
+    /// Basic LZ77-style compression for text
+    Basic,
+}
+
+impl CompressedData {
+    /// Compress text data
+    pub fn compress_text(text: &str) -> Self {
+        let bytes = text.as_bytes();
+        
+        // For small text, don't compress
+        if bytes.len() < 100 {
+            return Self {
+                data: bytes.to_vec(),
+                original_size: bytes.len(),
+                algorithm: CompressionAlgorithm::None,
+            };
+        }
+        
+        // Simple run-length encoding for repetitive text
+        let compressed = Self::run_length_encode(bytes);
+        
+        // Only use compression if it actually saves space
+        if compressed.len() < bytes.len() {
+            Self {
+                data: compressed,
+                original_size: bytes.len(),
+                algorithm: CompressionAlgorithm::RunLength,
+            }
+        } else {
+            Self {
+                data: bytes.to_vec(),
+                original_size: bytes.len(),
+                algorithm: CompressionAlgorithm::None,
+            }
+        }
+    }
+    
+    /// Compress float vector data
+    pub fn compress_float_vec(vec: &[f32]) -> Self {
+        let bytes = unsafe {
+            std::slice::from_raw_parts(
+                vec.as_ptr() as *const u8,
+                vec.len() * std::mem::size_of::<f32>()
+            )
+        };
+        
+        // For small vectors, don't compress
+        if vec.len() < 25 {
+            return Self {
+                data: bytes.to_vec(),
+                original_size: bytes.len(),
+                algorithm: CompressionAlgorithm::None,
+            };
+        }
+        
+        // Run-length encoding can work well for sparse vectors
+        let compressed = Self::run_length_encode(bytes);
+        
+        if compressed.len() < bytes.len() {
+            Self {
+                data: compressed,
+                original_size: bytes.len(),
+                algorithm: CompressionAlgorithm::RunLength,
+            }
+        } else {
+            Self {
+                data: bytes.to_vec(),
+                original_size: bytes.len(),
+                algorithm: CompressionAlgorithm::None,
+            }
+        }
+    }
+    
+    /// Decompress to text
+    pub fn decompress_text(&self) -> Result<String, &'static str> {
+        let bytes = match self.algorithm {
+            CompressionAlgorithm::None => self.data.clone(),
+            CompressionAlgorithm::RunLength => Self::run_length_decode(&self.data)?,
+            CompressionAlgorithm::Basic => return Err("Basic compression not implemented"),
+        };
+        
+        String::from_utf8(bytes).map_err(|_| "Invalid UTF-8")
+    }
+    
+    /// Decompress to float vector
+    pub fn decompress_float_vec(&self) -> Result<Vec<f32>, &'static str> {
+        let bytes = match self.algorithm {
+            CompressionAlgorithm::None => self.data.clone(),
+            CompressionAlgorithm::RunLength => Self::run_length_decode(&self.data)?,
+            CompressionAlgorithm::Basic => return Err("Basic compression not implemented"),
+        };
+        
+        if bytes.len() % std::mem::size_of::<f32>() != 0 {
+            return Err("Invalid float vector data");
+        }
+        
+        let float_count = bytes.len() / std::mem::size_of::<f32>();
+        let mut result = Vec::with_capacity(float_count);
+        
+        unsafe {
+            let float_ptr = bytes.as_ptr() as *const f32;
+            for i in 0..float_count {
+                result.push(*float_ptr.add(i));
+            }
+        }
+        
+        Ok(result)
+    }
+    
+    /// Simple run-length encoding
+    fn run_length_encode(input: &[u8]) -> Vec<u8> {
+        if input.is_empty() {
+            return Vec::new();
+        }
+        
+        let mut result = Vec::new();
+        let mut current_byte = input[0];
+        let mut count = 1u8;
+        
+        for &byte in &input[1..] {
+            if byte == current_byte && count < 255 {
+                count += 1;
+            } else {
+                result.push(count);
+                result.push(current_byte);
+                current_byte = byte;
+                count = 1;
+            }
+        }
+        
+        // Add final run
+        result.push(count);
+        result.push(current_byte);
+        
+        result
+    }
+    
+    /// Decode run-length encoded data
+    fn run_length_decode(input: &[u8]) -> Result<Vec<u8>, &'static str> {
+        if input.len() % 2 != 0 {
+            return Err("Invalid run-length encoded data");
+        }
+        
+        let mut result = Vec::new();
+        
+        for chunk in input.chunks_exact(2) {
+            let count = chunk[0];
+            let byte = chunk[1];
+            
+            for _ in 0..count {
+                result.push(byte);
+            }
+        }
+        
+        Ok(result)
+    }
+    
+    /// Get compression ratio (compressed_size / original_size)
+    pub fn compression_ratio(&self) -> f32 {
+        if self.original_size == 0 {
+            return 1.0;
+        }
+        self.data.len() as f32 / self.original_size as f32
+    }
+    
+    /// Get memory usage in bytes
+    pub fn memory_size(&self) -> usize {
+        std::mem::size_of::<Self>() + self.data.capacity()
+    }
+}
+
+impl Hash for CompactString {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_str().hash(state);
     }
 }
 
@@ -97,6 +370,57 @@ impl AttrValue {
             AttrValue::Text(_) => "Text",
             AttrValue::FloatVec(_) => "FloatVec",
             AttrValue::Bool(_) => "Bool",
+            AttrValue::CompactText(_) => "CompactText",
+            AttrValue::SmallInt(_) => "SmallInt",
+            AttrValue::Bytes(_) => "Bytes",
+            AttrValue::CompressedText(_) => "CompressedText",
+            AttrValue::CompressedFloatVec(_) => "CompressedFloatVec",
+        }
+    }
+    
+    /// Calculate memory usage in bytes (Memory Optimization 1)
+    pub fn memory_size(&self) -> usize {
+        match self {
+            AttrValue::Float(_) => std::mem::size_of::<f32>(),
+            AttrValue::Int(_) => std::mem::size_of::<i64>(),
+            AttrValue::Text(s) => std::mem::size_of::<String>() + s.capacity(),
+            AttrValue::FloatVec(v) => std::mem::size_of::<Vec<f32>>() + v.capacity() * std::mem::size_of::<f32>(),
+            AttrValue::Bool(_) => std::mem::size_of::<bool>(),
+            AttrValue::CompactText(cs) => cs.memory_size(),
+            AttrValue::SmallInt(_) => std::mem::size_of::<i32>(),
+            AttrValue::Bytes(b) => std::mem::size_of::<Vec<u8>>() + b.capacity(),
+            AttrValue::CompressedText(cd) => cd.memory_size(),
+            AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+        }
+    }
+    
+    /// Check if this value can be stored more efficiently as a compact variant
+    pub fn can_optimize(&self) -> bool {
+        match self {
+            AttrValue::Text(s) if s.len() <= 15 => true,
+            AttrValue::Text(s) if s.len() > 100 => true, // Can compress large text
+            AttrValue::Int(i) if *i >= i32::MIN as i64 && *i <= i32::MAX as i64 => true,
+            AttrValue::FloatVec(v) if v.len() > 25 => true, // Can compress large vectors
+            _ => false,
+        }
+    }
+    
+    /// Convert to a more memory-efficient variant if possible (Memory Optimization 1 & 3)
+    pub fn optimize(self) -> Self {
+        match self {
+            AttrValue::Text(s) if s.len() <= 15 => {
+                AttrValue::CompactText(CompactString::new(&s))
+            }
+            AttrValue::Text(s) if s.len() > 100 => {
+                AttrValue::CompressedText(CompressedData::compress_text(&s))
+            }
+            AttrValue::Int(i) if i >= i32::MIN as i64 && i <= i32::MAX as i64 => {
+                AttrValue::SmallInt(i as i32)
+            }
+            AttrValue::FloatVec(v) if v.len() > 25 => {
+                AttrValue::CompressedFloatVec(CompressedData::compress_float_vec(&v))
+            }
+            other => other,
         }
     }
     
@@ -111,6 +435,7 @@ impl AttrValue {
     pub fn as_int(&self) -> Option<i64> {
         match self {
             AttrValue::Int(i) => Some(*i),
+            AttrValue::SmallInt(i) => Some(*i as i64),
             _ => None,
         }
     }
@@ -118,6 +443,18 @@ impl AttrValue {
     pub fn as_text(&self) -> Option<&str> {
         match self {
             AttrValue::Text(s) => Some(s),
+            AttrValue::CompactText(cs) => Some(cs.as_str()),
+            // Note: Compressed text requires decompression, so we can't return &str
+            _ => None,
+        }
+    }
+    
+    /// Get text content, decompressing if necessary
+    pub fn get_text(&self) -> Option<String> {
+        match self {
+            AttrValue::Text(s) => Some(s.clone()),
+            AttrValue::CompactText(cs) => Some(cs.as_str().to_string()),
+            AttrValue::CompressedText(cd) => cd.decompress_text().ok(),
             _ => None,
         }
     }
@@ -125,6 +462,16 @@ impl AttrValue {
     pub fn as_float_vec(&self) -> Option<&[f32]> {
         match self {
             AttrValue::FloatVec(v) => Some(v),
+            // Note: Compressed vectors require decompression, so we can't return &[f32]
+            _ => None,
+        }
+    }
+    
+    /// Get float vector content, decompressing if necessary
+    pub fn get_float_vec(&self) -> Option<Vec<f32>> {
+        match self {
+            AttrValue::FloatVec(v) => Some(v.clone()),
+            AttrValue::CompressedFloatVec(cd) => cd.decompress_float_vec().ok(),
             _ => None,
         }
     }
@@ -135,4 +482,62 @@ impl AttrValue {
             _ => None,
         }
     }
+    
+    pub fn as_bytes(&self) -> Option<&[u8]> {
+        match self {
+            AttrValue::Bytes(b) => Some(b),
+            _ => None,
+        }
+    }
+}
+
+/// Memory usage statistics (Memory Optimization 4)
+#[derive(Debug, Clone)]
+pub struct MemoryStatistics {
+    /// Pool memory usage in bytes
+    pub pool_memory_bytes: usize,
+    /// Space memory usage in bytes
+    pub space_memory_bytes: usize,
+    /// History memory usage in bytes
+    pub history_memory_bytes: usize,
+    /// Change tracker memory usage in bytes
+    pub change_tracker_memory_bytes: usize,
+    /// Total memory usage in bytes
+    pub total_memory_bytes: usize,
+    /// Total memory usage in megabytes
+    pub total_memory_mb: f64,
+    /// Memory efficiency metrics
+    pub memory_efficiency: MemoryEfficiency,
+    /// Compression statistics
+    pub compression_stats: CompressionStatistics,
+}
+
+/// Memory efficiency metrics
+#[derive(Debug, Clone)]
+pub struct MemoryEfficiency {
+    /// Average bytes per node
+    pub bytes_per_node: f64,
+    /// Average bytes per edge
+    pub bytes_per_edge: f64,
+    /// Average bytes per entity (node or edge)
+    pub bytes_per_entity: f64,
+    /// Memory overhead ratio
+    pub overhead_ratio: f64,
+    /// Cache efficiency (0.0 to 1.0)
+    pub cache_efficiency: f64,
+}
+
+/// Data compression statistics
+#[derive(Debug, Clone)]
+pub struct CompressionStatistics {
+    /// Number of compressed attributes
+    pub compressed_attributes: usize,
+    /// Total number of attributes
+    pub total_attributes: usize,
+    /// Average compression ratio
+    pub average_compression_ratio: f32,
+    /// Memory saved through compression in bytes
+    pub memory_saved_bytes: usize,
+    /// Memory saved as percentage
+    pub memory_saved_percentage: f64,
 }

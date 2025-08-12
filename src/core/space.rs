@@ -38,7 +38,7 @@ WHAT DOESN'T BELONG HERE:
 use std::collections::{HashMap, HashSet};
 use crate::types::{NodeId, EdgeId, AttrName, StateId};
 // NOTE: ChangeTracker import removed - Graph manages it directly now
-use crate::errors::{GraphError, GraphResult};
+use crate::errors::GraphResult;
 use crate::core::pool::GraphPool;
 use crate::core::delta::DeltaObject;
 
@@ -75,6 +75,24 @@ pub struct GraphSpace {
     active_edges: HashSet<EdgeId>,
     
     /*
+    === COLUMNAR TOPOLOGY CACHE ===
+    Cached columnar representation of edges for vectorized topology queries
+    */
+    
+    /// Edge sources in columnar format (parallel to edge_targets)
+    /// DESIGN: Separate vectors for vectorized/SIMD operations
+    edge_sources: Vec<NodeId>,
+    
+    /// Edge targets in columnar format (parallel to edge_sources) 
+    edge_targets: Vec<NodeId>,
+    
+    /// Active edge IDs in columnar format (parallel to sources/targets)
+    active_edge_ids: Vec<EdgeId>,
+    
+    /// Flag indicating if columnar cache needs rebuild
+    topology_cache_dirty: bool,
+    
+    /*
     === ATTRIBUTE INDEX MAPPINGS ===
     Map entities to their current attribute indices in Pool columns
     */
@@ -106,6 +124,10 @@ impl GraphSpace {
         Self {
             active_nodes: HashSet::new(),
             active_edges: HashSet::new(),
+            edge_sources: Vec::new(),
+            edge_targets: Vec::new(),
+            active_edge_ids: Vec::new(),
+            topology_cache_dirty: false,
             node_attribute_indices: HashMap::new(),
             edge_attribute_indices: HashMap::new(),
             base_state,
@@ -129,6 +151,29 @@ impl GraphSpace {
         self.active_nodes.extend(nodes);
         // NOTE: Graph calls ChangeTracker directly for cleaner separation
     }
+    
+    /// Bulk activate nodes using range (BULK OPTIMIZED for large ranges)
+    /// 
+    /// PERFORMANCE: O(n) but with HashSet::extend optimization for ranges
+    pub fn activate_nodes_bulk(&mut self, node_range: (NodeId, NodeId)) {
+        // Pre-grow HashSet to prevent rehashing
+        let count = (node_range.1 - node_range.0 + 1) as usize;
+        self.active_nodes.reserve(count);
+        
+        // Use range iterator - more efficient than collecting to Vec first
+        self.active_nodes.extend(node_range.0..=node_range.1);
+    }
+    
+    /// Bulk activate nodes from Vec (BULK OPTIMIZED for arbitrary IDs)
+    /// 
+    /// PERFORMANCE: Single HashSet::extend call instead of individual inserts
+    pub fn activate_nodes_vec(&mut self, nodes: Vec<NodeId>) {
+        // Pre-grow HashSet
+        self.active_nodes.reserve(nodes.len());
+        
+        // Single bulk extend operation
+        self.active_nodes.extend(nodes);
+    }
 
     /// Remove multiple nodes from the active set (called by Graph.remove_nodes())
     pub fn deactivate_nodes(&mut self, nodes: &[NodeId]) {
@@ -151,6 +196,12 @@ impl GraphSpace {
     /// Add an edge to the active set (called by Graph.add_edge())
     pub fn activate_edge(&mut self, edge_id: EdgeId, source: NodeId, target: NodeId) {
         self.active_edges.insert(edge_id);
+        
+        // Update columnar topology cache
+        self.active_edge_ids.push(edge_id);
+        self.edge_sources.push(source);
+        self.edge_targets.push(target);
+        
         // NOTE: Graph calls ChangeTracker directly for cleaner separation
     }
 
@@ -159,6 +210,10 @@ impl GraphSpace {
         self.active_edges.remove(&edge_id);
         // Also remove all attribute indices for this edge
         self.edge_attribute_indices.remove(&edge_id);
+        
+        // Mark topology cache as dirty (will be rebuilt on next access)
+        self.topology_cache_dirty = true;
+        
         // NOTE: Graph calls ChangeTracker directly for cleaner separation
     }
 
@@ -166,6 +221,40 @@ impl GraphSpace {
     pub fn activate_edges(&mut self, edges: &[EdgeId]) {
         self.active_edges.extend(edges);
         // NOTE: Graph calls ChangeTracker directly for cleaner separation
+    }
+    
+    /// Bulk activate edges with pre-allocation (BULK OPTIMIZED)
+    /// 
+    /// PERFORMANCE: Single HashSet operation with capacity management
+    pub fn activate_edges_bulk(&mut self, edges: Vec<EdgeId>) {
+        // Pre-grow HashSet to prevent rehashing
+        self.active_edges.reserve(edges.len());
+        
+        // Single bulk extend operation
+        self.active_edges.extend(&edges);
+        
+        // Mark topology cache as dirty since we can't efficiently update columnar cache
+        // for bulk operations without knowing source/target info
+        self.topology_cache_dirty = true;
+    }
+    
+    /// Bulk activate edges with topology info (MOST OPTIMIZED)
+    /// 
+    /// PERFORMANCE: Updates both HashSet and columnar cache efficiently
+    pub fn activate_edges_bulk_with_topology(&mut self, edges: Vec<(EdgeId, NodeId, NodeId)>) {
+        // Pre-grow all structures
+        self.active_edges.reserve(edges.len());
+        self.active_edge_ids.reserve(edges.len());
+        self.edge_sources.reserve(edges.len());
+        self.edge_targets.reserve(edges.len());
+        
+        // Bulk extend all structures in parallel
+        for (edge_id, source, target) in edges {
+            self.active_edges.insert(edge_id);
+            self.active_edge_ids.push(edge_id);
+            self.edge_sources.push(source);
+            self.edge_targets.push(target);
+        }
     }
 
     /// Remove multiple edges from the active set (called by Graph.remove_edges())
@@ -301,6 +390,56 @@ impl GraphSpace {
     /// Get all active edge IDs as a vector
     pub fn edge_ids(&self) -> Vec<EdgeId> {
         self.active_edges.iter().copied().collect()
+    }
+    
+    /*
+    === COLUMNAR TOPOLOGY ACCESS ===
+    High-performance vectorized topology queries
+    */
+    
+    /// Get columnar topology vectors for vectorized neighbor queries
+    /// 
+    /// PERFORMANCE: Returns references to cached vectors for zero-copy access
+    /// Returns (edge_ids, sources, targets) as parallel vectors
+    pub fn get_columnar_topology(&self) -> (&[EdgeId], &[NodeId], &[NodeId]) {
+        (&self.active_edge_ids, &self.edge_sources, &self.edge_targets)
+    }
+    
+    /// Rebuild columnar topology cache from current active edges
+    /// 
+    /// PERFORMANCE: Called automatically when cache is dirty
+    fn rebuild_topology_cache(&mut self, pool: &crate::core::pool::GraphPool) {
+        // Clear existing cache
+        self.active_edge_ids.clear();
+        self.edge_sources.clear();
+        self.edge_targets.clear();
+        
+        // Reserve capacity
+        let edge_count = self.active_edges.len();
+        self.active_edge_ids.reserve(edge_count);
+        self.edge_sources.reserve(edge_count);
+        self.edge_targets.reserve(edge_count);
+        
+        // Rebuild from active edges
+        for &edge_id in &self.active_edges {
+            if let Some((source, target)) = pool.get_edge_endpoints(edge_id) {
+                self.active_edge_ids.push(edge_id);
+                self.edge_sources.push(source);
+                self.edge_targets.push(target);
+            }
+        }
+        
+        self.topology_cache_dirty = false;
+    }
+    
+    /// Get columnar topology with automatic cache maintenance
+    /// 
+    /// PERFORMANCE: Rebuilds cache only when dirty
+    pub fn get_columnar_topology_cached(&mut self, pool: &crate::core::pool::GraphPool) -> (&[EdgeId], &[NodeId], &[NodeId]) {
+        if self.topology_cache_dirty {
+            self.rebuild_topology_cache(pool);
+        }
+        self.get_columnar_topology()
     }
     
     /// NOTE: Topology queries (neighbors, degree, connectivity) now handled by

@@ -97,6 +97,34 @@ pub fn attr_value_hash(value: &AttrValue) -> u64 {
             }
             hasher.finish()
         },
+        AttrValue::CompactText(cs) => {
+            // Hash compact string using its string content
+            let mut hasher = DefaultHasher::new();
+            cs.as_str().hash(&mut hasher);
+            hasher.finish()
+        },
+        AttrValue::SmallInt(i) => {
+            // Fast path for small integers
+            *i as u64
+        },
+        AttrValue::Bytes(b) => {
+            // Hash byte array
+            let mut hasher = DefaultHasher::new();
+            b.hash(&mut hasher);
+            hasher.finish()
+        },
+        AttrValue::CompressedText(cd) => {
+            // Hash compressed data
+            let mut hasher = DefaultHasher::new();
+            cd.data.hash(&mut hasher);
+            hasher.finish()
+        },
+        AttrValue::CompressedFloatVec(cd) => {
+            // Hash compressed vector data
+            let mut hasher = DefaultHasher::new();
+            cd.data.hash(&mut hasher);
+            hasher.finish()
+        },
     }
 }
 

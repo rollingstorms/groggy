@@ -30,7 +30,7 @@ KEY DESIGN DECISIONS:
 use std::collections::HashMap;
 use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
 use crate::core::pool::GraphPool;
-use crate::errors::{GraphResult, GraphError};
+use crate::errors::GraphResult;
 
 /// The main query engine that processes complex read-only operations
 /// 
@@ -58,9 +58,11 @@ pub struct QueryEngine {
     
     /// Statistics about attribute distributions (for query optimization)
     /// Maps attribute name -> distribution statistics
+    #[allow(dead_code)]
     attr_statistics: HashMap<AttrName, AttributeStatistics>,
     
     /// Configuration for query execution
+    #[allow(dead_code)]
     config: QueryConfig,
     
     /*
@@ -233,11 +235,27 @@ impl QueryEngine {
                 Ok(Vec::new()) // TODO: implement complement properly
             },
             
-            // TODO: Implement structural filters
-            NodeFilter::HasNeighbor(_) => Ok(Vec::new()),
-            NodeFilter::HasNeighborMatching(_) => Ok(Vec::new()),
-            NodeFilter::DegreeFilter(_) => Ok(Vec::new()),
-            NodeFilter::MatchesPattern(_) => Ok(Vec::new()),
+            // Basic structural filters (would need GraphSpace for full implementation)
+            NodeFilter::HasNeighbor(_neighbor_id) => {
+                // Would need access to graph topology to implement properly
+                // For now, return empty results
+                Ok(Vec::new())
+            },
+            NodeFilter::HasNeighborMatching(_neighbor_filter) => {
+                // Would need access to graph topology and recursive filtering
+                // For now, return empty results
+                Ok(Vec::new())
+            },
+            NodeFilter::DegreeFilter(_degree_filter) => {
+                // Would need access to graph topology to count edges
+                // For now, return empty results
+                Ok(Vec::new())
+            },
+            NodeFilter::MatchesPattern(_pattern) => {
+                // Would need pattern matching implementation
+                // For now, return empty results
+                Ok(Vec::new())
+            },
         }
     }
     
@@ -420,6 +438,7 @@ impl QueryEngine {
     }
     
     /// Optimize a query plan before execution
+    #[allow(dead_code)]
     fn optimize_query_plan(&self, plan: QueryPlan) -> QueryPlan {
         // Basic implementation returns plan unchanged
         plan
@@ -629,9 +648,13 @@ impl AttributeFilter {
                     false
                 }
             },
-            AttributeFilter::Matches(_pattern) => {
-                // TODO: Implement regex matching - requires regex crate
-                false
+            AttributeFilter::Matches(pattern) => {
+                // Use simple wildcard matching for basic pattern support
+                if let AttrValue::Text(text) = value {
+                    simple_wildcard_match(pattern, text)
+                } else {
+                    false
+                }
             },
             
             // Set membership
@@ -640,8 +663,16 @@ impl AttributeFilter {
             
             // Existence checks - these are handled at a higher level
             // since we need to know if the attribute exists vs has a value
-            AttributeFilter::IsNull => false, // TODO: Need Option<AttrValue> context
-            AttributeFilter::IsNotNull => true, // TODO: Need Option<AttrValue> context
+            AttributeFilter::IsNull => {
+                // This would require the context of whether an attribute exists
+                // For now, assume all values we're testing exist (since we're testing against actual values)
+                false
+            }
+            AttributeFilter::IsNotNull => {
+                // This would require the context of whether an attribute exists  
+                // For now, assume all values we're testing exist
+                true
+            }
             
             // Vector operations (only valid for FloatVec)
             AttributeFilter::VectorSimilarity { target, similarity_type, threshold } => {
@@ -1021,9 +1052,13 @@ pub struct DegreeDistribution {
 /// Cached query result with metadata
 #[derive(Debug, Clone)]
 struct CachedQueryResult {
+    #[allow(dead_code)]
     result: QueryResult,
+    #[allow(dead_code)]
     timestamp: u64,
+    #[allow(dead_code)]
     access_count: usize,
+    #[allow(dead_code)]
     computation_time_ms: u64,
 }
 
@@ -1042,8 +1077,11 @@ pub struct AttributeStatistics {
 #[derive(Debug, Clone)]
 struct QueryPerformance {
     execution_count: usize,
+    #[allow(dead_code)]
     total_time_ms: u64,
+    #[allow(dead_code)]
     average_time_ms: f64,
+    #[allow(dead_code)]
     last_execution_time: u64,
 }
 
@@ -1066,6 +1104,7 @@ pub enum EntityType {
 
 /// Execution plan for query optimization
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct QueryPlan {
     operations: Vec<PlanOperation>,
     estimated_cost: f64,
@@ -1073,6 +1112,7 @@ struct QueryPlan {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 enum PlanOperation {
     ScanAttribute(AttrName, AttributeFilter),
     IndexLookup(AttrName, AttrValue),
@@ -1090,6 +1130,48 @@ impl Default for QueryEngine {
 === VECTOR SIMILARITY HELPER FUNCTIONS ===
 Helper functions for computing vector similarities
 */
+
+/// Simple wildcard pattern matching (* and ?) without regex crate
+fn simple_wildcard_match(pattern: &str, text: &str) -> bool {
+    let pattern_chars: Vec<char> = pattern.chars().collect();
+    let text_chars: Vec<char> = text.chars().collect();
+    
+    fn match_recursive(pattern: &[char], text: &[char], p_idx: usize, t_idx: usize) -> bool {
+        if p_idx >= pattern.len() {
+            return t_idx >= text.len();
+        }
+        
+        match pattern[p_idx] {
+            '*' => {
+                // Match zero or more characters
+                for i in t_idx..=text.len() {
+                    if match_recursive(pattern, text, p_idx + 1, i) {
+                        return true;
+                    }
+                }
+                false
+            },
+            '?' => {
+                // Match exactly one character
+                if t_idx < text.len() {
+                    match_recursive(pattern, text, p_idx + 1, t_idx + 1)
+                } else {
+                    false
+                }
+            },
+            c => {
+                // Match literal character
+                if t_idx < text.len() && text[t_idx] == c {
+                    match_recursive(pattern, text, p_idx + 1, t_idx + 1)
+                } else {
+                    false
+                }
+            }
+        }
+    }
+    
+    match_recursive(&pattern_chars, &text_chars, 0, 0)
+}
 
 /// Compute cosine similarity between two vectors
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {

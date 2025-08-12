@@ -50,7 +50,7 @@ pub struct ChangeTracker {
 
 use std::collections::{HashMap, HashSet};
 use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
-use crate::core::strategies::{TemporalStorageStrategy, StorageStrategyType, StorageCharacteristics, create_strategy, IndexDeltaStrategy};
+use crate::core::strategies::{TemporalStorageStrategy, StorageStrategyType, StorageCharacteristics, create_strategy};
 use crate::core::delta::DeltaObject;
 use crate::core::pool::GraphPool;
 use crate::errors::GraphError;
@@ -88,6 +88,13 @@ impl ChangeTracker {
         self.strategy.record_node_addition(node_id);
     }
     
+    /// Record that multiple nodes were added (bulk operation)
+    pub fn record_nodes_addition(&mut self, node_ids: &[NodeId]) {
+        for &node_id in node_ids {
+            self.strategy.record_node_addition(node_id);
+        }
+    }
+    
     /// Record that a node was removed
     pub fn record_node_removal(&mut self, node_id: NodeId) {
         self.strategy.record_node_removal(node_id);
@@ -96,6 +103,13 @@ impl ChangeTracker {
     /// Record that a new edge was added
     pub fn record_edge_addition(&mut self, edge_id: EdgeId, source: NodeId, target: NodeId) {
         self.strategy.record_edge_addition(edge_id, source, target);
+    }
+    
+    /// Record that multiple edges were added (bulk operation)
+    pub fn record_edges_addition(&mut self, edges: &[(EdgeId, NodeId, NodeId)]) {
+        for &(edge_id, source, target) in edges {
+            self.strategy.record_edge_addition(edge_id, source, target);
+        }
     }
     
     /// Record that an edge was removed
@@ -175,28 +189,68 @@ impl ChangeTracker {
     
     /// Get all nodes that have been modified (added, removed, or attrs changed)
     pub fn get_modified_nodes(&self) -> HashSet<NodeId> {
-        // Basic implementation returns empty - full implementation would query the strategy
-        HashSet::new()
+        let mut modified = HashSet::new();
+        let changeset = self.strategy.create_change_set();
+        
+        // Add all nodes that were added or removed
+        modified.extend(changeset.nodes_added.iter());
+        modified.extend(changeset.nodes_removed.iter());
+        
+        // Add all nodes that had attribute changes
+        for (node_id, _, _, _) in &changeset.node_attr_changes {
+            modified.insert(*node_id);
+        }
+        
+        modified
     }
     
     /// Get all edges that have been modified
     pub fn get_modified_edges(&self) -> HashSet<EdgeId> {
-        // Basic implementation returns empty - full implementation would query the strategy
-        HashSet::new()
+        let mut modified = HashSet::new();
+        let changeset = self.strategy.create_change_set();
+        
+        // Add all edges that were added or removed
+        for (edge_id, _, _) in &changeset.edges_added {
+            modified.insert(*edge_id);
+        }
+        modified.extend(changeset.edges_removed.iter());
+        
+        // Add all edges that had attribute changes
+        for (edge_id, _, _, _) in &changeset.edge_attr_changes {
+            modified.insert(*edge_id);
+        }
+        
+        modified
     }
     
     /// Check if a specific node has been modified
     pub fn is_node_modified(&self, node_id: NodeId) -> bool {
-        let _ = node_id; // Silence unused parameter warning
-        // Basic implementation returns false - full implementation would query the strategy
-        false
+        let changeset = self.strategy.create_change_set();
+        
+        // Check if node was added or removed
+        if changeset.nodes_added.contains(&node_id) || 
+           changeset.nodes_removed.contains(&node_id) {
+            return true;
+        }
+        
+        // Check if node had attribute changes
+        changeset.node_attr_changes.iter()
+            .any(|(changed_node_id, _, _, _)| *changed_node_id == node_id)
     }
     
     /// Check if a specific edge has been modified
     pub fn is_edge_modified(&self, edge_id: EdgeId) -> bool {
-        let _ = edge_id; // Silence unused parameter warning
-        // Basic implementation returns false - full implementation would query the strategy
-        false
+        let changeset = self.strategy.create_change_set();
+        
+        // Check if edge was added or removed
+        if changeset.edges_added.iter().any(|(id, _, _)| *id == edge_id) ||
+           changeset.edges_removed.contains(&edge_id) {
+            return true;
+        }
+        
+        // Check if edge had attribute changes
+        changeset.edge_attr_changes.iter()
+            .any(|(changed_edge_id, _, _, _)| *changed_edge_id == edge_id)
     }
     
     /*
@@ -254,17 +308,17 @@ impl ChangeTracker {
     
     /// Get a summary of what has changed (compatibility method)
     pub fn change_summary(&self) -> ChangeSummary {
-        // Basic implementation creates a summary with basic information
-        // Full implementation would use strategy-specific information
+        let changeset = self.strategy.create_change_set();
+        
         ChangeSummary {
-            nodes_added: 0, // Strategy doesn't expose these details yet
-            nodes_removed: 0,
-            edges_added: 0,
-            edges_removed: 0,
-            node_attr_changes: 0,
-            edge_attr_changes: 0,
+            nodes_added: changeset.nodes_added.len(),
+            nodes_removed: changeset.nodes_removed.len(),
+            edges_added: changeset.edges_added.len(),
+            edges_removed: changeset.edges_removed.len(),
+            node_attr_changes: changeset.node_attr_changes.len(),
+            edge_attr_changes: changeset.edge_attr_changes.len(),
             total_changes: self.change_count(),
-            first_change_time: None,
+            first_change_time: None, // TODO: Could track timestamps in strategy
         }
     }
     
@@ -315,8 +369,79 @@ impl ChangeTracker {
     
     /// Estimate the memory usage of the change tracker
     pub fn memory_usage(&self) -> usize {
-        // Basic implementation returns 0 - memory usage calculation not yet implemented
-        0
+        let changeset = self.strategy.create_change_set();
+        let mut total = 0;
+        
+        // Size of vectors holding IDs
+        total += changeset.nodes_added.len() * std::mem::size_of::<NodeId>();
+        total += changeset.nodes_removed.len() * std::mem::size_of::<NodeId>();
+        total += changeset.edges_added.len() * std::mem::size_of::<(EdgeId, NodeId, NodeId)>();
+        total += changeset.edges_removed.len() * std::mem::size_of::<EdgeId>();
+        
+        // Size of attribute changes
+        for (_, _attr_name, old_val, new_val) in &changeset.node_attr_changes {
+            total += std::mem::size_of::<NodeId>();
+            total += std::mem::size_of::<AttrName>();
+            if let Some(val) = old_val {
+                total += match val {
+                    AttrValue::Text(s) => s.len(),
+                    AttrValue::Int(_) => std::mem::size_of::<i64>(),
+                    AttrValue::Float(_) => std::mem::size_of::<f64>(),
+                    AttrValue::Bool(_) => std::mem::size_of::<bool>(),
+                    AttrValue::FloatVec(v) => v.len() * std::mem::size_of::<f32>(),
+                    AttrValue::CompactText(cs) => cs.memory_size(),
+                    AttrValue::SmallInt(_) => std::mem::size_of::<i32>(),
+                    AttrValue::Bytes(b) => b.len(),
+                    AttrValue::CompressedText(cd) => cd.memory_size(),
+                    AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+                };
+            }
+            total += match new_val {
+                AttrValue::Text(s) => s.len(),
+                AttrValue::Int(_) => std::mem::size_of::<i64>(),
+                AttrValue::Float(_) => std::mem::size_of::<f64>(),
+                AttrValue::Bool(_) => std::mem::size_of::<bool>(),
+                AttrValue::FloatVec(v) => v.len() * std::mem::size_of::<f32>(),
+                AttrValue::CompactText(cs) => cs.memory_size(),
+                AttrValue::SmallInt(_) => std::mem::size_of::<i32>(),
+                AttrValue::Bytes(b) => b.len(),
+                AttrValue::CompressedText(cd) => cd.memory_size(),
+                AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+            };
+        }
+        
+        for (_, _attr_name, old_val, new_val) in &changeset.edge_attr_changes {
+            total += std::mem::size_of::<EdgeId>();
+            total += std::mem::size_of::<AttrName>();
+            if let Some(val) = old_val {
+                total += match val {
+                    AttrValue::Text(s) => s.len(),
+                    AttrValue::Int(_) => std::mem::size_of::<i64>(),
+                    AttrValue::Float(_) => std::mem::size_of::<f64>(),
+                    AttrValue::Bool(_) => std::mem::size_of::<bool>(),
+                    AttrValue::FloatVec(v) => v.len() * std::mem::size_of::<f32>(),
+                    AttrValue::CompactText(cs) => cs.memory_size(),
+                    AttrValue::SmallInt(_) => std::mem::size_of::<i32>(),
+                    AttrValue::Bytes(b) => b.len(),
+                    AttrValue::CompressedText(cd) => cd.memory_size(),
+                    AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+                };
+            }
+            total += match new_val {
+                AttrValue::Text(s) => s.len(),
+                AttrValue::Int(_) => std::mem::size_of::<i64>(),
+                AttrValue::Float(_) => std::mem::size_of::<f64>(),
+                AttrValue::Bool(_) => std::mem::size_of::<bool>(),
+                AttrValue::FloatVec(v) => v.len() * std::mem::size_of::<f32>(),
+                AttrValue::CompactText(cs) => cs.memory_size(),
+                AttrValue::SmallInt(_) => std::mem::size_of::<i32>(),
+                AttrValue::Bytes(b) => b.len(),
+                AttrValue::CompressedText(cd) => cd.memory_size(),
+                AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+            };
+        }
+        
+        total
     }
     
     /*
