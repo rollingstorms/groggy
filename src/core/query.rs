@@ -34,8 +34,60 @@ impl QueryEngine {
         space: &GraphSpace,
         filter: &NodeFilter
     ) -> GraphResult<Vec<NodeId>> {
-        let active_nodes: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
-        self.filter_nodes_columnar(&active_nodes, pool, space, filter)
+        // OPTIMIZED: Use the new optimized space method for active nodes
+        match filter {
+            NodeFilter::AttributeFilter { name, filter } => {
+                // OPTIMIZED: Use the existing bulk method which is fastest overall
+                let mut matching_nodes = Vec::with_capacity(space.get_active_nodes().len() / 4);
+                let active_nodes_vec: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
+                let node_attr_pairs = space.get_attributes_for_nodes(pool, name, &active_nodes_vec);
+                
+                // OPTIMIZED: Process results efficiently with pre-allocated capacity
+                for (node_id, attr_opt) in node_attr_pairs {
+                    if let Some(attr_value) = attr_opt {
+                        if filter.matches(attr_value) {
+                            matching_nodes.push(node_id);
+                        }
+                    }
+                }
+                Ok(matching_nodes)
+            }
+            
+            NodeFilter::AttributeEquals { name, value } => {
+                // OPTIMIZED: Use the existing bulk method which is fastest overall
+                let mut matching_nodes = Vec::with_capacity(space.get_active_nodes().len() / 4);
+                let active_nodes_vec: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
+                let node_attr_pairs = space.get_attributes_for_nodes(pool, name, &active_nodes_vec);
+                
+                // OPTIMIZED: Process results efficiently with pre-allocated capacity
+                for (node_id, attr_opt) in node_attr_pairs {
+                    if let Some(attr_value) = attr_opt {
+                        if *attr_value == *value {
+                            matching_nodes.push(node_id);
+                        }
+                    }
+                }
+                Ok(matching_nodes)
+            }
+            
+            NodeFilter::HasAttribute { name } => {
+                // STREAMING: Check attribute existence directly
+                let mut results = Vec::with_capacity(space.get_active_nodes().len() / 2);
+                
+                for &node_id in space.get_active_nodes() {
+                    if space.get_node_attr_index(node_id, name).is_some() {
+                        results.push(node_id);
+                    }
+                }
+                Ok(results)
+            }
+            
+            // For complex filters, fall back to collecting the active nodes
+            _ => {
+                let active_nodes_vec: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
+                self.filter_nodes_columnar(&active_nodes_vec, pool, space, filter)
+            }
+        }
     }
 
     /// Columnar filtering on any subset of nodes - THE CORE METHOD
@@ -48,50 +100,45 @@ impl QueryEngine {
     ) -> GraphResult<Vec<NodeId>> {
         match filter {
             NodeFilter::AttributeFilter { name, filter } => {
-                // Bulk optimization: Single operation for all nodes
+                // OPTIMIZED: Pre-allocate result vector to avoid multiple allocations
+                let mut matching_nodes = Vec::with_capacity(nodes.len() / 4); // estimate 25% match rate
                 let node_attr_pairs = space.get_attributes_for_nodes(pool, name, nodes);
-                let matching_nodes: Vec<NodeId> = node_attr_pairs
-                    .into_iter()
-                    .filter_map(|(node_id, attr_opt)| {
-                        if let Some(attr_value) = attr_opt {
-                            if filter.matches(attr_value) {
-                                Some(node_id)
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
+                
+                for (node_id, attr_opt) in node_attr_pairs {
+                    if let Some(attr_value) = attr_opt {
+                        if filter.matches(attr_value) {
+                            matching_nodes.push(node_id);
                         }
-                    })
-                    .collect();
+                    }
+                }
                 Ok(matching_nodes)
             }
             
             NodeFilter::AttributeEquals { name, value } => {
-                // Bulk equality check
+                // OPTIMIZED: Pre-allocate and avoid iterator chain
+                let mut matching_nodes = Vec::with_capacity(nodes.len() / 4);
                 let node_attr_pairs = space.get_attributes_for_nodes(pool, name, nodes);
-                let matching_nodes: Vec<NodeId> = node_attr_pairs
-                    .into_iter()
-                    .filter_map(|(node_id, attr_opt)| {
-                        if let Some(attr_value) = attr_opt {
-                            if *attr_value == *value {
-                                Some(node_id)
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
+                
+                for (node_id, attr_opt) in node_attr_pairs {
+                    if let Some(attr_value) = attr_opt {
+                        if *attr_value == *value {
+                            matching_nodes.push(node_id);
                         }
-                    })
-                    .collect();
+                    }
+                }
                 Ok(matching_nodes)
             }
             
             NodeFilter::HasAttribute { name } => {
-                let results: Vec<NodeId> = nodes.iter()
-                    .filter(|&node_id| space.get_node_attr_index(*node_id, name).is_some())
-                    .copied()
-                    .collect();
+                // OPTIMIZED: Use bulk attribute lookup and pre-allocate
+                let mut results = Vec::with_capacity(nodes.len() / 2);
+                let node_attr_pairs = space.get_attributes_for_nodes(pool, name, nodes);
+                
+                for (node_id, attr_opt) in node_attr_pairs {
+                    if attr_opt.is_some() {
+                        results.push(node_id);
+                    }
+                }
                 Ok(results)
             }
             
@@ -311,27 +358,27 @@ impl AttributeFilter {
     }
     
     /// Helper method for flexible numeric comparisons
-    /// Converts both values to f64 for comparison to handle all numeric type combinations
+    /// OPTIMIZED: Use pattern matching to avoid allocations and improve performance
     fn compare_numeric<F>(&self, value: &AttrValue, target: &AttrValue, op: F) -> bool 
     where
         F: Fn(f64, f64) -> bool,
     {
-        let val_num = match value {
-            AttrValue::Int(i) => Some(*i as f64),
-            AttrValue::SmallInt(i) => Some(*i as f64),
-            AttrValue::Float(f) => Some(*f as f64),
-            _ => None,
-        };
-        
-        let target_num = match target {
-            AttrValue::Int(i) => Some(*i as f64),
-            AttrValue::SmallInt(i) => Some(*i as f64),
-            AttrValue::Float(f) => Some(*f as f64),
-            _ => None,
-        };
-        
-        match (val_num, target_num) {
-            (Some(a), Some(b)) => op(a, b),
+        // OPTIMIZED: Direct pattern matching for common cases to avoid conversions
+        match (value, target) {
+            // Int comparisons - most common case
+            (AttrValue::Int(a), AttrValue::Int(b)) => op(*a as f64, *b as f64),
+            (AttrValue::SmallInt(a), AttrValue::SmallInt(b)) => op(*a as f64, *b as f64),
+            (AttrValue::Float(a), AttrValue::Float(b)) => op(*a as f64, *b as f64),
+            
+            // Mixed comparisons
+            (AttrValue::Int(a), AttrValue::Float(b)) => op(*a as f64, *b as f64),
+            (AttrValue::Float(a), AttrValue::Int(b)) => op(*a as f64, *b as f64),
+            (AttrValue::SmallInt(a), AttrValue::Int(b)) => op(*a as f64, *b as f64),
+            (AttrValue::Int(a), AttrValue::SmallInt(b)) => op(*a as f64, *b as f64),
+            (AttrValue::SmallInt(a), AttrValue::Float(b)) => op(*a as f64, *b as f64),
+            (AttrValue::Float(a), AttrValue::SmallInt(b)) => op(*a as f64, *b as f64),
+            
+            // Non-numeric types
             _ => false,
         }
     }

@@ -16,7 +16,7 @@ use crate::core::pool::GraphPool;
 use crate::core::space::GraphSpace;
 use crate::core::history::{HistoryForest, HistoricalView, CommitDiff};
 use crate::core::query::{QueryEngine, NodeFilter, EdgeFilter};
-use crate::core::traversal::{TraversalEngine, TraversalOptions, TraversalResult};
+use crate::core::traversal::TraversalEngine;
 use crate::core::ref_manager::BranchInfo;
 use crate::config::GraphConfig;
 use crate::types::{NodeId, EdgeId, AttrName, AttrValue, StateId, BranchName, MemoryStatistics, MemoryEfficiency, CompressionStatistics};
@@ -667,8 +667,8 @@ impl Graph {
     
     /// Get basic statistics about the current graph
     pub fn statistics(&self) -> GraphStatistics {
-        let pool_stats = self.pool.statistics();
-        let history_stats = self.history.statistics();
+        let _pool_stats = self.pool.statistics();
+        let _history_stats = self.history.statistics();
         
         // Accurate memory calculation using new memory monitoring
         // let memory_stats = self.memory_statistics();

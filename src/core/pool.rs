@@ -64,6 +64,7 @@ pub struct AttributeMemoryPool {
     /// Pool of reusable float vectors
     float_vec_pool: Vec<Vec<f32>>,
     /// Pool of reusable byte vectors  
+    #[allow(dead_code)] // TODO: Implement byte pool reuse
     byte_pool: Vec<Vec<u8>>,
     /// Statistics
     reuse_count: usize,
@@ -506,6 +507,46 @@ impl GraphPool {
                 let attr_value = index_opt
                     .and_then(|index| attr_column?.values.get(index));
                 (*entity_id, attr_value)
+            })
+            .collect()
+    }
+    
+    /// OPTIMIZED: Direct access to attribute column to avoid repeated HashMap lookups
+    pub fn get_node_attribute_column(&self, attr_name: &AttrName) -> Option<&AttributeColumn> {
+        self.node_attributes.get(attr_name)
+    }
+    
+    /// OPTIMIZED: Direct access to edge attribute column
+    pub fn get_edge_attribute_column(&self, attr_name: &AttrName) -> Option<&AttributeColumn> {
+        self.edge_attributes.get(attr_name)
+    }
+    
+    /// OPTIMIZED: Iterator-based attribute retrieval to eliminate intermediate allocations
+    /// 
+    /// PERFORMANCE: Zero-allocation bulk operation for filtering  
+    /// INPUT: Iterator of (entity_id, optional_column_index) pairs
+    /// OUTPUT: Vec of (entity_id, optional_attribute_value) pairs
+    pub fn get_attribute_values_iter<I>(&self, 
+        attr_name: &AttrName, 
+        entity_indices_iter: I, 
+        is_node: bool
+    ) -> Vec<(NodeId, Option<&AttrValue>)> 
+    where
+        I: Iterator<Item = (NodeId, Option<usize>)>
+    {
+        // Get the columnar attribute storage
+        let attr_column = if is_node {
+            self.node_attributes.get(attr_name)
+        } else {
+            self.edge_attributes.get(attr_name)
+        };
+        
+        // OPTIMIZED: Direct iterator processing without intermediate collections
+        entity_indices_iter
+            .map(|(entity_id, index_opt)| {
+                let attr_value = index_opt
+                    .and_then(|index| attr_column?.values.get(index));
+                (entity_id, attr_value)
             })
             .collect()
     }

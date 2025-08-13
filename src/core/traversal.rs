@@ -17,7 +17,7 @@ use crate::core::pool::GraphPool;
 use crate::core::space::GraphSpace;
 use crate::core::query::{NodeFilter, EdgeFilter};
 use crate::errors::GraphResult;
-use rayon::prelude::*;
+// use rayon::prelude::*; // TODO: Re-enable when parallel traversal is implemented
 
 /// High-performance graph traversal engine
 /// 
@@ -37,15 +37,18 @@ pub struct TraversalEngine {
     state_pool: TraversalStatePool,
     
     /// Performance configuration
+    #[allow(dead_code)] // TODO: Implement configuration system
     config: TraversalConfig,
     
     /// Statistics tracking
     stats: TraversalStats,
     
     /// Adjacency cache for fast neighbor lookups
+    #[allow(dead_code)] // TODO: Implement adjacency caching
     adjacency_cache: AdjacencyCache,
     
     /// Filter result cache to avoid repeated evaluations
+    #[allow(dead_code)] // TODO: Implement filter result caching
     filter_cache: FilterCache,
 }
 
@@ -627,6 +630,7 @@ impl TraversalEngine {
     }
     
     /// Check if traversal should terminate based on options
+    #[allow(dead_code)] // TODO: Implement termination conditions
     fn should_terminate(&self, options: &TraversalOptions, depth: usize, nodes_found: usize) -> bool {
         if let Some(max_depth) = options.max_depth {
             if depth >= max_depth {
@@ -778,7 +782,7 @@ impl TraversalEngine {
             });
         } else {
             // Continue exploring - get topology data
-            let (edge_ids, sources, targets) = space.get_columnar_topology_cached(pool);
+            let (_edge_ids, sources, targets) = space.get_columnar_topology_cached(pool);
             
             // Collect neighbors first to avoid borrowing conflicts
             let mut neighbors = Vec::new();
@@ -876,6 +880,7 @@ impl TraversalStatePool {
 #[derive(Debug)]
 struct TraversalState {
     visited: HashSet<NodeId>,
+    #[allow(dead_code)] // TODO: Implement queue-based traversal
     queue: VecDeque<NodeId>,
     distances: HashMap<NodeId, f64>,
     predecessors: HashMap<NodeId, NodeId>,
