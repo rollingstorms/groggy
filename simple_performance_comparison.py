@@ -118,7 +118,7 @@ def run_python_stress_test() -> Dict[str, float]:
     
     try:
         result = subprocess.run([
-            'python', 'stress_test_python_optimized.py'
+            'python', 'stress_test_python.py'
         ], capture_output=True, text=True, cwd='/Users/michaelroth/Documents/Code/groggy', timeout=120)
         
         if result.returncode != 0:

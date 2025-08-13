@@ -53,15 +53,8 @@ impl QueryEngine {
                 let matching_nodes: Vec<NodeId> = node_attr_pairs
                     .into_iter()
                     .filter_map(|(node_id, attr_opt)| {
-                        if let Some(attr_value) = attr_opt {
-                            if filter.matches(attr_value) {
-                                Some(node_id)
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
+                        attr_opt.filter(|attr_value| filter.matches(attr_value))
+                               .map(|_| node_id)
                     })
                     .collect();
                 Ok(matching_nodes)
@@ -73,15 +66,8 @@ impl QueryEngine {
                 let matching_nodes: Vec<NodeId> = node_attr_pairs
                     .into_iter()
                     .filter_map(|(node_id, attr_opt)| {
-                        if let Some(attr_value) = attr_opt {
-                            if *attr_value == *value {
-                                Some(node_id)
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
+                        attr_opt.filter(|attr_value| **attr_value == *value)
+                               .map(|_| node_id)
                     })
                     .collect();
                 Ok(matching_nodes)
@@ -300,39 +286,19 @@ impl AttributeFilter {
         match self {
             AttributeFilter::Equals(target) => value == target,
             AttributeFilter::GreaterThan(target) => {
-                // Flexible numeric comparison - handle all numeric type combinations
-                self.compare_numeric(value, target, |a, b| a > b)
+                match (value, target) {
+                    (AttrValue::Int(a), AttrValue::Int(b)) => a > b,
+                    (AttrValue::Float(a), AttrValue::Float(b)) => a > b,
+                    _ => false,
+                }
             }
             AttributeFilter::LessThan(target) => {
-                // Flexible numeric comparison - handle all numeric type combinations
-                self.compare_numeric(value, target, |a, b| a < b)
+                match (value, target) {
+                    (AttrValue::Int(a), AttrValue::Int(b)) => a < b,
+                    (AttrValue::Float(a), AttrValue::Float(b)) => a < b,
+                    _ => false,
+                }
             }
-        }
-    }
-    
-    /// Helper method for flexible numeric comparisons
-    /// Converts both values to f64 for comparison to handle all numeric type combinations
-    fn compare_numeric<F>(&self, value: &AttrValue, target: &AttrValue, op: F) -> bool 
-    where
-        F: Fn(f64, f64) -> bool,
-    {
-        let val_num = match value {
-            AttrValue::Int(i) => Some(*i as f64),
-            AttrValue::SmallInt(i) => Some(*i as f64),
-            AttrValue::Float(f) => Some(*f as f64),
-            _ => None,
-        };
-        
-        let target_num = match target {
-            AttrValue::Int(i) => Some(*i as f64),
-            AttrValue::SmallInt(i) => Some(*i as f64),
-            AttrValue::Float(f) => Some(*f as f64),
-            _ => None,
-        };
-        
-        match (val_num, target_num) {
-            (Some(a), Some(b)) => op(a, b),
-            _ => false,
         }
     }
 }

@@ -12,7 +12,10 @@ from ._groggy import (
     EdgeFilter, 
     AttributeFilter,
     TraversalResult,
-    AggregationResult
+    AggregationResult,
+    GroupedAggregationResult,
+    PyResultHandle,
+    PyAttributeCollection
 )
 
 from .types import NodeId, EdgeId, AttrName, StateId, BranchName
@@ -44,4 +47,7 @@ __all__ = [
     "AttributeFilter", 
     "TraversalResult",
     "AggregationResult",
+    "GroupedAggregationResult",
+    "PyResultHandle",
+    "PyAttributeCollection",
 ]

@@ -16,6 +16,7 @@ use crate::core::pool::GraphPool;
 use crate::core::space::GraphSpace;
 use crate::core::history::{HistoryForest, HistoricalView, CommitDiff};
 use crate::core::query::{QueryEngine, NodeFilter, EdgeFilter};
+use crate::core::traversal::{TraversalEngine, TraversalOptions, TraversalResult};
 use crate::core::ref_manager::BranchInfo;
 use crate::config::GraphConfig;
 use crate::types::{NodeId, EdgeId, AttrName, AttrValue, StateId, BranchName, MemoryStatistics, MemoryEfficiency, CompressionStatistics};
@@ -84,6 +85,10 @@ pub struct Graph {
     /// Handles filtering, aggregation, pattern matching
     query_engine: QueryEngine,
     
+    /// Graph traversal engine for BFS, DFS, pathfinding
+    /// Handles connectivity analysis and traversal algorithms
+    traversal_engine: TraversalEngine,
+    
     /*
     === TRANSACTION MANAGEMENT ===
     Track what's changed since last commit
@@ -115,6 +120,7 @@ impl Graph {
             current_branch: "main".to_string(),
             current_commit: 0,
             query_engine: QueryEngine::new(),
+            traversal_engine: TraversalEngine::new(),
             space: GraphSpace::new(0), // base state = 0
             change_tracker: ChangeTracker::new(),
             config,
@@ -129,6 +135,7 @@ impl Graph {
             current_branch: "main".to_string(),
             current_commit: 0,
             query_engine: QueryEngine::new(),
+            traversal_engine: TraversalEngine::new(),
             space: GraphSpace::new(0), // base state = 0
             change_tracker: ChangeTracker::new(),
             config,
@@ -944,68 +951,54 @@ impl Graph {
     }
     
     /*
-    === GRAPH TRAVERSAL ALGORITHMS ===
-    High-level graph traversal and pathfinding operations
+    === GRAPH TRAVERSAL OPERATIONS ===
+    Advanced graph algorithms for traversal, pathfinding, and connectivity analysis.
+    These delegate to the traversal_engine for optimized traversal algorithms.
     */
     
     /// Perform Breadth-First Search from a starting node
     pub fn bfs(&mut self, start: NodeId, options: crate::core::traversal::TraversalOptions) -> Result<crate::core::traversal::TraversalResult, GraphError> {
-        self.query_engine.bfs(&self.pool, &mut self.space, start, options)
+        self.traversal_engine.bfs(&self.pool, &mut self.space, start, options)
             .map_err(|e| e.into())
     }
     
     /// Perform Depth-First Search from a starting node
     pub fn dfs(&mut self, start: NodeId, options: crate::core::traversal::TraversalOptions) -> Result<crate::core::traversal::TraversalResult, GraphError> {
-        self.query_engine.dfs(&self.pool, &mut self.space, start, options)
+        self.traversal_engine.dfs(&self.pool, &mut self.space, start, options)
             .map_err(|e| e.into())
     }
     
     /// Find shortest path between two nodes
     pub fn shortest_path(&mut self, start: NodeId, end: NodeId, options: crate::core::traversal::PathFindingOptions) -> Result<Option<crate::core::traversal::Path>, GraphError> {
-        self.query_engine.shortest_path(&self.pool, &mut self.space, start, end, options)
+        self.traversal_engine.shortest_path(&self.pool, &mut self.space, start, end, options)
             .map_err(|e| e.into())
     }
     
     /// Find all simple paths between two nodes
     pub fn all_paths(&mut self, start: NodeId, end: NodeId, max_length: usize) -> Result<Vec<crate::core::traversal::Path>, GraphError> {
-        self.query_engine.all_paths(&self.pool, &mut self.space, start, end, max_length)
+        self.traversal_engine.all_paths(&self.pool, &mut self.space, start, end, max_length)
             .map_err(|e| e.into())
     }
     
     /// Find all connected components in the graph
     pub fn connected_components(&mut self, options: crate::core::traversal::TraversalOptions) -> Result<crate::core::traversal::ConnectedComponentsResult, GraphError> {
-        self.query_engine.connected_components(&self.pool, &mut self.space, options)
+        self.traversal_engine.connected_components(&self.pool, &mut self.space, options)
             .map_err(|e| e.into())
     }
     
     /// Get traversal performance statistics
     pub fn traversal_statistics(&self) -> &crate::core::traversal::TraversalStats {
-        self.query_engine.traversal_statistics()
+        self.traversal_engine.statistics()
     }
     
-    /*
-    === PHASE 3.3: COMPLEX QUERY COMPOSITION ===
-    High-level complex query building and execution
-    */
+    // TODO: Implement complex query composition when needed
     
     /// Create a new complex query builder
-    pub fn query(&self) -> crate::core::query::ComplexQueryBuilder {
-        self.query_engine.query_builder()
-    }
-    
-    /// Execute a complex query with optimization and caching
-    pub fn execute_query(&mut self, query: crate::core::query::ComplexQuery) -> Result<crate::core::query::ComplexQueryResult, GraphError> {
-        self.query_engine.execute_complex_query(&self.pool, &mut self.space, query)
-            .map_err(|e| e.into())
-    }
-    
-    /// Create and execute a query in one step (convenience method)
-    pub fn execute_query_builder<F>(&mut self, builder_fn: F) -> Result<crate::core::query::ComplexQueryResult, GraphError>
-    where
-        F: FnOnce(crate::core::query::ComplexQueryBuilder) -> crate::core::query::ComplexQuery,
-    {
-        let query = builder_fn(self.query());
-        self.execute_query(query)
+    pub fn query(&self) -> Result<(), GraphError> {
+        Err(GraphError::NotImplemented {
+            feature: "complex query builder".to_string(),
+            tracking_issue: None,
+        })
     }
     
     /// Create a read-only view of the graph for analysis
@@ -1115,168 +1108,158 @@ impl Graph {
     
     /*
     === AGGREGATION AND ANALYTICS ===
-    Phase 3.4 implementation - comprehensive query result aggregation
+    Statistical operations and data analysis functionality.
     */
     
     /// Compute aggregate statistics for a node attribute
-    pub fn aggregate_node_attribute(
-        &self,
-        attr_name: &AttrName,
-        aggregation: crate::core::query::AggregationType
-    ) -> Result<crate::core::query::AggregationResult, GraphError> {
-        self.query_engine.aggregate_node_attribute(&self.pool, &self.space, attr_name, aggregation)
-            .map_err(|e| GraphError::internal(&format!("Node aggregation failed: {}", e), "Graph::aggregate_node_attribute"))
+    pub fn aggregate_node_attribute(&self, attr_name: &AttrName, operation: &str) -> Result<AggregationResult, GraphError> {
+        // Get all active nodes
+        let node_ids: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
+        
+        // Collect attribute values
+        let mut values = Vec::new();
+        for &node_id in &node_ids {
+            if let Ok(Some(attr_value)) = self.get_node_attr(node_id, attr_name) {
+                values.push(attr_value);
+            }
+        }
+        
+        if values.is_empty() {
+            return Ok(AggregationResult::new(0.0));
+        }
+        
+        // Perform the requested aggregation
+        let result = match operation {
+            "count" => values.len() as f64,
+            "average" | "mean" => {
+                let sum = values.iter().fold(0.0, |acc, val| acc + extract_numeric(val));
+                sum / values.len() as f64
+            },
+            "sum" => values.iter().fold(0.0, |acc, val| acc + extract_numeric(val)),
+            "min" => values.iter().fold(f64::INFINITY, |acc, val| acc.min(extract_numeric(val))),
+            "max" => values.iter().fold(f64::NEG_INFINITY, |acc, val| acc.max(extract_numeric(val))),
+            "stddev" => {
+                let mean = values.iter().fold(0.0, |acc, val| acc + extract_numeric(val)) / values.len() as f64;
+                let variance = values.iter().fold(0.0, |acc, val| {
+                    let diff = extract_numeric(val) - mean;
+                    acc + diff * diff
+                }) / values.len() as f64;
+                variance.sqrt()
+            },
+            "median" => {
+                let mut numeric_values: Vec<f64> = values.iter().map(extract_numeric).collect();
+                numeric_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let mid = numeric_values.len() / 2;
+                if numeric_values.len() % 2 == 0 {
+                    (numeric_values[mid - 1] + numeric_values[mid]) / 2.0
+                } else {
+                    numeric_values[mid]
+                }
+            },
+            "percentile_95" => {
+                let mut numeric_values: Vec<f64> = values.iter().map(extract_numeric).collect();
+                numeric_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                let index = ((numeric_values.len() as f64 - 1.0) * 0.95).round() as usize;
+                numeric_values[index.min(numeric_values.len() - 1)]
+            },
+            "unique_count" => {
+                let mut unique_values = std::collections::HashSet::new();
+                for value in values {
+                    unique_values.insert(value);
+                }
+                unique_values.len() as f64
+            },
+            _ => return Err(GraphError::InvalidInput(format!("Unsupported aggregation operation: {}", operation)))
+        };
+        
+        Ok(AggregationResult::new(result))
     }
     
     /// Compute aggregate statistics for an edge attribute  
-    pub fn aggregate_edge_attribute(
-        &self,
-        attr_name: &AttrName,
-        aggregation: crate::core::query::AggregationType
-    ) -> Result<crate::core::query::AggregationResult, GraphError> {
-        self.query_engine.aggregate_edge_attribute(&self.pool, &self.space, attr_name, aggregation)
-            .map_err(|e| GraphError::internal(&format!("Edge aggregation failed: {}", e), "Graph::aggregate_edge_attribute"))
+    pub fn aggregate_edge_attribute(&self, attr_name: &AttrName, operation: &str) -> Result<AggregationResult, GraphError> {
+        // Get all active edges
+        let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
+        
+        // Collect attribute values
+        let mut values = Vec::new();
+        for &edge_id in &edge_ids {
+            if let Ok(Some(attr_value)) = self.get_edge_attr(edge_id, attr_name) {
+                values.push(attr_value);
+            }
+        }
+        
+        if values.is_empty() {
+            return Ok(AggregationResult::new(0.0));
+        }
+        
+        // Perform the requested aggregation (same logic as node aggregation)
+        let result = match operation {
+            "count" => values.len() as f64,
+            "average" | "mean" => {
+                let sum = values.iter().fold(0.0, |acc, val| acc + extract_numeric(val));
+                sum / values.len() as f64
+            },
+            "sum" => values.iter().fold(0.0, |acc, val| acc + extract_numeric(val)),
+            "min" => values.iter().fold(f64::INFINITY, |acc, val| acc.min(extract_numeric(val))),
+            "max" => values.iter().fold(f64::NEG_INFINITY, |acc, val| acc.max(extract_numeric(val))),
+            "stddev" => {
+                let mean = values.iter().fold(0.0, |acc, val| acc + extract_numeric(val)) / values.len() as f64;
+                let variance = values.iter().fold(0.0, |acc, val| {
+                    let diff = extract_numeric(val) - mean;
+                    acc + diff * diff
+                }) / values.len() as f64;
+                variance.sqrt()
+            },
+            _ => return Err(GraphError::InvalidInput(format!("Unsupported aggregation operation: {}", operation)))
+        };
+        
+        Ok(AggregationResult::new(result))
     }
     
     /// Group nodes by attribute value and compute aggregates for each group
-    pub fn group_nodes_by_attribute(
-        &self,
-        group_by_attr: &AttrName,
-        aggregate_attr: &AttrName,
-        aggregation: crate::core::query::AggregationType
-    ) -> Result<std::collections::HashMap<crate::types::AttrValue, crate::core::query::AggregationResult>, GraphError> {
-        self.query_engine.group_nodes_by_attribute(&self.pool, &self.space, group_by_attr, aggregate_attr, aggregation)
-            .map_err(|e| GraphError::internal(&format!("Node grouping failed: {}", e), "Graph::group_nodes_by_attribute"))
-    }
-    
-    /// Get comprehensive statistics for an attribute
-    pub fn compute_comprehensive_stats(
-        &self,
-        attr_name: &AttrName,
-        target: crate::core::query::AggregationTarget
-    ) -> Result<crate::core::query::ComprehensiveStats, GraphError> {
-        self.query_engine.compute_comprehensive_stats(&self.pool, &self.space, attr_name, target)
-            .map_err(|e| GraphError::internal(&format!("Comprehensive stats failed: {}", e), "Graph::compute_comprehensive_stats"))
-    }
-    
-    /// Create an analyzer for node attributes (fluent API)
-    pub fn analyze_node_attribute<'a>(&'a self, attr_name: &'a AttrName) -> NodeAttributeAnalyzer<'a> {
-        NodeAttributeAnalyzer::new(&self.query_engine, &self.pool, &self.space, attr_name)
-    }
-    
-    /// Create an analyzer for edge attributes (fluent API)  
-    pub fn analyze_edge_attribute<'a>(&'a self, attr_name: &'a AttrName) -> EdgeAttributeAnalyzer<'a> {
-        EdgeAttributeAnalyzer::new(&self.query_engine, &self.pool, &self.space, attr_name)
-    }
-}
-
-/// Fluent API for node attribute analysis
-pub struct NodeAttributeAnalyzer<'a> {
-    query_engine: &'a crate::core::query::QueryEngine,
-    pool: &'a crate::core::pool::GraphPool,
-    space: &'a crate::core::space::GraphSpace,
-    attr_name: &'a AttrName,
-}
-
-impl<'a> NodeAttributeAnalyzer<'a> {
-    pub fn new(
-        query_engine: &'a crate::core::query::QueryEngine,
-        pool: &'a crate::core::pool::GraphPool, 
-        space: &'a crate::core::space::GraphSpace,
-        attr_name: &'a AttrName
-    ) -> Self {
-        Self { query_engine, pool, space, attr_name }
-    }
-    
-    pub fn count(self) -> Result<i64, GraphError> {
-        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
-        analyzer.count(self.pool, self.space)
-            .map_err(|e| GraphError::internal(&format!("Count failed: {}", e), "NodeAttributeAnalyzer::count"))
-    }
-    
-    pub fn sum(self) -> Result<f64, GraphError> {
-        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
-        analyzer.sum(self.pool, self.space)
-            .map_err(|e| GraphError::internal(&format!("Sum failed: {}", e), "NodeAttributeAnalyzer::sum"))
-    }
-    
-    pub fn average(self) -> Result<f64, GraphError> {
-        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
-        analyzer.average(self.pool, self.space)
-            .map_err(|e| GraphError::internal(&format!("Average failed: {}", e), "NodeAttributeAnalyzer::average"))
-    }
-    
-    pub fn min_max(self) -> Result<(f64, f64), GraphError> {
-        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
-        analyzer.min_max(self.pool, self.space)
-            .map_err(|e| GraphError::internal(&format!("Min/Max failed: {}", e), "NodeAttributeAnalyzer::min_max"))
-    }
-    
-    pub fn percentile(self, percentile: f64) -> Result<f64, GraphError> {
-        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
-        analyzer.percentile(self.pool, self.space, percentile)
-            .map_err(|e| GraphError::internal(&format!("Percentile failed: {}", e), "NodeAttributeAnalyzer::percentile"))
-    }
-    
-    pub fn comprehensive_stats(self) -> Result<crate::core::query::ComprehensiveStats, GraphError> {
-        let analyzer = self.query_engine.analyze_node_attribute(self.attr_name);
-        analyzer.comprehensive_stats(self.pool, self.space)
-            .map_err(|e| GraphError::internal(&format!("Comprehensive stats failed: {}", e), "NodeAttributeAnalyzer::comprehensive_stats"))
-    }
-}
-
-/// Fluent API for edge attribute analysis
-pub struct EdgeAttributeAnalyzer<'a> {
-    query_engine: &'a crate::core::query::QueryEngine,
-    pool: &'a crate::core::pool::GraphPool,
-    space: &'a crate::core::space::GraphSpace,
-    attr_name: &'a AttrName,
-}
-
-impl<'a> EdgeAttributeAnalyzer<'a> {
-    pub fn new(
-        query_engine: &'a crate::core::query::QueryEngine,
-        pool: &'a crate::core::pool::GraphPool, 
-        space: &'a crate::core::space::GraphSpace,
-        attr_name: &'a AttrName
-    ) -> Self {
-        Self { query_engine, pool, space, attr_name }
-    }
-    
-    pub fn count(self) -> Result<i64, GraphError> {
-        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
-        analyzer.count(self.pool, self.space)
-            .map_err(|e| GraphError::internal(&format!("Count failed: {}", e), "EdgeAttributeAnalyzer::count"))
-    }
-    
-    pub fn sum(self) -> Result<f64, GraphError> {
-        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
-        analyzer.sum(self.pool, self.space)
-            .map_err(|e| GraphError::internal(&format!("Sum failed: {}", e), "EdgeAttributeAnalyzer::sum"))
-    }
-    
-    pub fn average(self) -> Result<f64, GraphError> {
-        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
-        analyzer.average(self.pool, self.space)
-            .map_err(|e| GraphError::internal(&format!("Average failed: {}", e), "EdgeAttributeAnalyzer::average"))
-    }
-    
-    pub fn min_max(self) -> Result<(f64, f64), GraphError> {
-        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
-        analyzer.min_max(self.pool, self.space)
-            .map_err(|e| GraphError::internal(&format!("Min/Max failed: {}", e), "EdgeAttributeAnalyzer::min_max"))
-    }
-    
-    pub fn percentile(self, percentile: f64) -> Result<f64, GraphError> {
-        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
-        analyzer.percentile(self.pool, self.space, percentile)
-            .map_err(|e| GraphError::internal(&format!("Percentile failed: {}", e), "EdgeAttributeAnalyzer::percentile"))
-    }
-    
-    pub fn comprehensive_stats(self) -> Result<crate::core::query::ComprehensiveStats, GraphError> {
-        let analyzer = self.query_engine.analyze_edge_attribute(self.attr_name);
-        analyzer.comprehensive_stats(self.pool, self.space)
-            .map_err(|e| GraphError::internal(&format!("Comprehensive stats failed: {}", e), "EdgeAttributeAnalyzer::comprehensive_stats"))
+    pub fn group_nodes_by_attribute(&self, group_by_attr: &AttrName, aggregate_attr: &AttrName, operation: &str) -> Result<std::collections::HashMap<AttrValue, AggregationResult>, GraphError> {
+        // Get all active nodes
+        let node_ids: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
+        
+        // Group nodes by the group_by_attr
+        let mut groups: std::collections::HashMap<AttrValue, Vec<NodeId>> = std::collections::HashMap::new();
+        
+        for &node_id in &node_ids {
+            if let Ok(Some(group_value)) = self.get_node_attr(node_id, group_by_attr) {
+                groups.entry(group_value).or_insert_with(Vec::new).push(node_id);
+            }
+        }
+        
+        // For each group, compute the aggregation on the aggregate_attr
+        let mut results = std::collections::HashMap::new();
+        
+        for (group_value, group_nodes) in groups {
+            // Collect values for this group
+            let mut values = Vec::new();
+            for &node_id in &group_nodes {
+                if let Ok(Some(attr_value)) = self.get_node_attr(node_id, aggregate_attr) {
+                    values.push(attr_value);
+                }
+            }
+            
+            if !values.is_empty() {
+                let result = match operation {
+                    "count" => values.len() as f64,
+                    "average" | "mean" => {
+                        let sum = values.iter().fold(0.0, |acc, val| acc + extract_numeric(val));
+                        sum / values.len() as f64
+                    },
+                    "sum" => values.iter().fold(0.0, |acc, val| acc + extract_numeric(val)),
+                    "min" => values.iter().fold(f64::INFINITY, |acc, val| acc.min(extract_numeric(val))),
+                    "max" => values.iter().fold(f64::NEG_INFINITY, |acc, val| acc.max(extract_numeric(val))),
+                    _ => return Err(GraphError::InvalidInput(format!("Unsupported aggregation operation: {}", operation)))
+                };
+                
+                results.insert(group_value, AggregationResult::new(result));
+            }
+        }
+        
+        Ok(results)
     }
 }
 
@@ -1308,6 +1291,28 @@ pub struct CommitInfo {
     pub author: String,
     pub timestamp: u64,
     pub changes_summary: String,
+}
+
+/// Result of an aggregation operation
+#[derive(Debug, Clone)]
+pub struct AggregationResult {
+    pub value: f64,
+}
+
+impl AggregationResult {
+    pub fn new(value: f64) -> Self {
+        Self { value }
+    }
+}
+
+/// Extract numeric value from AttrValue for aggregation
+fn extract_numeric(attr_value: &AttrValue) -> f64 {
+    match attr_value {
+        AttrValue::Int(i) => *i as f64,
+        AttrValue::Float(f) => *f as f64,
+        AttrValue::SmallInt(i) => *i as f64,
+        _ => 0.0, // Non-numeric values default to 0
+    }
 }
 
 impl Default for Graph {

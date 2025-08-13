@@ -39,7 +39,7 @@ This is the heart of the flexible attribute system. Should support:
 
 /// Efficient storage for attribute values supporting multiple data types
 /// DESIGN: Enum dispatch is fast, Hash implementation handles f32 properly
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum AttrValue {
     /// 32-bit float (embeddings, coordinates, ML features)
     Float(f32),
@@ -63,6 +63,88 @@ pub enum AttrValue {
     CompressedText(CompressedData),
     /// Compressed large float vector (Memory Optimization 3)
     CompressedFloatVec(CompressedData),
+}
+
+/// Custom PartialEq implementation that compares logical content across storage variants
+/// This allows Text("hello") to equal CompactText("hello") and CompressedText("hello")
+impl PartialEq for AttrValue {
+    fn eq(&self, other: &Self) -> bool {
+        use AttrValue::*;
+        match (self, other) {
+            // Exact type matches
+            (Float(a), Float(b)) => a == b,
+            (Int(a), Int(b)) => a == b,
+            (Bool(a), Bool(b)) => a == b,
+            (SmallInt(a), SmallInt(b)) => a == b,
+            (FloatVec(a), FloatVec(b)) => a == b,
+            (Bytes(a), Bytes(b)) => a == b,
+            
+            // Cross-type integer comparisons
+            (Int(a), SmallInt(b)) => *a == *b as i64,
+            (SmallInt(a), Int(b)) => *a as i64 == *b,
+            
+            // Cross-type string comparisons - compare content, not storage format
+            (Text(a), Text(b)) => a == b,
+            (Text(a), CompactText(b)) => a.as_str() == b.as_str(),
+            (Text(a), CompressedText(b)) => {
+                if let Ok(decompressed) = b.decompress_text() {
+                    a.as_str() == decompressed.as_str()
+                } else {
+                    false
+                }
+            }
+            (CompactText(a), Text(b)) => a.as_str() == b.as_str(),
+            (CompactText(a), CompactText(b)) => a.as_str() == b.as_str(),
+            (CompactText(a), CompressedText(b)) => {
+                if let Ok(decompressed) = b.decompress_text() {
+                    a.as_str() == decompressed.as_str()
+                } else {
+                    false
+                }
+            }
+            (CompressedText(a), Text(b)) => {
+                if let Ok(decompressed) = a.decompress_text() {
+                    decompressed.as_str() == b.as_str()
+                } else {
+                    false
+                }
+            }
+            (CompressedText(a), CompactText(b)) => {
+                if let Ok(decompressed) = a.decompress_text() {
+                    decompressed.as_str() == b.as_str()
+                } else {
+                    false
+                }
+            }
+            (CompressedText(a), CompressedText(b)) => {
+                // For compressed text, try to decompress both and compare
+                match (a.decompress_text(), b.decompress_text()) {
+                    (Ok(a_text), Ok(b_text)) => a_text == b_text,
+                    _ => false,
+                }
+            }
+            
+            // Cross-type float vector comparisons
+            (FloatVec(a), CompressedFloatVec(b)) => {
+                // TODO: Implement compressed float vector decompression when needed
+                let _ = (a, b);
+                false
+            }
+            (CompressedFloatVec(a), FloatVec(b)) => {
+                // TODO: Implement compressed float vector decompression when needed
+                let _ = (a, b);
+                false
+            }
+            (CompressedFloatVec(a), CompressedFloatVec(b)) => {
+                // TODO: Implement compressed float vector comparison when needed
+                let _ = (a, b);
+                false
+            }
+            
+            // All other combinations are not equal
+            _ => false,
+        }
+    }
 }
 
 /// Memory-efficient string storage that avoids heap allocation for short strings

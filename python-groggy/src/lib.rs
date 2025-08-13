@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyTuple};
-use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError};
+use pyo3::types::PyDict;
+use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyNotImplementedError};
 use std::collections::HashMap;
 
 // Import from the main groggy crate
@@ -16,14 +16,8 @@ use groggy::{
         NodeFilter,
         EdgeFilter,  
         AttributeFilter,
-        AggregationType,
-        AggregationResult,
-        AggregationTarget,
     },
-    core::traversal::{
-        TraversalOptions,
-        TraversalResult,
-    },
+
 };
 
 /// Convert Rust GraphError to Python exception
@@ -378,6 +372,65 @@ impl PyAttrValue {
     fn __eq__(&self, other: &PyAttrValue) -> bool {
         self.inner == other.inner
     }
+    
+    fn __hash__(&self) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut hasher = DefaultHasher::new();
+        // Create a hash based on the variant and value
+        match &self.inner {
+            RustAttrValue::Int(i) => {
+                0u8.hash(&mut hasher);
+                i.hash(&mut hasher);
+            },
+            RustAttrValue::Float(f) => {
+                1u8.hash(&mut hasher);
+                f.to_bits().hash(&mut hasher);
+            },
+            RustAttrValue::Text(s) => {
+                2u8.hash(&mut hasher);
+                s.hash(&mut hasher);
+            },
+            RustAttrValue::Bool(b) => {
+                3u8.hash(&mut hasher);
+                b.hash(&mut hasher);
+            },
+            RustAttrValue::FloatVec(v) => {
+                4u8.hash(&mut hasher);
+                for f in v {
+                    f.to_bits().hash(&mut hasher);
+                }
+            },
+            RustAttrValue::Bytes(b) => {
+                5u8.hash(&mut hasher);
+                b.hash(&mut hasher);
+            },
+            RustAttrValue::CompactText(cs) => {
+                6u8.hash(&mut hasher);
+                cs.as_str().hash(&mut hasher);
+            },
+            RustAttrValue::SmallInt(i) => {
+                7u8.hash(&mut hasher);
+                i.hash(&mut hasher);
+            },
+            RustAttrValue::CompressedText(cd) => {
+                8u8.hash(&mut hasher);
+                if let Ok(text) = cd.decompress_text() {
+                    text.hash(&mut hasher);
+                }
+            },
+            RustAttrValue::CompressedFloatVec(cd) => {
+                9u8.hash(&mut hasher);
+                if let Ok(vec) = cd.decompress_float_vec() {
+                    for f in vec {
+                        f.to_bits().hash(&mut hasher);
+                    }
+                }
+            },
+        }
+        hasher.finish()
+    }
 }
 
 /// Python wrapper for AttributeFilter
@@ -395,11 +448,6 @@ impl PyAttributeFilter {
     }
     
     #[staticmethod]
-    fn not_equals(value: &PyAttrValue) -> Self {
-        Self { inner: AttributeFilter::NotEquals(value.inner.clone()) }
-    }
-    
-    #[staticmethod]
     fn greater_than(value: &PyAttrValue) -> Self {
         Self { inner: AttributeFilter::GreaterThan(value.inner.clone()) }
     }
@@ -407,21 +455,6 @@ impl PyAttributeFilter {
     #[staticmethod]
     fn less_than(value: &PyAttrValue) -> Self {
         Self { inner: AttributeFilter::LessThan(value.inner.clone()) }
-    }
-    
-    #[staticmethod]
-    fn between(min_val: &PyAttrValue, max_val: &PyAttrValue) -> Self {
-        Self { inner: AttributeFilter::Between(min_val.inner.clone(), max_val.inner.clone()) }
-    }
-    
-    #[staticmethod]
-    fn starts_with(prefix: String) -> Self {
-        Self { inner: AttributeFilter::StartsWith(prefix) }
-    }
-    
-    #[staticmethod]
-    fn contains(substring: String) -> Self {
-        Self { inner: AttributeFilter::Contains(substring) }
     }
 }
 
@@ -537,101 +570,64 @@ impl PyEdgeFilter {
     }
 }
 
-/// Python wrapper for TraversalResult
+/// Python wrapper for TraversalResult (stub)
 #[pyclass(name = "TraversalResult")]
 pub struct PyTraversalResult {
-    inner: TraversalResult,
+    nodes: Vec<NodeId>,
+    edges: Vec<EdgeId>,
 }
 
 #[pymethods]
 impl PyTraversalResult {
     #[getter]
     fn nodes(&self) -> Vec<NodeId> {
-        self.inner.nodes.clone()
+        self.nodes.clone()
     }
     
     #[getter]
     fn edges(&self) -> Vec<EdgeId> {
-        self.inner.edges.clone()  
+        self.edges.clone()  
     }
     
     #[getter]
     fn algorithm(&self) -> String {
-        format!("{:?}", self.inner.algorithm)
+        "NotImplemented".to_string()
+    }
+}
+
+/// Python wrapper for GroupedAggregationResult
+#[pyclass(name = "GroupedAggregationResult")]
+pub struct PyGroupedAggregationResult {
+    pub value: PyObject,
+}
+
+#[pymethods]
+impl PyGroupedAggregationResult {
+    #[getter]
+    fn value(&self) -> PyObject {
+        self.value.clone()
     }
     
-    #[getter]
-    fn paths(&self, py: Python) -> Vec<PyObject> {
-        self.inner.paths.iter()
-            .map(|path| {
-                let dict = PyDict::new(py);
-                dict.set_item("nodes", &path.nodes).ok();
-                dict.set_item("weight", path.total_weight).ok();
-                dict.to_object(py)
-            })
-            .collect()
-    }
-    
-    #[getter]
-    fn max_depth(&self) -> Option<usize> {
-        Some(self.inner.metadata.max_depth)
+    fn __repr__(&self) -> String {
+        "GroupedAggregationResult(...)".to_string()
     }
 }
 
 /// Python wrapper for AggregationResult
 #[pyclass(name = "AggregationResult")]
 pub struct PyAggregationResult {
-    inner: AggregationResult,
+    pub value: f64,
 }
 
 #[pymethods]
 impl PyAggregationResult {
     #[getter]
-    fn value(&self, py: Python) -> PyObject {
-        match &self.inner {
-            AggregationResult::Integer(i) => i.to_object(py),
-            AggregationResult::Float(f) => f.to_object(py),
-            AggregationResult::Text(s) => s.to_object(py),
-            AggregationResult::IntegerVec(v) => v.to_object(py),
-            AggregationResult::FloatVec(v) => v.to_object(py),
-            AggregationResult::TextVec(v) => v.to_object(py),
-            AggregationResult::GroupedResults(groups) => {
-                let dict = PyDict::new(py);
-                for (key, result) in groups {
-                    let py_result = Py::new(py, PyAggregationResult { inner: (**result).clone() }).unwrap();
-                    dict.set_item(key, py_result).ok();
-                }
-                dict.to_object(py)
-            },
-            AggregationResult::MultipleValues { values, count } => {
-                let dict = PyDict::new(py);
-                let py_values: Vec<PyObject> = values.iter().map(|v| {
-                    match v {
-                        RustAttrValue::Int(i) => i.to_object(py),
-                        RustAttrValue::Float(f) => f.to_object(py),
-                        RustAttrValue::Text(s) => s.to_object(py),
-                        RustAttrValue::Bool(b) => b.to_object(py),
-                        _ => py.None(),
-                    }
-                }).collect();
-                dict.set_item("values", py_values).ok();
-                dict.set_item("count", *count).ok();
-                dict.to_object(py)
-            },
-        }
+    fn value(&self) -> f64 {
+        self.value
     }
     
     fn __repr__(&self) -> String {
-        match &self.inner {
-            AggregationResult::Integer(i) => format!("AggregationResult::Integer({})", i),
-            AggregationResult::Float(f) => format!("AggregationResult::Float({})", f),
-            AggregationResult::Text(s) => format!("AggregationResult::Text(\"{}\")", s),
-            AggregationResult::IntegerVec(v) => format!("AggregationResult::IntegerVec({:?})", v),
-            AggregationResult::FloatVec(v) => format!("AggregationResult::FloatVec({:?})", v),
-            AggregationResult::TextVec(v) => format!("AggregationResult::TextVec({:?})", v),
-            AggregationResult::GroupedResults(groups) => format!("AggregationResult::GroupedResults({} groups)", groups.len()),
-            AggregationResult::MultipleValues { count, .. } => format!("AggregationResult::MultipleValues(count: {})", count),
-        }
+        format!("AggregationResult({})", self.value)
     }
 }
 
@@ -797,6 +793,18 @@ impl PyGraph {
         self.inner.set_node_attrs(attrs_values)
             .map_err(graph_error_to_py_err)
     }
+    
+    /// Simple bulk method that accepts [(node_id, AttrValue), ...] format (matches benchmark expectations)
+    fn set_node_attribute_bulk(&mut self, attr_name: String, node_values: Vec<(NodeId, PyAttrValue)>) -> PyResult<()> {
+        let mut attrs_values = std::collections::HashMap::new();
+        let converted_values: Vec<(NodeId, RustAttrValue)> = node_values.into_iter()
+            .map(|(node_id, py_attr_value)| (node_id, py_attr_value.inner))
+            .collect();
+        
+        attrs_values.insert(attr_name, converted_values);
+        self.inner.set_node_attrs(attrs_values)
+            .map_err(graph_error_to_py_err)
+    }
 
     fn set_edge_attributes(&mut self, _py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         // New efficient columnar API for edges - zero PyAttrValue objects created!
@@ -939,7 +947,7 @@ impl PyGraph {
     // === TOPOLOGY OPERATIONS ===
     
     fn contains_node(&self, node: NodeId) -> bool {
-        self.inner.contains_node(node)
+        self.inner.contains_node(node) 
     }
     
     fn contains_edge(&self, edge: EdgeId) -> bool {
@@ -1045,14 +1053,20 @@ impl PyGraph {
     /// Phase 3.2: Graph traversal algorithms
     fn traverse_bfs(&mut self, start_node: NodeId, max_depth: Option<usize>, 
                    node_filter: Option<&PyNodeFilter>, edge_filter: Option<&PyEdgeFilter>) -> PyResult<PyResultHandle> {
-        let options = TraversalOptions {
-            node_filter: node_filter.map(|f| f.inner.clone()),
-            edge_filter: edge_filter.map(|f| f.inner.clone()),
-            max_depth,
-            max_nodes: None,
-            target_node: None,
-        };
         
+        // Create traversal options
+        let mut options = groggy::core::traversal::TraversalOptions::default();
+        if let Some(depth) = max_depth {
+            options.max_depth = Some(depth);
+        }
+        if let Some(filter) = node_filter {
+            options.node_filter = Some(filter.inner.clone());
+        }
+        if let Some(filter) = edge_filter {
+            options.edge_filter = Some(filter.inner.clone());
+        }
+        
+        // Perform BFS traversal
         let result = self.inner.bfs(start_node, options)
             .map_err(graph_error_to_py_err)?;
         
@@ -1066,18 +1080,23 @@ impl PyGraph {
     
     fn traverse_dfs(&mut self, start_node: NodeId, max_depth: Option<usize>,
                    node_filter: Option<&PyNodeFilter>, edge_filter: Option<&PyEdgeFilter>) -> PyResult<PyResultHandle> {
-        let options = TraversalOptions {
-            node_filter: node_filter.map(|f| f.inner.clone()),
-            edge_filter: edge_filter.map(|f| f.inner.clone()),
-            max_depth,
-            max_nodes: None,
-            target_node: None,
-        };
         
+        // Create traversal options
+        let mut options = groggy::core::traversal::TraversalOptions::default();
+        if let Some(depth) = max_depth {
+            options.max_depth = Some(depth);
+        }
+        if let Some(filter) = node_filter {
+            options.node_filter = Some(filter.inner.clone());
+        }
+        if let Some(filter) = edge_filter {
+            options.edge_filter = Some(filter.inner.clone());
+        }
+        
+        // Perform DFS traversal
         let result = self.inner.dfs(start_node, options)
             .map_err(graph_error_to_py_err)?;
         
-        // Ok(PyTraversalResult { inner: result })
         Ok(PyResultHandle {
             nodes: result.nodes,
             edges: result.edges,
@@ -1086,120 +1105,57 @@ impl PyGraph {
     }
     
     fn shortest_path(&mut self, source: NodeId, target: NodeId, weight_attribute: Option<AttrName>) -> PyResult<Option<Vec<NodeId>>> {
-        let options = groggy::core::traversal::PathFindingOptions {
-            weight_attribute,
-            max_path_length: None,
-            heuristic: None,
-        };
-        
-        let result = self.inner.shortest_path(source, target, options)
-            .map_err(graph_error_to_py_err)?;
-        
-        // Convert Path to Vec<NodeId> if found
-        Ok(result.map(|path| path.nodes))
+        let _ = (source, target, weight_attribute);
+        Err(PyErr::new::<PyNotImplementedError, _>("Shortest path not implemented"))
     }
     
     fn find_connected_components(&mut self) -> PyResult<Vec<PyResultHandle>> {
-        let options = TraversalOptions::default();
+        let options = groggy::core::traversal::TraversalOptions::default();
         let result = self.inner.connected_components(options)
             .map_err(graph_error_to_py_err)?;
-            
-        // Return handles for each component
-        let handles = result.components.into_iter().enumerate().map(|(i, comp)| {
-            PyResultHandle {
-                nodes: comp.nodes,
-                edges: Vec::new(),
+        
+        // Convert each component to a PyResultHandle
+        let mut handles = Vec::new();
+        for (i, component) in result.components.into_iter().enumerate() {
+            handles.push(PyResultHandle {
+                nodes: component.nodes, // Access the nodes field
+                edges: Vec::new(), // TODO: Could add component edges if needed
                 result_type: format!("connected_component_{}", i),
-            }
-        }).collect();
+            });
+        }
         
         Ok(handles)
     }
     
-    
     /// Phase 3.4: Query result aggregation and analytics
     fn aggregate_node_attribute(&self, attribute: AttrName, operation: String) -> PyResult<PyAggregationResult> {
-        let op = match operation.as_str() {
-            "count" => AggregationType::Count,
-            "sum" => AggregationType::Sum,
-            "average" => AggregationType::Average,
-            "min" => AggregationType::Min,
-            "max" => AggregationType::Max,
-            "median" => AggregationType::Median,
-            "mode" => AggregationType::Mode,
-            "stddev" => AggregationType::StandardDeviation,
-            "variance" => AggregationType::Variance,
-            "percentile_25" => AggregationType::Percentile(25.0),
-            "percentile_75" => AggregationType::Percentile(75.0),
-            "percentile_90" => AggregationType::Percentile(90.0),
-            "percentile_95" => AggregationType::Percentile(95.0),
-            "percentile_99" => AggregationType::Percentile(99.0),
-            "unique_count" => AggregationType::CountDistinct,
-            _ => return Err(PyErr::new::<PyValueError, _>("Invalid aggregation operation")),
-        };
-        
-        let result = self.inner.aggregate_node_attribute(&attribute, op)
+        let result = self.inner.aggregate_node_attribute(&attribute, &operation)
             .map_err(graph_error_to_py_err)?;
-            
-        Ok(PyAggregationResult { inner: result })
+        Ok(PyAggregationResult { value: result.value })
     }
     
     fn aggregate_edge_attribute(&self, attribute: AttrName, operation: String) -> PyResult<PyAggregationResult> {
-        let op = match operation.as_str() {
-            "count" => AggregationType::Count,
-            "sum" => AggregationType::Sum,
-            "average" => AggregationType::Average,
-            "min" => AggregationType::Min,
-            "max" => AggregationType::Max,
-            "median" => AggregationType::Median,
-            "mode" => AggregationType::Mode,
-            "stddev" => AggregationType::StandardDeviation,
-            "variance" => AggregationType::Variance,
-            "percentile_25" => AggregationType::Percentile(25.0),
-            "percentile_75" => AggregationType::Percentile(75.0),
-            "percentile_90" => AggregationType::Percentile(90.0),
-            "percentile_95" => AggregationType::Percentile(95.0),
-            "percentile_99" => AggregationType::Percentile(99.0),
-            "unique_count" => AggregationType::CountDistinct,
-            _ => return Err(PyErr::new::<PyValueError, _>("Invalid aggregation operation")),
-        };
-        
-        let result = self.inner.aggregate_edge_attribute(&attribute, op)
+        let result = self.inner.aggregate_edge_attribute(&attribute, &operation)
             .map_err(graph_error_to_py_err)?;
-            
-        Ok(PyAggregationResult { inner: result })
+        Ok(PyAggregationResult { value: result.value })
     }
     
-    fn group_nodes_by_attribute(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyAggregationResult> {
-        let op = match operation.as_str() {
-            "count" => AggregationType::Count,
-            "sum" => AggregationType::Sum,
-            "average" => AggregationType::Average,
-            "min" => AggregationType::Min,
-            "max" => AggregationType::Max,
-            _ => return Err(PyErr::new::<PyValueError, _>("Invalid aggregation operation for grouping")),
-        };
-        
-        let result_map = self.inner.group_nodes_by_attribute(&attribute, &aggregation_attr, op)
+    fn group_nodes_by_attribute(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyGroupedAggregationResult> {
+        let py = unsafe { Python::assume_gil_acquired() };
+        let results = self.inner.group_nodes_by_attribute(&attribute, &aggregation_attr, &operation)
             .map_err(graph_error_to_py_err)?;
-            
-        // Convert HashMap to GroupedResults
-        let grouped_results: HashMap<String, Box<AggregationResult>> = result_map
-            .into_iter()
-            .map(|(k, v)| {
-                let key_str = match k {
-                    RustAttrValue::Text(s) => s,
-                    RustAttrValue::Int(i) => i.to_string(),
-                    RustAttrValue::Float(f) => f.to_string(),
-                    RustAttrValue::Bool(b) => b.to_string(),
-                    _ => "unknown".to_string(),
-                };
-                (key_str, Box::new(v))
-            })
-            .collect();
-            
-        let result = AggregationResult::GroupedResults(grouped_results);
-        Ok(PyAggregationResult { inner: result })
+        
+        // Convert HashMap to Python dict
+        let dict = PyDict::new(py);
+        for (attr_value, agg_result) in results {
+            let py_attr_value = PyAttrValue { inner: attr_value };
+            let py_agg_result = PyAggregationResult { value: agg_result.value };
+            dict.set_item(Py::new(py, py_attr_value)?, Py::new(py, py_agg_result)?)?;
+        }
+        
+        Ok(PyGroupedAggregationResult {
+            value: dict.to_object(py)
+        })
     }
     
     /// Native attribute collection - returns handle for vectorized operations in Rust
@@ -1345,31 +1301,8 @@ impl PyGraph {
     }
     
     fn compute_comprehensive_stats(&self, attribute: AttrName, target: String) -> PyResult<PyObject> {
-        let stats = if target == "nodes" {
-            self.inner.compute_comprehensive_stats(&attribute, AggregationTarget::Nodes)
-                .map_err(graph_error_to_py_err)?
-        } else if target == "edges" {
-            self.inner.compute_comprehensive_stats(&attribute, AggregationTarget::Edges)
-                .map_err(graph_error_to_py_err)?
-        } else {
-            return Err(PyErr::new::<PyValueError, _>("target must be 'nodes' or 'edges'"));
-        };
-        
-        // Convert ComprehensiveStats to Python dict
-        Python::with_gil(|py| {
-            let dict = PyDict::new(py);
-            dict.set_item("count", stats.count)?;
-            dict.set_item("mean", stats.mean)?;
-            dict.set_item("std_dev", stats.std_dev)?;
-            dict.set_item("variance", stats.variance)?;
-            dict.set_item("min", stats.min)?;
-            dict.set_item("max", stats.max)?;
-            dict.set_item("median", stats.median)?;
-            dict.set_item("percentile_25", stats.percentile_25)?;
-            dict.set_item("percentile_75", stats.percentile_75)?;
-            dict.set_item("percentile_95", stats.percentile_95)?;
-            Ok(dict.to_object(py))
-        })
+        let _ = (attribute, target);
+        Err(PyErr::new::<PyNotImplementedError, _>("Comprehensive stats not implemented"))
     }
 }
 
@@ -1386,6 +1319,8 @@ fn _groggy(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyEdgeFilter>()?;
     m.add_class::<PyTraversalResult>()?;
     m.add_class::<PyAggregationResult>()?;
+    m.add_class::<PyGroupedAggregationResult>()?;
+
     
     // Native performance classes
     m.add_class::<PyResultHandle>()?;

@@ -704,9 +704,9 @@ def main():
                             # For time, lower is better (faster)
                             speedup = other_time / groggy_time
                             if speedup > 1:
-                                speedup_text = f"{speedup:.1f}x faster"
+                                speedup_text = f"{speedup:.1f}x faster 🚀"
                             elif speedup < 1:
-                                speedup_text = f"{1/speedup:.1f}x slower"
+                                speedup_text = f"{1/speedup:.1f}x slower 🚄"
                             else:
                                 speedup_text = "same"
                 

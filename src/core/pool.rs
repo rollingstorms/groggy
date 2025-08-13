@@ -37,7 +37,6 @@ This separation allows:
 
 use std::collections::HashMap;
 use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
-use crate::errors::GraphResult;
 
 /// Columnar storage for attribute values with memory pooling
 /// 
@@ -478,53 +477,38 @@ impl GraphPool {
     }
     
     /*
-    === INTERNAL BULK OPERATIONS ===
-    Efficient operations for internal use by Graph coordinator.
-    Pool provides full column access - Graph handles filtering and security.
+    === BULK ATTRIBUTE OPERATIONS ===
+    Single unified method for all attribute retrieval needs
     */
     
-    /// Get full attribute column (internal use only)
+    /// Get attribute values for multiple entities using their column indices
     /// 
-    /// INTERNAL: This exposes the full column - Graph coordinator handles filtering
-    /// PERFORMANCE: Direct access to columnar data for maximum efficiency
-    /// RETURNS: Reference to the entire attribute vector
-    pub fn get_attr_column(&self, attr: &AttrName, is_node: bool) -> Option<&[AttrValue]> {
-        let column_map = if is_node {
-            &self.node_attributes
+    /// PERFORMANCE: Single bulk operation replacing N individual lookups
+    /// INPUT: Vec of (entity_id, optional_column_index) pairs  
+    /// OUTPUT: Vec of (entity_id, optional_attribute_value) pairs
+    pub fn get_attribute_values(&self, 
+        attr_name: &AttrName, 
+        entity_indices: &[(NodeId, Option<usize>)], 
+        is_node: bool
+    ) -> Vec<(NodeId, Option<&AttrValue>)> {
+        
+        // Get the columnar attribute storage
+        let attr_column = if is_node {
+            self.node_attributes.get(attr_name)
         } else {
-            &self.edge_attributes
-        };
-        column_map.get(attr).map(|column| column.as_slice())
-    }
-    
-    /// Get attribute values for specific indices (internal bulk operation)
-    /// 
-    /// INTERNAL: Used by Graph when it has already determined which indices to access
-    /// PERFORMANCE: More efficient than individual lookups for known valid indices
-    pub fn get_attrs_at_indices(&self, attr: &AttrName, indices: &[usize], is_node: bool) -> GraphResult<Vec<Option<AttrValue>>> {
-        let column_map = if is_node {
-            &self.node_attributes
-        } else {
-            &self.edge_attributes
+            self.edge_attributes.get(attr_name)
         };
         
-        if let Some(attr_column) = column_map.get(attr) {
-            let mut results = Vec::with_capacity(indices.len());
-            for &index in indices {
-                if index < attr_column.values.len() {
-                    results.push(Some(attr_column.values[index].clone()));
-                } else {
-                    results.push(None);
-                }
-            }
-            Ok(results)
-        } else {
-            Ok(vec![None; indices.len()])
-        }
+        // Bulk retrieval with vectorized access pattern
+        entity_indices
+            .iter()
+            .map(|(entity_id, index_opt)| {
+                let attr_value = index_opt
+                    .and_then(|index| attr_column?.values.get(index));
+                (*entity_id, attr_value)
+            })
+            .collect()
     }
-    
-    
-    
     
     /*
     === STATISTICS & INTROSPECTION ===
@@ -556,8 +540,6 @@ impl GraphPool {
         (node_attrs, edge_attrs)
     }
 }
-
-
 
 /// Statistics about the current state of the graph store
 #[derive(Debug, Clone)]
