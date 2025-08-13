@@ -15,7 +15,12 @@ from ._groggy import (
     AggregationResult,
     GroupedAggregationResult,
     PyResultHandle,
-    PyAttributeCollection
+    PyAttributeCollection,
+    # Version control classes
+    Commit,
+    BranchInfo,
+    HistoryStatistics,
+    HistoricalView,
 )
 
 from .types import NodeId, EdgeId, AttrName, StateId, BranchName
@@ -50,4 +55,9 @@ __all__ = [
     "GroupedAggregationResult",
     "PyResultHandle",
     "PyAttributeCollection",
+    # Version control classes
+    "Commit",
+    "BranchInfo", 
+    "HistoryStatistics",
+    "HistoricalView",
 ]
