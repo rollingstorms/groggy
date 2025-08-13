@@ -31,6 +31,7 @@ from .errors import (
     InvalidInputError, 
     NotImplementedError
 )
+from .query_parser import parse_node_query, parse_edge_query
 
 __version__ = "0.1.0"
 __all__ = [

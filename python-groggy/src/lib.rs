@@ -28,6 +28,48 @@ use groggy::{
     core::ref_manager::BranchInfo,
 };
 
+/// Convert Python value to Rust AttrValue (reusing PyAttrValue conversion logic)
+fn python_value_to_attr_value(value: &PyAny) -> PyResult<RustAttrValue> {
+    // Fast path optimization: Check most common types first
+    
+    // Check integers first (very common in benchmarks)
+    if let Ok(i) = value.extract::<i64>() {
+        return Ok(RustAttrValue::Int(i));
+    }
+    
+    // Check strings second (also very common)
+    if let Ok(s) = value.extract::<String>() {
+        return Ok(RustAttrValue::Text(s));
+    }
+    
+    // Check floats third
+    if let Ok(f) = value.extract::<f64>() {
+        return Ok(RustAttrValue::Float(f as f32));  // Convert f64 to f32
+    }
+    
+    // Check booleans (note: must come after integers as Python bool is a subtype of int)
+    if let Ok(b) = value.extract::<bool>() {
+        return Ok(RustAttrValue::Bool(b));
+    }
+    
+    // Less common types
+    if let Ok(f) = value.extract::<f32>() {
+        return Ok(RustAttrValue::Float(f));
+    } else if let Ok(vec) = value.extract::<Vec<f32>>() {
+        return Ok(RustAttrValue::FloatVec(vec));
+    } else if let Ok(vec) = value.extract::<Vec<f64>>() {
+        // Convert Vec<f64> to Vec<f32>
+        let f32_vec: Vec<f32> = vec.into_iter().map(|f| f as f32).collect();
+        return Ok(RustAttrValue::FloatVec(f32_vec));
+    } else if let Ok(bytes) = value.extract::<Vec<u8>>() {
+        return Ok(RustAttrValue::Bytes(bytes))
+    } else {
+        Err(PyErr::new::<PyTypeError, _>(
+            "Unsupported attribute value type"
+        ))
+    }
+}
+
 /// Convert Rust GraphError to Python exception
 fn graph_error_to_py_err(error: GraphError) -> PyErr {
     match error {
@@ -63,6 +105,17 @@ pub struct PyResultHandle {
     nodes: Vec<NodeId>,
     edges: Vec<EdgeId>,
     result_type: String,
+}
+
+/// Subgraph - represents a filtered view of the main graph with same interface
+#[pyclass(name = "Subgraph")]
+pub struct PySubgraph {
+    // For now, we'll store the data directly (like PyResultHandle)
+    // Later we can add graph reference for attribute access
+    nodes: Vec<NodeId>,
+    edges: Vec<EdgeId>, // Induced edges between subgraph nodes
+    // Metadata
+    subgraph_type: String, // "filtered_nodes", "traversal", "component", etc.
 }
 
 #[pymethods]
@@ -166,6 +219,81 @@ impl PyResultHandle {
             edges: intersection_edges,
             result_type: format!("{}&{}", self.result_type, other.result_type),
         }
+    }
+}
+
+#[pymethods]
+impl PySubgraph {
+    /// Get nodes as a property (like g.nodes)
+    #[getter]
+    fn nodes(&self) -> Vec<NodeId> {
+        self.nodes.clone()
+    }
+    
+    /// Get edges as a property (like g.edges)
+    #[getter] 
+    fn edges(&self) -> Vec<EdgeId> {
+        self.edges.clone()
+    }
+    
+    /// Python len() support - returns number of nodes
+    fn __len__(&self) -> usize {
+        self.nodes.len()
+    }
+    
+    /// Node count property
+    fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+    
+    /// Edge count property
+    fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+    
+    /// Check if a node exists in this subgraph
+    fn has_node(&self, node_id: NodeId) -> bool {
+        self.nodes.contains(&node_id)
+    }
+    
+    /// Check if an edge exists in this subgraph
+    fn has_edge(&self, edge_id: EdgeId) -> bool {
+        self.edges.contains(&edge_id)
+    }
+    
+    /// String representation
+    fn __repr__(&self) -> String {
+        format!("Subgraph(nodes={}, edges={}, type={})", 
+                self.nodes.len(), self.edges.len(), self.subgraph_type)
+    }
+    
+    /// Filter nodes within this subgraph (chainable)
+    /// NOTE: This is a placeholder - use graph.filter_subgraph_nodes(subgraph, filter) for actual filtering
+    fn filter_nodes(&self, _py: Python, _filter: &PyAny) -> PyResult<PySubgraph> {
+        // Return a helpful error message directing users to the proper method
+        Err(PyErr::new::<PyNotImplementedError, _>(
+            "Direct subgraph filtering not supported. Use: new_subgraph = graph.filter_subgraph_nodes(subgraph, filter)"
+        ))
+    }
+    
+    /// Filter edges within this subgraph (chainable)
+    fn filter_edges(&self, _py: Python, _filter: &PyAny) -> PyResult<PySubgraph> {
+        // Placeholder implementation
+        Ok(PySubgraph {
+            nodes: self.nodes.clone(),
+            edges: self.edges.clone(),
+            subgraph_type: format!("{}_edge_filtered", self.subgraph_type),
+        })
+    }
+    
+    /// Connected components within this subgraph
+    fn connected_components(&self) -> PyResult<Vec<PySubgraph>> {
+        // Placeholder - return single component for now
+        Ok(vec![PySubgraph {
+            nodes: self.nodes.clone(),
+            edges: self.edges.clone(),
+            subgraph_type: "component".to_string(),
+        }])
     }
 }
 
@@ -832,6 +960,86 @@ impl PyHistoricalView {
     }
 }
 
+/// Python wrapper for accessing node attributes as columns
+#[pyclass(name = "NodeAttributes", unsendable)]
+pub struct PyNodeAttributes {
+    graph: *const RustGraph, // Pointer to avoid ownership issues
+}
+
+#[pymethods]
+impl PyNodeAttributes {
+    /// Access attribute column by name - g.attributes["salary"]
+    fn __getitem__(&self, attr_name: &str) -> PyResult<Vec<PyObject>> {
+        unsafe {
+            let graph = &*self.graph;
+            let node_ids = graph.node_ids();
+            
+            Python::with_gil(|py| {
+                let mut values = Vec::new();
+                
+                for node_id in node_ids {
+                    match graph.get_node_attr(node_id, &attr_name.to_string()) {
+                        Ok(Some(attr_value)) => {
+                            let py_value = match attr_value {
+                                RustAttrValue::Int(i) => i.to_object(py),
+                                RustAttrValue::Float(f) => f.to_object(py),
+                                RustAttrValue::Text(s) => s.to_object(py),
+                                RustAttrValue::Bool(b) => b.to_object(py),
+                                RustAttrValue::FloatVec(v) => v.to_object(py),
+                                RustAttrValue::CompactText(s) => s.as_str().to_object(py),
+                                RustAttrValue::SmallInt(i) => i.to_object(py),
+                                RustAttrValue::Bytes(b) => b.to_object(py),
+                                RustAttrValue::CompressedText(_) => "CompressedText".to_object(py), // TODO: decompress
+                                RustAttrValue::CompressedFloatVec(_) => "CompressedFloatVec".to_object(py), // TODO: decompress
+                            };
+                            values.push(py_value);
+                        },
+                        Ok(None) => {
+                            // Node doesn't have this attribute, use None
+                            values.push(py.None());
+                        },
+                        Err(_) => {
+                            // Error getting attribute, use None
+                            values.push(py.None());
+                        }
+                    }
+                }
+                
+                Ok(values)
+            })
+        }
+    }
+    
+    /// List available attribute names
+    fn keys(&self) -> PyResult<Vec<String>> {
+        unsafe {
+            let graph = &*self.graph;
+            let node_ids = graph.node_ids();
+            let mut attr_names = std::collections::HashSet::new();
+            
+            // Collect all unique attribute names across all nodes
+            for node_id in node_ids {
+                if let Ok(attrs) = graph.get_node_attrs(node_id) {
+                    for (name, _) in attrs {
+                        attr_names.insert(name);
+                    }
+                }
+            }
+            
+            Ok(attr_names.into_iter().collect())
+        }
+    }
+    
+    /// Check if attribute exists
+    fn __contains__(&self, attr_name: &str) -> PyResult<bool> {
+        Ok(self.keys()?.contains(&attr_name.to_string()))
+    }
+    
+    fn __repr__(&self) -> String {
+        format!("NodeAttributes(keys={:?})", self.keys().unwrap_or_default())
+    }
+}
+
 /// Python wrapper for the main Graph
 #[pyclass(name = "Graph", unsendable)]
 pub struct PyGraph {
@@ -850,21 +1058,264 @@ impl PyGraph {
     
     // === CORE GRAPH OPERATIONS ===
     
-    fn add_node(&mut self) -> NodeId {
-        self.inner.add_node()
+    #[pyo3(signature = (**kwargs))]
+    fn add_node(&mut self, kwargs: Option<&PyDict>) -> PyResult<NodeId> {
+        let node_id = self.inner.add_node();
+        
+        // Fast path: if no kwargs, just return the node_id
+        if let Some(attrs) = kwargs {
+            if !attrs.is_empty() {
+                // Only do attribute setting if we actually have attributes
+                for (key, value) in attrs.iter() {
+                    let attr_name: String = key.extract()?;
+                    let attr_value = python_value_to_attr_value(value)?;
+                    
+                    self.inner.set_node_attr(node_id, attr_name, attr_value)
+                        .map_err(graph_error_to_py_err)?;
+                }
+            }
+        }
+        
+        Ok(node_id)
     }
     
-    fn add_nodes(&mut self, count: usize) -> Vec<NodeId> {
-        self.inner.add_nodes(count)
+    #[pyo3(signature = (data, uid_key = None))]
+    fn add_nodes(&mut self, data: &PyAny, uid_key: Option<String>) -> PyResult<PyObject> {
+        // Fast path optimization: Check for integer first (most common case)
+        if let Ok(count) = data.extract::<usize>() {
+            // Old API: add_nodes(5) -> [0, 1, 2, 3, 4] - fastest path
+            let node_ids = self.inner.add_nodes(count);
+            return Python::with_gil(|py| Ok(node_ids.to_object(py)));
+        }
+        
+        // Only use Python::with_gil for complex operations
+        Python::with_gil(|py| {
+            if let Ok(node_data_list) = data.extract::<Vec<&PyDict>>() {
+                // New API: add_nodes([{"id": "alice", "age": 30}, ...], id_key="id")
+                let mut id_mapping = std::collections::HashMap::new();
+                
+                // Create all nodes first
+                let node_ids = self.inner.add_nodes(node_data_list.len());
+                
+                // Process each node's data
+                for (i, node_dict) in node_data_list.iter().enumerate() {
+                    let node_id = node_ids[i];
+                    
+                    // Extract the ID if id_key is provided
+                    if let Some(ref key) = uid_key {
+                        match node_dict.get_item(key) {
+                            Ok(Some(id_value)) => {
+                                if let Ok(user_id) = id_value.extract::<String>() {
+                                    id_mapping.insert(user_id, node_id);
+                                }
+                            }
+                            Ok(None) => {
+                                return Err(PyErr::new::<PyKeyError, _>(format!("Missing key: {}", key)));
+                            }
+                            Err(e) => return Err(e),
+                        }
+                    }
+                    
+                    // Set all attributes from the dict
+                    for (attr_key, attr_value) in node_dict.iter() {
+                        let attr_name: String = attr_key.extract()?;
+                        
+                        // Store all attributes including the id_key for later uid_key lookups
+                        // (Previous version skipped id_key, but we need it for uid_key resolution)
+                        
+                        let attr_val = python_value_to_attr_value(attr_value)?;
+                        self.inner.set_node_attr(node_id, attr_name, attr_val)
+                            .map_err(graph_error_to_py_err)?;
+                    }
+                }
+                
+                // Return the mapping if id_key was provided, otherwise return node IDs
+                if uid_key.is_some() {
+                    Ok(id_mapping.to_object(py))
+                } else {
+                    Ok(node_ids.to_object(py))
+                }
+            } else {
+                Err(PyErr::new::<PyTypeError, _>(
+                    "add_nodes expects either an integer count or a list of dictionaries"
+                ))
+            }
+        })
     }
     
-    fn add_edge(&mut self, source: NodeId, target: NodeId) -> PyResult<EdgeId> {
-        self.inner.add_edge(source, target)
-            .map_err(graph_error_to_py_err)
+    /// Helper method to resolve string ID to NodeId using uid_key attribute
+    fn resolve_string_id_to_node(&self, string_id: &str, uid_key: &str) -> PyResult<NodeId> {
+        let node_ids = self.inner.node_ids();
+        
+        for node_id in node_ids {
+            if let Ok(Some(attr_value)) = self.inner.get_node_attr(node_id, &uid_key.to_string()) {
+                match attr_value {
+                    RustAttrValue::Text(s) => {
+                        if s == string_id {
+                            return Ok(node_id);
+                        }
+                    },
+                    RustAttrValue::CompactText(s) => {
+                        if s.as_str() == string_id {
+                            return Ok(node_id);
+                        }
+                    },
+                    _ => continue, // Skip non-text attributes
+                }
+            }
+        }
+        
+        Err(PyErr::new::<PyKeyError, _>(format!("No node found with {}='{}'", uid_key, string_id)))
     }
     
-    fn add_edges(&mut self, edges: Vec<(NodeId, NodeId)>) -> Vec<EdgeId> {
-        self.inner.add_edges(&edges)
+    #[pyo3(signature = (source, target, uid_key = None, **kwargs))]
+    fn add_edge(&mut self, py: Python, source: &PyAny, target: &PyAny, uid_key: Option<String>, kwargs: Option<&PyDict>) -> PyResult<EdgeId> {
+        // Try to extract as NodeId first (most common case)
+        let source_id = if let Ok(node_id) = source.extract::<NodeId>() {
+            node_id
+        } else if let Some(ref key) = uid_key {
+            // String ID with uid_key resolution
+            let source_str: String = source.extract()?;
+            self.resolve_string_id_to_node(&source_str, key)?
+        } else {
+            return Err(PyErr::new::<PyTypeError, _>("Source must be NodeId or string with uid_key"));
+        };
+        
+        let target_id = if let Ok(node_id) = target.extract::<NodeId>() {
+            node_id
+        } else if let Some(ref key) = uid_key {
+            // String ID with uid_key resolution  
+            let target_str: String = target.extract()?;
+            self.resolve_string_id_to_node(&target_str, key)?
+        } else {
+            return Err(PyErr::new::<PyTypeError, _>("Target must be NodeId or string with uid_key"));
+        };
+        
+        let edge_id = self.inner.add_edge(source_id, target_id)
+            .map_err(graph_error_to_py_err)?;
+        
+        // Fast path: if no kwargs, just return the edge_id
+        if let Some(attrs) = kwargs {
+            if !attrs.is_empty() {
+                // Only do attribute setting if we actually have attributes
+                for (key, value) in attrs.iter() {
+                    let attr_name: String = key.extract()?;
+                    
+                    // Skip uid_key if it's in kwargs
+                    if let Some(ref uid_k) = uid_key {
+                        if attr_name == *uid_k {
+                            continue;
+                        }
+                    }
+                    
+                    let attr_value = python_value_to_attr_value(value)?;
+                    
+                    self.inner.set_edge_attr(edge_id, attr_name, attr_value)
+                        .map_err(graph_error_to_py_err)?;
+                }
+            }
+        }
+        
+        Ok(edge_id)
+    }
+    
+    #[pyo3(signature = (edges, node_mapping = None))]
+    fn add_edges(&mut self, edges: &PyAny, node_mapping: Option<std::collections::HashMap<String, NodeId>>) -> PyResult<Vec<EdgeId>> {
+        // Fast path optimization: Check for simple tuple list first (most common case)
+        if let Ok(edge_pairs) = edges.extract::<Vec<(NodeId, NodeId)>>() {
+            // Format 1: List of (source, target) tuples - fastest path
+            return Ok(self.inner.add_edges(&edge_pairs));
+        }
+        // Format 2: List of (source, target, attrs_dict) tuples  
+        else if let Ok(edge_tuples) = edges.extract::<Vec<(&PyAny, &PyAny, Option<&PyDict>)>>() {
+            let mut edge_ids = Vec::new();
+            
+            for (src_any, tgt_any, attrs_opt) in edge_tuples {
+                let source: NodeId = src_any.extract()?;
+                let target: NodeId = tgt_any.extract()?;
+                
+                let edge_id = self.inner.add_edge(source, target)
+                    .map_err(graph_error_to_py_err)?;
+                
+                // Set attributes if provided
+                if let Some(attrs) = attrs_opt {
+                    for (key, value) in attrs.iter() {
+                        let attr_name: String = key.extract()?;
+                        let attr_value = python_value_to_attr_value(value)?;
+                        
+                        self.inner.set_edge_attr(edge_id, attr_name, attr_value)
+                            .map_err(graph_error_to_py_err)?;
+                    }
+                }
+                
+                edge_ids.push(edge_id);
+            }
+            
+            Ok(edge_ids)
+        }
+        // Format 3: List of dictionaries with node_mapping 
+        else if let Ok(edge_dicts) = edges.extract::<Vec<&PyDict>>() {
+            if let Some(mapping) = node_mapping {
+                // Use the existing add_edges_from_dicts logic
+                let mut edge_ids = Vec::new();
+                
+                for edge_dict in edge_dicts {
+                    // Extract source and target IDs (support both "source"/"target" and flexible keys)
+                    let source_val = edge_dict.get_item("source")
+                        .or_else(|_| edge_dict.get_item("src"))
+                        .or_else(|_| edge_dict.get_item("from"))?;
+                    let target_val = edge_dict.get_item("target")
+                        .or_else(|_| edge_dict.get_item("tgt"))
+                        .or_else(|_| edge_dict.get_item("to"))?;
+                    
+                    if let (Some(src), Some(tgt)) = (source_val, target_val) {
+                        let source_str: String = src.extract()?;
+                        let target_str: String = tgt.extract()?;
+                        
+                        // Resolve to internal node IDs
+                        let source_node = mapping.get(&source_str)
+                            .ok_or_else(|| PyErr::new::<PyValueError, _>(format!("Unknown source ID: {}", source_str)))?;
+                        let target_node = mapping.get(&target_str)
+                            .ok_or_else(|| PyErr::new::<PyValueError, _>(format!("Unknown target ID: {}", target_str)))?;
+                        
+                        // Create the edge
+                        let edge_id = self.inner.add_edge(*source_node, *target_node)
+                            .map_err(graph_error_to_py_err)?;
+                        
+                        // Set attributes from dict (excluding source/target keys)
+                        for (key, value) in edge_dict.iter() {
+                            let attr_name: String = key.extract()?;
+                            
+                            // Skip source/target keys
+                            if attr_name == "source" || attr_name == "target" || 
+                               attr_name == "src" || attr_name == "tgt" ||
+                               attr_name == "from" || attr_name == "to" {
+                                continue;
+                            }
+                            
+                            let attr_value = python_value_to_attr_value(value)?;
+                            self.inner.set_edge_attr(edge_id, attr_name, attr_value)
+                                .map_err(graph_error_to_py_err)?;
+                        }
+                        
+                        edge_ids.push(edge_id);
+                    } else {
+                        return Err(PyErr::new::<PyKeyError, _>("Edge dict must have 'source' and 'target' keys"));
+                    }
+                }
+                
+                Ok(edge_ids)
+            } else {
+                Err(PyErr::new::<PyValueError, _>(
+                    "Dictionary edges require node_mapping parameter"
+                ))
+            }
+        }
+        else {
+            Err(PyErr::new::<PyTypeError, _>(
+                "add_edges expects a list of (source, target) tuples, (source, target, attrs) tuples, or dictionaries with node_mapping"
+            ))
+        }
     }
     
     fn remove_node(&mut self, node: NodeId) -> PyResult<()> {
@@ -995,17 +1446,6 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
     
-    /// Simple bulk method that accepts [(node_id, AttrValue), ...] format (matches benchmark expectations)
-    fn set_node_attribute_bulk(&mut self, attr_name: String, node_values: Vec<(NodeId, PyAttrValue)>) -> PyResult<()> {
-        let mut attrs_values = std::collections::HashMap::new();
-        let converted_values: Vec<(NodeId, RustAttrValue)> = node_values.into_iter()
-            .map(|(node_id, py_attr_value)| (node_id, py_attr_value.inner))
-            .collect();
-        
-        attrs_values.insert(attr_name, converted_values);
-        self.inner.set_node_attrs(attrs_values)
-            .map_err(graph_error_to_py_err)
-    }
 
     fn set_edge_attributes(&mut self, _py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         // New efficient columnar API for edges - zero PyAttrValue objects created!
@@ -1113,14 +1553,6 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
     
-    fn get_nodes_attributes(&self, attr: AttrName, nodes: Vec<NodeId>) -> PyResult<Vec<Option<PyAttrValue>>> {
-        let result = self.inner.get_nodes_attrs(&attr, &nodes)
-            .map_err(graph_error_to_py_err)?;
-        
-        Ok(result.into_iter()
-            .map(|opt| opt.map(|val| PyAttrValue { inner: val }))
-            .collect())
-    }
     
     fn get_edges_attributes(&self, attr: AttrName, edges: Vec<EdgeId>) -> PyResult<Vec<Option<PyAttrValue>>> {
         let result = self.inner.get_edges_attrs(&attr, &edges)
@@ -1155,13 +1587,6 @@ impl PyGraph {
         self.inner.contains_edge(edge)
     }
     
-    fn node_ids(&self) -> Vec<NodeId> {
-        self.inner.node_ids()
-    }
-    
-    fn edge_ids(&self) -> Vec<EdgeId> {
-        self.inner.edge_ids()
-    }
     
     fn edge_endpoints(&self, edge: EdgeId) -> PyResult<(NodeId, NodeId)> {
         self.inner.edge_endpoints(edge)
@@ -1231,30 +1656,181 @@ impl PyGraph {
         format!("Graph(nodes={}, edges={})", node_count, edge_count)
     }
     
+    /// Python len() support - returns number of nodes
+    fn __len__(&self) -> usize {
+        self.inner.node_ids().len()
+    }
+    
+    /// Check if a node exists in the graph
+    fn has_node(&self, node_id: NodeId) -> bool {
+        self.inner.contains_node(node_id)
+    }
+    
+    /// Check if an edge exists in the graph
+    fn has_edge(&self, edge_id: EdgeId) -> bool {
+        self.inner.contains_edge(edge_id)
+    }
+    
+    /// Get the number of nodes in the graph
+    fn node_count(&self) -> usize {
+        self.inner.node_ids().len()
+    }
+    
+    /// Get the number of edges in the graph
+    fn edge_count(&self) -> usize {
+        self.inner.edge_ids().len()
+    }
+    
+    /// Get all active node IDs (g.node_ids property)
+    #[getter]
+    fn node_ids(&self) -> Vec<NodeId> {
+        self.inner.node_ids()
+    }
+    
+    /// Get all active edge IDs (g.edge_ids property)  
+    #[getter]
+    fn edge_ids(&self) -> Vec<EdgeId> {
+        self.inner.edge_ids()
+    }
+    
+    /// Get nodes accessor for fluent API (g.nodes property) 
+    #[getter]
+    fn nodes(self_: PyRef<Self>, py: Python) -> PyResult<Py<PyNodesAccessor>> {
+        let graph_ref = self_.into();
+        PyGraph::create_nodes_accessor_internal(graph_ref, py)
+    }
+    
+    /// Get edges accessor for fluent API (g.edges property)
+    #[getter]
+    fn edges(self_: PyRef<Self>, py: Python) -> PyResult<Py<PyEdgesAccessor>> {
+        let graph_ref = self_.into();
+        PyGraph::create_edges_accessor_internal(graph_ref, py)
+    }
+    
+    /// Get node attributes as dictionary-like access (g.attributes property)
+    #[getter]
+    fn attributes(&self) -> PyNodeAttributes {
+        PyNodeAttributes {
+            graph: &self.inner as *const RustGraph,
+        }
+    }
+    
     // === PHASE 3 QUERYING METHODS ===
     
-    /// Phase 3.1: Advanced filtering
-    fn filter_nodes(&mut self, filter: &PyNodeFilter) -> PyResult<PyResultHandle> {
-        let nodes = self.inner.find_nodes(filter.inner.clone())
+    /// Phase 3.1: Advanced filtering - accepts NodeFilter or string query
+    fn filter_nodes(&mut self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+        // Fast path optimization: Check for NodeFilter object first (most common case)
+        let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
+            // Direct NodeFilter object - fastest path
+            filter_obj.inner.clone()
+        } else if let Ok(query_str) = filter.extract::<String>() {
+            // String query - parse it using our query parser
+            let query_parser = py.import("groggy.query_parser")?;
+            let parse_func = query_parser.getattr("parse_node_query")?;
+            let parsed_filter: PyNodeFilter = parse_func.call1((query_str,))?.extract()?;
+            parsed_filter.inner.clone()
+        } else {
+            return Err(PyErr::new::<PyTypeError, _>(
+                "filter must be a NodeFilter object or a string query (e.g., 'salary > 120000')"
+            ));
+        };
+        
+        let filtered_nodes = self.inner.find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
+        
+        // Calculate induced edges (edges between the filtered nodes)
+        let all_edges = self.inner.edge_ids();
+        let mut induced_edges = Vec::new();
+        
+        for edge_id in all_edges {
+            if let Ok((source, target)) = self.inner.edge_endpoints(edge_id) {
+                if filtered_nodes.contains(&source) && filtered_nodes.contains(&target) {
+                    induced_edges.push(edge_id);
+                }
+            }
+        }
             
-        Ok(PyResultHandle {
-            nodes,
-            edges: Vec::new(),
-            result_type: "filtered_nodes".to_string(),
+        Ok(PySubgraph {
+            nodes: filtered_nodes,
+            edges: induced_edges,
+            subgraph_type: "filtered_nodes".to_string(),
         })
     }
     
+    /// Filter nodes within an existing subgraph (enables chaining)
+    fn filter_subgraph_nodes(&mut self, py: Python, subgraph: &PySubgraph, filter: &PyAny) -> PyResult<PySubgraph> {
+        // Parse the filter like in filter_nodes
+        let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
+            filter_obj.inner.clone()
+        } else if let Ok(query_str) = filter.extract::<String>() {
+            let query_parser = py.import("groggy.query_parser")?;
+            let parse_func = query_parser.getattr("parse_node_query")?;
+            let parsed_filter: PyNodeFilter = parse_func.call1((query_str,))?.extract()?;
+            parsed_filter.inner.clone()
+        } else {
+            return Err(PyErr::new::<PyTypeError, _>(
+                "filter must be a NodeFilter object or a string query"
+            ));
+        };
+        
+        // Filter only the nodes in the current subgraph
+        // Use the existing find_nodes and then intersect with subgraph nodes
+        let all_matching_nodes = self.inner.find_nodes(node_filter)
+            .map_err(graph_error_to_py_err)?;
+        
+        let mut filtered_nodes = Vec::new();
+        for &node_id in &subgraph.nodes {
+            if all_matching_nodes.contains(&node_id) {
+                filtered_nodes.push(node_id);
+            }
+        }
+        
+        // Calculate induced edges among the filtered nodes
+        let mut induced_edges = Vec::new();
+        for &edge_id in &subgraph.edges {
+            if let Ok((source, target)) = self.inner.edge_endpoints(edge_id) {
+                if filtered_nodes.contains(&source) && filtered_nodes.contains(&target) {
+                    induced_edges.push(edge_id);
+                }
+            }
+        }
+        
+        Ok(PySubgraph {
+            nodes: filtered_nodes,
+            edges: induced_edges,
+            subgraph_type: format!("{}_filtered", subgraph.subgraph_type),
+        })
+    }
     
-    fn filter_edges(&mut self, filter: &PyEdgeFilter) -> PyResult<Vec<EdgeId>> {
-        self.inner.find_edges(filter.inner.clone())
+    /// Advanced edge filtering - accepts EdgeFilter or string query
+    fn filter_edges(&mut self, py: Python, filter: &PyAny) -> PyResult<Vec<EdgeId>> {
+        // Fast path optimization: Check for EdgeFilter object first (most common case)
+        let edge_filter = if let Ok(filter_obj) = filter.extract::<PyEdgeFilter>() {
+            // Direct EdgeFilter object - fastest path
+            filter_obj.inner.clone()
+        } else if let Ok(query_str) = filter.extract::<String>() {
+            // String query - parse it using our query parser
+            let query_parser = py.import("groggy.query_parser")?;
+            let parse_func = query_parser.getattr("parse_edge_query")?;
+            let parsed_filter: PyEdgeFilter = parse_func.call1((query_str,))?.extract()?;
+            parsed_filter.inner.clone()
+        } else {
+            return Err(PyErr::new::<PyTypeError, _>(
+                "filter must be an EdgeFilter object or a string query (e.g., 'weight > 0.5')"
+            ));
+        };
+        
+        self.inner.find_edges(edge_filter)
             .map_err(graph_error_to_py_err)
     }
     
     /// Phase 3.2: Graph traversal algorithms
-    fn traverse_bfs(&mut self, start_node: NodeId, max_depth: Option<usize>, 
-                   node_filter: Option<&PyNodeFilter>, edge_filter: Option<&PyEdgeFilter>) -> PyResult<PyResultHandle> {
-        
+    
+    
+    
+    /// Cleaner alias for traverse_bfs - shorter and more intuitive
+    fn bfs(&mut self, start_node: NodeId, max_depth: Option<usize>, 
+           node_filter: Option<&PyNodeFilter>, edge_filter: Option<&PyEdgeFilter>) -> PyResult<PyResultHandle> {
         // Create traversal options
         let mut options = groggy::core::traversal::TraversalOptions::default();
         if let Some(depth) = max_depth {
@@ -1278,10 +1854,9 @@ impl PyGraph {
         })
     }
     
-    
-    fn traverse_dfs(&mut self, start_node: NodeId, max_depth: Option<usize>,
-                   node_filter: Option<&PyNodeFilter>, edge_filter: Option<&PyEdgeFilter>) -> PyResult<PyResultHandle> {
-        
+    /// Cleaner alias for traverse_dfs - shorter and more intuitive  
+    fn dfs(&mut self, start_node: NodeId, max_depth: Option<usize>,
+           node_filter: Option<&PyNodeFilter>, edge_filter: Option<&PyEdgeFilter>) -> PyResult<PyResultHandle> {
         // Create traversal options
         let mut options = groggy::core::traversal::TraversalOptions::default();
         if let Some(depth) = max_depth {
@@ -1310,7 +1885,8 @@ impl PyGraph {
         Err(PyErr::new::<PyNotImplementedError, _>("Shortest path not implemented"))
     }
     
-    fn find_connected_components(&mut self) -> PyResult<Vec<PyResultHandle>> {
+    /// Cleaner alias for find_connected_components - more intuitive name
+    fn connected_components(&mut self) -> PyResult<Vec<PyResultHandle>> {
         let options = groggy::core::traversal::TraversalOptions::default();
         let result = self.inner.connected_components(options)
             .map_err(graph_error_to_py_err)?;
@@ -1328,104 +1904,39 @@ impl PyGraph {
         Ok(handles)
     }
     
-    /// Phase 3.4: Query result aggregation and analytics
-    fn aggregate_node_attribute(&self, attribute: AttrName, operation: String) -> PyResult<PyAggregationResult> {
-        let result = self.inner.aggregate_node_attribute(&attribute, &operation)
-            .map_err(graph_error_to_py_err)?;
-        Ok(PyAggregationResult { value: result.value })
-    }
-    
-    fn aggregate_edge_attribute(&self, attribute: AttrName, operation: String) -> PyResult<PyAggregationResult> {
-        let result = self.inner.aggregate_edge_attribute(&attribute, &operation)
-            .map_err(graph_error_to_py_err)?;
-        Ok(PyAggregationResult { value: result.value })
-    }
-    
-    fn group_nodes_by_attribute(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyGroupedAggregationResult> {
-        let py = unsafe { Python::assume_gil_acquired() };
-        let results = self.inner.group_nodes_by_attribute(&attribute, &aggregation_attr, &operation)
-            .map_err(graph_error_to_py_err)?;
+    /// Phase 3.4: Query result aggregation and analytics - UNIFIED AGGREGATE METHOD
+    #[pyo3(signature = (attribute, operation, target = None, node_ids = None))]
+    fn aggregate(&self, attribute: AttrName, operation: String, target: Option<String>, node_ids: Option<Vec<NodeId>>, py: Python) -> PyResult<PyObject> {
+        let target = target.unwrap_or_else(|| "nodes".to_string());
         
-        // Convert HashMap to Python dict
-        let dict = PyDict::new(py);
-        for (attr_value, agg_result) in results {
-            let py_attr_value = PyAttrValue { inner: attr_value };
-            let py_agg_result = PyAggregationResult { value: agg_result.value };
-            dict.set_item(Py::new(py, py_attr_value)?, Py::new(py, py_agg_result)?)?;
-        }
-        
-        Ok(PyGroupedAggregationResult {
-            value: dict.to_object(py)
-        })
-    }
-    
-    /// Native attribute collection - returns handle for vectorized operations in Rust
-    fn get_node_attribute_collection(&self, node_ids: Vec<NodeId>, attribute: AttrName) -> PyResult<PyAttributeCollection> {
-        // We need a way to safely reference the graph - for now use raw pointer with lifetime control
-        Ok(PyAttributeCollection {
-            graph_ref: &self.inner as *const RustGraph,
-            node_ids,
-            attr_name: attribute,
-        })
-    }
-    
-    /// Native bulk aggregation - compute statistics entirely in Rust  
-    /// Native vectorized attribute access - return collection handle
-    fn get_node_attributes(&self, node_ids: Vec<NodeId>, attribute: AttrName) -> PyResult<PyAttributeCollection> {
-        Ok(PyAttributeCollection {
-            graph_ref: &self.inner as *const RustGraph,
-            node_ids,
-            attr_name: attribute,
-        })
-    }
-    
-    /// Native bulk attribute retrieval without individual PyO3 conversions
-    fn get_node_attributes_batch(&self, node_ids: Vec<NodeId>, attributes: Vec<AttrName>, py: Python) -> PyResult<PyObject> {
-        let dict = PyDict::new(py);
-        
-        for attr_name in attributes {
-            let mut values = Vec::new();
-            for &node_id in &node_ids {
-                if let Ok(Some(attr)) = self.inner.get_node_attr(node_id, &attr_name) {
-                    values.push(PyAttrValue { inner: attr });
+        match target.as_str() {
+            "nodes" => {
+                if let Some(node_list) = node_ids {
+                    // Custom node list aggregation (replaces aggregate_nodes)
+                    self.aggregate_custom_nodes(node_list, attribute, py)
                 } else {
-                    values.push(PyAttrValue { inner: RustAttrValue::Text("None".to_string()) });
+                    // All nodes aggregation (replaces aggregate_node_attribute)
+                    let result = self.inner.aggregate_node_attribute(&attribute, &operation)
+                        .map_err(graph_error_to_py_err)?;
+                    let py_result = PyAggregationResult { value: result.value };
+                    Ok(Py::new(py, py_result)?.to_object(py))
                 }
+            },
+            "edges" => {
+                // Edge aggregation (replaces aggregate_edge_attribute)
+                let result = self.inner.aggregate_edge_attribute(&attribute, &operation)
+                    .map_err(graph_error_to_py_err)?;
+                let py_result = PyAggregationResult { value: result.value };
+                Ok(Py::new(py, py_result)?.to_object(py))
+            },
+            _ => {
+                Err(PyValueError::new_err(format!("Invalid target '{}'. Use 'nodes' or 'edges'", target)))
             }
-            let py_values: Vec<PyObject> = values.into_iter()
-                .map(|v| Py::new(py, v).map(|p| p.to_object(py)))
-                .collect::<Result<Vec<_>, _>>()?;
-            dict.set_item(&attr_name, py_values)?;
         }
-        
-        Ok(dict.to_object(py))
     }
     
-    /// Native filtered attribute access - apply filter and return attributes in one step
-    fn get_attribute_by_filter(&mut self, filter: &PyNodeFilter, attribute: AttrName, py: Python) -> PyResult<PyObject> {
-        // Get filtered nodes
-        let nodes = self.inner.find_nodes(filter.inner.clone())
-            .map_err(graph_error_to_py_err)?;
-            
-        // Extract attributes in bulk
-        let mut values = Vec::new();
-        for &node_id in &nodes {
-            if let Ok(Some(attr)) = self.inner.get_node_attr(node_id, &attribute) {
-                values.push(PyAttrValue { inner: attr });
-            }
-        }
-        
-        let result_dict = PyDict::new(py);
-        result_dict.set_item("node_count", nodes.len())?;
-        let py_values: Vec<PyObject> = values.into_iter()
-            .map(|v| Py::new(py, v).map(|p| p.to_object(py)))
-            .collect::<Result<Vec<_>, _>>()?;
-        result_dict.set_item("values", py_values)?;
-        
-        Ok(result_dict.to_object(py))
-    }
-
-    fn aggregate_nodes(&self, node_ids: Vec<NodeId>, attribute: AttrName, py: Python) -> PyResult<PyObject> {
+    // Helper method for custom node list aggregation (extracted from aggregate_nodes)
+    fn aggregate_custom_nodes(&self, node_ids: Vec<NodeId>, attribute: AttrName, py: Python) -> PyResult<PyObject> {
         let mut values = Vec::new();
         for &node_id in &node_ids {
             if let Ok(Some(attr)) = self.inner.get_node_attr(node_id, &attribute) {
@@ -1501,9 +2012,27 @@ impl PyGraph {
         }
     }
     
-    fn compute_comprehensive_stats(&self, attribute: AttrName, target: String) -> PyResult<PyObject> {
-        let _ = (attribute, target);
-        Err(PyErr::new::<PyNotImplementedError, _>("Comprehensive stats not implemented"))
+    fn group_nodes_by_attribute(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyGroupedAggregationResult> {
+        let py = unsafe { Python::assume_gil_acquired() };
+        let results = self.inner.group_nodes_by_attribute(&attribute, &aggregation_attr, &operation)
+            .map_err(graph_error_to_py_err)?;
+        
+        // Convert HashMap to Python dict
+        let dict = PyDict::new(py);
+        for (attr_value, agg_result) in results {
+            let py_attr_value = PyAttrValue { inner: attr_value };
+            let py_agg_result = PyAggregationResult { value: agg_result.value };
+            dict.set_item(Py::new(py, py_attr_value)?, Py::new(py, py_agg_result)?)?;
+        }
+        
+        Ok(PyGroupedAggregationResult {
+            value: dict.to_object(py)
+        })
+    }
+    
+    /// Cleaner alias for group_nodes_by_attribute - shorter and more intuitive
+    fn group_by(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyGroupedAggregationResult> {
+        self.group_nodes_by_attribute(attribute, aggregation_attr, operation)
     }
     
     // === VERSION CONTROL OPERATIONS ===
@@ -1526,23 +2055,26 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
     
-    /// List all branches
-    fn list_branches(&self) -> Vec<PyBranchInfo> {
+    
+    
+    
+    /// Cleaner alias for list_branches - more concise
+    fn branches(&self) -> Vec<PyBranchInfo> {
         self.inner.list_branches()
             .into_iter()
             .map(|branch_info| PyBranchInfo { inner: branch_info })
             .collect()
     }
     
-    /// Get commit history  
-    fn get_commit_history(&self) -> Vec<PyCommit> {
+    /// Cleaner alias for get_commit_history - more concise
+    fn commit_history(&self) -> Vec<PyCommit> {
         // Use the public commit_history method which returns CommitInfo
         // For now, return empty vector since CommitInfo != Commit
         Vec::new()
     }
     
-    /// Create a historical view of the graph at a specific commit
-    fn get_historical_view(&self, commit_id: StateId) -> PyResult<PyHistoricalView> {
+    /// Cleaner alias for get_historical_view - more concise
+    fn historical_view(&self, commit_id: StateId) -> PyResult<PyHistoricalView> {
         match self.inner.view_at_commit(commit_id) {
             Ok(_view) => Ok(PyHistoricalView {
                 state_id: commit_id,
@@ -1555,6 +2087,305 @@ impl PyGraph {
     fn has_uncommitted_changes(&self) -> bool {
         self.inner.has_uncommitted_changes()
     }
+    
+    // ========================================================================
+    // VIEW CREATION METHODS FOR FLUENT API  
+    // ========================================================================
+    
+    /// Create a NodeView for fluent attribute updates (internal helper)
+    fn create_node_view_internal(graph_ref: Py<PyGraph>, py: Python, node_id: NodeId) -> PyResult<Py<PyNodeView>> {
+        Py::new(py, PyNodeView {
+            graph: graph_ref,
+            node_id,
+        })
+    }
+    
+    /// Create an EdgeView for fluent attribute updates (internal helper)
+    fn create_edge_view_internal(graph_ref: Py<PyGraph>, py: Python, edge_id: EdgeId) -> PyResult<Py<PyEdgeView>> {
+        Py::new(py, PyEdgeView {
+            graph: graph_ref,
+            edge_id,
+        })
+    }
+    
+    /// Create a NodesAccessor (internal helper)
+    fn create_nodes_accessor_internal(graph_ref: Py<PyGraph>, py: Python) -> PyResult<Py<PyNodesAccessor>> {
+        Py::new(py, PyNodesAccessor {
+            graph: graph_ref,
+        })
+    }
+    
+    /// Create an EdgesAccessor (internal helper)
+    fn create_edges_accessor_internal(graph_ref: Py<PyGraph>, py: Python) -> PyResult<Py<PyEdgesAccessor>> {
+        Py::new(py, PyEdgesAccessor {
+            graph: graph_ref,
+        })
+    }
+}
+
+// ============================================================================
+// NODE AND EDGE VIEW CLASSES FOR FLUENT API
+// ============================================================================
+
+/// Wrapper for g.nodes that supports indexing syntax: g.nodes[id] -> NodeView
+#[pyclass(name = "NodesAccessor")]
+pub struct PyNodesAccessor {
+    graph: Py<PyGraph>,
+}
+
+#[pymethods]
+impl PyNodesAccessor {
+    /// Support single node access: g.nodes[0] -> NodeView
+    fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<Py<PyNodeView>> {
+        let node_id: NodeId = key.extract()?;
+        
+        // Check if node exists
+        let graph = self.graph.borrow(py);
+        if !graph.has_node(node_id) {
+            return Err(PyKeyError::new_err(format!("Node {} does not exist", node_id)));
+        }
+        
+        // Return NodeView for this node
+        PyGraph::create_node_view_internal(self.graph.clone(), py, node_id)
+    }
+    
+    /// Support iteration: for node_id in g.nodes
+    fn __iter__(&self, py: Python) -> PyResult<PyObject> {
+        let graph = self.graph.borrow(py);
+        let node_ids = graph.node_ids();
+        // Return the list directly - Python will handle iteration
+        Ok(node_ids.to_object(py))
+    }
+    
+    /// Support len(g.nodes)
+    fn __len__(&self, py: Python) -> PyResult<usize> {
+        let graph = self.graph.borrow(py);
+        Ok(graph.node_count())
+    }
+    
+    /// String representation
+    fn __str__(&self, py: Python) -> PyResult<String> {
+        let graph = self.graph.borrow(py);
+        let count = graph.node_count();
+        Ok(format!("NodesAccessor({} nodes)", count))
+    }
+}
+
+/// Wrapper for g.edges that supports indexing syntax: g.edges[id] -> EdgeView  
+#[pyclass(name = "EdgesAccessor")]
+pub struct PyEdgesAccessor {
+    graph: Py<PyGraph>,
+}
+
+#[pymethods]
+impl PyEdgesAccessor {
+    /// Support single edge access: g.edges[0] -> EdgeView
+    fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<Py<PyEdgeView>> {
+        let edge_id: EdgeId = key.extract()?;
+        
+        // Check if edge exists
+        let graph = self.graph.borrow(py);
+        if !graph.has_edge(edge_id) {
+            return Err(PyKeyError::new_err(format!("Edge {} does not exist", edge_id)));
+        }
+        
+        // Return EdgeView for this edge
+        PyGraph::create_edge_view_internal(self.graph.clone(), py, edge_id)
+    }
+    
+    /// Support iteration: for edge_id in g.edges
+    fn __iter__(&self, py: Python) -> PyResult<PyObject> {
+        let graph = self.graph.borrow(py);
+        let edge_ids = graph.edge_ids();
+        // Return the list directly - Python will handle iteration
+        Ok(edge_ids.to_object(py))
+    }
+    
+    /// Support len(g.edges)
+    fn __len__(&self, py: Python) -> PyResult<usize> {
+        let graph = self.graph.borrow(py);
+        Ok(graph.edge_count())
+    }
+    
+    /// String representation
+    fn __str__(&self, py: Python) -> PyResult<String> {
+        let graph = self.graph.borrow(py);
+        let count = graph.edge_count();
+        Ok(format!("EdgesAccessor({} edges)", count))
+    }
+}
+
+/// Fluent view for a single node with chainable attribute updates
+#[pyclass(name = "NodeView")]
+pub struct PyNodeView {
+    graph: Py<PyGraph>,
+    node_id: NodeId,
+}
+
+#[pymethods]
+impl PyNodeView {
+    /// Set attributes using kwargs syntax: node.set(name="Alice", age=30)
+    #[pyo3(signature = (**kwargs))]
+    fn set(&mut self, py: Python, kwargs: Option<&PyDict>) -> PyResult<Py<PyNodeView>> {
+        if let Some(kwargs) = kwargs {
+            let mut graph = self.graph.borrow_mut(py);
+            
+            // Iterate through kwargs and set each attribute
+            for (key, value) in kwargs.iter() {
+                let attr_name: String = key.extract()?;
+                let attr_value = python_value_to_attr_value(value)?;
+                let py_attr_value = PyAttrValue { inner: attr_value };
+                
+                graph.set_node_attribute(self.node_id, attr_name, &py_attr_value)?;
+            }
+        }
+        
+        // Return self for chaining
+        Ok(PyGraph::create_node_view_internal(self.graph.clone(), py, self.node_id)?)
+    }
+    
+    /// Update attributes using dict syntax: node.update({"name": "Alice", "age": 30})
+    fn update(&mut self, py: Python, data: &PyDict) -> PyResult<Py<PyNodeView>> {
+        let mut graph = self.graph.borrow_mut(py);
+        
+        // Iterate through dict and set each attribute
+        for (key, value) in data.iter() {
+            let attr_name: String = key.extract()?;
+            let attr_value = python_value_to_attr_value(value)?;
+            let py_attr_value = PyAttrValue { inner: attr_value };
+            
+            graph.set_node_attribute(self.node_id, attr_name, &py_attr_value)?;
+        }
+        
+        // Return self for chaining
+        Ok(PyGraph::create_node_view_internal(self.graph.clone(), py, self.node_id)?)
+    }
+    
+    /// Get all attributes as a dict
+    fn attrs(&self, py: Python) -> PyResult<PyObject> {
+        // For now, return empty dict - we'll implement this later
+        let dict = pyo3::types::PyDict::new(py);
+        Ok(dict.to_object(py))
+    }
+    
+    /// Get a specific attribute value
+    fn get(&self, py: Python, attr_name: String) -> PyResult<Option<PyAttrValue>> {
+        let graph = self.graph.borrow(py);
+        graph.get_node_attribute(self.node_id, attr_name)
+    }
+    
+    /// Support item access: node["name"]
+    fn __getitem__(&self, py: Python, attr_name: String) -> PyResult<PyAttrValue> {
+        let graph = self.graph.borrow(py);
+        match graph.get_node_attribute(self.node_id, attr_name.clone())? {
+            Some(value) => Ok(value),
+            None => Err(PyKeyError::new_err(format!("Attribute '{}' not found", attr_name))),
+        }
+    }
+    
+    /// Support item assignment: node["name"] = "Alice"
+    fn __setitem__(&mut self, py: Python, attr_name: String, value: &PyAny) -> PyResult<()> {
+        let mut graph = self.graph.borrow_mut(py);
+        let attr_value = python_value_to_attr_value(value)?;
+        let py_attr_value = PyAttrValue { inner: attr_value };
+        graph.set_node_attribute(self.node_id, attr_name, &py_attr_value)
+    }
+    
+    /// String representation
+    fn __str__(&self, py: Python) -> PyResult<String> {
+        Ok(format!("NodeView(id={})", self.node_id))
+    }
+    
+    /// Repr
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        self.__str__(py)
+    }
+}
+
+/// Fluent view for a single edge with chainable attribute updates  
+#[pyclass(name = "EdgeView")]
+pub struct PyEdgeView {
+    graph: Py<PyGraph>,
+    edge_id: EdgeId,
+}
+
+#[pymethods]
+impl PyEdgeView {
+    /// Set attributes using kwargs syntax: edge.set(weight=0.9, type="friendship")
+    #[pyo3(signature = (**kwargs))]
+    fn set(&mut self, py: Python, kwargs: Option<&PyDict>) -> PyResult<Py<PyEdgeView>> {
+        if let Some(kwargs) = kwargs {
+            let mut graph = self.graph.borrow_mut(py);
+            
+            // Iterate through kwargs and set each attribute
+            for (key, value) in kwargs.iter() {
+                let attr_name: String = key.extract()?;
+                let attr_value = python_value_to_attr_value(value)?;
+                let py_attr_value = PyAttrValue { inner: attr_value };
+                
+                graph.set_edge_attribute(self.edge_id, attr_name, &py_attr_value)?;
+            }
+        }
+        
+        // Return self for chaining
+        Ok(PyGraph::create_edge_view_internal(self.graph.clone(), py, self.edge_id)?)
+    }
+    
+    /// Update attributes using dict syntax: edge.update({"weight": 0.9, "type": "friendship"})
+    fn update(&mut self, py: Python, data: &PyDict) -> PyResult<Py<PyEdgeView>> {
+        let mut graph = self.graph.borrow_mut(py);
+        
+        // Iterate through dict and set each attribute
+        for (key, value) in data.iter() {
+            let attr_name: String = key.extract()?;
+            let attr_value = python_value_to_attr_value(value)?;
+            let py_attr_value = PyAttrValue { inner: attr_value };
+            
+            graph.set_edge_attribute(self.edge_id, attr_name, &py_attr_value)?;
+        }
+        
+        // Return self for chaining
+        Ok(PyGraph::create_edge_view_internal(self.graph.clone(), py, self.edge_id)?)
+    }
+    
+    /// Get all attributes as a dict (includes source/target)
+    fn attrs(&self, py: Python) -> PyResult<PyObject> {
+        let graph = self.graph.borrow(py);
+        graph.get_edge_attributes(self.edge_id, py)
+    }
+    
+    /// Get a specific attribute value
+    fn get(&self, py: Python, attr_name: String) -> PyResult<Option<PyAttrValue>> {
+        let graph = self.graph.borrow(py);
+        graph.get_edge_attribute(self.edge_id, attr_name)
+    }
+    
+    /// Support item access: edge["weight"]
+    fn __getitem__(&self, py: Python, attr_name: String) -> PyResult<PyAttrValue> {
+        let graph = self.graph.borrow(py);
+        match graph.get_edge_attribute(self.edge_id, attr_name.clone())? {
+            Some(value) => Ok(value),
+            None => Err(PyKeyError::new_err(format!("Attribute '{}' not found", attr_name))),
+        }
+    }
+    
+    /// Support item assignment: edge["weight"] = 0.9
+    fn __setitem__(&mut self, py: Python, attr_name: String, value: &PyAny) -> PyResult<()> {
+        let mut graph = self.graph.borrow_mut(py);
+        let attr_value = python_value_to_attr_value(value)?;
+        let py_attr_value = PyAttrValue { inner: attr_value };
+        graph.set_edge_attribute(self.edge_id, attr_name, &py_attr_value)
+    }
+    
+    /// String representation
+    fn __str__(&self, py: Python) -> PyResult<String> {
+        Ok(format!("EdgeView(id={})", self.edge_id))
+    }
+    
+    /// Repr
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        self.__str__(py)
+    }
 }
 
 /// The Python module
@@ -1563,6 +2394,7 @@ fn _groggy(_py: Python, m: &PyModule) -> PyResult<()> {
     // Core classes
     m.add_class::<PyGraph>()?;
     m.add_class::<PyAttrValue>()?;
+    m.add_class::<PyNodeAttributes>()?;
     
     // Phase 3 filtering and querying classes
     m.add_class::<PyAttributeFilter>()?;
@@ -1580,7 +2412,14 @@ fn _groggy(_py: Python, m: &PyModule) -> PyResult<()> {
     
     // Native performance classes
     m.add_class::<PyResultHandle>()?;
+    m.add_class::<PySubgraph>()?;
     m.add_class::<PyAttributeCollection>()?;
+    
+    // Fluent API view classes
+    m.add_class::<PyNodeView>()?;
+    m.add_class::<PyEdgeView>()?;
+    m.add_class::<PyNodesAccessor>()?;
+    m.add_class::<PyEdgesAccessor>()?;
     
     Ok(())
 }
