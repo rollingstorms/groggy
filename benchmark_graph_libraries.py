@@ -305,14 +305,14 @@ class GroggyPhase3Benchmark:
         """Test BFS traversal"""
         start = time.time()
         start_node = self.bulk_node_ids[0]  # Use first node from bulk creation
-        result = self.graph.traverse_bfs(start_node=start_node, max_depth=3)
+        result = self.graph.bfs(start_node=start_node, max_depth=3)
         return time.time() - start, len(result)
     
     def traversal_dfs(self):
         """Test DFS traversal"""
         start = time.time()
         start_node = self.bulk_node_ids[0]  # Use first node from bulk creation
-        result = self.graph.traverse_dfs(start_node=start_node, max_depth=3)
+        result = self.graph.dfs(start_node=start_node, max_depth=3)
         return time.time() - start, len(result)
     
     def traversal_bfs_filtered(self):
@@ -320,13 +320,13 @@ class GroggyPhase3Benchmark:
         start = time.time()
         start_node = self.bulk_node_ids[0]  # Use first node from bulk creation
         active_filter = gr.NodeFilter.attribute_equals("active", gr.AttrValue(True))
-        result = self.graph.traverse_bfs(start_node=start_node, max_depth=2, node_filter=active_filter)
+        result = self.graph.bfs(start_node=start_node, max_depth=2, node_filter=active_filter)
         return time.time() - start, len(result)
     
     def connected_components(self):
         """Test connected components analysis"""
         start = time.time()
-        result = self.graph.find_connected_components()
+        result = self.graph.connected_components()
         return time.time() - start, len(result)
     
     # Phase 3.4: Aggregation & Analytics Tests
@@ -335,10 +335,10 @@ class GroggyPhase3Benchmark:
         start = time.time()
         
         # Multiple aggregations
-        count = self.graph.aggregate_node_attribute("salary", "count")
-        avg_salary = self.graph.aggregate_node_attribute("salary", "average")
-        min_salary = self.graph.aggregate_node_attribute("salary", "min")
-        max_salary = self.graph.aggregate_node_attribute("salary", "max")
+        count = self.graph.aggregate(attribute="salary", operation="count", target="nodes")
+        avg_salary = self.graph.aggregate(attribute="salary", operation="average", target="nodes")
+        min_salary = self.graph.aggregate(attribute="salary", operation="min", target="nodes")
+        max_salary = self.graph.aggregate(attribute="salary", operation="max", target="nodes")
         
         return time.time() - start, {
             'count': count.value,
@@ -351,10 +351,10 @@ class GroggyPhase3Benchmark:
         """Test advanced statistical operations"""
         start = time.time()
         
-        stddev = self.graph.aggregate_node_attribute("salary", "stddev")
-        median = self.graph.aggregate_node_attribute("salary", "median")
-        p95 = self.graph.aggregate_node_attribute("salary", "percentile_95")
-        unique_depts = self.graph.aggregate_node_attribute("department", "unique_count")
+        stddev = self.graph.aggregate(attribute="salary", operation="stddev", target="nodes")
+        median = self.graph.aggregate(attribute="salary", operation="median", target="nodes")
+        p95 = self.graph.aggregate(attribute="salary", operation="percentile_95", target="nodes")
+        unique_depts = self.graph.aggregate(attribute="department", operation="unique_count", target="nodes")
         
         return time.time() - start, {
             'stddev': stddev.value,
@@ -368,7 +368,7 @@ class GroggyPhase3Benchmark:
         start = time.time()
         
         # Average salary by department
-        grouped = self.graph.group_nodes_by_attribute(
+        grouped = self.graph.group_by(
             "department",
             "salary",
             "average"
