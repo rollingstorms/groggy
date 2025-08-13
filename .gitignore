@@ -49,3 +49,6 @@ notebooks/
 *.tmp
 *.temp
 gli_diff.txt
+
+# notes
+notes/
