@@ -231,14 +231,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {{
         graph = gr.Graph()
         node_list = graph.add_nodes(nodes)
         
-        # Set attributes in bulk  
+        # Set attributes in bulk using correct format
         attrs_dict = {
-            "type": [(node_id, gr.AttrValue("user")) for node_id in node_list],
-            "department": [(node_id, gr.AttrValue(["Engineering", "Marketing", "Sales", "HR", "Finance", "Operations"][i % 6])) 
-                          for i, node_id in enumerate(node_list)],
-            "active": [(node_id, gr.AttrValue(i % 3 != 0)) for i, node_id in enumerate(node_list)],
-            "age": [(node_id, gr.AttrValue(25 + (i % 40))) for i, node_id in enumerate(node_list)],
-            "salary": [(node_id, gr.AttrValue(50000 + (i % 100000))) for i, node_id in enumerate(node_list)]
+            "type": {
+                "nodes": node_list,
+                "values": ["user"] * len(node_list),
+                "value_type": "text"
+            },
+            "department": {
+                "nodes": node_list,
+                "values": [["Engineering", "Marketing", "Sales", "HR", "Finance", "Operations"][i % 6] for i in range(len(node_list))],
+                "value_type": "text"
+            },
+            "active": {
+                "nodes": node_list,
+                "values": [i % 3 != 0 for i in range(len(node_list))],
+                "value_type": "bool"
+            },
+            "age": {
+                "nodes": node_list,
+                "values": [25 + (i % 40) for i in range(len(node_list))],
+                "value_type": "int"
+            },
+            "salary": {
+                "nodes": node_list,
+                "values": [50000 + (i % 100000) for i in range(len(node_list))],
+                "value_type": "int"
+            }
         }
         graph.set_node_attributes(attrs_dict)
         

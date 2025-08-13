@@ -343,6 +343,107 @@ impl GraphSpace {
     }
 
     /*
+    === COLUMNAR FILTERING OPTIMIZATION ===
+    Bulk attribute operations for vectorized filtering
+    */
+    
+    /// Get attribute indices for all active nodes/edges in bulk (VECTORIZED)
+    /// 
+    /// PERFORMANCE: Single bulk operation replaces individual per-node lookups
+    /// This is the key enabler for columnar filtering operations
+    pub fn get_attribute_indices(&self, 
+        attr_name: &AttrName,
+        is_node: bool
+    ) -> Vec<(NodeId, Option<usize>)> {
+        
+        if is_node {
+            // Get all active nodes and their attribute indices in one operation
+            self.active_nodes
+                .iter()
+                .map(|&node_id| {
+                    let index = self.get_node_attr_index(node_id, attr_name);
+                    (node_id, index)
+                })
+                .collect()
+        } else {
+            // Get all active edges and their attribute indices in one operation
+            self.active_edges
+                .iter()
+                .map(|&edge_id| {
+                    let index = self.get_edge_attr_index(edge_id, attr_name);
+                    (edge_id as NodeId, index)  // Cast EdgeId to NodeId for consistent interface
+                })
+                .collect()
+        }
+    }
+    
+    /// Get attribute values for all active nodes/edges in columnar format
+    /// 
+    /// PERFORMANCE: This method combines index lookup + value retrieval in single bulk operation
+    /// Replaces the pattern: for node in nodes { get_index(); get_value() } 
+    pub fn get_attributes<'a>(&self, 
+        pool: &'a GraphPool, 
+        attr_name: &AttrName,
+        is_node: bool
+    ) -> Vec<(NodeId, Option<&'a crate::types::AttrValue>)> {
+        
+        // STEP 1: Get all indices for active entities in bulk
+        let entity_indices = self.get_attribute_indices(attr_name, is_node);
+        
+        // STEP 2: Bulk attribute retrieval from pool
+        pool.get_attribute_values(attr_name, &entity_indices, is_node)
+    }
+
+    /// Get attribute values for a specific subset of nodes in bulk (NEW OPTIMIZED METHOD)
+    /// 
+    /// PERFORMANCE: Single bulk operation replaces N individual lookups
+    /// This is what the query system should actually use
+    pub fn get_attributes_for_nodes<'a>(
+        &self,
+        pool: &'a GraphPool,
+        attr_name: &AttrName,
+        node_ids: &[NodeId]
+    ) -> Vec<(NodeId, Option<&'a crate::types::AttrValue>)> {
+        // STEP 1: Bulk index lookup for specific nodes
+        let entity_indices: Vec<(NodeId, Option<usize>)> = node_ids
+            .iter()
+            .map(|&node_id| {
+                let index = self.node_attribute_indices
+                    .get(&(node_id as usize))
+                    .and_then(|attrs| attrs.get(attr_name))
+                    .copied();
+                (node_id, index)
+            })
+            .collect();
+        
+        // STEP 2: Single bulk retrieval from pool
+        pool.get_attribute_values(attr_name, &entity_indices, true)
+    }
+
+    /// Get attribute values for a specific subset of edges in bulk (NEW OPTIMIZED METHOD)
+    pub fn get_attributes_for_edges<'a>(
+        &self,
+        pool: &'a GraphPool,
+        attr_name: &AttrName,
+        edge_ids: &[EdgeId]
+    ) -> Vec<(NodeId, Option<&'a crate::types::AttrValue>)> {
+        // STEP 1: Bulk index lookup for specific edges
+        let entity_indices: Vec<(NodeId, Option<usize>)> = edge_ids
+            .iter()
+            .map(|&edge_id| {
+                let index = self.edge_attribute_indices
+                    .get(&(edge_id as usize))
+                    .and_then(|attrs| attrs.get(attr_name))
+                    .copied();
+                (edge_id as NodeId, index) // Cast for consistent interface
+            })
+            .collect();
+        
+        // STEP 2: Single bulk retrieval from pool
+        pool.get_attribute_values(attr_name, &entity_indices, false)
+    }
+
+    /*
     === SIMPLE ACTIVE STATE QUERIES ===
     Basic information about what's currently active
     */
