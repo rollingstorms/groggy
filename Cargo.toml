@@ -12,11 +12,6 @@ documentation = "https://groggy.readthedocs.io"
 name = "groggy"
 crate-type = ["rlib"]
 
-
-[[bin]]
-name = "stress_test_rust"
-path = "stress_test_rust.rs"
-
 [dependencies]
 fastrand = "2.0"
 # pyo3 = { version = "0.20", features = ["extension-module"] } # Moved to python-groggy

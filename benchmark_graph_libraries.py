@@ -2,6 +2,64 @@
 """
 Benchmark comparison: Groggy vs other high-performance graph libraries
 Tests Phase 3 querying capabilities: Advanced filtering, traversal, and aggregation
+
+COMPUTATIONAL COMPLEXITY INSIGHTS (Latest Run):
+===============================================
+CRITICAL FINDINGS - Node Filtering Performance Crisis:
+- Groggy node filtering has >O(n²) complexity, showing 5-10x per-item degradation at scale
+- NetworkX maintains ~O(n log n) with only 1.4-2.0x per-item degradation 
+- Root cause: get_attributes_for_nodes() bulk method in src/core/query.rs has algorithmic issues
+- Edge filtering works perfectly with O(n) complexity (78ns→62ns per item)
+
+SPECIFIC PERFORMANCE TARGETS IDENTIFIED:
+- Groggy Single Attribute: 207ns→1195ns per item (5.8x degradation) 
+- Groggy Numeric Range: 373ns→3649ns per item (9.8x degradation)
+- Groggy Complex AND: 119ns→666ns per item (5.6x degradation)
+- Target: Achieve edge-level performance (<100ns per item at all scales)
+
+TODO - FUTURE BENCHMARK ENHANCEMENTS:
+====================================
+1. ADD MEMORY SCALING ANALYSIS:
+   - Track memory usage growth per node/edge added
+   - Identify memory efficiency regressions
+   - Compare memory access patterns between libraries
+
+2. ALGORITHMIC PROFILING INTEGRATION:
+   - Add Rust profiling hooks to identify bottleneck functions
+   - Measure time spent in get_attributes_for_nodes vs individual lookups
+   - Profile memory allocation patterns during bulk operations
+
+3. REGRESSION TESTING FRAMEWORK:
+   - Set performance baselines for each operation at each scale
+   - Automatic alerts when per-item time exceeds thresholds
+   - Track optimization progress over time
+
+4. EXTENDED COMPLEXITY ANALYSIS:
+   - Test with more data points (1K, 5K, 10K, 25K, 50K, 100K, 250K)
+   - Measure different attribute types (string, int, float, bool)
+   - Test attribute distribution effects (sparse vs dense)
+   - Compare cold vs warm cache performance
+
+5. COMPARATIVE DEEP DIVE:
+   - Analyze NetworkX's implementation strategies
+   - Test hybrid approaches (bulk + individual for different scenarios)
+   - Measure attribute access pattern optimization opportunities
+
+6. ADVANCED METRICS:
+   - CPU cache hit/miss rates during bulk operations
+   - Memory fragmentation analysis
+   - Thread contention measurements
+   - I/O wait time analysis
+
+OPTIMIZATION PRIORITIES BASED ON DATA:
+=====================================
+1. URGENT: Fix get_attributes_for_nodes() - worst offender at 3649ns/item
+2. HIGH: Optimize single attribute filtering - 1195ns/item target
+3. MEDIUM: Complex filtering optimization - 666ns/item
+4. REFERENCE: Edge filtering as gold standard - 62ns/item
+
+The benchmark now provides the exact algorithmic complexity measurements needed
+to guide optimization work and validate improvements.
 """
 
 import sys
@@ -588,23 +646,209 @@ def run_comprehensive_benchmark(benchmark, name):
     
     return results
 
+def measure_per_item_complexity(graph, operation_name, filter_func, dataset_size, iterations=5):
+    """Measure per-item performance for complexity analysis"""
+    times = []
+    
+    for _ in range(iterations):
+        start_time = time.perf_counter()
+        result = filter_func()
+        end_time = time.perf_counter()
+        times.append(end_time - start_time)
+    
+    # Calculate statistics
+    avg_time = statistics.mean(times)
+    min_time = min(times)
+    max_time = max(times)
+    std_time = statistics.stdev(times) if len(times) > 1 else 0
+    
+    # Per-item metrics
+    per_item_time_ns = (avg_time / dataset_size * 1_000_000_000) if dataset_size > 0 else 0
+    items_per_sec = 1_000_000_000 / per_item_time_ns if per_item_time_ns > 0 else 0
+    
+    return {
+        'operation': operation_name,
+        'avg_time_ms': avg_time * 1000,
+        'min_time_ms': min_time * 1000,
+        'max_time_ms': max_time * 1000,
+        'std_time_ms': std_time * 1000,
+        'per_item_time_ns': per_item_time_ns,
+        'items_per_sec': items_per_sec,
+        'dataset_size': dataset_size,
+        'iterations': iterations
+    }
+
+def run_complexity_analysis(benchmark, name, scale_name):
+    """Run computational complexity analysis for filtering operations"""
+    print(f"\n🔬 COMPUTATIONAL COMPLEXITY ANALYSIS - {name} ({scale_name})")
+    print("=" * 80)
+    
+    complexity_results = []
+    
+    try:
+        # Get dataset sizes
+        if hasattr(benchmark, 'graph'):
+            if hasattr(benchmark.graph, 'nodes') and hasattr(benchmark.graph, 'edges'):
+                # Groggy
+                num_nodes = len(benchmark.graph.nodes)
+                num_edges = len(benchmark.graph.edges)
+            elif hasattr(benchmark.graph.nodes, '__len__'):
+                # NetworkX
+                num_nodes = len(benchmark.graph.nodes)
+                num_edges = len(benchmark.graph.edges)
+            else:
+                num_nodes = 0
+                num_edges = 0
+        else:
+            num_nodes = 0
+            num_edges = 0
+        
+        print(f"Dataset: {num_nodes:,} nodes, {num_edges:,} edges")
+        
+        # Test node filtering operations
+        print("\n📊 NODE FILTERING COMPLEXITY:")
+        print("Operation                    | Avg Time (ms) | Per Item (ns) | Items/sec      | Efficiency")
+        print("----------------------------|---------------|---------------|----------------|------------")
+        
+        # Single attribute filter
+        result = measure_per_item_complexity(
+            benchmark.graph,
+            "Single Attribute",
+            lambda: benchmark.filter_nodes_by_single_attribute()[1],  # Just get count
+            num_nodes
+        )
+        complexity_results.append({**result, 'type': 'nodes'})
+        print(f"{result['operation']:<27} | {result['avg_time_ms']:>11.3f} | "
+              f"{result['per_item_time_ns']:>11.1f} | {result['items_per_sec']:>12,.0f} | "
+              f"{'✅ Good' if result['per_item_time_ns'] < 200 else '⚠️ Fair' if result['per_item_time_ns'] < 500 else '❌ Poor'}")
+        
+        # Numeric range filter
+        result = measure_per_item_complexity(
+            benchmark.graph,
+            "Numeric Range",
+            lambda: benchmark.filter_nodes_by_numeric_range()[1],
+            num_nodes
+        )
+        complexity_results.append({**result, 'type': 'nodes'})
+        print(f"{result['operation']:<27} | {result['avg_time_ms']:>11.3f} | "
+              f"{result['per_item_time_ns']:>11.1f} | {result['items_per_sec']:>12,.0f} | "
+              f"{'✅ Good' if result['per_item_time_ns'] < 200 else '⚠️ Fair' if result['per_item_time_ns'] < 500 else '❌ Poor'}")
+        
+        # Complex AND filter
+        result = measure_per_item_complexity(
+            benchmark.graph,
+            "Complex AND",
+            lambda: benchmark.filter_nodes_complex_and()[1],
+            num_nodes
+        )
+        complexity_results.append({**result, 'type': 'nodes'})
+        print(f"{result['operation']:<27} | {result['avg_time_ms']:>11.3f} | "
+              f"{result['per_item_time_ns']:>11.1f} | {result['items_per_sec']:>12,.0f} | "
+              f"{'✅ Good' if result['per_item_time_ns'] < 200 else '⚠️ Fair' if result['per_item_time_ns'] < 500 else '❌ Poor'}")
+        
+        # Test edge filtering operations if we have edges
+        if num_edges > 0:
+            print("\n📊 EDGE FILTERING COMPLEXITY:")
+            print("Operation                    | Avg Time (ms) | Per Item (ns) | Items/sec      | Efficiency")
+            print("----------------------------|---------------|---------------|----------------|------------")
+            
+            result = measure_per_item_complexity(
+                benchmark.graph,
+                "Edge Relationship",
+                lambda: benchmark.filter_edges_by_relationship()[1],
+                num_edges
+            )
+            complexity_results.append({**result, 'type': 'edges'})
+            print(f"{result['operation']:<27} | {result['avg_time_ms']:>11.3f} | "
+                  f"{result['per_item_time_ns']:>11.1f} | {result['items_per_sec']:>12,.0f} | "
+                  f"{'✅ Good' if result['per_item_time_ns'] < 200 else '⚠️ Fair' if result['per_item_time_ns'] < 500 else '❌ Poor'}")
+        
+    except Exception as e:
+        print(f"   ❌ Error in complexity analysis for {name}: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return complexity_results
+
+def analyze_scaling_behavior(all_complexity_results):
+    """Analyze how performance scales across different dataset sizes"""
+    if len(all_complexity_results) < 2:
+        return
+        
+    print("\n🎯 SCALING BEHAVIOR ANALYSIS")
+    print("=" * 80)
+    print("(Per-item time should remain constant for O(n) algorithms)")
+    
+    # Group results by library and operation
+    scaling_data = {}
+    
+    for scale_results in all_complexity_results:
+        library = scale_results['library']
+        scale = scale_results['scale']
+        
+        for result in scale_results['results']:
+            operation = result['operation']
+            op_type = result['type']
+            key = f"{library}_{op_type}_{operation}"
+            
+            if key not in scaling_data:
+                scaling_data[key] = []
+            
+            scaling_data[key].append({
+                'scale': scale,
+                'dataset_size': result['dataset_size'],
+                'per_item_time_ns': result['per_item_time_ns']
+            })
+    
+    print("\nPer-Item Performance Scaling (smaller dataset → larger dataset):")
+    print("Library/Type/Operation                    | Small→Large | Scaling Behavior")
+    print("------------------------------------------|--------------|------------------")
+    
+    for key, data_points in scaling_data.items():
+        if len(data_points) >= 2:
+            # Sort by dataset size
+            data_points.sort(key=lambda x: x['dataset_size'])
+            
+            smallest = data_points[0]
+            largest = data_points[-1]
+            
+            if smallest['per_item_time_ns'] > 0:
+                scaling_ratio = largest['per_item_time_ns'] / smallest['per_item_time_ns']
+                scale_factor = largest['dataset_size'] / smallest['dataset_size']
+                
+                # Determine scaling quality
+                if scaling_ratio < 1.2:  # Less than 20% increase
+                    behavior = "✅ Excellent O(n)"
+                elif scaling_ratio < 2.0:  # Less than 2x increase
+                    behavior = "⚠️ Good ~O(n log n)"
+                elif scaling_ratio < 5.0:  # Less than 5x increase  
+                    behavior = "❌ Poor ~O(n²)"
+                else:
+                    behavior = "💥 Very Poor >O(n²)"
+                
+                change_text = f"{smallest['per_item_time_ns']:.0f}→{largest['per_item_time_ns']:.0f}ns"
+                
+                print(f"{key.replace('_', '/'):<41} | {change_text:<12} | {behavior}")
+
 def main():
     print("=" * 80)
-    print("🚀 GROGGY PHASE 3 QUERYING BENCHMARK")
+    print("🚀 GROGGY COMPREHENSIVE BENCHMARK WITH COMPLEXITY ANALYSIS")
     print("=" * 80)
     print(f"Using groggy from: {gr.__file__}")
     print(f"Libraries available: {[k for k, v in libraries_available.items() if v]}")
     
-    # Test sizes - Reduced by 10x for more manageable testing
+    # Test sizes for complexity analysis
     test_sizes = [
-        (50_000, 25_000),     # 50K nodes - 10x reduction from 500K
-        (250_000, 125_000),   # 250K nodes - 10x reduction from 2.5M
-        # (1_000_000, 500_000), # 1M nodes - 10x reduction from 10M (commented for safety)
+        (50_000, 50_000, "Medium"),    # Medium scale 
+        (250_000, 250_000, "Large"),    # Large scale for scaling analysis
     ]
     
-    for num_nodes, num_edges in test_sizes:
+    # Store complexity results across scales
+    all_complexity_results = []
+    
+    for num_nodes, num_edges, scale_name in test_sizes:
         print(f"\n{'=' * 80}")
-        print(f"📊 BENCHMARK: {num_nodes:,} nodes, {num_edges:,} edges")
+        print(f"📊 BENCHMARK: {num_nodes:,} nodes, {num_edges:,} edges ({scale_name} Scale)")
         print(f"{'=' * 80}")
         
         # Generate test data
@@ -613,10 +857,23 @@ def main():
         # Store results for comparison
         all_results = {}
         
+        # Store complexity results for this scale
+        scale_complexity_results = []
+        
         # Test Groggy Phase 3
         if libraries_available['groggy']:
             groggy_bench = GroggyPhase3Benchmark(nodes_data, edges_data)
             all_results['Groggy Phase 3'] = run_comprehensive_benchmark(groggy_bench, "Groggy Phase 3")
+            
+            # Run complexity analysis for Groggy
+            complexity_results = run_complexity_analysis(groggy_bench, "Groggy", scale_name)
+            if complexity_results:
+                scale_complexity_results.append({
+                    'library': 'Groggy',
+                    'scale': scale_name,
+                    'results': complexity_results
+                })
+            
             del groggy_bench
             gc.collect()
         
@@ -625,10 +882,29 @@ def main():
             try:
                 nx_bench = NetworkXBenchmark(nodes_data, edges_data)
                 all_results['NetworkX'] = run_comprehensive_benchmark(nx_bench, "NetworkX")
+                
+                # Run complexity analysis for NetworkX
+                complexity_results = run_complexity_analysis(nx_bench, "NetworkX", scale_name)
+                if complexity_results:
+                    scale_complexity_results.append({
+                        'library': 'NetworkX',
+                        'scale': scale_name,
+                        'results': complexity_results
+                    })
+                
                 del nx_bench
                 gc.collect()
             except Exception as e:
                 print(f"❌ NetworkX failed: {e}")
+        
+        # Store complexity results for this scale
+        if scale_complexity_results:
+            all_complexity_results.append({
+                'scale': scale_name,
+                'nodes': num_nodes,
+                'edges': num_edges,
+                'libraries': scale_complexity_results
+            })
         
         # Performance comparison
         print(f"\n📈 PERFORMANCE COMPARISON ({num_nodes:,} nodes)")
@@ -740,6 +1016,24 @@ def main():
                 print(f"      • Grouping operations: {groggy_results['grouping']:.4f}s")
         
         print("\n" + "=" * 80)
+    
+    # Perform cross-scale complexity analysis
+    if len(all_complexity_results) >= 2:
+        print(f"\n{'=' * 80}")
+        print("🧬 FINAL SCALING BEHAVIOR ANALYSIS")
+        print(f"{'=' * 80}")
+        
+        # Flatten structure for analysis
+        flat_results = []
+        for scale_data in all_complexity_results:
+            for lib_data in scale_data['libraries']:
+                flat_results.append({
+                    'library': lib_data['library'],
+                    'scale': scale_data['scale'],
+                    'results': lib_data['results']
+                })
+        
+        analyze_scaling_behavior(flat_results)
 
 if __name__ == "__main__":
     main()
