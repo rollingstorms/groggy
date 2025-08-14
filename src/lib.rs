@@ -127,6 +127,7 @@ pub mod core {
     pub mod state;
     pub mod ref_manager;
     pub mod strategies;
+    pub mod subgraph;
 }
 
 // Public API
