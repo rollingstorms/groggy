@@ -32,16 +32,22 @@ def complete_graph(n: int, **node_attrs) -> Graph:
     """
     g = Graph()
     
-    # Add all nodes
-    nodes = []
+    # ✅ BULK: Create node data with attributes
+    node_data = []
     for i in range(n):
-        node_id = g.add_node(index=i, **node_attrs)
-        nodes.append(node_id)
+        node_dict = {"index": i, **node_attrs}
+        node_data.append(node_dict)
     
-    # Add all edges (complete connectivity)
+    # Add all nodes with data at once
+    nodes = g.add_nodes(node_data)
+    
+    # ✅ BULK: Create all edge pairs, then add at once
+    edge_pairs = []
     for i in range(n):
         for j in range(i + 1, n):
-            g.add_edge(nodes[i], nodes[j])
+            edge_pairs.append((nodes[i], nodes[j]))
+    
+    g.add_edges(edge_pairs)
     
     return g
 
@@ -68,18 +74,62 @@ def erdos_renyi(n: int, p: float, directed: bool = False, seed: Optional[int] = 
     
     g = Graph()
     
-    # Add all nodes
-    nodes = []
+    # ✅ BULK: Create node data with attributes
+    node_data = []
     for i in range(n):
-        node_id = g.add_node(index=i, **node_attrs)
-        nodes.append(node_id)
+        node_dict = {"index": i, **node_attrs}
+        node_data.append(node_dict)
     
-    # Add edges randomly with probability p
-    for i in range(n):
-        start_j = 0 if directed else i + 1
-        for j in range(start_j, n):
-            if i != j and random.random() < p:
-                g.add_edge(nodes[i], nodes[j])
+    # Add all nodes with data at once
+    nodes = g.add_nodes(node_data)
+    
+    # ✅ BULK: Create edge pairs, optimized for sparse graphs
+    edge_pairs = []
+    
+    # For sparse graphs (p < 0.1), use sampling approach to avoid O(n²)
+    if p < 0.1 and n > 1000:
+        # Calculate expected number of edges
+        if directed:
+            total_possible_edges = n * (n - 1)
+        else:
+            total_possible_edges = n * (n - 1) // 2
+        
+        expected_edges = int(p * total_possible_edges)
+        
+        # Generate edges by sampling without replacement
+        edges_created = 0
+        max_attempts = min(expected_edges * 10, total_possible_edges)  # Avoid infinite loops
+        attempts = 0
+        
+        used_pairs = set()
+        while edges_created < expected_edges and attempts < max_attempts:
+            i = random.randint(0, n - 1)
+            j = random.randint(0, n - 1)
+            
+            if i == j:
+                attempts += 1
+                continue
+            
+            # Ensure consistent ordering for undirected graphs
+            if not directed and i > j:
+                i, j = j, i
+            
+            pair = (i, j)
+            if pair not in used_pairs:
+                used_pairs.add(pair)
+                edge_pairs.append((nodes[i], nodes[j]))
+                edges_created += 1
+            
+            attempts += 1
+    else:
+        # Use traditional O(n²) approach for dense graphs or small n
+        for i in range(n):
+            start_j = 0 if directed else i + 1
+            for j in range(start_j, n):
+                if i != j and random.random() < p:
+                    edge_pairs.append((nodes[i], nodes[j]))
+    
+    g.add_edges(edge_pairs)
     
     return g
 
@@ -108,52 +158,59 @@ def barabasi_albert(n: int, m: int, seed: Optional[int] = None, **node_attrs) ->
     
     g = Graph()
     
-    # Start with a complete graph of m+1 nodes
-    nodes = []
-    for i in range(m + 1):
-        node_id = g.add_node(index=i, **node_attrs)
-        nodes.append(node_id)
+    # ✅ BULK: Create all node data first
+    node_data = []
+    for i in range(n):
+        node_dict = {"index": i, **node_attrs}
+        node_data.append(node_dict)
     
-    # Connect initial nodes in a complete graph
+    # Add all nodes at once
+    nodes = g.add_nodes(node_data)
+    
+    # ✅ BULK: Collect all edges, then add at once
+    edge_pairs = []
+    
+    # Start with initial complete graph edges (m+1 nodes)
     for i in range(m + 1):
         for j in range(i + 1, m + 1):
-            g.add_edge(nodes[i], nodes[j])
+            edge_pairs.append((nodes[i], nodes[j]))
     
     # Keep track of degree for preferential attachment
     degrees = [m] * (m + 1)  # Each initial node has degree m
     total_degree = sum(degrees)
     
-    # Add remaining nodes with preferential attachment
+    # Generate remaining edges with preferential attachment
     for i in range(m + 1, n):
-        node_id = g.add_node(index=i, **node_attrs)
-        nodes.append(node_id)
-        
         # Choose m nodes to connect to based on degree (preferential attachment)
-        targets = []
-        for _ in range(m):
+        targets = set()  # Use set to avoid duplicates efficiently
+        
+        # More efficient preferential attachment using weighted sampling
+        while len(targets) < m:
             # Weighted random selection based on degrees
             rand_val = random.randint(0, total_degree - 1)
             cumsum = 0
             for j, degree in enumerate(degrees):
                 cumsum += degree
                 if rand_val < cumsum and j not in targets:
-                    targets.append(j)
+                    targets.add(j)
                     break
             
-            # Fallback: if we couldn't find a unique target, pick randomly
-            if len(targets) == 0 or targets[-1] in targets[:-1]:
-                available = [j for j in range(len(nodes)-1) if j not in targets]
+            # Fallback: if we couldn't find a target after reasonable attempts
+            if len(targets) == 0:
+                available = [j for j in range(i) if j not in targets]
                 if available:
-                    targets[-1] = random.choice(available)
+                    targets.add(random.choice(available))
         
-        # Add edges to selected targets
+        # Add edges to collected pairs
         for target_idx in targets:
-            g.add_edge(node_id, nodes[target_idx])
+            edge_pairs.append((nodes[i], nodes[target_idx]))
             degrees[target_idx] += 1
         
         # Add degree for new node
         degrees.append(m)
         total_degree += 2 * m  # Each edge adds 2 to total degree
+    
+    g.add_edges(edge_pairs)
     
     return g
 
@@ -185,11 +242,14 @@ def watts_strogatz(n: int, k: int, p: float, seed: Optional[int] = None, **node_
     
     g = Graph()
     
-    # Add all nodes
-    nodes = []
+    # ✅ BULK: Create all node data first
+    node_data = []
     for i in range(n):
-        node_id = g.add_node(index=i, **node_attrs)
-        nodes.append(node_id)
+        node_dict = {"index": i, **node_attrs}
+        node_data.append(node_dict)
+    
+    # Add all nodes at once
+    nodes = g.add_nodes(node_data)
     
     # Create ring lattice (each node connected to k/2 neighbors on each side)
     edges = []
@@ -208,9 +268,12 @@ def watts_strogatz(n: int, k: int, p: float, seed: Optional[int] = None, **node_
                 j = random.choice(possible_targets)
         rewired_edges.append((i, j))
     
-    # Add all edges to graph
+    # ✅ BULK: Convert to node pairs and add all edges at once
+    edge_pairs = []
     for i, j in rewired_edges:
-        g.add_edge(nodes[i], nodes[j])
+        edge_pairs.append((nodes[i], nodes[j]))
+    
+    g.add_edges(edge_pairs)
     
     return g
 
@@ -227,16 +290,22 @@ def cycle_graph(n: int, **node_attrs) -> Graph:
     """
     g = Graph()
     
-    # Add all nodes
-    nodes = []
+    # ✅ BULK: Create all node data first
+    node_data = []
     for i in range(n):
-        node_id = g.add_node(index=i, **node_attrs)
-        nodes.append(node_id)
+        node_dict = {"index": i, **node_attrs}
+        node_data.append(node_dict)
     
-    # Add cycle edges
+    # Add all nodes at once
+    nodes = g.add_nodes(node_data)
+    
+    # ✅ BULK: Create all edge pairs, then add at once
+    edge_pairs = []
     for i in range(n):
         next_node = (i + 1) % n
-        g.add_edge(nodes[i], nodes[next_node])
+        edge_pairs.append((nodes[i], nodes[next_node]))
+    
+    g.add_edges(edge_pairs)
     
     return g
 
@@ -253,15 +322,21 @@ def path_graph(n: int, **node_attrs) -> Graph:
     """
     g = Graph()
     
-    # Add all nodes
-    nodes = []
+    # ✅ BULK: Create all node data first
+    node_data = []
     for i in range(n):
-        node_id = g.add_node(index=i, **node_attrs)
-        nodes.append(node_id)
+        node_dict = {"index": i, **node_attrs}
+        node_data.append(node_dict)
     
-    # Add path edges
+    # Add all nodes at once
+    nodes = g.add_nodes(node_data)
+    
+    # ✅ BULK: Create all edge pairs, then add at once
+    edge_pairs = []
     for i in range(n - 1):
-        g.add_edge(nodes[i], nodes[i + 1])
+        edge_pairs.append((nodes[i], nodes[i + 1]))
+    
+    g.add_edges(edge_pairs)
     
     return g
 
@@ -278,16 +353,22 @@ def star_graph(n: int, **node_attrs) -> Graph:
     """
     g = Graph()
     
-    # Add all nodes
-    nodes = []
+    # ✅ BULK: Create all node data first
+    node_data = []
     for i in range(n):
-        node_id = g.add_node(index=i, **node_attrs)
-        nodes.append(node_id)
+        node_dict = {"index": i, **node_attrs}
+        node_data.append(node_dict)
     
-    # Connect center (node 0) to all other nodes
+    # Add all nodes at once
+    nodes = g.add_nodes(node_data)
+    
+    # ✅ BULK: Create all edge pairs (center to all others), then add at once
+    edge_pairs = []
     center = nodes[0]
     for i in range(1, n):
-        g.add_edge(center, nodes[i])
+        edge_pairs.append((center, nodes[i]))
+    
+    g.add_edges(edge_pairs)
     
     return g
 
@@ -311,49 +392,76 @@ def grid_graph(dims: List[int], **node_attrs) -> Graph:
     if len(dims) == 2:
         width, height = dims
         
-        # Create nodes
-        nodes = {}
+        # ✅ BULK: Create all node data first
+        node_data = []
+        coord_to_idx = {}
+        idx = 0
         for x in range(width):
             for y in range(height):
-                node_id = g.add_node(x=x, y=y, **node_attrs)
-                nodes[(x, y)] = node_id
+                node_dict = {"x": x, "y": y, **node_attrs}
+                node_data.append(node_dict)
+                coord_to_idx[(x, y)] = idx
+                idx += 1
         
-        # Create edges (4-connected grid)
+        # Add all nodes at once
+        nodes = g.add_nodes(node_data)
+        
+        # ✅ BULK: Create all edge pairs, then add at once
+        edge_pairs = []
         for x in range(width):
             for y in range(height):
-                current = nodes[(x, y)]
+                current_idx = coord_to_idx[(x, y)]
+                current = nodes[current_idx]
                 # Right neighbor
                 if x + 1 < width:
-                    g.add_edge(current, nodes[(x + 1, y)])
+                    neighbor_idx = coord_to_idx[(x + 1, y)]
+                    edge_pairs.append((current, nodes[neighbor_idx]))
                 # Down neighbor  
                 if y + 1 < height:
-                    g.add_edge(current, nodes[(x, y + 1)])
+                    neighbor_idx = coord_to_idx[(x, y + 1)]
+                    edge_pairs.append((current, nodes[neighbor_idx]))
+        
+        g.add_edges(edge_pairs)
     
     elif len(dims) == 3:
         width, height, depth = dims
         
-        # Create nodes
-        nodes = {}
+        # ✅ BULK: Create all node data first
+        node_data = []
+        coord_to_idx = {}
+        idx = 0
         for x in range(width):
             for y in range(height):
                 for z in range(depth):
-                    node_id = g.add_node(x=x, y=y, z=z, **node_attrs)
-                    nodes[(x, y, z)] = node_id
+                    node_dict = {"x": x, "y": y, "z": z, **node_attrs}
+                    node_data.append(node_dict)
+                    coord_to_idx[(x, y, z)] = idx
+                    idx += 1
         
-        # Create edges (6-connected grid)
+        # Add all nodes at once
+        nodes = g.add_nodes(node_data)
+        
+        # ✅ BULK: Create all edge pairs, then add at once
+        edge_pairs = []
         for x in range(width):
             for y in range(height):
                 for z in range(depth):
-                    current = nodes[(x, y, z)]
+                    current_idx = coord_to_idx[(x, y, z)]
+                    current = nodes[current_idx]
                     # Right neighbor
                     if x + 1 < width:
-                        g.add_edge(current, nodes[(x + 1, y, z)])
+                        neighbor_idx = coord_to_idx[(x + 1, y, z)]
+                        edge_pairs.append((current, nodes[neighbor_idx]))
                     # Down neighbor
                     if y + 1 < height:
-                        g.add_edge(current, nodes[(x, y + 1, z)])
+                        neighbor_idx = coord_to_idx[(x, y + 1, z)]
+                        edge_pairs.append((current, nodes[neighbor_idx]))
                     # Forward neighbor
                     if z + 1 < depth:
-                        g.add_edge(current, nodes[(x, y, z + 1)])
+                        neighbor_idx = coord_to_idx[(x, y, z + 1)]
+                        edge_pairs.append((current, nodes[neighbor_idx]))
+        
+        g.add_edges(edge_pairs)
     
     else:
         raise ValueError("Only 2D and 3D grids are supported")
@@ -377,32 +485,33 @@ def tree(n: int, branching_factor: int = 2, **node_attrs) -> Graph:
     if n <= 0:
         return g
     
-    # Add root node
-    nodes = []
-    root_id = g.add_node(index=0, level=0, **node_attrs)
-    nodes.append(root_id)
+    # ✅ BULK: Create all node data first
+    node_data = []
+    for i in range(n):
+        level = 0
+        temp_i = i
+        temp_bf = branching_factor
+        while temp_i >= temp_bf:
+            temp_i -= temp_bf
+            temp_bf *= branching_factor
+            level += 1
+        
+        node_dict = {"index": i, "level": level, **node_attrs}
+        node_data.append(node_dict)
     
-    # Add nodes level by level
-    level = 0
-    while len(nodes) < n:
-        level += 1
-        level_start = len(nodes)
-        
-        # For each node in previous level, add children
-        prev_level_start = 0 if level == 1 else sum(branching_factor ** i for i in range(level - 1))
-        prev_level_end = sum(branching_factor ** i for i in range(level))
-        
-        for parent_idx in range(max(0, len(nodes) - (prev_level_end - prev_level_start)), len(nodes)):
-            if len(nodes) >= n:
-                break
-            parent_id = nodes[parent_idx]
-            
-            for child_num in range(branching_factor):
-                if len(nodes) >= n:
-                    break
-                child_id = g.add_node(index=len(nodes), level=level, **node_attrs)
-                nodes.append(child_id)
-                g.add_edge(parent_id, child_id)
+    # Add all nodes at once
+    nodes = g.add_nodes(node_data)
+    
+    # ✅ BULK: Create all edge pairs, then add at once
+    edge_pairs = []
+    
+    # Create parent-child relationships
+    for i in range(1, n):  # Skip root (node 0)
+        parent_idx = (i - 1) // branching_factor
+        if parent_idx < len(nodes):
+            edge_pairs.append((nodes[parent_idx], nodes[i]))
+    
+    g.add_edges(edge_pairs)
     
     return g
 
@@ -416,11 +525,14 @@ def karate_club() -> Graph:
     """
     g = Graph()
     
-    # Create 34 nodes
-    nodes = []
+    # ✅ BULK: Create all node data first
+    node_data = []
     for i in range(34):
-        node_id = g.add_node(index=i, name=f"Member_{i}")
-        nodes.append(node_id)
+        node_dict = {"index": i, "name": f"Member_{i}"}
+        node_data.append(node_dict)
+    
+    # Add all nodes at once
+    nodes = g.add_nodes(node_data)
     
     # Define the edges from the original dataset
     edges = [
@@ -436,9 +548,12 @@ def karate_club() -> Graph:
         (28, 31), (28, 33), (29, 32), (29, 33), (30, 32), (30, 33), (31, 32), (31, 33), (32, 33)
     ]
     
-    # Add all edges
+    # ✅ BULK: Create all edge data with attributes, then add at once
+    edge_data = []
     for i, j in edges:
-        g.add_edge(nodes[i], nodes[j], relationship="friendship")
+        edge_data.append((nodes[i], nodes[j], {"relationship": "friendship"}))
+    
+    g.add_edges(edge_data)
     
     return g
 
@@ -472,8 +587,8 @@ def social_network(n: int, communities: int = 3,
     # Generate realistic attribute values
     locations = ['NYC', 'SF', 'LA', 'Chicago', 'Boston', 'Austin', 'Seattle', 'Denver']
     
-    # Create nodes with attributes
-    nodes = []
+    # ✅ BULK: Create all node data first
+    node_data = []
     for i in range(n):
         attrs = {'index': i, 'community': i % communities}
         
@@ -484,23 +599,84 @@ def social_network(n: int, communities: int = 3,
         if 'location' in node_attrs:
             attrs['location'] = random.choice(locations)
         
-        node_id = g.add_node(**attrs)
-        nodes.append(node_id)
+        node_data.append(attrs)
     
-    # Create edges with community structure (higher probability within communities)
-    for i in range(n):
-        for j in range(i + 1, n):
-            # Higher probability of connection within same community
-            same_community = (i % communities) == (j % communities)
-            p = 0.15 if same_community else 0.02
+    # Add all nodes at once
+    nodes = g.add_nodes(node_data)
+    
+    # ✅ BULK: Create edges more efficiently using expected degree approach
+    edge_data = []
+    
+    # Group nodes by community for efficient sampling
+    community_nodes = {}
+    for i, node_id in enumerate(nodes):
+        community = i % communities
+        if community not in community_nodes:
+            community_nodes[community] = []
+        community_nodes[community].append((i, node_id))
+    
+    # Generate edges within communities (higher probability)
+    within_community_p = 0.15
+    for community, node_list in community_nodes.items():
+        community_size = len(node_list)
+        expected_edges = int(within_community_p * community_size * (community_size - 1) / 2)
+        
+        # Sample edge pairs efficiently
+        all_pairs = [(i, j) for i in range(community_size) for j in range(i + 1, community_size)]
+        if len(all_pairs) > 0:
+            # Sample without replacement up to expected number
+            num_edges = min(expected_edges, len(all_pairs))
+            selected_pairs = random.sample(all_pairs, num_edges)
             
-            if random.random() < p:
+            for i_idx, j_idx in selected_pairs:
+                i, node_i = node_list[i_idx]
+                j, node_j = node_list[j_idx]
+                
                 edge_attrs_dict = {}
                 if 'strength' in edge_attrs:
                     edge_attrs_dict['strength'] = random.uniform(0.1, 1.0)
                 if 'frequency' in edge_attrs:
                     edge_attrs_dict['frequency'] = random.choice(['daily', 'weekly', 'monthly', 'rarely'])
                 
-                g.add_edge(nodes[i], nodes[j], **edge_attrs_dict)
+                edge_data.append((node_i, node_j, edge_attrs_dict))
+    
+    # Generate edges between communities (lower probability)
+    between_community_p = 0.02
+    total_inter_community_pairs = 0
+    for i in range(communities):
+        for j in range(i + 1, communities):
+            total_inter_community_pairs += len(community_nodes[i]) * len(community_nodes[j])
+    
+    expected_inter_edges = int(between_community_p * total_inter_community_pairs)
+    
+    # Efficiently sample inter-community edges
+    inter_community_edges = 0
+    for i in range(communities):
+        for j in range(i + 1, communities):
+            if inter_community_edges >= expected_inter_edges:
+                break
+                
+            nodes_i = community_nodes[i]
+            nodes_j = community_nodes[j]
+            
+            # Sample a reasonable number of pairs between these communities
+            pairs_needed = min(len(nodes_i) * len(nodes_j), 
+                             expected_inter_edges - inter_community_edges)
+            
+            for _ in range(pairs_needed):
+                if random.random() < between_community_p:
+                    node_i_idx, node_i = random.choice(nodes_i)
+                    node_j_idx, node_j = random.choice(nodes_j)
+                    
+                    edge_attrs_dict = {}
+                    if 'strength' in edge_attrs:
+                        edge_attrs_dict['strength'] = random.uniform(0.1, 1.0)
+                    if 'frequency' in edge_attrs:
+                        edge_attrs_dict['frequency'] = random.choice(['daily', 'weekly', 'monthly', 'rarely'])
+                    
+                    edge_data.append((node_i, node_j, edge_attrs_dict))
+                    inter_community_edges += 1
+    
+    g.add_edges(edge_data)
     
     return g

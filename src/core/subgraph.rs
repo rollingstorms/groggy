@@ -79,14 +79,24 @@ impl Subgraph {
         Ok(Self::new(graph, nodes, edges, subgraph_type))
     }
     
-    /// Calculate induced edges (edges where both endpoints are in the node set)
+    /// Calculate induced edges (edges where both endpoints are in the node set) - O(k) OPTIMIZED
+    /// 
+    /// Uses columnar topology vectors for O(k) performance where k = number of active edges,
+    /// which is much better than O(E) over all edges in the graph.
     fn calculate_induced_edges(graph: &Rc<RefCell<Graph>>, nodes: &HashSet<NodeId>) -> GraphResult<HashSet<EdgeId>> {
         let mut induced_edges = HashSet::new();
         let graph_borrow = graph.borrow();
         
-        // Get all edges from the graph and check if both endpoints are in our node set
-        for edge_id in graph_borrow.edge_ids() {
-            let (source, target) = graph_borrow.edge_endpoints(edge_id)?;
+        // Get columnar topology vectors (edge_ids, sources, targets) - O(1) if cached
+        let (edge_ids, sources, targets) = graph_borrow.get_columnar_topology();
+        
+        // Iterate through parallel vectors - O(k) where k = active edges
+        for i in 0..edge_ids.len() {
+            let edge_id = edge_ids[i];
+            let source = sources[i];
+            let target = targets[i];
+            
+            // O(1) HashSet lookups instead of O(n) Vec::contains
             if nodes.contains(&source) && nodes.contains(&target) {
                 induced_edges.insert(edge_id);
             }

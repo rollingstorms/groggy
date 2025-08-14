@@ -592,6 +592,18 @@ impl Graph {
         self.space.get_active_edges().iter().copied().collect()
     }
     
+    /// Get columnar topology vectors for efficient subgraph operations
+    /// 
+    /// Returns (edge_ids, sources, targets) as parallel vectors where:
+    /// - edge_ids[i] is the EdgeId 
+    /// - sources[i] is the source NodeId of that edge
+    /// - targets[i] is the target NodeId of that edge
+    ///
+    /// This is used internally for optimized operations like subgraph edge calculation.
+    pub fn get_columnar_topology(&self) -> (&[EdgeId], &[NodeId], &[NodeId]) {
+        self.space.get_columnar_topology()
+    }
+    
     /// Get the endpoints of an edge
     pub fn edge_endpoints(&self, edge: EdgeId) -> Result<(NodeId, NodeId), GraphError> {
         self.pool.get_edge_endpoints(edge)
