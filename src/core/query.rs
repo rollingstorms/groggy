@@ -337,8 +337,11 @@ impl QueryEngine {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AttributeFilter {
     Equals(AttrValue),
+    NotEquals(AttrValue),
     GreaterThan(AttrValue),
     LessThan(AttrValue),
+    GreaterThanOrEqual(AttrValue),
+    LessThanOrEqual(AttrValue),
 }
 
 impl AttributeFilter {
@@ -346,6 +349,7 @@ impl AttributeFilter {
     pub fn matches(&self, value: &AttrValue) -> bool {
         match self {
             AttributeFilter::Equals(target) => value == target,
+            AttributeFilter::NotEquals(target) => value != target,
             AttributeFilter::GreaterThan(target) => {
                 // Flexible numeric comparison - handle all numeric type combinations
                 self.compare_numeric(value, target, |a, b| a > b)
@@ -353,6 +357,14 @@ impl AttributeFilter {
             AttributeFilter::LessThan(target) => {
                 // Flexible numeric comparison - handle all numeric type combinations
                 self.compare_numeric(value, target, |a, b| a < b)
+            }
+            AttributeFilter::GreaterThanOrEqual(target) => {
+                // Flexible numeric comparison - handle all numeric type combinations
+                self.compare_numeric(value, target, |a, b| a >= b)
+            }
+            AttributeFilter::LessThanOrEqual(target) => {
+                // Flexible numeric comparison - handle all numeric type combinations
+                self.compare_numeric(value, target, |a, b| a <= b)
             }
         }
     }
