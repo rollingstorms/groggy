@@ -779,7 +779,7 @@ def analyze_scaling_behavior(all_complexity_results):
         for result in scale_results['results']:
             operation = result['operation']
             op_type = result['type']
-            key = f"{library}_{op_type}_{operation}"
+            key = f"{library}/{op_type}/{operation}"
             
             if key not in scaling_data:
                 scaling_data[key] = []
@@ -818,7 +818,145 @@ def analyze_scaling_behavior(all_complexity_results):
                 
                 change_text = f"{smallest['per_item_time_ns']:.0f}→{largest['per_item_time_ns']:.0f}ns"
                 
-                print(f"{key.replace('_', '/'):<41} | {change_text:<12} | {behavior}")
+                print(f"{key:<41} | {change_text:<12} | {behavior}")
+
+
+def analyze_comprehensive_scaling_behavior(all_results_by_scale):
+    """Analyze how ALL operations scale across different dataset sizes"""
+    if len(all_results_by_scale) < 2:
+        return
+        
+    print("\n🎯 COMPREHENSIVE SCALING BEHAVIOR ANALYSIS")
+    print("=" * 80)
+    print("(Time should scale predictably based on algorithmic complexity)")
+    
+    # Define all operations we want to analyze
+    all_operations = [
+        # Core operations  
+        ('Graph Creation', 'creation_time', 'nodes', 'Graph setup time'),
+        ('Memory Usage (MB)', 'creation_memory', 'nodes', 'Memory per node'),
+        
+        # Phase 3.1: Advanced Filtering  
+        ('Filter Single Attr', 'filter_single', 'nodes', 'Node filtering'),
+        ('Filter Numeric Range', 'filter_numeric', 'nodes', 'Range queries'),
+        ('Filter Complex AND', 'filter_and', 'nodes', 'Complex filtering'),
+        ('Filter Complex OR', 'filter_or', 'nodes', 'Complex filtering'),
+        ('Filter NOT', 'filter_not', 'nodes', 'Negation queries'),
+        ('Filter Edges', 'filter_edges', 'edges', 'Edge filtering'),
+        
+        # Phase 3.2: Graph Traversal
+        ('BFS Traversal', 'bfs', 'nodes', 'Graph traversal'),
+        ('DFS Traversal', 'dfs', 'nodes', 'Graph traversal'),
+        ('BFS Filtered', 'bfs_filtered', 'nodes', 'Filtered traversal'),
+        ('Connected Components', 'components', 'nodes', 'Graph analysis'),
+        
+        # Phase 3.4: Aggregation & Analytics
+        ('Basic Statistics', 'basic_stats', 'nodes', 'Aggregation'),
+        ('Advanced Statistics', 'advanced_stats', 'nodes', 'Aggregation'),
+        ('Grouping Operations', 'grouping', 'nodes', 'Grouping'),
+    ]
+    
+    # Collect scaling data for all operations
+    scaling_results = {}
+    
+    # Get scale info 
+    scales = list(all_results_by_scale.keys())
+    # Sort by actual dataset size, not alphabetically
+    scale_order = {'Medium': 1, 'Large': 2}  # Define proper ordering
+    scales.sort(key=lambda x: scale_order.get(x, 0))
+    
+    if len(scales) < 2:
+        print("Need at least 2 scales for comparison")
+        return
+        
+    small_scale = scales[0]  # Should be "Medium" 
+    large_scale = scales[1]  # Should be "Large"
+    
+    # Get dataset sizes for per-item calculations
+    small_nodes = 50000   # Medium scale
+    large_nodes = 250000  # Large scale  
+    small_edges = 50000   # Medium scale
+    large_edges = 250000  # Large scale
+    
+    print(f"\nScaling Analysis: {small_scale} ({small_nodes:,} nodes) → {large_scale} ({large_nodes:,} nodes)")
+    print("Operation Category       | Library        | Small→Large Time | Per-Item Change | Scaling Quality")
+    print("-------------------------|----------------|------------------|-----------------|------------------")
+    
+    # Group operations by category
+    categories = {
+        'Core Operations': ['Graph Creation', 'Memory Usage (MB)'],
+        'Node Filtering': ['Filter Single Attr', 'Filter Numeric Range', 'Filter Complex AND', 'Filter Complex OR', 'Filter NOT'],
+        'Edge Operations': ['Filter Edges'],
+        'Graph Traversal': ['BFS Traversal', 'DFS Traversal', 'BFS Filtered', 'Connected Components'], 
+        'Analytics': ['Basic Statistics', 'Advanced Statistics', 'Grouping Operations']
+    }
+    
+    for category_name, category_ops in categories.items():
+        category_printed = False
+        
+        for op_name, op_key, scale_basis, description in all_operations:
+            if op_name not in category_ops:
+                continue
+                
+            # Check each library
+            for library in all_results_by_scale[small_scale]:
+                small_results = all_results_by_scale[small_scale][library]  # Medium scale results
+                large_results = all_results_by_scale[large_scale].get(library)  # Large scale results
+                
+                if not small_results or not large_results or op_key not in small_results or op_key not in large_results:
+                    continue
+                    
+                small_time = small_results[op_key]
+                large_time = large_results[op_key]
+                
+                if small_time <= 0 or large_time <= 0:
+                    continue
+                
+                # Calculate per-item metrics
+                if scale_basis == 'nodes':
+                    small_per_item = (small_time * 1_000_000_000) / small_nodes  # ns per node
+                    large_per_item = (large_time * 1_000_000_000) / large_nodes
+                else:  # edges
+                    small_per_item = (small_time * 1_000_000_000) / small_edges  # ns per edge  
+                    large_per_item = (large_time * 1_000_000_000) / large_edges
+                
+                # Determine scaling quality
+                if small_per_item > 0:
+                    scaling_ratio = large_per_item / small_per_item
+                    
+                    if op_key == 'creation_memory':  # Memory should scale linearly
+                        if scaling_ratio < 1.5:
+                            quality = "✅ Excellent Linear"
+                        elif scaling_ratio < 3.0:
+                            quality = "⚠️ Acceptable" 
+                        else:
+                            quality = "❌ Poor Scaling"
+                    else:  # Time-based metrics
+                        if scaling_ratio < 1.2:
+                            quality = "✅ Excellent O(n)"
+                        elif scaling_ratio < 2.0:
+                            quality = "⚠️ Good ~O(n log n)"  
+                        elif scaling_ratio < 5.0:
+                            quality = "❌ Fair ~O(n²)"
+                        else:
+                            quality = "💥 Poor >O(n²)"
+                    
+                    # Format display
+                    if not category_printed:
+                        print(f"{category_name:<25}| {'':15} | {'':16} | {'':15} | {'':16}")
+                        category_printed = True
+                        
+                    time_change = f"{small_time:.4f}→{large_time:.4f}s"
+                    per_item_change = f"{small_per_item:.0f}→{large_per_item:.0f}ns"
+                    
+                    # Truncate long library names
+                    lib_display = library[:14] if len(library) > 14 else library
+                    op_display = op_name[:24] if len(op_name) > 24 else op_name
+                    
+                    print(f"  {op_display:<23}| {lib_display:<15}| {time_change:<16} | {per_item_change:<15} | {quality}")
+        
+        if category_printed:
+            print()  # Add space between categories
 
 def main():
     print("=" * 80)
@@ -835,6 +973,9 @@ def main():
     
     # Store complexity results across scales
     all_complexity_results = []
+    
+    # Store ALL benchmark results across scales for comprehensive analysis
+    all_results_by_scale = {}
     
     for num_nodes, num_edges, scale_name in test_sizes:
         print(f"\n{'=' * 80}")
@@ -895,6 +1036,9 @@ def main():
                 'edges': num_edges,
                 'libraries': scale_complexity_results
             })
+        
+        # Store ALL results for comprehensive scaling analysis
+        all_results_by_scale[scale_name] = all_results
         
         # Performance comparison
         print(f"\n📈 PERFORMANCE COMPARISON ({num_nodes:,} nodes)")
@@ -1024,6 +1168,10 @@ def main():
                 })
         
         analyze_scaling_behavior(flat_results)
+    
+    # Perform comprehensive scaling analysis for ALL operations
+    if len(all_results_by_scale) >= 2:
+        analyze_comprehensive_scaling_behavior(all_results_by_scale)
 
 if __name__ == "__main__":
     main()

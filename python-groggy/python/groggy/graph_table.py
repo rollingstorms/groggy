@@ -48,8 +48,8 @@ class GraphTable:
     
     def _extract_value(self, value):
         """Extract the actual value from AttrValue objects."""
-        if hasattr(value, 'inner'):
-            return value.inner
+        if hasattr(value, 'value'):
+            return value.value
         else:
             return value
     

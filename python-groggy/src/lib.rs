@@ -1,7 +1,7 @@
 #![allow(non_local_definitions)] // Suppress PyO3 macro warnings
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySlice};
+use pyo3::types::PyDict;
 use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyNotImplementedError};
 // use std::collections::HashMap; // TODO: Remove if not needed
 
@@ -526,6 +526,7 @@ impl PySubgraph {
         self.get_node_attribute_column(py, key)
     }
     
+    /// Create GraphTable for DataFrame-like view of this subgraph
     /// Create GraphTable for DataFrame-like view of this subgraph
     /// TODO: Implement table integration after core refactor is complete
     fn table(&self, _py: Python) -> PyResult<PyObject> {
@@ -1282,6 +1283,62 @@ pub struct PyNodeAttributes {
     graph: *const RustGraph, // Pointer to avoid ownership issues
 }
 
+/// Python wrapper for accessing edge attributes as columns
+#[pyclass(name = "EdgeAttributes", unsendable)]
+pub struct PyEdgeAttributes {
+    graph: *const RustGraph, // Pointer to avoid ownership issues
+}
+
+/// Unified attributes accessor that provides both node and edge attributes
+#[pyclass(name = "Attributes", unsendable)]
+pub struct PyAttributes {
+    graph: *const RustGraph, // Pointer to avoid ownership issues
+}
+
+#[pymethods]
+impl PyAttributes {
+    /// Access node attributes - g.attributes.nodes["salary"] 
+    #[getter]
+    fn nodes(&self) -> PyNodeAttributes {
+        PyNodeAttributes {
+            graph: self.graph,
+        }
+    }
+    
+    /// Access edge attributes - g.attributes.edges["weight"]
+    #[getter] 
+    fn edges(&self) -> PyEdgeAttributes {
+        PyEdgeAttributes {
+            graph: self.graph,
+        }
+    }
+    
+    /// Legacy support: g.attributes["attr_name"] defaults to node attributes
+    fn __getitem__(&self, attr_name: &str) -> PyResult<Vec<PyObject>> {
+        let node_attrs = PyNodeAttributes { graph: self.graph };
+        node_attrs.__getitem__(attr_name)
+    }
+    
+    /// List available attribute names (both nodes and edges)
+    fn keys(&self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            let dict = PyDict::new(py);
+            
+            let node_attrs = PyNodeAttributes { graph: self.graph };
+            let edge_attrs = PyEdgeAttributes { graph: self.graph };
+            
+            dict.set_item("nodes", node_attrs.keys()?)?;
+            dict.set_item("edges", edge_attrs.keys()?)?;
+            
+            Ok(dict.to_object(py))
+        })
+    }
+    
+    fn __repr__(&self) -> String {
+        "Attributes(nodes=NodeAttributes(...), edges=EdgeAttributes(...))".to_string()
+    }
+}
+
 #[pymethods]
 impl PyNodeAttributes {
     /// Access attribute column by name - g.attributes["salary"]
@@ -1353,6 +1410,78 @@ impl PyNodeAttributes {
     
     fn __repr__(&self) -> String {
         format!("NodeAttributes(keys={:?})", self.keys().unwrap_or_default())
+    }
+}
+
+#[pymethods]
+impl PyEdgeAttributes {
+    /// Access edge attribute column by name - g.attributes.edges["weight"]
+    fn __getitem__(&self, attr_name: &str) -> PyResult<Vec<PyObject>> {
+        unsafe {
+            let graph = &*self.graph;
+            let edge_ids = graph.edge_ids();
+            
+            Python::with_gil(|py| {
+                let mut values = Vec::new();
+                
+                for edge_id in edge_ids {
+                    match graph.get_edge_attr(edge_id, &attr_name.to_string()) {
+                        Ok(Some(attr_value)) => {
+                            let py_value = match attr_value {
+                                RustAttrValue::Int(i) => i.to_object(py),
+                                RustAttrValue::Float(f) => f.to_object(py),
+                                RustAttrValue::Text(s) => s.to_object(py),
+                                RustAttrValue::Bool(b) => b.to_object(py),
+                                RustAttrValue::FloatVec(v) => v.to_object(py),
+                                RustAttrValue::CompactText(s) => s.as_str().to_object(py),
+                                RustAttrValue::SmallInt(i) => i.to_object(py),
+                                RustAttrValue::Bytes(b) => b.to_object(py),
+                                RustAttrValue::CompressedText(_) => "CompressedText".to_object(py),
+                                RustAttrValue::CompressedFloatVec(_) => "CompressedFloatVec".to_object(py),
+                            };
+                            values.push(py_value);
+                        },
+                        Ok(None) => {
+                            values.push(py.None());
+                        },
+                        Err(_) => {
+                            values.push(py.None());
+                        }
+                    }
+                }
+                
+                Ok(values)
+            })
+        }
+    }
+    
+    /// List available edge attribute names
+    fn keys(&self) -> PyResult<Vec<String>> {
+        unsafe {
+            let graph = &*self.graph;
+            let edge_ids = graph.edge_ids();
+            let mut attr_names = std::collections::HashSet::new();
+            
+            // Collect all unique attribute names across all edges
+            for edge_id in edge_ids {
+                if let Ok(attrs) = graph.get_edge_attrs(edge_id) {
+                    for (name, _) in attrs {
+                        attr_names.insert(name);
+                    }
+                }
+            }
+            
+            Ok(attr_names.into_iter().collect())
+        }
+    }
+    
+    /// Check if edge attribute exists
+    fn __contains__(&self, attr_name: &str) -> PyResult<bool> {
+        Ok(self.keys()?.contains(&attr_name.to_string()))
+    }
+    
+    fn __repr__(&self) -> String {
+        format!("EdgeAttributes(keys={:?})", self.keys().unwrap_or_default())
     }
 }
 
@@ -1485,7 +1614,7 @@ impl PyGraph {
     }
     
     #[pyo3(signature = (source, target, uid_key = None, **kwargs))]
-    fn add_edge(&mut self, py: Python, source: &PyAny, target: &PyAny, uid_key: Option<String>, kwargs: Option<&PyDict>) -> PyResult<EdgeId> {
+    fn add_edge(&mut self, _py: Python, source: &PyAny, target: &PyAny, uid_key: Option<String>, kwargs: Option<&PyDict>) -> PyResult<EdgeId> {
         // Try to extract as NodeId first (most common case)
         let source_id = if let Ok(node_id) = source.extract::<NodeId>() {
             node_id
@@ -2046,10 +2175,10 @@ impl PyGraph {
         PyGraph::create_edges_accessor_internal(graph_ref, py)
     }
     
-    /// Get node attributes as dictionary-like access (g.attributes property)
+    /// Get unified attributes accessor for both nodes and edges (g.attributes property)
     #[getter]
-    fn attributes(&self) -> PyNodeAttributes {
-        PyNodeAttributes {
+    fn attributes(&self) -> PyAttributes {
+        PyAttributes {
             graph: &self.inner as *const RustGraph,
         }
     }
@@ -2155,7 +2284,7 @@ impl PyGraph {
     }
     
     /// Advanced edge filtering - accepts EdgeFilter or string query
-    fn filter_edges(&mut self, py: Python, filter: &PyAny) -> PyResult<Vec<EdgeId>> {
+    fn filter_edges(mut self_: PyRefMut<Self>, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for EdgeFilter object first (most common case)
         let edge_filter = if let Ok(filter_obj) = filter.extract::<PyEdgeFilter>() {
             // Direct EdgeFilter object - fastest path
@@ -2172,8 +2301,31 @@ impl PyGraph {
             ));
         };
         
-        self.inner.find_edges(edge_filter)
-            .map_err(graph_error_to_py_err)
+        let filtered_edges = self_.inner.find_edges(edge_filter)
+            .map_err(graph_error_to_py_err)?;
+        
+        // Collect all endpoints of the filtered edges to create the node set
+        // 🚀 PERFORMANCE FIX: Use HashSet for O(1) contains/insert instead of O(n) Vec operations
+        let mut endpoint_nodes_set = std::collections::HashSet::new();
+        for &edge_id in &filtered_edges {
+            if let Ok((source, target)) = self_.inner.edge_endpoints(edge_id) {
+                endpoint_nodes_set.insert(source);  // O(1) hash insert
+                endpoint_nodes_set.insert(target);  // O(1) hash insert
+            }
+        }
+        
+        // Convert to Vec for compatibility
+        let endpoint_nodes: Vec<NodeId> = endpoint_nodes_set.into_iter().collect();
+        
+        // Get a reference to this graph to pass to the subgraph
+        let graph_ref = self_.into();
+        
+        Ok(PySubgraph::new(
+            endpoint_nodes,
+            filtered_edges,
+            "filtered_edges".to_string(),
+            Some(graph_ref),
+        ))
     }
     
     /// Phase 3.2: Graph traversal algorithms
@@ -2182,7 +2334,7 @@ impl PyGraph {
     
     /// Cleaner alias for traverse_bfs - shorter and more intuitive
     #[pyo3(signature = (start_node, max_depth = None, node_filter = None, edge_filter = None, inplace = false, attr_name = None))]
-    fn bfs(&mut self, py: Python, start_node: NodeId, max_depth: Option<usize>, 
+    fn bfs(&mut self, _py: Python, start_node: NodeId, max_depth: Option<usize>, 
            node_filter: Option<&PyNodeFilter>, edge_filter: Option<&PyEdgeFilter>,
            inplace: Option<bool>, attr_name: Option<String>) -> PyResult<PySubgraph> {
         let inplace = inplace.unwrap_or(false);
@@ -2225,7 +2377,7 @@ impl PyGraph {
     
     /// Cleaner alias for traverse_dfs - shorter and more intuitive  
     #[pyo3(signature = (start_node, max_depth = None, node_filter = None, edge_filter = None, inplace = false, node_attr = None, edge_attr = None))]
-    fn dfs(&mut self, py: Python, start_node: NodeId, max_depth: Option<usize>,
+    fn dfs(&mut self, _py: Python, start_node: NodeId, max_depth: Option<usize>,
            node_filter: Option<&PyNodeFilter>, edge_filter: Option<&PyEdgeFilter>,
            inplace: Option<bool>, node_attr: Option<String>, edge_attr: Option<String>) -> PyResult<PySubgraph> {
         let inplace = inplace.unwrap_or(false);
@@ -2322,7 +2474,7 @@ impl PyGraph {
     
     /// Find connected components with optional in-place attribute setting
     #[pyo3(signature = (inplace = false, attr_name = None))]
-    fn connected_components(&mut self, py: Python, inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Vec<PySubgraph>> {
+    fn connected_components(&mut self, _py: Python, inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Vec<PySubgraph>> {
         let inplace = inplace.unwrap_or(false);
         
         let options = groggy::core::traversal::TraversalOptions::default();
@@ -2573,7 +2725,7 @@ impl PyGraph {
     /// Returns a GraphTable object with all nodes and their attributes
     /// TODO: Implement table integration after core refactor is complete
     fn table(&self, _py: Python) -> PyResult<PyObject> {
-        Err(PyErr::new::<PyNotImplementedError, _>(
+        Err(PyErr::new::<PyRuntimeError, _>(
             "table() method temporarily disabled during architecture refactor"
         ))
     }
@@ -2663,10 +2815,12 @@ impl PyNodesAccessor {
             }
             
             // Calculate induced edges between these nodes
+            // 🚀 PERFORMANCE FIX: Use HashSet for O(1) contains instead of O(n) Vec operations
+            let node_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
             let mut induced_edges = Vec::new();
             for edge_id in graph.edge_ids() {
                 if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
-                    if node_ids.contains(&source) && node_ids.contains(&target) {
+                    if node_set.contains(&source) && node_set.contains(&target) {  // O(1) hash lookup
                         induced_edges.push(edge_id);
                     }
                 }
@@ -2703,10 +2857,12 @@ impl PyNodesAccessor {
             }
             
             // Calculate induced edges between selected nodes
+            // 🚀 PERFORMANCE FIX: Use HashSet for O(1) contains instead of O(n) Vec operations  
+            let selected_node_set: std::collections::HashSet<NodeId> = selected_nodes.iter().copied().collect();
             let mut induced_edges = Vec::new();
             for edge_id in graph.edge_ids() {
                 if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
-                    if selected_nodes.contains(&source) && selected_nodes.contains(&target) {
+                    if selected_node_set.contains(&source) && selected_node_set.contains(&target) {  // O(1) hash lookup
                         induced_edges.push(edge_id);
                     }
                 }
@@ -2798,17 +2954,17 @@ impl PyEdgesAccessor {
             }
             
             // Collect all endpoints of selected edges
-            let mut endpoint_nodes = Vec::new();
+            // 🚀 PERFORMANCE FIX: Use HashSet for O(1) contains/insert instead of O(n) Vec operations
+            let mut endpoint_nodes_set = std::collections::HashSet::new();
             for &edge_id in &edge_ids {
                 if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
-                    if !endpoint_nodes.contains(&source) {
-                        endpoint_nodes.push(source);
-                    }
-                    if !endpoint_nodes.contains(&target) {
-                        endpoint_nodes.push(target);
-                    }
+                    endpoint_nodes_set.insert(source);  // O(1) hash insert
+                    endpoint_nodes_set.insert(target);  // O(1) hash insert
                 }
             }
+            
+            // Convert to Vec for compatibility
+            let endpoint_nodes: Vec<NodeId> = endpoint_nodes_set.into_iter().collect();
             
             // Create and return Subgraph
             let subgraph = PySubgraph::new(
@@ -2841,17 +2997,17 @@ impl PyEdgesAccessor {
             }
             
             // Collect all endpoints of selected edges
-            let mut endpoint_nodes = Vec::new();
+            // 🚀 PERFORMANCE FIX: Use HashSet for O(1) contains/insert instead of O(n) Vec operations
+            let mut endpoint_nodes_set = std::collections::HashSet::new();
             for &edge_id in &selected_edges {
                 if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
-                    if !endpoint_nodes.contains(&source) {
-                        endpoint_nodes.push(source);
-                    }
-                    if !endpoint_nodes.contains(&target) {
-                        endpoint_nodes.push(target);
-                    }
+                    endpoint_nodes_set.insert(source);  // O(1) hash insert
+                    endpoint_nodes_set.insert(target);  // O(1) hash insert
                 }
             }
+            
+            // Convert to Vec for compatibility
+            let endpoint_nodes: Vec<NodeId> = endpoint_nodes_set.into_iter().collect();
             
             // Create and return Subgraph
             let subgraph = PySubgraph::new(
