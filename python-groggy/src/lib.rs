@@ -70,6 +70,23 @@ fn python_value_to_attr_value(value: &PyAny) -> PyResult<RustAttrValue> {
     }
 }
 
+/// Convert Rust AttrValue to Python object
+fn attr_value_to_python_value(py: Python, attr_value: &RustAttrValue) -> PyResult<PyObject> {
+    let py_value = match attr_value {
+        RustAttrValue::Int(i) => i.to_object(py),
+        RustAttrValue::Float(f) => f.to_object(py),
+        RustAttrValue::Text(s) => s.to_object(py),
+        RustAttrValue::Bool(b) => b.to_object(py),
+        RustAttrValue::FloatVec(vec) => vec.to_object(py),
+        RustAttrValue::Bytes(bytes) => bytes.to_object(py),
+        RustAttrValue::CompactText(compact_str) => compact_str.as_str().to_object(py),
+        RustAttrValue::SmallInt(i) => i.to_object(py),
+        RustAttrValue::CompressedText(_) => "compressed_text".to_object(py), // Placeholder
+        RustAttrValue::CompressedFloatVec(_) => vec!["compressed_floats"].to_object(py), // Placeholder
+    };
+    Ok(py_value)
+}
+
 /// Convert Rust GraphError to Python exception
 fn graph_error_to_py_err(error: GraphError) -> PyErr {
     match error {
@@ -362,9 +379,9 @@ impl PySubgraph {
             let mut values = Vec::new();
             
             for &node_id in &self.nodes {
-                if let Ok(Some(attr_value)) = graph.get_node_attribute(node_id, attr_name) {
+                if let Ok(Some(attr_value)) = graph.inner.get_node_attr(node_id, &attr_name.to_string()) {
                     // Convert AttrValue to Python object
-                    let py_value = attr_value_to_python_value(py, &attr_value.inner)?;
+                    let py_value = attr_value_to_python_value(py, &attr_value)?;
                     values.push(py_value);
                 } else {
                     // Handle missing attributes - use None
@@ -387,9 +404,9 @@ impl PySubgraph {
             let mut values = Vec::new();
             
             for &edge_id in &self.edges {
-                if let Ok(Some(attr_value)) = graph.get_edge_attribute(edge_id, attr_name) {
+                if let Ok(Some(attr_value)) = graph.inner.get_edge_attr(edge_id, &attr_name.to_string()) {
                     // Convert AttrValue to Python object
-                    let py_value = attr_value_to_python_value(py, &attr_value.inner)?;
+                    let py_value = attr_value_to_python_value(py, &attr_value)?;
                     values.push(py_value);
                 } else {
                     // Handle missing attributes - use None
@@ -430,9 +447,9 @@ impl PySubgraph {
                                 let attr_name = parts[0].trim_matches('"').trim_matches('\'');
                                 let attr_value = parts[1].trim_matches('"').trim_matches('\'');
                                 
-                                if let Ok(Some(node_attr)) = graph.get_node_attribute(node_id, attr_name) {
+                                if let Ok(Some(node_attr)) = graph.inner.get_node_attr(node_id, &attr_name.to_string()) {
                                     // Simple string comparison
-                                    if let RustAttrValue::Text(text_val) = &node_attr.inner {
+                                    if let RustAttrValue::Text(text_val) = &node_attr {
                                         return text_val == attr_value;
                                     }
                                 }
@@ -768,6 +785,21 @@ impl PyAttributeFilter {
     #[staticmethod]
     fn less_than(value: &PyAttrValue) -> Self {
         Self { inner: AttributeFilter::LessThan(value.inner.clone()) }
+    }
+    
+    #[staticmethod]
+    fn not_equals(value: &PyAttrValue) -> Self {
+        Self { inner: AttributeFilter::NotEquals(value.inner.clone()) }
+    }
+    
+    #[staticmethod]
+    fn greater_than_or_equal(value: &PyAttrValue) -> Self {
+        Self { inner: AttributeFilter::GreaterThanOrEqual(value.inner.clone()) }
+    }
+    
+    #[staticmethod]
+    fn less_than_or_equal(value: &PyAttrValue) -> Self {
+        Self { inner: AttributeFilter::LessThanOrEqual(value.inner.clone()) }
     }
 }
 
@@ -2651,6 +2683,38 @@ impl PyEdgesAccessor {
         let count = graph.edge_count();
         Ok(format!("EdgesAccessor({} edges)", count))
     }
+    
+    /// Get all source node IDs as a list
+    #[getter]
+    fn source(&self, py: Python) -> PyResult<Vec<NodeId>> {
+        let graph = self.graph.borrow(py);
+        let edge_ids = graph.edge_ids();
+        let mut sources = Vec::new();
+        
+        for edge_id in edge_ids {
+            if let Ok((source, _)) = graph.inner.edge_endpoints(edge_id) {
+                sources.push(source);
+            }
+        }
+        
+        Ok(sources)
+    }
+    
+    /// Get all target node IDs as a list
+    #[getter]
+    fn target(&self, py: Python) -> PyResult<Vec<NodeId>> {
+        let graph = self.graph.borrow(py);
+        let edge_ids = graph.edge_ids();
+        let mut targets = Vec::new();
+        
+        for edge_id in edge_ids {
+            if let Ok((_, target)) = graph.inner.edge_endpoints(edge_id) {
+                targets.push(target);
+            }
+        }
+        
+        Ok(targets)
+    }
 }
 
 /// Fluent view for a single node with chainable attribute updates
@@ -2729,14 +2793,59 @@ impl PyNodeView {
         graph.set_node_attribute(self.node_id, attr_name, &py_attr_value)
     }
     
-    /// String representation
+    /// String representation with all attributes
     fn __str__(&self, py: Python) -> PyResult<String> {
-        Ok(format!("NodeView(id={})", self.node_id))
+        let graph = self.graph.borrow(py);
+        
+        // Get all attributes for this node
+        let mut attr_parts = Vec::new();
+        
+        // Try to get common attributes and add them to display
+        if let Ok(Some(attr)) = graph.inner.get_node_attr(self.node_id, &"name".to_string()) {
+            if let Ok(py_val) = attr_value_to_python_value(py, &attr) {
+                if let Ok(name_str) = py_val.extract::<String>(py) {
+                    attr_parts.push(format!("name={}", name_str));
+                }
+            }
+        }
+        
+        if let Ok(Some(attr)) = graph.inner.get_node_attr(self.node_id, &"age".to_string()) {
+            if let Ok(py_val) = attr_value_to_python_value(py, &attr) {
+                if let Ok(age_val) = py_val.extract::<i64>(py) {
+                    attr_parts.push(format!("age={}", age_val));
+                }
+            }
+        }
+        
+        if let Ok(Some(attr)) = graph.inner.get_node_attr(self.node_id, &"dept".to_string()) {
+            if let Ok(py_val) = attr_value_to_python_value(py, &attr) {
+                if let Ok(dept_str) = py_val.extract::<String>(py) {
+                    attr_parts.push(format!("dept={}", dept_str));
+                }
+            }
+        }
+        
+        // Add more attributes if found (limit to first few for readability)
+        let attr_display = if attr_parts.is_empty() {
+            String::new()
+        } else if attr_parts.len() <= 3 {
+            format!(", {}", attr_parts.join(", "))
+        } else {
+            format!(", {}, ...", attr_parts[..3].join(", "))
+        };
+        
+        Ok(format!("NodeView(id={}{})", self.node_id, attr_display))
     }
     
     /// Repr
     fn __repr__(&self, py: Python) -> PyResult<String> {
         self.__str__(py)
+    }
+    
+    /// Get the node ID
+    #[getter]
+    fn id(&self) -> NodeId {
+        self.node_id
     }
 }
 
@@ -2815,14 +2924,92 @@ impl PyEdgeView {
         graph.set_edge_attribute(self.edge_id, attr_name, &py_attr_value)
     }
     
-    /// String representation
+    /// String representation with source, target, and attributes
     fn __str__(&self, py: Python) -> PyResult<String> {
-        Ok(format!("EdgeView(id={})", self.edge_id))
+        let graph = self.graph.borrow(py);
+        
+        // Get source and target
+        let (source, target) = graph.inner.edge_endpoints(self.edge_id)
+            .map_err(graph_error_to_py_err)?;
+        
+        // Get attributes
+        let mut attr_parts = Vec::new();
+        
+        // Try to get common edge attributes
+        if let Ok(Some(attr)) = graph.inner.get_edge_attr(self.edge_id, &"weight".to_string()) {
+            if let Ok(py_val) = attr_value_to_python_value(py, &attr) {
+                if let Ok(weight_val) = py_val.extract::<f64>(py) {
+                    attr_parts.push(format!("weight={:.2}", weight_val));
+                } else if let Ok(weight_val) = py_val.extract::<f32>(py) {
+                    attr_parts.push(format!("weight={:.2}", weight_val));
+                }
+            }
+        }
+        
+        if let Ok(Some(attr)) = graph.inner.get_edge_attr(self.edge_id, &"type".to_string()) {
+            if let Ok(py_val) = attr_value_to_python_value(py, &attr) {
+                if let Ok(type_str) = py_val.extract::<String>(py) {
+                    attr_parts.push(format!("type={}", type_str));
+                }
+            }
+        }
+        
+        if let Ok(Some(attr)) = graph.inner.get_edge_attr(self.edge_id, &"relationship".to_string()) {
+            if let Ok(py_val) = attr_value_to_python_value(py, &attr) {
+                if let Ok(rel_str) = py_val.extract::<String>(py) {
+                    attr_parts.push(format!("relationship={}", rel_str));
+                }
+            }
+        }
+        
+        // Format the attribute display
+        let attr_display = if attr_parts.is_empty() {
+            String::new()
+        } else if attr_parts.len() <= 3 {
+            format!(", {}", attr_parts.join(", "))
+        } else {
+            format!(", {}, ...", attr_parts[..3].join(", "))
+        };
+        
+        Ok(format!("EdgeView(id={}, source={}, target={}{})", 
+                  self.edge_id, source, target, attr_display))
     }
     
     /// Repr
     fn __repr__(&self, py: Python) -> PyResult<String> {
         self.__str__(py)
+    }
+    
+    /// Get the edge ID
+    #[getter]
+    fn id(&self) -> EdgeId {
+        self.edge_id
+    }
+    
+    /// Get the source node ID
+    #[getter]
+    fn source(&self, py: Python) -> PyResult<NodeId> {
+        let graph = self.graph.borrow(py);
+        let (source, _) = graph.inner.edge_endpoints(self.edge_id)
+            .map_err(graph_error_to_py_err)?;
+        Ok(source)
+    }
+    
+    /// Get the target node ID
+    #[getter]
+    fn target(&self, py: Python) -> PyResult<NodeId> {
+        let graph = self.graph.borrow(py);
+        let (_, target) = graph.inner.edge_endpoints(self.edge_id)
+            .map_err(graph_error_to_py_err)?;
+        Ok(target)
+    }
+    
+    /// Get both endpoints as a tuple (source, target)
+    #[getter]
+    fn endpoints(&self, py: Python) -> PyResult<(NodeId, NodeId)> {
+        let graph = self.graph.borrow(py);
+        graph.inner.edge_endpoints(self.edge_id)
+            .map_err(graph_error_to_py_err)
     }
 }
 

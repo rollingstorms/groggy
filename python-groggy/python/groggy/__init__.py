@@ -32,6 +32,11 @@ from .errors import (
     NotImplementedError
 )
 from .query_parser import parse_node_query, parse_edge_query
+from . import generators
+from . import networkx_compat
+from .enhanced_query import enhanced_filter_nodes, enhanced_filter_edges
+from .graph_table import GraphTable
+from . import table_extensions
 
 __version__ = "0.1.0"
 __all__ = [
@@ -61,4 +66,13 @@ __all__ = [
     "BranchInfo", 
     "HistoryStatistics",
     "HistoricalView",
+    # Graph generators
+    "generators",
+    # NetworkX interoperability
+    "networkx_compat",
+    # Enhanced query functions
+    "enhanced_filter_nodes",
+    "enhanced_filter_edges",
+    # Graph table functionality
+    "GraphTable",
 ]

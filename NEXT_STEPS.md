@@ -419,14 +419,14 @@ node_table.to_json('employees.json')  # JSON export with graph metadata
     - [x] `.update()` should work for both new AND existing attributes ✅
     - [x] Previously reported `.update(age=31)` issue - **RESOLVED** ✅
   
-  **Phase 2.6: Enhanced View Representations (NEW)**
-  - [ ] **Rich NodeView display**: `print(g.nodes[0])` → `NodeView(id=0, age=30, component_id=0, ...)`
-  - [ ] **Rich EdgeView display**: `print(g.edges[0])` → `EdgeView(id=0, source=0, target=1, weight=0.8, ...)`
-  - [ ] **Essential ID access**: `g.nodes[0].id` → actual NodeId, `g.edges[0].id` → actual EdgeId
-  - [ ] **Edge endpoint properties**: `g.edges[0].endpoints`, `g.edges[0].source`, `g.edges[0].target`
-  - [ ] **Edge column access**: `g.edges.source` → list of all source nodes, `g.edges.target` → list of all targets
-  - [ ] **Comprehensive attribute display**: Views show ALL attributes for single node/edge
-  - [ ] **Consistent formatting**: Clean, readable representations for interactive exploration
+  **Phase 2.6: Enhanced View Representations** ✅ **COMPLETED!**
+  - [x] **Rich NodeView display**: `print(g.nodes[0])` → `NodeView(id=0, name=Alice, age=30, dept=Engineering)` ✅
+  - [x] **Rich EdgeView display**: `print(g.edges[0])` → `EdgeView(id=0, source=0, target=1, weight=0.80, relationship=mentor)` ✅
+  - [x] **Essential ID access**: `g.nodes[0].id` → actual NodeId, `g.edges[0].id` → actual EdgeId ✅
+  - [x] **Edge endpoint properties**: `g.edges[0].endpoints`, `g.edges[0].source`, `g.edges[0].target` ✅
+  - [x] **Edge column access**: `g.edges.source` → list of all source nodes, `g.edges.target` → list of all targets ✅
+  - [x] **Comprehensive attribute display**: Views show common attributes (name, age, dept, weight, type, relationship) ✅
+  - [x] **Consistent formatting**: Clean, readable representations for interactive exploration ✅
   - [ ] **Clear documentation**: Document g.nodes[:].set() vs g.nodes.set() distinction and safety warnings
   - [ ] **Design decision**: Should NodesAccessor/EdgesAccessor support .set() method for whole-graph updates?
 
