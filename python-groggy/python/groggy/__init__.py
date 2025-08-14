@@ -33,6 +33,19 @@ from .errors import (
 )
 from .query_parser import parse_node_query, parse_edge_query
 from . import generators
+from .generators import (
+    complete_graph,
+    erdos_renyi,
+    barabasi_albert,
+    watts_strogatz,
+    cycle_graph,
+    path_graph,
+    star_graph,
+    grid_graph,
+    tree,
+    karate_club,
+    social_network,
+)
 from . import networkx_compat
 from .enhanced_query import enhanced_filter_nodes, enhanced_filter_edges
 from .graph_table import GraphTable
@@ -68,6 +81,17 @@ __all__ = [
     "HistoricalView",
     # Graph generators
     "generators",
+    "complete_graph",
+    "erdos_renyi",
+    "barabasi_albert", 
+    "watts_strogatz",
+    "cycle_graph",
+    "path_graph",
+    "star_graph",
+    "grid_graph",
+    "tree",
+    "karate_club",
+    "social_network",
     # NetworkX interoperability
     "networkx_compat",
     # Enhanced query functions

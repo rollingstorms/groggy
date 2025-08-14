@@ -1,7 +1,7 @@
 #![allow(non_local_definitions)] // Suppress PyO3 macro warnings
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PySlice};
 use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyNotImplementedError};
 // use std::collections::HashMap; // TODO: Remove if not needed
 
@@ -15,10 +15,13 @@ use groggy::{
     GraphError,
     StateId,
     // Phase 3 imports - use explicit paths  
-    core::query::{
-        NodeFilter,
-        EdgeFilter,  
-        AttributeFilter,
+    core::{
+        subgraph::Subgraph as RustSubgraph,
+        query::{
+            NodeFilter,
+            EdgeFilter,
+            AttributeFilter,
+        },
     },
     // Version control imports
     core::history::{
@@ -125,15 +128,43 @@ pub struct PyResultHandle {
 }
 
 /// Subgraph - represents a filtered view of the main graph with same interface
-#[pyclass(name = "Subgraph")]
+#[pyclass(name = "Subgraph", unsendable)]
 pub struct PySubgraph {
-    // Node and edge data
+    // Use the core Rust Subgraph with proper Rc<RefCell<Graph>> architecture
+    inner: Option<RustSubgraph>,
+    // Fallback data for legacy compatibility (when inner is None)
     nodes: Vec<NodeId>,
-    edges: Vec<EdgeId>, // Induced edges between subgraph nodes
-    // Metadata
-    subgraph_type: String, // "filtered_nodes", "traversal", "component", etc.
-    // Optional graph reference for batch operations (when created from PyNodesAccessor/PyEdgesAccessor)
+    edges: Vec<EdgeId>,
+    subgraph_type: String,
     graph: Option<Py<PyGraph>>,
+}
+
+impl PySubgraph {
+    /// Create a PySubgraph from a core RustSubgraph (with proper graph reference)
+    pub fn from_core_subgraph(subgraph: RustSubgraph) -> Self {
+        let nodes = subgraph.node_ids();
+        let edges = subgraph.edge_ids();
+        let subgraph_type = subgraph.subgraph_type().to_string();
+        
+        PySubgraph {
+            inner: Some(subgraph),
+            nodes,
+            edges,
+            subgraph_type,
+            graph: None, // Not needed when we have inner
+        }
+    }
+    
+    /// Standard PySubgraph constructor
+    pub fn new(nodes: Vec<NodeId>, edges: Vec<EdgeId>, subgraph_type: String, graph: Option<Py<PyGraph>>) -> Self {
+        PySubgraph {
+            inner: None,
+            nodes,
+            edges,
+            subgraph_type,
+            graph,
+        }
+    }
 }
 
 #[pymethods]
@@ -242,16 +273,30 @@ impl PyResultHandle {
 
 #[pymethods]
 impl PySubgraph {
-    /// Get nodes as a property (like g.nodes)
+    /// Get nodes as a property that supports indexing and attribute access
     #[getter]
-    fn nodes(&self) -> Vec<NodeId> {
-        self.nodes.clone()
+    fn nodes(self_: PyRef<Self>, py: Python) -> PyResult<Py<PyNodesAccessor>> {
+        if let Some(graph_ref) = &self_.graph {
+            Py::new(py, PyNodesAccessor {
+                graph: graph_ref.clone(),
+                constrained_nodes: Some(self_.nodes.clone()),
+            })
+        } else {
+            Err(PyRuntimeError::new_err("No graph reference available"))
+        }
     }
     
-    /// Get edges as a property (like g.edges)
+    /// Get edges as a property that supports indexing and attribute access
     #[getter] 
-    fn edges(&self) -> Vec<EdgeId> {
-        self.edges.clone()
+    fn edges(self_: PyRef<Self>, py: Python) -> PyResult<Py<PyEdgesAccessor>> {
+        if let Some(graph_ref) = &self_.graph {
+            Py::new(py, PyEdgesAccessor {
+                graph: graph_ref.clone(),
+                constrained_edges: Some(self_.edges.clone()),
+            })
+        } else {
+            Err(PyRuntimeError::new_err("No graph reference available"))
+        }
     }
     
     /// Python len() support - returns number of nodes
@@ -289,29 +334,68 @@ impl PySubgraph {
     /// Filter edges within this subgraph (chainable)
     fn filter_edges(&self, _py: Python, _filter: &PyAny) -> PyResult<PySubgraph> {
         // Placeholder implementation
-        Ok(PySubgraph {
-            nodes: self.nodes.clone(),
-            edges: self.edges.clone(),
-            subgraph_type: format!("{}_edge_filtered", self.subgraph_type),
-            graph: self.graph.clone(),
-        })
+        Ok(PySubgraph::new(
+            self.nodes.clone(),
+            self.edges.clone(),
+            format!("{}_edge_filtered", self.subgraph_type),
+            self.graph.clone(),
+        ))
     }
     
     /// Connected components within this subgraph
     fn connected_components(&self) -> PyResult<Vec<PySubgraph>> {
-        // Placeholder - return single component for now
-        Ok(vec![PySubgraph {
-            nodes: self.nodes.clone(),
-            edges: self.edges.clone(),
-            subgraph_type: "component".to_string(),
-            graph: self.graph.clone(),
-        }])
+        // Use inner subgraph if available
+        if let Some(ref inner_subgraph) = self.inner {
+            let components = inner_subgraph.connected_components()
+                .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("Failed to get connected components: {}", e)))?;
+            
+            let mut result = Vec::new();
+            for component in components {
+                result.push(PySubgraph::from_core_subgraph(component));
+            }
+            Ok(result)
+        } else {
+            // Fallback - return single component for now
+            Ok(vec![PySubgraph::new(
+                self.nodes.clone(),
+                self.edges.clone(),
+                "component".to_string(),
+                self.graph.clone(),
+            )])
+        }
     }
     
     /// Set attributes on all nodes in this subgraph (batch operation)
     #[pyo3(signature = (**kwargs))]
     fn set(&mut self, py: Python, kwargs: Option<&PyDict>) -> PyResult<Py<PySubgraph>> {
-        if let Some(graph_ref) = &self.graph {
+        // Use inner Subgraph if available (preferred path)
+        if let Some(ref inner_subgraph) = self.inner {
+            if let Some(kwargs) = kwargs {
+                for (key, value) in kwargs.iter() {
+                    let attr_name: String = key.extract()?;
+                    let attr_value = python_value_to_attr_value(value)?;
+                    
+                    // Use the core Subgraph's bulk set method
+                    inner_subgraph.set_node_attribute_bulk(&attr_name, attr_value)
+                        .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("Failed to set attribute: {}", e)))?;
+                }
+            }
+            
+            // Return self for chaining  
+            let new_subgraph = if let Some(ref inner) = self.inner {
+                PySubgraph::from_core_subgraph(inner.clone())
+            } else {
+                PySubgraph::new(
+                    self.nodes.clone(),
+                    self.edges.clone(), 
+                    self.subgraph_type.clone(),
+                    self.graph.clone(),
+                )
+            };
+            Ok(Py::new(py, new_subgraph)?)
+        }
+        // Fallback to legacy implementation
+        else if let Some(graph_ref) = &self.graph {
             if let Some(kwargs) = kwargs {
                 let mut graph = graph_ref.borrow_mut(py);
                 
@@ -328,12 +412,12 @@ impl PySubgraph {
             }
             
             // Return self for chaining
-            Ok(Py::new(py, PySubgraph {
-                nodes: self.nodes.clone(),
-                edges: self.edges.clone(),
-                subgraph_type: self.subgraph_type.clone(),
-                graph: self.graph.clone(),
-            })?)
+            Ok(Py::new(py, PySubgraph::new(
+                self.nodes.clone(),
+                self.edges.clone(),
+                self.subgraph_type.clone(),
+                self.graph.clone(),
+            ))?)
         } else {
             Err(PyErr::new::<PyRuntimeError, _>(
                 "Cannot set attributes on subgraph without graph reference. Use graph.filter_nodes() or similar methods."
@@ -358,12 +442,12 @@ impl PySubgraph {
             }
             
             // Return self for chaining
-            Ok(Py::new(py, PySubgraph {
-                nodes: self.nodes.clone(),
-                edges: self.edges.clone(),
-                subgraph_type: self.subgraph_type.clone(),
-                graph: self.graph.clone(),
-            })?)
+            Ok(Py::new(py, PySubgraph::new(
+                self.nodes.clone(),
+                self.edges.clone(),
+                self.subgraph_type.clone(),
+                self.graph.clone(),
+            ))?)
         } else {
             Err(PyErr::new::<PyRuntimeError, _>(
                 "Cannot update attributes on subgraph without graph reference. Use graph.filter_nodes() or similar methods."
@@ -374,7 +458,22 @@ impl PySubgraph {
     /// Column access: get all values for a node attribute within this subgraph
     /// This enables: subgraph['component_id'] -> [val1, val2, val3]
     fn get_node_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<Vec<PyObject>> {
-        if let Some(graph_ref) = &self.graph {
+        // Use inner Subgraph if available (preferred path)
+        if let Some(ref inner_subgraph) = self.inner {
+            let attr_values = inner_subgraph.get_node_attribute_column(&attr_name.to_string())
+                .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("Failed to get attribute column: {}", e)))?;
+            
+            // Convert AttrValue vector to Python objects
+            let mut py_values = Vec::new();
+            for attr_value in attr_values {
+                let py_value = attr_value_to_python_value(py, &attr_value)?;
+                py_values.push(py_value);
+            }
+            
+            Ok(py_values)
+        }
+        // Fallback to legacy implementation
+        else if let Some(graph_ref) = &self.graph {
             let graph = graph_ref.borrow(py);
             let mut values = Vec::new();
             
@@ -427,6 +526,14 @@ impl PySubgraph {
         self.get_node_attribute_column(py, key)
     }
     
+    /// Create GraphTable for DataFrame-like view of this subgraph
+    /// TODO: Implement table integration after core refactor is complete
+    fn table(&self, _py: Python) -> PyResult<PyObject> {
+        Err(PyErr::new::<PyNotImplementedError, _>(
+            "table() method temporarily disabled during architecture refactor"
+        ))
+    }
+    
     /// Enhanced filter_nodes method using the existing graph's filter capabilities
     /// This enables chaining: subgraph.filter_nodes('age > 30').filter_nodes('dept == "Engineering"')
     fn filter_nodes(&self, py: Python, filter_obj: &PyAny) -> PyResult<PySubgraph> {
@@ -472,12 +579,12 @@ impl PySubgraph {
                     .copied()
                     .collect();
                 
-                Ok(PySubgraph {
-                    nodes: filtered_nodes,
-                    edges: filtered_edges,
-                    subgraph_type: format!("{}_filtered", self.subgraph_type),
-                    graph: self.graph.clone(),
-                })
+                Ok(PySubgraph::new(
+                    filtered_nodes,
+                    filtered_edges,
+                    format!("{}_filtered", self.subgraph_type),
+                    self.graph.clone(),
+                ))
             } else {
                 Err(PyErr::new::<PyValueError, _>(
                     "Filter must be a string. Example: subgraph.filter_nodes('dept == \"Engineering\"')"
@@ -1428,8 +1535,31 @@ impl PyGraph {
         Ok(edge_id)
     }
     
-    #[pyo3(signature = (edges, node_mapping = None))]
-    fn add_edges(&mut self, edges: &PyAny, node_mapping: Option<std::collections::HashMap<String, NodeId>>) -> PyResult<Vec<EdgeId>> {
+    #[pyo3(signature = (edges, node_mapping = None, uid_key = None))]
+    fn add_edges(&mut self, edges: &PyAny, node_mapping: Option<std::collections::HashMap<String, NodeId>>, uid_key: Option<String>) -> PyResult<Vec<EdgeId>> {
+        // If uid_key is provided but no node_mapping, generate it automatically  
+        let resolved_node_mapping = if uid_key.is_some() && node_mapping.is_none() {
+            if let Some(ref key) = uid_key {
+                Python::with_gil(|py| -> PyResult<std::collections::HashMap<String, NodeId>> {
+                    let mapping_obj = self.get_node_mapping(key.clone())?;
+                    let mapping_dict: &PyDict = mapping_obj.downcast(py)?;
+                    
+                    let mut string_mapping = std::collections::HashMap::new();
+                    for (k, v) in mapping_dict.iter() {
+                        let key_str: String = k.extract()?;
+                        let node_id: NodeId = v.extract()?;
+                        string_mapping.insert(key_str, node_id);
+                    }
+                    Ok(string_mapping)
+                })?
+            } else {
+                std::collections::HashMap::new()
+            }
+        } else {
+            node_mapping.unwrap_or_default()
+        };
+        let final_mapping = if resolved_node_mapping.is_empty() { None } else { Some(resolved_node_mapping) };
+        
         // Fast path optimization: Check for simple tuple list first (most common case)
         if let Ok(edge_pairs) = edges.extract::<Vec<(NodeId, NodeId)>>() {
             // Format 1: List of (source, target) tuples - fastest path
@@ -1464,7 +1594,7 @@ impl PyGraph {
         }
         // Format 3: List of dictionaries with node_mapping 
         else if let Ok(edge_dicts) = edges.extract::<Vec<&PyDict>>() {
-            if let Some(mapping) = node_mapping {
+            if let Some(mapping) = final_mapping {
                 // Use the existing add_edges_from_dicts logic
                 let mut edge_ids = Vec::new();
                 
@@ -1927,7 +2057,7 @@ impl PyGraph {
     // === PHASE 3 QUERYING METHODS ===
     
     /// Phase 3.1: Advanced filtering - accepts NodeFilter or string query
-    fn filter_nodes(&mut self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+    fn filter_nodes(mut self_: PyRefMut<Self>, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for NodeFilter object first (most common case)
         let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
             // Direct NodeFilter object - fastest path
@@ -1944,27 +2074,38 @@ impl PyGraph {
             ));
         };
         
-        let filtered_nodes = self.inner.find_nodes(node_filter)
+        let filtered_nodes = self_.inner.find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
         
-        // Calculate induced edges (edges between the filtered nodes)
-        let all_edges = self.inner.edge_ids();
+        // O(k) Calculate induced edges using optimized core subgraph method
+        use std::collections::HashSet;
+        let node_set: HashSet<NodeId> = filtered_nodes.iter().copied().collect();
+        
+        // Get columnar topology vectors (edge_ids, sources, targets) - O(1) if cached
+        let (edge_ids, sources, targets) = self_.inner.get_columnar_topology();
         let mut induced_edges = Vec::new();
         
-        for edge_id in all_edges {
-            if let Ok((source, target)) = self.inner.edge_endpoints(edge_id) {
-                if filtered_nodes.contains(&source) && filtered_nodes.contains(&target) {
-                    induced_edges.push(edge_id);
-                }
+        // Iterate through parallel vectors - O(k) where k = active edges
+        for i in 0..edge_ids.len() {
+            let edge_id = edge_ids[i];
+            let source = sources[i];
+            let target = targets[i];
+            
+            // O(1) HashSet lookups instead of O(n) Vec::contains
+            if node_set.contains(&source) && node_set.contains(&target) {
+                induced_edges.push(edge_id);
             }
         }
-            
-        Ok(PySubgraph {
-            nodes: filtered_nodes,
-            edges: induced_edges,
-            subgraph_type: "filtered_nodes".to_string(),
-            graph: None,
-        })
+        
+        // Get a reference to this graph to pass to the subgraph
+        let graph_ref = self_.into();
+        
+        Ok(PySubgraph::new(
+            filtered_nodes,
+            induced_edges,
+            "filtered_nodes".to_string(),
+            Some(graph_ref),
+        ))
     }
     
     /// Filter nodes within an existing subgraph (enables chaining)
@@ -2005,12 +2146,12 @@ impl PyGraph {
             }
         }
         
-        Ok(PySubgraph {
-            nodes: filtered_nodes,
-            edges: induced_edges,
-            subgraph_type: format!("{}_filtered", subgraph.subgraph_type),
-            graph: subgraph.graph.clone(),
-        })
+        Ok(PySubgraph::new(
+            filtered_nodes,
+            induced_edges,
+            format!("{}_filtered", subgraph.subgraph_type),
+            subgraph.graph.clone(),
+        ))
     }
     
     /// Advanced edge filtering - accepts EdgeFilter or string query
@@ -2074,12 +2215,12 @@ impl PyGraph {
             }
         }
         
-        Ok(PySubgraph {
-            nodes: result.nodes,
-            edges: result.edges,
-            subgraph_type: "bfs_traversal".to_string(),
-            graph: None,
-        })
+        Ok(PySubgraph::new(
+            result.nodes,
+            result.edges,
+            "bfs_traversal".to_string(),
+            None,
+        ))
     }
     
     /// Cleaner alias for traverse_dfs - shorter and more intuitive  
@@ -2132,12 +2273,12 @@ impl PyGraph {
             }
         }
         
-        Ok(PySubgraph {
-            nodes: result.nodes,
-            edges: result.edges,
-            subgraph_type: "dfs_traversal".to_string(),
-            graph: None,
-        })
+        Ok(PySubgraph::new(
+            result.nodes,
+            result.edges,
+            "dfs_traversal".to_string(),
+            None,
+        ))
     }
     
     /// Find shortest path between two nodes with optional in-place attribute setting
@@ -2168,12 +2309,12 @@ impl PyGraph {
                     }
                 }
                 
-                Ok(Some(PySubgraph {
-                    nodes: path.nodes,
-                    edges: path.edges,
-                    subgraph_type: "shortest_path".to_string(),
-                    graph: None,
-                }))
+                Ok(Some(PySubgraph::new(
+                    path.nodes,
+                    path.edges,
+                    "shortest_path".to_string(),
+                    None,
+                )))
             },
             None => Ok(None),
         }
@@ -2192,12 +2333,12 @@ impl PyGraph {
         let mut subgraphs = Vec::new();
         for (i, component) in result.components.into_iter().enumerate() {
             // Create subgraph with induced edges (for now, empty - can be enhanced later)
-            let subgraph = PySubgraph {
-                nodes: component.nodes.clone(),
-                edges: Vec::new(), // TODO: Calculate induced edges between component nodes
-                subgraph_type: format!("connected_component_{}", i),
-                graph: None,
-            };
+            let subgraph = PySubgraph::new(
+                component.nodes.clone(),
+                Vec::new(), // TODO: Calculate induced edges between component nodes
+                format!("connected_component_{}", i),
+                None, // TODO: Phase 2.2 - complex graph reference sharing needed
+            );
             subgraphs.push(subgraph);
             
             // If inplace=True, set component_id attribute on nodes
@@ -2398,6 +2539,45 @@ impl PyGraph {
         self.inner.has_uncommitted_changes()
     }
     
+    /// Get mapping from uid_key attribute values to internal node IDs
+    /// Returns: {"alice": 0, "bob": 1, ...} for all nodes with the specified attribute
+    fn get_node_mapping(&self, uid_key: String) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            let dict = PyDict::new(py);
+            let node_ids = self.inner.node_ids();
+            
+            // Scan all nodes for the specified uid_key attribute
+            for node_id in node_ids {
+                if let Ok(Some(attr_value)) = self.inner.get_node_attr(node_id, &uid_key) {
+                    // Convert attribute value to appropriate Python type
+                    let key_value = match attr_value {
+                        RustAttrValue::Text(s) => s.to_object(py),
+                        RustAttrValue::CompactText(s) => s.as_str().to_object(py),
+                        RustAttrValue::Int(i) => i.to_object(py),
+                        RustAttrValue::SmallInt(i) => i.to_object(py), 
+                        RustAttrValue::Float(f) => f.to_object(py),
+                        RustAttrValue::Bool(b) => b.to_object(py),
+                        // For other types, convert to string representation
+                        _ => format!("{:?}", attr_value).to_object(py),
+                    };
+                    
+                    dict.set_item(key_value, node_id.to_object(py))?;
+                }
+            }
+            
+            Ok(dict.to_object(py))
+        })
+    }
+    
+    /// Create a GraphTable view for DataFrame-like access to node data
+    /// Returns a GraphTable object with all nodes and their attributes
+    /// TODO: Implement table integration after core refactor is complete
+    fn table(&self, _py: Python) -> PyResult<PyObject> {
+        Err(PyErr::new::<PyNotImplementedError, _>(
+            "table() method temporarily disabled during architecture refactor"
+        ))
+    }
+    
     // ========================================================================
     // VIEW CREATION METHODS FOR FLUENT API  
     // ========================================================================
@@ -2422,6 +2602,7 @@ impl PyGraph {
     fn create_nodes_accessor_internal(graph_ref: Py<PyGraph>, py: Python) -> PyResult<Py<PyNodesAccessor>> {
         Py::new(py, PyNodesAccessor {
             graph: graph_ref,
+            constrained_nodes: None,
         })
     }
     
@@ -2429,6 +2610,7 @@ impl PyGraph {
     fn create_edges_accessor_internal(graph_ref: Py<PyGraph>, py: Python) -> PyResult<Py<PyEdgesAccessor>> {
         Py::new(py, PyEdgesAccessor {
             graph: graph_ref,
+            constrained_edges: None,
         })
     }
 }
@@ -2441,6 +2623,8 @@ impl PyGraph {
 #[pyclass(name = "NodesAccessor")]
 pub struct PyNodesAccessor {
     graph: Py<PyGraph>,
+    /// Optional constraint: if Some, only these nodes are accessible
+    constrained_nodes: Option<Vec<NodeId>>,
 }
 
 #[pymethods]
@@ -2449,6 +2633,13 @@ impl PyNodesAccessor {
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
         // Try to extract as single integer (existing behavior)
         if let Ok(node_id) = key.extract::<NodeId>() {
+            // Check constraint first
+            if let Some(ref constrained) = self.constrained_nodes {
+                if !constrained.contains(&node_id) {
+                    return Err(PyKeyError::new_err(format!("Node {} is not in this subgraph", node_id)));
+                }
+            }
+            
             // Single node access - return NodeView
             let graph = self.graph.borrow(py);
             if !graph.has_node(node_id) {
@@ -2482,12 +2673,12 @@ impl PyNodesAccessor {
             }
             
             // Create and return Subgraph
-            let subgraph = PySubgraph {
-                nodes: node_ids,
-                edges: induced_edges,
-                subgraph_type: "node_batch_selection".to_string(),
-                graph: Some(self.graph.clone()),
-            };
+            let subgraph = PySubgraph::new(
+                node_ids,
+                induced_edges,
+                "node_batch_selection".to_string(),
+                Some(self.graph.clone()),
+            );
             
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -2522,12 +2713,12 @@ impl PyNodesAccessor {
             }
             
             // Create and return Subgraph
-            let subgraph = PySubgraph {
-                nodes: selected_nodes,
-                edges: induced_edges,
-                subgraph_type: "node_slice_selection".to_string(),
-                graph: Some(self.graph.clone()),
-            };
+            let subgraph = PySubgraph::new(
+                selected_nodes,
+                induced_edges,
+                "node_slice_selection".to_string(),
+                Some(self.graph.clone()),
+            );
             
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -2546,8 +2737,12 @@ impl PyNodesAccessor {
     
     /// Support len(g.nodes)
     fn __len__(&self, py: Python) -> PyResult<usize> {
-        let graph = self.graph.borrow(py);
-        Ok(graph.node_count())
+        if let Some(ref constrained) = self.constrained_nodes {
+            Ok(constrained.len())
+        } else {
+            let graph = self.graph.borrow(py);
+            Ok(graph.node_count())
+        }
     }
     
     /// String representation
@@ -2558,10 +2753,13 @@ impl PyNodesAccessor {
     }
 }
 
+/// Wrapper for subgraph.nodes that supports indexing syntax: subgraph.nodes[id] -> NodeView
 /// Wrapper for g.edges that supports indexing syntax: g.edges[id] -> EdgeView  
 #[pyclass(name = "EdgesAccessor")]
 pub struct PyEdgesAccessor {
     graph: Py<PyGraph>,
+    /// Optional constraint: if Some, only these edges are accessible
+    constrained_edges: Option<Vec<EdgeId>>,
 }
 
 #[pymethods]
@@ -2570,6 +2768,13 @@ impl PyEdgesAccessor {
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
         // Try to extract as single integer (existing behavior)
         if let Ok(edge_id) = key.extract::<EdgeId>() {
+            // Check constraint first
+            if let Some(ref constrained) = self.constrained_edges {
+                if !constrained.contains(&edge_id) {
+                    return Err(PyKeyError::new_err(format!("Edge {} is not in this subgraph", edge_id)));
+                }
+            }
+            
             // Single edge access - return EdgeView
             let graph = self.graph.borrow(py);
             if !graph.has_edge(edge_id) {
@@ -2606,12 +2811,12 @@ impl PyEdgesAccessor {
             }
             
             // Create and return Subgraph
-            let subgraph = PySubgraph {
-                nodes: endpoint_nodes,
-                edges: edge_ids,
-                subgraph_type: "edge_batch_selection".to_string(),
-                graph: Some(self.graph.clone()),
-            };
+            let subgraph = PySubgraph::new(
+                endpoint_nodes,
+                edge_ids,
+                "edge_batch_selection".to_string(),
+                Some(self.graph.clone()),
+            );
             
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -2649,12 +2854,12 @@ impl PyEdgesAccessor {
             }
             
             // Create and return Subgraph
-            let subgraph = PySubgraph {
-                nodes: endpoint_nodes,
-                edges: selected_edges,
-                subgraph_type: "edge_slice_selection".to_string(),
-                graph: Some(self.graph.clone()),
-            };
+            let subgraph = PySubgraph::new(
+                endpoint_nodes,
+                selected_edges,
+                "edge_slice_selection".to_string(),
+                Some(self.graph.clone()),
+            );
             
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -2673,8 +2878,12 @@ impl PyEdgesAccessor {
     
     /// Support len(g.edges)
     fn __len__(&self, py: Python) -> PyResult<usize> {
-        let graph = self.graph.borrow(py);
-        Ok(graph.edge_count())
+        if let Some(ref constrained) = self.constrained_edges {
+            Ok(constrained.len())
+        } else {
+            let graph = self.graph.borrow(py);
+            Ok(graph.edge_count())
+        }
     }
     
     /// String representation

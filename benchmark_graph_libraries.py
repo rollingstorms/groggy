@@ -301,61 +301,50 @@ class GroggyPhase3Benchmark:
     def filter_nodes_by_single_attribute(self):
         """Test basic attribute filtering"""
         start = time.time()
-        engineer_filter = gr.NodeFilter.attribute_equals("department", gr.AttrValue("Engineering"))
-        result = self.graph.filter_nodes(engineer_filter)
+        # Use optimized query parser instead of direct NodeFilter
+        filter_obj = gr.parse_node_query("department == 'Engineering'")
+        result = self.graph.filter_nodes(filter_obj)
         return time.time() - start, len(result)
     
     def filter_nodes_by_numeric_range(self):
         """Test numeric range filtering"""
         start = time.time()
-        # High earners: salary > 120000
-        high_salary_filter = gr.AttributeFilter.greater_than(gr.AttrValue(120000))
-        salary_filter = gr.NodeFilter.attribute_filter("salary", high_salary_filter)
-        result = self.graph.filter_nodes(salary_filter)
+        # Use optimized query parser instead of direct NodeFilter
+        filter_obj = gr.parse_node_query("salary > 120000")
+        result = self.graph.filter_nodes(filter_obj)
         return time.time() - start, len(result)
     
     def filter_nodes_complex_and(self):
         """Test complex AND filtering"""
         start = time.time()
-        # Senior engineers with high performance - need to check if 'role' attribute exists
-        # For now, focus on attributes we definitely have: department, salary, performance, active
-        filters = [
-            gr.NodeFilter.attribute_equals("department", gr.AttrValue("Engineering")),
-            gr.NodeFilter.attribute_filter("performance", gr.AttributeFilter.greater_than(gr.AttrValue(4.0))),
-            gr.NodeFilter.attribute_equals("active", gr.AttrValue(True))
-        ]
-        complex_filter = gr.NodeFilter.and_filters(filters)
-        result = self.graph.filter_nodes(complex_filter)
+        # Use optimized query parser with logical operators
+        # Use simpler 2-term AND query until we support 3+ terms
+        filter_obj = gr.parse_node_query("department == 'Engineering' AND performance > 4.0")
+        result = self.graph.filter_nodes(filter_obj)
         return time.time() - start, len(result)
     
     def filter_nodes_complex_or(self):
         """Test complex OR filtering"""
         start = time.time()
-        # High salary or high performance (using attributes we have)
-        filters = [
-            gr.NodeFilter.attribute_filter("salary", gr.AttributeFilter.greater_than(gr.AttrValue(150000))),
-            gr.NodeFilter.attribute_filter("performance", gr.AttributeFilter.greater_than(gr.AttrValue(4.5)))
-        ]
-        or_filter = gr.NodeFilter.or_filters(filters)
-        result = self.graph.filter_nodes(or_filter)
+        # Use optimized query parser with logical operators
+        filter_obj = gr.parse_node_query("salary > 150000 OR performance > 4.5")
+        result = self.graph.filter_nodes(filter_obj)
         return time.time() - start, len(result)
     
     def filter_nodes_negation(self):
         """Test NOT filtering"""
         start = time.time()
-        # Not in Engineering
-        eng_filter = gr.NodeFilter.attribute_equals("department", gr.AttrValue("Engineering"))
-        not_eng_filter = gr.NodeFilter.not_filter(eng_filter)
-        result = self.graph.filter_nodes(not_eng_filter)
+        # Use optimized query parser with logical operators
+        filter_obj = gr.parse_node_query("NOT department == 'Engineering'")
+        result = self.graph.filter_nodes(filter_obj)
         return time.time() - start, len(result)
     
     def filter_edges_by_relationship(self):
         """Test edge filtering"""
         start = time.time()
-        # Use attribute_filter + equals instead of attribute_equals (which has a bug)
-        reports_attr_filter = gr.AttributeFilter.equals(gr.AttrValue("reports_to"))
-        reports_filter = gr.EdgeFilter.attribute_filter("relationship", reports_attr_filter)
-        result = self.graph.filter_edges(reports_filter)
+        # Use optimized query parser for edges
+        # filter_obj = gr.parse_edge_query("relationship == 'reports_to'")
+        result = self.graph.filter_edges("relationship == 'reports_to'")
         return time.time() - start, len(result)
     
     # Phase 3.2: Graph Traversal Tests  
@@ -377,7 +366,8 @@ class GroggyPhase3Benchmark:
         """Test BFS with node filtering"""
         start = time.time()
         start_node = self.bulk_node_ids[0]  # Use first node from bulk creation
-        active_filter = gr.NodeFilter.attribute_equals("active", gr.AttrValue(True))
+        # Use optimized query parser
+        active_filter = gr.parse_node_query("active == True")
         result = self.graph.bfs(start_node=start_node, max_depth=2, node_filter=active_filter)
         return time.time() - start, len(result)
     

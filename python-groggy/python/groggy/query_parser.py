@@ -70,87 +70,96 @@ class QueryParser:
         
         return tokens
     
-    def _parse_logical_expression(self, query: str, filter_class) -> Union[NodeFilter, EdgeFilter]:
-        """Parse expressions with logical operators (AND, OR, NOT)."""
-        
-        # Convert to uppercase for case-insensitive matching
-        normalized_query = query.upper()
-        
-        # Check for logical operators
-        if ' AND ' in normalized_query:
-            return self._parse_and_expression(query, filter_class)
-        elif ' OR ' in normalized_query:
-            return self._parse_or_expression(query, filter_class)
-        elif normalized_query.startswith('NOT '):
-            return self._parse_not_expression(query, filter_class)
-        else:
-            # Single comparison
-            return self._parse_comparison(query, filter_class)
-    
-    def _parse_and_expression(self, query: str, filter_class) -> Union[NodeFilter, EdgeFilter]:
-        """Parse AND expressions."""
-        # For now, use a simple approach: split by ' AND ' and parse each part
-        parts = re.split(r'\s+AND\s+', query, flags=re.IGNORECASE)
-        if len(parts) != 2:
-            raise ValueError(f"Complex AND expressions with more than 2 parts not yet supported: {query}")
-        
-        left_filter = self._parse_logical_expression(parts[0].strip(), filter_class)
-        right_filter = self._parse_logical_expression(parts[1].strip(), filter_class)
-        
-        # For now, we'll create a composite filter using a helper class
-        return CompositeFilter.and_filter([left_filter, right_filter], filter_class)
-    
-    def _parse_or_expression(self, query: str, filter_class) -> Union[NodeFilter, EdgeFilter]:
-        """Parse OR expressions."""
-        # For now, use a simple approach: split by ' OR ' and parse each part
-        parts = re.split(r'\s+OR\s+', query, flags=re.IGNORECASE)
-        if len(parts) != 2:
-            raise ValueError(f"Complex OR expressions with more than 2 parts not yet supported: {query}")
-        
-        left_filter = self._parse_logical_expression(parts[0].strip(), filter_class)
-        right_filter = self._parse_logical_expression(parts[1].strip(), filter_class)
-        
-        # For now, we'll create a composite filter using a helper class
-        return CompositeFilter.or_filter([left_filter, right_filter], filter_class)
-    
-    def _parse_not_expression(self, query: str, filter_class) -> Union[NodeFilter, EdgeFilter]:
-        """Parse NOT expressions."""
-        # Remove 'NOT ' from the beginning
-        inner_query = re.sub(r'^NOT\s+', '', query, flags=re.IGNORECASE).strip()
-        inner_filter = self._parse_logical_expression(inner_query, filter_class)
-        
-        # For now, we'll create a composite filter using a helper class
-        return CompositeFilter.not_filter(inner_filter, filter_class)
     
     def parse_node_filter(self, query: str) -> NodeFilter:
         """Parse a string query into a NodeFilter with logical operator support."""
         query = query.strip()
         
-        # Check for logical operators - if found, use enhanced filtering
+        # Handle logical operators directly in the parser
         normalized_query = query.upper()
-        if ' AND ' in normalized_query or ' OR ' in normalized_query or normalized_query.startswith('NOT '):
-            # Use enhanced filtering for logical operations
-            from .enhanced_query import enhanced_filter_nodes
-            # Return a special marker that the graph can detect
-            return EnhancedQueryMarker(query, "nodes")
+        if ' AND ' in normalized_query:
+            return self._parse_and_node_filter(query)
+        elif ' OR ' in normalized_query:
+            return self._parse_or_node_filter(query)
+        elif normalized_query.startswith('NOT '):
+            return self._parse_not_node_filter(query)
         else:
             # Use standard parsing for simple queries
             return self._parse_comparison(query, NodeFilter)
+    
+    def _parse_and_node_filter(self, query: str) -> NodeFilter:
+        """Parse AND expressions for nodes."""
+        parts = re.split(r'\s+AND\s+', query, flags=re.IGNORECASE)
+        if len(parts) != 2:
+            raise ValueError(f"Complex AND expressions with more than 2 parts not yet supported: {query}")
+        
+        left_filter = self.parse_node_filter(parts[0].strip())
+        right_filter = self.parse_node_filter(parts[1].strip())
+        
+        return NodeFilter.and_filters([left_filter, right_filter])
+    
+    def _parse_or_node_filter(self, query: str) -> NodeFilter:
+        """Parse OR expressions for nodes."""
+        parts = re.split(r'\s+OR\s+', query, flags=re.IGNORECASE)
+        if len(parts) != 2:
+            raise ValueError(f"Complex OR expressions with more than 2 parts not yet supported: {query}")
+        
+        left_filter = self.parse_node_filter(parts[0].strip())
+        right_filter = self.parse_node_filter(parts[1].strip())
+        
+        return NodeFilter.or_filters([left_filter, right_filter])
+    
+    def _parse_not_node_filter(self, query: str) -> NodeFilter:
+        """Parse NOT expressions for nodes."""
+        inner_query = re.sub(r'^NOT\s+', '', query, flags=re.IGNORECASE).strip()
+        inner_filter = self.parse_node_filter(inner_query)
+        
+        return NodeFilter.not_filter(inner_filter)
     
     def parse_edge_filter(self, query: str) -> EdgeFilter:
         """Parse a string query into an EdgeFilter with logical operator support."""
         query = query.strip()
         
-        # Check for logical operators - if found, use enhanced filtering
+        # Handle logical operators directly in the parser
         normalized_query = query.upper()
-        if ' AND ' in normalized_query or ' OR ' in normalized_query or normalized_query.startswith('NOT '):
-            # Use enhanced filtering for logical operations
-            from .enhanced_query import enhanced_filter_edges
-            # Return a special marker that the graph can detect
-            return EnhancedQueryMarker(query, "edges")
+        if ' AND ' in normalized_query:
+            return self._parse_and_edge_filter(query)
+        elif ' OR ' in normalized_query:
+            return self._parse_or_edge_filter(query)
+        elif normalized_query.startswith('NOT '):
+            return self._parse_not_edge_filter(query)
         else:
             # Use standard parsing for simple queries
             return self._parse_comparison(query, EdgeFilter)
+    
+    def _parse_and_edge_filter(self, query: str) -> EdgeFilter:
+        """Parse AND expressions for edges."""
+        parts = re.split(r'\s+AND\s+', query, flags=re.IGNORECASE)
+        if len(parts) != 2:
+            raise ValueError(f"Complex AND expressions with more than 2 parts not yet supported: {query}")
+        
+        left_filter = self.parse_edge_filter(parts[0].strip())
+        right_filter = self.parse_edge_filter(parts[1].strip())
+        
+        return EdgeFilter.and_filters([left_filter, right_filter])
+    
+    def _parse_or_edge_filter(self, query: str) -> EdgeFilter:
+        """Parse OR expressions for edges."""
+        parts = re.split(r'\s+OR\s+', query, flags=re.IGNORECASE)
+        if len(parts) != 2:
+            raise ValueError(f"Complex OR expressions with more than 2 parts not yet supported: {query}")
+        
+        left_filter = self.parse_edge_filter(parts[0].strip())
+        right_filter = self.parse_edge_filter(parts[1].strip())
+        
+        return EdgeFilter.or_filters([left_filter, right_filter])
+    
+    def _parse_not_edge_filter(self, query: str) -> EdgeFilter:
+        """Parse NOT expressions for edges."""
+        inner_query = re.sub(r'^NOT\s+', '', query, flags=re.IGNORECASE).strip()
+        inner_filter = self.parse_edge_filter(inner_query)
+        
+        return EdgeFilter.not_filter(inner_filter)
     
     def _parse_comparison(self, query: str, filter_class) -> Union[NodeFilter, EdgeFilter]:
         """Parse comparison expressions like 'salary > 120000'."""
@@ -216,51 +225,3 @@ def parse_edge_query(query: str) -> EdgeFilter:
     """
     return _parser.parse_edge_filter(query)
 
-class CompositeFilter:
-    """Helper class for creating composite filters with logical operations."""
-    
-    @staticmethod
-    def and_filter(filters: List[Union[NodeFilter, EdgeFilter]], filter_class) -> Union[NodeFilter, EdgeFilter]:
-        """Create an AND composite filter."""
-        # For now, implement by applying filters sequentially
-        # This is a simplified approach - in a full implementation, you'd want proper logical evaluation
-        if filter_class == NodeFilter:
-            return CompositeNodeFilter(filters, 'AND')
-        else:
-            return CompositeEdgeFilter(filters, 'AND')
-    
-    @staticmethod
-    def or_filter(filters: List[Union[NodeFilter, EdgeFilter]], filter_class) -> Union[NodeFilter, EdgeFilter]:
-        """Create an OR composite filter."""
-        if filter_class == NodeFilter:
-            return CompositeNodeFilter(filters, 'OR')
-        else:
-            return CompositeEdgeFilter(filters, 'OR')
-    
-    @staticmethod
-    def not_filter(filter_obj: Union[NodeFilter, EdgeFilter], filter_class) -> Union[NodeFilter, EdgeFilter]:
-        """Create a NOT composite filter."""
-        if filter_class == NodeFilter:
-            return CompositeNodeFilter([filter_obj], 'NOT')
-        else:
-            return CompositeEdgeFilter([filter_obj], 'NOT')
-
-class CompositeNodeFilter:
-    """A composite node filter that combines multiple filters with logical operators."""
-    
-    def __init__(self, filters: List[NodeFilter], operation: str):
-        self.filters = filters
-        self.operation = operation
-    
-    def __repr__(self):
-        return f"CompositeNodeFilter({self.operation}, {len(self.filters)} filters)"
-
-class CompositeEdgeFilter:
-    """A composite edge filter that combines multiple filters with logical operators."""
-    
-    def __init__(self, filters: List[EdgeFilter], operation: str):
-        self.filters = filters
-        self.operation = operation
-    
-    def __repr__(self):
-        return f"CompositeEdgeFilter({self.operation}, {len(self.filters)} filters)"
