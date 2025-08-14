@@ -42,6 +42,17 @@
 
   g.add_edge(0, 1, relationship="collaborates")
   g.add_edge("alice", "bob", relationship="collaborates", uid_key="id")  # ✅ WORKING!
+  
+  # ⭐ MISSING: Retrieve node mapping after graph construction
+  node_mapping = g.get_node_mapping(uid_key="id")  # ❌ NOT IMPLEMENTED
+  # Should return: {"alice": 0, "bob": 1, ...} for all nodes with 'id' attribute
+  # Use case: Reference nodes by string ID after initial graph construction
+  
+  # ⭐ MISSING: Direct uid_key support in add_edges for convenience
+  edge_data = [{"source": "alice", "target": "bob", "strength": 0.8}]
+  g.add_edges(edge_data, uid_key="id")  # ❌ NOT IMPLEMENTED
+  # Should auto-resolve string IDs without requiring explicit node_mapping
+  # More convenient than: g.add_edges(edge_data, node_mapping=g.get_node_mapping(uid_key="id"))
   ```
   **✅ Implementation Complete**:
   - [x] **Python Query Parser**: Convert strings like `"salary > 120000"` → Rust filters ✅
@@ -51,6 +62,8 @@
   - [x] **Property access**: `len(g)`, `g.has_node()`, `g.has_edge()` ✅
   - [x] **uid_key parameter**: `g.add_edge("alice", "bob", uid_key="id")` ✅
   - [x] **node_mapping parameter**: `g.add_edges(edge_data, node_mapping)` ✅
+  - [ ] **get_node_mapping method**: `g.get_node_mapping(uid_key="id")` → retrieve string-to-ID mapping ⭐
+  - [ ] **add_edges uid_key parameter**: `g.add_edges(edge_data, uid_key="id")` → auto-resolve string IDs ⭐
 
 ### 🆕 Graph Views and Subgraph Architecture (NEW PRIORITY)
 
@@ -135,15 +148,83 @@
 - ✅ **Algorithm labeling**: Persist algorithm results as node/edge attributes
 - ✅ **Composable analysis**: Run algorithms on subgraphs with attribute labeling
 
+### 🆕 GraphTable: DataFrame-like Views (NEW FEATURE)
+
+#### **🎯 GraphTable Vision**
+- **Lazy DataFrame views**: Seamlessly blend graph operations with data science workflows
+- **Comprehensive attribute views**: Show all node/edge attributes in tabular format with NaN handling
+- **Interactive exploration**: Make graph data exploration as easy as pandas DataFrames
+- **Subgraph compatibility**: Works with both full graphs and filtered subgraphs
+
+#### **📊 GraphTable API Design**:
+```python
+# Full graph table views
+node_table = g.table()  # GraphTable showing ALL nodes with ALL attributes
+edge_table = g.edges.table()  # GraphTable showing ALL edges with source/target + attributes
+
+print(node_table)
+#    id  name     age  dept         salary  influence_score  component_id
+# 0   0  Alice     30  Engineering  120000           0.23            0
+# 1   1  Bob       35  Engineering  140000           0.45            0  
+# 2   2  Carol     28  Design        95000           0.12            1
+# 3   3  David    NaN  Engineering  180000           0.67            0
+
+print(edge_table)  
+#    id  source  target     weight  type         last_contact
+# 0   0       0       1       0.8   friendship   2024-01-15
+# 1   1       0       2       0.6   collaboration    NaN
+# 2   2       1       3       0.9   reports_to   2024-01-20
+
+# Subgraph table views (filtered data)
+engineers = g.filter_nodes('dept == "Engineering"')
+eng_table = engineers.table()  # GraphTable with only Engineering nodes
+print(eng_table)
+#    id  name   age  dept         salary  influence_score  component_id
+# 0   0  Alice   30  Engineering  120000           0.23            0
+# 1   1  Bob     35  Engineering  140000           0.45            0
+# 2   3  David  NaN  Engineering  180000           0.67            0
+
+# Slice-based table views  
+small_team_table = g.nodes[0:5].table()  # GraphTable for nodes 0-4
+specific_edges_table = g.edges[[0, 2, 5]].table()  # GraphTable for specific edges
+
+# Advanced GraphTable operations
+filtered_table = node_table[node_table['salary'] > 100000]  # Pandas-like filtering
+grouped_table = node_table.groupby('dept')['salary'].mean()  # Department salary averages
+
+# Export capabilities  
+node_table.to_pandas()  # Convert to actual pandas DataFrame
+node_table.to_csv('employees.csv')  # Direct CSV export
+node_table.to_json('employees.json')  # JSON export with graph metadata
+```
+
+#### **🏗️ GraphTable Implementation Features**:
+- **Lazy evaluation**: Only compute table when accessed/printed
+- **NaN handling**: Missing attributes show as NaN (like pandas)
+- **Index consistency**: Graph node/edge IDs become DataFrame index
+- **Attribute discovery**: Automatically discover all attributes across nodes/edges
+- **Memory efficient**: Don't duplicate data, create views into graph attributes
+- **Pandas compatibility**: Easy conversion to/from pandas DataFrames
+- **Export capabilities**: CSV, JSON, Parquet export with graph context
+
+#### **📋 GraphTable Implementation Tasks**:
+- [ ] **Core GraphTable class**: Lazy DataFrame-like wrapper around graph data
+- [ ] **Attribute discovery**: Scan all nodes/edges to find complete attribute schema
+- [ ] **NaN handling**: Handle missing attributes gracefully in tabular view
+- [ ] **Pandas integration**: Seamless to_pandas() and from_pandas() conversion
+- [ ] **Export methods**: CSV, JSON, Parquet export with proper graph metadata
+- [ ] **Subgraph compatibility**: Ensure tables work with filtered subgraphs
+- [ ] **Performance optimization**: Lazy evaluation and efficient column access
+
 ### 🆕 Node and Edge Views (APPLIES TO BOTH Graph AND Subgraph)
 - [x] **Node Properties and Views** ✅ **g.nodes/g.edges IMPLEMENTED!**:
   ```python
-  # Basic access - returns list of ACTIVE node IDs only ✅ WORKING!
-  g.nodes  # Returns [0, 2, 5, 7, ...] (actual list of all EXISTING node IDs)
-  len(g.nodes)  # Number of active nodes
+  # Basic access - returns NodesAccessor object (not plain list)
+  g.nodes  # Returns NodesAccessor wrapping sorted [0, 2, 5, 7, ...] (EXISTING node IDs)
+  len(g.nodes)  # Number of active nodes (works via NodesAccessor.__len__)
   
   # Example: if nodes 1, 3, 4, 6 were deleted:
-  # g.nodes returns [0, 2, 5, 7, 8, ...] (only existing nodes)
+  # g.nodes contains [0, 2, 5, 7, 8, ...] (only existing nodes, in sorted order)
   
   # Attribute access via indexing
   g.nodes[0]  # Returns dict of all attributes: {'name': 'Alice', 'age': 30, ...}
@@ -152,6 +233,15 @@
   g.nodes[0].set(name='Alice Updated', age=31)  # Chainable single attribute updates # and is basically the same as our set attributes batch methods. we are just calling the existing methods, not creating new ones
   g.nodes[0].set({'name': 'Alice', 'age': 30, 'role': 'engineer'})  # Dict-based bulk update
   g.nodes[0].update(age=32).set(promoted=True)  # Chainable operations
+  
+  # Neighbor access - intuitive node method
+  g.nodes[0].neighbors()  # Same as g.neighbors(0) - returns neighbor node IDs
+  
+  # Rich NodeView representation
+  print(g.nodes[0])  # NodeView(id=0, age=30, component_id=0, name="Alice", ...)
+  
+  # Essential ID access - the actual node ID in the graph  
+  g.nodes[0].id  # Returns 0 (the actual NodeId, essential for cross-referencing)
   
   # IMPORTANT: update() vs set() behavior
   # - g.nodes[0].set(age=31) → Always works, overwrites existing attributes
@@ -171,6 +261,25 @@
   g.nodes[[0, 1, 2]].set(department='Engineering')  # Update multiple nodes (on Subgraph)
   g.nodes[0:10].set(batch_processed=True)  # Update range of nodes (on Subgraph)
   
+  # CRITICAL: Batch Update Patterns - NodesAccessor vs Subgraph
+  g.nodes[:].set(is_cool=False)    # ✅ Works - g.nodes[:] creates subgraph of ALL nodes
+  g.nodes.set(is_cool=True)        # ❓ TBD - g.nodes is NodesAccessor object, could support .set()
+  g.edges[:].set(verified=True)    # ✅ Works - g.edges[:] creates subgraph of ALL edges  
+  g.edges.set(verified=False)      # ❓ TBD - g.edges is EdgesAccessor object, could support .set()
+  
+  # Design Decision: Should NodesAccessor/EdgesAccessor support .set()?
+  # Option A: g.nodes.set() works - convenient but potentially dangerous for large graphs
+  # Option B: g.nodes.set() fails - forces explicit g.nodes[:].set() for safety
+  
+  # Safety Warning: Accidental Whole-Graph Updates ⚠️
+  g.nodes[:].set(deleted=True)     # DANGER! Accidentally marks ALL nodes as deleted
+  g.edges[:].set(weight=0.0)       # DANGER! Accidentally zeros ALL edge weights
+  g.nodes.set(processed=True)      # DANGER! (if implemented) - affects entire graph
+  
+  # Recommended: Use explicit filtering for safety
+  all_nodes = g.filter_nodes()     # More explicit than g.nodes[:] 
+  all_nodes.set(processed=True)    # Clearer intent, same result
+  
   # Iteration support
   for node_id in g.nodes:
       attrs = g.nodes[node_id]  # Get NodeView with ALL attributes for single node
@@ -183,18 +292,34 @@
   for node_id in subgraph.nodes:
       attrs = subgraph.nodes[node_id]  # NodeView with ALL attributes within subgraph context
       print(f"Subgraph node {node_id}: {attrs}")
+      print(f"Original graph ID: {attrs.id}")  # Still shows original graph NodeId
   ```
 - [ ] **Edge Properties and Views**:
   ```python  
-  # Basic access - returns list of ACTIVE edge IDs only
-  g.edges  # Returns [0, 2, 4, 6, ...] (actual list of all EXISTING edge IDs)
-  len(g.edges)  # Number of active edges
+  # Basic access - returns EdgesAccessor object (not plain list)
+  g.edges  # Returns EdgesAccessor wrapping sorted [0, 2, 4, 6, ...] (EXISTING edge IDs)
+  len(g.edges)  # Number of active edges (works via EdgesAccessor.__len__)
   
   # Example: if edges 1, 3, 5 were deleted:
-  # g.edges returns [0, 2, 4, 6, 7, ...] (only existing edges)
+  # g.edges contains [0, 2, 4, 6, 7, ...] (only existing edges, in sorted order)
   
   # Attribute access via indexing (includes source/target)
   g.edges[0]  # Returns dict: {'source': 0, 'target': 1, 'weight': 0.8, ...}
+  
+  # Rich EdgeView representation  
+  print(g.edges[0])  # EdgeView(id=0, source=0, target=1, weight=0.8, type="friendship")
+  
+  # Essential ID access - the actual edge ID in the graph
+  g.edges[0].id  # Returns 0 (the actual EdgeId, essential for cross-referencing)
+  
+  # Edge endpoint access
+  g.edges[0].endpoints  # (source_id, target_id) tuple
+  g.edges[0].source     # Source node ID
+  g.edges[0].target     # Target node ID
+  
+  # Column access for all edges
+  g.edges.source  # [0, 1, 2, ...] - List of all source nodes
+  g.edges.target  # [1, 2, 3, ...] - List of all target nodes
   
   # Fluent attribute updates for edges
   g.edges[0].set(weight=0.9, relationship='strong')  # Chainable edge updates
@@ -269,8 +394,8 @@
   - [x] **Consistent return types**: List[Subgraph] for multi-result algorithms, Subgraph for single results ✅
   
   **Phase 2: Node/Edge Views (Both Graph and Subgraph)** ✅ **COMPLETED!**
-  - [x] `g.nodes` returns `Vec<NodeId>` of **active/existing nodes only** ✅
-  - [x] `g.edges` returns `Vec<EdgeId>` of **active/existing edges only** ✅
+  - [x] `g.nodes` returns `NodesAccessor` wrapping **sorted** `Vec<NodeId>` of **active/existing nodes only** ✅
+  - [x] `g.edges` returns `EdgesAccessor` wrapping **sorted** `Vec<EdgeId>` of **active/existing edges only** ✅
   - [x] Use existing `Graph.node_ids()` and `Graph.edge_ids()` methods from Rust ✅
   - [x] Implement `Graph.__getitem__()` and `Subgraph.__getitem__()` to handle: ✅
     - [x] `g.nodes[id]` → returns `NodeView` object showing **ALL attributes** for that node ✅
@@ -293,6 +418,53 @@
     - [x] `.set()` should always work (overwrite existing attributes) ✅
     - [x] `.update()` should work for both new AND existing attributes ✅
     - [x] Previously reported `.update(age=31)` issue - **RESOLVED** ✅
+  
+  **Phase 2.6: Enhanced View Representations (NEW)**
+  - [ ] **Rich NodeView display**: `print(g.nodes[0])` → `NodeView(id=0, age=30, component_id=0, ...)`
+  - [ ] **Rich EdgeView display**: `print(g.edges[0])` → `EdgeView(id=0, source=0, target=1, weight=0.8, ...)`
+  - [ ] **Essential ID access**: `g.nodes[0].id` → actual NodeId, `g.edges[0].id` → actual EdgeId
+  - [ ] **Edge endpoint properties**: `g.edges[0].endpoints`, `g.edges[0].source`, `g.edges[0].target`
+  - [ ] **Edge column access**: `g.edges.source` → list of all source nodes, `g.edges.target` → list of all targets
+  - [ ] **Comprehensive attribute display**: Views show ALL attributes for single node/edge
+  - [ ] **Consistent formatting**: Clean, readable representations for interactive exploration
+  - [ ] **Clear documentation**: Document g.nodes[:].set() vs g.nodes.set() distinction and safety warnings
+  - [ ] **Design decision**: Should NodesAccessor/EdgesAccessor support .set() method for whole-graph updates?
+
+### 🤔 **DESIGN DECISION: NodesAccessor.set() Support**
+
+**The Question**: Should `g.nodes.set()` and `g.edges.set()` work for whole-graph attribute updates?
+
+**Option A: Support Direct .set() (Convenience)**
+```python
+g.nodes.set(processed=True)   # ✅ Works - updates ALL nodes directly
+g.edges.set(verified=True)    # ✅ Works - updates ALL edges directly
+# Pros: Convenient, intuitive, matches user expectation
+# Cons: Easy to accidentally modify entire graph, no undo confirmation
+```
+
+**Option B: Require Slice Notation (Safety)**  
+```python
+g.nodes.set(processed=True)   # ❌ Fails - forces explicit slice notation
+g.nodes[:].set(processed=True) # ✅ Works - explicit whole-graph intent
+# Pros: Prevents accidents, forces deliberate whole-graph operations
+# Cons: Less intuitive, extra syntax burden
+```
+
+**Recommendation**: **Option A (Support Direct .set())** with **clear warnings in documentation**
+- Users expect `g.nodes.set()` to work (follows pandas/numpy patterns)
+- NodesAccessor is already a specialized object (not just a list)
+- Safety comes from documentation and naming, not artificial restrictions
+- Advanced users will appreciate the convenience
+- Can add confirmation prompts for large graphs in the future
+  
+  **Phase 2.7: GraphTable Integration (NEW)**  
+  - [ ] **Core GraphTable class**: DataFrame-like wrapper with lazy evaluation
+  - [ ] **Full graph tables**: `g.table()` → node table, `g.edges.table()` → edge table
+  - [ ] **Subgraph tables**: `engineers.table()` → filtered DataFrame view  
+  - [ ] **Slice tables**: `g.nodes[0:5].table()` → range-based DataFrame views
+  - [ ] **Pandas integration**: `table.to_pandas()`, `table.to_csv()`, export methods
+  - [ ] **NaN handling**: Missing attributes handled gracefully in tabular format
+  - [ ] **Attribute discovery**: Automatic schema detection across all nodes/edges
   
   **Phase 2.1: Enhanced Subgraph Architecture (CORE RUST)** ✅ **COMPLETED!**
   
@@ -1132,7 +1304,50 @@ All redundant and poorly named methods have been consolidated and cleaned up:
 
 ### 🚧 **REMAINING HIGH-PRIORITY FEATURES**
 
-#### **1. Node/Edge Views with Fluent Updates** (Next Priority)
+#### **1. Missing get_node_mapping() Method** (IMMEDIATE PRIORITY)
+- [ ] **get_node_mapping(uid_key) Implementation**
+  ```python
+  # USE CASE: Retrieve string-to-ID mapping after graph construction
+  g = gr.Graph()
+  node_data = [
+      {"employee_id": "alice", "name": "Alice", "dept": "Engineering"}, 
+      {"employee_id": "bob", "name": "Bob", "dept": "Sales"}
+  ]
+  node_mapping = g.add_nodes(node_data, uid_key="employee_id")
+  # Returns: {"alice": 0, "bob": 1}
+  
+  # PROBLEM: Later in code, need to reference nodes by employee_id but lost mapping
+  # SOLUTION: Retrieve mapping on demand
+  current_mapping = g.get_node_mapping(uid_key="employee_id")  # ❌ NOT IMPLEMENTED
+  # Should return: {"alice": 0, "bob": 1, "charlie": 2, ...} for all nodes
+  
+  # IMPLEMENTATION DETAILS:
+  # - Scan all nodes for nodes that have the specified uid_key attribute
+  # - Return dict mapping attribute_value → internal_node_id
+  # - Handle missing attributes gracefully (skip nodes without uid_key)
+  # - Performance: O(n) scan through all nodes - acceptable for typical use
+  
+  # RUST IMPLEMENTATION NEEDED:
+  def get_node_mapping(uid_key: str) -> Dict[str, int]:
+      """Return mapping from uid_key attribute values to internal node IDs"""
+      mapping = {}
+      for node_id in g.nodes:
+          if uid_key in g.nodes[node_id]:
+              uid_value = g.nodes[node_id][uid_key]
+              mapping[uid_value] = node_id
+      return mapping
+  ```
+  
+- [ ] **Implementation Tasks**:
+  - [ ] Add `get_node_mapping(uid_key: str) -> Dict[Any, NodeId]` to Rust Graph
+  - [ ] Add `uid_key` parameter to `add_edges()` for automatic string ID resolution
+  - [ ] Python wrapper methods in graph.py for both features
+  - [ ] Handle different attribute value types (String, Int, Float) in both methods
+  - [ ] Add error handling for invalid uid_key and missing nodes
+  - [ ] Add comprehensive tests for various uid_key scenarios  
+  - [ ] Document performance characteristics (O(n) scan for get_node_mapping)
+
+#### **2. Node/Edge Views with Fluent Updates** (Next Priority)
 - [ ] **Phase 2: Node/Edge Views (Both Graph and Subgraph)**
   - [ ] `g.nodes[id]` returns `NodeView` object with fluent update methods
   - [ ] `g.edges[id]` returns `EdgeView` object with fluent update methods  
