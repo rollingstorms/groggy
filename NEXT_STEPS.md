@@ -3,7 +3,14 @@
 ## ✅ MAJOR PROGRESS UPDATE (August 2025)
 
 ### 🚀 **MAJOR PERFORMANCE BREAKTHROUGH!**
-**Status**: ✅ **COMPLETED** - 48x performance improvement achieved through Python binding optimization
+**Status**: ✅ **COMPLETE**Implementation Features**:
+- 🚀 **Native Performance**: All statistics computed in Rust with lazy caching
+- ⚡ **O(n) Statistical Methods**: Ensure all PyArray statistics are O(n) (not O(n log n))
+- 📊 **Rich API**: mean, std, min, max, quantiles, describe, histogram  
+- 🧠 **Lazy Caching**: Expensive computations cached automatically
+- 🔗 **List Compatibility**: Drop-in replacement for current lists
+- 📈 **Extensible**: Easy to add correlation, regression, etc.
+- 🎯 **Powerful Algorithms**: PyArray will support advanced array algorithms (correlation, regression, FFT, etc.)48x performance improvement achieved through Python binding optimization
 
 **Critical Discovery**: The bottleneck was in the **Python binding layer** (`lib.rs`), not the core Rust algorithms!
 
@@ -54,6 +61,7 @@ Per-Item Performance Scaling (Medium 50K → Large 250K nodes):
 - Hash table resizing during filtering?
 - String comparison overhead?
 - Memory allocation patterns?
+- **Graph statistics O(n log n)**: Current graph stats are O(n log n) instead of O(n) - needs optimization
 
 ### 2. Memory Efficiency Optimization
 **Priority**: Medium - Resource usage
@@ -74,12 +82,12 @@ Per-Item Performance Scaling (Medium 50K → Large 250K nodes):
 ```python
 # Create table views of graph data
 node_table = g.table()  # All nodes with all attributes
-edge_table = g.edges_table()  # All edges with source/target + attributes
+edge_table = g.edges.table()  # All edges with source/target + attributes
 
 # Subgraph table views
 engineers = g.filter_nodes('dept == "Engineering"')  
 eng_table = engineers.table()  # Only engineering nodes
-edge_eng_table = engineers.edges_table()  # Engineering subgraph edges
+edge_eng_table = engineers.edges.table()  # Engineering subgraph edges
 
 # Export capabilities
 node_table.to_pandas()  # Convert to pandas DataFrame
@@ -401,7 +409,7 @@ subgraph = g.nodes[:5]                      # PySubgraph
 
 # Missing: Single node/edge dict access
 node = g.nodes[0]                           # Single node view
-# Should work: node.dict()                  # Dict of attributes + metadata
+# Should work: node.table()                 # GraphTable one row - default for nodeview/edgeview
 
 # Missing: Column-subset tables
 # Should work: g.nodes[:5][['age', 'name']].table()  # Table with only 2 columns
@@ -411,13 +419,14 @@ node = g.nodes[0]                           # Single node view
 ```python
 # 1. All views support table() - returns GraphTable
 g.table()                                   # All nodes (current ✅)
-g.edges_table()                             # All edges (current ✅)  
+g.nodes.table()                             # same as
+g.edges.table()                             # All edges (current ✅)  
 g.nodes[:5].table()                         # Subgraph nodes (NEW)
 g.edges[:10].table()                        # Subgraph edges (NEW)
 g.nodes[age > 30].table()                   # Filtered nodes table (NEW)
 
 # 2. Single entity views support dict() - returns dict
-g.nodes[0].dict()                           # Node attributes + metadata (NEW)
+node_dict = g.nodes[0].dict()                           # Node attributes + metadata (NEW)
 g.edges[0].dict()                           # Edge attributes + metadata (NEW)
 # Returns: {'id': 0, 'age': 25, 'name': 'Alice', '_graph_id': ...}
 
@@ -435,6 +444,8 @@ g.edges[:10][['weight', 'type']].table()    # Edge column subsets (NEW)
 engineers = g.filter_nodes('dept == "Engineering"')
 young_eng = engineers[engineers['age'] < 30]  
 young_eng_table = young_eng[['name', 'age', 'salary']].table()  # Filtered + selected columns
+
+(gr.GraphTable([node_dict,node_dict])?) maybe
 ```
 
 **Implementation Requirements**:
@@ -499,7 +510,301 @@ def set(self, *args, **kwargs):
 - Column-subset table creation pipeline functional
 - Maintains performance with new view layer abstractions
 
-### 🎯 **Priority 4: Fine-Tune O(n log n) Operations**
+### 🎯 **Priority 4: GraphTable PyArray Integration**
+**Priority**: High - Enhanced data analysis user experience
+
+**Goal**: Integrate PyArray with GraphTable column access for native statistical operations
+
+**Current State**: GraphTable column access returns plain Python lists
+```python
+# Current: Plain lists (limited functionality)
+table = g.table()
+ages = table['age']          # Returns [25, 30, 35, 40, 45] - plain list
+print(sum(ages) / len(ages)) # Manual mean calculation required
+```
+
+**Enhanced Goal**: GraphTable columns return PyArray objects with statistical methods
+```python
+# Enhanced: PyArray columns with statistical methods
+table = g.table()
+ages = table['age']          # Returns PyArray([25, 30, 35, 40, 45])
+
+# Native statistical operations on table columns
+print(ages.mean())           # 35.0 - computed in Rust
+print(ages.std())            # 7.91 - native standard deviation
+print(ages.quantile(0.95))   # 44.0 - 95th percentile
+print(ages.describe())       # Full statistical summary
+
+# Still works like a regular list
+print(len(ages))             # 5
+print(ages[0])               # 25
+for age in ages: process(age) # Iteration works
+```
+
+**Implementation Strategy**:
+```python
+# Modify GraphTable.__getitem__ method
+def __getitem__(self, key):
+    """Access columns or rows like a DataFrame."""
+    if isinstance(key, str):
+        # Column access - return PyArray instead of plain list
+        rows, columns = self._build_table_data()
+        if key not in columns:
+            raise KeyError(f"Column '{key}' not found")
+        
+        column_data = [row.get(key) for row in rows]
+        # NEW: Return PyArray for enhanced analytics
+        from groggy import PyArray
+        return PyArray(column_data)
+```
+
+**Integration Benefits**:
+- **Native Performance**: Statistical operations computed in Rust
+- **Seamless Experience**: Column access automatically provides analytics capabilities
+- **Backward Compatibility**: PyArray acts like a regular list for existing code
+- **Rich Analytics**: mean(), std(), min(), max(), quantile(), describe() methods
+- **DataFrame-like UX**: Similar to pandas column access with statistical methods
+
+**Usage Examples**:
+```python
+# Create table and analyze columns
+engineers = g.filter_nodes('dept == "Engineering"')
+table = engineers.table()
+
+# Analyze salary distribution
+salaries = table['salary']              # Returns PyArray
+print(f"Mean: {salaries.mean()}")       # Native mean
+print(f"Median: {salaries.median()}")   # Native median  
+print(f"95th percentile: {salaries.quantile(0.95)}")
+
+# Age analysis
+ages = table['age']
+print(ages.describe())                  # Full summary statistics
+
+# Multi-column analysis
+experience = table['years_experience']
+print(f"Salary-Experience correlation: {salaries.correlation(experience)}")
+```
+
+**Implementation Tasks**:
+- [ ] **Modify GraphTable.__getitem__**: Return PyArray for column access instead of plain list
+- [ ] **Add row slicing support**: Enable `table[:5]`, `table[10:20]`, `table[-5:]` syntax
+- [ ] **Handle type conversion**: Ensure proper AttrValue → Python → PyArray conversion pipeline
+- [ ] **Maintain backward compatibility**: Ensure existing list-like behavior works
+- [ ] **Add import handling**: Proper PyArray import in GraphTable module
+- [ ] **Test statistical accuracy**: Verify PyArray statistics match manual calculations
+- [ ] **Performance validation**: Ensure no significant overhead for small columns
+- [ ] **Documentation**: Update GraphTable examples to showcase PyArray integration
+
+**Enhanced Implementation Strategy**:
+```python
+# Enhanced GraphTable.__getitem__ method with row slicing
+def __getitem__(self, key):
+    """Access columns, rows, or slices like a DataFrame."""
+    rows, columns = self._build_table_data()
+    
+    if isinstance(key, str):
+        # Column access - return PyArray
+        if key not in columns:
+            raise KeyError(f"Column '{key}' not found")
+        column_data = [row.get(key) for row in rows]
+        from groggy import PyArray
+        return PyArray(column_data)
+    
+    elif isinstance(key, int):
+        # Single row access
+        if key < 0 or key >= len(rows):
+            raise IndexError(f"Row index {key} out of range")
+        return rows[key]
+    
+    elif isinstance(key, slice):
+        # Row slicing - NEW!
+        return GraphTable(rows[key], self.table_type, self.graph_override)
+    
+    else:
+        raise TypeError("Key must be string (column), int (row), or slice")
+```
+
+**Row Slicing Usage Examples**:
+```python
+# Create table
+table = g.table()  # 1000 nodes
+
+# Row slicing operations
+first_five = table[:5]        # First 5 rows as new GraphTable
+next_ten = table[5:15]        # Rows 5-14 as new GraphTable  
+last_five = table[-5:]        # Last 5 rows as new GraphTable
+every_tenth = table[::10]     # Every 10th row as new GraphTable
+
+# Sliced tables support all GraphTable operations
+first_five.to_pandas()        # Convert slice to DataFrame
+first_five['age'].mean()      # PyArray statistics on slice columns
+first_five.to_csv('top5.csv') # Export slice to CSV
+
+# Chaining operations
+engineers = g.filter_nodes('dept == "Engineering"')
+top_earners = engineers.table()[:10]  # Top 10 engineering nodes
+salaries = top_earners['salary']      # PyArray of top 10 salaries
+print(f"Top 10 avg salary: {salaries.mean()}")
+```
+
+**Success Metrics**:
+- Table column access returns PyArray objects with statistical methods
+- All existing list-like operations continue to work (len, indexing, iteration)
+- Statistical operations provide accurate results matching manual calculations
+- Performance impact minimal for small columns, beneficial for large columns
+
+### 🎯 **Priority 5: Subgraph API Consistency Issues**
+**Priority**: High - Core API consistency bugs  
+
+**Issues Identified**:
+
+**1. Missing node_ids and edge_ids Properties on PySubgraph**
+```python
+# Current: These don't work on subgraphs
+subgraph = g.connected_components()[0]
+subgraph.node_ids  # AttributeError - should inherit from graph
+subgraph.edge_ids  # AttributeError - should inherit from graph
+
+# Should work: Subgraphs should expose their node/edge lists
+print(subgraph.node_ids)  # List of NodeIds in this component
+print(subgraph.edge_ids)  # List of EdgeIds in this component
+```
+
+**2. Connected Components Missing Edges**
+```python
+# Issue: Connected components return subgraphs with no edges
+components = g.connected_components()
+comp = components[0]
+print(f"Nodes: {comp.node_count()}")  # Works: shows nodes
+print(f"Edges: {comp.edge_count()}")  # Problem: shows 0 edges
+
+# Should work: Component should include edges within the component
+# Expected: Edges connecting nodes within the same component
+```
+
+**Root Cause**: PySubgraph implementation inconsistencies in Rust bindings
+
+**Implementation Tasks**:
+- [ ] **Add node_ids property to PySubgraph**: Expose `self.nodes` as property like PyGraph
+- [ ] **Add edge_ids property to PySubgraph**: Expose `self.edges` as property like PyGraph  
+- [ ] **Fix connected_components edge collection**: Ensure component subgraphs include internal edges
+- [ ] **Validate subgraph edge filtering**: Verify edges are properly filtered to component nodes
+- [ ] **Add integration tests**: Test subgraph property access and edge consistency
+- [ ] **Update documentation**: Document subgraph node_ids/edge_ids properties
+
+**Expected Fix Location**: `/python-groggy/src/lib.rs` PySubgraph implementation
+
+**Success Metrics**:
+- `subgraph.node_ids` and `subgraph.edge_ids` properties work consistently
+- Connected components include all edges between component nodes
+- Subgraph API matches PyGraph consistency for basic properties
+
+### 🎯 **Priority 6: Adjacency Matrix Support**
+**Priority**: High - Essential graph analytics feature
+
+**Goal**: Provide efficient adjacency matrix generation for graphs and subgraphs
+
+**API Design**:
+```python
+# Full graph adjacency matrix
+adj_matrix = g.adjacency()                    # Returns gr.array (sparse/dense matrix)
+
+# Subgraph adjacency matrix with index mapping  
+subgraph = g.filter_nodes("dept == 'Engineering'")
+adj_matrix = subgraph.adjacency(map_index=True)   # Default: True - compact gr.array
+index_mapping = subgraph.index_mapping()           # Maps subgraph indices to original node IDs
+
+# Option: Full-size matrix (rare use case)
+adj_matrix_full = subgraph.adjacency(map_index=False)  # Full graph size gr.array, sparse for subgraph
+
+# Laplacian matrix support
+laplacian = g.laplacian(epsilon=-0.5, k=1)            # Graph Laplacian as gr.array
+laplacian_sub = subgraph.laplacian(epsilon=-0.5, k=1) # Subgraph Laplacian as gr.array
+
+# Fast conversion to scientific computing libraries
+adj_numpy = adj_matrix.to_numpy()              # Convert to NumPy array
+adj_scipy = adj_matrix.to_scipy_sparse()       # Convert to SciPy sparse matrix
+adj_pandas = adj_matrix.to_pandas()            # Convert to Pandas DataFrame
+
+# Usage examples
+import numpy as np
+eigenvals = np.linalg.eigvals(adj_matrix.to_numpy())      # Graph spectral analysis
+degrees = adj_matrix.to_numpy().sum(axis=1)               # Node degrees from matrix
+laplacian_eigenvals = np.linalg.eigvals(laplacian.to_numpy())  # Laplacian spectrum
+```
+
+**Key Features**:
+- **gr.array Return Type**: Matrices returned as groggy array objects with native performance
+- **Fast Conversions**: Easy `to_numpy()`, `to_scipy_sparse()`, `to_pandas()` methods
+- **Efficient Storage**: Sparse matrices by default for large graphs
+- **Index Mapping**: Subgraph matrices use compact indexing with mapping to original IDs
+- **Flexible Options**: Choice between compact (default) or full-size matrices
+- **Integration**: Works seamlessly with NumPy/SciPy via conversion methods
+- **Performance**: Native Rust implementation for fast matrix construction
+- **Rust Implementation**: All adjacency matrix logic and rendering implemented in Rust core
+- **Laplacian Support**: Graph Laplacian matrix with configurable epsilon and k parameters
+
+**Implementation Strategy**:
+```python
+# PyGraph method
+def adjacency(self, sparse=True, dtype=np.float64):
+    """Generate adjacency matrix for full graph"""
+    return self._rust_graph.adjacency_matrix(sparse, dtype)
+
+def laplacian(self, epsilon=-0.5, k=1, sparse=True, dtype=np.float64):
+    """Generate Laplacian matrix for full graph"""
+    return self._rust_graph.laplacian_matrix(epsilon, k, sparse, dtype)
+
+# PySubgraph method  
+def adjacency(self, map_index=True, sparse=True, dtype=np.float64):
+    """Generate adjacency matrix for subgraph"""
+    if map_index:
+        # Compact matrix using subgraph node indices
+        return self._build_compact_adjacency_matrix(sparse, dtype)
+    else:
+        # Full-size matrix with zeros for non-subgraph nodes
+        return self._build_full_adjacency_matrix(sparse, dtype)
+
+def laplacian(self, epsilon=-0.5, k=1, map_index=True, sparse=True, dtype=np.float64):
+    """Generate Laplacian matrix for subgraph"""
+    if map_index:
+        return self._build_compact_laplacian_matrix(epsilon, k, sparse, dtype)
+    else:
+        return self._build_full_laplacian_matrix(epsilon, k, sparse, dtype)
+
+def index_mapping(self):
+    """Return mapping from compact indices to original node IDs"""
+    return {i: node_id for i, node_id in enumerate(self.node_ids)}
+```
+
+**Use Cases**:
+- **Spectral Analysis**: Eigenvalue/eigenvector computations for graph properties
+- **Community Detection**: Matrix-based clustering algorithms  
+- **Path Analysis**: Powers of adjacency matrix for multi-step connectivity
+- **Graph Comparison**: Matrix norms and distances between graph structures
+- **Machine Learning**: Graph neural networks, embedding algorithms
+- **Laplacian Analysis**: Graph signal processing, diffusion processes, spectral clustering
+
+**Implementation Tasks**:
+- [ ] **Add adjacency() to PyGraph**: Full graph adjacency matrix as gr.array
+- [ ] **Add adjacency() to PySubgraph**: Compact and full-size options as gr.array
+- [ ] **Add laplacian() to PyGraph**: Graph Laplacian matrix with epsilon/k parameters as gr.array
+- [ ] **Add laplacian() to PySubgraph**: Subgraph Laplacian with index mapping support as gr.array
+- [ ] **Add index_mapping() to PySubgraph**: Mapping from compact to original indices
+- [ ] **Implement gr.array conversion methods**: `to_numpy()`, `to_scipy_sparse()`, `to_pandas()`
+- [ ] **Add weighted matrix support**: Include edge weights in matrix values
+- [ ] **Performance optimization**: Native Rust matrix construction and storage
+- [ ] **Integration testing**: Verify matrix operations work with conversion methods
+- [ ] **Documentation**: Examples for spectral analysis and ML applications
+
+**Success Metrics**:
+- Graph adjacency matrices generate correctly for any graph size
+- Subgraph compact matrices use minimal memory with proper index mapping
+- Matrix operations integrate seamlessly with scientific Python ecosystem
+- Performance competitive with NetworkX for large graphs
+
+### 🎯 **Priority 7: Fine-Tune O(n log n) Operations**
 **Status**: Performance optimization opportunity
 
 **Remaining O(n log n) Operations to Optimize**:
@@ -534,6 +839,8 @@ def set(self, *args, **kwargs):
 - [ ] `subgraph.table()` works with filtered data (minor graph reference issue)
 - [ ] pyarray provides accurate statistics: `mean()`, `std()`, `min()`, `max()`
 - [ ] pyarray works like normal list: indexing, iteration, `len()`
+- [ ] **PyArray O(n) performance**: All statistical methods achieve O(n) complexity (not O(n log n))
+- [ ] **PyArray advanced algorithms**: Correlation, regression, FFT support implemented
 - [ ] Statistical arrays cached properly for performance
 - [x] **Batch attribute access**: Bulk column methods work correctly ✅ **COMPLETED**
 - [x] **GraphTable performance**: 5-10x speedup achieved with bulk optimization ✅ **COMPLETED**
