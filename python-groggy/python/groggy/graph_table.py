@@ -327,19 +327,25 @@ class GraphTable:
         rows, columns = self._build_table_data()
         
         if isinstance(key, str):
-            # Column access - return PyArray for enhanced analytics
+            # Column access - return GraphArray for enhanced analytics  
             if key not in columns:
                 raise KeyError(f"Column '{key}' not found")
             
-            column_data = [row.get(key) for row in rows]
+            # Use optimized Rust method that returns GraphArray directly
+            # This is much more efficient than building table data and extracting columns
+            graph = self._get_graph()
+            if hasattr(graph, '_get_node_attribute_column') and self.table_type == "nodes":
+                try:
+                    # Direct GraphArray return from Rust - no Python conversion overhead
+                    return graph._get_node_attribute_column(key)
+                except Exception as e:
+                    # Fallback to table-based extraction if direct access fails
+                    print(f"Warning: Direct GraphArray access failed ({e}), using fallback")
+                    pass
             
-            # Return GraphArray for native statistical operations
-            try:
-                from groggy import GraphArray
-                return GraphArray(column_data)
-            except ImportError:
-                # Fallback to plain list if GraphArray not available
-                return column_data
+            # Fallback: extract from table data (less efficient but compatible)
+            column_data = [row.get(key) for row in rows]
+            return column_data
                 
         elif isinstance(key, int):
             # Single row access
