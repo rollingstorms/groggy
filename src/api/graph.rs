@@ -587,14 +587,14 @@ impl Graph {
         Ok(results)
     }
     
-    /// Get attribute column for ALL active nodes (optimized for GraphTable)
+    /// INTERNAL: Get attribute column for ALL active nodes (optimized for GraphTable)
     /// 
     /// This is the key optimization for GraphTable - instead of O(n*m) individual calls,
     /// we make O(m) bulk calls to get complete attribute columns.
     /// 
     /// PERFORMANCE: Single column access + filtering by active nodes only
-    /// USAGE: Ideal for table(), DataFrame creation, bulk data export
-    pub fn get_node_attribute_column(&self, attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
+    /// USAGE: Internal use by table(), DataFrame creation, bulk data export
+    pub fn _get_node_attribute_column(&self, attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
         let node_ids = self.space.node_ids(); // Get all active node IDs
         let mut results = Vec::with_capacity(node_ids.len());
         
@@ -616,8 +616,8 @@ impl Graph {
         Ok(results)
     }
     
-    /// Get attribute column for ALL active edges (optimized for GraphTable)
-    pub fn get_edge_attribute_column(&self, attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
+    /// INTERNAL: Get attribute column for ALL active edges (optimized for GraphTable)
+    pub fn _get_edge_attribute_column(&self, attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
         let edge_ids = self.space.edge_ids(); // Get all active edge IDs
         let mut results = Vec::with_capacity(edge_ids.len());
         
@@ -641,16 +641,16 @@ impl Graph {
     
     /// Get attribute column for specific nodes (optimized for subgraph tables)
     /// 
-    /// This enables subgraph.table() to be as efficient as graph.table()
+    /// INTERNAL: This enables subgraph.table() to be as efficient as graph.table()
     /// by using bulk column access instead of individual attribute calls.
-    pub fn get_node_attributes_for_nodes(&self, node_ids: &[NodeId], attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
+    pub fn _get_node_attributes_for_nodes(&self, node_ids: &[NodeId], attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
         // This is the same as get_nodes_attrs but with a more descriptive name
         // for use in subgraph table creation
         self.get_nodes_attrs(attr, node_ids)
     }
     
-    /// Get attribute column for specific edges (optimized for subgraph edge tables)
-    pub fn get_edge_attributes_for_edges(&self, edge_ids: &[EdgeId], attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
+    /// INTERNAL: Get attribute column for specific edges (optimized for subgraph edge tables)
+    pub fn _get_edge_attributes_for_edges(&self, edge_ids: &[EdgeId], attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
         // This is the same as get_edges_attrs but with a more descriptive name
         // for use in subgraph edge table creation
         self.get_edges_attrs(attr, edge_ids)

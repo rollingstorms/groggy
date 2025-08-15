@@ -1887,10 +1887,10 @@ impl PyGraph {
     
     /// Get complete attribute column for ALL nodes (optimized for table() method)
     /// 
-    /// This is the key optimization for GraphTable - instead of O(n*m) individual calls,
+    /// INTERNAL: This is the key optimization for GraphTable - instead of O(n*m) individual calls,
     /// we make O(m) calls to get complete columns.
-    fn get_node_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<Vec<PyObject>> {
-        match self.inner.get_node_attribute_column(&attr_name.to_string()) {
+    fn _get_node_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<Vec<PyObject>> {
+        match self.inner._get_node_attribute_column(&attr_name.to_string()) {
             Ok(values) => {
                 let mut py_values = Vec::with_capacity(values.len());
                 for value in values {
@@ -1906,8 +1906,8 @@ impl PyGraph {
     }
     
     /// Get complete attribute column for ALL edges (optimized for edge table() method)
-    fn get_edge_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<Vec<PyObject>> {
-        match self.inner.get_edge_attribute_column(&attr_name.to_string()) {
+    fn _get_edge_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<Vec<PyObject>> {
+        match self.inner._get_edge_attribute_column(&attr_name.to_string()) {
             Ok(values) => {
                 let mut py_values = Vec::with_capacity(values.len());
                 for value in values {
@@ -1923,8 +1923,8 @@ impl PyGraph {
     }
     
     /// Get attribute column for specific nodes (optimized for subgraph tables)
-    fn get_node_attributes_for_nodes(&self, py: Python, node_ids: Vec<NodeId>, attr_name: &str) -> PyResult<Vec<PyObject>> {
-        match self.inner.get_node_attributes_for_nodes(&node_ids, &attr_name.to_string()) {
+    fn _get_node_attributes_for_nodes(&self, py: Python, node_ids: Vec<NodeId>, attr_name: &str) -> PyResult<Vec<PyObject>> {
+        match self.inner._get_node_attributes_for_nodes(&node_ids, &attr_name.to_string()) {
             Ok(values) => {
                 let mut py_values = Vec::with_capacity(values.len());
                 for value in values {
@@ -1940,8 +1940,8 @@ impl PyGraph {
     }
     
     /// Get attribute column for specific edges (optimized for subgraph edge tables)
-    fn get_edge_attributes_for_edges(&self, py: Python, edge_ids: Vec<EdgeId>, attr_name: &str) -> PyResult<Vec<PyObject>> {
-        match self.inner.get_edge_attributes_for_edges(&edge_ids, &attr_name.to_string()) {
+    fn _get_edge_attributes_for_edges(&self, py: Python, edge_ids: Vec<EdgeId>, attr_name: &str) -> PyResult<Vec<PyObject>> {
+        match self.inner._get_edge_attributes_for_edges(&edge_ids, &attr_name.to_string()) {
             Ok(values) => {
                 let mut py_values = Vec::with_capacity(values.len());
                 for value in values {
