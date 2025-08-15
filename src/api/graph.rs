@@ -532,36 +532,130 @@ impl Graph {
     /// Get attribute values for specific nodes (secure and efficient)
     /// 
     /// ALGORITHM:
-    /// 1. Filter requested nodes to only active ones
-    /// 2. Get full attribute column from pool (efficient)
-    /// 3. Extract values at active indices only
-    /// 4. Return results aligned with requested nodes
+    /// 1. Get full attribute column from pool (O(1) HashMap lookup)
+    /// 2. For each requested node: get its attribute index and extract value
+    /// 3. Return results aligned with requested nodes
     /// 
     /// SECURITY: Only returns data for active nodes that were explicitly requested
-    /// PERFORMANCE: Uses efficient column access internally
+    /// PERFORMANCE: Uses bulk columnar access - much faster than individual get_node_attr calls
     pub fn get_nodes_attrs(&self, attr: &AttrName, requested_nodes: &[NodeId]) -> GraphResult<Vec<Option<AttrValue>>> {
         let mut results = Vec::with_capacity(requested_nodes.len());
-        for &node_id in requested_nodes {
-            match self.get_node_attr(node_id, attr) {
-                Ok(value) => results.push(value),
-                Err(_) => results.push(None), // Node doesn't exist or error occurred
+        
+        // Get the attribute column once (O(1) HashMap lookup)
+        if let Some(attr_column) = self.pool.get_node_attribute_column(attr) {
+            // Bulk process all nodes using direct column access
+            for &node_id in requested_nodes {
+                if !self.space.contains_node(node_id) {
+                    results.push(None); // Node doesn't exist
+                } else if let Some(index) = self.space.get_node_attr_index(node_id, attr) {
+                    // Direct O(1) access to column value
+                    results.push(attr_column.get(index).cloned());
+                } else {
+                    results.push(None); // Attribute not set for this node
+                }
             }
+        } else {
+            // Attribute doesn't exist in the graph
+            results.resize(requested_nodes.len(), None);
         }
+        
         Ok(results)
     }
     
     /// Get attribute values for specific edges (secure and efficient)
     pub fn get_edges_attrs(&self, attr: &AttrName, requested_edges: &[EdgeId]) -> GraphResult<Vec<Option<AttrValue>>> {
         let mut results = Vec::with_capacity(requested_edges.len());
-        for &edge_id in requested_edges {
-            match self.get_edge_attr(edge_id, attr) {
-                Ok(value) => results.push(value),
-                Err(_) => results.push(None), // Edge doesn't exist or error occurred
+        
+        // Get the attribute column once (O(1) HashMap lookup)
+        if let Some(attr_column) = self.pool.get_edge_attribute_column(attr) {
+            // Bulk process all edges using direct column access
+            for &edge_id in requested_edges {
+                if !self.space.contains_edge(edge_id) {
+                    results.push(None); // Edge doesn't exist
+                } else if let Some(index) = self.space.get_edge_attr_index(edge_id, attr) {
+                    // Direct O(1) access to column value
+                    results.push(attr_column.get(index).cloned());
+                } else {
+                    results.push(None); // Attribute not set for this edge
+                }
             }
+        } else {
+            // Attribute doesn't exist in the graph
+            results.resize(requested_edges.len(), None);
         }
+        
         Ok(results)
     }
     
+    /// Get attribute column for ALL active nodes (optimized for GraphTable)
+    /// 
+    /// This is the key optimization for GraphTable - instead of O(n*m) individual calls,
+    /// we make O(m) bulk calls to get complete attribute columns.
+    /// 
+    /// PERFORMANCE: Single column access + filtering by active nodes only
+    /// USAGE: Ideal for table(), DataFrame creation, bulk data export
+    pub fn get_node_attribute_column(&self, attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
+        let node_ids = self.space.node_ids(); // Get all active node IDs
+        let mut results = Vec::with_capacity(node_ids.len());
+        
+        // Get the attribute column once (O(1) HashMap lookup)
+        if let Some(attr_column) = self.pool.get_node_attribute_column(attr) {
+            // Process all active nodes using direct column access
+            for node_id in node_ids {
+                if let Some(index) = self.space.get_node_attr_index(node_id, attr) {
+                    results.push(attr_column.get(index).cloned());
+                } else {
+                    results.push(None); // Attribute not set for this node
+                }
+            }
+        } else {
+            // Attribute doesn't exist in the graph
+            results.resize(node_ids.len(), None);
+        }
+        
+        Ok(results)
+    }
+    
+    /// Get attribute column for ALL active edges (optimized for GraphTable)
+    pub fn get_edge_attribute_column(&self, attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
+        let edge_ids = self.space.edge_ids(); // Get all active edge IDs
+        let mut results = Vec::with_capacity(edge_ids.len());
+        
+        // Get the attribute column once (O(1) HashMap lookup)
+        if let Some(attr_column) = self.pool.get_edge_attribute_column(attr) {
+            // Process all active edges using direct column access
+            for edge_id in edge_ids {
+                if let Some(index) = self.space.get_edge_attr_index(edge_id, attr) {
+                    results.push(attr_column.get(index).cloned());
+                } else {
+                    results.push(None); // Attribute not set for this edge
+                }
+            }
+        } else {
+            // Attribute doesn't exist in the graph
+            results.resize(edge_ids.len(), None);
+        }
+        
+        Ok(results)
+    }
+    
+    /// Get attribute column for specific nodes (optimized for subgraph tables)
+    /// 
+    /// This enables subgraph.table() to be as efficient as graph.table()
+    /// by using bulk column access instead of individual attribute calls.
+    pub fn get_node_attributes_for_nodes(&self, node_ids: &[NodeId], attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
+        // This is the same as get_nodes_attrs but with a more descriptive name
+        // for use in subgraph table creation
+        self.get_nodes_attrs(attr, node_ids)
+    }
+    
+    /// Get attribute column for specific edges (optimized for subgraph edge tables)
+    pub fn get_edge_attributes_for_edges(&self, edge_ids: &[EdgeId], attr: &AttrName) -> GraphResult<Vec<Option<AttrValue>>> {
+        // This is the same as get_edges_attrs but with a more descriptive name
+        // for use in subgraph edge table creation
+        self.get_edges_attrs(attr, edge_ids)
+    }
+
     // NOTE: Removed set_node_attr_bulk - use set_node_attrs for all bulk operations
     
     // NOTE: Removed set_edge_attr_bulk - use set_edge_attrs for all bulk operations
