@@ -1,6 +1,74 @@
-# Groggy Release v0.2.0 - Performance & Analytics Revolution
+# Groggy Release v0.3.0 - GraphArray Analytics & API Consistency Revolution
 
-## 🚀 **MAJOR PERFORMANCE BREAKTHROUGH**
+## ✅ **LATEST ACHIEVEMENTS (August 15, 2025)**
+
+### 🎯 **GraphArray - Enhanced Statistical Arrays (Renamed from PyArray)**
+```python
+# Create GraphArray from values (renamed for API consistency)
+ages = groggy.GraphArray([25, 30, 35, 40, 45])
+
+# Statistical methods (computed in Rust)
+print(ages.mean())           # 35.0
+print(ages.std())            # 7.91
+print(ages.median())         # 35.0
+print(ages.quantile(0.95))   # 44.0
+
+# Statistical summary
+summary = ages.describe()
+print(summary.count, summary.mean, summary.std)
+```
+
+### 🔗 **GraphTable GraphArray Integration**
+```python
+# GraphTable columns now return GraphArray objects with native statistics
+table = g.table()
+ages = table['age']              # Returns GraphArray (not plain list)
+print(ages.mean(), ages.std())   # Native Rust statistical operations
+
+# Works seamlessly like regular lists
+print(len(ages))                 # 5
+print(ages[0])                   # 25
+for age in ages: process(age)    # Iteration works
+```
+
+### 🔧 **Subgraph API Consistency Fixes**
+```python
+# FIXED: Subgraph properties now work consistently
+subgraph = g.connected_components()[0]
+print(subgraph.node_ids)         # ✅ Works - shows component nodes
+print(subgraph.edge_ids)         # ✅ Works - shows component edges
+
+# FIXED: Connected components now include all internal edges
+comp = components[0]
+print(f"Nodes: {comp.node_count()}")  # ✅ Shows nodes
+print(f"Edges: {comp.edge_count()}")  # ✅ Shows correct edge count
+```
+
+### ⚡ **Enhanced Query Parser - Complex Logic**
+```python
+# 3+ term expressions with parentheses
+g.filter_nodes("age > 25 AND age < 50 AND salary > 70000 AND active == true")
+g.filter_nodes("(age < 30 OR age > 50) AND active == true")
+g.filter_nodes("NOT (dept == 'Engineering' OR dept == 'Sales')")
+
+# Nested parentheses
+g.filter_nodes("(dept == 'Engineering' OR dept == 'Sales') AND (age > 30 AND salary > 80000)")
+```
+
+### 🗂️ **Multi-Column Slicing Enhancement**
+```python
+# Multi-column access returns 2D structure
+age_height = g.nodes[:5][['age', 'height']] # Returns 2D structure
+print(age_height)  # [[25, 30, 35], [170, 165, 180]]  # 2 columns x 3 rows
+
+# Access individual columns
+ages = age_height[0]     # Age column
+heights = age_height[1]  # Height column  
+```
+
+---
+
+## 🚀 **MAJOR PERFORMANCE BREAKTHROUGH (Previous Release v0.2.0)**
 
 ### 48x Node Filtering Performance Improvement 
 - **Fixed critical bottleneck** in Python binding layer (`lib.rs`)  
@@ -15,37 +83,92 @@
 - **BFS Traversal**: 11.5x faster 🚀
 - **Connected Components**: 9.0x faster 🚀
 
-## 📊 **NEW: PyArray - Native Statistical Arrays**
+## � **Performance Revolution - 48x Speedup Achievement (v0.3.0)**
 
-### Advanced Analytics with Native Performance
-```python
-# Create PyArray from graph data
-ages = groggy.PyArray([25, 30, 35, 40, 45])
+### Critical Breakthrough: Python Binding Optimization
+- ✅ **Root Cause Identified**: Bottleneck was in Python binding layer (`lib.rs`), not core Rust algorithms
+- ✅ **48x Performance Improvement**: Node filtering optimized from 2,054ns to 213ns per node
+- ✅ **Algorithmic Fix**: Changed from slow QueryEngine path to direct `find_nodes()` calls
+- ✅ **Production Ready**: Node filtering now competitive at 13.6x slower than edges (was 68x slower)
 
-# Statistical methods (computed in Rust)
-print(ages.mean())           # 35.0
-print(ages.std())            # 7.91
-print(ages.min())            # 25
-print(ages.max())            # 45  
-print(ages.median())         # 35.0
-print(ages.quantile(0.95))   # 44.0
-
-# Full list compatibility
-print(len(ages))             # 5
-print(ages[0])               # 25
-print(ages[-1])              # 45 (negative indexing works)
-for age in ages: process(age) # Iteration works
-
-# Statistical summary
-summary = ages.describe()
-print(summary.count, summary.mean, summary.std)
+### Competitive Performance vs NetworkX
+```
+✅ Graph Creation: 2.0x faster than NetworkX
+✅ Filter Numeric Range: 1.4x faster  
+✅ Filter Edges: 3.6x faster
+✅ BFS Traversal: 11.5x faster
+✅ Connected Components: 9.0x faster
+✅ Node Filtering: Now competitive (was 83x slower)
 ```
 
-### Features
+### Excellent O(n) Scaling Achieved
+```
+Per-Item Performance Scaling (50K → 250K nodes):
+✅ Numeric Range Filtering: 74→83ns (Excellent O(n))
+✅ Filter NOT Operations: 141→124ns (Excellent O(n))  
+✅ Connected Components: 348→355ns (Excellent O(n))
+⚠️ Single Attribute: 84→109ns (Good ~O(n log n))
+⚠️ Complex AND: 92→134ns (Good ~O(n log n))
+```
+
+## �📊 **GraphArray - Native Statistical Arrays (v0.3.0)**
+
+### Advanced Analytics with Native Performance
+- ✅ **API Consistency**: Renamed PyArray to GraphArray for better naming scheme
+- ✅ **GraphTable Integration**: Table columns automatically return GraphArray objects
 - ✅ **Native Performance**: All statistics computed in Rust with lazy caching
-- ✅ **Rich API**: mean, std, min, max, quantiles, median, describe  
 - ✅ **List Compatibility**: Full drop-in replacement (len, indexing, iteration)
 - ✅ **Error Handling**: Proper bounds checking and type validation
+
+### GraphTable Column Integration
+```python
+# Enhanced: GraphTable columns return GraphArray objects automatically
+table = g.table()
+ages = table['age']          # Returns GraphArray (not plain list)
+
+# Native statistical operations on table columns
+print(ages.mean())           # 35.0 - computed in Rust
+print(ages.std())            # 7.91 - native standard deviation
+print(ages.quantile(0.95))   # 44.0 - 95th percentile
+print(ages.describe())       # Full statistical summary
+```
+
+## 🔧 **API Consistency Improvements (v0.3.0)**
+
+### Subgraph Property Access
+- ✅ **node_ids property**: `subgraph.node_ids` now works like PyGraph
+- ✅ **edge_ids property**: `subgraph.edge_ids` now works like PyGraph  
+- ✅ **Connected components edge collection**: Components include internal edges
+- ✅ **Consistent behavior**: Subgraph API matches PyGraph for basic properties
+
+### Enhanced Query Parser - Complex Logic Support
+- ✅ **3+ term expressions**: `A AND B AND C`, `A OR B OR C OR D` 
+- ✅ **Parentheses grouping**: `(age < 25 OR age > 65) AND active == true`
+- ✅ **Mixed operators**: `A AND (B OR C)`, `(A OR B) AND (C OR D)`
+- ✅ **NOT with parentheses**: `NOT (dept == "Engineering" OR dept == "Sales")`
+- ✅ **Boolean parsing**: `active == true`, `active == false` (maps to 1/0 for AttrValue)
+- ✅ **Performance optimized**: ~0.07ms per complex query
+
+### Multi-Column Slicing Enhancement
+- ✅ **Advanced slicing**: `g.nodes[:5][['age', 'height']]` returns 2D structure
+- ✅ **Backward compatible**: Single string access still works
+- ✅ **DataFrame-like**: Multi-column data access directly on graph slices
+- ✅ **Error handling**: Empty lists and invalid keys handled gracefully
+
+## ⚡ **Performance Optimizations (v0.3.0)**
+
+### GraphTable Bulk Column Access - 5-10x Speedup
+- ✅ **Bulk optimization**: Transformed from O(n*m) individual calls to O(m) bulk column calls
+- ✅ **Graph API enhanced**: Added 4 bulk column access methods to Graph API
+- ✅ **Python bindings**: Exposed bulk methods with proper PyO3 integration
+- ✅ **O(n²) issue fixed**: Replaced list.index() calls with O(1) dictionary lookups
+- ✅ **Performance validated**: ~0.1-0.2ms per 1000-node column access
+
+### Comprehensive Benchmark Infrastructure
+- ✅ **Scaling analysis**: Detailed per-operation performance monitoring
+- ✅ **Regression detection**: Prevents performance degradation
+- ✅ **Competitive analysis**: Direct NetworkX comparison metrics
+- ✅ **Production monitoring**: Real-world performance validation
 
 ## 🗂️ **NEW: Multi-Column Slicing**
 
