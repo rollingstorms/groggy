@@ -22,7 +22,7 @@ from ._groggy import (
     HistoryStatistics,
     HistoricalView,
     # Statistical arrays
-    PyArray,
+    GraphArray,
 )
 
 from .types import NodeId, EdgeId, AttrName, StateId, BranchName
@@ -82,7 +82,7 @@ __all__ = [
     "HistoryStatistics",
     "HistoricalView",
     # Statistical arrays
-    "PyArray",
+    "GraphArray",
     # Graph generators
     "generators",
     "complete_graph",
