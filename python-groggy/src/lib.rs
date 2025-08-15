@@ -1,8 +1,8 @@
 #![allow(non_local_definitions)] // Suppress PyO3 macro warnings
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
-use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyIndexError};
+use pyo3::types::PyDict;
+use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyIndexError, PyImportError, PyNotImplementedError};
 // use std::collections::HashMap; // TODO: Remove if not needed
 
 // Import from the main groggy crate
@@ -34,8 +34,46 @@ use groggy::{
 mod utils;
 use utils::{python_value_to_attr_value, attr_value_to_python_value, graph_error_to_py_err};
 
-
-
+/// Helper function to convert AdjacencyMatrix to PyGraphMatrix
+fn adjacency_matrix_to_py_graph_matrix(py: Python, matrix: groggy::AdjacencyMatrix) -> PyResult<Py<PyGraphMatrix>> {
+    let (rows, cols) = matrix.shape();
+    
+    // Create column data from adjacency matrix
+    let mut columns = Vec::new();
+    let mut column_names = Vec::new();
+    
+    // Create columns representing each row of the adjacency matrix
+    for col_idx in 0..cols {
+        let mut column_data = Vec::with_capacity(rows);
+        
+        // Extract column values from the matrix
+        for row_idx in 0..rows {
+            let value = match &matrix {
+                groggy::AdjacencyMatrix::Dense(m) => {
+                    m.get(row_idx, col_idx).cloned().unwrap_or(groggy::AttrValue::Float(0.0))
+                },
+                groggy::AdjacencyMatrix::Sparse(m) => {
+                    m.get(row_idx, col_idx).cloned().unwrap_or(groggy::AttrValue::Float(0.0))
+                }
+            };
+            column_data.push(value);
+        }
+        
+        // Create GraphArray for this column
+        let graph_array = groggy::GraphArray::from_vec(column_data);
+        let py_graph_array = PyGraphArray { inner: graph_array };
+        columns.push(Py::new(py, py_graph_array)?);
+        column_names.push(format!("col_{}", col_idx));
+    }
+    
+    let py_matrix = PyGraphMatrix {
+        columns,
+        column_names,
+        num_rows: rows,
+    };
+    
+    Ok(Py::new(py, py_matrix)?)
+}
 
 /// Native result handle that keeps data in Rust
 #[pyclass]
@@ -232,16 +270,26 @@ impl PySubgraph {
         self.edges.len()
     }
     
-    /// Get node IDs in this subgraph (subgraph.node_ids property)
+    /// Get node IDs in this subgraph as GraphArray (lazy Rust view) - use .values for Python list
     #[getter]
-    fn node_ids(&self) -> Vec<NodeId> {
-        self.nodes.clone()
+    fn node_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+        let attr_values: Vec<groggy::AttrValue> = self.nodes.iter()
+            .map(|&id| groggy::AttrValue::Int(id as i64))
+            .collect();
+        let graph_array = groggy::GraphArray::from_vec(attr_values);
+        let py_graph_array = PyGraphArray { inner: graph_array };
+        Ok(Py::new(py, py_graph_array)?)
     }
     
-    /// Get edge IDs in this subgraph (subgraph.edge_ids property) 
+    /// Get edge IDs in this subgraph as GraphArray (lazy Rust view) - use .values for Python list
     #[getter]
-    fn edge_ids(&self) -> Vec<EdgeId> {
-        self.edges.clone()
+    fn edge_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+        let attr_values: Vec<groggy::AttrValue> = self.edges.iter()
+            .map(|&id| groggy::AttrValue::Int(id as i64))
+            .collect();
+        let graph_array = groggy::GraphArray::from_vec(attr_values);
+        let py_graph_array = PyGraphArray { inner: graph_array };
+        Ok(Py::new(py, py_graph_array)?)
     }
     
     /// Check if a node exists in this subgraph
@@ -280,8 +328,15 @@ impl PySubgraph {
                 .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("Failed to get connected components: {}", e)))?;
             
             let mut result = Vec::new();
-            for component in components {
-                result.push(PySubgraph::from_core_subgraph(component));
+            for (i, component) in components.iter().enumerate() {
+                // STANDARDIZED: Use PySubgraph::new() like all other subgraph creation methods
+                // This ensures consistent graph reference handling for .nodes/.edges accessors
+                result.push(PySubgraph::new(
+                    component.node_ids(),
+                    component.edge_ids(),
+                    format!("connected_component_{}", i),
+                    self.graph.clone(),  // Pass the graph reference consistently
+                ));
             }
             Ok(result)
         } else {
@@ -468,22 +523,81 @@ impl PySubgraph {
                 return Err(PyValueError::new_err("Empty attribute list"));
             }
             
-            // Collect all columns
+            // Collect all columns as GraphArrays
             let mut columns = Vec::new();
+            let mut num_rows = 0;
+            
+            // Type checking for mixed types
+            let mut column_types = Vec::new();
+            
             for attr_name in &attr_names {
                 let column = self.get_node_attribute_column(py, attr_name)?;
+                
+                // Detect column type by borrowing temporarily
+                let column_type = {
+                    let graph_array = column.borrow(py);
+                    
+                    // Get the length and detect column type
+                    num_rows = graph_array.inner.len();
+                    
+                    // Sample a few values to determine the predominant type
+                    if num_rows > 0 {
+                        let sample_size = std::cmp::min(num_rows, 3);
+                        let mut type_counts = std::collections::HashMap::new();
+                        
+                        for i in 0..sample_size {
+                            let type_name = match &graph_array.inner[i] {
+                                groggy::AttrValue::Int(_) | groggy::AttrValue::SmallInt(_) => "int",
+                                groggy::AttrValue::Float(_) => "float", 
+                                groggy::AttrValue::Bool(_) => "bool",
+                                groggy::AttrValue::Text(_) | groggy::AttrValue::CompactText(_) => "str",
+                                _ => "mixed",
+                            };
+                            *type_counts.entry(type_name).or_insert(0) += 1;
+                        }
+                        
+                        // Get the most common type
+                        type_counts.into_iter()
+                            .max_by_key(|(_, count)| *count)
+                            .map(|(type_name, _)| type_name)
+                            .unwrap_or("mixed")
+                    } else {
+                        "empty"
+                    }
+                }; // Borrow ends here
+                
+                column_types.push(column_type);
                 columns.push(column);
             }
             
-            // For multi-column, return a 2D structure
+            // Check for mixed types (GraphMatrix constraint)  
+            if attr_names.len() > 1 {
+                let first_type = column_types[0];
+                let has_mixed_types = column_types.iter().any(|&t| t != first_type && t != "empty");
+                
+                if has_mixed_types {
+                    let detected_types: Vec<&str> = column_types.into_iter().collect();
+                    return Err(PyTypeError::new_err(format!(
+                        "Mixed types detected: [{}]. GraphMatrix requires homogeneous types.\n\
+                        Use subgraph.nodes.table()[{:?}] for mixed-type data.",
+                        detected_types.join(", "),
+                        attr_names
+                    )));
+                }
+            }
+            
+            // For single column in list form: [['age']] -> return GraphArray (same as 'age')
             if attr_names.len() == 1 {
-                // Single column in list form: [['age']] -> same as 'age'
-                return Ok(columns[0].to_object(py));
+                return Ok(columns[0].clone_ref(py).to_object(py));
             } else {
-                // Multiple columns: [['age', 'height']] -> 2D array-like structure
-                // Create a list of columns (transpose-like structure)
-                let result = PyList::new(py, columns);
-                return Ok(result.to_object(py));
+                // Multiple columns: [['age', 'height']] -> return PyGraphMatrix (structured collection)
+                let matrix = PyGraphMatrix {
+                    columns,
+                    column_names: attr_names,
+                    num_rows,
+                };
+                
+                return Ok(Py::new(py, matrix)?.to_object(py));
             }
         }
         
@@ -575,6 +689,53 @@ impl PySubgraph {
                 "Cannot filter subgraph without graph reference."
             ))
         }
+    }
+    
+    // ========================================================================
+    // ADJACENCY MATRIX OPERATIONS (same interface as Graph)
+    // ========================================================================
+    
+    /// Generate adjacency matrix for subgraph - same API as graph.adjacency_matrix()
+    fn adjacency_matrix(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        if let Some(graph_ref) = &self.graph {
+            let graph = graph_ref.borrow(py);
+            let node_ids = self.nodes.clone();
+            graph.subgraph_adjacency_matrix(py, node_ids)
+        } else {
+            Err(PyErr::new::<PyRuntimeError, _>(
+                "Cannot create adjacency matrix for subgraph without graph reference."
+            ))
+        }
+    }
+    
+    /// Generate adjacency matrix for subgraph (cleaner API)
+    /// Returns: GraphMatrix with multi-index access (matrix[0, 1])
+    /// This is a cleaner alias for adjacency_matrix()
+    fn adjacency(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        self.adjacency_matrix(py)
+    }
+    
+    /// Generate weighted adjacency matrix for subgraph - same API as graph.weighted_adjacency_matrix()
+    fn weighted_adjacency_matrix(&self, py: Python, _weight_attr: &str) -> PyResult<Py<PyGraphMatrix>> {
+        if let Some(graph_ref) = &self.graph {
+            let graph = graph_ref.borrow(py);
+            let node_ids = self.nodes.clone();
+            
+            // For now, just return unweighted adjacency matrix for subgraph
+            // TODO: Implement weighted subgraph matrices by extracting weights from edges
+            graph.subgraph_adjacency_matrix(py, node_ids)
+        } else {
+            Err(PyErr::new::<PyRuntimeError, _>(
+                "Cannot create weighted adjacency matrix for subgraph without graph reference."
+            ))
+        }
+    }
+    
+    /// Generate Laplacian matrix for subgraph - same API as graph.laplacian_matrix()
+    fn laplacian_matrix(&self, _py: Python, _normalized: Option<bool>) -> PyResult<Py<PyGraphMatrix>> {
+        Err(PyErr::new::<PyNotImplementedError, _>(
+            "Subgraph Laplacian matrices not yet implemented. Use graph.laplacian_matrix() for full graph."
+        ))
     }
 }
 
@@ -2204,16 +2365,28 @@ impl PyGraph {
         self.inner.edge_ids().len()
     }
     
-    /// Get all active node IDs (g.node_ids property)
+    /// Get all active node IDs as GraphArray (lazy Rust view) - use .values for Python list
     #[getter]
-    fn node_ids(&self) -> Vec<NodeId> {
-        self.inner.node_ids()
+    fn node_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+        let node_ids = self.inner.node_ids();
+        let attr_values: Vec<groggy::AttrValue> = node_ids.into_iter()
+            .map(|id| groggy::AttrValue::Int(id as i64))
+            .collect();
+        let graph_array = groggy::GraphArray::from_vec(attr_values);
+        let py_graph_array = PyGraphArray { inner: graph_array };
+        Ok(Py::new(py, py_graph_array)?)
     }
     
-    /// Get all active edge IDs (g.edge_ids property)  
+    /// Get all active edge IDs as GraphArray (lazy Rust view) - use .values for Python list
     #[getter]
-    fn edge_ids(&self) -> Vec<EdgeId> {
-        self.inner.edge_ids()
+    fn edge_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+        let edge_ids = self.inner.edge_ids();
+        let attr_values: Vec<groggy::AttrValue> = edge_ids.into_iter()
+            .map(|id| groggy::AttrValue::Int(id as i64))
+            .collect();
+        let graph_array = groggy::GraphArray::from_vec(attr_values);
+        let py_graph_array = PyGraphArray { inner: graph_array };
+        Ok(Py::new(py, py_graph_array)?)
     }
     
     /// Get nodes accessor for fluent API (g.nodes property) 
@@ -2529,22 +2702,51 @@ impl PyGraph {
     
     /// Find connected components with optional in-place attribute setting
     #[pyo3(signature = (inplace = false, attr_name = None))]
-    fn connected_components(&mut self, _py: Python, inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Vec<PySubgraph>> {
+    fn connected_components(mut self_: PyRefMut<Self>, py: Python, inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Vec<PySubgraph>> {
         let inplace = inplace.unwrap_or(false);
         
         let options = groggy::core::traversal::TraversalOptions::default();
-        let result = self.inner.connected_components(options)
+        let result = self_.inner.connected_components(options)
             .map_err(graph_error_to_py_err)?;
         
-        // Convert each component to a PySubgraph
+        // Convert each component to a PySubgraph  
         let mut subgraphs = Vec::new();
+        
+        // Get columnar topology once for efficient edge processing (same pattern as filter_nodes)
+        let (edge_ids, sources, targets) = self_.inner.get_columnar_topology();
+        
+        // Process components and collect results first (avoid borrow conflicts)
+        let mut components_with_edges = Vec::new();
         for (i, component) in result.components.into_iter().enumerate() {
-            // Create subgraph with induced edges (for now, empty - can be enhanced later)
+            // Calculate induced edges using optimized columnar topology method (same as filter_nodes)
+            use std::collections::HashSet;
+            let component_nodes: HashSet<NodeId> = component.nodes.iter().copied().collect();
+            let mut induced_edges = Vec::new();
+            
+            // Iterate through parallel vectors - O(k) where k = active edges
+            for j in 0..edge_ids.len() {
+                let edge_id = edge_ids[j];
+                let source = sources[j];
+                let target = targets[j];
+                
+                // O(1) HashSet lookups instead of O(n) Vec::contains
+                if component_nodes.contains(&source) && component_nodes.contains(&target) {
+                    induced_edges.push(edge_id);
+                }
+            }
+            
+            // Store component data for later processing
+            components_with_edges.push((component.nodes.clone(), induced_edges, i));
+        }
+        
+        // Now create subgraphs and handle inplace attributes without borrow conflicts
+        for (nodes, induced_edges, i) in components_with_edges {
+            // Create subgraph with proper induced edges
             let subgraph = PySubgraph::new(
-                component.nodes.clone(),
-                Vec::new(), // TODO: Calculate induced edges between component nodes
+                nodes.clone(),
+                induced_edges, // Include all edges within this component
                 format!("connected_component_{}", i),
-                None, // TODO: Phase 2.2 - complex graph reference sharing needed
+                None, // Temporarily None - will be set below
             );
             subgraphs.push(subgraph);
             
@@ -2553,10 +2755,16 @@ impl PyGraph {
                 let attr_name = attr_name.clone().unwrap_or_else(|| "component_id".to_string());
                 let component_value = PyAttrValue { inner: groggy::AttrValue::Int(i as i64) };
                 
-                for &node_id in &component.nodes {
-                    self.set_node_attribute(node_id, attr_name.clone(), &component_value)?;
+                for &node_id in &nodes {
+                    self_.set_node_attribute(node_id, attr_name.clone(), &component_value)?;
                 }
             }
+        }
+        
+        // Now set the graph reference for all subgraphs
+        let graph_ref: Py<PyGraph> = self_.into();
+        for subgraph in &mut subgraphs {
+            subgraph.graph = Some(graph_ref.clone());
         }
         
         Ok(subgraphs)
@@ -2808,6 +3016,80 @@ impl PyGraph {
     }
     
     // ========================================================================
+    // ADJACENCY MATRIX OPERATIONS
+    // ========================================================================
+    
+    /// Generate adjacency matrix for the entire graph
+    /// Returns: AdjacencyMatrix with multi-index access (matrix[0, 1])
+    fn adjacency_matrix(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        match self.inner.adjacency_matrix() {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(PyErr::new::<PyRuntimeError, _>(format!("Failed to create adjacency matrix: {}", e)))
+        }
+    }
+    
+    /// Generate adjacency matrix for the entire graph (cleaner API)
+    /// Returns: GraphMatrix with multi-index access (matrix[0, 1])
+    /// This is a cleaner alias for adjacency_matrix()
+    fn adjacency(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        self.adjacency_matrix(py)
+    }
+    
+    /// Generate weighted adjacency matrix using specified edge attribute
+    fn weighted_adjacency_matrix(&self, py: Python, weight_attr: &str) -> PyResult<Py<PyGraphMatrix>> {
+        match self.inner.weighted_adjacency_matrix(weight_attr) {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(PyErr::new::<PyRuntimeError, _>(format!("Failed to create weighted adjacency matrix: {}", e)))
+        }
+    }
+    
+    /// Generate dense adjacency matrix
+    fn dense_adjacency_matrix(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        match self.inner.dense_adjacency_matrix() {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(PyErr::new::<PyRuntimeError, _>(format!("Failed to create dense adjacency matrix: {}", e)))
+        }
+    }
+    
+    /// Generate sparse adjacency matrix
+    fn sparse_adjacency_matrix(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        match self.inner.sparse_adjacency_matrix() {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(PyErr::new::<PyRuntimeError, _>(format!("Failed to create sparse adjacency matrix: {}", e)))
+        }
+    }
+    
+    /// Generate Laplacian matrix
+    fn laplacian_matrix(&self, py: Python, normalized: Option<bool>) -> PyResult<Py<PyGraphMatrix>> {
+        let normalized = normalized.unwrap_or(false);
+        match self.inner.laplacian_matrix(normalized) {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(PyErr::new::<PyRuntimeError, _>(format!("Failed to create Laplacian matrix: {}", e)))
+        }
+    }
+    
+    /// Generate adjacency matrix for a subgraph with specific nodes
+    fn subgraph_adjacency_matrix(&self, py: Python, node_ids: Vec<NodeId>) -> PyResult<Py<PyGraphMatrix>> {
+        match self.inner.subgraph_adjacency_matrix(&node_ids) {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(PyErr::new::<PyRuntimeError, _>(format!("Failed to create subgraph adjacency matrix: {}", e)))
+        }
+    }
+    
+    
+    // ========================================================================
     // VIEW CREATION METHODS FOR FLUENT API  
     // ========================================================================
     
@@ -2895,7 +3177,7 @@ impl PyNodesAccessor {
             // 🚀 PERFORMANCE FIX: Use HashSet for O(1) contains instead of O(n) Vec operations
             let node_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
             let mut induced_edges = Vec::new();
-            for edge_id in graph.edge_ids() {
+            for edge_id in graph.inner.edge_ids() {
                 if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
                     if node_set.contains(&source) && node_set.contains(&target) {  // O(1) hash lookup
                         induced_edges.push(edge_id);
@@ -2917,7 +3199,7 @@ impl PyNodesAccessor {
         // Try to extract as slice (slice access)
         if let Ok(slice) = key.downcast::<pyo3::types::PySlice>() {
             let graph = self.graph.borrow(py);
-            let all_node_ids = graph.node_ids();
+            let all_node_ids = graph.inner.node_ids();
             
             // Convert slice to indices
             let slice_info = slice.indices(all_node_ids.len() as i64)?;
@@ -2937,7 +3219,7 @@ impl PyNodesAccessor {
             // 🚀 PERFORMANCE FIX: Use HashSet for O(1) contains instead of O(n) Vec operations  
             let selected_node_set: std::collections::HashSet<NodeId> = selected_nodes.iter().copied().collect();
             let mut induced_edges = Vec::new();
-            for edge_id in graph.edge_ids() {
+            for edge_id in graph.inner.edge_ids() {
                 if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
                     if selected_node_set.contains(&source) && selected_node_set.contains(&target) {  // O(1) hash lookup
                         induced_edges.push(edge_id);
@@ -2963,8 +3245,8 @@ impl PyNodesAccessor {
     /// Support iteration: for node_id in g.nodes
     fn __iter__(&self, py: Python) -> PyResult<PyObject> {
         let graph = self.graph.borrow(py);
-        let node_ids = graph.node_ids();
-        // Return the list directly - Python will handle iteration
+        let node_ids = graph.node_ids(py)?;
+        // Return the GraphArray directly - Python will handle iteration
         Ok(node_ids.to_object(py))
     }
     
@@ -2983,6 +3265,30 @@ impl PyNodesAccessor {
         let graph = self.graph.borrow(py);
         let count = graph.node_count();
         Ok(format!("NodesAccessor({} nodes)", count))
+    }
+    
+    /// Get table view of nodes (GraphTable with node attributes)
+    fn table(&self, py: Python) -> PyResult<PyObject> {
+        // Import the Python GraphTable class
+        let groggy = py.import("groggy")?;
+        let graph_table_class = groggy.getattr("GraphTable")?;
+        
+        // Get the underlying graph
+        let graph = self.graph.borrow(py);
+        
+        // Determine node list based on constraints
+        let node_data = if let Some(ref constrained) = self.constrained_nodes {
+            // Subgraph case: use constrained nodes
+            constrained.clone()
+        } else {
+            // Full graph case: get all node IDs from the graph
+            // Use the inner graph's node_ids method directly
+            graph.inner.node_ids()
+        };
+        
+        // Create GraphTable with nodes data source
+        let table = graph_table_class.call1((node_data, "nodes", self.graph.clone()))?;
+        Ok(table.to_object(py))
     }
 }
 
@@ -3057,7 +3363,7 @@ impl PyEdgesAccessor {
         // Try to extract as slice (slice access)
         if let Ok(slice) = key.downcast::<pyo3::types::PySlice>() {
             let graph = self.graph.borrow(py);
-            let all_edge_ids = graph.edge_ids();
+            let all_edge_ids = graph.inner.edge_ids();
             
             // Convert slice to indices
             let slice_info = slice.indices(all_edge_ids.len() as i64)?;
@@ -3104,8 +3410,8 @@ impl PyEdgesAccessor {
     /// Support iteration: for edge_id in g.edges
     fn __iter__(&self, py: Python) -> PyResult<PyObject> {
         let graph = self.graph.borrow(py);
-        let edge_ids = graph.edge_ids();
-        // Return the list directly - Python will handle iteration
+        let edge_ids = graph.edge_ids(py)?;
+        // Return the GraphArray directly - Python will handle iteration
         Ok(edge_ids.to_object(py))
     }
     
@@ -3130,7 +3436,7 @@ impl PyEdgesAccessor {
     #[getter]
     fn source(&self, py: Python) -> PyResult<Vec<NodeId>> {
         let graph = self.graph.borrow(py);
-        let edge_ids = graph.edge_ids();
+        let edge_ids = graph.inner.edge_ids();
         let mut sources = Vec::new();
         
         for edge_id in edge_ids {
@@ -3146,7 +3452,7 @@ impl PyEdgesAccessor {
     #[getter]
     fn target(&self, py: Python) -> PyResult<Vec<NodeId>> {
         let graph = self.graph.borrow(py);
-        let edge_ids = graph.edge_ids();
+        let edge_ids = graph.inner.edge_ids();
         let mut targets = Vec::new();
         
         for edge_id in edge_ids {
@@ -3156,6 +3462,30 @@ impl PyEdgesAccessor {
         }
         
         Ok(targets)
+    }
+    
+    /// Get table view of edges (GraphTable with edge attributes)
+    fn table(&self, py: Python) -> PyResult<PyObject> {
+        // Import the Python GraphTable class
+        let groggy = py.import("groggy")?;
+        let graph_table_class = groggy.getattr("GraphTable")?;
+        
+        // Get the underlying graph
+        let graph = self.graph.borrow(py);
+        
+        // Determine edge list based on constraints
+        let edge_data = if let Some(ref constrained) = self.constrained_edges {
+            // Subgraph case: use constrained edges
+            constrained.clone()
+        } else {
+            // Full graph case: get all edge IDs from the graph
+            // Use the inner graph's edge_ids method directly
+            graph.inner.edge_ids()
+        };
+        
+        // Create GraphTable with edges data source
+        let table = graph_table_class.call1((edge_data, "edges", self.graph.clone()))?;
+        Ok(table.to_object(py))
     }
 }
 
@@ -3513,9 +3843,70 @@ impl PyGraphArray {
         }
     }
     
-    /// String representation
+    /// String representation with data preview
     fn __repr__(&self) -> String {
-        format!("GraphArray(len={})", self.inner.len())
+        let len = self.inner.len();
+        if len == 0 {
+            return "GraphArray(len=0, values=[])".to_string();
+        }
+        
+        // Show first few values for small arrays
+        if len <= 5 {
+            // Convert first few values to display format
+            let values_str: Vec<String> = (0..len)
+                .map(|i| {
+                    match &self.inner[i] {
+                        groggy::AttrValue::Int(n) => n.to_string(),
+                        groggy::AttrValue::SmallInt(n) => n.to_string(),
+                        groggy::AttrValue::Float(f) => format!("{:.2}", f),
+                        groggy::AttrValue::Text(s) => format!("'{}'", s),
+                        groggy::AttrValue::CompactText(s) => format!("'{}'", s.as_str()),
+                        groggy::AttrValue::CompressedText(_) => "'<compressed>'".to_string(),
+                        groggy::AttrValue::Bool(b) => b.to_string(),
+                        groggy::AttrValue::FloatVec(v) => format!("[{}...]", v.len()),
+                        groggy::AttrValue::CompressedFloatVec(_) => "'<compressed_vec>'".to_string(),
+                        groggy::AttrValue::Bytes(b) => format!("<{} bytes>", b.len()),
+                    }
+                })
+                .collect();
+            format!("GraphArray(len={}, values=[{}])", len, values_str.join(", "))
+        } else {
+            // Show first 3 and last 2 for large arrays
+            let first_values: Vec<String> = (0..3)
+                .map(|i| {
+                    match &self.inner[i] {
+                        groggy::AttrValue::Int(n) => n.to_string(),
+                        groggy::AttrValue::SmallInt(n) => n.to_string(),
+                        groggy::AttrValue::Float(f) => format!("{:.2}", f),
+                        groggy::AttrValue::Text(s) => format!("'{}'", s),
+                        groggy::AttrValue::CompactText(s) => format!("'{}'", s.as_str()),
+                        groggy::AttrValue::CompressedText(_) => "'<compressed>'".to_string(),
+                        groggy::AttrValue::Bool(b) => b.to_string(),
+                        groggy::AttrValue::FloatVec(v) => format!("[{}...]", v.len()),
+                        groggy::AttrValue::CompressedFloatVec(_) => "'<compressed_vec>'".to_string(),
+                        groggy::AttrValue::Bytes(b) => format!("<{} bytes>", b.len()),
+                    }
+                })
+                .collect();
+            let last_values: Vec<String> = ((len-2)..len)
+                .map(|i| {
+                    match &self.inner[i] {
+                        groggy::AttrValue::Int(n) => n.to_string(),
+                        groggy::AttrValue::SmallInt(n) => n.to_string(),
+                        groggy::AttrValue::Float(f) => format!("{:.2}", f),
+                        groggy::AttrValue::Text(s) => format!("'{}'", s),
+                        groggy::AttrValue::CompactText(s) => format!("'{}'", s.as_str()),
+                        groggy::AttrValue::CompressedText(_) => "'<compressed>'".to_string(),
+                        groggy::AttrValue::Bool(b) => b.to_string(),
+                        groggy::AttrValue::FloatVec(v) => format!("[{}...]", v.len()),
+                        groggy::AttrValue::CompressedFloatVec(_) => "'<compressed_vec>'".to_string(),
+                        groggy::AttrValue::Bytes(b) => format!("<{} bytes>", b.len()),
+                    }
+                })
+                .collect();
+            format!("GraphArray(len={}, values=[{}, ..., {}])", 
+                   len, first_values.join(", "), last_values.join(", "))
+        }
     }
     
     /// Iterator support (for value in array)
@@ -3580,11 +3971,70 @@ impl PyGraphArray {
         self.inner.count()
     }
     
+    /// Get raw data as Python list (like pandas .values property) 
+    #[getter]
+    fn values(&self, py: Python) -> PyResult<Vec<PyObject>> {
+        self.to_list(py)
+    }
+    
     /// Get comprehensive statistical summary
-    fn describe(&self, py: Python) -> PyResult<PyStatsSummary> {
+    fn describe(&self, _py: Python) -> PyResult<PyStatsSummary> {
         Ok(PyStatsSummary {
             inner: self.inner.describe(),
         })
+    }
+    
+    // ========================================================================
+    // SCIENTIFIC COMPUTING CONVERSIONS
+    // ========================================================================
+    
+    /// Convert to NumPy array (when numpy available)
+    fn to_numpy(&self, py: Python) -> PyResult<PyObject> {
+        // Try to import numpy
+        let numpy = py.import("numpy").map_err(|_| {
+            PyErr::new::<PyImportError, _>("numpy is required for to_numpy(). Install with: pip install numpy")
+        })?;
+        
+        // Get data as Python list
+        let values = self.values(py)?;
+        
+        // Convert to numpy array
+        let array = numpy.call_method1("array", (values,))?;
+        Ok(array.to_object(py))
+    }
+    
+    /// Convert to Pandas Series (when pandas available)
+    fn to_pandas(&self, py: Python) -> PyResult<PyObject> {
+        // Try to import pandas
+        let pandas = py.import("pandas").map_err(|_| {
+            PyErr::new::<PyImportError, _>("pandas is required for to_pandas(). Install with: pip install pandas")
+        })?;
+        
+        // Get data as Python list
+        let values = self.values(py)?;
+        
+        // Create Series
+        let series = pandas.call_method1("Series", (values,))?;
+        Ok(series.to_object(py))
+    }
+    
+    /// Convert to SciPy sparse array (for compatibility - GraphArray is dense by nature)
+    fn to_scipy_sparse(&self, py: Python) -> PyResult<PyObject> {
+        // Try to import scipy.sparse
+        let scipy_sparse = py.import("scipy.sparse").map_err(|_| {
+            PyErr::new::<PyImportError, _>("scipy is required for to_scipy_sparse(). Install with: pip install scipy")
+        })?;
+        
+        // Get data as Python list
+        let values = self.values(py)?;
+        
+        // Convert to numpy first, then to sparse
+        let numpy = py.import("numpy")?;
+        let array = numpy.call_method1("array", (values,))?;
+        
+        // Create CSR matrix (compressed sparse row) from the dense array
+        let sparse_matrix = scipy_sparse.call_method1("csr_matrix", (array,))?;
+        Ok(sparse_matrix.to_object(py))
     }
 }
 
@@ -3647,6 +4097,265 @@ impl PyStatsSummary {
     }
 }
 
+/// Python wrapper for GraphMatrix - structured collection of GraphArray columns
+/// This is the return type for multi-column operations like g.nodes[:][['age', 'dept']]
+#[pyclass(name = "GraphMatrix")]
+pub struct PyGraphMatrix {
+    /// Column data as GraphArrays
+    columns: Vec<Py<PyGraphArray>>,
+    /// Column names
+    column_names: Vec<String>,
+    /// Number of rows
+    num_rows: usize,
+}
+
+#[pymethods]
+impl PyGraphMatrix {
+    /// Get matrix dimensions as (rows, columns) tuple
+    fn shape(&self) -> (usize, usize) {
+        (self.num_rows, self.column_names.len())
+    }
+    
+    /// Get column names
+    fn columns(&self) -> Vec<String> {
+        self.column_names.clone()
+    }
+    
+    /// Get number of columns
+    fn column_count(&self) -> usize {
+        self.column_names.len()
+    }
+    
+    /// Get number of rows
+    fn row_count(&self) -> usize {
+        self.num_rows
+    }
+    
+    /// Enhanced access supporting multiple patterns:
+    /// - Column by name: matrix['age'] -> GraphArray
+    /// - Row by index: matrix[0] -> list/dict of row values  
+    /// - Multi-index: matrix[0, 1] -> single cell value
+    /// - Positional column: matrix[:, 0] -> GraphArray (first column)
+    fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
+        // Pattern 1: Multi-index access (row, col) -> single cell value
+        if let Ok(indices) = key.extract::<(usize, usize)>() {
+            let (row, col) = indices;
+            return self.get_cell(py, row, col);
+        }
+        
+        // Pattern 2: String key -> column by name
+        if let Ok(column_name) = key.extract::<String>() {
+            if let Some(index) = self.column_names.iter().position(|name| name == &column_name) {
+                return Ok(self.columns[index].clone_ref(py).to_object(py));
+            } else {
+                return Err(PyKeyError::new_err(format!("Column '{}' not found. Available columns: {:?}", column_name, self.column_names)));
+            }
+        }
+        
+        // Pattern 3: Single integer -> row access
+        if let Ok(row_index) = key.extract::<usize>() {
+            return self.get_row(py, row_index);
+        }
+        
+        // Pattern 4: Slice notation (future enhancement)
+        // if let Ok(slice) = key.extract::<PySlice>() { ... }
+        
+        Err(PyTypeError::new_err(
+            "Key must be: string (column name), int (row index), or (row, col) tuple for multi-index access"
+        ))
+    }
+    
+    /// Get single cell value at (row, col)
+    fn get_cell(&self, py: Python, row: usize, col: usize) -> PyResult<PyObject> {
+        if col >= self.columns.len() {
+            return Err(PyIndexError::new_err(format!("Column index {} out of range (0-{})", col, self.columns.len() - 1)));
+        }
+        
+        let column = &self.columns[col];
+        let graph_array = column.borrow(py);
+        
+        // Get the value at the specified row from this column
+        graph_array.__getitem__(py, row as isize)
+    }
+    
+    /// Get entire row as dict (if named columns) or list (if positional)
+    fn get_row(&self, py: Python, row: usize) -> PyResult<PyObject> {
+        if row >= self.num_rows {
+            return Err(PyIndexError::new_err(format!("Row index {} out of range (0-{})", row, self.num_rows - 1)));
+        }
+        
+        // If we have column names, return as dict
+        if !self.column_names.is_empty() && !self.column_names.iter().all(|name| name.starts_with("col_")) {
+            let mut row_dict = std::collections::HashMap::new();
+            
+            for (i, column_name) in self.column_names.iter().enumerate() {
+                let column = &self.columns[i];
+                let graph_array = column.borrow(py);
+                let value = graph_array.__getitem__(py, row as isize)?;
+                row_dict.insert(column_name.clone(), value);
+            }
+            
+            Ok(row_dict.to_object(py))
+        } else {
+            // Return as list for positional access
+            let mut row_values = Vec::new();
+            
+            for column in &self.columns {
+                let graph_array = column.borrow(py);
+                let value = graph_array.__getitem__(py, row as isize)?;
+                row_values.push(value);
+            }
+            
+            Ok(row_values.to_object(py))
+        }
+    }
+    
+    /// Get raw 2D data structure as list of lists: [[column1_data], [column2_data], ...]
+    #[getter]
+    fn values(&self, py: Python) -> PyResult<PyObject> {
+        let mut columns_data = Vec::new();
+        
+        for column in &self.columns {
+            let graph_array = column.borrow(py);
+            let column_values = graph_array.values(py)?;
+            columns_data.push(column_values);
+        }
+        
+        Ok(columns_data.to_object(py))
+    }
+    
+    /// Convert to pandas DataFrame (when pandas available)
+    fn to_pandas(&self, py: Python) -> PyResult<PyObject> {
+        // Try to import pandas
+        let pandas = py.import("pandas").map_err(|_| {
+            PyErr::new::<PyImportError, _>("pandas is required for to_pandas(). Install with: pip install pandas")
+        })?;
+        
+        // Create dictionary of column_name -> values
+        let mut data_dict = std::collections::HashMap::new();
+        for (i, column_name) in self.column_names.iter().enumerate() {
+            let graph_array = self.columns[i].borrow(py);
+            let column_values = graph_array.values(py)?;
+            data_dict.insert(column_name.clone(), column_values);
+        }
+        
+        // Create DataFrame
+        let df = pandas.call_method1("DataFrame", (data_dict,))?;
+        Ok(df.to_object(py))
+    }
+    
+    /// Convert to NumPy array (when numpy available)
+    fn to_numpy(&self, py: Python) -> PyResult<PyObject> {
+        // Try to import numpy
+        let numpy = py.import("numpy").map_err(|_| {
+            PyErr::new::<PyImportError, _>("numpy is required for to_numpy(). Install with: pip install numpy")
+        })?;
+        
+        // Get all column data
+        let mut all_data = Vec::new();
+        for column in &self.columns {
+            let graph_array = column.borrow(py);
+            let column_values = graph_array.values(py)?;
+            all_data.push(column_values);
+        }
+        
+        // Convert to numpy array (shape: rows x columns)
+        // We need to transpose from column-major to row-major
+        let mut rows = Vec::new();
+        for row_idx in 0..self.num_rows {
+            let mut row = Vec::new();
+            for col_list in &all_data {
+                // col_list is already Vec<PyObject>
+                if row_idx < col_list.len() {
+                    row.push(col_list[row_idx].clone());
+                }
+            }
+            rows.push(row);
+        }
+        
+        let array = numpy.call_method1("array", (rows,))?;
+        Ok(array.to_object(py))
+    }
+    
+    /// Convert to list of lists (row-major): [[row1_data], [row2_data], ...]
+    fn to_list(&self, py: Python) -> PyResult<Vec<Vec<PyObject>>> {
+        // Get all column data first
+        let mut all_columns = Vec::new();
+        for column in &self.columns {
+            let graph_array = column.borrow(py);
+            let column_values = graph_array.values(py)?;
+            // column_values is already Vec<PyObject>
+            all_columns.push(column_values);
+        }
+        
+        // Transpose to row-major format
+        let mut rows = Vec::new();
+        for row_idx in 0..self.num_rows {
+            let mut row = Vec::new();
+            for col_data in &all_columns {
+                if row_idx < col_data.len() {
+                    row.push(col_data[row_idx].clone());
+                }
+            }
+            rows.push(row);
+        }
+        
+        Ok(rows)
+    }
+    
+    /// Convert to GraphTable for rich DataFrame-like operations
+    fn table(&self, py: Python) -> PyResult<PyObject> {
+        // Import the Python GraphTable class
+        let _groggy = py.import("groggy")?;
+        let _graph_table_class = _groggy.getattr("GraphTable")?;
+        
+        // Create a simple data source from our matrix data
+        let _rows = self.to_list(py)?;
+        
+        // TODO: This requires implementing GraphTable integration
+        // For now, return error with helpful message
+        Err(PyErr::new::<PyNotImplementedError, _>(
+            "GraphMatrix.table() conversion not yet implemented. Use .to_pandas() for DataFrame-like operations."
+        ))
+    }
+    
+    /// String representation
+    fn __repr__(&self) -> String {
+        let (rows, cols) = self.shape();
+        format!("GraphMatrix(shape=({}, {}), columns={:?})", rows, cols, self.column_names)
+    }
+    
+    /// Check if this is a square matrix (useful for adjacency matrices)
+    fn is_square(&self) -> bool {
+        self.num_rows == self.columns.len()
+    }
+    
+    /// Check if matrix represents sparse data (for adjacency matrix compatibility)
+    /// For GraphMatrix, we estimate sparsity by checking the first column
+    fn is_sparse(&self) -> bool {
+        if self.columns.is_empty() {
+            return false;
+        }
+        
+        // For now, return false - we can enhance this later to analyze sparsity
+        // This keeps the API compatible with AdjacencyMatrix
+        false
+    }
+    
+    /// Check if matrix is dense (opposite of sparse)
+    fn is_dense(&self) -> bool {
+        !self.is_sparse()
+    }
+    
+    /// Get estimated memory usage in bytes
+    fn memory_usage(&self) -> usize {
+        // Estimate based on number of elements and typical AttrValue size
+        let elements = self.num_rows * self.columns.len();
+        elements * std::mem::size_of::<f64>() // Rough estimate
+    }
+}
+
+
 /// Iterator for GraphArray
 #[pyclass]
 struct GraphArrayIterator {
@@ -3705,9 +4414,10 @@ fn _groggy(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PySubgraph>()?;
     m.add_class::<PyAttributeCollection>()?;
     
-    // Enhanced statistical arrays
+    // Enhanced statistical arrays and matrices
     // GraphArray is not a PyClass, it's a core Rust type
     // m.add_class::<GraphArray>()?;
+    m.add_class::<PyGraphMatrix>()?;
     m.add_class::<PyStatsSummary>()?;
     
     // Fluent API view classes
