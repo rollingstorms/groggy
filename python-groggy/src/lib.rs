@@ -536,7 +536,7 @@ impl PySubgraph {
     
     /// Python dict-like access with multi-column support
     /// - subgraph['attr_name'] -> single column (Vec<PyObject>)  
-    /// - subgraph[['age', 'height']] -> multi-column 2D PyArray of shape (2, n)
+    /// - subgraph[['age', 'height']] -> multi-column 2D GraphArray of shape (2, n)
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
         // Try single string first (existing behavior)
         if let Ok(attr_name) = key.extract::<String>() {
@@ -3534,14 +3534,14 @@ impl PyEdgeView {
 // ================================================================================================
 
 /// Python wrapper for StatisticalArray with fast native statistical operations
-#[pyclass(name = "PyArray")]
-pub struct PyArray {
+#[pyclass(name = "GraphArray")]
+pub struct GraphArray {
     inner: StatisticalArray,
 }
 
 #[pymethods]
-impl PyArray {
-    /// Create a new PyArray from a list of values
+impl GraphArray {
+    /// Create a new GraphArray from a list of values
     #[new]
     fn new(values: Vec<PyObject>) -> PyResult<Self> {
         Python::with_gil(|py| {
@@ -3552,7 +3552,7 @@ impl PyArray {
                 attr_values.push(attr_value);
             }
             
-            Ok(PyArray {
+            Ok(GraphArray {
                 inner: StatisticalArray::from_vec(attr_values),
             })
         })
@@ -3589,12 +3589,12 @@ impl PyArray {
     
     /// String representation
     fn __repr__(&self) -> String {
-        format!("PyArray(len={})", self.inner.len())
+        format!("GraphArray(len={})", self.inner.len())
     }
     
     /// Iterator support (for value in array)
-    fn __iter__(slf: PyRef<Self>) -> PyArrayIterator {
-        PyArrayIterator {
+    fn __iter__(slf: PyRef<Self>) -> GraphArrayIterator {
+        GraphArrayIterator {
             array: slf.inner.clone(),
             index: 0,
         }
@@ -3721,15 +3721,15 @@ impl PyStatsSummary {
     }
 }
 
-/// Iterator for PyArray
+/// Iterator for GraphArray
 #[pyclass]
-struct PyArrayIterator {
+struct GraphArrayIterator {
     array: StatisticalArray,
     index: usize,
 }
 
 #[pymethods]
-impl PyArrayIterator {
+impl GraphArrayIterator {
     fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
@@ -3745,10 +3745,10 @@ impl PyArrayIterator {
     }
 }
 
-// Helper function to create PyArray from StatisticalArray
-impl PyArray {
+// Helper function to create GraphArray from StatisticalArray
+impl GraphArray {
     pub fn from_statistical_array(array: StatisticalArray) -> Self {
-        PyArray { inner: array }
+        GraphArray { inner: array }
     }
 }
 
@@ -3780,7 +3780,7 @@ fn _groggy(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyAttributeCollection>()?;
     
     // Enhanced statistical arrays
-    m.add_class::<PyArray>()?;
+    m.add_class::<GraphArray>()?;
     m.add_class::<PyStatsSummary>()?;
     
     // Fluent API view classes

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Test GraphTable PyArray integration - column access returns PyArray objects
+Test GraphTable GraphArray integration - column access returns GraphArray objects
 """
 
 import sys
@@ -9,9 +9,9 @@ sys.path.insert(0, 'python-groggy/python')
 
 import groggy
 
-def test_graphtable_pyarray_columns():
-    """Test that GraphTable column access returns PyArray objects"""
-    print("🧪 Testing GraphTable PyArray integration...")
+def test_graphtable_grapharray_columns():
+    """Test that GraphTable column access returns GraphArray objects"""
+    print("🧪 Testing GraphTable GraphArray integration...")
     
     # Create a graph with multiple attributes
     g = groggy.Graph()
@@ -38,9 +38,9 @@ def test_graphtable_pyarray_columns():
         ages_column = table['age']
         print(f"✅ Column access successful: {type(ages_column)}")
         
-        # Test that it's a PyArray
+        # Test that it's a GraphArray
         if hasattr(ages_column, 'mean') and hasattr(ages_column, 'std'):
-            print(f"✅ Column is PyArray with statistical methods")
+            print(f"✅ Column is GraphArray with statistical methods")
             
             # Test statistical operations
             mean_age = ages_column.mean()
@@ -71,7 +71,7 @@ def test_graphtable_pyarray_columns():
                 print(f"❌ Std dev calculation error: {std_age} vs {expected_std}")
                 
         else:
-            print(f"❌ Column is not PyArray: {type(ages_column)}")
+            print(f"❌ Column is not GraphArray: {type(ages_column)}")
             return False
             
     except Exception as e:
@@ -150,7 +150,7 @@ def test_graphtable_row_slicing():
         return False
 
 def test_backward_compatibility():
-    """Test that existing code still works with PyArray integration"""
+    """Test that existing code still works with GraphArray integration"""
     print("\n🧪 Testing backward compatibility...")
     
     g = groggy.Graph()
@@ -165,7 +165,7 @@ def test_backward_compatibility():
     try:
         column = table['test_val']
         
-        # These should all work with PyArray (list compatibility)
+        # These should all work with GraphArray (list compatibility)
         length = len(column)
         first_item = column[0]
         iteration_works = list(column)
@@ -183,16 +183,16 @@ def test_backward_compatibility():
 
 if __name__ == "__main__":
     try:
-        success1 = test_graphtable_pyarray_columns()
+        success1 = test_graphtable_grapharray_columns()
         success2 = test_graphtable_row_slicing()
         success3 = test_backward_compatibility()
         
         if success1 and success2 and success3:
-            print("\n🎉 GraphTable PyArray integration tests passed!")
+            print("\n🎉 GraphTable GraphArray integration tests passed!")
         else:
-            print("\n❌ Some GraphTable PyArray integration tests failed!")
+            print("\n❌ Some GraphTable GraphArray integration tests failed!")
             
     except Exception as e:
-        print(f"\n❌ GraphTable PyArray integration test crashed: {e}")
+        print(f"\n❌ GraphTable GraphArray integration test crashed: {e}")
         import traceback
         traceback.print_exc()

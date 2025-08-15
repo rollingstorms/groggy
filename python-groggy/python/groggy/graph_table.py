@@ -333,12 +333,12 @@ class GraphTable:
             
             column_data = [row.get(key) for row in rows]
             
-            # Return PyArray for native statistical operations
+            # Return GraphArray for native statistical operations
             try:
-                from groggy import PyArray
-                return PyArray(column_data)
+                from groggy import GraphArray
+                return GraphArray(column_data)
             except ImportError:
-                # Fallback to plain list if PyArray not available
+                # Fallback to plain list if GraphArray not available
                 return column_data
                 
         elif isinstance(key, int):
