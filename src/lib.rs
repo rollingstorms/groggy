@@ -117,6 +117,7 @@ pub mod util;
 
 // Core graph data structures and components
 pub mod core {
+    pub mod array;
     pub mod delta;
     pub mod change_tracker;
     pub mod pool;

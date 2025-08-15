@@ -1,0 +1,482 @@
+//! Statistical Array - Enhanced array with native statistical operations
+//!
+//! Provides StatisticalArray that combines list-like functionality with
+//! fast native statistical computations and intelligent caching.
+
+use crate::types::AttrValue;
+use std::cell::RefCell;
+
+/// Cache for expensive statistical computations
+#[derive(Debug, Clone)]
+struct CachedStats {
+    mean: Option<f64>,
+    std: Option<f64>,
+    min: Option<AttrValue>,
+    max: Option<AttrValue>,
+    count: Option<usize>,
+    sum: Option<f64>,
+}
+
+impl CachedStats {
+    fn new() -> Self {
+        Self {
+            mean: None,
+            std: None,
+            min: None,
+            max: None,
+            count: None,
+            sum: None,
+        }
+    }
+    
+    fn invalidate(&mut self) {
+        *self = Self::new();
+    }
+}
+
+/// Statistical Array with fast native operations and intelligent caching
+/// 
+/// Combines list-like functionality (indexing, iteration, len) with
+/// high-performance statistical methods computed in Rust.
+/// 
+/// PERFORMANCE FEATURES:
+/// - Lazy computation: Stats calculated only when requested
+/// - Intelligent caching: Expensive computations cached until data changes
+/// - Native speed: All statistical operations computed in Rust
+/// - Zero-copy views: Efficient access to underlying data
+/// 
+/// USAGE:
+/// ```rust
+/// let arr = StatisticalArray::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+/// let mean = arr.mean().unwrap();  // Computed and cached
+/// let std = arr.std().unwrap();    // Uses cached mean
+/// let list = arr.to_list();        // Convert to Vec for compatibility
+/// ```
+#[derive(Debug, Clone)]
+pub struct StatisticalArray {
+    /// Core data storage
+    values: Vec<AttrValue>,
+    /// Cached statistical computations (lazy evaluation)
+    cached_stats: RefCell<CachedStats>,
+}
+
+impl StatisticalArray {
+    /// Create a new StatisticalArray from a vector of AttrValues
+    pub fn from_vec(values: Vec<AttrValue>) -> Self {
+        Self {
+            values,
+            cached_stats: RefCell::new(CachedStats::new()),
+        }
+    }
+    
+    /// Create an empty StatisticalArray
+    pub fn new() -> Self {
+        Self::from_vec(Vec::new())
+    }
+    
+    /// Get the number of elements
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+    
+    /// Check if the array is empty
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+    
+    /// Get element by index
+    pub fn get(&self, index: usize) -> Option<&AttrValue> {
+        self.values.get(index)
+    }
+    
+    /// Convert to a plain Vec<AttrValue> for compatibility
+    pub fn to_list(&self) -> Vec<AttrValue> {
+        self.values.clone()
+    }
+    
+    /// Get iterator over values
+    pub fn iter(&self) -> std::slice::Iter<AttrValue> {
+        self.values.iter()
+    }
+    
+    /// Extract numeric values for statistical computation
+    /// Returns None if array contains non-numeric values
+    fn extract_numeric_values(&self) -> Option<Vec<f64>> {
+        let mut numeric_values = Vec::with_capacity(self.values.len());
+        
+        for value in &self.values {
+            match value {
+                AttrValue::Int(i) => numeric_values.push(*i as f64),
+                AttrValue::SmallInt(i) => numeric_values.push(*i as f64),
+                AttrValue::Float(f) => numeric_values.push(*f as f64),
+                _ => return None, // Non-numeric value found
+            }
+        }
+        
+        if numeric_values.is_empty() {
+            None
+        } else {
+            Some(numeric_values)
+        }
+    }
+    
+    /// Calculate and cache count of non-null values
+    pub fn count(&self) -> usize {
+        let mut cache = self.cached_stats.borrow_mut();
+        
+        if let Some(cached_count) = cache.count {
+            return cached_count;
+        }
+        
+        let count = self.values.len();
+        cache.count = Some(count);
+        count
+    }
+    
+    /// Calculate and cache mean (average) of numeric values
+    pub fn mean(&self) -> Option<f64> {
+        let mut cache = self.cached_stats.borrow_mut();
+        
+        if let Some(cached_mean) = cache.mean {
+            return Some(cached_mean);
+        }
+        
+        let numeric_values = self.extract_numeric_values()?;
+        if numeric_values.is_empty() {
+            return None;
+        }
+        
+        let sum: f64 = numeric_values.iter().sum();
+        let mean = sum / numeric_values.len() as f64;
+        
+        // Cache both sum and mean for efficiency
+        cache.sum = Some(sum);
+        cache.mean = Some(mean);
+        
+        Some(mean)
+    }
+    
+    /// Calculate and cache standard deviation of numeric values
+    pub fn std(&self) -> Option<f64> {
+        let mut cache = self.cached_stats.borrow_mut();
+        
+        if let Some(cached_std) = cache.std {
+            return Some(cached_std);
+        }
+        
+        let numeric_values = self.extract_numeric_values()?;
+        if numeric_values.len() < 2 {
+            return None; // Need at least 2 values for std dev
+        }
+        
+        // Get or compute mean
+        let mean = if let Some(cached_mean) = cache.mean {
+            cached_mean
+        } else {
+            let sum: f64 = numeric_values.iter().sum();
+            let mean = sum / numeric_values.len() as f64;
+            cache.sum = Some(sum);
+            cache.mean = Some(mean);
+            mean
+        };
+        
+        // Calculate variance
+        let variance: f64 = numeric_values
+            .iter()
+            .map(|x| {
+                let diff = x - mean;
+                diff * diff
+            })
+            .sum::<f64>() / (numeric_values.len() - 1) as f64; // Sample standard deviation
+        
+        let std = variance.sqrt();
+        cache.std = Some(std);
+        
+        Some(std)
+    }
+    
+    /// Calculate and cache minimum value
+    pub fn min(&self) -> Option<AttrValue> {
+        let mut cache = self.cached_stats.borrow_mut();
+        
+        if let Some(ref cached_min) = cache.min {
+            return Some(cached_min.clone());
+        }
+        
+        if self.values.is_empty() {
+            return None;
+        }
+        
+        // Custom min logic since AttrValue doesn't implement Ord
+        let mut min_value = &self.values[0];
+        for value in &self.values[1..] {
+            if self.compare_attr_values(value, min_value) < 0 {
+                min_value = value;
+            }
+        }
+        
+        let min_value = min_value.clone();
+        cache.min = Some(min_value.clone());
+        
+        Some(min_value)
+    }
+    
+    /// Calculate and cache maximum value
+    pub fn max(&self) -> Option<AttrValue> {
+        let mut cache = self.cached_stats.borrow_mut();
+        
+        if let Some(ref cached_max) = cache.max {
+            return Some(cached_max.clone());
+        }
+        
+        if self.values.is_empty() {
+            return None;
+        }
+        
+        // Custom max logic since AttrValue doesn't implement Ord
+        let mut max_value = &self.values[0];
+        for value in &self.values[1..] {
+            if self.compare_attr_values(value, max_value) > 0 {
+                max_value = value;
+            }
+        }
+        
+        let max_value = max_value.clone();
+        cache.max = Some(max_value.clone());
+        
+        Some(max_value)
+    }
+    
+    /// Compare two AttrValues for ordering
+    /// Returns: -1 if a < b, 0 if a == b, 1 if a > b
+    fn compare_attr_values(&self, a: &AttrValue, b: &AttrValue) -> i32 {
+        use AttrValue::*;
+        use std::cmp::Ordering;
+        
+        let ord = match (a, b) {
+            // Numeric comparisons
+            (Int(a), Int(b)) => a.cmp(b),
+            (SmallInt(a), SmallInt(b)) => a.cmp(b),
+            (Float(a), Float(b)) => a.partial_cmp(b).unwrap_or(Ordering::Equal),
+            
+            // Cross-type numeric comparisons
+            (Int(a), SmallInt(b)) => (*a as f64).partial_cmp(&(*b as f64)).unwrap_or(Ordering::Equal),
+            (SmallInt(a), Int(b)) => (*a as f64).partial_cmp(&(*b as f64)).unwrap_or(Ordering::Equal),
+            (Int(a), Float(b)) => (*a as f64).partial_cmp(&(*b as f64)).unwrap_or(Ordering::Equal),
+            (Float(a), Int(b)) => (*a as f64).partial_cmp(&(*b as f64)).unwrap_or(Ordering::Equal),
+            (SmallInt(a), Float(b)) => (*a as f64).partial_cmp(&(*b as f64)).unwrap_or(Ordering::Equal),
+            (Float(a), SmallInt(b)) => (*a as f64).partial_cmp(&(*b as f64)).unwrap_or(Ordering::Equal),
+            
+            // String comparisons
+            (Text(a), Text(b)) => a.cmp(b),
+            
+            // Boolean comparisons
+            (Bool(a), Bool(b)) => a.cmp(b),
+            
+            // Default: treat different types as equal
+            _ => Ordering::Equal,
+        };
+        
+        match ord {
+            Ordering::Less => -1,
+            Ordering::Equal => 0,
+            Ordering::Greater => 1,
+        }
+    }
+    
+    /// Calculate quantile (percentile) of numeric values
+    /// quantile: 0.0 to 1.0 (e.g., 0.5 for median, 0.95 for 95th percentile)
+    pub fn quantile(&self, quantile: f64) -> Option<f64> {
+        if !(0.0..=1.0).contains(&quantile) {
+            return None;
+        }
+        
+        let mut numeric_values = self.extract_numeric_values()?;
+        if numeric_values.is_empty() {
+            return None;
+        }
+        
+        numeric_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        
+        let index = (quantile * (numeric_values.len() - 1) as f64).round() as usize;
+        Some(numeric_values[index.min(numeric_values.len() - 1)])
+    }
+    
+    /// Calculate median (50th percentile)
+    pub fn median(&self) -> Option<f64> {
+        self.quantile(0.5)
+    }
+    
+    /// Get comprehensive statistical summary
+    pub fn describe(&self) -> StatsSummary {
+        StatsSummary {
+            count: self.count(),
+            mean: self.mean(),
+            std: self.std(),
+            min: self.min(),
+            max: self.max(),
+            median: self.median(),
+            q25: self.quantile(0.25),
+            q75: self.quantile(0.75),
+        }
+    }
+}
+
+/// Comprehensive statistical summary
+#[derive(Debug, Clone)]
+pub struct StatsSummary {
+    pub count: usize,
+    pub mean: Option<f64>,
+    pub std: Option<f64>,
+    pub min: Option<AttrValue>,
+    pub max: Option<AttrValue>,
+    pub median: Option<f64>,
+    pub q25: Option<f64>,  // 25th percentile
+    pub q75: Option<f64>,  // 75th percentile
+}
+
+impl std::fmt::Display for StatsSummary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Statistical Summary:")?;
+        writeln!(f, "  Count: {}", self.count)?;
+        
+        if let Some(mean) = self.mean {
+            writeln!(f, "  Mean:  {:.2}", mean)?;
+        }
+        
+        if let Some(std) = self.std {
+            writeln!(f, "  Std:   {:.2}", std)?;
+        }
+        
+        if let Some(ref min) = self.min {
+            writeln!(f, "  Min:   {:?}", min)?;
+        }
+        
+        if let Some(q25) = self.q25 {
+            writeln!(f, "  25%:   {:.2}", q25)?;
+        }
+        
+        if let Some(median) = self.median {
+            writeln!(f, "  50%:   {:.2}", median)?;
+        }
+        
+        if let Some(q75) = self.q75 {
+            writeln!(f, "  75%:   {:.2}", q75)?;
+        }
+        
+        if let Some(ref max) = self.max {
+            writeln!(f, "  Max:   {:?}", max)?;
+        }
+        
+        Ok(())
+    }
+}
+
+// Implement indexing
+impl std::ops::Index<usize> for StatisticalArray {
+    type Output = AttrValue;
+    
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.values[index]
+    }
+}
+
+// Implement IntoIterator for for-loop support
+impl IntoIterator for StatisticalArray {
+    type Item = AttrValue;
+    type IntoIter = std::vec::IntoIter<AttrValue>;
+    
+    fn into_iter(self) -> Self::IntoIter {
+        self.values.into_iter()
+    }
+}
+
+// Implement IntoIterator for references
+impl<'a> IntoIterator for &'a StatisticalArray {
+    type Item = &'a AttrValue;
+    type IntoIter = std::slice::Iter<'a, AttrValue>;
+    
+    fn into_iter(self) -> Self::IntoIter {
+        self.values.iter()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::AttrValue;
+    
+    #[test]
+    fn test_basic_functionality() {
+        let values = vec![
+            AttrValue::Int(1),
+            AttrValue::Int(2),
+            AttrValue::Int(3),
+            AttrValue::Int(4),
+            AttrValue::Int(5),
+        ];
+        
+        let arr = StatisticalArray::from_vec(values);
+        
+        assert_eq!(arr.len(), 5);
+        assert_eq!(arr[0], AttrValue::Int(1));
+        assert_eq!(arr.to_list().len(), 5);
+    }
+    
+    #[test]
+    fn test_statistical_operations() {
+        let values = vec![
+            AttrValue::Float(1.0),
+            AttrValue::Float(2.0),
+            AttrValue::Float(3.0),
+            AttrValue::Float(4.0),
+            AttrValue::Float(5.0),
+        ];
+        
+        let arr = StatisticalArray::from_vec(values);
+        
+        assert_eq!(arr.mean(), Some(3.0));
+        assert_eq!(arr.median(), Some(3.0));
+        assert_eq!(arr.min(), Some(AttrValue::Float(1.0)));
+        assert_eq!(arr.max(), Some(AttrValue::Float(5.0)));
+        
+        // Test caching by calling twice
+        assert_eq!(arr.mean(), Some(3.0));
+    }
+    
+    #[test]
+    fn test_describe() {
+        let values = vec![
+            AttrValue::Int(10),
+            AttrValue::Int(20),
+            AttrValue::Int(30),
+        ];
+        
+        let arr = StatisticalArray::from_vec(values);
+        let summary = arr.describe();
+        
+        assert_eq!(summary.count, 3);
+        assert_eq!(summary.mean, Some(20.0));
+        assert_eq!(summary.median, Some(20.0));
+    }
+    
+    #[test]
+    fn test_iteration() {
+        let values = vec![
+            AttrValue::Int(1),
+            AttrValue::Int(2),
+            AttrValue::Int(3),
+        ];
+        
+        let arr = StatisticalArray::from_vec(values);
+        
+        let mut sum = 0;
+        for value in &arr {
+            if let AttrValue::Int(i) = value {
+                sum += i;
+            }
+        }
+        
+        assert_eq!(sum, 6);
+    }
+}
