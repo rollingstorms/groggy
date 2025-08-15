@@ -84,10 +84,18 @@ class GraphTable:
         attributes = set()
         
         # Comprehensive list of common attributes to check
+        # TODO: Replace with dynamic attribute discovery from graph API
         if self.table_type == "nodes":
-            common_attrs = ['name', 'age', 'dept', 'salary', 'seniority', 'index', 'level', 'component_id', 'influence_score', 'id']
+            common_attrs = [
+                'name', 'age', 'dept', 'salary', 'seniority', 'index', 'level', 
+                'component_id', 'influence_score', 'id', 'value', 'test_val',
+                'height', 'active', 'years_experience', 'department'
+            ]
         else:
-            common_attrs = ['weight', 'type', 'relationship', 'strength', 'frequency', 'last_contact']
+            common_attrs = [
+                'weight', 'type', 'relationship', 'strength', 'frequency', 
+                'last_contact', 'source', 'target'
+            ]
         
         if self.table_type == "nodes":
             for node_id in ids:
@@ -319,17 +327,54 @@ class GraphTable:
         rows, columns = self._build_table_data()
         
         if isinstance(key, str):
-            # Column access
+            # Column access - return PyArray for enhanced analytics
             if key not in columns:
                 raise KeyError(f"Column '{key}' not found")
-            return [row.get(key) for row in rows]
+            
+            column_data = [row.get(key) for row in rows]
+            
+            # Return PyArray for native statistical operations
+            try:
+                from groggy import PyArray
+                return PyArray(column_data)
+            except ImportError:
+                # Fallback to plain list if PyArray not available
+                return column_data
+                
         elif isinstance(key, int):
-            # Row access
+            # Single row access
             if key < 0 or key >= len(rows):
                 raise IndexError(f"Row index {key} out of range")
             return rows[key]
+            
+        elif isinstance(key, slice):
+            # Row slicing - return new GraphTable with sliced data
+            sliced_rows = rows[key]
+            
+            # Create a simplified data source for the sliced table
+            class SlicedDataSource:
+                def __init__(self, sliced_data, table_type):
+                    self.sliced_data = sliced_data
+                    self.table_type = table_type
+                    
+                def __len__(self):
+                    return len(self.sliced_data)
+                    
+                def __iter__(self):
+                    # Return IDs for compatibility
+                    return iter(row.get('id') for row in self.sliced_data if 'id' in row)
+                    
+            sliced_source = SlicedDataSource(sliced_rows, self.table_type)
+            new_table = GraphTable(sliced_source, self.table_type, self.graph_override)
+            
+            # Cache the sliced data and preserve column structure
+            new_table._cached_data = sliced_rows
+            new_table._cached_columns = columns  # Use the same columns as the parent table
+            
+            return new_table
+            
         else:
-            raise TypeError("Key must be string (column) or int (row)")
+            raise TypeError("Key must be string (column), int (row), or slice")
     
     @property
     def columns(self):
