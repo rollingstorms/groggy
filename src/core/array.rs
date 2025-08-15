@@ -1,6 +1,6 @@
-//! Statistical Array - Enhanced array with native statistical operations
+//! GraphArray - Enhanced array with native statistical operations
 //!
-//! Provides StatisticalArray that combines list-like functionality with
+//! Provides GraphArray that combines list-like functionality with
 //! fast native statistical computations and intelligent caching.
 
 use crate::types::AttrValue;
@@ -47,21 +47,21 @@ impl CachedStats {
 /// 
 /// USAGE:
 /// ```rust
-/// let arr = StatisticalArray::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+/// let arr = GraphArray::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
 /// let mean = arr.mean().unwrap();  // Computed and cached
 /// let std = arr.std().unwrap();    // Uses cached mean
 /// let list = arr.to_list();        // Convert to Vec for compatibility
 /// ```
 #[derive(Debug, Clone)]
-pub struct StatisticalArray {
+pub struct GraphArray {
     /// Core data storage
     values: Vec<AttrValue>,
     /// Cached statistical computations (lazy evaluation)
     cached_stats: RefCell<CachedStats>,
 }
 
-impl StatisticalArray {
-    /// Create a new StatisticalArray from a vector of AttrValues
+impl GraphArray {
+    /// Create a new GraphArray from a vector of AttrValues
     pub fn from_vec(values: Vec<AttrValue>) -> Self {
         Self {
             values,
@@ -69,7 +69,7 @@ impl StatisticalArray {
         }
     }
     
-    /// Create an empty StatisticalArray
+    /// Create an empty GraphArray
     pub fn new() -> Self {
         Self::from_vec(Vec::new())
     }
@@ -154,6 +154,25 @@ impl StatisticalArray {
         cache.mean = Some(mean);
         
         Some(mean)
+    }
+    
+    /// Calculate and cache sum of numeric values
+    pub fn sum(&self) -> Option<f64> {
+        let mut cache = self.cached_stats.borrow_mut();
+        
+        if let Some(cached_sum) = cache.sum {
+            return Some(cached_sum);
+        }
+        
+        let numeric_values = self.extract_numeric_values()?;
+        if numeric_values.is_empty() {
+            return None;
+        }
+        
+        let sum: f64 = numeric_values.iter().sum();
+        cache.sum = Some(sum);
+        
+        Some(sum)
     }
     
     /// Calculate and cache standard deviation of numeric values
@@ -373,7 +392,7 @@ impl std::fmt::Display for StatsSummary {
 }
 
 // Implement indexing
-impl std::ops::Index<usize> for StatisticalArray {
+impl std::ops::Index<usize> for GraphArray {
     type Output = AttrValue;
     
     fn index(&self, index: usize) -> &Self::Output {
@@ -382,7 +401,7 @@ impl std::ops::Index<usize> for StatisticalArray {
 }
 
 // Implement IntoIterator for for-loop support
-impl IntoIterator for StatisticalArray {
+impl IntoIterator for GraphArray {
     type Item = AttrValue;
     type IntoIter = std::vec::IntoIter<AttrValue>;
     
@@ -392,7 +411,7 @@ impl IntoIterator for StatisticalArray {
 }
 
 // Implement IntoIterator for references
-impl<'a> IntoIterator for &'a StatisticalArray {
+impl<'a> IntoIterator for &'a GraphArray {
     type Item = &'a AttrValue;
     type IntoIter = std::slice::Iter<'a, AttrValue>;
     
@@ -416,7 +435,7 @@ mod tests {
             AttrValue::Int(5),
         ];
         
-        let arr = StatisticalArray::from_vec(values);
+        let arr = GraphArray::from_vec(values);
         
         assert_eq!(arr.len(), 5);
         assert_eq!(arr[0], AttrValue::Int(1));
@@ -433,7 +452,7 @@ mod tests {
             AttrValue::Float(5.0),
         ];
         
-        let arr = StatisticalArray::from_vec(values);
+        let arr = GraphArray::from_vec(values);
         
         assert_eq!(arr.mean(), Some(3.0));
         assert_eq!(arr.median(), Some(3.0));
@@ -452,7 +471,7 @@ mod tests {
             AttrValue::Int(30),
         ];
         
-        let arr = StatisticalArray::from_vec(values);
+        let arr = GraphArray::from_vec(values);
         let summary = arr.describe();
         
         assert_eq!(summary.count, 3);
@@ -468,7 +487,7 @@ mod tests {
             AttrValue::Int(3),
         ];
         
-        let arr = StatisticalArray::from_vec(values);
+        let arr = GraphArray::from_vec(values);
         
         let mut sum = 0;
         for value in &arr {

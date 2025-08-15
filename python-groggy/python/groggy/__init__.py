@@ -21,8 +21,7 @@ from ._groggy import (
     BranchInfo,
     HistoryStatistics,
     HistoricalView,
-    # Statistical arrays
-    GraphArray,
+    # Statistical arrays (GraphArray is used internally, not directly exposed)
 )
 
 from .types import NodeId, EdgeId, AttrName, StateId, BranchName
@@ -81,8 +80,7 @@ __all__ = [
     "BranchInfo", 
     "HistoryStatistics",
     "HistoricalView",
-    # Statistical arrays
-    "GraphArray",
+    # Statistical arrays (GraphArray used internally)
     # Graph generators
     "generators",
     "complete_graph",

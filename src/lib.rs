@@ -129,6 +129,7 @@ pub mod core {
     pub mod ref_manager;
     pub mod strategies;
     pub mod subgraph;
+    pub mod adjacency;
 }
 
 // Public API
@@ -155,6 +156,8 @@ pub use core::delta::{ColumnDelta, DeltaObject};
 pub use core::change_tracker::ChangeTracker;
 pub use core::pool::GraphPool;
 pub use core::space::GraphSpace;
+pub use core::adjacency::{AdjacencyMatrix, GraphMatrix, SparseGraphMatrix, MatrixFormat, MatrixType, IndexMapping};
+pub use core::array::{GraphArray, StatsSummary};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
