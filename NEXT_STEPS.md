@@ -121,8 +121,10 @@ g.filter_nodes("(age < 25 OR age > 65) AND active == true")
 - 3+ term expressions: `A AND B AND C`
 - Mixed operators: `A AND (B OR C)`
 
-### 4. pyarray - Enhanced Statistical Arrays
+### 4. GraphArray - Enhanced Statistical Arrays (formerly pyarray)
 **Priority**: High - Improves data analysis user experience
+
+**Note**: Rename PyArray to GraphArray for better API consistency
 
 **Goal**: Replace plain lists with statistical array objects that support fast analytics
 ```python
@@ -131,7 +133,7 @@ salaries = g.attributes.nodes["salary"]  # Returns basic list
 print(sum(salaries) / len(salaries))     # Manual mean calculation
 
 # Enhanced: Statistical arrays with built-in methods
-salaries = g.attributes.nodes["salary"]  # Returns pyarray
+salaries = g.attributes.nodes["salary"]  # Returns GraphArray
 print(salaries.mean())                   # Fast native mean
 print(salaries.std())                    # Standard deviation
 print(salaries.min(), salaries.max())   # Min/max
@@ -323,6 +325,8 @@ g.filter_nodes("(dept == 'Engineering' OR dept == 'Sales') AND (age > 30 AND sal
 ### ✅ **COMPLETED: PyArray - Enhanced Statistical Arrays**  
 **Status**: ✅ **COMPLETED** - Fast native analytics successfully implemented
 
+**Note**: Should rename PyArray to GraphArray for better API consistency
+
 **Achievement**: Replace plain lists with statistical array objects that provide native performance
 
 **Implementation Features**:
@@ -334,8 +338,8 @@ g.filter_nodes("(dept == 'Engineering' OR dept == 'Sales') AND (age > 30 AND sal
 
 **Usage Examples**:
 ```python
-# Create PyArray from values
-ages = groggy.PyArray([25, 30, 35, 40, 45])
+# Create GraphArray from values (renamed from PyArray)
+ages = groggy.GraphArray([25, 30, 35, 40, 45])
 
 # Statistical methods (computed in Rust)
 print(ages.mean())           # 35.0
@@ -510,10 +514,12 @@ def set(self, *args, **kwargs):
 - Column-subset table creation pipeline functional
 - Maintains performance with new view layer abstractions
 
-### 🎯 **Priority 4: GraphTable PyArray Integration**
+### 🎯 **Priority 4: GraphTable GraphArray Integration**
 **Priority**: High - Enhanced data analysis user experience
 
-**Goal**: Integrate PyArray with GraphTable column access for native statistical operations
+**Note**: Update to use GraphArray instead of PyArray for better API consistency
+
+**Goal**: Integrate GraphArray with GraphTable column access for native statistical operations
 
 **Current State**: GraphTable column access returns plain Python lists
 ```python
@@ -523,11 +529,11 @@ ages = table['age']          # Returns [25, 30, 35, 40, 45] - plain list
 print(sum(ages) / len(ages)) # Manual mean calculation required
 ```
 
-**Enhanced Goal**: GraphTable columns return PyArray objects with statistical methods
+**Enhanced Goal**: GraphTable columns return GraphArray objects with statistical methods
 ```python
-# Enhanced: PyArray columns with statistical methods
+# Enhanced: GraphArray columns with statistical methods
 table = g.table()
-ages = table['age']          # Returns PyArray([25, 30, 35, 40, 45])
+ages = table['age']          # Returns GraphArray([25, 30, 35, 40, 45])
 
 # Native statistical operations on table columns
 print(ages.mean())           # 35.0 - computed in Rust
@@ -547,21 +553,21 @@ for age in ages: process(age) # Iteration works
 def __getitem__(self, key):
     """Access columns or rows like a DataFrame."""
     if isinstance(key, str):
-        # Column access - return PyArray instead of plain list
+        # Column access - return GraphArray instead of plain list
         rows, columns = self._build_table_data()
         if key not in columns:
             raise KeyError(f"Column '{key}' not found")
         
         column_data = [row.get(key) for row in rows]
-        # NEW: Return PyArray for enhanced analytics
-        from groggy import PyArray
-        return PyArray(column_data)
+        # NEW: Return GraphArray for enhanced analytics
+        from groggy import GraphArray
+        return GraphArray(column_data)
 ```
 
 **Integration Benefits**:
 - **Native Performance**: Statistical operations computed in Rust
 - **Seamless Experience**: Column access automatically provides analytics capabilities
-- **Backward Compatibility**: PyArray acts like a regular list for existing code
+- **Backward Compatibility**: GraphArray acts like a regular list for existing code
 - **Rich Analytics**: mean(), std(), min(), max(), quantile(), describe() methods
 - **DataFrame-like UX**: Similar to pandas column access with statistical methods
 
@@ -587,14 +593,14 @@ print(f"Salary-Experience correlation: {salaries.correlation(experience)}")
 ```
 
 **Implementation Tasks**:
-- [ ] **Modify GraphTable.__getitem__**: Return PyArray for column access instead of plain list
+- [ ] **Modify GraphTable.__getitem__**: Return GraphArray for column access instead of plain list
 - [ ] **Add row slicing support**: Enable `table[:5]`, `table[10:20]`, `table[-5:]` syntax
-- [ ] **Handle type conversion**: Ensure proper AttrValue → Python → PyArray conversion pipeline
+- [ ] **Handle type conversion**: Ensure proper AttrValue → Python → GraphArray conversion pipeline
 - [ ] **Maintain backward compatibility**: Ensure existing list-like behavior works
-- [ ] **Add import handling**: Proper PyArray import in GraphTable module
-- [ ] **Test statistical accuracy**: Verify PyArray statistics match manual calculations
+- [ ] **Add import handling**: Proper GraphArray import in GraphTable module
+- [ ] **Test statistical accuracy**: Verify GraphArray statistics match manual calculations
 - [ ] **Performance validation**: Ensure no significant overhead for small columns
-- [ ] **Documentation**: Update GraphTable examples to showcase PyArray integration
+- [ ] **Documentation**: Update GraphTable examples to showcase GraphArray integration
 
 **Enhanced Implementation Strategy**:
 ```python
@@ -638,18 +644,18 @@ every_tenth = table[::10]     # Every 10th row as new GraphTable
 
 # Sliced tables support all GraphTable operations
 first_five.to_pandas()        # Convert slice to DataFrame
-first_five['age'].mean()      # PyArray statistics on slice columns
+first_five['age'].mean()      # GraphArray statistics on slice columns
 first_five.to_csv('top5.csv') # Export slice to CSV
 
 # Chaining operations
 engineers = g.filter_nodes('dept == "Engineering"')
 top_earners = engineers.table()[:10]  # Top 10 engineering nodes
-salaries = top_earners['salary']      # PyArray of top 10 salaries
+salaries = top_earners['salary']      # GraphArray of top 10 salaries
 print(f"Top 10 avg salary: {salaries.mean()}")
 ```
 
 **Success Metrics**:
-- Table column access returns PyArray objects with statistical methods
+- Table column access returns GraphArray objects with statistical methods
 - All existing list-like operations continue to work (len, indexing, iteration)
 - Statistical operations provide accurate results matching manual calculations
 - Performance impact minimal for small columns, beneficial for large columns
@@ -837,10 +843,10 @@ def index_mapping(self):
 - [x] Bulk column access methods implemented in Graph API ✅ **COMPLETED**
 - [x] O(n²) issues eliminated from GraphTable implementation ✅ **COMPLETED**
 - [ ] `subgraph.table()` works with filtered data (minor graph reference issue)
-- [ ] pyarray provides accurate statistics: `mean()`, `std()`, `min()`, `max()`
-- [ ] pyarray works like normal list: indexing, iteration, `len()`
-- [ ] **PyArray O(n) performance**: All statistical methods achieve O(n) complexity (not O(n log n))
-- [ ] **PyArray advanced algorithms**: Correlation, regression, FFT support implemented
+- [ ] pyarray provides accurate statistics: `mean()`, `std()`, `min()`, `max()` (rename to GraphArray)
+- [ ] pyarray works like normal list: indexing, iteration, `len()` (rename to GraphArray)
+- [ ] **GraphArray O(n) performance**: All statistical methods achieve O(n) complexity (not O(n log n))
+- [ ] **GraphArray advanced algorithms**: Correlation, regression, FFT support implemented
 - [ ] Statistical arrays cached properly for performance
 - [x] **Batch attribute access**: Bulk column methods work correctly ✅ **COMPLETED**
 - [x] **GraphTable performance**: 5-10x speedup achieved with bulk optimization ✅ **COMPLETED**
@@ -868,7 +874,7 @@ def index_mapping(self):
 ### 🎯 **REMAINING SUCCESS CRITERIA**  
 1. ✅ **Batch Optimization**: Delivered 5-10x speedup for multi-column GraphTable operations ✅ **COMPLETED**
 2. ✅ **Query Enhancement**: Complex logical expressions with parentheses support ✅ **COMPLETED**  
-3. **Analytics Enhancement**: PyArray provides fast, native statistical operations on graph data
+3. **Analytics Enhancement**: GraphArray provides fast, native statistical operations on graph data (rename from PyArray)
 4. **Memory Efficiency**: Reduce memory overhead to be competitive with NetworkX
 4. **Query Completeness**: Parser handles complex logical expressions (3+ terms, parentheses)
 5. **Integration Reliability**: All operations work consistently across graphs and subgraphs

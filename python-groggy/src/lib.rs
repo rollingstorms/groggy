@@ -315,6 +315,18 @@ impl PySubgraph {
         self.edges.len()
     }
     
+    /// Get node IDs in this subgraph (subgraph.node_ids property)
+    #[getter]
+    fn node_ids(&self) -> Vec<NodeId> {
+        self.nodes.clone()
+    }
+    
+    /// Get edge IDs in this subgraph (subgraph.edge_ids property) 
+    #[getter]
+    fn edge_ids(&self) -> Vec<EdgeId> {
+        self.edges.clone()
+    }
+    
     /// Check if a node exists in this subgraph
     fn has_node(&self, node_id: NodeId) -> bool {
         self.nodes.contains(&node_id)
