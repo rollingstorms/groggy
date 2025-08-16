@@ -247,8 +247,8 @@ impl PyGraphAnalytics {
     /// Get analytics summary
     fn get_summary(&self, py: Python) -> PyResult<String> {
         let graph = self.graph.borrow(py);
-        let node_count = graph.inner.node_count();
-        let edge_count = graph.inner.edge_count();
+        let node_count = graph.get_node_count();
+        let edge_count = graph.get_edge_count();
         
         Ok(format!("Graph Analytics: {} nodes, {} edges", node_count, edge_count))
     }

@@ -359,14 +359,14 @@ impl PyGraph {
     // === HELPER METHODS FOR OTHER MODULES ===
     
     pub fn has_node_attribute(&self, node_id: NodeId, attr_name: &str) -> bool {
-        match self.inner.get_node_attr(node_id, attr_name) {
+        match self.inner.get_node_attr(node_id, &attr_name.to_string()) {
             Ok(Some(_)) => true,
             _ => false,
         }
     }
     
     pub fn has_edge_attribute(&self, edge_id: EdgeId, attr_name: &str) -> bool {
-        match self.inner.get_edge_attr(edge_id, attr_name) {
+        match self.inner.get_edge_attr(edge_id, &attr_name.to_string()) {
             Ok(Some(_)) => true,
             _ => false,
         }
@@ -377,13 +377,6 @@ impl PyGraph {
         self.inner.edge_endpoints(edge_id).map_err(|e| e.to_string())
     }
     
-    pub fn contains_node_internal(&self, node_id: NodeId) -> bool {
-        self.inner.contains_node(node_id)
-    }
-    
-    pub fn contains_edge_internal(&self, edge_id: EdgeId) -> bool {
-        self.inner.contains_edge(edge_id)
-    }
     
     pub fn get_node_ids(&self) -> PyResult<Vec<NodeId>> {
         Ok(self.inner.node_ids())
@@ -394,11 +387,11 @@ impl PyGraph {
     }
     
     // Additional public methods for internal module access
-    pub fn contains_node(&self, node_id: NodeId) -> bool {
+    pub fn has_node_internal(&self, node_id: NodeId) -> bool {
         self.inner.contains_node(node_id)
     }
     
-    pub fn contains_edge(&self, edge_id: EdgeId) -> bool {
+    pub fn has_edge_internal(&self, edge_id: EdgeId) -> bool {
         self.inner.contains_edge(edge_id)
     }
     
@@ -410,7 +403,15 @@ impl PyGraph {
         self.inner.edge_ids().len()
     }
     
-    pub fn node_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+    pub fn node_ids_vec(&self) -> Vec<NodeId> {
+        self.inner.node_ids()
+    }
+    
+    pub fn edge_ids_vec(&self) -> Vec<EdgeId> {
+        self.inner.edge_ids()
+    }
+    
+    pub fn get_node_ids_array(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
         let node_ids = self.inner.node_ids();
         let attr_values: Vec<groggy::AttrValue> = node_ids.into_iter()
             .map(|id| groggy::AttrValue::Int(id as i64))
@@ -420,7 +421,7 @@ impl PyGraph {
         Ok(Py::new(py, py_graph_array)?)
     }
     
-    pub fn edge_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+    pub fn get_edge_ids_array(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
         let edge_ids = self.inner.edge_ids();
         let attr_values: Vec<groggy::AttrValue> = edge_ids.into_iter()
             .map(|id| groggy::AttrValue::Int(id as i64))
@@ -429,4 +430,5 @@ impl PyGraph {
         let py_graph_array = PyGraphArray { inner: graph_array };
         Ok(Py::new(py, py_graph_array)?)
     }
+    
 }

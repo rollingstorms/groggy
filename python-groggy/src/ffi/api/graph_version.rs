@@ -70,8 +70,8 @@ impl PyBranchInfo {
     }
     
     #[getter]
-    fn head_commit(&self) -> StateId {
-        self.inner.head_commit
+    fn head(&self) -> StateId {
+        self.inner.head
     }
     
     #[getter]
@@ -80,8 +80,8 @@ impl PyBranchInfo {
     }
     
     fn __repr__(&self) -> String {
-        format!("BranchInfo(name='{}', head_commit={}, current={})", 
-                self.inner.name, self.inner.head_commit, self.inner.is_current)
+        format!("BranchInfo(name='{}', head={}, current={})", 
+                self.inner.name, self.inner.head, self.inner.is_current)
     }
 }
 
@@ -216,8 +216,8 @@ impl PyGraphVersion {
         dict.set_item("has_uncommitted_changes", graph.inner.has_uncommitted_changes())?;
         
         // Get current state info
-        let node_count = graph.inner.node_count();
-        let edge_count = graph.inner.edge_count();
+        let node_count = graph.get_node_count();
+        let edge_count = graph.get_edge_count();
         dict.set_item("current_state", format!("{} nodes, {} edges", node_count, edge_count))?;
         
         Ok(dict.to_object(py))
@@ -253,8 +253,8 @@ impl PyGraphVersion {
     /// Get version info
     fn get_info(&self, py: Python) -> PyResult<String> {
         let graph = self.graph.borrow(py);
-        let node_count = graph.inner.node_count();
-        let edge_count = graph.inner.edge_count();
+        let node_count = graph.get_node_count();
+        let edge_count = graph.get_edge_count();
         let has_changes = graph.inner.has_uncommitted_changes();
         
         Ok(format!("Version Control: {} nodes, {} edges, uncommitted changes: {}", 
