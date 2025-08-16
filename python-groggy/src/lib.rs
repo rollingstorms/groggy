@@ -745,33 +745,6 @@ impl PySubgraph {
         ))
     }
     
-    /// Support attribute access: subgraph['id'] returns appropriate IDs based on subgraph type
-    fn __getitem__(&self, py: Python, attr_name: String) -> PyResult<Py<PyGraphArray>> {
-        match attr_name.as_str() {
-            "id" => {
-                // For edge subgraphs (created by edges[:]), return edge IDs
-                // For node subgraphs (created by nodes[:]), return node IDs
-                if self.subgraph_type.contains("edge") {
-                    // This is an edge subgraph - return edge IDs
-                    self.edge_ids(py)
-                } else {
-                    // This is a node subgraph - return node IDs  
-                    self.node_ids(py)
-                }
-            }
-            _ => {
-                // For other attributes, determine whether to use node or edge attributes
-                // For edge subgraphs, use edge attributes; for node subgraphs, use node attributes
-                if self.subgraph_type.contains("edge") {
-                    // Edge subgraph - get edge attribute
-                    self.get_edge_attribute_column(py, &attr_name)
-                } else {
-                    // Node subgraph - get node attribute
-                    self.get_node_attribute_column(py, &attr_name)
-                }
-            }
-        }
-    }
 }
 
 /// Native attribute collection that keeps data in Rust
@@ -3932,6 +3905,7 @@ impl PyGraphArray {
         Ok(py_values)
     }
     
+    
     // === STATISTICAL OPERATIONS ===
     
     /// Calculate mean (average) of numeric values
@@ -4172,11 +4146,14 @@ pub struct PyGraphMatrix {
 #[pymethods]
 impl PyGraphMatrix {
     /// Get matrix dimensions as (rows, columns) tuple
+    /// Get matrix shape as (rows, cols) tuple 
+    #[getter]
     fn shape(&self) -> (usize, usize) {
         (self.num_rows, self.column_names.len())
     }
     
-    /// Get column names
+    /// Get column names as property
+    #[getter]
     fn columns(&self) -> Vec<String> {
         self.column_names.clone()
     }

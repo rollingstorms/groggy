@@ -476,6 +476,12 @@ class GraphTable:
         return columns
     
     @property
+    def dtypes(self):
+        """Get column data types."""
+        rows, columns = self._build_table_data()
+        return self._detect_column_types(rows, columns)
+    
+    @property
     def shape(self):
         """Get table shape (rows, columns)."""
         rows, columns = self._build_table_data()
