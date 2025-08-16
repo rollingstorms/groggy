@@ -17,6 +17,9 @@ pub mod core;
 // API FFI bindings (mirror main project api/)
 pub mod api;
 
+// Display FFI bindings (mirror main project display/)
+pub mod display;
+
 // Re-export commonly used FFI types
 pub use types::*;
 pub use errors::*;
