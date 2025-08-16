@@ -6,7 +6,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyIndexError, PyImportError, PyNotImplementedError};
-use groggy::{NodeId, EdgeId, AttrValue, Subgraph as RustSubgraph};
+use groggy::{NodeId, EdgeId, AttrValue};
 use std::collections::HashMap;
 
 // Import types from our FFI modules
@@ -246,7 +246,7 @@ impl PySubgraph {
                         let attr_value = python_value_to_attr_value(value)?;
                         let py_attr_value = PyAttrValue::from_attr_value(attr_value);
                         
-                        graph.set_node_attribute(node_id, &attr_name, py_attr_value.to_attr_value());
+                        graph.set_node_attribute(node_id, attr_name, &py_attr_value)?;
                     }
                 }
             }
@@ -277,7 +277,7 @@ impl PySubgraph {
                     let attr_value = python_value_to_attr_value(value)?;
                     let py_attr_value = PyAttrValue::from_attr_value(attr_value);
                     
-                    graph.set_node_attribute(node_id, &attr_name, py_attr_value.to_attr_value());
+                    graph.set_node_attribute(node_id, attr_name, &py_attr_value)?;
                 }
             }
             
@@ -592,10 +592,4 @@ impl PySubgraph {
             Err(PyRuntimeError::new_err("No graph reference available for filtering"))
         }
     }
-}graph FFI Bindings
-//! 
-//! Python bindings for subgraph operations.
-
-use pyo3::prelude::*;
-
-// Placeholder - will extract PySubgraph from lib_old.rs
+}

@@ -430,11 +430,11 @@ impl PyStatsSummary {
 #[pyclass(name = "GraphMatrix")]
 pub struct PyGraphMatrix {
     /// Column data as GraphArrays
-    columns: Vec<Py<PyGraphArray>>,
+    pub columns: Vec<Py<PyGraphArray>>,
     /// Column names
-    column_names: Vec<String>,
+    pub column_names: Vec<String>,
     /// Number of rows
-    num_rows: usize,
+    pub num_rows: usize,
 }
 
 #[pymethods]

@@ -18,6 +18,16 @@ impl PyAttrValue {
     pub fn new(inner: RustAttrValue) -> Self {
         Self { inner }
     }
+    
+    /// Create PyAttrValue from RustAttrValue (for FFI integration)
+    pub fn from_attr_value(attr_value: RustAttrValue) -> Self {
+        Self { inner: attr_value }
+    }
+    
+    /// Convert PyAttrValue to RustAttrValue (for FFI integration)
+    pub fn to_attr_value(&self) -> RustAttrValue {
+        self.inner.clone()
+    }
 }
 
 #[pymethods]
@@ -119,6 +129,31 @@ impl PyAttrValue {
         })
     }
     
+    pub fn __str__(&self) -> PyResult<String> {
+        Ok(match &self.inner {
+            RustAttrValue::Int(i) => i.to_string(),
+            RustAttrValue::Float(f) => f.to_string(),
+            RustAttrValue::Text(s) => s.clone(),
+            RustAttrValue::Bool(b) => b.to_string(),
+            RustAttrValue::FloatVec(v) => format!("{:?}", v),
+            RustAttrValue::Bytes(b) => format!("{:?}", b),
+            RustAttrValue::CompactText(cs) => cs.as_str().to_string(),
+            RustAttrValue::SmallInt(i) => i.to_string(),
+            RustAttrValue::CompressedText(cd) => {
+                match cd.decompress_text() {
+                    Ok(data) => data,
+                    Err(_) => "compressed(error)".to_string()
+                }
+            },
+            RustAttrValue::CompressedFloatVec(cd) => {
+                match cd.decompress_float_vec() {
+                    Ok(data) => format!("{:?}", data),
+                    Err(_) => "compressed(error)".to_string()
+                }
+            },
+        })
+    }
+    
     fn __eq__(&self, other: &PyAttrValue) -> bool {
         self.inner == other.inner
     }
@@ -183,6 +218,34 @@ impl PyAttrValue {
     }
 }
 
+// ToPyObject implementation for PyAttrValue
+impl pyo3::ToPyObject for PyAttrValue {
+    fn to_object(&self, py: pyo3::Python<'_>) -> pyo3::PyObject {
+        match &self.inner {
+            RustAttrValue::Int(i) => i.to_object(py),
+            RustAttrValue::Float(f) => f.to_object(py),
+            RustAttrValue::Text(s) => s.to_object(py),
+            RustAttrValue::Bool(b) => b.to_object(py),
+            RustAttrValue::FloatVec(v) => v.to_object(py),
+            RustAttrValue::Bytes(b) => b.to_object(py),
+            RustAttrValue::CompactText(cs) => cs.as_str().to_object(py),
+            RustAttrValue::SmallInt(i) => (*i as i64).to_object(py),
+            RustAttrValue::CompressedText(cd) => {
+                match cd.decompress_text() {
+                    Ok(data) => data.to_object(py),
+                    Err(_) => py.None()
+                }
+            },
+            RustAttrValue::CompressedFloatVec(cd) => {
+                match cd.decompress_float_vec() {
+                    Ok(data) => data.to_object(py),
+                    Err(_) => py.None()
+                }
+            },
+        }
+    }
+}
+
 /// Native result handle that keeps data in Rust
 #[pyclass]
 pub struct PyResultHandle {
@@ -236,7 +299,7 @@ impl PyAttributeCollection {
         
         let mut values = Vec::new();
         for &node_id in &self.node_ids {
-            if let Ok(Some(attr)) = graph.get_node_attribute(node_id, &self.attr_name) {
+            if let Ok(Some(attr)) = graph.get_node_attr(node_id, &self.attr_name) {
                 values.push(attr);
             }
         }
@@ -307,7 +370,7 @@ impl PyAttributeCollection {
         };
         
         for &node_id in self.node_ids.iter().step_by(step).take(count) {
-            if let Ok(Some(attr)) = graph.get_node_attribute(node_id, &self.attr_name) {
+            if let Ok(Some(attr)) = graph.get_node_attr(node_id, &self.attr_name) {
                 results.push(PyAttrValue { inner: attr });
             }
         }
