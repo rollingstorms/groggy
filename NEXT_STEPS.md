@@ -424,10 +424,12 @@ print(f"Engineering group: {len(eng_group.node_ids)} nodes")
 
 **🎯 IMMEDIATE SMALL TASKS - Current Implementation Targets**:
 
-**🚨 CRITICAL BUG - Edge Subgraph Attribute Access (HIGHEST PRIORITY)**:
+**🚨 CRITICAL BUG - PySubgraph Attribute Access (HIGHEST PRIORITY)**:
 - [ ] **Fix `g.edges[:]['id']`**: Currently returns all zeros instead of actual edge IDs [0, 1, 2, 3]
-- [ ] **Fix PySubgraph.__getitem__()**: Edge subgraphs should return edge attributes, not node attributes
-- [ ] **Fix subgraph type detection**: `g.edges[:]` should create proper edge subgraph with working attribute access
+- [ ] **Fix `g.edges[:]['strength']`**: Returns GraphArray of 100 zeros instead of actual edge attributes
+- [ ] **Fix `g.nodes[:]['age']`**: Returns fallback text "GraphArray(len=100, dtype=int64)" instead of rich display
+- [ ] **Fix PySubgraph.__getitem__()**: Completely broken - edge subgraphs return zeros, node subgraphs fail to rich display
+- [ ] **Investigate existing broken __getitem__**: Find and replace the current broken implementation
 
 **📊 GraphArray Core Methods (HIGH PRIORITY)**:
 - [ ] **GraphArray.unique()**: Return GraphArray of unique values for data analysis
@@ -456,12 +458,13 @@ print(f"Engineering group: {len(eng_group.node_ids)} nodes")
 - [ ] **GraphTable.sort_values(column)**: Pandas-compatible sorting
 - [ ] **GraphMatrix.sort_by_column(idx)**: Sort matrix rows by specific column values
 
-**🔗 Access Patterns (MEDIUM PRIORITY)**:
-- [ ] **GraphArray.values property**: Direct access to underlying data (like Pandas Series.values)
+**🔗 Access Patterns (MOSTLY COMPLETED)**:
+- [x] **GraphArray.values property**: Direct access to underlying data (like Pandas Series.values) ✅
 - [ ] **GraphArray.rename(name)**: Change the name/label of a GraphArray for display and operations
-- [ ] **GraphTable.columns property**: List/GraphArray of column names
-- [ ] **GraphTable.dtypes property**: Column data types mapping
-- [ ] **GraphMatrix.shape property**: Tuple of (rows, cols) dimensions
+- [x] **GraphTable.columns property**: List/GraphArray of column names ✅
+- [x] **GraphTable.dtypes property**: Column data types mapping ✅
+- [x] **GraphMatrix.shape property**: Tuple of (rows, cols) dimensions ✅  
+- [x] **GraphMatrix.columns property**: Column names as property ✅
 
 **📈 Enhanced Statistics (LOW PRIORITY)**:
 - [ ] **GraphArray.value_counts()**: Pandas-style value counting with sort options
