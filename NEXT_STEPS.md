@@ -1,8 +1,56 @@
 # Next Steps - Current Priorities
 
+## 🚨 CRITICAL ISSUE: FFI Layer Streamlining Required
+
+**PROBLEM DISCOVERED (August 16, 2025)**: During modularization from `lib_old.rs` to the new modular FFI architecture, **algorithms were incorrectly copied into FFI wrapper methods** instead of creating thin wrappers around core functionality. This is causing:
+
+1. **Performance Issues**: `connected_components` is O(E) even for fast path because it reimplements edge calculation in FFI
+2. **Missing Functionality**: `group_by` and other methods missing from modular API 
+3. **Inconsistent Patterns**: Some methods call core algorithms, others reimplement them
+4. **Borrow Conflicts**: Complex borrow patterns instead of simple call->drop->create pattern
+
+**ROOT CAUSE**: FFI methods are implementing algorithms instead of being thin wrappers.
+
+### 🎯 IMMEDIATE PRIORITY: FFI Method Pattern Standardization
+
+**CORRECT FFI PATTERN**:
+```rust
+#[pyo3(signature = (param1, param2, ...))]
+fn method_name(&self, py: Python, ...) -> PyResult<ReturnType> {
+    // 1. Convert Python inputs to Rust types
+    let rust_param = convert_input(param)?;
+    
+    // 2. Call the CORE algorithm (no FFI logic here)
+    let mut graph = self.graph.borrow_mut(py);
+    let result = graph.inner.core_method(rust_param)
+        .map_err(graph_error_to_py_err)?;
+    
+    // 3. Release borrow early
+    drop(graph);
+    
+    // 4. Create Python objects from Rust results
+    let py_result = create_python_wrapper(result, self.graph.clone());
+    
+    Ok(py_result)
+}
+```
+
+**IMPLEMENTATION STRATEGY**:
+1. **Phase 1**: Create FFI method templates for common patterns
+2. **Phase 2**: Start with critical methods (`connected_components`, `group_by`, `add_node`)
+3. **Phase 3**: Apply templates systematically across all FFI methods
+4. **Phase 4**: Performance verification and API consistency check
+
+**AFFECTED MODULES**:
+- `python-groggy/src/ffi/api/graph.rs` (main graph methods)
+- `python-groggy/src/ffi/api/graph_analytics.rs` (analytics methods)
+- `python-groggy/src/ffi/core/` (accessors, views, etc.)
+
+---
+
 ## 🎯 CURRENT STATUS (August 15, 2025)
 
-**Major Milestones Achieved**: GraphArray integration, Adjacency matrices, Multi-column GraphMatrix support, **Rich Display Module**, **FFI Architecture Understanding**
+**Major Milestones Achieved**: GraphArray integration, Adjacency matrices, Multi-column GraphMatrix support, **Rich Display Module**, **FFI Architecture Understanding** ⚠️ **BUT FFI NEEDS STREAMLINING**
 
 **✅ COMPLETED TODAY (August 15, 2025)**:
 - [x] **Rich Display Module**: Complete professional display system with Unicode box-drawing characters  
