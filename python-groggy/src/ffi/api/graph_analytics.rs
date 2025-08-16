@@ -25,7 +25,7 @@ impl PyGraphAnalytics {
     #[pyo3(signature = (inplace = false, attr_name = None))]
     fn connected_components(&self, py: Python, inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Vec<PySubgraph>> {
         let inplace = inplace.unwrap_or(false);
-        let graph = self.graph.borrow(py);
+        let mut graph = self.graph.borrow_mut(py);
         
         let options = TraversalOptions::default();
         let result = graph.inner.connected_components(options)
@@ -34,12 +34,16 @@ impl PyGraphAnalytics {
         // Convert each component to a PySubgraph  
         let mut subgraphs = Vec::new();
         
-        // Get columnar topology once for efficient edge processing
-        let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
+        // Store components data to avoid borrow conflicts
+        let components_data: Vec<_> = result.components.into_iter().enumerate().collect();
+        drop(graph); // Release borrow
         
-        // Process components and collect results first (avoid borrow conflicts)
-        let mut components_with_edges = Vec::new();
-        for (i, component) in result.components.into_iter().enumerate() {
+        // Process each component
+        for (i, component) in components_data {
+            // Re-borrow for each component to get topology
+            let graph_ref = self.graph.borrow(py);
+            let (edge_ids, sources, targets) = graph_ref.inner.get_columnar_topology();
+            
             // Calculate induced edges using optimized columnar topology method
             let component_nodes: HashSet<NodeId> = component.nodes.iter().copied().collect();
             let mut induced_edges = Vec::new();
@@ -55,16 +59,11 @@ impl PyGraphAnalytics {
                     induced_edges.push(edge_id);
                 }
             }
+            drop(graph_ref); // Release immutable borrow
             
-            // Store component data for later processing
-            components_with_edges.push((component.nodes.clone(), induced_edges, i));
-        }
-        
-        // Now create subgraphs and handle inplace attributes without borrow conflicts
-        for (nodes, induced_edges, i) in components_with_edges {
             // Create subgraph with proper induced edges
             let subgraph = PySubgraph::new(
-                nodes.clone(),
+                component.nodes.clone(),
                 induced_edges,
                 format!("connected_component_{}", i),
                 Some(self.graph.clone()),
@@ -76,13 +75,11 @@ impl PyGraphAnalytics {
                 let attr_name = attr_name.clone().unwrap_or_else(|| "component_id".to_string());
                 let component_value = PyAttrValue { inner: groggy::AttrValue::Int(i as i64) };
                 
-                for &node_id in &nodes {
-                    drop(graph); // Release borrow before mutable operation
-                    let mut graph_mut = self.graph.borrow_mut(py);
+                let mut graph_mut = self.graph.borrow_mut(py);
+                for &node_id in &component.nodes {
                     graph_mut.set_node_attribute(node_id, attr_name.clone(), &component_value)?;
-                    drop(graph_mut); // Release mutable borrow
-                    let graph = self.graph.borrow(py); // Re-borrow for next iteration
                 }
+                drop(graph_mut); // Release mutable borrow
             }
         }
         
@@ -94,7 +91,7 @@ impl PyGraphAnalytics {
     fn bfs(&self, py: Python, start_node: NodeId, max_depth: Option<usize>, 
            inplace: Option<bool>, attr_name: Option<String>) -> PyResult<PySubgraph> {
         let inplace = inplace.unwrap_or(false);
-        let graph = self.graph.borrow(py);
+        let mut graph = self.graph.borrow_mut(py);
         
         // Create traversal options
         let mut options = TraversalOptions::default();
@@ -110,13 +107,10 @@ impl PyGraphAnalytics {
         if inplace {
             let attr_name = attr_name.unwrap_or_else(|| "bfs_distance".to_string());
             
-            drop(graph); // Release borrow before mutable operations
-            let mut graph_mut = self.graph.borrow_mut(py);
-            
             // Set distance attributes (distance from start_node)
             for (order, &node_id) in result.nodes.iter().enumerate() {
                 let order_value = PyAttrValue { inner: groggy::AttrValue::Int(order as i64) };
-                graph_mut.set_node_attribute(node_id, attr_name.clone(), &order_value)?;
+                graph.set_node_attribute(node_id, attr_name.clone(), &order_value)?;
             }
         }
         
@@ -133,7 +127,7 @@ impl PyGraphAnalytics {
     fn dfs(&self, py: Python, start_node: NodeId, max_depth: Option<usize>,
            inplace: Option<bool>, attr_name: Option<String>) -> PyResult<PySubgraph> {
         let inplace = inplace.unwrap_or(false);
-        let graph = self.graph.borrow(py);
+        let mut graph = self.graph.borrow_mut(py);
         
         // Create traversal options
         let mut options = TraversalOptions::default();
@@ -149,13 +143,10 @@ impl PyGraphAnalytics {
         if inplace {
             let attr_name = attr_name.unwrap_or_else(|| "dfs_order".to_string());
             
-            drop(graph); // Release borrow before mutable operations
-            let mut graph_mut = self.graph.borrow_mut(py);
-            
             // Set order attributes
             for (order, &node_id) in result.nodes.iter().enumerate() {
                 let order_value = PyAttrValue { inner: groggy::AttrValue::Int(order as i64) };
-                graph_mut.set_node_attribute(node_id, attr_name.clone(), &order_value)?;
+                graph.set_node_attribute(node_id, attr_name.clone(), &order_value)?;
             }
         }
         
@@ -173,7 +164,7 @@ impl PyGraphAnalytics {
                     weight_attribute: Option<AttrName>, inplace: Option<bool>, 
                     attr_name: Option<String>) -> PyResult<Option<PySubgraph>> {
         let inplace = inplace.unwrap_or(false);
-        let graph = self.graph.borrow(py);
+        let mut graph = self.graph.borrow_mut(py);
         
         let options = PathFindingOptions {
             weight_attribute,
@@ -188,13 +179,10 @@ impl PyGraphAnalytics {
             Some(path) => {
                 if inplace {
                     if let Some(attr_name) = attr_name {
-                        drop(graph); // Release borrow before mutable operations
-                        let mut graph_mut = self.graph.borrow_mut(py);
-                        
                         // Set path distance attribute on nodes
                         for (distance, &node_id) in path.nodes.iter().enumerate() {
                             let attr_value = groggy::AttrValue::Int(distance as i64);
-                            graph_mut.inner.set_node_attr(node_id, attr_name.clone(), attr_value)
+                            graph.inner.set_node_attr(node_id, attr_name.clone(), attr_value)
                                 .map_err(graph_error_to_py_err)?;
                         }
                     }

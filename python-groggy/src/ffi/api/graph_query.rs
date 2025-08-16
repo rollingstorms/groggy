@@ -23,7 +23,7 @@ pub struct PyGraphQuery {
 impl PyGraphQuery {
     /// Filter nodes by criteria
     fn filter_nodes(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
-        let graph = self.graph.borrow(py);
+        let mut graph = self.graph.borrow_mut(py);
         
         // Fast path optimization: Check for NodeFilter object first (most common case)
         let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
@@ -73,7 +73,7 @@ impl PyGraphQuery {
     
     /// Filter edges by criteria
     fn filter_edges(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
-        let graph = self.graph.borrow(py);
+        let mut graph = self.graph.borrow_mut(py);
         
         // Similar pattern to filter_nodes but for edges
         let edge_filter = if let Ok(filter_obj) = filter.extract::<PyEdgeFilter>() {
@@ -113,7 +113,7 @@ impl PyGraphQuery {
     
     /// Filter nodes within a subgraph
     fn filter_subgraph_nodes(&self, py: Python, subgraph: &PySubgraph, filter: &PyAny) -> PyResult<PySubgraph> {
-        let graph = self.graph.borrow(py);
+        let mut graph = self.graph.borrow_mut(py);
         
         // Parse filter same way as filter_nodes
         let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
@@ -212,11 +212,13 @@ impl PyGraphQuery {
         // For now, support basic query patterns
         if query.starts_with("nodes where ") {
             let filter_str = &query[12..]; // Remove "nodes where "
-            self.filter_nodes(py, &filter_str.into_py(py).into_ref(py))
+            let filter_py_str = filter_str.to_string().into_py(py);
+            self.filter_nodes(py, filter_py_str.as_ref(py))
                 .map(|subgraph| Py::new(py, subgraph).unwrap().to_object(py))
         } else if query.starts_with("edges where ") {
             let filter_str = &query[12..]; // Remove "edges where "
-            self.filter_edges(py, &filter_str.into_py(py).into_ref(py))
+            let filter_py_str = filter_str.to_string().into_py(py);
+            self.filter_edges(py, filter_py_str.as_ref(py))
                 .map(|subgraph| Py::new(py, subgraph).unwrap().to_object(py))
         } else {
             Err(PyValueError::new_err(format!("Unsupported query pattern: {}", query)))

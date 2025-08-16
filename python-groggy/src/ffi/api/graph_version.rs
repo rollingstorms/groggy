@@ -207,7 +207,7 @@ impl PyGraphVersion {
         // Get branch information
         let branches = self.branches(py);
         let branch_list: Vec<PyObject> = branches.into_iter()
-            .map(|branch| branch.to_object(py))
+            .map(|branch| Py::new(py, branch).unwrap().to_object(py))
             .collect();
         dict.set_item("branches", branch_list)?;
         

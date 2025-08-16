@@ -10,6 +10,7 @@ pub mod history;
 pub mod attributes;
 pub mod accessors;
 pub mod views;
+pub mod traversal;
 
 // Re-export core FFI types
 pub use array::*;
@@ -19,3 +20,4 @@ pub use history::*;
 pub use attributes::*;
 pub use accessors::*;
 pub use views::*;
+pub use traversal::*;
