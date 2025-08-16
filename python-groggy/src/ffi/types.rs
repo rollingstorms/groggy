@@ -183,4 +183,137 @@ impl PyAttrValue {
     }
 }
 
+/// Native result handle that keeps data in Rust
+#[pyclass]
+pub struct PyResultHandle {
+    pub nodes: Vec<NodeId>,
+    pub edges: Vec<EdgeId>,
+    pub result_type: String,
+}
+
+#[pymethods]
+impl PyResultHandle {
+    #[getter]
+    fn nodes(&self) -> Vec<NodeId> {
+        self.nodes.clone()
+    }
+    
+    #[getter]
+    fn edges(&self) -> Vec<EdgeId> {
+        self.edges.clone()
+    }
+    
+    #[getter]
+    fn result_type(&self) -> String {
+        self.result_type.clone()
+    }
+    
+    fn __repr__(&self) -> String {
+        format!("ResultHandle(nodes={}, edges={}, type='{}')", 
+                self.nodes.len(), self.edges.len(), self.result_type)
+    }
+}
+
+/// Python wrapper for high-performance attribute collections
+#[pyclass(unsendable)]
+pub struct PyAttributeCollection {
+    pub graph_ref: *const groggy::Graph, // Unsafe but controlled access
+    pub node_ids: Vec<NodeId>,
+    pub attr_name: String,
+}
+
+#[pymethods] 
+impl PyAttributeCollection {
+    /// Get count of attributes without converting
+    fn len(&self) -> usize {
+        self.node_ids.len()
+    }
+    
+    /// Compute statistics directly in Rust
+    fn compute_stats(&self, py: Python) -> PyResult<PyObject> {
+        // Safe because we control the lifetime
+        let graph = unsafe { &*self.graph_ref };
+        
+        let mut values = Vec::new();
+        for &node_id in &self.node_ids {
+            if let Ok(Some(attr)) = graph.get_node_attribute(node_id, &self.attr_name) {
+                values.push(attr);
+            }
+        }
+        
+        // Compute statistics in Rust
+        {
+            let dict = PyDict::new(py);
+            
+            // Count
+            dict.set_item("count", values.len())?;
+            
+            // Type-specific statistics
+            if !values.is_empty() {
+                match &values[0] {
+                    RustAttrValue::Int(_) => {
+                        let int_values: Vec<i64> = values.iter()
+                            .filter_map(|v| if let RustAttrValue::Int(i) = v { Some(*i) } else { None })
+                            .collect();
+                        
+                        if !int_values.is_empty() {
+                            let sum: i64 = int_values.iter().sum();
+                            let avg = sum as f64 / int_values.len() as f64;
+                            let min = *int_values.iter().min().unwrap();
+                            let max = *int_values.iter().max().unwrap();
+                            
+                            dict.set_item("sum", sum)?;
+                            dict.set_item("average", avg)?;
+                            dict.set_item("min", min)?;
+                            dict.set_item("max", max)?;
+                        }
+                    },
+                    RustAttrValue::Float(_) => {
+                        let float_values: Vec<f32> = values.iter()
+                            .filter_map(|v| if let RustAttrValue::Float(f) = v { Some(*f) } else { None })
+                            .collect();
+                        
+                        if !float_values.is_empty() {
+                            let sum: f32 = float_values.iter().sum();
+                            let avg = sum / float_values.len() as f32;
+                            let min = float_values.iter().fold(f32::INFINITY, |a, &b| a.min(b));
+                            let max = float_values.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b));
+                            
+                            dict.set_item("sum", sum)?;
+                            dict.set_item("average", avg)?;
+                            dict.set_item("min", min)?;
+                            dict.set_item("max", max)?;
+                        }
+                    },
+                    _ => {
+                        // For other types, just provide count
+                    }
+                }
+            }
+            
+            Ok(dict.to_object(py))
+        }
+    }
+    
+    /// Get sample values without converting all
+    fn sample_values(&self, count: usize) -> PyResult<Vec<PyAttrValue>> {
+        let graph = unsafe { &*self.graph_ref };
+        let mut results = Vec::new();
+        
+        let step = if self.node_ids.len() <= count { 
+            1 
+        } else { 
+            self.node_ids.len() / count 
+        };
+        
+        for &node_id in self.node_ids.iter().step_by(step).take(count) {
+            if let Ok(Some(attr)) = graph.get_node_attribute(node_id, &self.attr_name) {
+                results.push(PyAttrValue { inner: attr });
+            }
+        }
+        
+        Ok(results)
+    }
+}
+
 // We'll add more types as needed during modularization
