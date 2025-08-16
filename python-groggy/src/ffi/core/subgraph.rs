@@ -84,6 +84,16 @@ impl PySubgraph {
             graph,
         }
     }
+    
+    /// Get nodes vector (for internal module access)
+    pub fn get_nodes(&self) -> &Vec<NodeId> {
+        &self.nodes
+    }
+    
+    /// Get edges vector (for internal module access)  
+    pub fn get_edges(&self) -> &Vec<EdgeId> {
+        &self.edges
+    }
 }
 
 #[pymethods]
@@ -534,7 +544,7 @@ impl PySubgraph {
             if let Ok(filter_str) = filter_obj.extract::<String>() {
                 // Parse the filter string and apply to our node subset
                 // This is a simplified implementation - in practice, we'd use the full parser
-                let filtered_nodes = self.nodes.iter()
+                let filtered_nodes: Vec<NodeId> = self.nodes.iter()
                     .filter(|&&node_id| {
                         // For demonstration, let's support a simple "dept == 'Engineering'" pattern
                         if filter_str.contains("==") {

@@ -34,7 +34,7 @@ impl PyNodesAccessor {
             
             // Single node access - return NodeView
             let graph = self.graph.borrow(py);
-            if !graph.contains_node(node_id) {
+            if !graph.has_node_internal(node_id) {
                 return Err(PyKeyError::new_err(format!("Node {} does not exist", node_id)));
             }
             
@@ -49,7 +49,7 @@ impl PyNodesAccessor {
             
             // Validate all nodes exist
             for &node_id in &node_ids {
-                if !graph.contains_node(node_id) {
+                if !graph.has_node_internal(node_id) {
                     return Err(PyKeyError::new_err(format!("Node {} does not exist", node_id)));
                 }
             }
@@ -126,7 +126,7 @@ impl PyNodesAccessor {
     /// Support iteration: for node_id in g.nodes
     fn __iter__(&self, py: Python) -> PyResult<PyObject> {
         let graph = self.graph.borrow(py);
-        let node_ids = graph.node_ids(py)?;
+        let node_ids = graph.get_node_ids_array(py)?;
         // Return the GraphArray directly - Python will handle iteration
         Ok(node_ids.to_object(py))
     }
@@ -196,7 +196,7 @@ impl PyEdgesAccessor {
             
             // Single edge access - return EdgeView
             let graph = self.graph.borrow(py);
-            if !graph.contains_edge(edge_id) {
+            if !graph.has_edge_internal(edge_id) {
                 return Err(PyKeyError::new_err(format!("Edge {} does not exist", edge_id)));
             }
             
@@ -211,7 +211,7 @@ impl PyEdgesAccessor {
             
             // Validate all edges exist
             for &edge_id in &edge_ids {
-                if !graph.contains_edge(edge_id) {
+                if !graph.has_edge_internal(edge_id) {
                     return Err(PyKeyError::new_err(format!("Edge {} does not exist", edge_id)));
                 }
             }
@@ -282,7 +282,7 @@ impl PyEdgesAccessor {
     /// Support iteration: for edge_id in g.edges
     fn __iter__(&self, py: Python) -> PyResult<PyObject> {
         let graph = self.graph.borrow(py);
-        let edge_ids = graph.edge_ids(py)?;
+        let edge_ids = graph.get_edge_ids_array(py)?;
         // Return the GraphArray directly - Python will handle iteration
         Ok(edge_ids.to_object(py))
     }
@@ -293,14 +293,14 @@ impl PyEdgesAccessor {
             Ok(constrained.len())
         } else {
             let graph = self.graph.borrow(py);
-            Ok(graph.edge_count())
+            Ok(graph.get_edge_count())
         }
     }
     
     /// String representation
     fn __str__(&self, py: Python) -> PyResult<String> {
         let graph = self.graph.borrow(py);
-        let count = graph.edge_count();
+        let count = graph.get_edge_count();
         Ok(format!("EdgesAccessor({} edges)", count))
     }
     

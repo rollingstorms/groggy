@@ -95,7 +95,7 @@ impl PyGraphQuery {
         // Calculate nodes that are connected by the filtered edges
         let mut nodes = HashSet::new();
         for &edge_id in &filtered_edges {
-            if let Ok((source, target)) = graph.inner.get_edge_endpoints(edge_id) {
+            if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
                 nodes.insert(source);
                 nodes.insert(target);
             }
@@ -130,7 +130,7 @@ impl PyGraphQuery {
         };
         
         // Apply filter only to nodes in the subgraph
-        let subgraph_node_set: HashSet<NodeId> = subgraph.nodes.iter().copied().collect();
+        let subgraph_node_set: HashSet<NodeId> = subgraph.get_nodes().iter().copied().collect();
         let all_filtered_nodes = graph.inner.find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
         
@@ -141,9 +141,9 @@ impl PyGraphQuery {
         
         // Calculate induced edges within the filtered nodes
         let filtered_node_set: HashSet<NodeId> = filtered_nodes.iter().copied().collect();
-        let filtered_edges: Vec<EdgeId> = subgraph.edges.iter()
+        let filtered_edges: Vec<EdgeId> = subgraph.get_edges().iter()
             .filter(|&&edge_id| {
-                if let Ok((source, target)) = graph.inner.get_edge_endpoints(edge_id) {
+                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
                     filtered_node_set.contains(&source) && filtered_node_set.contains(&target)
                 } else {
                     false
@@ -155,7 +155,7 @@ impl PyGraphQuery {
         Ok(PySubgraph::new(
             filtered_nodes,
             filtered_edges,
-            format!("filtered_{}", subgraph.name),
+            "filtered_subgraph".to_string(),
             Some(self.graph.clone()),
         ))
     }
@@ -178,7 +178,7 @@ impl PyGraphQuery {
                         .map_err(graph_error_to_py_err)?;
                     
                     let dict = PyDict::new(py);
-                    dict.set_item("value", attr_value_to_python_value(py, &result.value)?)?;
+                    dict.set_item("value", result.value)?;
                     dict.set_item("operation", &operation)?;
                     dict.set_item("attribute", &attribute)?;
                     dict.set_item("target", "nodes")?;
@@ -191,7 +191,7 @@ impl PyGraphQuery {
                     .map_err(graph_error_to_py_err)?;
                 
                 let dict = PyDict::new(py);
-                dict.set_item("value", attr_value_to_python_value(py, &result.value)?)?;
+                dict.set_item("value", result.value)?;
                 dict.set_item("operation", &operation)?;
                 dict.set_item("attribute", &attribute)?;
                 dict.set_item("target", "edges")?;
@@ -212,12 +212,12 @@ impl PyGraphQuery {
         // For now, support basic query patterns
         if query.starts_with("nodes where ") {
             let filter_str = &query[12..]; // Remove "nodes where "
-            self.filter_nodes(py, &filter_str.to_object(py))
-                .map(|subgraph| subgraph.to_object(py))
+            self.filter_nodes(py, &filter_str.into_py(py).into_ref(py))
+                .map(|subgraph| Py::new(py, subgraph).unwrap().to_object(py))
         } else if query.starts_with("edges where ") {
             let filter_str = &query[12..]; // Remove "edges where "
-            self.filter_edges(py, &filter_str.to_object(py))
-                .map(|subgraph| subgraph.to_object(py))
+            self.filter_edges(py, &filter_str.into_py(py).into_ref(py))
+                .map(|subgraph| Py::new(py, subgraph).unwrap().to_object(py))
         } else {
             Err(PyValueError::new_err(format!("Unsupported query pattern: {}", query)))
         }
@@ -226,8 +226,8 @@ impl PyGraphQuery {
     /// Get query statistics
     fn get_stats(&self, py: Python) -> PyResult<String> {
         let graph = self.graph.borrow(py);
-        let node_count = graph.inner.node_count();
-        let edge_count = graph.inner.edge_count();
+        let node_count = graph.get_node_count();
+        let edge_count = graph.get_edge_count();
         
         Ok(format!("Query module ready: {} nodes, {} edges available", node_count, edge_count))
     }
@@ -273,7 +273,7 @@ impl PyGraphQuery {
                     },
                     groggy::AttrValue::Float(_) => {
                         let float_values: Vec<f64> = values.iter().filter_map(|v| match v {
-                            groggy::AttrValue::Float(f) => Some(*f),
+                            groggy::AttrValue::Float(f) => Some(*f as f64),
                             _ => None,
                         }).collect();
                         
