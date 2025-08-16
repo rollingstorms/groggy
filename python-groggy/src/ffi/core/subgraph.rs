@@ -94,6 +94,11 @@ impl PySubgraph {
     pub fn get_edges(&self) -> &Vec<EdgeId> {
         &self.edges
     }
+    
+    /// Set graph reference (for internal module access)
+    pub fn set_graph_reference(&mut self, graph: Py<PyGraph>) {
+        self.graph = Some(graph);
+    }
 }
 
 #[pymethods]

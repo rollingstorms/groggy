@@ -22,7 +22,7 @@ pub struct PyGraphQuery {
 #[pymethods]
 impl PyGraphQuery {
     /// Filter nodes by criteria
-    fn filter_nodes(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+    pub fn filter_nodes(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         let mut graph = self.graph.borrow_mut(py);
         
         // Fast path optimization: Check for NodeFilter object first (most common case)
@@ -72,7 +72,7 @@ impl PyGraphQuery {
     }
     
     /// Filter edges by criteria
-    fn filter_edges(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+    pub fn filter_edges(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         let mut graph = self.graph.borrow_mut(py);
         
         // Similar pattern to filter_nodes but for edges

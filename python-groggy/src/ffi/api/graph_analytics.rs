@@ -23,7 +23,7 @@ pub struct PyGraphAnalytics {
 impl PyGraphAnalytics {
     /// Calculate connected components with optional in-place attribute setting
     #[pyo3(signature = (inplace = false, attr_name = None))]
-    fn connected_components(&self, py: Python, inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Vec<PySubgraph>> {
+    pub fn connected_components(&self, py: Python, inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Vec<PySubgraph>> {
         let inplace = inplace.unwrap_or(false);
         let mut graph = self.graph.borrow_mut(py);
         
@@ -31,56 +31,71 @@ impl PyGraphAnalytics {
         let result = graph.inner.connected_components(options)
             .map_err(graph_error_to_py_err)?;
         
-        // Convert each component to a PySubgraph  
-        let mut subgraphs = Vec::new();
+        // Get columnar topology once for efficient edge processing (same pattern as original)
+        let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
         
-        // Store components data to avoid borrow conflicts
-        let components_data: Vec<_> = result.components.into_iter().enumerate().collect();
-        drop(graph); // Release borrow
-        
-        // Process each component
-        for (i, component) in components_data {
-            // Re-borrow for each component to get topology
-            let graph_ref = self.graph.borrow(py);
-            let (edge_ids, sources, targets) = graph_ref.inner.get_columnar_topology();
-            
+        // Process components and collect results first (avoid borrow conflicts like original)
+        let mut components_with_edges = Vec::new();
+        for (i, component) in result.components.into_iter().enumerate() {
             // Calculate induced edges using optimized columnar topology method
-            let component_nodes: HashSet<NodeId> = component.nodes.iter().copied().collect();
+            let component_nodes: std::collections::HashSet<NodeId> = component.nodes.iter().copied().collect();
             let mut induced_edges = Vec::new();
             
-            // Iterate through parallel vectors - O(k) where k = active edges
-            for j in 0..edge_ids.len() {
-                let edge_id = edge_ids[j];
-                let source = sources[j];
-                let target = targets[j];
-                
-                // O(1) HashSet lookups instead of O(n) Vec::contains
-                if component_nodes.contains(&source) && component_nodes.contains(&target) {
-                    induced_edges.push(edge_id);
+            // Only calculate edges if needed (when inplace=true or user wants full subgraphs)
+            if inplace {
+                // Iterate through parallel vectors - O(k) where k = active edges
+                for j in 0..edge_ids.len() {
+                    let edge_id = edge_ids[j];
+                    let source = sources[j];
+                    let target = targets[j];
+                    
+                    // O(1) HashSet lookups instead of O(n) Vec::contains
+                    if component_nodes.contains(&source) && component_nodes.contains(&target) {
+                        induced_edges.push(edge_id);
+                    }
                 }
             }
-            drop(graph_ref); // Release immutable borrow
+            // For fast path (inplace=false), use empty edges to avoid expensive computation
             
-            // Create subgraph with proper induced edges
+            // Store component data for later processing
+            components_with_edges.push((component.nodes.clone(), induced_edges, i));
+        }
+        
+        // Now create subgraphs and handle inplace attributes without borrow conflicts
+        let mut subgraphs = Vec::new();
+        for (nodes, induced_edges, i) in components_with_edges {
+            // Create subgraph with None graph reference initially (like original)
             let subgraph = PySubgraph::new(
-                component.nodes.clone(),
+                nodes.clone(),
                 induced_edges,
                 format!("connected_component_{}", i),
-                Some(self.graph.clone()),
+                None, // Temporarily None - will be set below like original
             );
             subgraphs.push(subgraph);
             
-            // If inplace=True, set component_id attribute on nodes
+            // If inplace=True, set component_id attribute on nodes  
             if inplace {
                 let attr_name = attr_name.clone().unwrap_or_else(|| "component_id".to_string());
-                let component_value = PyAttrValue { inner: groggy::AttrValue::Int(i as i64) };
+                let component_value = groggy::AttrValue::Int(i as i64);
                 
-                let mut graph_mut = self.graph.borrow_mut(py);
-                for &node_id in &component.nodes {
-                    graph_mut.set_node_attribute(node_id, attr_name.clone(), &component_value)?;
-                }
-                drop(graph_mut); // Release mutable borrow
+                // Use bulk set for efficiency
+                let mut attrs_values = std::collections::HashMap::new();
+                let node_value_pairs: Vec<(NodeId, groggy::AttrValue)> = nodes.iter()
+                    .map(|&node_id| (node_id, component_value.clone()))
+                    .collect();
+                attrs_values.insert(attr_name, node_value_pairs);
+                
+                graph.inner.set_node_attrs(attrs_values)
+                    .map_err(graph_error_to_py_err)?;
             }
+        }
+        
+        // Release graph borrow
+        drop(graph);
+        
+        // Now set the graph reference for all subgraphs (like original)
+        for subgraph in &mut subgraphs {
+            subgraph.set_graph_reference(self.graph.clone());
         }
         
         Ok(subgraphs)
@@ -88,7 +103,7 @@ impl PyGraphAnalytics {
     
     /// Perform breadth-first search traversal
     #[pyo3(signature = (start_node, max_depth = None, inplace = false, attr_name = None))]
-    fn bfs(&self, py: Python, start_node: NodeId, max_depth: Option<usize>, 
+    pub fn bfs(&self, py: Python, start_node: NodeId, max_depth: Option<usize>, 
            inplace: Option<bool>, attr_name: Option<String>) -> PyResult<PySubgraph> {
         let inplace = inplace.unwrap_or(false);
         let mut graph = self.graph.borrow_mut(py);
@@ -124,7 +139,7 @@ impl PyGraphAnalytics {
     
     /// Perform depth-first search traversal
     #[pyo3(signature = (start_node, max_depth = None, inplace = false, attr_name = None))]
-    fn dfs(&self, py: Python, start_node: NodeId, max_depth: Option<usize>,
+    pub fn dfs(&self, py: Python, start_node: NodeId, max_depth: Option<usize>,
            inplace: Option<bool>, attr_name: Option<String>) -> PyResult<PySubgraph> {
         let inplace = inplace.unwrap_or(false);
         let mut graph = self.graph.borrow_mut(py);
