@@ -1330,31 +1330,45 @@ impl Graph {
     }
     
     /// Group nodes by attribute value and compute aggregates for each group
+    /// OPTIMIZED: O(N) algorithm using bulk attribute retrieval instead of O(N²) individual lookups
     pub fn group_nodes_by_attribute(&self, group_by_attr: &AttrName, aggregate_attr: &AttrName, operation: &str) -> Result<std::collections::HashMap<AttrValue, AggregationResult>, GraphError> {
         // Get all active nodes
         let node_ids: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
         
-        // Group nodes by the group_by_attr
-        let mut groups: std::collections::HashMap<AttrValue, Vec<NodeId>> = std::collections::HashMap::new();
+        if node_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        
+        // BULK OPERATION 1: Get group_by attribute for all nodes at once (O(N))
+        let group_by_values = self.space.get_attributes_for_nodes(&self.pool, group_by_attr, &node_ids);
+        
+        // BULK OPERATION 2: Get aggregate attribute for all nodes at once (O(N))  
+        let aggregate_values = self.space.get_attributes_for_nodes(&self.pool, aggregate_attr, &node_ids);
+        
+        // Create lookup maps for efficient access
+        let group_by_map: std::collections::HashMap<NodeId, &AttrValue> = group_by_values
+            .iter()
+            .filter_map(|(node_id, opt_val)| opt_val.map(|val| (*node_id, val)))
+            .collect();
+            
+        let aggregate_map: std::collections::HashMap<NodeId, &AttrValue> = aggregate_values
+            .iter()
+            .filter_map(|(node_id, opt_val)| opt_val.map(|val| (*node_id, val)))
+            .collect();
+        
+        // Group nodes by attribute value and collect aggregate values (O(N))
+        let mut groups: std::collections::HashMap<AttrValue, Vec<AttrValue>> = std::collections::HashMap::new();
         
         for &node_id in &node_ids {
-            if let Ok(Some(group_value)) = self.get_node_attr(node_id, group_by_attr) {
-                groups.entry(group_value).or_insert_with(Vec::new).push(node_id);
+            if let (Some(&group_val), Some(&agg_val)) = (group_by_map.get(&node_id), aggregate_map.get(&node_id)) {
+                groups.entry(group_val.clone()).or_insert_with(Vec::new).push(agg_val.clone());
             }
         }
         
-        // For each group, compute the aggregation on the aggregate_attr
+        // Compute aggregations for each group (O(N) total across all groups)
         let mut results = std::collections::HashMap::new();
         
-        for (group_value, group_nodes) in groups {
-            // Collect values for this group
-            let mut values = Vec::new();
-            for &node_id in &group_nodes {
-                if let Ok(Some(attr_value)) = self.get_node_attr(node_id, aggregate_attr) {
-                    values.push(attr_value);
-                }
-            }
-            
+        for (group_value, values) in groups {
             if !values.is_empty() {
                 let result = match operation {
                     "count" => values.len() as f64,

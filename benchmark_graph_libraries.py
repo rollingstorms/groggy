@@ -424,7 +424,7 @@ class GroggyPhase3Benchmark:
             "average"
         )
         
-        return time.time() - start, len(grouped.value)
+        return time.time() - start, len(grouped.groups)
 
 class NetworkXBenchmark:
     """NetworkX benchmark for comparison"""

@@ -57,26 +57,26 @@ impl PyNodeView {
     /// Get all attribute values
     fn values(&self, py: Python) -> PyResult<Vec<PyAttrValue>> {
         let graph = self.graph.borrow(py);
-        let keys = graph.node_attribute_keys(self.node_id);
-        let mut values = Vec::new();
-        for key in keys {
-            if let Some(value) = graph.get_node_attribute(self.node_id, key.clone()).ok().flatten() {
-                values.push(value);
-            }
-        }
+        // 🚀 PERFORMANCE FIX: Use batch attribute access instead of manual loops
+        let node_attrs = graph.inner.get_node_attrs(self.node_id)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to get node attributes: {}", e)))?;
+        
+        let values = node_attrs.into_iter()
+            .map(|(_, value)| PyAttrValue::from_attr_value(value))
+            .collect();
         Ok(values)
     }
     
     /// Get all attribute items as (key, value) pairs
     fn items(&self, py: Python) -> PyResult<Vec<(String, PyAttrValue)>> {
         let graph = self.graph.borrow(py);
-        let keys = graph.node_attribute_keys(self.node_id);
-        let mut items = Vec::new();
-        for key in keys {
-            if let Some(value) = graph.get_node_attribute(self.node_id, key.clone()).ok().flatten() {
-                items.push((key, value));
-            }
-        }
+        // 🚀 PERFORMANCE FIX: Use batch attribute access instead of manual loops
+        let node_attrs = graph.inner.get_node_attrs(self.node_id)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to get node attributes: {}", e)))?;
+        
+        let items = node_attrs.into_iter()
+            .map(|(key, value)| (key, PyAttrValue::from_attr_value(value)))
+            .collect();
         Ok(items)
     }
     
@@ -216,26 +216,26 @@ impl PyEdgeView {
     /// Get all attribute values
     fn values(&self, py: Python) -> PyResult<Vec<PyAttrValue>> {
         let graph = self.graph.borrow(py);
-        let keys = graph.edge_attribute_keys(self.edge_id);
-        let mut values = Vec::new();
-        for key in keys {
-            if let Some(value) = graph.get_edge_attribute(self.edge_id, key.clone()).ok().flatten() {
-                values.push(value);
-            }
-        }
+        // 🚀 PERFORMANCE FIX: Use batch attribute access instead of manual loops
+        let edge_attrs = graph.inner.get_edge_attrs(self.edge_id)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to get edge attributes: {}", e)))?;
+        
+        let values = edge_attrs.into_iter()
+            .map(|(_, value)| PyAttrValue::from_attr_value(value))
+            .collect();
         Ok(values)
     }
     
     /// Get all attribute items as (key, value) pairs
     fn items(&self, py: Python) -> PyResult<Vec<(String, PyAttrValue)>> {
         let graph = self.graph.borrow(py);
-        let keys = graph.edge_attribute_keys(self.edge_id);
-        let mut items = Vec::new();
-        for key in keys {
-            if let Some(value) = graph.get_edge_attribute(self.edge_id, key.clone()).ok().flatten() {
-                items.push((key, value));
-            }
-        }
+        // 🚀 PERFORMANCE FIX: Use batch attribute access instead of manual loops
+        let edge_attrs = graph.inner.get_edge_attrs(self.edge_id)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to get edge attributes: {}", e)))?;
+        
+        let items = edge_attrs.into_iter()
+            .map(|(key, value)| (key, PyAttrValue::from_attr_value(value)))
+            .collect();
         Ok(items)
     }
     

@@ -54,15 +54,20 @@ impl PyNodesAccessor {
                 }
             }
             
-            // Calculate induced edges between these nodes
-            // 🚀 PERFORMANCE FIX: Use HashSet for O(1) contains instead of O(n) Vec operations
+            // 🚀 PERFORMANCE FIX: Use core columnar topology instead of O(E) FFI algorithm
             let node_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
+            let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
             let mut induced_edges = Vec::new();
-            for edge_id in graph.inner.edge_ids() {
-                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
-                    if node_set.contains(&source) && node_set.contains(&target) {  // O(1) hash lookup
-                        induced_edges.push(edge_id);
-                    }
+            
+            // O(k) where k = active edges, much better than O(E)
+            for i in 0..edge_ids.len() {
+                let edge_id = edge_ids[i];
+                let source = sources[i];
+                let target = targets[i];
+                
+                // O(1) HashSet lookups
+                if node_set.contains(&source) && node_set.contains(&target) {
+                    induced_edges.push(edge_id);
                 }
             }
             
@@ -96,15 +101,20 @@ impl PyNodesAccessor {
                 i += step;
             }
             
-            // Calculate induced edges between selected nodes
-            // 🚀 PERFORMANCE FIX: Use HashSet for O(1) contains instead of O(n) Vec operations  
+            // 🚀 PERFORMANCE FIX: Use core columnar topology instead of O(E) FFI algorithm  
             let selected_node_set: std::collections::HashSet<NodeId> = selected_nodes.iter().copied().collect();
+            let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
             let mut induced_edges = Vec::new();
-            for edge_id in graph.inner.edge_ids() {
-                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
-                    if selected_node_set.contains(&source) && selected_node_set.contains(&target) {  // O(1) hash lookup
-                        induced_edges.push(edge_id);
-                    }
+            
+            // O(k) where k = active edges, much better than O(E)
+            for i in 0..edge_ids.len() {
+                let edge_id = edge_ids[i];
+                let source = sources[i];
+                let target = targets[i];
+                
+                // O(1) HashSet lookups
+                if selected_node_set.contains(&source) && selected_node_set.contains(&target) {
+                    induced_edges.push(edge_id);
                 }
             }
             

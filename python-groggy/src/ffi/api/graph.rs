@@ -14,6 +14,7 @@ use crate::ffi::core::views::{PyNodeView, PyEdgeView};
 use crate::ffi::core::array::{PyGraphArray, PyGraphMatrix};
 use crate::ffi::core::subgraph::PySubgraph;
 use crate::ffi::core::query::{PyNodeFilter, PyEdgeFilter};
+use crate::ffi::core::traversal::PyGroupedAggregationResult;
 use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value, attr_value_to_python_value};
 
 // Import version control types
@@ -25,13 +26,22 @@ struct PyAttributes {
     graph: *const RustGraph,
 }
 
-
-struct PyAggregationResult {
-    value: f64, // Simplified for now
+/// Python wrapper for AggregationResult
+#[pyclass(name = "AggregationResult")]
+pub struct PyAggregationResult {
+    pub value: f64,
 }
 
-struct PyGroupedAggregationResult {
-    value: PyObject,
+#[pymethods]
+impl PyAggregationResult {
+    #[getter]
+    fn value(&self) -> f64 {
+        self.value
+    }
+    
+    fn __repr__(&self) -> String {
+        format!("AggregationResult({})", self.value)
+    }
 }
 
 
@@ -108,6 +118,10 @@ impl PyGraph {
                 // Create all nodes first
                 let node_ids = self.inner.add_nodes(node_data_list.len());
                 
+                // OPTIMIZATION: Collect attributes by name for bulk operations instead of individual calls
+                // This changes complexity from O(N × A × log N) to O(N × A)
+                let mut attrs_by_name: std::collections::HashMap<String, Vec<(NodeId, RustAttrValue)>> = std::collections::HashMap::new();
+                
                 // Process each node's data
                 for (i, node_dict) in node_data_list.iter().enumerate() {
                     let node_id = node_ids[i];
@@ -127,17 +141,20 @@ impl PyGraph {
                         }
                     }
                     
-                    // Set all attributes from the dict
+                    // Collect all attributes for bulk setting
                     for (attr_key, attr_value) in node_dict.iter() {
                         let attr_name: String = attr_key.extract()?;
+                        let attr_val = python_value_to_attr_value(attr_value)?;
                         
                         // Store all attributes including the id_key for later uid_key lookups
-                        // (Previous version skipped id_key, but we need it for uid_key resolution)
-                        
-                        let attr_val = python_value_to_attr_value(attr_value)?;
-                        self.inner.set_node_attr(node_id, attr_name, attr_val)
-                            .map_err(graph_error_to_py_err)?;
+                        attrs_by_name.entry(attr_name).or_insert_with(Vec::new).push((node_id, attr_val));
                     }
+                }
+                
+                // OPTIMIZATION: Use bulk attribute setting - O(A) operations instead of O(N × A)
+                if !attrs_by_name.is_empty() {
+                    self.inner.set_node_attrs(attrs_by_name)
+                        .map_err(graph_error_to_py_err)?;
                 }
                 
                 // Return the mapping if id_key was provided, otherwise return node IDs
@@ -509,7 +526,9 @@ impl PyGraph {
         // Format 2: List of (source, target, attrs_dict) tuples  
         else if let Ok(edge_tuples) = edges.extract::<Vec<(&PyAny, &PyAny, Option<&PyDict>)>>() {
             let mut edge_ids = Vec::new();
+            let mut edges_with_attrs = Vec::new();
             
+            // First pass: create all edges and collect attribute data
             for (src_any, tgt_any, attrs_opt) in edge_tuples {
                 let source: NodeId = src_any.extract()?;
                 let target: NodeId = tgt_any.extract()?;
@@ -518,16 +537,27 @@ impl PyGraph {
                     .map_err(graph_error_to_py_err)?;
                 edge_ids.push(edge_id);
                 
-                // Set attributes if provided
+                // Store edge attributes for bulk processing
                 if let Some(attrs) = attrs_opt {
+                    edges_with_attrs.push((edge_id, attrs));
+                }
+            }
+            
+            // OPTIMIZATION: Use bulk attribute setting instead of individual calls
+            if !edges_with_attrs.is_empty() {
+                let mut attrs_by_name: std::collections::HashMap<String, Vec<(EdgeId, RustAttrValue)>> = std::collections::HashMap::new();
+                
+                for (edge_id, attrs) in edges_with_attrs {
                     for (key, value) in attrs.iter() {
                         let attr_name: String = key.extract()?;
                         let attr_value = python_value_to_attr_value(value)?;
                         
-                        self.inner.set_edge_attr(edge_id, attr_name, attr_value)
-                            .map_err(graph_error_to_py_err)?;
+                        attrs_by_name.entry(attr_name).or_insert_with(Vec::new).push((edge_id, attr_value));
                     }
                 }
+                
+                self.inner.set_edge_attrs(attrs_by_name)
+                    .map_err(graph_error_to_py_err)?;
             }
             
             return Ok(edge_ids);
@@ -536,7 +566,9 @@ impl PyGraph {
         // Format 3: List of dictionaries with node mapping
         else if let Ok(edge_dicts) = edges.extract::<Vec<&PyDict>>() {
             let mut edge_ids = Vec::new();
+            let mut edges_with_attrs = Vec::new();
             
+            // First pass: create all edges and collect attribute data
             for edge_dict in edge_dicts {
                 // Extract source and target
                 let source = if let Some(mapping) = &node_mapping {
@@ -560,14 +592,27 @@ impl PyGraph {
                     .map_err(graph_error_to_py_err)?;
                 edge_ids.push(edge_id);
                 
-                // Set edge attributes if any
-                for (key, value) in edge_dict.iter() {
-                    let key_str: String = key.extract()?;
-                    if key_str != "source" && key_str != "target" {
-                        let attr_value = python_value_to_attr_value(value)?;
-                        self.inner.set_edge_attr(edge_id, key_str, attr_value)
-                            .map_err(graph_error_to_py_err)?;
+                // Store edge and its attributes for bulk processing
+                edges_with_attrs.push((edge_id, edge_dict));
+            }
+            
+            // OPTIMIZATION: Use bulk attribute setting instead of individual calls
+            if !edges_with_attrs.is_empty() {
+                let mut attrs_by_name: std::collections::HashMap<String, Vec<(EdgeId, RustAttrValue)>> = std::collections::HashMap::new();
+                
+                for (edge_id, edge_dict) in edges_with_attrs {
+                    for (key, value) in edge_dict.iter() {
+                        let key_str: String = key.extract()?;
+                        if key_str != "source" && key_str != "target" {
+                            let attr_value = python_value_to_attr_value(value)?;
+                            attrs_by_name.entry(key_str).or_insert_with(Vec::new).push((edge_id, attr_value));
+                        }
                     }
+                }
+                
+                if !attrs_by_name.is_empty() {
+                    self.inner.set_edge_attrs(attrs_by_name)
+                        .map_err(graph_error_to_py_err)?;
                 }
             }
             
@@ -670,261 +715,212 @@ impl PyGraph {
         ))
     }
     
-    /// Breadth-first search traversal
+    /// BFS traversal using core algorithm (THIN WRAPPER - NO FFI ALGORITHM)
     #[pyo3(signature = (start_node, max_depth = None, node_filter = None, edge_filter = None, inplace = None, attr_name = None))]
     fn bfs(&mut self, py: Python, start_node: NodeId, max_depth: Option<usize>, 
            node_filter: Option<&PyAny>, edge_filter: Option<&PyAny>,
            inplace: Option<bool>, attr_name: Option<String>) -> PyResult<PySubgraph> {
         
-        // Check if start node exists
-        if !self.inner.contains_node(start_node) {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Start node {} does not exist in the graph", start_node)
-            ));
+        let inplace = inplace.unwrap_or(false);
+        
+        // 1. Convert inputs to core traversal options (NO FFI ALGORITHM)
+        let mut options = groggy::core::traversal::TraversalOptions::default();
+        if let Some(depth) = max_depth {
+            options.max_depth = Some(depth);
         }
         
-        // BFS implementation
-        use std::collections::{VecDeque, HashSet};
+        // Handle filters (convert from PyAny to core filter types)
+        if let Some(filter) = node_filter {
+            if let Ok(node_filter_obj) = filter.extract::<PyNodeFilter>() {
+                options.node_filter = Some(node_filter_obj.inner.clone());
+            }
+        }
+        if let Some(filter) = edge_filter {
+            if let Ok(edge_filter_obj) = filter.extract::<PyEdgeFilter>() {
+                options.edge_filter = Some(edge_filter_obj.inner.clone());
+            }
+        }
         
-        let mut visited = HashSet::new();
-        let mut queue = VecDeque::new();
-        let mut result_nodes = Vec::new();
-        let mut result_edges = Vec::new();
+        // 2. Call proven core algorithm (NO FFI ALGORITHM IMPLEMENTATION)
+        let result = self.inner.bfs(start_node, options)
+            .map_err(graph_error_to_py_err)?;
         
-        queue.push_back((start_node, 0)); // (node_id, depth)
-        visited.insert(start_node);
-        
-        while let Some((current_node, depth)) = queue.pop_front() {
-            result_nodes.push(current_node);
-            
-            // Check max depth
-            if let Some(max_d) = max_depth {
-                if depth >= max_d {
-                    continue;
+        // 3. Handle inplace attribute setting
+        if inplace {
+            // Set node attributes (BFS distance/order)
+            if let Some(ref node_attr_name) = attr_name {
+                for (order, &node_id) in result.nodes.iter().enumerate() {
+                    let order_value = PyAttrValue::from_attr_value(groggy::AttrValue::Int(order as i64));
+                    self.set_node_attribute(node_id, node_attr_name.clone(), &order_value)?;
+                }
+            } else {
+                // Default node attribute
+                let default_attr = "bfs_distance".to_string();
+                for (order, &node_id) in result.nodes.iter().enumerate() {
+                    let order_value = PyAttrValue::from_attr_value(groggy::AttrValue::Int(order as i64));
+                    self.set_node_attribute(node_id, default_attr.clone(), &order_value)?;
                 }
             }
             
-            // Get neighbors by examining all edges
-            let all_edges = self.inner.edge_ids();
-            for edge_id in all_edges {
-                if let Ok((source, target)) = self.inner.edge_endpoints(edge_id) {
-                    let neighbor = if source == current_node {
-                        target
-                    } else if target == current_node {
-                        source
-                    } else {
-                        continue;
-                    };
-                    
-                    if !visited.contains(&neighbor) {
-                        visited.insert(neighbor);
-                        queue.push_back((neighbor, depth + 1));
-                        result_edges.push(edge_id);
-                    }
-                }
+            // Set edge attributes (tree edge markers)
+            let edge_attr_name = attr_name.unwrap_or_else(|| "bfs_tree_edge".to_string());
+            for &edge_id in &result.edges {
+                let tree_edge_value = PyAttrValue::from_attr_value(groggy::AttrValue::Bool(true));
+                self.set_edge_attribute(edge_id, edge_attr_name.clone(), &tree_edge_value)?;
             }
         }
         
-        // Handle inplace attribute setting
-        if let Some(true) = inplace {
-            let attr_name = attr_name.unwrap_or_else(|| "bfs_distance".to_string());
-            
-            for (order, &node_id) in result_nodes.iter().enumerate() {
-                let order_value = groggy::AttrValue::Int(order as i64);
-                let _ = self.inner.set_node_attr(node_id, attr_name.clone(), order_value);
-            }
-        }
-        
-        // Ignore filter parameters for now - they would need proper implementation
-        let _ = node_filter;
-        let _ = edge_filter;
-        
+        // 4. Wrap core results in FFI subgraph
         Ok(PySubgraph::new(
-            result_nodes,
-            result_edges,
+            result.nodes,
+            result.edges,
             "bfs_traversal".to_string(),
-            Some(Py::new(py, PyGraph { inner: groggy::Graph::new() })?)
+            None, // TODO: Fix graph reference when Graph has Clone
         ))
     }
     
-    /// Depth-first search traversal
-    #[pyo3(signature = (start_node, max_depth = None, node_filter = None, edge_filter = None, inplace = None, node_attr = None, edge_attr = None))]
+    /// DFS traversal using core algorithm (THIN WRAPPER - NO FFI ALGORITHM)
+    #[pyo3(signature = (start_node, max_depth = None, node_filter = None, edge_filter = None, inplace = None, attr_name = None))]
     fn dfs(&mut self, py: Python, start_node: NodeId, max_depth: Option<usize>,
            node_filter: Option<&PyAny>, edge_filter: Option<&PyAny>,
-           inplace: Option<bool>, node_attr: Option<String>, edge_attr: Option<String>) -> PyResult<PySubgraph> {
+           inplace: Option<bool>, attr_name: Option<String>) -> PyResult<PySubgraph> {
         
-        // Check if start node exists
-        if !self.inner.contains_node(start_node) {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Start node {} does not exist in the graph", start_node)
-            ));
+        let inplace = inplace.unwrap_or(false);
+        
+        // 1. Convert inputs to core traversal options (NO FFI ALGORITHM)
+        let mut options = groggy::core::traversal::TraversalOptions::default();
+        if let Some(depth) = max_depth {
+            options.max_depth = Some(depth);
         }
         
-        // DFS implementation
-        use std::collections::HashSet;
-        
-        let mut visited = HashSet::new();
-        let mut result_nodes = Vec::new();
-        let mut result_edges = Vec::new();
-        
-        // Recursive DFS helper function
-        fn dfs_recursive(
-            graph: &groggy::Graph,
-            current_node: NodeId,
-            visited: &mut HashSet<NodeId>,
-            result_nodes: &mut Vec<NodeId>,
-            result_edges: &mut Vec<EdgeId>,
-            depth: usize,
-            max_depth: Option<usize>
-        ) {
-            visited.insert(current_node);
-            result_nodes.push(current_node);
-            
-            // Check max depth
-            if let Some(max_d) = max_depth {
-                if depth >= max_d {
-                    return;
-                }
+        // Handle filters (convert from PyAny to core filter types)
+        if let Some(filter) = node_filter {
+            if let Ok(node_filter_obj) = filter.extract::<PyNodeFilter>() {
+                options.node_filter = Some(node_filter_obj.inner.clone());
             }
-            
-            // Get neighbors
-            let all_edges = graph.edge_ids();
-            for edge_id in all_edges {
-                if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
-                    let neighbor = if source == current_node {
-                        target
-                    } else if target == current_node {
-                        source
-                    } else {
-                        continue;
-                    };
-                    
-                    if !visited.contains(&neighbor) {
-                        result_edges.push(edge_id);
-                        dfs_recursive(graph, neighbor, visited, result_nodes, result_edges, depth + 1, max_depth);
-                    }
-                }
+        }
+        if let Some(filter) = edge_filter {
+            if let Ok(edge_filter_obj) = filter.extract::<PyEdgeFilter>() {
+                options.edge_filter = Some(edge_filter_obj.inner.clone());
             }
         }
         
-        dfs_recursive(&self.inner, start_node, &mut visited, &mut result_nodes, &mut result_edges, 0, max_depth);
+        // 2. Call proven core algorithm (NO FFI ALGORITHM IMPLEMENTATION)  
+        let result = self.inner.dfs(start_node, options)
+            .map_err(graph_error_to_py_err)?;
         
-        // Handle inplace attribute setting
-        if let Some(true) = inplace {
-            // Set node attributes
-            if let Some(node_attr_name) = node_attr {
-                for (order, &node_id) in result_nodes.iter().enumerate() {
-                    let order_value = groggy::AttrValue::Int(order as i64);
-                    let _ = self.inner.set_node_attr(node_id, node_attr_name.clone(), order_value);
+        // 3. Handle inplace attribute setting
+        if inplace {
+            // Set node attributes (DFS order/distance)
+            if let Some(ref node_attr_name) = attr_name {
+                for (order, &node_id) in result.nodes.iter().enumerate() {
+                    let order_value = PyAttrValue::from_attr_value(groggy::AttrValue::Int(order as i64));
+                    self.set_node_attribute(node_id, node_attr_name.clone(), &order_value)?;
+                }
+            } else {
+                // Default node attribute
+                let default_attr = "dfs_order".to_string();
+                for (order, &node_id) in result.nodes.iter().enumerate() {
+                    let order_value = PyAttrValue::from_attr_value(groggy::AttrValue::Int(order as i64));
+                    self.set_node_attribute(node_id, default_attr.clone(), &order_value)?;
                 }
             }
             
-            // Set edge attributes
-            if let Some(edge_attr_name) = edge_attr {
-                for &edge_id in &result_edges {
-                    let tree_edge_value = groggy::AttrValue::Bool(true);
-                    let _ = self.inner.set_edge_attr(edge_id, edge_attr_name.clone(), tree_edge_value);
-                }
+            // Set edge attributes (tree edge markers)
+            let edge_attr_name = attr_name.unwrap_or_else(|| "dfs_tree_edge".to_string());
+            for &edge_id in &result.edges {
+                let tree_edge_value = PyAttrValue::from_attr_value(groggy::AttrValue::Bool(true));
+                self.set_edge_attribute(edge_id, edge_attr_name.clone(), &tree_edge_value)?;
             }
         }
         
-        // Ignore filter parameters for now - they would need proper implementation
-        let _ = node_filter;
-        let _ = edge_filter;
-        
+        // 4. Wrap core results in FFI subgraph
         Ok(PySubgraph::new(
-            result_nodes,
-            result_edges,
+            result.nodes,
+            result.edges,
             "dfs_traversal".to_string(),
-            Some(Py::new(py, PyGraph { inner: groggy::Graph::new() })?)
+            None, // TODO: Fix graph reference when Graph has Clone
         ))
     }
     
-    /// Find connected components
+    /// Find connected components using core algorithm (THIN WRAPPER - NO FFI ALGORITHM)
     #[pyo3(signature = (inplace = None, attr_name = None))]
-    fn connected_components(&self, py: Python, inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Vec<PySubgraph>> {
-        // Connected components using DFS
-        use std::collections::HashSet;
+    fn connected_components(&mut self, py: Python, inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Vec<PySubgraph>> {
+        let inplace = inplace.unwrap_or(false);
         
-        let all_nodes = self.inner.node_ids();
-        let mut visited = HashSet::new();
-        let mut components = Vec::new();
+        // 1. Create core traversal options (convert inputs)
+        let options = groggy::core::traversal::TraversalOptions::default();
         
-        for start_node in all_nodes {
-            if visited.contains(&start_node) {
-                continue;
-            }
+        // 2. Call proven core algorithm (NO FFI ALGORITHM IMPLEMENTATION)
+        let result = self.inner.connected_components(options)
+            .map_err(graph_error_to_py_err)?;
+        
+        // 3. Convert core results to FFI wrappers using optimized pattern from lib_old
+        let mut subgraphs = Vec::new();
+        
+        // Get columnar topology once for efficient edge processing (O(1) if cached)
+        let (edge_ids, sources, targets) = self.inner.get_columnar_topology();
+        
+        // Process components and collect results first (avoid borrow conflicts)
+        let mut components_with_edges = Vec::new();
+        for (i, component) in result.components.into_iter().enumerate() {
+            // Calculate induced edges using optimized columnar topology method (same as filter_nodes)
+            use std::collections::HashSet;
+            let component_nodes: HashSet<NodeId> = component.nodes.iter().copied().collect();
+            let mut induced_edges = Vec::new();
             
-            // Find all nodes in this component using DFS
-            let mut component_nodes = Vec::new();
-            let mut stack = vec![start_node];
-            
-            while let Some(current_node) = stack.pop() {
-                if visited.contains(&current_node) {
-                    continue;
-                }
+            // Iterate through parallel vectors - O(k) where k = active edges
+            for j in 0..edge_ids.len() {
+                let edge_id = edge_ids[j];
+                let source = sources[j];
+                let target = targets[j];
                 
-                visited.insert(current_node);
-                component_nodes.push(current_node);
-                
-                // Find neighbors
-                let all_edges = self.inner.edge_ids();
-                for edge_id in all_edges {
-                    if let Ok((source, target)) = self.inner.edge_endpoints(edge_id) {
-                        let neighbor = if source == current_node {
-                            target
-                        } else if target == current_node {
-                            source
-                        } else {
-                            continue;
-                        };
-                        
-                        if !visited.contains(&neighbor) {
-                            stack.push(neighbor);
-                        }
-                    }
+                // O(1) HashSet lookups instead of O(n) Vec::contains
+                if component_nodes.contains(&source) && component_nodes.contains(&target) {
+                    induced_edges.push(edge_id);
                 }
             }
             
-            // Calculate induced edges for this component
-            let component_node_set: HashSet<NodeId> = component_nodes.iter().copied().collect();
-            let mut component_edges = Vec::new();
-            
-            let all_edges = self.inner.edge_ids();
-            for edge_id in all_edges {
-                if let Ok((source, target)) = self.inner.edge_endpoints(edge_id) {
-                    if component_node_set.contains(&source) && component_node_set.contains(&target) {
-                        component_edges.push(edge_id);
-                    }
-                }
-            }
-            
-            if !component_nodes.is_empty() {
-                let component = PySubgraph::new(
-                    component_nodes,
-                    component_edges,
-                    format!("connected_component_{}", components.len()),
-                    Some(Py::new(py, PyGraph { inner: groggy::Graph::new() })?)
-                );
-                components.push(component);
-            }
+            // Store component data for later processing
+            components_with_edges.push((component.nodes.clone(), induced_edges, i));
         }
         
-        // Handle inplace attribute setting
-        if let Some(true) = inplace {
-            let attr_name = attr_name.unwrap_or_else(|| "component_id".to_string());
-            
-            for (component_id, component) in components.iter().enumerate() {
-                // Set component_id attribute on all nodes in this component
-                // Note: This is a simplified implementation - in practice we'd access the nodes directly
-                let component_value = groggy::AttrValue::Int(component_id as i64);
-                // Would need to iterate through component nodes and set attributes
-                // For now, just acknowledge the parameter
-                let _ = component_value;
+        // Now create subgraphs and handle inplace attributes without borrow conflicts
+        for (nodes, induced_edges, i) in components_with_edges {
+            // If inplace=True, set component_id attribute on nodes
+            if inplace {
+                let _attr_name = attr_name.clone().unwrap_or_else(|| "component_id".to_string());
+                let component_value = PyAttrValue::from_attr_value(groggy::AttrValue::Int(i as i64));
+                
+                for &node_id in &nodes {
+                    self.set_node_attribute(node_id, _attr_name.clone(), &component_value)?;
+                }
             }
+            
+            // Create subgraph with proper induced edges
+            let mut subgraph = PySubgraph::new(
+                nodes.clone(),
+                induced_edges, // Include all edges within this component
+                format!("connected_component_{}", i),
+                None, // Temporarily None - will be set below
+            );
+            
+            subgraphs.push(subgraph);
         }
         
-        Ok(components)
+        // 4. Set graph references for all subgraphs (TODO: Fix graph reference cloning)
+        // Note: This is the correct architectural pattern - wrap results and handle references
+        // Need to solve graph cloning issue separately from the FFI streamlining pattern
+        for subgraph in &mut subgraphs {
+            // subgraph.set_graph_reference(graph_ref.clone()); // TODO: When Graph has Clone
+        }
+        
+        Ok(subgraphs)
+    }
+    
+    /// Group nodes by attribute value and compute aggregates for each group
+    pub fn group_by(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyGroupedAggregationResult> {
+        self.group_nodes_by_attribute(attribute, aggregation_attr, operation)
     }
 }
 
@@ -1048,6 +1044,28 @@ impl PyGraph {
         let graph_array = groggy::core::array::GraphArray::from_vec(attr_values);
         let py_graph_array = PyGraphArray { inner: graph_array };
         Ok(Py::new(py, py_graph_array)?)
+    }
+    
+    /// Group nodes by attribute value and compute aggregates for each group
+    pub fn group_nodes_by_attribute(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyGroupedAggregationResult> {
+        let results = self.inner.group_nodes_by_attribute(&attribute, &aggregation_attr, &operation)
+            .map_err(graph_error_to_py_err)?;
+        
+        Python::with_gil(|py| {
+            // Convert HashMap to Python dict
+            let dict = PyDict::new(py);
+            for (attr_value, agg_result) in results {
+                let py_attr_value = PyAttrValue { inner: attr_value };
+                let py_agg_result = PyAggregationResult { value: agg_result.value };
+                dict.set_item(Py::new(py, py_attr_value)?, Py::new(py, py_agg_result)?)?;
+            }
+            
+            Ok(PyGroupedAggregationResult {
+                groups: dict.to_object(py),
+                operation: operation.clone(),
+                attribute: attribute.clone(),
+            })
+        })
     }
     
 }
