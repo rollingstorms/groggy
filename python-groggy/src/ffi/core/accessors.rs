@@ -34,7 +34,7 @@ impl PyNodesAccessor {
             
             // Single node access - return NodeView
             let graph = self.graph.borrow(py);
-            if !graph.has_node(node_id) {
+            if !graph.contains_node(node_id) {
                 return Err(PyKeyError::new_err(format!("Node {} does not exist", node_id)));
             }
             
@@ -49,7 +49,7 @@ impl PyNodesAccessor {
             
             // Validate all nodes exist
             for &node_id in &node_ids {
-                if !graph.has_node(node_id) {
+                if !graph.contains_node(node_id) {
                     return Err(PyKeyError::new_err(format!("Node {} does not exist", node_id)));
                 }
             }
@@ -137,14 +137,14 @@ impl PyNodesAccessor {
             Ok(constrained.len())
         } else {
             let graph = self.graph.borrow(py);
-            Ok(graph.node_count())
+            Ok(graph.get_node_count())
         }
     }
     
     /// String representation
     fn __str__(&self, py: Python) -> PyResult<String> {
         let graph = self.graph.borrow(py);
-        let count = graph.node_count();
+        let count = graph.get_node_count();
         Ok(format!("NodesAccessor({} nodes)", count))
     }
     
@@ -196,7 +196,7 @@ impl PyEdgesAccessor {
             
             // Single edge access - return EdgeView
             let graph = self.graph.borrow(py);
-            if !graph.has_edge(edge_id) {
+            if !graph.contains_edge(edge_id) {
                 return Err(PyKeyError::new_err(format!("Edge {} does not exist", edge_id)));
             }
             
@@ -211,7 +211,7 @@ impl PyEdgesAccessor {
             
             // Validate all edges exist
             for &edge_id in &edge_ids {
-                if !graph.has_edge(edge_id) {
+                if !graph.contains_edge(edge_id) {
                     return Err(PyKeyError::new_err(format!("Edge {} does not exist", edge_id)));
                 }
             }
