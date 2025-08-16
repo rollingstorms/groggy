@@ -45,6 +45,45 @@ Edges    Time (s)   Rate (e/s)   Complexity
 
 ---
 
+## 🚨 CRITICAL ISSUE: Connected Components Subgraph References
+
+**PROBLEM DISCOVERED (August 16, 2025)**: Connected components subgraphs are missing graph references, breaking `.nodes.table()` and `.edges.table()` access.
+
+### 🔍 **ISSUE DETAILS**:
+```python
+# ❌ BROKEN: Connected components subgraphs missing graph ref
+>>> g.connected_components()[0].nodes.table()
+RuntimeError: No graph reference available
+
+# ✅ WORKING: Other subgraphs have graph refs  
+>>> g.nodes[:2].table()
+⊖⊖ gr.table
+╭──────┬──────┬──────┬───────╮
+│    # │ id   │ age  │ index │
+│      │ i64  │ i64  │ i64   │
+├──────┼──────┼──────┼───────┤
+│    0 │ 42   │ 41   │ 42    │
+│    1 │ 3    │ 45   │ 3     │
+╰──────┴──────┴──────┴───────╯
+rows: 2 • cols: 3 • index: int64
+```
+
+### 🎯 **ROOT CAUSE**: 
+Connected components creation method (`connected_components()`) is not setting graph references in the returned subgraphs, while other subgraph creation methods (slicing, filtering) are working correctly.
+
+### 🔧 **FIX REQUIRED**:
+- [ ] **Investigate connected_components() implementation**: Find where subgraphs are created without graph refs
+- [ ] **Add graph reference setting**: Ensure all subgraphs from `connected_components()` get proper graph references
+- [ ] **Verify consistency**: All subgraph creation methods should follow same pattern
+- [ ] **Test all subgraph methods**: Ensure `.nodes.table()`, `.edges.table()`, and `.table()` work universally
+
+### 📂 **LIKELY FILES TO FIX**:
+- `python-groggy/src/ffi/api/graph_analytics.rs` - Connected components FFI
+- `src/api/graph.rs` - Core connected components algorithm
+- Graph reference pattern used in slicing/filtering methods
+
+---
+
 ## 🚨 CRITICAL ISSUE: FFI Layer Streamlining Required
 
 **PROBLEM DISCOVERED (August 16, 2025)**: During modularization from `lib_old.rs` to the new modular FFI architecture, **algorithms were incorrectly copied into FFI wrapper methods** instead of creating thin wrappers around core functionality. 
