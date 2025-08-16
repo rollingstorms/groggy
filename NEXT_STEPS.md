@@ -2,49 +2,51 @@
 
 ## 🚨 CRITICAL ISSUE: FFI Layer Streamlining Required
 
-**PROBLEM DISCOVERED (August 16, 2025)**: During modularization from `lib_old.rs` to the new modular FFI architecture, **algorithms were incorrectly copied into FFI wrapper methods** instead of creating thin wrappers around core functionality. This is causing:
+**PROBLEM DISCOVERED (August 16, 2025)**: During modularization from `lib_old.rs` to the new modular FFI architecture, **algorithms were incorrectly copied into FFI wrapper methods** instead of creating thin wrappers around core functionality. 
 
-1. **Performance Issues**: `connected_components` is O(E) even for fast path because it reimplements edge calculation in FFI
-2. **Missing Functionality**: `group_by` and other methods missing from modular API 
-3. **Inconsistent Patterns**: Some methods call core algorithms, others reimplement them
-4. **Borrow Conflicts**: Complex borrow patterns instead of simple call->drop->create pattern
+### 📋 **COMPREHENSIVE AUDIT COMPLETED**
+**Full audit results**: [`docs/FFI_STREAMLINING_AUDIT.md`](docs/FFI_STREAMLINING_AUDIT.md)
+
+**Key Findings**:
+- **15+ algorithm implementations** found in FFI layer
+- **3 repeated patterns**: induced edge calculation, attribute iteration, type conversion
+- **Critical performance impact**: O(E) algorithms running in Python FFI instead of optimized core
+
+**Most Critical Issues**:
+1. **`connected_components()`** - Two implementations doing O(E) work in FFI
+2. **Induced edge calculation** - Repeated O(E) algorithm in accessors.rs  
+3. **`dfs_traversal()`** - Full DFS implementation in FFI
+4. **Attribute access patterns** - Manual loops instead of core batch operations
+
+### 🎯 SYSTEMATIC FIX STRATEGY (4-Week Plan)
+
+**Week 1**: Core Missing Methods - Add `create_induced_subgraph()`, bulk operations  
+**Week 2**: Critical Performance Fixes - Replace O(E) FFI algorithms with core calls  
+**Week 3**: Template Application - Standardize all FFI methods with input->core->wrap pattern  
+**Week 4**: Verification & Testing - Performance benchmarks and API consistency  
 
 **ROOT CAUSE**: FFI methods are implementing algorithms instead of being thin wrappers.
 
-### 🎯 IMMEDIATE PRIORITY: FFI Method Pattern Standardization
-
 **CORRECT FFI PATTERN**:
 ```rust
-#[pyo3(signature = (param1, param2, ...))]
-fn method_name(&self, py: Python, ...) -> PyResult<ReturnType> {
-    // 1. Convert Python inputs to Rust types
+// ✅ THIN WRAPPER (correct)
+fn method(&self, py: Python, param: Type) -> PyResult<ReturnType> {
     let rust_param = convert_input(param)?;
-    
-    // 2. Call the CORE algorithm (no FFI logic here)
     let mut graph = self.graph.borrow_mut(py);
-    let result = graph.inner.core_method(rust_param)
-        .map_err(graph_error_to_py_err)?;
-    
-    // 3. Release borrow early
+    let result = graph.inner.core_method(rust_param).map_err(graph_error_to_py_err)?;
     drop(graph);
-    
-    // 4. Create Python objects from Rust results
-    let py_result = create_python_wrapper(result, self.graph.clone());
-    
+    let py_result = create_wrapper(result, self.graph.clone());
     Ok(py_result)
 }
+
+// ❌ ALGORITHM IMPLEMENTATION (wrong) 
+fn method(&self, py: Python, param: Type) -> PyResult<ReturnType> {
+    let mut visited = HashSet::new();  // ❌ Algorithm logic in FFI
+    for node in all_nodes {            // ❌ Should be in core
+        // Complex computation...       // ❌ Performance bottleneck
+    }
+}
 ```
-
-**IMPLEMENTATION STRATEGY**:
-1. **Phase 1**: Create FFI method templates for common patterns
-2. **Phase 2**: Start with critical methods (`connected_components`, `group_by`, `add_node`)
-3. **Phase 3**: Apply templates systematically across all FFI methods
-4. **Phase 4**: Performance verification and API consistency check
-
-**AFFECTED MODULES**:
-- `python-groggy/src/ffi/api/graph.rs` (main graph methods)
-- `python-groggy/src/ffi/api/graph_analytics.rs` (analytics methods)
-- `python-groggy/src/ffi/core/` (accessors, views, etc.)
 
 ---
 
