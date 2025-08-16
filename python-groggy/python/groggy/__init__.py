@@ -21,7 +21,9 @@ from ._groggy import (
     BranchInfo,
     HistoryStatistics,
     HistoricalView,
-    # Statistical arrays (GraphArray is used internally, not directly exposed)
+    # Statistical arrays and matrices
+    GraphArray,
+    GraphMatrix,
 )
 
 from .types import NodeId, EdgeId, AttrName, StateId, BranchName
@@ -52,6 +54,25 @@ from .enhanced_query import enhanced_filter_nodes, enhanced_filter_edges
 from .graph_table import GraphTable
 from . import table_extensions
 
+# Import display formatters for rich display integration
+try:
+    from .display.formatters import format_array, format_matrix, format_table
+    _DISPLAY_AVAILABLE = True
+except ImportError:
+    _DISPLAY_AVAILABLE = False
+    
+    # Provide fallback functions if display module is not available
+    def format_array(data):
+        return f"GraphArray(len={len(data.get('data', []))}, dtype={data.get('dtype', 'object')})"
+    
+    def format_matrix(data):
+        shape = data.get('shape', (0, 0))
+        return f"GraphMatrix(shape={shape}, dtype={data.get('dtype', 'object')})"
+        
+    def format_table(data):
+        shape = data.get('shape', (0, 0))
+        return f"GraphTable(shape={shape})"
+
 __version__ = "0.1.0"
 __all__ = [
     "Graph",
@@ -80,7 +101,9 @@ __all__ = [
     "BranchInfo", 
     "HistoryStatistics",
     "HistoricalView",
-    # Statistical arrays (GraphArray used internally)
+    # Statistical arrays and matrices
+    "GraphArray",
+    "GraphMatrix",
     # Graph generators
     "generators",
     "complete_graph",

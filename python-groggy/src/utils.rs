@@ -6,24 +6,24 @@ use groggy::{AttrValue as RustAttrValue, GraphError};
 pub fn python_value_to_attr_value(value: &PyAny) -> PyResult<RustAttrValue> {
     // Fast path optimization: Check most common types first
     
-    // Check integers first (very common in benchmarks)
+    // Check booleans FIRST (Python bool is a subtype of int, so this must come before int check)
+    if let Ok(b) = value.extract::<bool>() {
+        return Ok(RustAttrValue::Bool(b));
+    }
+    
+    // Check integers second (very common in benchmarks)
     if let Ok(i) = value.extract::<i64>() {
         return Ok(RustAttrValue::Int(i));
     }
     
-    // Check strings second (also very common)
+    // Check strings third (also very common)
     if let Ok(s) = value.extract::<String>() {
         return Ok(RustAttrValue::Text(s));
     }
     
-    // Check floats third
+    // Check floats fourth
     if let Ok(f) = value.extract::<f64>() {
         return Ok(RustAttrValue::Float(f as f32));  // Convert f64 to f32
-    }
-    
-    // Check booleans (note: must come after integers as Python bool is a subtype of int)
-    if let Ok(b) = value.extract::<bool>() {
-        return Ok(RustAttrValue::Bool(b));
     }
     
     // Less common types

@@ -737,6 +737,41 @@ impl PySubgraph {
             "Subgraph Laplacian matrices not yet implemented. Use graph.laplacian_matrix() for full graph."
         ))
     }
+
+    ///Generate Laplacian matrix for subgraph (cleaner API)
+    fn laplacian(&self, _py: Python, _normalized: Option<bool>) -> PyResult<Py<PyGraphMatrix>> {
+        Err(PyErr::new::<PyNotImplementedError, _>(
+            "Subgraph Laplacian matrices not yet implemented. Use graph.laplacian_matrix() for full graph."
+        ))
+    }
+    
+    /// Support attribute access: subgraph['id'] returns appropriate IDs based on subgraph type
+    fn __getitem__(&self, py: Python, attr_name: String) -> PyResult<Py<PyGraphArray>> {
+        match attr_name.as_str() {
+            "id" => {
+                // For edge subgraphs (created by edges[:]), return edge IDs
+                // For node subgraphs (created by nodes[:]), return node IDs
+                if self.subgraph_type.contains("edge") {
+                    // This is an edge subgraph - return edge IDs
+                    self.edge_ids(py)
+                } else {
+                    // This is a node subgraph - return node IDs  
+                    self.node_ids(py)
+                }
+            }
+            _ => {
+                // For other attributes, determine whether to use node or edge attributes
+                // For edge subgraphs, use edge attributes; for node subgraphs, use node attributes
+                if self.subgraph_type.contains("edge") {
+                    // Edge subgraph - get edge attribute
+                    self.get_edge_attribute_column(py, &attr_name)
+                } else {
+                    // Node subgraph - get node attribute
+                    self.get_node_attribute_column(py, &attr_name)
+                }
+            }
+        }
+    }
 }
 
 /// Native attribute collection that keeps data in Rust
@@ -3843,70 +3878,39 @@ impl PyGraphArray {
         }
     }
     
-    /// String representation with data preview
-    fn __repr__(&self) -> String {
-        let len = self.inner.len();
-        if len == 0 {
-            return "GraphArray(len=0, values=[])".to_string();
+    /// String representation with rich display formatting
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        // Try rich display formatting first, with graceful fallback
+        match self._try_rich_display(py) {
+            Ok(formatted) => Ok(formatted),
+            Err(_) => {
+                // Fallback to simple representation
+                let len = self.inner.len();
+                let dtype = self._get_dtype();
+                Ok(format!("GraphArray(len={}, dtype={})", len, dtype))
+            }
         }
+    }
+    
+    /// Try to use rich display formatting
+    fn _try_rich_display(&self, py: Python) -> PyResult<String> {
+        // Get display data for formatting
+        let display_data = self._get_display_data(py)?;
         
-        // Show first few values for small arrays
-        if len <= 5 {
-            // Convert first few values to display format
-            let values_str: Vec<String> = (0..len)
-                .map(|i| {
-                    match &self.inner[i] {
-                        groggy::AttrValue::Int(n) => n.to_string(),
-                        groggy::AttrValue::SmallInt(n) => n.to_string(),
-                        groggy::AttrValue::Float(f) => format!("{:.2}", f),
-                        groggy::AttrValue::Text(s) => format!("'{}'", s),
-                        groggy::AttrValue::CompactText(s) => format!("'{}'", s.as_str()),
-                        groggy::AttrValue::CompressedText(_) => "'<compressed>'".to_string(),
-                        groggy::AttrValue::Bool(b) => b.to_string(),
-                        groggy::AttrValue::FloatVec(v) => format!("[{}...]", v.len()),
-                        groggy::AttrValue::CompressedFloatVec(_) => "'<compressed_vec>'".to_string(),
-                        groggy::AttrValue::Bytes(b) => format!("<{} bytes>", b.len()),
-                    }
-                })
-                .collect();
-            format!("GraphArray(len={}, values=[{}])", len, values_str.join(", "))
-        } else {
-            // Show first 3 and last 2 for large arrays
-            let first_values: Vec<String> = (0..3)
-                .map(|i| {
-                    match &self.inner[i] {
-                        groggy::AttrValue::Int(n) => n.to_string(),
-                        groggy::AttrValue::SmallInt(n) => n.to_string(),
-                        groggy::AttrValue::Float(f) => format!("{:.2}", f),
-                        groggy::AttrValue::Text(s) => format!("'{}'", s),
-                        groggy::AttrValue::CompactText(s) => format!("'{}'", s.as_str()),
-                        groggy::AttrValue::CompressedText(_) => "'<compressed>'".to_string(),
-                        groggy::AttrValue::Bool(b) => b.to_string(),
-                        groggy::AttrValue::FloatVec(v) => format!("[{}...]", v.len()),
-                        groggy::AttrValue::CompressedFloatVec(_) => "'<compressed_vec>'".to_string(),
-                        groggy::AttrValue::Bytes(b) => format!("<{} bytes>", b.len()),
-                    }
-                })
-                .collect();
-            let last_values: Vec<String> = ((len-2)..len)
-                .map(|i| {
-                    match &self.inner[i] {
-                        groggy::AttrValue::Int(n) => n.to_string(),
-                        groggy::AttrValue::SmallInt(n) => n.to_string(),
-                        groggy::AttrValue::Float(f) => format!("{:.2}", f),
-                        groggy::AttrValue::Text(s) => format!("'{}'", s),
-                        groggy::AttrValue::CompactText(s) => format!("'{}'", s.as_str()),
-                        groggy::AttrValue::CompressedText(_) => "'<compressed>'".to_string(),
-                        groggy::AttrValue::Bool(b) => b.to_string(),
-                        groggy::AttrValue::FloatVec(v) => format!("[{}...]", v.len()),
-                        groggy::AttrValue::CompressedFloatVec(_) => "'<compressed_vec>'".to_string(),
-                        groggy::AttrValue::Bytes(b) => format!("<{} bytes>", b.len()),
-                    }
-                })
-                .collect();
-            format!("GraphArray(len={}, values=[{}, ..., {}])", 
-                   len, first_values.join(", "), last_values.join(", "))
-        }
+        // Import the format_array function from Python
+        let groggy_module = py.import("groggy")?;
+        let format_array = groggy_module.getattr("format_array")?;
+        
+        // Call the Python formatter
+        let result = format_array.call1((display_data,))?;
+        let formatted_str: String = result.extract()?;
+        
+        Ok(formatted_str)
+    }
+    
+    /// String representation (same as __repr__ for consistency)
+    fn __str__(&self, py: Python) -> PyResult<String> {
+        self.__repr__(py)
     }
     
     /// Iterator support (for value in array)
@@ -4035,6 +4039,62 @@ impl PyGraphArray {
         // Create CSR matrix (compressed sparse row) from the dense array
         let sparse_matrix = scipy_sparse.call_method1("csr_matrix", (array,))?;
         Ok(sparse_matrix.to_object(py))
+    }
+    
+    // ========================================================================
+    // DISPLAY INTEGRATION METHODS
+    // ========================================================================
+    
+    /// Extract display data for Python display formatters
+    /// Returns a dictionary with the structure expected by array_display.py
+    fn _get_display_data(&self, py: Python) -> PyResult<PyObject> {
+        let dict = pyo3::types::PyDict::new(py);
+        
+        // Extract array data - convert to Python list
+        let data = self.to_list(py)?;
+        dict.set_item("data", data)?;
+        
+        // Get array metadata
+        dict.set_item("shape", (self.inner.len(),))?;
+        dict.set_item("dtype", self._get_dtype())?;
+        dict.set_item("name", self._get_name().unwrap_or_else(|| "array".to_string()))?;
+        
+        Ok(dict.to_object(py))
+    }
+    
+    /// Get data type string for display
+    fn _get_dtype(&self) -> String {
+        // Sample first few elements to determine predominant type
+        let sample_size = std::cmp::min(self.inner.len(), 5);
+        if sample_size == 0 {
+            return "object".to_string();
+        }
+        
+        let mut type_counts = std::collections::HashMap::new();
+        
+        for i in 0..sample_size {
+            let type_name = match &self.inner[i] {
+                groggy::AttrValue::Int(_) | groggy::AttrValue::SmallInt(_) => "int64",
+                groggy::AttrValue::Float(_) => "f32",
+                groggy::AttrValue::Bool(_) => "bool",
+                groggy::AttrValue::Text(_) | groggy::AttrValue::CompactText(_) => "str",
+                _ => "object",
+            };
+            *type_counts.entry(type_name).or_insert(0) += 1;
+        }
+        
+        // Return the most common type
+        type_counts.into_iter()
+            .max_by_key(|(_, count)| *count)
+            .map(|(type_name, _)| type_name.to_string())
+            .unwrap_or_else(|| "object".to_string())
+    }
+    
+    /// Get name for display (optional)
+    fn _get_name(&self) -> Option<String> {
+        // For now, we don't store names in GraphArray
+        // This can be enhanced later when we add named arrays
+        None
     }
 }
 
@@ -4319,10 +4379,38 @@ impl PyGraphMatrix {
         ))
     }
     
-    /// String representation
-    fn __repr__(&self) -> String {
-        let (rows, cols) = self.shape();
-        format!("GraphMatrix(shape=({}, {}), columns={:?})", rows, cols, self.column_names)
+    /// String representation with rich display formatting
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        // Try rich display formatting first, with graceful fallback
+        match self._try_rich_display(py) {
+            Ok(formatted) => Ok(formatted),
+            Err(_) => {
+                // Fallback to simple representation
+                let shape = self.shape();
+                Ok(format!("GraphMatrix(shape=({}, {}), columns={:?})", shape.0, shape.1, self.column_names))
+            }
+        }
+    }
+    
+    /// Try to use rich display formatting
+    fn _try_rich_display(&self, py: Python) -> PyResult<String> {
+        // Get display data for formatting
+        let display_data = self._get_display_data(py)?;
+        
+        // Import the format_matrix function from Python
+        let groggy_module = py.import("groggy")?;
+        let format_matrix = groggy_module.getattr("format_matrix")?;
+        
+        // Call the Python formatter
+        let result = format_matrix.call1((display_data,))?;
+        let formatted_str: String = result.extract()?;
+        
+        Ok(formatted_str)
+    }
+    
+    /// String representation (same as __repr__ for consistency)
+    fn __str__(&self, py: Python) -> PyResult<String> {
+        self.__repr__(py)
     }
     
     /// Check if this is a square matrix (useful for adjacency matrices)
@@ -4352,6 +4440,63 @@ impl PyGraphMatrix {
         // Estimate based on number of elements and typical AttrValue size
         let elements = self.num_rows * self.columns.len();
         elements * std::mem::size_of::<f64>() // Rough estimate
+    }
+    
+    // ========================================================================
+    // DISPLAY INTEGRATION METHODS
+    // ========================================================================
+    
+    /// Extract display data for Python display formatters
+    /// Returns a dictionary with the structure expected by matrix_display.py
+    fn _get_display_data(&self, py: Python) -> PyResult<PyObject> {
+        let dict = pyo3::types::PyDict::new(py);
+        
+        // Extract matrix data as nested lists
+        let data = self.to_nested_list(py)?;
+        dict.set_item("data", data)?;
+        
+        // Get matrix metadata
+        let shape = self.shape();
+        dict.set_item("shape", (shape.0, shape.1))?;
+        dict.set_item("dtype", self._get_matrix_dtype())?;
+        dict.set_item("column_names", self.columns())?;
+        
+        Ok(dict.to_object(py))
+    }
+    
+    /// Convert matrix to nested Python lists for display
+    fn to_nested_list(&self, py: Python) -> PyResult<PyObject> {
+        let mut rows = Vec::new();
+        let (num_rows, num_cols) = self.shape();
+        
+        for row_idx in 0..num_rows {
+            let mut row = Vec::new();
+            
+            for col_idx in 0..num_cols {
+                // Get cell value using existing __getitem__ functionality
+                let cell_value = match self.get_cell(py, row_idx, col_idx) {
+                    Ok(val) => val,
+                    Err(_) => py.None(),
+                };
+                row.push(cell_value);
+            }
+            
+            rows.push(row);
+        }
+        
+        Ok(rows.to_object(py))
+    }
+    
+    /// Get predominant data type of matrix for display
+    fn _get_matrix_dtype(&self) -> String {
+        // Sample values from multiple columns to determine type
+        if self.columns.is_empty() {
+            return "object".to_string();
+        }
+        
+        // Get type from first column - we need to access it properly
+        // For now, return a reasonable default
+        "f32".to_string()
     }
 }
 
@@ -4415,8 +4560,7 @@ fn _groggy(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyAttributeCollection>()?;
     
     // Enhanced statistical arrays and matrices
-    // GraphArray is not a PyClass, it's a core Rust type
-    // m.add_class::<GraphArray>()?;
+    m.add_class::<PyGraphArray>()?;
     m.add_class::<PyGraphMatrix>()?;
     m.add_class::<PyStatsSummary>()?;
     
