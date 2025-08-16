@@ -10,3 +10,4 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.20", features = ["extension-module"] }
 groggy = { path = "../" }  # Path to the main Rust library
+serde_json = "1.0"

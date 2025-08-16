@@ -24,6 +24,13 @@ from ._groggy import (
     # Statistical arrays and matrices
     GraphArray,
     GraphMatrix,
+    # Display functionality
+    DisplayConfig,
+    format_array,
+    format_matrix,
+    format_table,
+    format_data_structure,
+    detect_display_type,
 )
 
 from .types import NodeId, EdgeId, AttrName, StateId, BranchName
@@ -104,6 +111,13 @@ __all__ = [
     # Statistical arrays and matrices
     "GraphArray",
     "GraphMatrix",
+    # Display functionality  
+    "DisplayConfig",
+    "format_array",
+    "format_matrix", 
+    "format_table",
+    "format_data_structure",
+    "detect_display_type",
     # Graph generators
     "generators",
     "complete_graph",

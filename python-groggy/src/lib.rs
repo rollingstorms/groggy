@@ -60,6 +60,9 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     
     // Add aliases for Python imports - these are already added with correct names
     
+    // Register display functions
+    ffi::display::register_display_functions(py, m)?;
+    
     // Use the module registration function
     module::register_classes(py, m)?;
     
