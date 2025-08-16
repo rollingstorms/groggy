@@ -15,6 +15,9 @@ use crate::ffi::types::PyAttrValue;
 use crate::ffi::core::array::{PyGraphArray, PyGraphMatrix};
 use crate::ffi::core::accessors::{PyNodesAccessor, PyEdgesAccessor};
 
+// Import the core Subgraph type
+use groggy::core::subgraph::Subgraph as RustSubgraph;
+
 /// Utility function to convert Python values to AttrValue
 fn python_value_to_attr_value(value: &PyAny) -> PyResult<AttrValue> {
     if let Ok(int_val) = value.extract::<i64>() {
@@ -38,7 +41,7 @@ fn attr_value_to_python_value(py: Python, attr_value: &AttrValue) -> PyResult<Py
         AttrValue::Float(val) => Ok(val.to_object(py)),
         AttrValue::Bool(val) => Ok(val.to_object(py)),
         AttrValue::Text(val) => Ok(val.to_object(py)),
-        AttrValue::CompactText(val) => Ok(val.to_object(py)),
+        AttrValue::CompactText(val) => Ok(val.as_str().to_object(py)),
         _ => Ok(py.None()),
     }
 }
@@ -544,7 +547,7 @@ impl PySubgraph {
                                 if let Ok(Some(attr_value)) = graph.inner.get_node_attr(node_id, &attr_name.to_string()) {
                                     match attr_value {
                                         AttrValue::Text(ref text) => text == expected_value,
-                                        AttrValue::CompactText(ref text) => text == expected_value,
+                                        AttrValue::CompactText(ref text) => text.as_str() == expected_value,
                                         _ => false,
                                     }
                                 } else {

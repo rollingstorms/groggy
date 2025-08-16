@@ -11,9 +11,12 @@ use groggy::{Graph as RustGraph, NodeId, EdgeId, AttrValue as RustAttrValue, Att
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::core::accessors::{PyNodesAccessor, PyEdgesAccessor};
 use crate::ffi::core::views::{PyNodeView, PyEdgeView};
-use crate::ffi::core::array::PyGraphArray;
+use crate::ffi::core::array::{PyGraphArray, PyGraphMatrix};
 use crate::ffi::core::subgraph::PySubgraph;
 use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value, attr_value_to_python_value};
+
+// Import version control types
+use crate::ffi::api::graph_version::{PyCommit, PyBranchInfo};
 
 // Placeholder imports for missing types - these need to be implemented
 struct PyAttributes {
@@ -36,26 +39,14 @@ struct PyGroupedAggregationResult {
     value: PyObject,
 }
 
-struct PyBranchInfo {
-    inner: groggy::core::history::BranchInfo,
-}
-
-struct PyCommit {
-    inner: groggy::core::history::Commit,
-}
 
 struct PyHistoricalView {
     state_id: StateId,
 }
 
-struct PyGraphMatrix {
-    columns: Vec<Py<PyGraphArray>>,
-    column_names: Vec<String>,
-    num_rows: usize,
-}
 
 // Helper function for matrix conversion
-fn adjacency_matrix_to_py_graph_matrix(py: Python, matrix: groggy::core::array::GraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
+fn adjacency_matrix_to_py_graph_matrix(py: Python, matrix: groggy::AdjacencyMatrix) -> PyResult<Py<PyGraphMatrix>> {
     // Simplified implementation - needs proper matrix conversion
     let py_matrix = PyGraphMatrix {
         columns: Vec::new(),
@@ -68,7 +59,7 @@ fn adjacency_matrix_to_py_graph_matrix(py: Python, matrix: groggy::core::array::
 /// Python wrapper for the main Graph
 #[pyclass(name = "Graph", unsendable)]
 pub struct PyGraph {
-    inner: RustGraph,
+    pub inner: RustGraph,
 }
 
 #[pymethods]
@@ -225,17 +216,17 @@ impl PyGraph {
     
     // === ATTRIBUTE OPERATIONS ===
     
-    fn set_node_attribute(&mut self, node: NodeId, attr: AttrName, value: &PyAttrValue) -> PyResult<()> {
+    pub fn set_node_attribute(&mut self, node: NodeId, attr: AttrName, value: &PyAttrValue) -> PyResult<()> {
         self.inner.set_node_attr(node, attr, value.inner.clone())
             .map_err(graph_error_to_py_err)
     }
     
-    fn set_edge_attribute(&mut self, edge: EdgeId, attr: AttrName, value: &PyAttrValue) -> PyResult<()> {
+    pub fn set_edge_attribute(&mut self, edge: EdgeId, attr: AttrName, value: &PyAttrValue) -> PyResult<()> {
         self.inner.set_edge_attr(edge, attr, value.inner.clone())
             .map_err(graph_error_to_py_err)
     }
     
-    fn get_node_attribute(&self, node: NodeId, attr: AttrName) -> PyResult<Option<PyAttrValue>> {
+    pub fn get_node_attribute(&self, node: NodeId, attr: AttrName) -> PyResult<Option<PyAttrValue>> {
         match self.inner.get_node_attr(node, &attr) {
             Ok(Some(value)) => Ok(Some(PyAttrValue { inner: value })),
             Ok(None) => Ok(None),
@@ -243,7 +234,7 @@ impl PyGraph {
         }
     }
     
-    fn get_edge_attribute(&self, edge: EdgeId, attr: AttrName) -> PyResult<Option<PyAttrValue>> {
+    pub fn get_edge_attribute(&self, edge: EdgeId, attr: AttrName) -> PyResult<Option<PyAttrValue>> {
         match self.inner.get_edge_attr(edge, &attr) {
             Ok(Some(value)) => Ok(Some(PyAttrValue { inner: value })),
             Ok(None) => Ok(None),
@@ -363,5 +354,79 @@ impl PyGraph {
             Ok(attrs) => attrs.keys().cloned().collect(),
             Err(_) => Vec::new(),
         }
+    }
+    
+    // === HELPER METHODS FOR OTHER MODULES ===
+    
+    pub fn has_node_attribute(&self, node_id: NodeId, attr_name: &str) -> bool {
+        match self.inner.get_node_attr(node_id, attr_name) {
+            Ok(Some(_)) => true,
+            _ => false,
+        }
+    }
+    
+    pub fn has_edge_attribute(&self, edge_id: EdgeId, attr_name: &str) -> bool {
+        match self.inner.get_edge_attr(edge_id, attr_name) {
+            Ok(Some(_)) => true,
+            _ => false,
+        }
+    }
+    
+    
+    pub fn get_edge_endpoints(&self, edge_id: EdgeId) -> Result<(NodeId, NodeId), String> {
+        self.inner.edge_endpoints(edge_id).map_err(|e| e.to_string())
+    }
+    
+    pub fn contains_node_internal(&self, node_id: NodeId) -> bool {
+        self.inner.contains_node(node_id)
+    }
+    
+    pub fn contains_edge_internal(&self, edge_id: EdgeId) -> bool {
+        self.inner.contains_edge(edge_id)
+    }
+    
+    pub fn get_node_ids(&self) -> PyResult<Vec<NodeId>> {
+        Ok(self.inner.node_ids())
+    }
+    
+    pub fn get_edge_ids(&self) -> PyResult<Vec<EdgeId>> {
+        Ok(self.inner.edge_ids())
+    }
+    
+    // Additional public methods for internal module access
+    pub fn contains_node(&self, node_id: NodeId) -> bool {
+        self.inner.contains_node(node_id)
+    }
+    
+    pub fn contains_edge(&self, edge_id: EdgeId) -> bool {
+        self.inner.contains_edge(edge_id)
+    }
+    
+    pub fn get_node_count(&self) -> usize {
+        self.inner.node_ids().len()
+    }
+    
+    pub fn get_edge_count(&self) -> usize {
+        self.inner.edge_ids().len()
+    }
+    
+    pub fn node_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+        let node_ids = self.inner.node_ids();
+        let attr_values: Vec<groggy::AttrValue> = node_ids.into_iter()
+            .map(|id| groggy::AttrValue::Int(id as i64))
+            .collect();
+        let graph_array = groggy::core::array::GraphArray::from_vec(attr_values);
+        let py_graph_array = PyGraphArray { inner: graph_array };
+        Ok(Py::new(py, py_graph_array)?)
+    }
+    
+    pub fn edge_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+        let edge_ids = self.inner.edge_ids();
+        let attr_values: Vec<groggy::AttrValue> = edge_ids.into_iter()
+            .map(|id| groggy::AttrValue::Int(id as i64))
+            .collect();
+        let graph_array = groggy::core::array::GraphArray::from_vec(attr_values);
+        let py_graph_array = PyGraphArray { inner: graph_array };
+        Ok(Py::new(py, py_graph_array)?)
     }
 }
