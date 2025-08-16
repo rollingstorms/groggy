@@ -513,8 +513,47 @@ impl PySubgraph {
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
         // Try single string first (existing behavior)
         if let Ok(attr_name) = key.extract::<String>() {
-            let column = self.get_node_attribute_column(py, &attr_name)?;
-            return Ok(column.to_object(py));
+            // CRITICAL FIX: Route to edge attributes for edge subgraphs
+            if self.subgraph_type == "edge_slice_selection" {
+                // This is an edge subgraph - route to edge attributes
+                if attr_name == "id" {
+                    // Special case: edge IDs (the edges themselves)
+                    let edge_ids = self.edges.iter().map(|&edge_id| {
+                        groggy::AttrValue::Int(edge_id as i64)
+                    }).collect();
+                    let graph_array = groggy::GraphArray::from_vec(edge_ids);
+                    let py_graph_array = PyGraphArray { inner: graph_array };
+                    return Ok(Py::new(py, py_graph_array)?.to_object(py));
+                } else {
+                    // Regular edge attributes (strength, weight, etc.)
+                    let edge_values = self.get_edge_attribute_column(py, &attr_name)?;
+                    // Convert Vec<PyObject> to GraphArray for consistency
+                    let mut attr_values = Vec::new();
+                    for py_value in edge_values {
+                        // Convert Python values back to AttrValue
+                        if py_value.is_none(py) {
+                            attr_values.push(groggy::AttrValue::Int(0)); // Default for missing
+                        } else if let Ok(int_val) = py_value.extract::<i64>(py) {
+                            attr_values.push(groggy::AttrValue::Int(int_val));
+                        } else if let Ok(float_val) = py_value.extract::<f64>(py) {
+                            attr_values.push(groggy::AttrValue::Float(float_val as f32));
+                        } else if let Ok(str_val) = py_value.extract::<String>(py) {
+                            attr_values.push(groggy::AttrValue::Text(str_val));
+                        } else if let Ok(bool_val) = py_value.extract::<bool>(py) {
+                            attr_values.push(groggy::AttrValue::Bool(bool_val));
+                        } else {
+                            attr_values.push(groggy::AttrValue::Int(0)); // Fallback
+                        }
+                    }
+                    let graph_array = groggy::GraphArray::from_vec(attr_values);
+                    let py_graph_array = PyGraphArray { inner: graph_array };
+                    return Ok(Py::new(py, py_graph_array)?.to_object(py));
+                }
+            } else {
+                // This is a node subgraph - route to node attributes (original behavior)
+                let column = self.get_node_attribute_column(py, &attr_name)?;
+                return Ok(column.to_object(py));
+            }
         }
         
         // Try list of strings (multi-column access)
@@ -3939,6 +3978,15 @@ impl PyGraphArray {
         self.inner.quantile(q)
     }
     
+    /// Calculate percentile (user-friendly wrapper for quantile)
+    /// percentile: 0-100 (e.g., 25 for 25th percentile, 90 for 90th percentile)
+    fn percentile(&self, p: f64) -> Option<f64> {
+        if p < 0.0 || p > 100.0 {
+            return None;
+        }
+        self.inner.quantile(p / 100.0)
+    }
+    
     /// Calculate median (50th percentile)
     fn median(&self) -> Option<f64> {
         self.inner.median()
@@ -3947,6 +3995,77 @@ impl PyGraphArray {
     /// Get count of elements
     fn count(&self) -> usize {
         self.inner.count()
+    }
+    
+    /// Get unique values as a new GraphArray
+    fn unique(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+        use std::collections::HashSet;
+        
+        // Use HashSet to find unique values
+        let mut unique_set = HashSet::new();
+        let mut unique_values = Vec::new();
+        
+        for attr_value in self.inner.iter() {
+            // Create a simple hash key based on the value
+            let key = match attr_value {
+                groggy::AttrValue::Int(i) => format!("i:{}", i),
+                groggy::AttrValue::SmallInt(i) => format!("si:{}", i),
+                groggy::AttrValue::Float(f) => format!("f:{}", f),
+                groggy::AttrValue::Text(s) => format!("t:{}", s),
+                groggy::AttrValue::CompactText(s) => format!("ct:{}", s.as_str()),
+                groggy::AttrValue::Bool(b) => format!("b:{}", b),
+                groggy::AttrValue::Bytes(b) => format!("bytes:{}", b.len()), // Simple hash for bytes
+                _ => format!("other:{:?}", attr_value), // Fallback for other types
+            };
+            
+            if unique_set.insert(key) {
+                // This is a new unique value
+                unique_values.push(attr_value.clone());
+            }
+        }
+        
+        // Create new GraphArray with unique values
+        let unique_array = groggy::GraphArray::from_vec(unique_values);
+        let py_unique = PyGraphArray { inner: unique_array };
+        
+        Ok(Py::new(py, py_unique)?)
+    }
+    
+    /// Get value counts (frequency of each unique value) as Python dict
+    fn value_counts(&self, py: Python) -> PyResult<PyObject> {
+        use std::collections::HashMap;
+        
+        let mut counts: HashMap<String, (i32, groggy::AttrValue)> = HashMap::new();
+        
+        for attr_value in self.inner.iter() {
+            // Create a string representation for HashMap key
+            let key_str = match attr_value {
+                groggy::AttrValue::Int(i) => format!("i:{}", i),
+                groggy::AttrValue::SmallInt(i) => format!("si:{}", i),
+                groggy::AttrValue::Float(f) => format!("f:{}", f),
+                groggy::AttrValue::Text(s) => format!("t:{}", s),
+                groggy::AttrValue::CompactText(s) => format!("ct:{}", s.as_str()),
+                groggy::AttrValue::Bool(b) => format!("b:{}", b),
+                groggy::AttrValue::Bytes(b) => format!("bytes:{}", b.len()),
+                _ => format!("other:{:?}", attr_value),
+            };
+            
+            match counts.get_mut(&key_str) {
+                Some((count, _)) => *count += 1,
+                None => {
+                    counts.insert(key_str, (1, attr_value.clone()));
+                }
+            }
+        }
+        
+        // Convert to Python dict
+        let dict = pyo3::types::PyDict::new(py);
+        for (_, (count, attr_value)) in counts {
+            let py_key = attr_value_to_python_value(py, &attr_value)?;
+            dict.set_item(py_key, count)?;
+        }
+        
+        Ok(dict.to_object(py))
     }
     
     /// Get raw data as Python list (like pandas .values property) 
