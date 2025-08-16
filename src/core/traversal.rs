@@ -493,12 +493,31 @@ impl TraversalEngine {
         
         // Build adjacency map once - O(E)
         let (_edge_ids, sources, targets) = space.get_columnar_topology();
-        let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
+        
+        // Pre-calculate node degrees to avoid vector reallocations
+        let mut node_degrees: HashMap<NodeId, usize> = HashMap::new();
+        for i in 0..sources.len() {
+            let (source, target) = (sources[i], targets[i]);
+            *node_degrees.entry(source).or_insert(0) += 1;
+            *node_degrees.entry(target).or_insert(0) += 1;
+        }
+        
+        // Build adjacency map with pre-allocated capacity to avoid O(n²) reallocations
+        let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::with_capacity(active_nodes.len());
         
         for i in 0..sources.len() {
             let (source, target) = (sources[i], targets[i]);
-            adjacency.entry(source).or_insert_with(Vec::new).push(target);
-            adjacency.entry(target).or_insert_with(Vec::new).push(source);
+            
+            // Pre-allocate vectors with exact capacity to prevent reallocations
+            let source_vec = adjacency.entry(source).or_insert_with(|| {
+                Vec::with_capacity(node_degrees.get(&source).copied().unwrap_or(0))
+            });
+            source_vec.push(target);
+            
+            let target_vec = adjacency.entry(target).or_insert_with(|| {
+                Vec::with_capacity(node_degrees.get(&target).copied().unwrap_or(0))
+            });
+            target_vec.push(source);
         }
         
         // BFS for each unvisited node - O(V + E) total
