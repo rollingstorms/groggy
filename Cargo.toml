@@ -25,3 +25,4 @@ dashmap = "5.4"       # Concurrent HashMap
 ahash = "0.8"         # Fast hash algorithm
 bitvec = "1.0"        # Efficient bit vectors for indexing
 wide = "0.7"          # SIMD operations
+console = "0.15"      # Console utilities for display

@@ -132,6 +132,9 @@ pub mod core {
     pub mod adjacency;
 }
 
+// Display formatting
+pub mod display;
+
 // Public API
 pub mod api {
     pub mod graph;

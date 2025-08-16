@@ -51,7 +51,7 @@ impl MatrixDisplayFormatter {
         };
         
         // Show truncated data
-        for (i, row) in data.iter().take(max_display_rows).enumerate() {
+        for (_i, row) in data.iter().enumerate() {
             let row_values: Vec<String> = row.iter()
                 .take(max_display_cols)
                 .map(|v| self.format_matrix_value(v))
