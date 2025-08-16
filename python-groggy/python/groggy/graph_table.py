@@ -131,6 +131,60 @@ class GraphTable:
         
         return attributes
     
+    def _detect_column_types(self, rows, columns):
+        """Detect the data type of each column based on sample values."""
+        dtypes = {}
+        
+        for col in columns:
+            # Sample some non-None values to determine type
+            sample_values = []
+            for row in rows[:min(10, len(rows))]:  # Sample first 10 rows
+                value = row.get(col)
+                if value is not None:
+                    sample_values.append(value)
+                if len(sample_values) >= 5:  # Enough samples
+                    break
+            
+            if not sample_values:
+                dtypes[col] = 'object'
+                continue
+            
+            # Analyze the sample values to determine type
+            first_value = sample_values[0]
+            
+            if col == 'id':
+                # ID columns are always integers
+                dtypes[col] = 'int64'
+            elif isinstance(first_value, bool):
+                # Check if all samples are boolean
+                if all(isinstance(v, bool) for v in sample_values):
+                    dtypes[col] = 'bool'
+                else:
+                    dtypes[col] = 'object'
+            elif isinstance(first_value, int):
+                # Check if all samples are integers
+                if all(isinstance(v, int) for v in sample_values):
+                    dtypes[col] = 'int64'
+                else:
+                    dtypes[col] = 'object'
+            elif isinstance(first_value, float):
+                # Check if all samples are numeric (int or float)
+                if all(isinstance(v, (int, float)) for v in sample_values):
+                    dtypes[col] = 'float64'
+                else:
+                    dtypes[col] = 'object'
+            elif isinstance(first_value, str):
+                # String type - could be category if limited unique values
+                unique_values = set(sample_values)
+                if len(unique_values) <= 3 and len(sample_values) >= 3:
+                    dtypes[col] = 'category'
+                else:
+                    dtypes[col] = 'string'
+            else:
+                dtypes[col] = 'object'
+        
+        return dtypes
+    
     def _build_table_data(self):
         """Build the complete table data with all attributes."""
         if self._cached_data is not None:
@@ -286,36 +340,69 @@ class GraphTable:
         return rows, columns
     
     def __repr__(self):
-        """String representation of the table."""
-        rows, columns = self._build_table_data()
-        
-        if not rows:
-            return f"GraphTable({self.table_type}, 0 rows, 0 columns)"
-        
-        # Create formatted table
-        lines = []
-        
-        # Header
-        header = "   " + "  ".join(f"{col:>10}" for col in columns)
-        lines.append(header)
-        
-        # Rows
-        for i, row in enumerate(rows):
-            formatted_row = f"{i:2d} "
-            for col in columns:
-                value = row.get(col)
-                if value is None:
-                    formatted_value = "NaN"
-                elif isinstance(value, str):
-                    formatted_value = value[:10]  # Truncate long strings
-                elif isinstance(value, float):
-                    formatted_value = f"{value:.2f}"
-                else:
-                    formatted_value = str(value)
-                formatted_row += f"  {formatted_value:>10}"
-            lines.append(formatted_row)
-        
-        return "\n".join(lines)
+        """String representation with rich display formatting."""
+        try:
+            # Try to use rich display formatter
+            from . import format_table
+            
+            # Get display data structure
+            rows, columns = self._build_table_data()
+            
+            # Convert rows from list of dicts to list of lists for display formatter
+            data_rows = []
+            for row in rows:
+                data_row = [row.get(col) for col in columns]
+                data_rows.append(data_row)
+            
+            # Detect column data types for better display
+            dtypes = self._detect_column_types(rows, columns)
+            
+            display_data = {
+                'data': data_rows,
+                'columns': columns,
+                'dtypes': dtypes,
+                'shape': self.shape,
+                'table_type': self.table_type
+            }
+            
+            # Use rich formatter
+            return format_table(display_data)
+            
+        except (ImportError, Exception):
+            # Fallback to basic representation
+            rows, columns = self._build_table_data()
+            
+            if not rows:
+                return f"GraphTable({self.table_type}, 0 rows, 0 columns)"
+            
+            # Create formatted table
+            lines = []
+            
+            # Header
+            header = "   " + "  ".join(f"{col:>10}" for col in columns)
+            lines.append(header)
+            
+            # Rows
+            for i, row in enumerate(rows):
+                formatted_row = f"{i:2d} "
+                for col in columns:
+                    value = row.get(col)
+                    if value is None:
+                        formatted_value = "NaN"
+                    elif isinstance(value, str):
+                        formatted_value = value[:10]  # Truncate long strings
+                    elif isinstance(value, float):
+                        formatted_value = f"{value:.2f}"
+                    else:
+                        formatted_value = str(value)
+                    formatted_row += f"  {formatted_value:>10}"
+                lines.append(formatted_row)
+            
+            return "\n".join(lines)
+    
+    def __str__(self):
+        """String representation (same as __repr__ for consistency)."""
+        return self.__repr__()
     
     def __len__(self):
         """Number of rows in the table."""
