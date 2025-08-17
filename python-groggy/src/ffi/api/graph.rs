@@ -18,7 +18,7 @@ use crate::ffi::core::traversal::PyGroupedAggregationResult;
 use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value, attr_value_to_python_value};
 
 // Import version control types
-use crate::ffi::api::graph_version::{PyCommit, PyBranchInfo};
+use crate::ffi::api::graph_version::{PyCommit, PyBranchInfo, PyHistoricalView};
 use crate::ffi::api::graph_query::PyGraphQuery;
 
 // Placeholder imports for missing types - these need to be implemented
@@ -45,20 +45,21 @@ impl PyAggregationResult {
 }
 
 
-struct PyHistoricalView {
-    state_id: StateId,
-}
-
-
-// Helper function for matrix conversion
+// Helper function to extract GraphMatrix from AdjacencyMatrix and wrap in PyGraphMatrix
 fn adjacency_matrix_to_py_graph_matrix(py: Python, matrix: groggy::AdjacencyMatrix) -> PyResult<Py<PyGraphMatrix>> {
-    // Simplified implementation - needs proper matrix conversion
-    let py_matrix = PyGraphMatrix {
-        columns: Vec::new(),
-        column_names: Vec::new(),
-        num_rows: 0,
-    };
-    Ok(Py::new(py, py_matrix)?)
+    match matrix {
+        groggy::AdjacencyMatrix::Dense(graph_matrix) => {
+            // Directly wrap the core GraphMatrix in PyGraphMatrix
+            let py_graph_matrix = PyGraphMatrix { inner: graph_matrix };
+            Ok(Py::new(py, py_graph_matrix)?)
+        },
+        groggy::AdjacencyMatrix::Sparse(_sparse_matrix) => {
+            // For now, convert sparse to dense - TODO: implement PyGraphMatrix for sparse
+            Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                "Sparse adjacency matrices not yet supported in Python interface"
+            ))
+        }
+    }
 }
 
 /// Python wrapper for the main Graph
@@ -919,9 +920,356 @@ impl PyGraph {
     }
     
     /// Group nodes by attribute value and compute aggregates for each group
-    pub fn group_by(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyGroupedAggregationResult> {
-        self.group_nodes_by_attribute(attribute, aggregation_attr, operation)
+    pub fn group_nodes_by_attribute(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyGroupedAggregationResult> {
+        let results = self.inner.group_nodes_by_attribute(&attribute, &aggregation_attr, &operation)
+            .map_err(graph_error_to_py_err)?;
+        
+        Python::with_gil(|py| {
+            // Convert HashMap to Python dict
+            let dict = PyDict::new(py);
+            for (attr_value, agg_result) in results {
+                let py_attr_value = PyAttrValue { inner: attr_value };
+                let py_agg_result = PyAggregationResult { value: agg_result.value };
+                dict.set_item(Py::new(py, py_attr_value)?, Py::new(py, py_agg_result)?)?;
+            }
+            
+            Ok(PyGroupedAggregationResult {
+                groups: dict.to_object(py),
+                operation: operation.clone(),
+                attribute: attribute.clone(),
+            })
+        })
     }
+    
+    /// Group nodes by attribute value and compute aggregates (public method for benchmarks)
+    pub fn group_by(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyGroupedAggregationResult> {
+        self.group_nodes_by_attribute_internal(attribute, aggregation_attr, operation)
+    }
+    
+    // === REMOVAL OPERATIONS ===
+    
+    /// Remove a single node from the graph
+    fn remove_node(&mut self, node: NodeId) -> PyResult<()> {
+        self.inner.remove_node(node)
+            .map_err(graph_error_to_py_err)
+    }
+    
+    /// Remove a single edge from the graph
+    fn remove_edge(&mut self, edge: EdgeId) -> PyResult<()> {
+        self.inner.remove_edge(edge)
+            .map_err(graph_error_to_py_err)
+    }
+    
+    /// Remove multiple nodes from the graph
+    fn remove_nodes(&mut self, nodes: Vec<NodeId>) -> PyResult<()> {
+        self.inner.remove_nodes(&nodes)
+            .map_err(graph_error_to_py_err)
+    }
+    
+    /// Remove multiple edges from the graph
+    fn remove_edges(&mut self, edges: Vec<EdgeId>) -> PyResult<()> {
+        self.inner.remove_edges(&edges)
+            .map_err(graph_error_to_py_err)
+    }
+    
+    // === SINGLE EDGE ADDITION ===
+    
+    /// Add a single edge to the graph with support for string IDs and attributes
+    #[pyo3(signature = (source, target, uid_key = None, **kwargs))]
+    fn add_edge(&mut self, py: Python, source: &PyAny, target: &PyAny, uid_key: Option<String>, kwargs: Option<&PyDict>) -> PyResult<EdgeId> {
+        // Try to extract as NodeId first (most common case)
+        let source_id = if let Ok(node_id) = source.extract::<NodeId>() {
+            node_id
+        } else if let Ok(string_id) = source.extract::<String>() {
+            if let Some(ref key) = uid_key {
+                self.resolve_string_id_to_node(&string_id, key)?
+            } else {
+                return Err(PyErr::new::<PyTypeError, _>("String node IDs require uid_key parameter"));
+            }
+        } else {
+            return Err(PyErr::new::<PyTypeError, _>("Source must be NodeId or string"));
+        };
+        
+        let target_id = if let Ok(node_id) = target.extract::<NodeId>() {
+            node_id
+        } else if let Ok(string_id) = target.extract::<String>() {
+            if let Some(ref key) = uid_key {
+                self.resolve_string_id_to_node(&string_id, key)?
+            } else {
+                return Err(PyErr::new::<PyTypeError, _>("String node IDs require uid_key parameter"));
+            }
+        } else {
+            return Err(PyErr::new::<PyTypeError, _>("Target must be NodeId or string"));
+        };
+        
+        // Add the edge
+        let edge_id = self.inner.add_edge(source_id, target_id)
+            .map_err(graph_error_to_py_err)?;
+        
+        // Set attributes if provided
+        if let Some(attrs) = kwargs {
+            if !attrs.is_empty() {
+                for (key, value) in attrs.iter() {
+                    let attr_name: String = key.extract()?;
+                    let attr_value = python_value_to_attr_value(value)?;
+                    self.inner.set_edge_attr(edge_id, attr_name, attr_value)
+                        .map_err(graph_error_to_py_err)?;
+                }
+            }
+        }
+        
+        Ok(edge_id)
+    }
+    
+    // === ALGORITHM OPERATIONS ===
+    
+    /// Find shortest path between two nodes
+    #[pyo3(signature = (source, target, weight_attribute = None, inplace = None, attr_name = None))]
+    fn shortest_path(&mut self, source: NodeId, target: NodeId, weight_attribute: Option<AttrName>, 
+                    inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Option<PySubgraph>> {
+        let inplace = inplace.unwrap_or(false);
+        
+        let options = groggy::core::traversal::PathFindingOptions {
+            weight_attribute,
+            max_path_length: None,
+            heuristic: None,
+        };
+        
+        let result = self.inner.shortest_path(source, target, options)
+            .map_err(graph_error_to_py_err)?;
+            
+        match result {
+            Some(path) => {
+                if inplace {
+                    if let Some(attr_name) = attr_name {
+                        // Set path distance attribute on nodes
+                        for (distance, &node_id) in path.nodes.iter().enumerate() {
+                            let attr_value = groggy::AttrValue::Int(distance as i64);
+                            self.inner.set_node_attr(node_id, attr_name.clone(), attr_value)
+                                .map_err(graph_error_to_py_err)?;
+                        }
+                    }
+                }
+                
+                Ok(Some(PySubgraph::new(
+                    path.nodes,
+                    path.edges,
+                    "shortest_path".to_string(),
+                    None, // TODO: Fix graph reference
+                )))
+            },
+            None => Ok(None),
+        }
+    }
+    
+    /// Aggregate attribute values across nodes or edges
+    #[pyo3(signature = (attribute, operation, target = None, node_ids = None))]
+    fn aggregate(&self, py: Python, attribute: AttrName, operation: String, target: Option<String>, node_ids: Option<Vec<NodeId>>) -> PyResult<PyObject> {
+        let target = target.unwrap_or_else(|| "nodes".to_string());
+        
+        match target.as_str() {
+            "nodes" => {
+                // TODO: Core doesn't have aggregate_nodes_custom, implement if needed
+                let result = self.inner.aggregate_node_attribute(&attribute, &operation);
+                match result {
+                    Ok(agg_result) => {
+                        let py_result = PyAggregationResult { value: agg_result.value };
+                        Ok(Py::new(py, py_result)?.to_object(py))
+                    },
+                    Err(e) => Err(graph_error_to_py_err(e)),
+                }
+            },
+            "edges" => {
+                let result = self.inner.aggregate_edge_attribute(&attribute, &operation);
+                match result {
+                    Ok(agg_result) => {
+                        let py_result = PyAggregationResult { value: agg_result.value };
+                        Ok(Py::new(py, py_result)?.to_object(py))
+                    },
+                    Err(e) => Err(graph_error_to_py_err(e)),
+                }
+            },
+            _ => Err(PyErr::new::<PyTypeError, _>("Target must be 'nodes' or 'edges'")),
+        }
+    }
+    
+    // === VERSION CONTROL OPERATIONS ===
+    
+    /// Commit current state of the graph (FFI wrapper around core history system)
+    fn commit(&mut self, message: String, author: String) -> PyResult<StateId> {
+        self.inner.commit(message, author)
+            .map_err(graph_error_to_py_err)
+    }
+    
+    /// Create a new branch (FFI wrapper around core history system)
+    fn create_branch(&mut self, branch_name: String) -> PyResult<()> {
+        self.inner.create_branch(branch_name)
+            .map_err(graph_error_to_py_err)
+    }
+    
+    /// Checkout a branch (FFI wrapper around core history system)
+    fn checkout_branch(&mut self, branch_name: String) -> PyResult<()> {
+        self.inner.checkout_branch(branch_name)
+            .map_err(graph_error_to_py_err)
+    }
+    
+    /// List all branches (FFI wrapper around core history system)
+    fn branches(&self) -> Vec<PyBranchInfo> {
+        self.inner.list_branches()
+            .into_iter()
+            .map(|branch_info| PyBranchInfo::new(branch_info))
+            .collect()
+    }
+    
+    /// Get commit history (FFI wrapper around core history system)
+    fn commit_history(&self) -> Vec<PyCommit> {
+        // Delegate to core history system
+        self.inner.commit_history()
+            .into_iter()
+            .map(|commit_info| PyCommit::from_commit_info(commit_info))
+            .collect()
+    }
+    
+    /// Get historical view at specific commit (FFI wrapper around core history system)
+    fn historical_view(&self, commit_id: StateId) -> PyResult<PyHistoricalView> {
+        // Delegate to core history system
+        match self.inner.view_at_commit(commit_id) {
+            Ok(_historical_view) => {
+                Ok(PyHistoricalView {
+                    state_id: commit_id,
+                })
+            },
+            Err(e) => Err(graph_error_to_py_err(e)),
+        }
+    }
+    
+    // === STATE METHODS ===
+    
+    /// Check if there are uncommitted changes (FFI wrapper around core history system)
+    fn has_uncommitted_changes(&self) -> bool {
+        self.inner.has_uncommitted_changes()
+    }
+    
+    /// Get node mapping for a specific attribute (FFI wrapper around core operations)
+    fn get_node_mapping(&self, py: Python, uid_key: String) -> PyResult<PyObject> {
+        let dict = PyDict::new(py);
+        
+        // Delegate to core for node IDs and attributes
+        let node_ids = self.inner.node_ids();
+        
+        // Use core attribute access for each node
+        for node_id in node_ids {
+            if let Ok(Some(attr_value)) = self.inner.get_node_attr(node_id, &uid_key) {
+                // Convert attribute value to appropriate Python type
+                let key_value = match attr_value {
+                    RustAttrValue::Text(s) => s.to_object(py),
+                    RustAttrValue::CompactText(s) => s.as_str().to_object(py),
+                    RustAttrValue::Int(i) => i.to_object(py),
+                    RustAttrValue::SmallInt(i) => i.to_object(py), 
+                    RustAttrValue::Float(f) => f.to_object(py),
+                    RustAttrValue::Bool(b) => b.to_object(py),
+                    _ => continue, // Skip unsupported types
+                };
+                
+                dict.set_item(key_value, node_id)?;
+            }
+        }
+        
+        Ok(dict.to_object(py))
+    }
+    
+    // === ADJACENCY MATRIX OPERATIONS ===
+    
+    /// Generate adjacency matrix for the entire graph (FFI wrapper around core matrix operations)
+    /// Returns: GraphMatrix with multi-index access (matrix[0, 1])
+    fn adjacency_matrix(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        match self.inner.adjacency_matrix() {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(graph_error_to_py_err(e))
+        }
+    }
+    
+    /// Generate adjacency matrix for the entire graph (cleaner API)
+    /// Returns: GraphMatrix with multi-index access (matrix[0, 1])
+    /// This is a cleaner alias for adjacency_matrix()
+    fn adjacency(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        self.adjacency_matrix(py)
+    }
+    
+    /// Generate weighted adjacency matrix using specified edge attribute (FFI wrapper around core matrix operations)
+    fn weighted_adjacency_matrix(&self, py: Python, weight_attr: &str) -> PyResult<Py<PyGraphMatrix>> {
+        match self.inner.weighted_adjacency_matrix(weight_attr) {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(graph_error_to_py_err(e))
+        }
+    }
+    
+    /// Generate dense adjacency matrix (FFI wrapper around core matrix operations)
+    fn dense_adjacency_matrix(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        match self.inner.dense_adjacency_matrix() {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(graph_error_to_py_err(e))
+        }
+    }
+    
+    /// Generate sparse adjacency matrix (FFI wrapper around core matrix operations)
+    fn sparse_adjacency_matrix(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        match self.inner.sparse_adjacency_matrix() {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(graph_error_to_py_err(e))
+        }
+    }
+    
+    /// Generate Laplacian matrix (FFI wrapper around core matrix operations)
+    fn laplacian_matrix(&self, py: Python, normalized: Option<bool>) -> PyResult<Py<PyGraphMatrix>> {
+        let normalized = normalized.unwrap_or(false);
+        match self.inner.laplacian_matrix(normalized) {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(graph_error_to_py_err(e))
+        }
+    }
+    
+    /// Generate adjacency matrix for a subgraph with specific nodes (FFI wrapper around core matrix operations)
+    fn subgraph_adjacency_matrix(&self, py: Python, node_ids: Vec<NodeId>) -> PyResult<Py<PyGraphMatrix>> {
+        match self.inner.subgraph_adjacency_matrix(&node_ids) {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(graph_error_to_py_err(e))
+        }
+    }
+    
+    // === DISPLAY/TABLE METHODS ===
+    
+    /// Create a GraphTable view for DataFrame-like access to node data (from lib_old.rs)
+    /// Returns a GraphTable object with all nodes and their attributes
+    fn table(&self, py: Python) -> PyResult<PyObject> {
+        // Temporarily return a simple placeholder until PyO3 trait issue is resolved
+        let graph_table_module = py.import("groggy.graph_table")?;
+        let graph_table_class = graph_table_module.getattr("GraphTable")?;
+        
+        // Simple approach: create empty GraphTable and set attributes manually  
+        let empty_list = py.eval("[]", None, None)?;
+        let table = graph_table_class.call1((empty_list, "nodes"))?;
+        Ok(table.to_object(py))
+    }
+
+    /// Get all neighbors of a node
+    fn neighbors(&self, node: NodeId) -> PyResult<Vec<NodeId>> {
+        self.inner.neighbors(node)
+            .map_err(graph_error_to_py_err)
+    }
+    
 }
 
 // Internal methods for FFI integration (not exposed to Python)
@@ -1035,7 +1383,7 @@ impl PyGraph {
         let py_graph_array = PyGraphArray { inner: graph_array };
         Ok(Py::new(py, py_graph_array)?)
     }
-    
+
     pub fn get_edge_ids_array(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
         let edge_ids = self.inner.edge_ids();
         let attr_values: Vec<groggy::AttrValue> = edge_ids.into_iter()
@@ -1046,8 +1394,8 @@ impl PyGraph {
         Ok(Py::new(py, py_graph_array)?)
     }
     
-    /// Group nodes by attribute value and compute aggregates for each group
-    pub fn group_nodes_by_attribute(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyGroupedAggregationResult> {
+    /// Group nodes by attribute value and compute aggregates for each group (internal method)
+    pub fn group_nodes_by_attribute_internal(&self, attribute: AttrName, aggregation_attr: AttrName, operation: String) -> PyResult<PyGroupedAggregationResult> {
         let results = self.inner.group_nodes_by_attribute(&attribute, &aggregation_attr, &operation)
             .map_err(graph_error_to_py_err)?;
         
@@ -1067,5 +1415,24 @@ impl PyGraph {
             })
         })
     }
-    
+
+    /// Get complete attribute column for ALL nodes (optimized for table() method)
+    /// Returns GraphArray for enhanced analytics and proper integration with table columns
+    fn _get_node_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<Py<PyGraphArray>> {
+        match self.inner._get_node_attribute_column(&attr_name.to_string()) {
+            Ok(values) => {
+                // Convert Option<AttrValue> vector to AttrValue vector (convert None to appropriate AttrValue)
+                let attr_values: Vec<groggy::AttrValue> = values.into_iter()
+                    .map(|opt_val| opt_val.unwrap_or(groggy::AttrValue::Int(0))) // Use default for None values
+                    .collect();
+                
+                // Create GraphArray and convert to PyGraphArray
+                let graph_array = groggy::core::array::GraphArray::from_vec(attr_values);
+                let py_graph_array = PyGraphArray::from_graph_array(graph_array);
+                
+                Py::new(py, py_graph_array)
+            },
+            Err(e) => Err(graph_error_to_py_err(e))
+        }
+    }
 }

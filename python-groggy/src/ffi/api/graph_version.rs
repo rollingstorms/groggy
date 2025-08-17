@@ -22,8 +22,46 @@ pub struct PyCommit {
     inner: std::sync::Arc<groggy::core::history::Commit>,
 }
 
+impl PyCommit {
+    /// Create a PyCommit from a core Commit
+    pub fn from_core_commit(commit: std::sync::Arc<groggy::core::history::Commit>) -> Self {
+        Self { inner: commit }
+    }
+    
+    /// Create a PyCommit from a CommitInfo (simplified info)
+    pub fn from_commit_info(info: groggy::api::graph::CommitInfo) -> Self {
+        // Create a simplified Commit from CommitInfo
+        // Note: This is a temporary bridge until we have full core integration
+        let parents = match info.parent {
+            Some(p) => vec![p],
+            None => vec![],
+        };
+        
+        let fake_delta = std::sync::Arc::new(groggy::core::history::Delta {
+            content_hash: [0u8; 32],
+            nodes_added: Vec::new(),
+            nodes_removed: Vec::new(),
+            edges_added: Vec::new(),
+            edges_removed: Vec::new(),
+            node_attr_changes: Vec::new(),
+            edge_attr_changes: Vec::new(),
+        });
+        
+        let commit = groggy::core::history::Commit::new(
+            info.id,
+            parents,
+            fake_delta,
+            info.message,
+            info.author
+        );
+        
+        Self { inner: std::sync::Arc::new(commit) }
+    }
+}
+
 #[pymethods]
 impl PyCommit {
+    
     #[getter]
     fn id(&self) -> StateId {
         self.inner.id
@@ -60,6 +98,13 @@ impl PyCommit {
 #[derive(Clone)]
 pub struct PyBranchInfo {
     inner: groggy::core::ref_manager::BranchInfo,
+}
+
+impl PyBranchInfo {
+    /// Create a new PyBranchInfo from core BranchInfo
+    pub fn new(inner: groggy::core::ref_manager::BranchInfo) -> Self {
+        Self { inner }
+    }
 }
 
 #[pymethods]

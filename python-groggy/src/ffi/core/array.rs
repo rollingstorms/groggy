@@ -425,112 +425,100 @@ impl PyStatsSummary {
     }
 }
 
-/// Python wrapper for GraphMatrix - structured collection of GraphArray columns
-/// This is the return type for multi-column operations like g.nodes[:][['age', 'dept']]
+/// Python wrapper for GraphMatrix - wraps core GraphMatrix
+/// This is the return type for adjacency matrices and other matrix operations
 #[pyclass(name = "GraphMatrix")]
 pub struct PyGraphMatrix {
-    /// Column data as GraphArrays
-    pub columns: Vec<Py<PyGraphArray>>,
-    /// Column names
-    pub column_names: Vec<String>,
-    /// Number of rows
-    pub num_rows: usize,
+    /// Core GraphMatrix
+    pub inner: groggy::core::adjacency::GraphMatrix,
 }
 
 #[pymethods]
 impl PyGraphMatrix {
     /// Get matrix dimensions as (rows, columns) tuple
-    /// Get matrix shape as (rows, cols) tuple 
     #[getter]
     fn shape(&self) -> (usize, usize) {
-        (self.num_rows, self.column_names.len())
+        (self.inner.size, self.inner.size)
     }
     
-    /// Get column names as property
-    #[getter]
-    fn columns(&self) -> Vec<String> {
-        self.column_names.clone()
-    }
-    
-    /// Get number of columns
-    fn column_count(&self) -> usize {
-        self.column_names.len()
-    }
-    
-    /// Get number of rows
+    /// Get number of rows (same as columns for square matrices)
     fn row_count(&self) -> usize {
-        self.num_rows
+        self.inner.size
     }
     
-    /// Enhanced access supporting multiple patterns:
-    /// - Column by name: matrix['age'] -> GraphArray
-    /// - Row by index: matrix[0] -> list/dict of row values  
-    /// - Multi-index: matrix[0, 1] -> single cell value
-    /// - Positional column: matrix[:, 0] -> GraphArray (first column)
+    /// Get number of columns (same as rows for square matrices)
+    fn column_count(&self) -> usize {
+        self.inner.size
+    }
+    
+    /// Multi-index access for matrix elements: matrix[row, col] -> value
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
-        // Pattern 1: Multi-index access (row, col) -> single cell value
+        // Multi-index access (row, col) -> single cell value
         if let Ok(indices) = key.extract::<(usize, usize)>() {
             let (row, col) = indices;
             return self.get_cell(py, row, col);
         }
         
-        // Pattern 2: String key -> column by name
-        if let Ok(column_name) = key.extract::<String>() {
-            if let Some(index) = self.column_names.iter().position(|name| name == &column_name) {
-                return Ok(self.columns[index].clone_ref(py).to_object(py));
-            } else {
-                return Err(PyKeyError::new_err(format!("Column '{}' not found. Available columns: {:?}", column_name, self.column_names)));
-            }
-        }
-        
-        // Pattern 3: Single integer -> row access
+        // Single integer -> row access
         if let Ok(row_index) = key.extract::<usize>() {
             return self.get_row(py, row_index);
         }
         
-        // Pattern 4: Slice notation (future enhancement)
-        // if let Ok(slice) = key.extract::<PySlice>() { ... }
-        
         Err(PyTypeError::new_err(
-            "Key must be: string (column name), int (row index), or (row, col) tuple for multi-index access"
+            "Key must be: int (row index) or (row, col) tuple for multi-index access"
         ))
     }
     
-    /// Get single cell value at (row, col)
+    /// Get single cell value at (row, col) (FFI wrapper around core GraphMatrix)
     fn get_cell(&self, py: Python, row: usize, col: usize) -> PyResult<PyObject> {
-        if col >= self.columns.len() {
-            return Err(PyIndexError::new_err(format!("Column index {} out of range (0-{})", col, self.columns.len() - 1)));
+        match self.inner.get(row, col) {
+            Some(attr_value) => attr_value_to_python_value(py, attr_value),
+            None => Err(PyIndexError::new_err(format!(
+                "Index ({}, {}) out of range for {}x{} matrix", 
+                row, col, self.inner.size, self.inner.size
+            )))
         }
-        
-        let column = &self.columns[col];
-        let graph_array = column.borrow(py);
-        
-        // Get the value at the specified row from this column
-        graph_array.__getitem__(py, row as isize)
     }
     
-    /// Get entire row as dict (if named columns) or list (if positional)
+    /// Get entire row as list (FFI wrapper around core GraphMatrix)
     fn get_row(&self, py: Python, row: usize) -> PyResult<PyObject> {
-        if row >= self.num_rows {
-            return Err(PyIndexError::new_err(format!("Row index {} out of range (0-{})", row, self.num_rows - 1)));
+        match self.inner.get_row(row) {
+            Some(row_values) => {
+                let py_list = pyo3::types::PyList::empty(py);
+                for value in row_values {
+                    let py_value = attr_value_to_python_value(py, &value)?;
+                    py_list.append(py_value)?;
+                }
+                Ok(py_list.to_object(py))
+            },
+            None => Err(PyIndexError::new_err(format!(
+                "Row index {} out of range for {}x{} matrix", 
+                row, self.inner.size, self.inner.size
+            )))
         }
-        
-        // Return as dict with column names as keys
-        let dict = pyo3::types::PyDict::new(py);
-        
-        for (i, column_name) in self.column_names.iter().enumerate() {
-            let column = &self.columns[i];
-            let graph_array = column.borrow(py);
-            let value = graph_array.__getitem__(py, row as isize)?;
-            dict.set_item(column_name, value)?;
+    }
+    
+    /// Get entire column as list (FFI wrapper around core GraphMatrix)
+    fn get_column(&self, py: Python, col: usize) -> PyResult<PyObject> {
+        match self.inner.get_column(col) {
+            Some(col_values) => {
+                let py_list = pyo3::types::PyList::empty(py);
+                for value in col_values {
+                    let py_value = attr_value_to_python_value(py, &value)?;
+                    py_list.append(py_value)?;
+                }
+                Ok(py_list.to_object(py))
+            },
+            None => Err(PyIndexError::new_err(format!(
+                "Column index {} out of range for {}x{} matrix", 
+                col, self.inner.size, self.inner.size
+            )))
         }
-        
-        Ok(dict.to_object(py))
     }
     
     fn __repr__(&self) -> String {
-        format!("GraphMatrix(shape=({}, {}), columns={:?})", 
-                self.num_rows, self.column_names.len(), self.column_names)
+        format!("GraphMatrix({}x{} adjacency matrix)", 
+                self.inner.size, self.inner.size)
     }
 }
 
