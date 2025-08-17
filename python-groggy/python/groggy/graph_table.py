@@ -430,9 +430,16 @@ class GraphTable:
                     print(f"Warning: Direct GraphArray access failed ({e}), using fallback")
                     pass
             
-            # Fallback: extract from table data (less efficient but compatible)
+            # Fallback: extract from table data and convert to GraphArray
             column_data = [row.get(key) for row in rows]
-            return column_data
+            
+            # Convert to GraphArray for consistent API
+            try:
+                import groggy
+                return groggy.GraphArray(column_data)
+            except Exception:
+                # If GraphArray creation fails, return plain list as ultimate fallback
+                return column_data
                 
         elif isinstance(key, int):
             # Single row access

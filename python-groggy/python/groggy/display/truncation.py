@@ -66,8 +66,13 @@ def truncate_columns(headers: List[str], data: List[List[Any]], max_cols: int) -
     
     return truncated_headers, truncated_data, True
 
-def create_ellipsis_row(sample_row: List[Any]) -> List[str]:
+def create_ellipsis_row(sample_row: Any) -> Any:
     """Create an ellipsis row that matches the structure of a data row."""
+    # Handle 1D arrays where sample_row is a scalar value
+    if not hasattr(sample_row, '__len__') or isinstance(sample_row, str):
+        return Symbols.ELLIPSIS
+    
+    # Handle 2D arrays where sample_row is a list/array
     return [Symbols.ELLIPSIS] * len(sample_row) if sample_row else [Symbols.ELLIPSIS]
 
 def truncate_string(text: str, max_width: int, ellipsis: str = Symbols.ELLIPSIS) -> str:

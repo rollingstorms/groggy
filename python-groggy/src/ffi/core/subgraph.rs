@@ -502,14 +502,11 @@ impl PySubgraph {
             if attr_names.len() == 1 {
                 return Ok(columns[0].clone_ref(py).to_object(py));
             } else {
-                // Multiple columns: [['age', 'height']] -> return PyGraphMatrix (structured collection)
-                let matrix = PyGraphMatrix {
-                    columns,
-                    column_names: attr_names,
-                    num_rows,
-                };
-                
-                return Ok(Py::new(py, matrix)?.to_object(py));
+                // TODO: Implement proper multi-column access for attribute data
+                // This needs a different approach than adjacency PyGraphMatrix
+                return Err(PyNotImplementedError::new_err(
+                    "Multi-column attribute access not yet implemented with new GraphMatrix architecture"
+                ));
             }
         }
         

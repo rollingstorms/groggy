@@ -67,6 +67,13 @@ impl PyNodeView {
         Ok(values)
     }
     
+    /// Get neighbors of this node
+    fn neighbors(&self, py: Python) -> PyResult<Vec<NodeId>> {
+        let graph = self.graph.borrow(py);
+        graph.inner.neighbors(self.node_id)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get neighbors: {}", e)))
+    }
+    
     /// Get all attribute items as (key, value) pairs
     fn items(&self, py: Python) -> PyResult<Vec<(String, PyAttrValue)>> {
         let graph = self.graph.borrow(py);
