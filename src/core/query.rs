@@ -21,7 +21,7 @@ impl QueryEngine {
     pub fn find_nodes_by_filter_with_space(
         &mut self,
         pool: &GraphPool,
-        space: &GraphSpace,
+        space: &mut GraphSpace,
         filter: &NodeFilter
     ) -> GraphResult<Vec<NodeId>> {
         self.filter_nodes(pool, space, filter)
@@ -31,26 +31,29 @@ impl QueryEngine {
     pub fn filter_nodes(
         &mut self,
         pool: &GraphPool,
-        space: &GraphSpace,
+        space: &mut GraphSpace,
         filter: &NodeFilter
     ) -> GraphResult<Vec<NodeId>> {
         let start_time = std::time::Instant::now();
         let active_nodes: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
-        let num_nodes = active_nodes.len();
+        let _num_nodes = active_nodes.len();
+        
+        // Pre-fetch topology if needed for filter
+        let topology_data = match filter {
+            NodeFilter::DegreeRange { .. } | NodeFilter::HasNeighbor { .. } => {
+                let (edge_ids, sources, targets) = space.get_columnar_topology();
+                Some((edge_ids.to_vec(), sources.to_vec(), targets.to_vec()))
+            },
+            _ => None
+        };
         
         // 🚀 USE FAST INDIVIDUAL CALLS (same approach as edge filtering) instead of slow bulk method
-        let results: Vec<NodeId> = if num_nodes > 1000 {
-            active_nodes
-                .par_iter()
-                .filter(|&node_id| self.node_matches_filter(*node_id, pool, space, filter))
-                .copied()
-                .collect()
-        } else {
-            active_nodes
-                .into_iter()
-                .filter(|&node_id| self.node_matches_filter(node_id, pool, space, filter))
-                .collect()
-        };
+        let mut results = Vec::new();
+        for node_id in active_nodes {
+            if self.node_matches_filter_with_topology(node_id, pool, space, filter, &topology_data) {
+                results.push(node_id);
+            }
+        }
         
         let _total_time = start_time.elapsed();
         Ok(results)
@@ -61,7 +64,7 @@ impl QueryEngine {
         &self,
         nodes: &[NodeId],
         pool: &GraphPool,
-        space: &GraphSpace,
+        space: &mut GraphSpace,
         filter: &NodeFilter
     ) -> GraphResult<Vec<NodeId>> {
         let start_time = std::time::Instant::now();
@@ -147,30 +150,35 @@ impl QueryEngine {
             _ => {
                 // 🚨 FALLBACK: This uses the slow individual filtering approach
                 eprintln!("⚠️ PERFORMANCE: Using fallback individual filtering for: {:?}", filter);
-                if nodes.len() > 1000 {
-                    Ok(nodes
-                        .par_iter()
-                        .filter(|&node_id| self.node_matches_filter(*node_id, pool, space, filter))
-                        .copied()
-                        .collect())
-                } else {
-                    Ok(nodes
-                        .iter()
-                        .filter(|&node_id| self.node_matches_filter(*node_id, pool, space, filter))
-                        .copied()
-                        .collect())
+                
+                // Pre-fetch topology if needed
+                let topology_data = match filter {
+                    NodeFilter::DegreeRange { .. } | NodeFilter::HasNeighbor { .. } => {
+                        let (edge_ids, sources, targets) = space.get_columnar_topology();
+                        Some((edge_ids.to_vec(), sources.to_vec(), targets.to_vec()))
+                    },
+                    _ => None
+                };
+                
+                let mut results = Vec::new();
+                for &node_id in nodes {
+                    if self.node_matches_filter_with_topology(node_id, pool, space, filter, &topology_data) {
+                        results.push(node_id);
+                    }
                 }
+                Ok(results)
             }
         }
     }
 
-    /// Check if a node matches the given filter
-    fn node_matches_filter(
+    /// Check if a node matches the given filter with pre-fetched topology
+    fn node_matches_filter_with_topology(
         &self,
         node_id: NodeId,
         pool: &GraphPool,
         space: &GraphSpace,
-        filter: &NodeFilter
+        filter: &NodeFilter,
+        topology_data: &Option<(Vec<EdgeId>, Vec<NodeId>, Vec<NodeId>)>
     ) -> bool {
         match filter {
             NodeFilter::HasAttribute { name } => {
@@ -193,35 +201,59 @@ impl QueryEngine {
                 false
             }
             NodeFilter::DegreeRange { min, max } => {
-                let (_edge_ids, sources, targets) = space.get_columnar_topology();
-                let mut degree = 0;
-                for i in 0..sources.len() {
-                    if sources[i] == node_id || targets[i] == node_id {
-                        degree += 1;
+                if let Some((_, sources, targets)) = topology_data {
+                    let mut degree = 0;
+                    for i in 0..sources.len() {
+                        if sources[i] == node_id || targets[i] == node_id {
+                            degree += 1;
+                        }
                     }
+                    degree >= *min && degree <= *max
+                } else {
+                    false
                 }
-                degree >= *min && degree <= *max
             }
             NodeFilter::HasNeighbor { neighbor_id } => {
-                let (_edge_ids, sources, targets) = space.get_columnar_topology();
-                for i in 0..sources.len() {
-                    if (sources[i] == node_id && targets[i] == *neighbor_id) ||
-                       (sources[i] == *neighbor_id && targets[i] == node_id) {
-                        return true;
+                if let Some((_, sources, targets)) = topology_data {
+                    for i in 0..sources.len() {
+                        if (sources[i] == node_id && targets[i] == *neighbor_id) ||
+                           (sources[i] == *neighbor_id && targets[i] == node_id) {
+                            return true;
+                        }
                     }
                 }
                 false
             }
             NodeFilter::And(filters) => {
-                filters.iter().all(|f| self.node_matches_filter(node_id, pool, space, f))
+                filters.iter().all(|f| self.node_matches_filter_with_topology(node_id, pool, space, f, topology_data))
             }
             NodeFilter::Or(filters) => {
-                filters.iter().any(|f| self.node_matches_filter(node_id, pool, space, f))
+                filters.iter().any(|f| self.node_matches_filter_with_topology(node_id, pool, space, f, topology_data))
             }
             NodeFilter::Not(filter) => {
-                !self.node_matches_filter(node_id, pool, space, filter)
+                !self.node_matches_filter_with_topology(node_id, pool, space, filter, topology_data)
             }
         }
+    }
+
+    /// Check if a node matches the given filter (legacy method)
+    fn node_matches_filter(
+        &self,
+        node_id: NodeId,
+        pool: &GraphPool,
+        space: &mut GraphSpace,
+        filter: &NodeFilter
+    ) -> bool {
+        // Get topology if needed
+        let topology_data = match filter {
+            NodeFilter::DegreeRange { .. } | NodeFilter::HasNeighbor { .. } => {
+                let (edge_ids, sources, targets) = space.get_columnar_topology();
+                Some((edge_ids.to_vec(), sources.to_vec(), targets.to_vec()))
+            },
+            _ => None
+        };
+        
+        self.node_matches_filter_with_topology(node_id, pool, space, filter, &topology_data)
     }
 
     /// Check if an edge matches the given filter

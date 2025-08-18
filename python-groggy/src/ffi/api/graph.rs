@@ -716,207 +716,51 @@ impl PyGraph {
         ))
     }
     
-    /// BFS traversal using core algorithm (THIN WRAPPER - NO FFI ALGORITHM)
+    /// BFS traversal using core algorithm (DEPRECATED - use graph.analytics.bfs() instead)
     #[pyo3(signature = (start_node, max_depth = None, node_filter = None, edge_filter = None, inplace = None, attr_name = None))]
-    fn bfs(&mut self, py: Python, start_node: NodeId, max_depth: Option<usize>, 
+    fn bfs(slf: PyRef<Self>, py: Python, start_node: NodeId, max_depth: Option<usize>, 
            node_filter: Option<&PyAny>, edge_filter: Option<&PyAny>,
            inplace: Option<bool>, attr_name: Option<String>) -> PyResult<PySubgraph> {
         
-        let inplace = inplace.unwrap_or(false);
-        
-        // 1. Convert inputs to core traversal options (NO FFI ALGORITHM)
-        let mut options = groggy::core::traversal::TraversalOptions::default();
-        if let Some(depth) = max_depth {
-            options.max_depth = Some(depth);
+        // For now, ignore node_filter and edge_filter as they're not supported in analytics module
+        if node_filter.is_some() || edge_filter.is_some() {
+            return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                "node_filter and edge_filter are not yet supported. Use graph.analytics.bfs() for basic BFS functionality."
+            ));
         }
         
-        // Handle filters (convert from PyAny to core filter types)
-        if let Some(filter) = node_filter {
-            if let Ok(node_filter_obj) = filter.extract::<PyNodeFilter>() {
-                options.node_filter = Some(node_filter_obj.inner.clone());
-            }
-        }
-        if let Some(filter) = edge_filter {
-            if let Ok(edge_filter_obj) = filter.extract::<PyEdgeFilter>() {
-                options.edge_filter = Some(edge_filter_obj.inner.clone());
-            }
-        }
-        
-        // 2. Call proven core algorithm (NO FFI ALGORITHM IMPLEMENTATION)
-        let result = self.inner.bfs(start_node, options)
-            .map_err(graph_error_to_py_err)?;
-        
-        // 3. Handle inplace attribute setting
-        if inplace {
-            // Set node attributes (BFS distance/order)
-            if let Some(ref node_attr_name) = attr_name {
-                for (order, &node_id) in result.nodes.iter().enumerate() {
-                    let order_value = PyAttrValue::from_attr_value(groggy::AttrValue::Int(order as i64));
-                    self.set_node_attribute(node_id, node_attr_name.clone(), &order_value)?;
-                }
-            } else {
-                // Default node attribute
-                let default_attr = "bfs_distance".to_string();
-                for (order, &node_id) in result.nodes.iter().enumerate() {
-                    let order_value = PyAttrValue::from_attr_value(groggy::AttrValue::Int(order as i64));
-                    self.set_node_attribute(node_id, default_attr.clone(), &order_value)?;
-                }
-            }
-            
-            // Set edge attributes (tree edge markers)
-            let edge_attr_name = attr_name.unwrap_or_else(|| "bfs_tree_edge".to_string());
-            for &edge_id in &result.edges {
-                let tree_edge_value = PyAttrValue::from_attr_value(groggy::AttrValue::Bool(true));
-                self.set_edge_attribute(edge_id, edge_attr_name.clone(), &tree_edge_value)?;
-            }
-        }
-        
-        // 4. Wrap core results in FFI subgraph
-        Ok(PySubgraph::new(
-            result.nodes,
-            result.edges,
-            "bfs_traversal".to_string(),
-            None, // TODO: Fix graph reference when Graph has Clone
-        ))
+        // Delegate to analytics module which has proper graph reference handling
+        let analytics = PyGraph::analytics(slf, py)?;
+        let result = analytics.borrow(py).bfs(py, start_node, max_depth, inplace, attr_name);
+        result
     }
     
-    /// DFS traversal using core algorithm (THIN WRAPPER - NO FFI ALGORITHM)
+    /// DFS traversal using core algorithm (DEPRECATED - use graph.analytics.dfs() instead)
     #[pyo3(signature = (start_node, max_depth = None, node_filter = None, edge_filter = None, inplace = None, attr_name = None))]
-    fn dfs(&mut self, py: Python, start_node: NodeId, max_depth: Option<usize>,
+    fn dfs(slf: PyRef<Self>, py: Python, start_node: NodeId, max_depth: Option<usize>,
            node_filter: Option<&PyAny>, edge_filter: Option<&PyAny>,
            inplace: Option<bool>, attr_name: Option<String>) -> PyResult<PySubgraph> {
         
-        let inplace = inplace.unwrap_or(false);
-        
-        // 1. Convert inputs to core traversal options (NO FFI ALGORITHM)
-        let mut options = groggy::core::traversal::TraversalOptions::default();
-        if let Some(depth) = max_depth {
-            options.max_depth = Some(depth);
+        // For now, ignore node_filter and edge_filter as they're not supported in analytics module
+        if node_filter.is_some() || edge_filter.is_some() {
+            return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                "node_filter and edge_filter are not yet supported. Use graph.analytics.dfs() for basic DFS functionality."
+            ));
         }
         
-        // Handle filters (convert from PyAny to core filter types)
-        if let Some(filter) = node_filter {
-            if let Ok(node_filter_obj) = filter.extract::<PyNodeFilter>() {
-                options.node_filter = Some(node_filter_obj.inner.clone());
-            }
-        }
-        if let Some(filter) = edge_filter {
-            if let Ok(edge_filter_obj) = filter.extract::<PyEdgeFilter>() {
-                options.edge_filter = Some(edge_filter_obj.inner.clone());
-            }
-        }
-        
-        // 2. Call proven core algorithm (NO FFI ALGORITHM IMPLEMENTATION)  
-        let result = self.inner.dfs(start_node, options)
-            .map_err(graph_error_to_py_err)?;
-        
-        // 3. Handle inplace attribute setting
-        if inplace {
-            // Set node attributes (DFS order/distance)
-            if let Some(ref node_attr_name) = attr_name {
-                for (order, &node_id) in result.nodes.iter().enumerate() {
-                    let order_value = PyAttrValue::from_attr_value(groggy::AttrValue::Int(order as i64));
-                    self.set_node_attribute(node_id, node_attr_name.clone(), &order_value)?;
-                }
-            } else {
-                // Default node attribute
-                let default_attr = "dfs_order".to_string();
-                for (order, &node_id) in result.nodes.iter().enumerate() {
-                    let order_value = PyAttrValue::from_attr_value(groggy::AttrValue::Int(order as i64));
-                    self.set_node_attribute(node_id, default_attr.clone(), &order_value)?;
-                }
-            }
-            
-            // Set edge attributes (tree edge markers)
-            let edge_attr_name = attr_name.unwrap_or_else(|| "dfs_tree_edge".to_string());
-            for &edge_id in &result.edges {
-                let tree_edge_value = PyAttrValue::from_attr_value(groggy::AttrValue::Bool(true));
-                self.set_edge_attribute(edge_id, edge_attr_name.clone(), &tree_edge_value)?;
-            }
-        }
-        
-        // 4. Wrap core results in FFI subgraph
-        Ok(PySubgraph::new(
-            result.nodes,
-            result.edges,
-            "dfs_traversal".to_string(),
-            None, // TODO: Fix graph reference when Graph has Clone
-        ))
+        // Delegate to analytics module which has proper graph reference handling
+        let analytics = PyGraph::analytics(slf, py)?;
+        let result = analytics.borrow(py).dfs(py, start_node, max_depth, inplace, attr_name);
+        result
     }
     
-    /// Find connected components using core algorithm (THIN WRAPPER - NO FFI ALGORITHM)
-    #[pyo3(signature = (inplace = None, attr_name = None))]
-    fn connected_components(&mut self, py: Python, inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Vec<PySubgraph>> {
-        let inplace = inplace.unwrap_or(false);
-        
-        // 1. Create core traversal options (convert inputs)
-        let options = groggy::core::traversal::TraversalOptions::default();
-        
-        // 2. Call proven core algorithm (NO FFI ALGORITHM IMPLEMENTATION)
-        let result = self.inner.connected_components(options)
-            .map_err(graph_error_to_py_err)?;
-        
-        // 3. Convert core results to FFI wrappers using optimized pattern from lib_old
-        let mut subgraphs = Vec::new();
-        
-        // Get columnar topology once for efficient edge processing (O(1) if cached)
-        let (edge_ids, sources, targets) = self.inner.get_columnar_topology();
-        
-        // Process components and collect results first (avoid borrow conflicts)
-        let mut components_with_edges = Vec::new();
-        for (i, component) in result.components.into_iter().enumerate() {
-            // Calculate induced edges using optimized columnar topology method (same as filter_nodes)
-            use std::collections::HashSet;
-            let component_nodes: HashSet<NodeId> = component.nodes.iter().copied().collect();
-            let mut induced_edges = Vec::new();
-            
-            // Iterate through parallel vectors - O(k) where k = active edges
-            for j in 0..edge_ids.len() {
-                let edge_id = edge_ids[j];
-                let source = sources[j];
-                let target = targets[j];
-                
-                // O(1) HashSet lookups instead of O(n) Vec::contains
-                if component_nodes.contains(&source) && component_nodes.contains(&target) {
-                    induced_edges.push(edge_id);
-                }
-            }
-            
-            // Store component data for later processing
-            components_with_edges.push((component.nodes.clone(), induced_edges, i));
-        }
-        
-        // Now create subgraphs and handle inplace attributes without borrow conflicts
-        for (nodes, induced_edges, i) in components_with_edges {
-            // If inplace=True, set component_id attribute on nodes
-            if inplace {
-                let _attr_name = attr_name.clone().unwrap_or_else(|| "component_id".to_string());
-                let component_value = PyAttrValue::from_attr_value(groggy::AttrValue::Int(i as i64));
-                
-                for &node_id in &nodes {
-                    self.set_node_attribute(node_id, _attr_name.clone(), &component_value)?;
-                }
-            }
-            
-            // Create subgraph with proper induced edges
-            let mut subgraph = PySubgraph::new(
-                nodes.clone(),
-                induced_edges, // Include all edges within this component
-                format!("connected_component_{}", i),
-                None, // Temporarily None - will be set below
-            );
-            
-            subgraphs.push(subgraph);
-        }
-        
-        // 4. Set graph references for all subgraphs (TODO: Fix graph reference cloning)
-        // Note: This is the correct architectural pattern - wrap results and handle references
-        // Need to solve graph cloning issue separately from the FFI streamlining pattern
-        for subgraph in &mut subgraphs {
-            // subgraph.set_graph_reference(graph_ref.clone()); // TODO: When Graph has Clone
-        }
-        
-        Ok(subgraphs)
+    /// Get analytics module for this graph
+    #[getter]
+    fn analytics(slf: PyRef<Self>, py: Python) -> PyResult<Py<crate::ffi::api::graph_analytics::PyGraphAnalytics>> {
+        use crate::ffi::api::graph_analytics::PyGraphAnalytics;
+        let graph_ref: Py<PyGraph> = slf.into_py(py).extract(py)?;
+        let analytics = PyGraphAnalytics { graph: graph_ref };
+        Py::new(py, analytics)
     }
     
     /// Group nodes by attribute value and compute aggregates for each group
@@ -1023,43 +867,15 @@ impl PyGraph {
     
     // === ALGORITHM OPERATIONS ===
     
-    /// Find shortest path between two nodes
+    /// Find shortest path between two nodes (DEPRECATED - use graph.analytics.shortest_path() instead)
     #[pyo3(signature = (source, target, weight_attribute = None, inplace = None, attr_name = None))]
-    fn shortest_path(&mut self, source: NodeId, target: NodeId, weight_attribute: Option<AttrName>, 
+    fn shortest_path(slf: PyRef<Self>, py: Python, source: NodeId, target: NodeId, weight_attribute: Option<AttrName>, 
                     inplace: Option<bool>, attr_name: Option<String>) -> PyResult<Option<PySubgraph>> {
-        let inplace = inplace.unwrap_or(false);
         
-        let options = groggy::core::traversal::PathFindingOptions {
-            weight_attribute,
-            max_path_length: None,
-            heuristic: None,
-        };
-        
-        let result = self.inner.shortest_path(source, target, options)
-            .map_err(graph_error_to_py_err)?;
-            
-        match result {
-            Some(path) => {
-                if inplace {
-                    if let Some(attr_name) = attr_name {
-                        // Set path distance attribute on nodes
-                        for (distance, &node_id) in path.nodes.iter().enumerate() {
-                            let attr_value = groggy::AttrValue::Int(distance as i64);
-                            self.inner.set_node_attr(node_id, attr_name.clone(), attr_value)
-                                .map_err(graph_error_to_py_err)?;
-                        }
-                    }
-                }
-                
-                Ok(Some(PySubgraph::new(
-                    path.nodes,
-                    path.edges,
-                    "shortest_path".to_string(),
-                    None, // TODO: Fix graph reference
-                )))
-            },
-            None => Ok(None),
-        }
+        // Delegate to analytics module which has proper graph reference handling
+        let analytics = PyGraph::analytics(slf, py)?;
+        let result = analytics.borrow(py).shortest_path(py, source, target, weight_attribute, inplace, attr_name);
+        result
     }
     
     /// Aggregate attribute values across nodes or edges
@@ -1182,7 +998,7 @@ impl PyGraph {
     
     /// Generate adjacency matrix for the entire graph (FFI wrapper around core matrix operations)
     /// Returns: GraphMatrix with multi-index access (matrix[0, 1])
-    fn adjacency_matrix(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+    fn adjacency_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
         match self.inner.adjacency_matrix() {
             Ok(matrix) => {
                 adjacency_matrix_to_py_graph_matrix(py, matrix)
@@ -1194,12 +1010,12 @@ impl PyGraph {
     /// Generate adjacency matrix for the entire graph (cleaner API)
     /// Returns: GraphMatrix with multi-index access (matrix[0, 1])
     /// This is a cleaner alias for adjacency_matrix()
-    fn adjacency(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+    fn adjacency(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
         self.adjacency_matrix(py)
     }
     
     /// Generate weighted adjacency matrix using specified edge attribute (FFI wrapper around core matrix operations)
-    fn weighted_adjacency_matrix(&self, py: Python, weight_attr: &str) -> PyResult<Py<PyGraphMatrix>> {
+    fn weighted_adjacency_matrix(&mut self, py: Python, weight_attr: &str) -> PyResult<Py<PyGraphMatrix>> {
         match self.inner.weighted_adjacency_matrix(weight_attr) {
             Ok(matrix) => {
                 adjacency_matrix_to_py_graph_matrix(py, matrix)
@@ -1209,7 +1025,7 @@ impl PyGraph {
     }
     
     /// Generate dense adjacency matrix (FFI wrapper around core matrix operations)
-    fn dense_adjacency_matrix(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+    fn dense_adjacency_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
         match self.inner.dense_adjacency_matrix() {
             Ok(matrix) => {
                 adjacency_matrix_to_py_graph_matrix(py, matrix)
@@ -1219,7 +1035,7 @@ impl PyGraph {
     }
     
     /// Generate sparse adjacency matrix (FFI wrapper around core matrix operations)
-    fn sparse_adjacency_matrix(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+    fn sparse_adjacency_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
         match self.inner.sparse_adjacency_matrix() {
             Ok(matrix) => {
                 adjacency_matrix_to_py_graph_matrix(py, matrix)
@@ -1229,7 +1045,7 @@ impl PyGraph {
     }
     
     /// Generate Laplacian matrix (FFI wrapper around core matrix operations)
-    fn laplacian_matrix(&self, py: Python, normalized: Option<bool>) -> PyResult<Py<PyGraphMatrix>> {
+    fn laplacian_matrix(&mut self, py: Python, normalized: Option<bool>) -> PyResult<Py<PyGraphMatrix>> {
         let normalized = normalized.unwrap_or(false);
         match self.inner.laplacian_matrix(normalized) {
             Ok(matrix) => {
@@ -1240,7 +1056,7 @@ impl PyGraph {
     }
     
     /// Generate adjacency matrix for a subgraph with specific nodes (FFI wrapper around core matrix operations)
-    fn subgraph_adjacency_matrix(&self, py: Python, node_ids: Vec<NodeId>) -> PyResult<Py<PyGraphMatrix>> {
+    fn subgraph_adjacency_matrix(&mut self, py: Python, node_ids: Vec<NodeId>) -> PyResult<Py<PyGraphMatrix>> {
         match self.inner.subgraph_adjacency_matrix(&node_ids) {
             Ok(matrix) => {
                 adjacency_matrix_to_py_graph_matrix(py, matrix)
@@ -1265,7 +1081,7 @@ impl PyGraph {
     }
 
     /// Get all neighbors of a node
-    fn neighbors(&self, node: NodeId) -> PyResult<Vec<NodeId>> {
+    fn neighbors(&mut self, node: NodeId) -> PyResult<Vec<NodeId>> {
         self.inner.neighbors(node)
             .map_err(graph_error_to_py_err)
     }

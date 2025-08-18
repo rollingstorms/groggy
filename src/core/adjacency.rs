@@ -272,7 +272,7 @@ impl AdjacencyMatrixBuilder {
     pub fn build_full_graph(
         &self,
         pool: &GraphPool,
-        space: &GraphSpace,
+        space: &mut GraphSpace,
     ) -> GraphResult<AdjacencyMatrix> {
         let node_ids = space.node_ids();
         let mapping = if self.use_compact_indexing {
@@ -288,7 +288,7 @@ impl AdjacencyMatrixBuilder {
     pub fn build_subgraph(
         &self,
         pool: &GraphPool,
-        space: &GraphSpace,
+        space: &mut GraphSpace,
         subgraph_nodes: &[NodeId],
     ) -> GraphResult<AdjacencyMatrix> {
         let mapping = if self.use_compact_indexing {
@@ -304,14 +304,18 @@ impl AdjacencyMatrixBuilder {
     fn build_matrix(
         &self,
         pool: &GraphPool,
-        space: &GraphSpace,
+        space: &mut GraphSpace,
         nodes: &[NodeId],
         mapping: Option<IndexMapping>,
     ) -> GraphResult<AdjacencyMatrix> {
         let size = nodes.len();
         
-        // Get graph topology
+        // Get graph topology (separate from matrix building to avoid borrow conflicts)
         let (edge_ids, sources, targets) = space.get_columnar_topology();
+        // Clone the vectors to avoid borrow conflicts
+        let edge_ids: Vec<EdgeId> = edge_ids.to_vec();
+        let sources: Vec<NodeId> = sources.to_vec();
+        let targets: Vec<NodeId> = targets.to_vec();
         
         match self.format {
             MatrixFormat::Dense => {
@@ -333,7 +337,7 @@ impl AdjacencyMatrixBuilder {
     fn build_dense_matrix(
         &self,
         pool: &GraphPool,
-        space: &GraphSpace,
+        space: &mut GraphSpace,
         nodes: &[NodeId],
         edge_ids: &[EdgeId],
         sources: &[NodeId],
@@ -381,7 +385,7 @@ impl AdjacencyMatrixBuilder {
     fn build_sparse_matrix(
         &self,
         pool: &GraphPool,
-        space: &GraphSpace,
+        space: &mut GraphSpace,
         nodes: &[NodeId],
         edge_ids: &[EdgeId],
         sources: &[NodeId],

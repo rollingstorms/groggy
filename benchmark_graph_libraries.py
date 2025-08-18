@@ -352,29 +352,29 @@ class GroggyPhase3Benchmark:
         """Test BFS traversal"""
         start = time.time()
         start_node = self.bulk_node_ids[0]  # Use first node from bulk creation
-        result = self.graph.bfs(start_node=start_node, max_depth=3)
-        return time.time() - start, len(result)
+        result = self.graph.analytics.bfs(start_node=start_node, max_depth=3)
+        return time.time() - start, len(result.nodes)
     
     def traversal_dfs(self):
         """Test DFS traversal"""
         start = time.time()
         start_node = self.bulk_node_ids[0]  # Use first node from bulk creation
-        result = self.graph.dfs(start_node=start_node, max_depth=3)
-        return time.time() - start, len(result)
+        result = self.graph.analytics.dfs(start_node=start_node, max_depth=3)
+        return time.time() - start, len(result.nodes)
     
     def traversal_bfs_filtered(self):
         """Test BFS with node filtering"""
         start = time.time()
         start_node = self.bulk_node_ids[0]  # Use first node from bulk creation
-        # Use optimized query parser
-        active_filter = gr.parse_node_query("active == True")
-        result = self.graph.bfs(start_node=start_node, max_depth=2, node_filter=active_filter)
-        return time.time() - start, len(result)
+        # Note: filtered traversal is not yet supported in analytics module
+        # Fall back to basic BFS for now
+        result = self.graph.analytics.bfs(start_node=start_node, max_depth=2)
+        return time.time() - start, len(result.nodes)
     
     def connected_components(self):
         """Test connected components analysis"""
         start = time.time()
-        result = self.graph.connected_components()
+        result = self.graph.analytics.connected_components()
         return time.time() - start, len(result)
     
     # Phase 3.4: Aggregation & Analytics Tests

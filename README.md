@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="img/groggy.svg" alt="Groggy Logo" width="400"/>
+</div>
+
 # <span style="font-family: 'American Typewriter', monospace; font-size: 4em;">groggy</span>
 
 A high-performance graph language engine built with Rust and Python bindings.

@@ -364,7 +364,7 @@ impl GraphPool {
     /// 
     /// PERFORMANCE: Batch validation + bulk HashMap operations
     /// Returns Vec<EdgeId> for created edges
-    pub fn add_edges_bulk(&mut self, edges: &[(NodeId, NodeId)]) -> Vec<EdgeId> {
+    pub fn add_edges(&mut self, edges: &[(NodeId, NodeId)]) -> Vec<EdgeId> {
         let start_id = self.next_edge_id;
         let edge_ids: Vec<EdgeId> = (start_id..start_id + edges.len()).collect();
         

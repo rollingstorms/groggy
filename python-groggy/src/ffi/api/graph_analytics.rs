@@ -27,76 +27,54 @@ impl PyGraphAnalytics {
         let inplace = inplace.unwrap_or(false);
         let mut graph = self.graph.borrow_mut(py);
         
+        // Delegate to core algorithm - THIN WRAPPER
         let options = TraversalOptions::default();
         let result = graph.inner.connected_components(options)
             .map_err(graph_error_to_py_err)?;
         
-        // Process components and collect results first (avoid borrow conflicts like original)
-        let mut components_with_edges = Vec::new();
-        for (i, component) in result.components.into_iter().enumerate() {
-            // 🚀 PERFORMANCE FIX: Use core columnar topology instead of O(E) FFI algorithm
-            let induced_edges = if inplace {
-                // Delegate to proven core columnar method - NO FFI ALGORITHM IMPLEMENTATION
-                let component_nodes: std::collections::HashSet<NodeId> = component.nodes.iter().copied().collect();
-                let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
-                let mut edges = Vec::new();
-                
-                // O(k) where k = active edges, much better than O(E) 
-                for i in 0..edge_ids.len() {
-                    let edge_id = edge_ids[i];
-                    let source = sources[i];
-                    let target = targets[i];
-                    
-                    // O(1) HashSet lookups
-                    if component_nodes.contains(&source) && component_nodes.contains(&target) {
-                        edges.push(edge_id);
-                    }
-                }
-                edges
-            } else {
-                // For fast path (inplace=false), use empty edges to avoid expensive computation
-                Vec::new()
-            };
-            
-            // Store component data for later processing
-            components_with_edges.push((component.nodes.clone(), induced_edges, i));
-        }
-        
-        // Now create subgraphs and handle inplace attributes without borrow conflicts
         let mut subgraphs = Vec::new();
-        for (nodes, induced_edges, i) in components_with_edges {
-            // Create subgraph with None graph reference initially (like original)
-            let subgraph = PySubgraph::new(
-                nodes.clone(),
-                induced_edges,
-                format!("connected_component_{}", i),
-                None, // Temporarily None - will be set below like original
-            );
-            subgraphs.push(subgraph);
-            
-            // If inplace=True, set component_id attribute on nodes  
-            if inplace {
-                let attr_name = attr_name.clone().unwrap_or_else(|| "component_id".to_string());
-                let component_value = groggy::AttrValue::Int(i as i64);
-                
-                // Use bulk set for efficiency
+        
+        // Handle bulk attribute setting if requested
+        if inplace {
+            if let Some(ref attr_name) = attr_name {
                 let mut attrs_values = std::collections::HashMap::new();
-                let node_value_pairs: Vec<(NodeId, groggy::AttrValue)> = nodes.iter()
-                    .map(|&node_id| (node_id, component_value.clone()))
+                let node_value_pairs: Vec<(NodeId, groggy::AttrValue)> = result.components.iter().enumerate()
+                    .flat_map(|(i, component)| {
+                        component.nodes.iter().map(move |&node_id| (node_id, groggy::AttrValue::Int(i as i64)))
+                    })
                     .collect();
-                attrs_values.insert(attr_name, node_value_pairs);
+                attrs_values.insert(attr_name.clone(), node_value_pairs);
                 
                 graph.inner.set_node_attrs(attrs_values)
                     .map_err(graph_error_to_py_err)?;
             }
         }
         
-        // Release graph borrow
-        drop(graph);
-        
-        // Now set the graph reference for all subgraphs (like original)
-        for subgraph in &mut subgraphs {
-            subgraph.set_graph_reference(self.graph.clone());
+        // Convert core results to FFI wrappers - SIMPLE CONVERSION ONLY
+        for (i, component) in result.components.into_iter().enumerate() {
+            // Calculate induced edges efficiently using core's columnar topology
+            let component_nodes: std::collections::HashSet<NodeId> = component.nodes.iter().copied().collect();
+            let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
+            
+            let mut component_edges = Vec::new();
+            for j in 0..edge_ids.len() {
+                let edge_id = edge_ids[j];
+                let source = sources[j];
+                let target = targets[j];
+                
+                // Include edge if both endpoints are in this component
+                if component_nodes.contains(&source) && component_nodes.contains(&target) {
+                    component_edges.push(edge_id);
+                }
+            }
+            
+            let subgraph = PySubgraph::new(
+                component.nodes,
+                component_edges,
+                format!("connected_component_{}", i),
+                Some(self.graph.clone()),
+            );
+            subgraphs.push(subgraph);
         }
         
         Ok(subgraphs)
@@ -123,11 +101,15 @@ impl PyGraphAnalytics {
         if inplace {
             let attr_name = attr_name.unwrap_or_else(|| "bfs_distance".to_string());
             
-            // Set distance attributes (distance from start_node)
-            for (order, &node_id) in result.nodes.iter().enumerate() {
-                let order_value = PyAttrValue { inner: groggy::AttrValue::Int(order as i64) };
-                graph.set_node_attribute(node_id, attr_name.clone(), &order_value)?;
-            }
+            // Use bulk attribute setting for performance
+            let mut attrs_values = std::collections::HashMap::new();
+            let node_value_pairs: Vec<(NodeId, groggy::AttrValue)> = result.nodes.iter().enumerate()
+                .map(|(order, &node_id)| (node_id, groggy::AttrValue::Int(order as i64)))
+                .collect();
+            attrs_values.insert(attr_name, node_value_pairs);
+            
+            graph.inner.set_node_attrs(attrs_values)
+                .map_err(graph_error_to_py_err)?;
         }
         
         Ok(PySubgraph::new(
@@ -159,11 +141,15 @@ impl PyGraphAnalytics {
         if inplace {
             let attr_name = attr_name.unwrap_or_else(|| "dfs_order".to_string());
             
-            // Set order attributes
-            for (order, &node_id) in result.nodes.iter().enumerate() {
-                let order_value = PyAttrValue { inner: groggy::AttrValue::Int(order as i64) };
-                graph.set_node_attribute(node_id, attr_name.clone(), &order_value)?;
-            }
+            // Use bulk attribute setting for performance
+            let mut attrs_values = std::collections::HashMap::new();
+            let node_value_pairs: Vec<(NodeId, groggy::AttrValue)> = result.nodes.iter().enumerate()
+                .map(|(order, &node_id)| (node_id, groggy::AttrValue::Int(order as i64)))
+                .collect();
+            attrs_values.insert(attr_name, node_value_pairs);
+            
+            graph.inner.set_node_attrs(attrs_values)
+                .map_err(graph_error_to_py_err)?;
         }
         
         Ok(PySubgraph::new(
@@ -176,7 +162,7 @@ impl PyGraphAnalytics {
     
     /// Find shortest path between two nodes
     #[pyo3(signature = (source, target, weight_attribute = None, inplace = false, attr_name = None))]
-    fn shortest_path(&self, py: Python, source: NodeId, target: NodeId, 
+    pub fn shortest_path(&self, py: Python, source: NodeId, target: NodeId, 
                     weight_attribute: Option<AttrName>, inplace: Option<bool>, 
                     attr_name: Option<String>) -> PyResult<Option<PySubgraph>> {
         let inplace = inplace.unwrap_or(false);
@@ -195,12 +181,15 @@ impl PyGraphAnalytics {
             Some(path) => {
                 if inplace {
                     if let Some(attr_name) = attr_name {
-                        // Set path distance attribute on nodes
-                        for (distance, &node_id) in path.nodes.iter().enumerate() {
-                            let attr_value = groggy::AttrValue::Int(distance as i64);
-                            graph.inner.set_node_attr(node_id, attr_name.clone(), attr_value)
-                                .map_err(graph_error_to_py_err)?;
-                        }
+                        // Use bulk attribute setting for performance
+                        let mut attrs_values = std::collections::HashMap::new();
+                        let node_value_pairs: Vec<(NodeId, groggy::AttrValue)> = path.nodes.iter().enumerate()
+                            .map(|(distance, &node_id)| (node_id, groggy::AttrValue::Int(distance as i64)))
+                            .collect();
+                        attrs_values.insert(attr_name, node_value_pairs);
+                        
+                        graph.inner.set_node_attrs(attrs_values)
+                            .map_err(graph_error_to_py_err)?;
                     }
                 }
                 
