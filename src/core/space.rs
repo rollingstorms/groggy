@@ -92,6 +92,9 @@ pub struct GraphSpace {
     /// Flag indicating if columnar cache needs rebuild
     topology_cache_dirty: bool,
     
+    /// Topology generation counter - increments when structure changes
+    topology_generation: usize,
+    
     /*
     === ATTRIBUTE INDEX MAPPINGS ===
     Map entities to their current attribute indices in Pool columns
@@ -128,6 +131,7 @@ impl GraphSpace {
             edge_targets: Vec::new(),
             active_edge_ids: Vec::new(),
             topology_cache_dirty: false,
+            topology_generation: 0,
             node_attribute_indices: HashMap::new(),
             edge_attribute_indices: HashMap::new(),
             base_state,
@@ -146,28 +150,11 @@ impl GraphSpace {
         // NOTE: Graph calls ChangeTracker directly for cleaner separation
     }
 
-    /// Add multiple nodes to the active set (called by Graph.add_nodes())
-    pub fn activate_nodes(&mut self, nodes: &[NodeId]) {
-        self.active_nodes.extend(nodes);
-        // NOTE: Graph calls ChangeTracker directly for cleaner separation
-    }
-    
-    /// Bulk activate nodes using range (BULK OPTIMIZED for large ranges)
-    /// 
-    /// PERFORMANCE: O(n) but with HashSet::extend optimization for ranges
-    pub fn activate_nodes_bulk(&mut self, node_range: (NodeId, NodeId)) {
-        // Pre-grow HashSet to prevent rehashing
-        let count = (node_range.1 - node_range.0 + 1) as usize;
-        self.active_nodes.reserve(count);
-        
-        // Use range iterator - more efficient than collecting to Vec first
-        self.active_nodes.extend(node_range.0..=node_range.1);
-    }
     
     /// Bulk activate nodes from Vec (BULK OPTIMIZED for arbitrary IDs)
     /// 
     /// PERFORMANCE: Single HashSet::extend call instead of individual inserts
-    pub fn activate_nodes_vec(&mut self, nodes: Vec<NodeId>) {
+    pub fn activate_nodes(&mut self, nodes: Vec<NodeId>) {
         // Pre-grow HashSet
         self.active_nodes.reserve(nodes.len());
         
@@ -194,15 +181,12 @@ impl GraphSpace {
     }
 
     /// Add an edge to the active set (called by Graph.add_edge())
-    pub fn activate_edge(&mut self, edge_id: EdgeId, source: NodeId, target: NodeId) {
+    pub fn activate_edge(&mut self, edge_id: EdgeId, _source: NodeId, _target: NodeId) {
         self.active_edges.insert(edge_id);
         
-        // Update columnar topology cache
-        self.active_edge_ids.push(edge_id);
-        self.edge_sources.push(source);
-        self.edge_targets.push(target);
-        
         // NOTE: Graph calls ChangeTracker directly for cleaner separation
+        self.topology_cache_dirty = true;
+        self.topology_generation += 1;
     }
 
     /// Remove an edge from the active set (called by Graph.remove_edge())
@@ -213,20 +197,15 @@ impl GraphSpace {
         
         // Mark topology cache as dirty (will be rebuilt on next access)
         self.topology_cache_dirty = true;
+        self.topology_generation += 1;
         
-        // NOTE: Graph calls ChangeTracker directly for cleaner separation
-    }
-
-    /// Add multiple edges to the active set (called by Graph.add_edges())
-    pub fn activate_edges(&mut self, edges: &[EdgeId]) {
-        self.active_edges.extend(edges);
         // NOTE: Graph calls ChangeTracker directly for cleaner separation
     }
     
     /// Bulk activate edges with pre-allocation (BULK OPTIMIZED)
     /// 
     /// PERFORMANCE: Single HashSet operation with capacity management
-    pub fn activate_edges_bulk(&mut self, edges: Vec<EdgeId>) {
+    pub fn activate_edges(&mut self, edges: Vec<EdgeId>) {
         // Pre-grow HashSet to prevent rehashing
         self.active_edges.reserve(edges.len());
         
@@ -236,26 +215,9 @@ impl GraphSpace {
         // Mark topology cache as dirty since we can't efficiently update columnar cache
         // for bulk operations without knowing source/target info
         self.topology_cache_dirty = true;
+        self.topology_generation += 1;
     }
     
-    /// Bulk activate edges with topology info (MOST OPTIMIZED)
-    /// 
-    /// PERFORMANCE: Updates both HashSet and columnar cache efficiently
-    pub fn activate_edges_bulk_with_topology(&mut self, edges: Vec<(EdgeId, NodeId, NodeId)>) {
-        // Pre-grow all structures
-        self.active_edges.reserve(edges.len());
-        self.active_edge_ids.reserve(edges.len());
-        self.edge_sources.reserve(edges.len());
-        self.edge_targets.reserve(edges.len());
-        
-        // Bulk extend all structures in parallel
-        for (edge_id, source, target) in edges {
-            self.active_edges.insert(edge_id);
-            self.active_edge_ids.push(edge_id);
-            self.edge_sources.push(source);
-            self.edge_targets.push(target);
-        }
-    }
 
     /// Remove multiple edges from the active set (called by Graph.remove_edges())
     pub fn deactivate_edges(&mut self, edges: &[EdgeId]) {
@@ -265,6 +227,8 @@ impl GraphSpace {
             self.edge_attribute_indices.remove(edge);
         }
         // NOTE: Graph calls ChangeTracker directly for cleaner separation
+        self.topology_cache_dirty = true;
+        self.topology_generation += 1;
     }
 
     /*
@@ -506,6 +470,14 @@ impl GraphSpace {
         (&self.active_edge_ids, &self.edge_sources, &self.edge_targets)
     }
     
+    /// Ensure topology cache is up-to-date and return columnar topology
+    /// This is the method that should be called from Graph API when cache rebuilding is needed
+    pub fn get_columnar_topology_with_rebuild(&mut self, pool: &crate::core::pool::GraphPool) -> (&[EdgeId], &[NodeId], &[NodeId]) {
+        if self.topology_cache_dirty {
+            self.rebuild_topology_cache(pool);
+        }
+        self.get_columnar_topology()
+    }
     /// Rebuild columnar topology cache from current active edges
     /// 
     /// PERFORMANCE: Called automatically when cache is dirty
@@ -533,14 +505,16 @@ impl GraphSpace {
         self.topology_cache_dirty = false;
     }
     
-    /// Get columnar topology with automatic cache maintenance
-    /// 
-    /// PERFORMANCE: Rebuilds cache only when dirty
-    pub fn get_columnar_topology_cached(&mut self, pool: &crate::core::pool::GraphPool) -> (&[EdgeId], &[NodeId], &[NodeId]) {
-        if self.topology_cache_dirty {
-            self.rebuild_topology_cache(pool);
-        }
-        self.get_columnar_topology()
+
+    
+    /// Get current topology generation
+    pub fn get_topology_generation(&self) -> usize {
+        self.topology_generation
+    }
+    
+    /// Check if topology cache is dirty
+    pub fn is_topology_cache_dirty(&self) -> bool {
+        self.topology_cache_dirty
     }
     
     /// NOTE: Topology queries (neighbors, degree, connectivity) now handled by

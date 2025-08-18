@@ -73,7 +73,7 @@ impl AdjacencyCache {
     }
     
     /// Build adjacency cache from columnar topology
-    pub fn rebuild(&mut self, edge_ids: &[EdgeId], sources: &[NodeId], targets: &[NodeId]) {
+    pub fn rebuild(&mut self, edge_ids: &[EdgeId], sources: &[NodeId], targets: &[NodeId], topology_generation: usize) {
         self.adjacency_map.clear();
         
         for i in 0..sources.len() {
@@ -92,7 +92,7 @@ impl AdjacencyCache {
         }
         
         self.is_valid = true;
-        self.generation += 1;
+        self.generation = topology_generation;  // Set to current topology generation
     }
     
     /// Get neighbors for a node using the cache
@@ -102,6 +102,11 @@ impl AdjacencyCache {
         } else {
             None
         }
+    }
+    
+    /// Check if cache is up to date with topology generation
+    pub fn is_up_to_date(&self, topology_generation: usize) -> bool {
+        self.is_valid && self.generation == topology_generation
     }
     
     /// Invalidate the cache
@@ -176,7 +181,7 @@ impl TraversalEngine {
     
     /// Breadth-First Search from a starting node
     /// 
-    /// PERFORMANCE: O(V + E) with direct topology access
+    /// PERFORMANCE: O(V + E) with cached adjacency map - FAST!
     /// FEATURES: Early termination, filtering, minimal overhead
     pub fn bfs(
         &mut self,
@@ -187,18 +192,12 @@ impl TraversalEngine {
     ) -> GraphResult<TraversalResult> {
         let start_time = std::time::Instant::now();
         
-        // Build adjacency map once - O(E) 
-        let (edge_ids, sources, targets) = space.get_columnar_topology();
-        let mut adjacency: HashMap<NodeId, Vec<(NodeId, EdgeId)>> = HashMap::new();
-        
-        for i in 0..sources.len() {
-            let (source, target) = (sources[i], targets[i]);
-            let edge_id = edge_ids[i];
-            adjacency.entry(source).or_insert_with(Vec::new).push((target, edge_id));
-            adjacency.entry(target).or_insert_with(Vec::new).push((source, edge_id));
-        }
-        
-        let mut visited = HashSet::new();
+        // Use cached adjacency map - only rebuild if topology changed!
+        let topology_generation = space.get_topology_generation();
+        if !self.adjacency_cache.is_up_to_date(topology_generation) {
+            let (edge_ids, sources, targets) = space.get_columnar_topology();
+            self.adjacency_cache.rebuild(edge_ids, sources, targets, topology_generation);
+        }        let mut visited = HashSet::new();
         let mut queue = VecDeque::new();
         let mut result_nodes = Vec::new();
         let mut result_edges = Vec::new();
@@ -228,8 +227,8 @@ impl TraversalEngine {
             result_nodes.push(current_node);
             max_depth = max_depth.max(level);
             
-            // Find neighbors using adjacency map - O(degree) per node
-            if let Some(neighbors) = adjacency.get(&current_node) {
+            // Find neighbors using cached adjacency map - O(degree) per node - FAST!
+            if let Some(neighbors) = self.adjacency_cache.get_neighbors(current_node) {
                 for &(neighbor, edge_id) in neighbors {
                     if !visited.contains(&neighbor) {
                         // Simple filter check without caching overhead
@@ -266,7 +265,7 @@ impl TraversalEngine {
     
     /// Depth-First Search from a starting node
     /// 
-    /// PERFORMANCE: O(V + E) with direct topology access
+    /// PERFORMANCE: O(V + E) with cached adjacency map - FAST!
     /// FEATURES: Iterative implementation, minimal overhead
     pub fn dfs(
         &mut self,
@@ -277,18 +276,12 @@ impl TraversalEngine {
     ) -> GraphResult<TraversalResult> {
         let start_time = std::time::Instant::now();
         
-        // Build adjacency map once - O(E) 
-        let (edge_ids, sources, targets) = space.get_columnar_topology();
-        let mut adjacency: HashMap<NodeId, Vec<(NodeId, EdgeId)>> = HashMap::new();
-        
-        for i in 0..sources.len() {
-            let (source, target) = (sources[i], targets[i]);
-            let edge_id = edge_ids[i];
-            adjacency.entry(source).or_insert_with(Vec::new).push((target, edge_id));
-            adjacency.entry(target).or_insert_with(Vec::new).push((source, edge_id));
-        }
-        
-        let mut visited = HashSet::new();
+        // Use cached adjacency map - only rebuild if topology changed!
+        let topology_generation = space.get_topology_generation();
+        if !self.adjacency_cache.is_up_to_date(topology_generation) {
+            let (edge_ids, sources, targets) = space.get_columnar_topology();
+            self.adjacency_cache.rebuild(edge_ids, sources, targets, topology_generation);
+        }        let mut visited = HashSet::new();
         let mut stack = Vec::new();
         let mut result_nodes = Vec::new();
         let mut result_edges = Vec::new();
@@ -314,8 +307,8 @@ impl TraversalEngine {
                         }
                     }
                     
-                    // Get neighbors from adjacency map - O(1) lookup
-                    if let Some(neighbors) = adjacency.get(&current_node) {
+                    // Get neighbors from cached adjacency map - O(1) lookup - FAST!
+                    if let Some(neighbors) = self.adjacency_cache.get_neighbors(current_node) {
                         // Add in reverse order for consistent DFS traversal
                         for &(neighbor, edge_id) in neighbors.iter().rev() {
                             if !visited.contains(&neighbor) {
@@ -382,7 +375,7 @@ impl TraversalEngine {
         heap.push(DijkstraNode { id: start, distance: 0.0 });
         
         // Get columnar topology with cache maintenance (make owned copies)
-        let (edge_ids_ref, sources_ref, targets_ref) = space.get_columnar_topology_cached(pool);
+        let (edge_ids_ref, sources_ref, targets_ref) = space.get_columnar_topology();
         let edge_ids: Vec<EdgeId> = edge_ids_ref.to_vec();
         let sources: Vec<NodeId> = sources_ref.to_vec();
         let targets: Vec<NodeId> = targets_ref.to_vec();
@@ -487,38 +480,16 @@ impl TraversalEngine {
     ) -> GraphResult<ConnectedComponentsResult> {
         let start_time = std::time::Instant::now();
         
+        // Use cached adjacency for optimal performance  
+        let topology_generation = space.get_topology_generation();
+        if !self.adjacency_cache.is_up_to_date(topology_generation) {
+            let (edge_ids, sources, targets) = space.get_columnar_topology();
+            self.adjacency_cache.rebuild(edge_ids, sources, targets, topology_generation);
+        }
+        
         let active_nodes: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
         let mut visited = HashSet::new();
         let mut components = Vec::new();
-        
-        // Build adjacency map once - O(E)
-        let (_edge_ids, sources, targets) = space.get_columnar_topology();
-        
-        // Pre-calculate node degrees to avoid vector reallocations
-        let mut node_degrees: HashMap<NodeId, usize> = HashMap::new();
-        for i in 0..sources.len() {
-            let (source, target) = (sources[i], targets[i]);
-            *node_degrees.entry(source).or_insert(0) += 1;
-            *node_degrees.entry(target).or_insert(0) += 1;
-        }
-        
-        // Build adjacency map with pre-allocated capacity to avoid O(n²) reallocations
-        let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::with_capacity(active_nodes.len());
-        
-        for i in 0..sources.len() {
-            let (source, target) = (sources[i], targets[i]);
-            
-            // Pre-allocate vectors with exact capacity to prevent reallocations
-            let source_vec = adjacency.entry(source).or_insert_with(|| {
-                Vec::with_capacity(node_degrees.get(&source).copied().unwrap_or(0))
-            });
-            source_vec.push(target);
-            
-            let target_vec = adjacency.entry(target).or_insert_with(|| {
-                Vec::with_capacity(node_degrees.get(&target).copied().unwrap_or(0))
-            });
-            target_vec.push(source);
-        }
         
         // BFS for each unvisited node - O(V + E) total
         for &start_node in &active_nodes {
@@ -537,9 +508,9 @@ impl TraversalEngine {
                 while let Some(current) = queue.pop_front() {
                     component_nodes.push(current);
                     
-                    // Get neighbors from adjacency map - O(1) lookup
-                    if let Some(neighbors) = adjacency.get(&current) {
-                        for &neighbor in neighbors {
+                    // Use cached adjacency for optimal performance - get (neighbor, edge_id) pairs
+                    if let Some(neighbors) = self.adjacency_cache.get_neighbors(current) {
+                        for &(neighbor, _edge_id) in neighbors {
                             if !visited.contains(&neighbor) {
                                 if self.should_visit_node(pool, space, neighbor, &options)? {
                                     visited.insert(neighbor);
@@ -551,8 +522,31 @@ impl TraversalEngine {
                 }
                 
                 if !component_nodes.is_empty() {
+                    // Calculate induced edges for this component
+                    let component_node_set: HashSet<NodeId> = component_nodes.iter().copied().collect();
+                    let mut component_edges = Vec::new();
+                    
+                    // Use cached adjacency to find induced edges efficiently
+                    if let Some(_neighbors) = self.adjacency_cache.get_neighbors(start_node) {
+                        // For each node in the component, check its edges
+                        for &node in &component_nodes {
+                            if let Some(node_neighbors) = self.adjacency_cache.get_neighbors(node) {
+                                for &(neighbor, edge_id) in node_neighbors {
+                                    // Only include edge if both endpoints are in this component
+                                    // and we haven't already added this edge (avoid duplicates)
+                                    if component_node_set.contains(&neighbor) 
+                                        && node < neighbor // Avoid adding same edge twice
+                                        && !component_edges.contains(&edge_id) {
+                                        component_edges.push(edge_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
                     components.push(ConnectedComponent {
                         nodes: component_nodes.clone(),
+                        edges: component_edges,
                         size: component_nodes.len(),
                         root: start_node,
                     });
@@ -745,7 +739,7 @@ impl TraversalEngine {
     
     /// Find edge between two nodes (helper for path reconstruction)
     fn find_edge_between(&self, pool: &GraphPool, space: &mut GraphSpace, node1: NodeId, node2: NodeId) -> GraphResult<Option<EdgeId>> {
-        let (edge_ids, sources, targets) = space.get_columnar_topology_cached(pool);
+        let (edge_ids, sources, targets) = space.get_columnar_topology();
         
         for i in 0..sources.len() {
             if (sources[i] == node1 && targets[i] == node2) || 
@@ -801,7 +795,7 @@ impl TraversalEngine {
             });
         } else {
             // Continue exploring - get topology data
-            let (_edge_ids, sources, targets) = space.get_columnar_topology_cached(pool);
+            let (_edge_ids, sources, targets) = space.get_columnar_topology();
             
             // Collect neighbors first to avoid borrowing conflicts
             let mut neighbors = Vec::new();
@@ -1036,6 +1030,7 @@ pub struct ConnectedComponentsResult {
 #[derive(Debug, Clone)]
 pub struct ConnectedComponent {
     pub nodes: Vec<NodeId>,
+    pub edges: Vec<EdgeId>, // Induced edges within this component
     pub size: usize,
     pub root: NodeId, // Representative node
 }

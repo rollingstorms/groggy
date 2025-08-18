@@ -85,7 +85,7 @@ impl Subgraph {
     /// which is much better than O(E) over all edges in the graph.
     fn calculate_induced_edges(graph: &Rc<RefCell<Graph>>, nodes: &HashSet<NodeId>) -> GraphResult<HashSet<EdgeId>> {
         let mut induced_edges = HashSet::new();
-        let graph_borrow = graph.borrow();
+        let mut graph_borrow = graph.borrow_mut();
         
         // Get columnar topology vectors (edge_ids, sources, targets) - O(1) if cached
         let (edge_ids, sources, targets) = graph_borrow.get_columnar_topology();

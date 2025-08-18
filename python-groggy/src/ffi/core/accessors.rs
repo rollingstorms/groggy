@@ -45,7 +45,7 @@ impl PyNodesAccessor {
         // Try to extract as list of integers (batch access)
         if let Ok(node_ids) = key.extract::<Vec<NodeId>>() {
             // Batch node access - return Subgraph
-            let graph = self.graph.borrow(py);
+            let mut graph = self.graph.borrow_mut(py);
             
             // Validate all nodes exist
             for &node_id in &node_ids {
@@ -84,7 +84,7 @@ impl PyNodesAccessor {
         
         // Try to extract as slice (slice access)
         if let Ok(slice) = key.downcast::<PySlice>() {
-            let graph = self.graph.borrow(py);
+            let mut graph = self.graph.borrow_mut(py);
             let all_node_ids = graph.inner.node_ids();
             
             // Convert slice to indices

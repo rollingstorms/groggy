@@ -182,7 +182,7 @@ impl Graph {
         let (_start_id, _end_id, node_ids) = self.pool.add_nodes_bulk(count);
         
         // Use optimized bulk space activation  
-        self.space.activate_nodes_vec(node_ids.clone());
+        self.space.activate_nodes(node_ids.clone());
         
         // Single bulk change tracking update
         self.change_tracker.record_nodes_addition(&node_ids);
@@ -223,10 +223,10 @@ impl Graph {
         }
         
         // Use optimized bulk pool operation
-        let edge_ids = self.pool.add_edges_bulk(&valid_edges);
+        let edge_ids = self.pool.add_edges(&valid_edges);
         
         // Use optimized bulk space activation
-        self.space.activate_edges_bulk(edge_ids.clone());
+        self.space.activate_edges(edge_ids.clone());
         
         // Prepare data for change tracking
         let change_data: Vec<_> = edge_ids.iter()
@@ -687,6 +687,85 @@ impl Graph {
         self.space.get_active_edges().iter().copied().collect()
     }
     
+    /// Get the degree of a node (number of incident edges)
+    pub fn degree(&self, node: NodeId) -> Result<usize, GraphError> {
+        if !self.space.contains_node(node) {
+            return Err(GraphError::NodeNotFound {
+                node_id: node,
+                operation: "get degree".to_string(),
+                suggestion: "Check if node exists with contains_node()".to_string(),
+            });
+        }
+        
+        // Use cached columnar topology if available, otherwise fall back to individual edge lookups
+        if !self.space.is_topology_cache_dirty() {
+            // FAST PATH: Use cached columnar topology
+            let (_, sources, targets) = self.space.get_columnar_topology();
+            let mut count = 0;
+            for i in 0..sources.len() {
+                if sources[i] == node || targets[i] == node {
+                    count += 1;
+                }
+            }
+            Ok(count)
+        } else {
+            // SLOW PATH: Individual edge lookups (cache is dirty and we can't rebuild with immutable self)
+            let mut count = 0;
+            for edge_id in self.space.get_active_edges() {
+                if let Ok((source, target)) = self.edge_endpoints(*edge_id) {
+                    if source == node || target == node {
+                        count += 1;
+                    }
+                }
+            }
+            Ok(count)
+        }
+    }
+    
+    /// Get the neighbors of a node
+    pub fn neighbors(&self, node: NodeId) -> Result<Vec<NodeId>, GraphError> {
+        if !self.space.contains_node(node) {
+            return Err(GraphError::NodeNotFound {
+                node_id: node,
+                operation: "get neighbors".to_string(),
+                suggestion: "Check if node exists with contains_node()".to_string(),
+            });
+        }
+        
+        // Use cached columnar topology if available, otherwise fall back to individual edge lookups
+        if !self.space.is_topology_cache_dirty() {
+            // FAST PATH: Use cached columnar topology  
+            let (_, sources, targets) = self.space.get_columnar_topology();
+            let mut neighbors = Vec::new();
+            for i in 0..sources.len() {
+                if sources[i] == node {
+                    neighbors.push(targets[i]);
+                } else if targets[i] == node {
+                    neighbors.push(sources[i]);
+                }
+            }
+            // Remove duplicates efficiently
+            if !neighbors.is_empty() {
+                neighbors.sort_unstable();
+                neighbors.dedup();
+            }
+            Ok(neighbors)
+        } else {
+            // SLOW PATH: Individual edge lookups (cache is dirty and we can't rebuild with immutable self)
+            let mut neighbors = Vec::new();
+            for edge_id in self.space.get_active_edges() {
+                if let Ok((source, target)) = self.edge_endpoints(*edge_id) {
+                    if source == node {
+                        neighbors.push(target);
+                    } else if target == node {
+                        neighbors.push(source);
+                    }
+                }
+            }
+            Ok(neighbors)
+        }
+    }
+    
     /// Get columnar topology vectors for efficient subgraph operations
     /// 
     /// Returns (edge_ids, sources, targets) as parallel vectors where:
@@ -695,8 +774,8 @@ impl Graph {
     /// - targets[i] is the target NodeId of that edge
     ///
     /// This is used internally for optimized operations like subgraph edge calculation.
-    pub fn get_columnar_topology(&self) -> (&[EdgeId], &[NodeId], &[NodeId]) {
-        self.space.get_columnar_topology()
+    pub fn get_columnar_topology(&mut self) -> (&[EdgeId], &[NodeId], &[NodeId]) {
+        self.space.get_columnar_topology_with_rebuild(&self.pool)
     }
     
     /// Get the endpoints of an edge
@@ -709,67 +788,6 @@ impl Graph {
             })
     }
     
-    /// Get all neighbors of a node (MAIN OPTIMIZED API)
-    /// Uses cached columnar topology with vectorized operations and automatic deduplication.
-    /// This is the primary neighbors method - other get_neighbors() methods are for internal/historical use.
-    pub fn neighbors(&self, node: NodeId) -> Result<Vec<NodeId>, GraphError> {
-        if !self.space.contains_node(node) {
-            return Err(GraphError::NodeNotFound {
-                node_id: node,
-                operation: "get neighbors".to_string(),
-                suggestion: "Check if node exists with contains_node()".to_string(),
-            });
-        }
-        
-        // CACHED COLUMNAR APPROACH: Get pre-computed columnar vectors (zero-copy!)
-        let (_edge_ids, sources, targets) = self.space.get_columnar_topology();
-        
-        // VECTORIZED NEIGHBOR FINDING: Direct array access with potential for SIMD
-        let mut neighbors = Vec::new();
-        
-        // Single-pass vectorized comparison (compiler can optimize with SIMD)
-        for i in 0..sources.len() {
-            if sources[i] == node {
-                neighbors.push(targets[i]);
-            } else if targets[i] == node {
-                neighbors.push(sources[i]);
-            }
-        }
-        
-        // Remove duplicates efficiently
-        if !neighbors.is_empty() {
-            neighbors.sort_unstable(); // Faster than sort() for primitive types
-            neighbors.dedup();
-        }
-        
-        Ok(neighbors)
-    }
-    
-    /// Get the degree (number of incident edges) of a node
-    pub fn degree(&self, node: NodeId) -> Result<usize, GraphError> {
-        if !self.space.contains_node(node) {
-            return Err(GraphError::NodeNotFound {
-                node_id: node,
-                operation: "get degree".to_string(),
-                suggestion: "Check if node exists with contains_node()".to_string(),
-            });
-        }
-        
-        // CACHED COLUMNAR APPROACH: Get pre-computed columnar vectors (zero-copy!)
-        let (_edge_ids, sources, targets) = self.space.get_columnar_topology();
-        
-        // VECTORIZED DEGREE COUNTING: Direct array access with potential for SIMD
-        let mut degree = 0;
-        for i in 0..sources.len() {
-            if sources[i] == node || targets[i] == node {
-                degree += 1;
-                // Note: For self-loops (source == target == node), this counts as 1 edge
-                // In some graph representations, self-loops contribute 2 to the degree
-            }
-        }
-        
-        Ok(degree)
-    }
     
     
     /// Get basic statistics about the current graph
@@ -1047,7 +1065,7 @@ impl Graph {
     
     /// Find nodes matching attribute criteria
     pub fn find_nodes(&mut self, filter: NodeFilter) -> Result<Vec<NodeId>, GraphError> {
-        self.query_engine.find_nodes_by_filter_with_space(&self.pool, &self.space, &filter)
+        self.query_engine.find_nodes_by_filter_with_space(&self.pool, &mut self.space, &filter)
             .map_err(|e| e.into())
     }
     
@@ -1392,47 +1410,47 @@ impl Graph {
     // ===== ADJACENCY MATRIX OPERATIONS =====
 
     /// Generate adjacency matrix for the entire graph
-    pub fn adjacency_matrix(&self) -> GraphResult<AdjacencyMatrix> {
-        AdjacencyMatrixBuilder::new().build_full_graph(&self.pool, &self.space)
+    pub fn adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
+        AdjacencyMatrixBuilder::new().build_full_graph(&self.pool, &mut self.space)
     }
 
     /// Generate weighted adjacency matrix using specified edge attribute
-    pub fn weighted_adjacency_matrix(&self, weight_attr: &str) -> GraphResult<AdjacencyMatrix> {
+    pub fn weighted_adjacency_matrix(&mut self, weight_attr: &str) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
             .matrix_type(MatrixType::Weighted { weight_attr: Some(weight_attr.to_string()) })
-            .build_full_graph(&self.pool, &self.space)
+            .build_full_graph(&self.pool, &mut self.space)
     }
 
     /// Generate dense adjacency matrix
-    pub fn dense_adjacency_matrix(&self) -> GraphResult<AdjacencyMatrix> {
+    pub fn dense_adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
             .format(MatrixFormat::Dense)
-            .build_full_graph(&self.pool, &self.space)
+            .build_full_graph(&self.pool, &mut self.space)
     }
 
     /// Generate sparse adjacency matrix
-    pub fn sparse_adjacency_matrix(&self) -> GraphResult<AdjacencyMatrix> {
+    pub fn sparse_adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
             .format(MatrixFormat::Sparse)
-            .build_full_graph(&self.pool, &self.space)
+            .build_full_graph(&self.pool, &mut self.space)
     }
 
     /// Generate Laplacian matrix
-    pub fn laplacian_matrix(&self, normalized: bool) -> GraphResult<AdjacencyMatrix> {
+    pub fn laplacian_matrix(&mut self, normalized: bool) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
             .matrix_type(MatrixType::Laplacian { normalized })
-            .build_full_graph(&self.pool, &self.space)
+            .build_full_graph(&self.pool, &mut self.space)
     }
 
     /// Generate adjacency matrix for a subgraph with specific nodes
-    pub fn subgraph_adjacency_matrix(&self, node_ids: &[NodeId]) -> GraphResult<AdjacencyMatrix> {
+    pub fn subgraph_adjacency_matrix(&mut self, node_ids: &[NodeId]) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
-            .build_subgraph(&self.pool, &self.space, node_ids)
+            .build_subgraph(&self.pool, &mut self.space, node_ids)
     }
 
     /// Generate custom adjacency matrix with full control
     pub fn custom_adjacency_matrix(
-        &self,
+        &mut self,
         format: MatrixFormat,
         matrix_type: MatrixType,
         compact_indexing: bool,
@@ -1444,9 +1462,9 @@ impl Graph {
             .compact_indexing(compact_indexing);
 
         if let Some(nodes) = node_ids {
-            builder.build_subgraph(&self.pool, &self.space, nodes)
+            builder.build_subgraph(&self.pool, &mut self.space, nodes)
         } else {
-            builder.build_full_graph(&self.pool, &self.space)
+            builder.build_full_graph(&self.pool, &mut self.space)
         }
     }
 }
