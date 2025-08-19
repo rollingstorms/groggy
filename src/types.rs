@@ -29,6 +29,30 @@ pub type StateId = u64;
 pub type BranchName = String;
 
 /*
+=== GRAPH STRUCTURE TYPES ===
+Fundamental graph properties that affect behavior across the entire system.
+*/
+
+/// Graph directionality - determines edge interpretation throughout the system
+/// DESIGN: This affects adjacency caching, traversal algorithms, and matrix operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GraphType {
+    /// Directed graph - edges have direction (A→B ≠ B→A)
+    /// Compatible with NetworkX DiGraph
+    Directed,
+    /// Undirected graph - edges are bidirectional (A↔B = B↔A) 
+    /// Compatible with NetworkX Graph
+    Undirected,
+}
+
+impl Default for GraphType {
+    /// Default to undirected for backward compatibility
+    fn default() -> Self {
+        Self::Undirected
+    }
+}
+
+/*
 === ATTRIBUTE VALUE SYSTEM ===
 This is the heart of the flexible attribute system. Should support:
 - Common data types (numbers, strings, bools)

@@ -27,6 +27,7 @@ KEY DESIGN DECISIONS:
 */
 
 use crate::core::strategies::StorageStrategyType;
+use crate::types::GraphType;
 
 /// The main configuration structure for the entire graph system
 /// 
@@ -45,6 +46,15 @@ use crate::core::strategies::StorageStrategyType;
 /// - Storage: Compression, persistence, backup settings
 #[derive(Debug, Clone)]
 pub struct GraphConfig {
+    /*
+    === GRAPH STRUCTURE ===
+    Fundamental graph properties that affect the entire system
+    */
+    
+    /// Graph directionality - affects adjacency, traversal, and matrix operations
+    /// DESIGN: This is the most fundamental property and affects all other operations
+    pub graph_type: GraphType,
+    
     /*
     === MEMORY MANAGEMENT ===
     Control memory usage across all components
@@ -185,6 +195,7 @@ impl GraphConfig {
         // TODO: Initialize all other fields with balanced default values
         // For now, create a minimal config with the default strategy
         Self {
+            graph_type: GraphType::default(),
             temporal_storage_strategy: StorageStrategyType::default(),
             // TODO: Initialize remaining fields with reasonable defaults
             max_memory_usage: 1024 * 1024 * 1024, // 1GB placeholder

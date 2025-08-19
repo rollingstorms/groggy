@@ -198,7 +198,8 @@ class GroggyPhase3Benchmark:
         print("🔧 Creating Groggy Phase 3 graph...")
         start_memory = get_memory_usage()
         start = time.time()
-        self.graph = gr.Graph()
+        # Create directed graph to match NetworkX DiGraph behavior
+        self.graph = gr.Graph(directed=True)
         
         # Use bulk node creation for better performance
         num_nodes = len(nodes_data)
@@ -362,7 +363,7 @@ class GroggyPhase3Benchmark:
         # Use optimized query parser for edges
         # filter_obj = gr.parse_edge_query("relationship == 'reports_to'")
         result = self.graph.filter_edges("relationship == 'reports_to'")
-        return time.time() - start, len(result)
+        return time.time() - start, len(result.edges)
     
     # Phase 3.2: Graph Traversal Tests  
     def traversal_bfs(self):

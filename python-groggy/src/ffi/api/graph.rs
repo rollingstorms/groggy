@@ -71,11 +71,27 @@ pub struct PyGraph {
 #[pymethods]
 impl PyGraph {
     #[new]
-    fn new(_config: Option<&PyDict>) -> PyResult<Self> {
-        // For now, ignore config and just create a default graph
-        // TODO: Convert Python config to GraphConfig when needed
-        let rust_graph = RustGraph::new();
+    #[pyo3(signature = (directed = false, _config = None))]
+    fn new(directed: bool, _config: Option<&PyDict>) -> PyResult<Self> {
+        // Create graph with specified directionality
+        let rust_graph = if directed {
+            RustGraph::new_directed()
+        } else {
+            RustGraph::new_undirected()
+        };
         Ok(Self { inner: rust_graph })
+    }
+    
+    /// Check if this graph is directed
+    #[getter]
+    fn is_directed(&self) -> bool {
+        self.inner.is_directed()
+    }
+    
+    /// Check if this graph is undirected
+    #[getter]
+    fn is_undirected(&self) -> bool {
+        self.inner.is_undirected()
     }
     
     // === CORE GRAPH OPERATIONS ===
@@ -627,7 +643,7 @@ impl PyGraph {
     }
     
     /// Filter nodes using NodeFilter object or string query
-    fn filter_nodes(&mut self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+    fn filter_nodes(mut slf: PyRefMut<Self>, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for NodeFilter object first (most common case)
         let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
             // Direct NodeFilter object - fastest path
@@ -645,7 +661,7 @@ impl PyGraph {
         };
         
         let start = std::time::Instant::now();
-        let filtered_nodes = self.inner.find_nodes(node_filter)
+        let filtered_nodes = slf.inner.find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
 
         let elapsed = start.elapsed();
@@ -656,7 +672,7 @@ impl PyGraph {
         let node_set: HashSet<NodeId> = filtered_nodes.iter().copied().collect();
         
         // Get columnar topology vectors (edge_ids, sources, targets) - O(1) if cached
-        let (edge_ids, sources, targets) = self.inner.get_columnar_topology();
+        let (edge_ids, sources, targets) = slf.inner.get_columnar_topology();
         let mut induced_edges = Vec::new();
         
         // Iterate through parallel vectors - O(k) where k = active edges
@@ -677,12 +693,12 @@ impl PyGraph {
             filtered_nodes,
             induced_edges,
             "filtered_nodes".to_string(),
-            None, // TODO: Fix graph reference later
+            Some(slf.into()),
         ))
     }
     
     /// Filter edges using EdgeFilter object or string query
-    fn filter_edges(&mut self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+    fn filter_edges(mut slf: PyRefMut<Self>, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for EdgeFilter object first (most common case)
         let edge_filter = if let Ok(filter_obj) = filter.extract::<PyEdgeFilter>() {
             // Direct EdgeFilter object - fastest path
@@ -699,14 +715,14 @@ impl PyGraph {
             ));
         };
         
-        let filtered_edges = self.inner.find_edges(edge_filter)
+        let filtered_edges = slf.inner.find_edges(edge_filter)
             .map_err(graph_error_to_py_err)?;
         
         // Calculate nodes that are connected by the filtered edges
         use std::collections::HashSet;
         let mut nodes = HashSet::new();
         for &edge_id in &filtered_edges {
-            if let Ok((source, target)) = self.inner.edge_endpoints(edge_id) {
+            if let Ok((source, target)) = slf.inner.edge_endpoints(edge_id) {
                 nodes.insert(source);
                 nodes.insert(target);
             }
@@ -718,7 +734,7 @@ impl PyGraph {
             node_vec,
             filtered_edges,
             "filtered_edges".to_string(),
-            None, // TODO: Fix graph reference later
+            Some(slf.into()),
         ))
     }
     

@@ -116,10 +116,31 @@ pub struct Graph {
 }
 
 impl Graph {
-    /// Create a new empty graph with default settings
+    /// Create a new empty graph with default settings (undirected by default)
     pub fn new() -> Self {
-        let config = GraphConfig::new();
-        let pool = Rc::new(RefCell::new(GraphPool::new()));
+        Self::new_with_type(crate::types::GraphType::default())
+    }
+    
+    /// Create a new empty graph with specified directionality
+    /// 
+    /// # Arguments
+    /// * `graph_type` - Whether the graph is directed or undirected
+    /// 
+    /// # Examples
+    /// ```
+    /// use groggy::api::Graph;
+    /// use groggy::types::GraphType;
+    /// 
+    /// // Create a directed graph (like NetworkX DiGraph)
+    /// let directed_graph = Graph::new_with_type(GraphType::Directed);
+    /// 
+    /// // Create an undirected graph (like NetworkX Graph)  
+    /// let undirected_graph = Graph::new_with_type(GraphType::Undirected);
+    /// ```
+    pub fn new_with_type(graph_type: crate::types::GraphType) -> Self {
+        let mut config = GraphConfig::new();
+        config.graph_type = graph_type;
+        let pool = Rc::new(RefCell::new(GraphPool::new_with_type(graph_type)));
         Self {
             space: GraphSpace::new(pool.clone(), 0), // base state = 0
             pool,
@@ -133,9 +154,23 @@ impl Graph {
         }
     }
     
+    /// Create a new directed graph (like NetworkX DiGraph)
+    /// 
+    /// This is a convenience method equivalent to `new_with_type(GraphType::Directed)`
+    pub fn new_directed() -> Self {
+        Self::new_with_type(crate::types::GraphType::Directed)
+    }
+    
+    /// Create a new undirected graph (like NetworkX Graph)
+    /// 
+    /// This is a convenience method equivalent to `new_with_type(GraphType::Undirected)`
+    pub fn new_undirected() -> Self {
+        Self::new_with_type(crate::types::GraphType::Undirected)
+    }
+    
     /// Create a graph with custom configuration
     pub fn with_config(config: GraphConfig) -> Self {
-        let pool = Rc::new(RefCell::new(GraphPool::new()));
+        let pool = Rc::new(RefCell::new(GraphPool::new_with_type(config.graph_type)));
         Self {
             space: GraphSpace::new(pool.clone(), 0), // base state = 0
             pool,
@@ -158,6 +193,21 @@ impl Graph {
             feature: "load_from_path".to_string(),
             tracking_issue: None,
         })
+    }
+    
+    /// Get the graph type (directed or undirected)
+    pub fn graph_type(&self) -> crate::types::GraphType {
+        self.config.graph_type
+    }
+    
+    /// Check if this graph is directed
+    pub fn is_directed(&self) -> bool {
+        matches!(self.config.graph_type, crate::types::GraphType::Directed)
+    }
+    
+    /// Check if this graph is undirected
+    pub fn is_undirected(&self) -> bool {
+        matches!(self.config.graph_type, crate::types::GraphType::Undirected)
     }
     
     /*
