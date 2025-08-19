@@ -493,19 +493,28 @@ impl GraphPool {
         is_node: bool
     ) -> Vec<(NodeId, Option<&AttrValue>)> {
         
-        // Get the columnar attribute storage
+        // Get the columnar attribute storage once
         let attr_column = if is_node {
             self.node_attributes.get(attr_name)
         } else {
             self.edge_attributes.get(attr_name)
         };
         
-        // Bulk retrieval with vectorized access pattern
+        // Early return if column doesn't exist
+        let column = match attr_column {
+            Some(col) => col,
+            None => return entity_indices.iter().map(|(id, _)| (*id, None)).collect()
+        };
+        
+        // Get direct access to values slice to avoid repeated column access
+        let values_slice = column.as_slice();
+        
+        // Bulk retrieval with optimized access pattern
         entity_indices
             .iter()
             .map(|(entity_id, index_opt)| {
                 let attr_value = index_opt
-                    .and_then(|index| attr_column?.values.get(index));
+                    .and_then(|index| values_slice.get(index));
                 (*entity_id, attr_value)
             })
             .collect()
