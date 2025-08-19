@@ -13,6 +13,9 @@
 
 use crate::core::change_tracker::ChangeTracker;
 use crate::core::pool::GraphPool;
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::sync::Arc;
 use crate::core::space::GraphSpace;
 use crate::core::history::{HistoryForest, HistoricalView, CommitDiff};
 use crate::core::query::{QueryEngine, NodeFilter, EdgeFilter};
@@ -63,7 +66,8 @@ pub struct Graph {
     */
     /// Attribute storage - holds columnar data for node and edge attributes
     /// This is where the actual attribute data lives
-    pool: GraphPool,
+    /// Wrapped in Rc<RefCell<>> for interior mutability access from GraphSpace
+    pool: Rc<RefCell<GraphPool>>,
     
     /*
     === VERSION CONTROL SYSTEM ===
@@ -115,14 +119,15 @@ impl Graph {
     /// Create a new empty graph with default settings
     pub fn new() -> Self {
         let config = GraphConfig::new();
+        let pool = Rc::new(RefCell::new(GraphPool::new()));
         Self {
-            pool: GraphPool::new(),
+            space: GraphSpace::new(pool.clone(), 0), // base state = 0
+            pool,
             history: HistoryForest::new(),
             current_branch: "main".to_string(),
             current_commit: 0,
             query_engine: QueryEngine::new(),
             traversal_engine: TraversalEngine::new(),
-            space: GraphSpace::new(0), // base state = 0
             change_tracker: ChangeTracker::new(),
             config,
         }
@@ -130,14 +135,15 @@ impl Graph {
     
     /// Create a graph with custom configuration
     pub fn with_config(config: GraphConfig) -> Self {
+        let pool = Rc::new(RefCell::new(GraphPool::new()));
         Self {
-            pool: GraphPool::new(),
+            space: GraphSpace::new(pool.clone(), 0), // base state = 0
+            pool,
             history: HistoryForest::new(),
             current_branch: "main".to_string(),
             current_commit: 0,
             query_engine: QueryEngine::new(),
             traversal_engine: TraversalEngine::new(),
-            space: GraphSpace::new(0), // base state = 0
             change_tracker: ChangeTracker::new(),
             config,
         }
@@ -169,7 +175,7 @@ impl Graph {
     /// 
     /// PERFORMANCE: O(1) amortized
     pub fn add_node(&mut self) -> NodeId {
-        let node_id = self.pool.add_node();        // Pool creates and stores
+        let node_id = self.pool.borrow_mut().add_node();        // Pool creates and stores
         self.space.activate_node(node_id);         // Space tracks as active
         self.change_tracker.record_node_addition(node_id);  // Track change for commit
         node_id
@@ -179,7 +185,7 @@ impl Graph {
     /// OPTIMIZED: True bulk operation using vectorized pool operations
     pub fn add_nodes(&mut self, count: usize) -> Vec<NodeId> {
         // Use optimized bulk pool operation
-        let (_start_id, _end_id, node_ids) = self.pool.add_nodes_bulk(count);
+        let (_start_id, _end_id, node_ids) = self.pool.borrow_mut().add_nodes_bulk(count);
         
         // Use optimized bulk space activation  
         self.space.activate_nodes(node_ids.clone());
@@ -201,7 +207,7 @@ impl Graph {
         if !self.space.contains_node(source) || !self.space.contains_node(target) {
             return Err(GraphError::node_not_found(source, "add edge"));
         }
-        let edge_id = self.pool.add_edge(source, target);  // Pool creates and stores
+        let edge_id = self.pool.borrow_mut().add_edge(source, target);  // Pool creates and stores
         self.space.activate_edge(edge_id, source, target); // Space tracks as active
         self.change_tracker.record_edge_addition(edge_id, source, target); // Track change
         Ok(edge_id)
@@ -223,7 +229,7 @@ impl Graph {
         }
         
         // Use optimized bulk pool operation
-        let edge_ids = self.pool.add_edges(&valid_edges);
+        let edge_ids = self.pool.borrow_mut().add_edges(&valid_edges);
         
         // Use optimized bulk space activation
         self.space.activate_edges(edge_ids.clone());
@@ -310,7 +316,7 @@ impl Graph {
         let old_index = self.space.get_node_attr_index(node, &attr);
         
         // 3. Pool stores value and returns new index (is_node = true)
-        let new_index = self.pool.set_attr(attr.clone(), value, true);
+        let new_index = self.pool.borrow_mut().set_attr(attr.clone(), value, true);
         
         // 4. Space updates current mapping
         self.space.set_node_attr_index(node, attr.clone(), new_index);
@@ -335,7 +341,7 @@ impl Graph {
         }
         
         // Use optimized vectorized pool operation
-        let index_changes = self.pool.set_bulk_attrs(attrs_values, true);
+        let index_changes = self.pool.borrow_mut().set_bulk_attrs(attrs_values, true);
         
         // Update space attribute indices in bulk
         for (attr_name, entity_indices) in index_changes {
@@ -370,7 +376,7 @@ impl Graph {
         let old_index = self.space.get_edge_attr_index(edge, &attr);
         
         // 3. Pool stores value and returns new index (is_node = false)
-        let new_index = self.pool.set_attr(attr.clone(), value, false);
+        let new_index = self.pool.borrow_mut().set_attr(attr.clone(), value, false);
         
         // 4. Space updates current mapping
         self.space.set_edge_attr_index(edge, attr.clone(), new_index);
@@ -393,7 +399,7 @@ impl Graph {
         }
         
         // Use optimized vectorized pool operation
-        let index_changes = self.pool.set_bulk_attrs(attrs_values, false);
+        let index_changes = self.pool.borrow_mut().set_bulk_attrs(attrs_values, false);
         
         // Update space attribute indices in bulk
         for (attr_name, entity_indices) in index_changes {
@@ -426,7 +432,7 @@ impl Graph {
         // Get the current index for this attribute from space
         if let Some(index) = self.space.get_attr_index(node, attr, true) {
             // Get the value from pool using the index
-            Ok(self.pool.get_attr_by_index(attr, index, true).cloned())
+            Ok(self.pool.borrow().get_attr_by_index(attr, index, true).cloned())
         } else {
             Ok(None)  // Attribute not set for this node
         }
@@ -449,7 +455,7 @@ impl Graph {
         // Get the current index for this attribute from space
         if let Some(index) = self.space.get_attr_index(edge, attr, false) {
             // Get the value from pool using the index
-            Ok(self.pool.get_attr_by_index(attr, index, false).cloned())
+            Ok(self.pool.borrow().get_attr_by_index(attr, index, false).cloned())
         } else {
             Ok(None)  // Attribute not set for this edge
         }
@@ -474,7 +480,7 @@ impl Graph {
         let attr_indices = self.space.get_node_attr_indices(node);
         
         for (attr_name, index) in attr_indices {
-            if let Some(value) = self.pool.get_attr_by_index(&attr_name, index, true) {
+            if let Some(value) = self.pool.borrow().get_attr_by_index(&attr_name, index, true) {
                 attributes.insert(attr_name, value.clone());
             }
         }
@@ -501,7 +507,7 @@ impl Graph {
         let attr_indices = self.space.get_edge_attr_indices(edge);
         
         for (attr_name, index) in attr_indices {
-            if let Some(value) = self.pool.get_attr_by_index(&attr_name, index, false) {
+            if let Some(value) = self.pool.borrow().get_attr_by_index(&attr_name, index, false) {
                 attributes.insert(attr_name, value.clone());
             }
         }
@@ -543,7 +549,7 @@ impl Graph {
         let mut results = Vec::with_capacity(requested_nodes.len());
         
         // Get the attribute column once (O(1) HashMap lookup)
-        if let Some(attr_column) = self.pool.get_node_attribute_column(attr) {
+        if let Some(attr_column) = self.pool.borrow().get_node_attribute_column(attr) {
             // Bulk process all nodes using direct column access
             for &node_id in requested_nodes {
                 if !self.space.contains_node(node_id) {
@@ -568,7 +574,7 @@ impl Graph {
         let mut results = Vec::with_capacity(requested_edges.len());
         
         // Get the attribute column once (O(1) HashMap lookup)
-        if let Some(attr_column) = self.pool.get_edge_attribute_column(attr) {
+        if let Some(attr_column) = self.pool.borrow().get_edge_attribute_column(attr) {
             // Bulk process all edges using direct column access
             for &edge_id in requested_edges {
                 if !self.space.contains_edge(edge_id) {
@@ -600,7 +606,7 @@ impl Graph {
         let mut results = Vec::with_capacity(node_ids.len());
         
         // Get the attribute column once (O(1) HashMap lookup)
-        if let Some(attr_column) = self.pool.get_node_attribute_column(attr) {
+        if let Some(attr_column) = self.pool.borrow().get_node_attribute_column(attr) {
             // Process all active nodes using direct column access
             for node_id in node_ids {
                 if let Some(index) = self.space.get_node_attr_index(node_id, attr) {
@@ -623,7 +629,7 @@ impl Graph {
         let mut results = Vec::with_capacity(edge_ids.len());
         
         // Get the attribute column once (O(1) HashMap lookup)
-        if let Some(attr_column) = self.pool.get_edge_attribute_column(attr) {
+        if let Some(attr_column) = self.pool.borrow().get_edge_attribute_column(attr) {
             // Process all active edges using direct column access
             for edge_id in edge_ids {
                 if let Some(index) = self.space.get_edge_attr_index(edge_id, attr) {
@@ -697,29 +703,15 @@ impl Graph {
             });
         }
         
-        // Use cached columnar topology if available, otherwise fall back to individual edge lookups
-        if !self.space.is_topology_cache_dirty() {
-            // FAST PATH: Use cached columnar topology
-            let (_, sources, targets) = self.space.get_columnar_topology();
-            let mut count = 0;
-            for i in 0..sources.len() {
-                if sources[i] == node || targets[i] == node {
-                    count += 1;
-                }
+        // Get fresh topology snapshot
+        let (_, sources, targets, _) = self.space.snapshot(&*self.pool.borrow());
+        let mut count = 0;
+        for i in 0..sources.len() {
+            if sources[i] == node || targets[i] == node {
+                count += 1;
             }
-            Ok(count)
-        } else {
-            // SLOW PATH: Individual edge lookups (cache is dirty and we can't rebuild with immutable self)
-            let mut count = 0;
-            for edge_id in self.space.get_active_edges() {
-                if let Ok((source, target)) = self.edge_endpoints(*edge_id) {
-                    if source == node || target == node {
-                        count += 1;
-                    }
-                }
-            }
-            Ok(count)
         }
+        Ok(count)
     }
     
     /// Get the neighbors of a node
@@ -732,37 +724,16 @@ impl Graph {
             });
         }
         
-        // Use cached columnar topology if available, otherwise fall back to individual edge lookups
-        if !self.space.is_topology_cache_dirty() {
-            // FAST PATH: Use cached columnar topology  
-            let (_, sources, targets) = self.space.get_columnar_topology();
-            let mut neighbors = Vec::new();
-            for i in 0..sources.len() {
-                if sources[i] == node {
-                    neighbors.push(targets[i]);
-                } else if targets[i] == node {
-                    neighbors.push(sources[i]);
-                }
-            }
-            // Remove duplicates efficiently
-            if !neighbors.is_empty() {
-                neighbors.sort_unstable();
-                neighbors.dedup();
-            }
-            Ok(neighbors)
+        // Get fresh adjacency snapshot - much more efficient than columnar scan
+        let (_, _, _, neighbors_map) = self.space.snapshot(&*self.pool.borrow());
+        
+        if let Some(neighbors) = neighbors_map.get(&node) {
+            // Extract just the neighbor nodes (not the edge IDs)
+            let neighbor_nodes: Vec<NodeId> = neighbors.iter().map(|(neighbor, _)| *neighbor).collect();
+            Ok(neighbor_nodes)
         } else {
-            // SLOW PATH: Individual edge lookups (cache is dirty and we can't rebuild with immutable self)
-            let mut neighbors = Vec::new();
-            for edge_id in self.space.get_active_edges() {
-                if let Ok((source, target)) = self.edge_endpoints(*edge_id) {
-                    if source == node {
-                        neighbors.push(target);
-                    } else if target == node {
-                        neighbors.push(source);
-                    }
-                }
-            }
-            Ok(neighbors)
+            // Node exists but has no neighbors
+            Ok(Vec::new())
         }
     }
     
@@ -774,13 +745,14 @@ impl Graph {
     /// - targets[i] is the target NodeId of that edge
     ///
     /// This is used internally for optimized operations like subgraph edge calculation.
-    pub fn get_columnar_topology(&mut self) -> (&[EdgeId], &[NodeId], &[NodeId]) {
-        self.space.get_columnar_topology_with_rebuild(&self.pool)
+    pub fn get_columnar_topology(&self) -> (Arc<Vec<EdgeId>>, Arc<Vec<NodeId>>, Arc<Vec<NodeId>>) {
+        let (edge_ids, sources, targets, _) = self.space.snapshot(&*self.pool.borrow());
+        (edge_ids, sources, targets)
     }
     
     /// Get the endpoints of an edge
     pub fn edge_endpoints(&self, edge: EdgeId) -> Result<(NodeId, NodeId), GraphError> {
-        self.pool.get_edge_endpoints(edge)
+        self.pool.borrow().get_edge_endpoints(edge)
             .ok_or_else(|| GraphError::EdgeNotFound {
                 edge_id: edge,
                 operation: "get endpoints".to_string(),
@@ -792,14 +764,14 @@ impl Graph {
     
     /// Get basic statistics about the current graph
     pub fn statistics(&self) -> GraphStatistics {
-        let _pool_stats = self.pool.statistics();
+        let _pool_stats = self.pool.borrow().statistics();
         let _history_stats = self.history.statistics();
         
         // Accurate memory calculation using new memory monitoring
         // let memory_stats = self.memory_statistics();
         
         // Simple memory calculation to avoid stack overflow
-        let pool_stats = self.pool.statistics();
+        let pool_stats = self.pool.borrow().statistics();
         let history_stats = self.history.statistics();
         
         // Basic memory estimate
@@ -860,9 +832,9 @@ impl Graph {
         // This is a simplified estimate - in a real implementation,
         // we'd need access to pool internals or expose memory_usage() methods
         let attr_count = if is_node { 
-            self.pool.statistics().node_attribute_count 
+            self.pool.borrow().statistics().node_attribute_count 
         } else { 
-            self.pool.statistics().edge_attribute_count 
+            self.pool.borrow().statistics().edge_attribute_count 
         };
         
         // Rough estimate: assume average of 100 bytes per attribute value
@@ -933,7 +905,7 @@ impl Graph {
     fn calculate_compression_stats(&self) -> CompressionStatistics {
         // This would require querying the pool for compression ratios
         // For now, provide placeholder statistics
-        let pool_stats = self.pool.statistics();
+        let pool_stats = self.pool.borrow().statistics();
         let total_attributes = pool_stats.node_attribute_count + pool_stats.edge_attribute_count;
         
         CompressionStatistics {
@@ -1065,13 +1037,13 @@ impl Graph {
     
     /// Find nodes matching attribute criteria
     pub fn find_nodes(&mut self, filter: NodeFilter) -> Result<Vec<NodeId>, GraphError> {
-        self.query_engine.find_nodes_by_filter_with_space(&self.pool, &mut self.space, &filter)
+        self.query_engine.find_nodes_by_filter_with_space(&*self.pool.borrow(), &self.space, &filter)
             .map_err(|e| e.into())
     }
     
     /// Find edges matching attribute criteria
     pub fn find_edges(&mut self, filter: EdgeFilter) -> Result<Vec<EdgeId>, GraphError> {
-        self.query_engine.find_edges_by_filter_with_space(&self.pool, &self.space, &filter)
+        self.query_engine.find_edges_by_filter_with_space(&*self.pool.borrow(), &self.space, &filter)
             .map_err(|e| e.into())
     }
     
@@ -1083,31 +1055,31 @@ impl Graph {
     
     /// Perform Breadth-First Search from a starting node
     pub fn bfs(&mut self, start: NodeId, options: crate::core::traversal::TraversalOptions) -> Result<crate::core::traversal::TraversalResult, GraphError> {
-        self.traversal_engine.bfs(&self.pool, &mut self.space, start, options)
+        self.traversal_engine.bfs(&*self.pool.borrow(), &mut self.space, start, options)
             .map_err(|e| e.into())
     }
     
     /// Perform Depth-First Search from a starting node
     pub fn dfs(&mut self, start: NodeId, options: crate::core::traversal::TraversalOptions) -> Result<crate::core::traversal::TraversalResult, GraphError> {
-        self.traversal_engine.dfs(&self.pool, &mut self.space, start, options)
+        self.traversal_engine.dfs(&*self.pool.borrow(), &mut self.space, start, options)
             .map_err(|e| e.into())
     }
     
     /// Find shortest path between two nodes
     pub fn shortest_path(&mut self, start: NodeId, end: NodeId, options: crate::core::traversal::PathFindingOptions) -> Result<Option<crate::core::traversal::Path>, GraphError> {
-        self.traversal_engine.shortest_path(&self.pool, &mut self.space, start, end, options)
+        self.traversal_engine.shortest_path(&*self.pool.borrow(), &mut self.space, start, end, options)
             .map_err(|e| e.into())
     }
     
     /// Find all simple paths between two nodes
     pub fn all_paths(&mut self, start: NodeId, end: NodeId, max_length: usize) -> Result<Vec<crate::core::traversal::Path>, GraphError> {
-        self.traversal_engine.all_paths(&self.pool, &mut self.space, start, end, max_length)
+        self.traversal_engine.all_paths(&*self.pool.borrow(), &mut self.space, start, end, max_length)
             .map_err(|e| e.into())
     }
     
     /// Find all connected components in the graph
     pub fn connected_components(&mut self, options: crate::core::traversal::TraversalOptions) -> Result<crate::core::traversal::ConnectedComponentsResult, GraphError> {
-        self.traversal_engine.connected_components(&self.pool, &mut self.space, options)
+        self.traversal_engine.connected_components(&*self.pool.borrow(), &mut self.space, options)
             .map_err(|e| e.into())
     }
     
@@ -1165,20 +1137,20 @@ impl Graph {
     /// This is used during branch switching to restore the graph to a specific state
     fn reset_to_snapshot(&mut self, snapshot: crate::core::state::GraphSnapshot) -> Result<(), GraphError> {
         // 1. Clear current state
-        self.pool = crate::core::pool::GraphPool::new();
-        self.space = crate::core::space::GraphSpace::new(snapshot.state_id);
+        self.pool = Rc::new(RefCell::new(crate::core::pool::GraphPool::new()));
+        self.space = crate::core::space::GraphSpace::new(self.pool.clone(), snapshot.state_id);
         
         // 2. Restore nodes
         for &node_id in &snapshot.active_nodes {
             // Ensure node ID exists in pool
-            self.pool.ensure_node_id_exists(node_id);
+            self.pool.borrow_mut().ensure_node_id_exists(node_id);
             // Activate in space
             self.space.activate_node(node_id);
             
             // Restore node attributes
             if let Some(attrs) = snapshot.node_attributes.get(&node_id) {
                 for (attr_name, attr_value) in attrs {
-                    let index = self.pool.set_attr(attr_name.clone(), attr_value.clone(), true);
+                    let index = self.pool.borrow_mut().set_attr(attr_name.clone(), attr_value.clone(), true);
                     self.space.set_node_attr_index(node_id, attr_name.clone(), index);
                 }
             }
@@ -1187,14 +1159,14 @@ impl Graph {
         // 3. Restore edges
         for (&edge_id, &(source, target)) in &snapshot.edges {
             // Store topology in pool with specific ID
-            self.pool.add_edge_with_id(edge_id, source, target);
+            self.pool.borrow_mut().add_edge_with_id(edge_id, source, target);
             // Activate in space
             self.space.activate_edge(edge_id, source, target);
             
             // Restore edge attributes
             if let Some(attrs) = snapshot.edge_attributes.get(&edge_id) {
                 for (attr_name, attr_value) in attrs {
-                    let index = self.pool.set_attr(attr_name.clone(), attr_value.clone(), false);
+                    let index = self.pool.borrow_mut().set_attr(attr_name.clone(), attr_value.clone(), false);
                     self.space.set_edge_attr_index(edge_id, attr_name.clone(), index);
                 }
             }
@@ -1358,10 +1330,11 @@ impl Graph {
         }
         
         // BULK OPERATION 1: Get group_by attribute for all nodes at once (O(N))
-        let group_by_values = self.space.get_attributes_for_nodes(&self.pool, group_by_attr, &node_ids);
+        let pool_ref = self.pool.borrow();
+        let group_by_values = self.space.get_attributes_for_nodes(&*pool_ref, group_by_attr, &node_ids);
         
         // BULK OPERATION 2: Get aggregate attribute for all nodes at once (O(N))  
-        let aggregate_values = self.space.get_attributes_for_nodes(&self.pool, aggregate_attr, &node_ids);
+        let aggregate_values = self.space.get_attributes_for_nodes(&*pool_ref, aggregate_attr, &node_ids);
         
         // Create lookup maps for efficient access
         let group_by_map: std::collections::HashMap<NodeId, &AttrValue> = group_by_values
@@ -1411,41 +1384,41 @@ impl Graph {
 
     /// Generate adjacency matrix for the entire graph
     pub fn adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
-        AdjacencyMatrixBuilder::new().build_full_graph(&self.pool, &mut self.space)
+        AdjacencyMatrixBuilder::new().build_full_graph(&*self.pool.borrow(), &mut self.space)
     }
 
     /// Generate weighted adjacency matrix using specified edge attribute
     pub fn weighted_adjacency_matrix(&mut self, weight_attr: &str) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
             .matrix_type(MatrixType::Weighted { weight_attr: Some(weight_attr.to_string()) })
-            .build_full_graph(&self.pool, &mut self.space)
+            .build_full_graph(&*self.pool.borrow(), &mut self.space)
     }
 
     /// Generate dense adjacency matrix
     pub fn dense_adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
             .format(MatrixFormat::Dense)
-            .build_full_graph(&self.pool, &mut self.space)
+            .build_full_graph(&*self.pool.borrow(), &mut self.space)
     }
 
     /// Generate sparse adjacency matrix
     pub fn sparse_adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
             .format(MatrixFormat::Sparse)
-            .build_full_graph(&self.pool, &mut self.space)
+            .build_full_graph(&*self.pool.borrow(), &mut self.space)
     }
 
     /// Generate Laplacian matrix
     pub fn laplacian_matrix(&mut self, normalized: bool) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
             .matrix_type(MatrixType::Laplacian { normalized })
-            .build_full_graph(&self.pool, &mut self.space)
+            .build_full_graph(&*self.pool.borrow(), &mut self.space)
     }
 
     /// Generate adjacency matrix for a subgraph with specific nodes
     pub fn subgraph_adjacency_matrix(&mut self, node_ids: &[NodeId]) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
-            .build_subgraph(&self.pool, &mut self.space, node_ids)
+            .build_subgraph(&*self.pool.borrow(), &mut self.space, node_ids)
     }
 
     /// Generate custom adjacency matrix with full control
@@ -1462,9 +1435,9 @@ impl Graph {
             .compact_indexing(compact_indexing);
 
         if let Some(nodes) = node_ids {
-            builder.build_subgraph(&self.pool, &mut self.space, nodes)
+            builder.build_subgraph(&*self.pool.borrow(), &mut self.space, nodes)
         } else {
-            builder.build_full_graph(&self.pool, &mut self.space)
+            builder.build_full_graph(&*self.pool.borrow(), &mut self.space)
         }
     }
 }

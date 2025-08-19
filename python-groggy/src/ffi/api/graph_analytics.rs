@@ -50,27 +50,12 @@ impl PyGraphAnalytics {
             }
         }
         
-        // Convert core results to FFI wrappers - SIMPLE CONVERSION ONLY
+        // Convert core results to FFI wrappers - ZERO-COPY: just use pre-computed edges!
         for (i, component) in result.components.into_iter().enumerate() {
-            // Calculate induced edges efficiently using core's columnar topology
-            let component_nodes: std::collections::HashSet<NodeId> = component.nodes.iter().copied().collect();
-            let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
-            
-            let mut component_edges = Vec::new();
-            for j in 0..edge_ids.len() {
-                let edge_id = edge_ids[j];
-                let source = sources[j];
-                let target = targets[j];
-                
-                // Include edge if both endpoints are in this component
-                if component_nodes.contains(&source) && component_nodes.contains(&target) {
-                    component_edges.push(edge_id);
-                }
-            }
-            
+            // 🚀 PERFORMANCE: Use edges already computed by Rust core - no recomputation needed!
             let subgraph = PySubgraph::new(
                 component.nodes,
-                component_edges,
+                component.edges, // Use pre-computed induced edges from Rust core
                 format!("connected_component_{}", i),
                 Some(self.graph.clone()),
             );

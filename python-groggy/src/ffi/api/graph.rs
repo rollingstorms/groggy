@@ -644,9 +644,13 @@ impl PyGraph {
             ));
         };
         
+        let start = std::time::Instant::now();
         let filtered_nodes = self.inner.find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
+
+        let elapsed = start.elapsed();
         
+        let start = std::time::Instant::now();
         // O(k) Calculate induced edges using optimized core subgraph method
         use std::collections::HashSet;
         let node_set: HashSet<NodeId> = filtered_nodes.iter().copied().collect();
@@ -666,6 +670,8 @@ impl PyGraph {
                 induced_edges.push(edge_id);
             }
         }
+        
+        let elapsed = start.elapsed();
         
         Ok(PySubgraph::new(
             filtered_nodes,

@@ -36,11 +36,9 @@ WHAT DOESN'T BELONG HERE:
 */
 
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::rc::Rc;
-use std::cell::RefCell;
 use crate::types::{NodeId, EdgeId, AttrName, StateId};
-// NOTE: ChangeTracker import removed - Graph manages it directly now
 use crate::errors::GraphResult;
 use crate::core::pool::GraphPool;
 use crate::core::delta::DeltaObject;
@@ -55,7 +53,7 @@ pub struct TopologySnapshot {
     pub version: u64,
 }
 
-/// Internal cache state with interior mutability
+/// Internal cache state with RwLock for read-heavy access
 #[derive(Debug)]
 struct CacheState {
     built_version: u64,
@@ -102,71 +100,66 @@ impl CacheState {
 /// 4. Eventually committed to create new historical state
 #[derive(Debug)]
 pub struct GraphSpace {
-    
     /*
-    === ACTIVE SET TRACKING ===
-    GraphSpace only tracks which entities are currently active
+    === ACTIVE SETS - Plain containers (no RefCell) ===
     */
     
-    /// All currently active (not deleted) nodes with interior mutability
-    /// DESIGN: HashSet for O(1) contains() and fast iteration
-    active_nodes: RefCell<HashSet<NodeId>>,
+    /// All currently active (not deleted) nodes
+    active_nodes: HashSet<NodeId>,
     
-    /// All currently active (not deleted) edges with interior mutability  
-    /// DESIGN: HashSet for O(1) contains() and fast iteration
-    active_edges: RefCell<HashSet<EdgeId>>,
+    /// All currently active (not deleted) edges  
+    active_edges: HashSet<EdgeId>,
     
     /*
-    === UNIFIED CACHE SYSTEM ===
-    Single versioned cache with interior mutability for lock-free access
+    === POOL REFERENCE ===
     */
     
     /// Shared reference to the graph pool for topology rebuilding
-    pool: Rc<RefCell<GraphPool>>,
-    
-    /// Version counter with interior mutability - increments on structural changes
-    version: RefCell<u64>,
-    
-    /// Cache state with interior mutability for lock-free rebuilding
-    cache: RefCell<CacheState>,
+    pool: Rc<std::cell::RefCell<GraphPool>>,
     
     /*
-    === ATTRIBUTE INDEX MAPPINGS ===
-    Map entities to their current attribute indices in Pool columns
+    === VERSION COUNTER - Plain u64 ===
     */
     
-    /// Maps node -> attribute_name -> column_index with interior mutability
-    /// This is how we resolve "what is node X's current value for attribute Y"
-    node_attribute_indices: RefCell<HashMap<NodeId, HashMap<AttrName, usize>>>,
+    /// Version counter - increments on structural changes
+    version: u64,
     
-    /// Maps edge -> attribute_name -> column_index with interior mutability
-    /// Same pattern as nodes but for edges
-    edge_attribute_indices: RefCell<HashMap<EdgeId, HashMap<AttrName, usize>>>,
+    /*
+    === CACHE - RwLock for read-heavy, occasional write ===
+    */
+    
+    /// Cache state with RwLock for lock-free reads
+    cache: RwLock<CacheState>,
+    
+    /*
+    === ATTRIBUTE INDEX MAPPINGS - Plain HashMaps ===
+    */
+    
+    /// Maps attribute_name -> node -> column_index (OPTIMIZED: attribute-first for bulk filtering)
+    node_attribute_indices: HashMap<AttrName, HashMap<NodeId, usize>>,
+    
+    /// Maps attribute_name -> edge -> column_index (OPTIMIZED: attribute-first for bulk filtering)
+    edge_attribute_indices: HashMap<AttrName, HashMap<EdgeId, usize>>,
     
     /*
     === WORKSPACE METADATA ===
-    Information about this workspace state
     */
     
     /// Which historical state this workspace is based on
-    /// Used for computing deltas when committing
     base_state: StateId,
-    
-    // NOTE: ChangeTracker moved to Graph for cleaner separation
-    // Graph coordinates between Space (current state) and ChangeTracker (deltas)
 }
 
 impl GraphSpace {
     /// Create a new empty graph space 
-    pub fn new(pool: Rc<RefCell<GraphPool>>, base_state: StateId) -> Self {
+    pub fn new(pool: Rc<std::cell::RefCell<GraphPool>>, base_state: StateId) -> Self {
         Self {
-            active_nodes: RefCell::new(HashSet::new()),
-            active_edges: RefCell::new(HashSet::new()),
+            active_nodes: HashSet::new(),
+            active_edges: HashSet::new(),
             pool,
-            version: RefCell::new(1), // Start at 1 so empty cache (version 0) is immediately stale
-            cache: RefCell::new(CacheState::new()),
-            node_attribute_indices: RefCell::new(HashMap::new()),
-            edge_attribute_indices: RefCell::new(HashMap::new()),
+            version: 1, // Start at 1 so empty cache (version 0) is immediately stale
+            cache: RwLock::new(CacheState::new()),
+            node_attribute_indices: HashMap::new(),
+            edge_attribute_indices: HashMap::new(),
             base_state,
         }
     }
@@ -177,95 +170,72 @@ impl GraphSpace {
     Legacy methods for external activation/deactivation
     */
 
-    /// Add a node to the active set (called by Graph.add_node())
-    pub fn activate_node(&self, node_id: NodeId) {
-        self.active_nodes.borrow_mut().insert(node_id);
-        // NOTE: Graph calls ChangeTracker directly for cleaner separation
+    /// Add a node to the active set (&mut self)
+    pub fn activate_node(&mut self, node_id: NodeId) {
+        self.active_nodes.insert(node_id);
     }
 
     
-    /// Bulk activate nodes from Vec (BULK OPTIMIZED for arbitrary IDs)
-    /// 
-    /// PERFORMANCE: Single HashSet::extend call instead of individual inserts
-    pub fn activate_nodes(&self, nodes: Vec<NodeId>) {
-        let mut active_nodes = self.active_nodes.borrow_mut();
-        // Pre-grow HashSet
-        active_nodes.reserve(nodes.len());
-        
-        // Single bulk extend operation
-        active_nodes.extend(nodes);
+    /// Bulk activate nodes (&mut self - PERFORMANCE: single extend call)
+    pub fn activate_nodes<I: IntoIterator<Item = NodeId>>(&mut self, nodes: I) {
+        self.active_nodes.extend(nodes);
     }
 
-    /// Remove multiple nodes from the active set (called by Graph.remove_nodes())
-    pub fn deactivate_nodes(&self, nodes: &[NodeId]) {
-        self.active_nodes.borrow_mut().retain(|node| !nodes.contains(node));
-        // Also remove all attribute indices for these nodes
-        let mut node_attrs = self.node_attribute_indices.borrow_mut();
-        for node in nodes {
-            node_attrs.remove(node);
+    /// Remove multiple nodes from the active set (&mut self)
+    pub fn deactivate_nodes(&mut self, nodes: &[NodeId]) {
+        let to_remove: HashSet<NodeId> = nodes.iter().copied().collect();
+        self.active_nodes.retain(|n| !to_remove.contains(n));
+        // Remove nodes from all attribute indices
+        for (_, nodes_map) in self.node_attribute_indices.iter_mut() {
+            for node_id in &to_remove {
+                nodes_map.remove(node_id);
+            }
         }
-        // NOTE: Graph calls ChangeTracker directly for cleaner separation
     }
 
-    /// Remove a node from the active set (called by Graph.remove_node())
-    pub fn deactivate_node(&self, node_id: NodeId) {
-        self.active_nodes.borrow_mut().remove(&node_id);
-        // Also remove all attribute indices for this node
-        self.node_attribute_indices.borrow_mut().remove(&node_id);
-        // NOTE: Graph calls ChangeTracker directly for cleaner separation
-    }
-
-    /// Add an edge to the active set (called by Graph.add_edge())
-    pub fn activate_edge(&self, edge_id: EdgeId, _source: NodeId, _target: NodeId) {
-        self.active_edges.borrow_mut().insert(edge_id);
-        
-        // Increment version to invalidate cache lazily
-        *self.version.borrow_mut() += 1;
-        // NOTE: Graph calls ChangeTracker directly for cleaner separation
-    }
-
-    /// Remove an edge from the active set (called by Graph.remove_edge())
-    pub fn deactivate_edge(&self, edge_id: EdgeId) {
-        self.active_edges.borrow_mut().remove(&edge_id);
-        // Also remove all attribute indices for this edge
-        self.edge_attribute_indices.borrow_mut().remove(&edge_id);
-        
-        // Increment version to invalidate cache lazily
-        *self.version.borrow_mut() += 1;
-        
-        // NOTE: Graph calls ChangeTracker directly for cleaner separation
-    }
-    
-    /// Bulk activate edges with pre-allocation (BULK OPTIMIZED)
-    /// 
-    /// PERFORMANCE: Single HashSet operation with capacity management
-    pub fn activate_edges(&self, edges: Vec<EdgeId>) {
-        let mut active_edges = self.active_edges.borrow_mut();
-        // Pre-grow HashSet to prevent rehashing
-        active_edges.reserve(edges.len());
-        
-        // Single bulk extend operation
-        active_edges.extend(&edges);
-        
-        // Increment version to invalidate cache lazily
-        // Single version bump for entire bulk operation
-        *self.version.borrow_mut() += 1;
-    }
-    
-
-    /// Remove multiple edges from the active set (called by Graph.remove_edges())
-    pub fn deactivate_edges(&self, edges: &[EdgeId]) {
-        self.active_edges.borrow_mut().retain(|edge| !edges.contains(edge));
-        // Also remove all attribute indices for these edges
-        let mut edge_attrs = self.edge_attribute_indices.borrow_mut();
-        for edge in edges {
-            edge_attrs.remove(edge);
+    /// Remove a node from the active set (&mut self)
+    pub fn deactivate_node(&mut self, node_id: NodeId) {
+        self.active_nodes.remove(&node_id);
+        // Remove node from all attribute indices
+        for (_, nodes) in self.node_attribute_indices.iter_mut() {
+            nodes.remove(&node_id);
         }
-        
-        // Increment version to invalidate cache lazily
-        // Single version bump for entire bulk operation
-        *self.version.borrow_mut() += 1;
-        // NOTE: Graph calls ChangeTracker directly for cleaner separation
+    }
+
+    /// Add an edge to the active set (&mut self - increments version for topology cache invalidation)
+    pub fn activate_edge(&mut self, edge_id: EdgeId, _source: NodeId, _target: NodeId) {
+        self.active_edges.insert(edge_id);
+        self.version += 1; // invalidate topology cache
+    }
+
+    /// Remove an edge from the active set (&mut self)
+    pub fn deactivate_edge(&mut self, edge_id: EdgeId) {
+        self.active_edges.remove(&edge_id);
+        // Remove edge from all attribute indices
+        for (_, edges) in self.edge_attribute_indices.iter_mut() {
+            edges.remove(&edge_id);
+        }
+        self.version += 1;
+    }
+    
+    /// Bulk activate edges (&mut self)
+    pub fn activate_edges<I: IntoIterator<Item = EdgeId>>(&mut self, edges: I) {
+        self.active_edges.extend(edges);
+        self.version += 1;
+    }
+    
+
+    /// Remove multiple edges from the active set (&mut self)
+    pub fn deactivate_edges(&mut self, edges: &[EdgeId]) {
+        let to_remove: HashSet<EdgeId> = edges.iter().copied().collect();
+        self.active_edges.retain(|e| !to_remove.contains(e));
+        // Remove edges from all attribute indices
+        for (_, edges_map) in self.edge_attribute_indices.iter_mut() {
+            for edge_id in &to_remove {
+                edges_map.remove(edge_id);
+            }
+        }
+        self.version += 1;
     }
 
     /*
@@ -274,80 +244,126 @@ impl GraphSpace {
     Graph coordinates between Space (current state) and ChangeTracker (deltas)
     */
     
-    /// Update the current attribute index for any entity (called by Graph after Pool storage)
-    pub fn set_attr_index<T>(&self, entity_id: T, attr_name: AttrName, new_index: usize, is_node: bool) 
+    /// Update the current attribute index for any entity (&mut self)
+    pub fn set_attr_index<T>(&mut self, entity_id: T, attr_name: AttrName, new_index: usize, is_node: bool) 
     where T: Into<usize> + Copy {
         let id = entity_id.into();
         if is_node {
             self.node_attribute_indices
-                .borrow_mut()
-                .entry(id)
-                .or_insert_with(HashMap::new)
-                .insert(attr_name, new_index);
+                .entry(attr_name)
+                .or_default()
+                .insert(id as NodeId, new_index);
         } else {
             self.edge_attribute_indices
-                .borrow_mut()
-                .entry(id)
-                .or_insert_with(HashMap::new)
-                .insert(attr_name, new_index);
+                .entry(attr_name)
+                .or_default()
+                .insert(id as EdgeId, new_index);
         }
     }
     
-    /// Get current attribute index for any entity (used by Graph for change tracking)
+    /// Get current attribute index for any entity (&self - read-only)
     pub fn get_attr_index<T>(&self, entity_id: T, attr_name: &AttrName, is_node: bool) -> Option<usize> 
     where T: Into<usize> + Copy {
         let id = entity_id.into();
         if is_node {
             self.node_attribute_indices
-                .borrow()
-                .get(&id)
-                .and_then(|attrs| attrs.get(attr_name))
+                .get(attr_name)
+                .and_then(|nodes| nodes.get(&(id as NodeId)))
                 .copied()
         } else {
             self.edge_attribute_indices
-                .borrow()
-                .get(&id)
-                .and_then(|attrs| attrs.get(attr_name))
+                .get(attr_name)
+                .and_then(|edges| edges.get(&(id as EdgeId)))
                 .copied()
         }
     }
     
-    /// Convenience method: Get current attribute index for a node
+    /// Get current attribute index for a node (&self - read-only)
     pub fn get_node_attr_index(&self, node_id: NodeId, attr_name: &AttrName) -> Option<usize> {
-        self.get_attr_index(node_id, attr_name, true)
-    }
-    
-    /// Convenience method: Set current attribute index for a node
-    pub fn set_node_attr_index(&self, node_id: NodeId, attr_name: AttrName, new_index: usize) {
-        self.set_attr_index(node_id, attr_name, new_index, true)
-    }
-    
-    /// Convenience method: Get current attribute index for an edge
-    pub fn get_edge_attr_index(&self, edge_id: EdgeId, attr_name: &AttrName) -> Option<usize> {
-        self.get_attr_index(edge_id, attr_name, false)
-    }
-    
-    /// Convenience method: Set current attribute index for an edge  
-    pub fn set_edge_attr_index(&self, edge_id: EdgeId, attr_name: AttrName, new_index: usize) {
-        self.set_attr_index(edge_id, attr_name, new_index, false)
-    }
-    
-    /// Get all attribute names and indices for a node
-    pub fn get_node_attr_indices(&self, node_id: NodeId) -> HashMap<AttrName, usize> {
         self.node_attribute_indices
-            .borrow()
-            .get(&(node_id as usize))
-            .cloned()
-            .unwrap_or_default()
+            .get(attr_name)
+            .and_then(|nodes| nodes.get(&node_id))
+            .copied()
     }
     
-    /// Get all attribute names and indices for an edge
-    pub fn get_edge_attr_indices(&self, edge_id: EdgeId) -> HashMap<AttrName, usize> {
+    /// Get specific attribute indices for multiple nodes in one call (ULTRA-OPTIMIZED: attribute-first)
+    /// 
+    /// PERFORMANCE: Single attribute lookup + fast node iteration instead of N*2 HashMap lookups
+    /// OLD: 50k * (node_lookup + attr_lookup) = 100k HashMap operations
+    /// NEW: 1 * attr_lookup + 50k * (direct HashMap get) = 1 + 50k operations
+    pub fn get_node_attr_indices_for_attr(&self, node_ids: &[NodeId], attr_name: &AttrName) -> Vec<(NodeId, Option<usize>)> {
+        // Single attribute lookup to get all nodes with this attribute
+        if let Some(attr_nodes) = self.node_attribute_indices.get(attr_name) {
+            // Fast iteration through requested nodes with direct HashMap access
+            node_ids
+                .iter()
+                .map(|&node_id| (node_id, attr_nodes.get(&node_id).copied()))
+                .collect()
+        } else {
+            // No nodes have this attribute - return all None
+            node_ids.iter().map(|&node_id| (node_id, None)).collect()
+        }
+    }
+    
+    /// Set current attribute index for a node (&mut self)
+    pub fn set_node_attr_index(&mut self, node_id: NodeId, attr_name: AttrName, new_index: usize) {
+        self.node_attribute_indices
+            .entry(attr_name)
+            .or_default()
+            .insert(node_id, new_index);
+    }
+    
+    /// Get current attribute index for an edge (&self - read-only)
+    pub fn get_edge_attr_index(&self, edge_id: EdgeId, attr_name: &AttrName) -> Option<usize> {
         self.edge_attribute_indices
-            .borrow()
-            .get(&(edge_id as usize))
-            .cloned()
-            .unwrap_or_default()
+            .get(attr_name)
+            .and_then(|edges| edges.get(&edge_id))
+            .copied()
+    }
+    
+    /// Set current attribute index for an edge (&mut self)
+    pub fn set_edge_attr_index(&mut self, edge_id: EdgeId, attr_name: AttrName, new_index: usize) {
+        self.edge_attribute_indices
+            .entry(attr_name)
+            .or_default()
+            .insert(edge_id, new_index);
+    }
+    
+    /// Get specific attribute indices for multiple edges in one call (ULTRA-OPTIMIZED: attribute-first)
+    pub fn get_edge_attr_indices_for_attr(&self, edge_ids: &[EdgeId], attr_name: &AttrName) -> Vec<(EdgeId, Option<usize>)> {
+        // Single attribute lookup to get all edges with this attribute
+        if let Some(attr_edges) = self.edge_attribute_indices.get(attr_name) {
+            // Fast iteration through requested edges with direct HashMap access
+            edge_ids
+                .iter()
+                .map(|&edge_id| (edge_id, attr_edges.get(&edge_id).copied()))
+                .collect()
+        } else {
+            // No edges have this attribute - return all None
+            edge_ids.iter().map(|&edge_id| (edge_id, None)).collect()
+        }
+    }
+    
+    /// Get all attribute names and indices for a node (&self - read-only)
+    pub fn get_node_attr_indices(&self, node_id: NodeId) -> HashMap<AttrName, usize> {
+        let mut result = HashMap::new();
+        for (attr_name, nodes) in &self.node_attribute_indices {
+            if let Some(&index) = nodes.get(&node_id) {
+                result.insert(attr_name.clone(), index);
+            }
+        }
+        result
+    }
+    
+    /// Get all attribute names and indices for an edge (&self - read-only)
+    pub fn get_edge_attr_indices(&self, edge_id: EdgeId) -> HashMap<AttrName, usize> {
+        let mut result = HashMap::new();
+        for (attr_name, edges) in &self.edge_attribute_indices {
+            if let Some(&index) = edges.get(&edge_id) {
+                result.insert(attr_name.clone(), index);
+            }
+        }
+        result
     }
 
     /*
@@ -355,75 +371,72 @@ impl GraphSpace {
     Bulk attribute operations for vectorized filtering
     */
     
-    /// Get attribute indices for all active nodes/edges in bulk (VECTORIZED)
-    /// 
-    /// PERFORMANCE: Single bulk operation replaces individual per-node lookups
-    /// This is the key enabler for columnar filtering operations
-    pub fn get_attribute_indices(&self, 
-        attr_name: &AttrName,
-        is_node: bool
-    ) -> Vec<(NodeId, Option<usize>)> {
-        
-        if is_node {
-            // Get all active nodes and their attribute indices in one operation
+    /// Get attribute indices for all active nodes (&self - ULTRA-OPTIMIZED: attribute-first)
+    pub fn get_attribute_indices_nodes(&self, attr_name: &AttrName) -> Vec<(NodeId, Option<usize>)> {
+        if let Some(attr_nodes) = self.node_attribute_indices.get(attr_name) {
             self.active_nodes
-                .borrow().iter()
-                .map(|&node_id| {
-                    let index = self.get_node_attr_index(node_id, attr_name);
-                    (node_id, index)
-                })
+                .iter()
+                .map(|&node_id| (node_id, attr_nodes.get(&node_id).copied()))
                 .collect()
         } else {
-            // Get all active edges and their attribute indices in one operation
-            self.active_edges
-                .borrow().iter()
-                .map(|&edge_id| {
-                    let index = self.get_edge_attr_index(edge_id, attr_name);
-                    (edge_id as NodeId, index)  // Cast EdgeId to NodeId for consistent interface
-                })
+            self.active_nodes
+                .iter()
+                .map(|&node_id| (node_id, None))
                 .collect()
         }
     }
     
-    /// Get attribute values for all active nodes/edges in columnar format
-    /// 
-    /// PERFORMANCE: This method combines index lookup + value retrieval in single bulk operation
-    /// Replaces the pattern: for node in nodes { get_index(); get_value() } 
-    pub fn get_attributes<'a>(&self, 
+    /// Get attribute indices for all active edges (&self - ULTRA-OPTIMIZED: attribute-first)
+    pub fn get_attribute_indices_edges(&self, attr_name: &AttrName) -> Vec<(EdgeId, Option<usize>)> {
+        if let Some(attr_edges) = self.edge_attribute_indices.get(attr_name) {
+            self.active_edges
+                .iter()
+                .map(|&edge_id| (edge_id, attr_edges.get(&edge_id).copied()))
+                .collect()
+        } else {
+            self.active_edges
+                .iter()
+                .map(|&edge_id| (edge_id, None))
+                .collect()
+        }
+    }
+    
+    /// Get attribute values for all active nodes in columnar format (&self - OPTIMIZED)
+    pub fn get_attributes_nodes<'a>(&self, 
         pool: &'a GraphPool, 
-        attr_name: &AttrName,
-        is_node: bool
+        attr_name: &AttrName
     ) -> Vec<(NodeId, Option<&'a crate::types::AttrValue>)> {
-        
-        // STEP 1: Get all indices for active entities in bulk
-        let entity_indices = self.get_attribute_indices(attr_name, is_node);
-        
-        // STEP 2: Bulk attribute retrieval from pool
-        pool.get_attribute_values(attr_name, &entity_indices, is_node)
+        let entity_indices = self.get_attribute_indices_nodes(attr_name);
+        pool.get_attribute_values(attr_name, &entity_indices, true)
+    }
+    
+    /// Get attribute values for all active edges in columnar format (&self - OPTIMIZED)
+    pub fn get_attributes_edges<'a>(&self, 
+        pool: &'a GraphPool, 
+        attr_name: &AttrName
+    ) -> Vec<(EdgeId, Option<&'a crate::types::AttrValue>)> {
+        let entity_indices = self.get_attribute_indices_edges(attr_name);
+        pool.get_attribute_values(attr_name, &entity_indices, false)
     }
 
-    /// Get nodes that have a specific attribute (REVERSE INDEX OPTIMIZATION)
+    /// Get nodes that have a specific attribute (ULTRA-OPTIMIZED: direct attribute lookup)
     /// 
-    /// PERFORMANCE: Instead of checking N nodes to see if they have an attribute,
-    /// find all nodes that have the attribute first (much faster for sparse attributes)
+    /// PERFORMANCE: Direct O(1) lookup + iteration instead of checking N nodes
+    /// OLD: Iterate all nodes, check if each has attribute
+    /// NEW: Direct lookup of attribute -> get all nodes with it
     pub fn get_nodes_with_attribute(&self, attr_name: &AttrName) -> Vec<NodeId> {
-        let node_attrs = self.node_attribute_indices.borrow();
-        let mut nodes_with_attr = Vec::new();
-        
-        // Iterate through all nodes that have any attributes
-        for (&node_id, attrs) in node_attrs.iter() {
-            if attrs.contains_key(attr_name) {
-                nodes_with_attr.push(node_id as NodeId);
-            }
+        if let Some(attr_nodes) = self.node_attribute_indices.get(attr_name) {
+            attr_nodes.keys().copied().collect()
+        } else {
+            Vec::new()
         }
-        
-        nodes_with_attr
     }
 
     /// Get attribute values for a specific subset of nodes in bulk (ULTRA-OPTIMIZED)
     /// 
     /// PERFORMANCE: Eliminates all HashMap lookups for large sparse attribute queries
     /// This is what the query system should actually use
+    /// Get attribute values for specific nodes (ULTRA-OPTIMIZED: no RefCell churn)
     pub fn get_attributes_for_nodes<'a>(
         &self,
         pool: &'a GraphPool,
@@ -431,82 +444,34 @@ impl GraphSpace {
         node_ids: &[NodeId]
     ) -> Vec<(NodeId, Option<&'a crate::types::AttrValue>)> {
         
-        if node_ids.len() < 1000 {
-            // Direct lookup is fine for small sets - use original optimized version
-            let node_attrs = self.node_attribute_indices.borrow();
-            let entity_indices: Vec<(NodeId, Option<usize>)> = node_ids
-                .iter()
-                .map(|&node_id| {
-                    let index = node_attrs
-                        .get(&(node_id as usize))
-                        .and_then(|attrs| attrs.get(attr_name))
-                        .copied();
-                    (node_id, index)
-                })
-                .collect();
-            drop(node_attrs);
-            
-            pool.get_attribute_values(attr_name, &entity_indices, true)
-        } else {
-            // RADICAL OPTIMIZATION: For large sets, completely avoid individual HashMap lookups
-            // Build result by iterating through attribute index ONCE instead of N lookups
-            
-            let node_attrs = self.node_attribute_indices.borrow();
-            let query_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
-            let mut entity_indices = Vec::new();
-            
-            // Single pass through attribute indices - O(A) where A = nodes with any attributes
-            // Instead of O(N) where N = query size
-            for (&node_id_usize, attrs) in node_attrs.iter() {
-                let node_id = node_id_usize as NodeId;
-                if query_set.contains(&node_id) {
-                    if let Some(&index) = attrs.get(attr_name) {
-                        entity_indices.push((node_id, Some(index)));
-                    }
-                }
-            }
-            drop(node_attrs);
-            
-            if entity_indices.is_empty() {
-                // No nodes in our query have this attribute
-                return node_ids.iter().map(|&id| (id, None)).collect();
-            }
-            
-            // Get attribute values for nodes that have the attribute
-            let attr_results = pool.get_attribute_values(attr_name, &entity_indices, true);
-            let attr_map: std::collections::HashMap<NodeId, Option<&'a crate::types::AttrValue>> = 
-                attr_results.into_iter().collect();
-            
-            // Build final result maintaining order
-            node_ids.iter().map(|&node_id| {
-                (node_id, attr_map.get(&node_id).copied().flatten())
-            }).collect()
-        }
+        let start_time = std::time::Instant::now();
+        
+        // PERFORMANCE: Bulk index lookup in single call
+        let entity_indices = self.get_node_attr_indices_for_attr(node_ids, attr_name);
+        
+        let index_time = start_time.elapsed();
+        let start_time = std::time::Instant::now();
+        
+        // Single pool call for bulk attribute retrieval
+        let values = pool.get_attribute_values(attr_name, &entity_indices, true);
+        
+        let pool_time = start_time.elapsed();
+        
+        values
     }
 
-    /// Get attribute values for a specific subset of edges in bulk (NEW OPTIMIZED METHOD)
+    /// Get attribute values for specific edges (ULTRA-OPTIMIZED: no RefCell churn)
     pub fn get_attributes_for_edges<'a>(
         &self,
         pool: &'a GraphPool,
         attr_name: &AttrName,
         edge_ids: &[EdgeId]
-    ) -> Vec<(NodeId, Option<&'a crate::types::AttrValue>)> {
-        // STEP 1: Single borrow for bulk index lookup - fixes O(n) RefCell borrows
-        let edge_attrs = self.edge_attribute_indices.borrow();
-        let entity_indices: Vec<(NodeId, Option<usize>)> = edge_ids
-            .iter()
-            .map(|&edge_id| {
-                let index = edge_attrs
-                    .get(&(edge_id as usize))
-                    .and_then(|attrs| attrs.get(attr_name))
-                    .copied();
-                (edge_id as NodeId, index) // Cast for consistent interface
-            })
-            .collect();
-        // Drop the borrow before calling pool
-        drop(edge_attrs);
+    ) -> Vec<(EdgeId, Option<&'a crate::types::AttrValue>)> {
         
-        // STEP 2: Single bulk retrieval from pool
+        // PERFORMANCE: Bulk index lookup in single call
+        let entity_indices = self.get_edge_attr_indices_for_attr(edge_ids, attr_name);
+
+        // Single pool call for bulk attribute retrieval
         pool.get_attribute_values(attr_name, &entity_indices, false)
     }
 
@@ -515,34 +480,34 @@ impl GraphSpace {
     Basic information about what's currently active
     */
 
-    /// Get the number of active nodes
+    /// Get the number of active nodes (&self - read-only)
     pub fn node_count(&self) -> usize {
-        self.active_nodes.borrow().len()
+        self.active_nodes.len()
     }
 
-    /// Get the number of active edges
+    /// Get the number of active edges (&self - read-only)
     pub fn edge_count(&self) -> usize {
-        self.active_edges.borrow().len()
+        self.active_edges.len()
     }
 
-    /// Check if a node is currently active
+    /// Check if a node is currently active (&self - read-only)
     pub fn contains_node(&self, node_id: NodeId) -> bool {
-        self.active_nodes.borrow().contains(&node_id)
+        self.active_nodes.contains(&node_id)
     }
 
-    /// Check if an edge is currently active
+    /// Check if an edge is currently active (&self - read-only)
     pub fn contains_edge(&self, edge_id: EdgeId) -> bool {
-        self.active_edges.borrow().contains(&edge_id)
+        self.active_edges.contains(&edge_id)
     }
 
-    /// Get all active node IDs (for iteration)
+    /// Get all active node IDs (compatibility with old RefCell API)
     pub fn get_active_nodes(&self) -> HashSet<NodeId> {
-        self.active_nodes.borrow().clone()
+        self.active_nodes.clone()
     }
     
-    /// Get all active edge IDs (for iteration)
+    /// Get all active edge IDs (compatibility with old RefCell API)
     pub fn get_active_edges(&self) -> HashSet<EdgeId> {
-        self.active_edges.borrow().clone()
+        self.active_edges.clone()
     }
 
     /*
@@ -550,14 +515,14 @@ impl GraphSpace {
     Simple active set queries - topology handled by Graph coordinator
     */
 
-    /// Get all active node IDs as a vector
+    /// Get all active node IDs as a vector (&self - read-only)
     pub fn node_ids(&self) -> Vec<NodeId> {
-        self.active_nodes.borrow().iter().copied().collect()
+        self.active_nodes.iter().copied().collect()
     }
 
-    /// Get all active edge IDs as a vector
+    /// Get all active edge IDs as a vector (&self - read-only)
     pub fn edge_ids(&self) -> Vec<EdgeId> {
-        self.active_edges.borrow().iter().copied().collect()
+        self.active_edges.iter().copied().collect()
     }
     
     /*
@@ -565,21 +530,29 @@ impl GraphSpace {
     Single method to get consistent topology and adjacency data with interior mutability
     */
     
-    /// Get consistent snapshot of topology and adjacency data
-    /// 
-    /// PERFORMANCE: Rebuilds cache atomically only when version has changed
-    /// All returned data is guaranteed to be consistent with each other
+    /// Get consistent snapshot of topology and adjacency data (RwLock for read-heavy access)
     pub fn snapshot(&self, pool: &GraphPool) -> (Arc<Vec<EdgeId>>, Arc<Vec<NodeId>>, Arc<Vec<NodeId>>, Arc<HashMap<NodeId, Vec<(NodeId, EdgeId)>>>) {
-        let current_version = *self.version.borrow();
+        let current_version = self.version;
+
+        // Fast path: read-lock and try to get cached snapshot
+        {
+            let cache = self.cache.read().unwrap();
+            if let Some(snapshot) = cache.try_get_snapshot(current_version) {
+                return (snapshot.edge_ids, snapshot.sources, snapshot.targets, snapshot.neighbors);
+            }
+        }
+
+        // Slow path: write-lock and rebuild if still stale
+        let mut cache = self.cache.write().unwrap();
         
-        // Fast path: try to get existing snapshot
-        if let Some(snapshot) = self.cache.borrow().try_get_snapshot(current_version) {
+        // Double-check after acquiring write lock (another thread might have rebuilt)
+        if let Some(snapshot) = cache.try_get_snapshot(current_version) {
             return (snapshot.edge_ids, snapshot.sources, snapshot.targets, snapshot.neighbors);
         }
-        
-        // Slow path: rebuild cache
-        let (edge_ids, sources, targets) = self.rebuild_topology(pool);
 
+        // Rebuild topology cache
+        let (edge_ids, sources, targets) = self.rebuild_topology(pool);
+        
         // Build adjacency map from columnar topology (O(E))
         let mut neighbors = HashMap::<NodeId, Vec<(NodeId, EdgeId)>>::new();
         for (i, &edge_id) in edge_ids.iter().enumerate() {
@@ -589,7 +562,7 @@ impl GraphSpace {
             neighbors.entry(v).or_default().push((u, edge_id));
         }
 
-        // Create new snapshot
+        // Create Arc-wrapped data for zero-copy sharing
         let edge_ids_arc = Arc::new(edge_ids);
         let sources_arc = Arc::new(sources);
         let targets_arc = Arc::new(targets);
@@ -597,50 +570,37 @@ impl GraphSpace {
 
         let snapshot = TopologySnapshot {
             edge_ids: edge_ids_arc.clone(),
-            sources: sources_arc.clone(), 
+            sources: sources_arc.clone(),
             targets: targets_arc.clone(),
             neighbors: neighbors_arc.clone(),
             version: current_version,
         };
 
-        // Update cache and return tuple
-        self.cache.borrow_mut().set_snapshot(snapshot);
+        cache.set_snapshot(snapshot);
         (edge_ids_arc, sources_arc, targets_arc, neighbors_arc)
     }
     
-    /// Rebuild columnar topology from active edges
-    /// 
-    /// PERFORMANCE: O(E) where E = number of active edges
-    /// Returns owned vectors that will be wrapped in Arc
+    /// Rebuild columnar topology from active edges (PERFORMANCE: O(E))
     fn rebuild_topology(&self, pool: &GraphPool) -> (Vec<EdgeId>, Vec<NodeId>, Vec<NodeId>) {
-        let mut edge_ids = Vec::new();
-        let mut sources = Vec::new();
-        let mut targets = Vec::new();
-        
-        // Get active edges with interior mutability
-        let active_edges = self.active_edges.borrow();
-        
-        // Reserve capacity
-        let edge_count = active_edges.len();
-        edge_ids.reserve(edge_count);
-        sources.reserve(edge_count);
-        targets.reserve(edge_count);
-        
-        // Rebuild from active edges
-        for &edge_id in active_edges.iter() {
+        let edge_count = self.active_edges.len();
+        let mut edge_ids = Vec::with_capacity(edge_count);
+        let mut sources = Vec::with_capacity(edge_count);
+        let mut targets = Vec::with_capacity(edge_count);
+
+        for &edge_id in &self.active_edges {
             if let Some((source, target)) = pool.get_edge_endpoints(edge_id) {
                 edge_ids.push(edge_id);
                 sources.push(source);
                 targets.push(target);
             }
         }
-        
+
         (edge_ids, sources, targets)
     }
     
     /// Get current version (for debugging/monitoring)
     pub fn get_version(&self) -> u64 {
-        *self.version.borrow()
+        self.version
     }
     
     /// NOTE: Topology queries (neighbors, degree, connectivity) now handled by
@@ -674,24 +634,41 @@ impl GraphSpace {
         self.base_state
     }
 
-    /// Create a delta object representing current changes
-    /// USAGE: Called when committing changes to history
+    /// Create a delta object representing current changes (placeholder)
     pub fn create_change_delta(&self, _pool: &GraphPool) -> DeltaObject {
-        // NOTE: Graph creates delta via ChangeTracker now - Space doesn't track changes
-        // Return empty delta as placeholder
         DeltaObject::empty()
     }
-
-    /// Clear all uncommitted changes (reset to base state)
-    /// WARNING: This loses all work since the last commit
-    pub fn reset_hard(&self) -> GraphResult<()> {
-        // NOTE: Graph manages change state now - Space just clears active sets
-        self.active_nodes.borrow_mut().clear();
-        self.active_edges.borrow_mut().clear();
-        self.node_attribute_indices.borrow_mut().clear();
-        self.edge_attribute_indices.borrow_mut().clear();
-        Ok(())
+    
+    /*
+    === COMPATIBILITY METHODS FOR OLD REFCELL API ===
+    */
+    
+    /// Generic attribute index getter (compatibility with old API)
+    pub fn get_attribute_indices(&self, attr_name: &AttrName, is_node: bool) -> Vec<(NodeId, Option<usize>)> {
+        if is_node {
+            self.get_attribute_indices_nodes(attr_name)
+        } else {
+            // Convert EdgeId result to NodeId for compatibility
+            self.get_attribute_indices_edges(attr_name)
+                .into_iter()
+                .map(|(edge_id, index)| (edge_id as NodeId, index))
+                .collect()
+        }
     }
+    
+    /// Generic attribute values getter (compatibility with old API)
+    pub fn get_attributes<'a>(&self, pool: &'a GraphPool, attr_name: &AttrName, is_node: bool) -> Vec<(NodeId, Option<&'a crate::types::AttrValue>)> {
+        if is_node {
+            self.get_attributes_nodes(pool, attr_name)
+        } else {
+            // Convert EdgeId result to NodeId for compatibility
+            self.get_attributes_edges(pool, attr_name)
+                .into_iter()
+                .map(|(edge_id, value)| (edge_id as NodeId, value))
+                .collect()
+        }
+    }
+
 }
 
 /*
