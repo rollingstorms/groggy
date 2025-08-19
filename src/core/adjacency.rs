@@ -311,11 +311,11 @@ impl AdjacencyMatrixBuilder {
         let size = nodes.len();
         
         // Get graph topology (separate from matrix building to avoid borrow conflicts)
-        let (edge_ids, sources, targets) = space.get_columnar_topology();
+        let (edge_ids_ref, sources_ref, targets_ref, _) = space.snapshot(pool);
         // Clone the vectors to avoid borrow conflicts
-        let edge_ids: Vec<EdgeId> = edge_ids.to_vec();
-        let sources: Vec<NodeId> = sources.to_vec();
-        let targets: Vec<NodeId> = targets.to_vec();
+        let edge_ids: Vec<EdgeId> = edge_ids_ref.as_ref().clone();
+        let sources: Vec<NodeId> = sources_ref.as_ref().clone();
+        let targets: Vec<NodeId> = targets_ref.as_ref().clone();
         
         match self.format {
             MatrixFormat::Dense => {

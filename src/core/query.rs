@@ -4,7 +4,7 @@ use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
 use crate::core::pool::GraphPool;
 use crate::core::space::GraphSpace;
 use crate::errors::GraphResult;
-// use rayon::prelude::*; // Commented out - RefCell not compatible with parallel processing
+use rayon::prelude::*; // Re-enabled - RefCell eliminated, now safe for parallel processing
 use std::collections::HashSet;
 
 /// The main query engine for filtering operations
@@ -21,7 +21,7 @@ impl QueryEngine {
     pub fn find_nodes_by_filter_with_space(
         &mut self,
         pool: &GraphPool,
-        space: &mut GraphSpace,
+        space: &GraphSpace, // Changed from &mut to &
         filter: &NodeFilter
     ) -> GraphResult<Vec<NodeId>> {
         self.filter_nodes(pool, space, filter)
@@ -31,21 +31,21 @@ impl QueryEngine {
     pub fn filter_nodes(
         &mut self,
         pool: &GraphPool,
-        space: &mut GraphSpace,
+        space: &GraphSpace, // Changed from &mut to &
         filter: &NodeFilter
     ) -> GraphResult<Vec<NodeId>> {
-        let active_nodes: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
+        let active_nodes: Vec<NodeId> = space.node_ids(); // Direct call, no RefCell clone
         
         // Use bulk columnar filtering for maximum performance
         self.filter_nodes_columnar(&active_nodes, pool, space, filter)
     }
 
-    /// Columnar filtering on any subset of nodes - THE CORE METHOD
+    /// Columnar filtering on any subset of nodes - THE CORE METHOD (ULTRA-OPTIMIZED)
     fn filter_nodes_columnar(
         &self,
         nodes: &[NodeId],
         pool: &GraphPool,
-        space: &mut GraphSpace,
+        space: &GraphSpace, // Changed from &mut to &
         filter: &NodeFilter
     ) -> GraphResult<Vec<NodeId>> {
         let start_time = std::time::Instant::now();
@@ -57,10 +57,24 @@ impl QueryEngine {
                 let attr_start = std::time::Instant::now();
                 let node_attr_pairs = space.get_attributes_for_nodes(pool, name, nodes);
                 let attr_time = attr_start.elapsed();
-                eprintln!("🔍 NODE COLUMNAR: get_attributes_for_nodes took {:?} for {} nodes", attr_time, nodes.len());
                 
-                // ULTRA-OPTIMIZED: Direct iterator processing with minimal allocations
-                matching_nodes.extend(
+                // ULTRA-OPTIMIZED: Parallel iterator processing with minimal allocations
+                let parallel_results: Vec<NodeId> = if node_attr_pairs.len() > 1000 {
+                    // Use parallel processing for large datasets
+                    node_attr_pairs
+                        .into_par_iter()
+                        .filter_map(|(node_id, attr_opt)| {
+                            attr_opt.and_then(|attr_value| {
+                                if filter.matches(attr_value) {
+                                    Some(node_id)
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .collect()
+                } else {
+                    // Use sequential processing for small datasets to avoid overhead
                     node_attr_pairs
                         .into_iter()
                         .filter_map(|(node_id, attr_opt)| {
@@ -72,9 +86,10 @@ impl QueryEngine {
                                 }
                             })
                         })
-                );
+                        .collect()
+                };
+                matching_nodes.extend(parallel_results);
                 let total_time = start_time.elapsed();
-                eprintln!("🔍 NODE COLUMNAR: AttributeFilter completed in {:?}, {} matches", total_time, matching_nodes.len());
                 Ok(matching_nodes)
             }
             
@@ -84,30 +99,72 @@ impl QueryEngine {
                 let attr_start = std::time::Instant::now();
                 let node_attr_pairs = space.get_attributes_for_nodes(pool, name, nodes);
                 let attr_time = attr_start.elapsed();
-                eprintln!("🔍 NODE COLUMNAR: get_attributes_for_nodes took {:?} for {} nodes (AttributeEquals)", attr_time, nodes.len());
                 
-                for (node_id, attr_opt) in node_attr_pairs {
-                    if let Some(attr_value) = attr_opt {
-                        if *attr_value == *value {
-                            matching_nodes.push(node_id);
-                        }
-                    }
-                }
+                // PARALLEL: Use parallel processing for large datasets
+                let parallel_results: Vec<NodeId> = if node_attr_pairs.len() > 1000 {
+                    node_attr_pairs
+                        .into_par_iter()
+                        .filter_map(|(node_id, attr_opt)| {
+                            if let Some(attr_value) = attr_opt {
+                                if *attr_value == *value {
+                                    Some(node_id)
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        })
+                        .collect()
+                } else {
+                    node_attr_pairs
+                        .into_iter()
+                        .filter_map(|(node_id, attr_opt)| {
+                            if let Some(attr_value) = attr_opt {
+                                if *attr_value == *value {
+                                    Some(node_id)
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        })
+                        .collect()
+                };
+                matching_nodes.extend(parallel_results);
                 let total_time = start_time.elapsed();
-                eprintln!("🔍 NODE COLUMNAR: AttributeEquals completed in {:?}, {} matches", total_time, matching_nodes.len());
                 Ok(matching_nodes)
             }
             
             NodeFilter::HasAttribute { name } => {
-                // OPTIMIZED: Use bulk attribute lookup and pre-allocate
-                let mut results = Vec::with_capacity(nodes.len() / 2);
+                // OPTIMIZED: Use bulk attribute lookup with parallel processing
                 let node_attr_pairs = space.get_attributes_for_nodes(pool, name, nodes);
                 
-                for (node_id, attr_opt) in node_attr_pairs {
-                    if attr_opt.is_some() {
-                        results.push(node_id);
-                    }
-                }
+                let results: Vec<NodeId> = if node_attr_pairs.len() > 1000 {
+                    node_attr_pairs
+                        .into_par_iter()
+                        .filter_map(|(node_id, attr_opt)| {
+                            if attr_opt.is_some() {
+                                Some(node_id)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect()
+                } else {
+                    node_attr_pairs
+                        .into_iter()
+                        .filter_map(|(node_id, attr_opt)| {
+                            if attr_opt.is_some() {
+                                Some(node_id)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect()
+                };
+                
                 Ok(results)
             }
             
@@ -359,11 +416,11 @@ impl QueryEngine {
     pub fn filter_edges(
         &mut self,
         pool: &GraphPool,
-        space: &GraphSpace,
+        space: &GraphSpace, // Already &
         filter: &EdgeFilter
     ) -> GraphResult<Vec<EdgeId>> {
         let start_time = std::time::Instant::now();
-        let active_edges: Vec<EdgeId> = space.get_active_edges().iter().copied().collect();
+        let active_edges: Vec<EdgeId> = space.edge_ids(); // Direct call, no RefCell clone
         let _num_edges = active_edges.len();
         
         let results: Vec<EdgeId> = active_edges
@@ -379,7 +436,7 @@ impl QueryEngine {
     pub fn find_edges_by_filter_with_space(
         &mut self,
         pool: &GraphPool,
-        space: &GraphSpace,
+        space: &GraphSpace, // Already &
         filter: &EdgeFilter
     ) -> GraphResult<Vec<EdgeId>> {
         self.filter_edges(pool, space, filter)

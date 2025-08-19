@@ -15,7 +15,7 @@ use std::cmp::Ordering;
 use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
 use crate::core::pool::GraphPool;
 use crate::core::space::GraphSpace;
-use crate::core::query::{NodeFilter, EdgeFilter};
+use crate::core::query::{NodeFilter, EdgeFilter, QueryEngine};
 use crate::errors::GraphResult;
 // use rayon::prelude::*; // TODO: Re-enable when parallel traversal is implemented
 
@@ -43,13 +43,8 @@ pub struct TraversalEngine {
     /// Statistics tracking
     stats: TraversalStats,
     
-    /// Adjacency cache for fast neighbor lookups
-    #[allow(dead_code)] // TODO: Implement adjacency caching
-    adjacency_cache: AdjacencyCache,
-    
-    /// Filter result cache to avoid repeated evaluations
-    #[allow(dead_code)] // TODO: Implement filter result caching
-    filter_cache: FilterCache,
+    /// Query engine for bulk filtering operations
+    query_engine: QueryEngine,
 }
 
 /// Adjacency list cache for fast neighbor lookups
@@ -158,8 +153,7 @@ impl TraversalEngine {
             state_pool: TraversalStatePool::new(),
             config: TraversalConfig::default(),
             stats: TraversalStats::new(),
-            adjacency_cache: AdjacencyCache::new(),
-            filter_cache: FilterCache::new(10000), // Cache up to 10k results
+            query_engine: QueryEngine::new(),
         }
     }
     
@@ -169,8 +163,7 @@ impl TraversalEngine {
             state_pool: TraversalStatePool::new(),
             config,
             stats: TraversalStats::new(),
-            adjacency_cache: AdjacencyCache::new(),
-            filter_cache: FilterCache::new(10000), // Cache up to 10k results
+            query_engine: QueryEngine::new(),
         }
     }
     
@@ -186,18 +179,22 @@ impl TraversalEngine {
     pub fn bfs(
         &mut self,
         pool: &GraphPool,
-        space: &mut GraphSpace,
+        space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
         start: NodeId,
         options: TraversalOptions
     ) -> GraphResult<TraversalResult> {
         let start_time = std::time::Instant::now();
         
-        // Use cached adjacency map - only rebuild if topology changed!
-        let topology_generation = space.get_topology_generation();
-        if !self.adjacency_cache.is_up_to_date(topology_generation) {
-            let (edge_ids, sources, targets) = space.get_columnar_topology();
-            self.adjacency_cache.rebuild(edge_ids, sources, targets, topology_generation);
-        }        let mut visited = HashSet::new();
+        // Get fresh snapshot with guaranteed consistent adjacency data
+        let (_, _, _, neighbors) = space.snapshot(pool);
+        
+        // 🚀 PERFORMANCE: Use Arc reference directly - no O(E) clone needed!
+        // The Arc allows zero-copy sharing of the adjacency map
+        
+        // 🚀 PERFORMANCE: Skip bulk pre-filtering - filter nodes individually during traversal
+        // This is much faster for sparse traversals that only visit a small subset of nodes
+        
+        let mut visited = HashSet::new();
         let mut queue = VecDeque::new();
         let mut result_nodes = Vec::new();
         let mut result_edges = Vec::new();
@@ -211,9 +208,9 @@ impl TraversalEngine {
         let mut max_depth = 0;
         
         while let Some((current_node, level)) = queue.pop_front() {
-            // Check termination conditions
+            // Check termination conditions - skip nodes beyond max depth
             if let Some(max_depth_limit) = options.max_depth {
-                if level >= max_depth_limit {
+                if level > max_depth_limit {
                     continue;
                 }
             }
@@ -227,16 +224,25 @@ impl TraversalEngine {
             result_nodes.push(current_node);
             max_depth = max_depth.max(level);
             
-            // Find neighbors using cached adjacency map - O(degree) per node - FAST!
-            if let Some(neighbors) = self.adjacency_cache.get_neighbors(current_node) {
-                for &(neighbor, edge_id) in neighbors {
-                    if !visited.contains(&neighbor) {
-                        // Simple filter check without caching overhead
-                        if self.should_visit_node(pool, space, neighbor, &options)? {
-                            visited.insert(neighbor);
-                            queue.push_back((neighbor, level + 1));
-                            result_edges.push(edge_id);
-                            levels.insert(neighbor, level + 1);
+            // Find neighbors using fresh adjacency map - O(1) lookup, O(degree) iteration - FAST!
+            if let Some(node_neighbors) = neighbors.get(&current_node) {
+                // Check if we can still explore deeper before processing neighbors
+                let next_level = level + 1;
+                let can_explore_deeper = match options.max_depth {
+                    Some(max_depth_limit) => next_level <= max_depth_limit,
+                    None => true,
+                };
+                
+                if can_explore_deeper {
+                    for &(neighbor, edge_id) in node_neighbors {
+                        if !visited.contains(&neighbor) {
+                            // 🚀 FAST: Individual node filtering - only check nodes we actually encounter
+                            if self.should_visit_node(pool, space, neighbor, &options)? {
+                                visited.insert(neighbor);
+                                queue.push_back((neighbor, next_level));
+                                result_edges.push(edge_id);
+                                levels.insert(neighbor, next_level);
+                            }
                         }
                     }
                 }
@@ -270,30 +276,42 @@ impl TraversalEngine {
     pub fn dfs(
         &mut self,
         pool: &GraphPool,
-        space: &mut GraphSpace,
+        space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
         start: NodeId,
         options: TraversalOptions
     ) -> GraphResult<TraversalResult> {
         let start_time = std::time::Instant::now();
         
-        // Use cached adjacency map - only rebuild if topology changed!
-        let topology_generation = space.get_topology_generation();
-        if !self.adjacency_cache.is_up_to_date(topology_generation) {
-            let (edge_ids, sources, targets) = space.get_columnar_topology();
-            self.adjacency_cache.rebuild(edge_ids, sources, targets, topology_generation);
-        }        let mut visited = HashSet::new();
+        // Get fresh snapshot with guaranteed consistent adjacency data
+        let (_, _, _, neighbors) = space.snapshot(pool);
+        
+        // 🚀 PERFORMANCE: Use Arc reference directly - no O(E) clone needed!
+        // The Arc allows zero-copy sharing of the adjacency map
+        
+        // 🚀 PERFORMANCE: Skip bulk pre-filtering - filter nodes individually during traversal
+        // This is much faster for sparse traversals that only visit a small subset of nodes
+        
+        let mut visited = HashSet::new();
         let mut stack = Vec::new();
         let mut result_nodes = Vec::new();
         let mut result_edges = Vec::new();
+        let mut edge_set = HashSet::new(); // O(1) duplicate check instead of O(n)
         let mut discovery_order = HashMap::new();
         let mut discovery_count = 0;
         
-        // Initialize DFS
-        stack.push(start);
+        // Initialize DFS with depth tracking
+        stack.push((start, 0)); // (node, depth)
         
-        while let Some(current_node) = stack.pop() {
+        while let Some((current_node, depth)) = stack.pop() {
             if !visited.contains(&current_node) {
-                // Simple filter check without caching overhead
+                // Check depth limit before processing
+                if let Some(max_depth_limit) = options.max_depth {
+                    if depth > max_depth_limit {
+                        continue;
+                    }
+                }
+                
+                // 🚀 FAST: Individual node filtering - only check nodes we actually encounter
                 if self.should_visit_node(pool, space, current_node, &options)? {
                     visited.insert(current_node);
                     result_nodes.push(current_node);
@@ -307,14 +325,23 @@ impl TraversalEngine {
                         }
                     }
                     
-                    // Get neighbors from cached adjacency map - O(1) lookup - FAST!
-                    if let Some(neighbors) = self.adjacency_cache.get_neighbors(current_node) {
-                        // Add in reverse order for consistent DFS traversal
-                        for &(neighbor, edge_id) in neighbors.iter().rev() {
-                            if !visited.contains(&neighbor) {
-                                stack.push(neighbor);
-                                if !result_edges.contains(&edge_id) {
-                                    result_edges.push(edge_id);
+                    // Get neighbors from fresh adjacency map - O(1) lookup - FAST!
+                    if let Some(node_neighbors) = neighbors.get(&current_node) {
+                        // Check if we can explore deeper
+                        let next_depth = depth + 1;
+                        let can_explore_deeper = match options.max_depth {
+                            Some(max_depth_limit) => next_depth <= max_depth_limit,
+                            None => true,
+                        };
+                        
+                        if can_explore_deeper {
+                            // Add in reverse order for consistent DFS traversal
+                            for &(neighbor, edge_id) in node_neighbors.iter().rev() {
+                                if !visited.contains(&neighbor) {
+                                    stack.push((neighbor, next_depth));
+                                    if edge_set.insert(edge_id) { // O(1) check + insert
+                                        result_edges.push(edge_id);
+                                    }
                                 }
                             }
                         }
@@ -355,7 +382,7 @@ impl TraversalEngine {
     pub fn shortest_path(
         &mut self,
         pool: &GraphPool,
-        space: &mut GraphSpace,
+        space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
         start: NodeId,
         end: NodeId,
         options: PathFindingOptions
@@ -375,10 +402,10 @@ impl TraversalEngine {
         heap.push(DijkstraNode { id: start, distance: 0.0 });
         
         // Get columnar topology with cache maintenance (make owned copies)
-        let (edge_ids_ref, sources_ref, targets_ref) = space.get_columnar_topology();
-        let edge_ids: Vec<EdgeId> = edge_ids_ref.to_vec();
-        let sources: Vec<NodeId> = sources_ref.to_vec();
-        let targets: Vec<NodeId> = targets_ref.to_vec();
+        let (edge_ids_ref, sources_ref, targets_ref, _) = space.snapshot(pool);
+        let edge_ids: Vec<EdgeId> = edge_ids_ref.as_ref().clone();
+        let sources: Vec<NodeId> = sources_ref.as_ref().clone();
+        let targets: Vec<NodeId> = targets_ref.as_ref().clone();
         
         while let Some(DijkstraNode { id: current, distance }) = heap.pop() {
             // Early termination if we reached the target
@@ -442,7 +469,7 @@ impl TraversalEngine {
     pub fn all_paths(
         &mut self,
         pool: &GraphPool,
-        space: &mut GraphSpace,
+        space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
         start: NodeId,
         end: NodeId,
         max_length: usize
@@ -475,30 +502,49 @@ impl TraversalEngine {
     pub fn connected_components(
         &mut self,
         pool: &GraphPool,
-        space: &mut GraphSpace,
+        space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
         options: TraversalOptions
     ) -> GraphResult<ConnectedComponentsResult> {
         let start_time = std::time::Instant::now();
         
-        // Use cached adjacency for optimal performance  
-        let topology_generation = space.get_topology_generation();
-        if !self.adjacency_cache.is_up_to_date(topology_generation) {
-            let (edge_ids, sources, targets) = space.get_columnar_topology();
-            self.adjacency_cache.rebuild(edge_ids, sources, targets, topology_generation);
-        }
-        
+        // 📊 TIMING: Step 1 - Get active nodes
+        let step1_start = std::time::Instant::now();
         let active_nodes: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
+        let step1_duration = step1_start.elapsed();
+        println!("⏱️  CC Step 1 (get active nodes): {:.4}s ({} nodes)", step1_duration.as_secs_f64(), active_nodes.len());
+        
+        // 📊 TIMING: Step 2 - Build adjacency snapshot
+        let step2_start = std::time::Instant::now();
+        let (_, _, _, neighbors) = space.snapshot(pool);
+        let step2_duration = step2_start.elapsed();
+        println!("⏱️  CC Step 2 (build adjacency): {:.4}s", step2_duration.as_secs_f64());
+        
+        // 🚀 PERFORMANCE: Use Arc reference directly - no O(E) clone needed!
+        // The Arc allows zero-copy sharing of the adjacency map
+        
+        // 📊 TIMING: Step 3 - Initialize data structures
+        let step3_start = std::time::Instant::now();
         let mut visited = HashSet::new();
         let mut components = Vec::new();
+        let step3_duration = step3_start.elapsed();
+        println!("⏱️  CC Step 3 (init structures): {:.4}s", step3_duration.as_secs_f64());
+        
+        // 📊 TIMING: Step 4 - Main component finding loop
+        let step4_start = std::time::Instant::now();
+        let mut bfs_time = std::time::Duration::ZERO;
+        let mut edge_computation_time = std::time::Duration::ZERO;
+        let mut component_count = 0;
         
         // BFS for each unvisited node - O(V + E) total
         for &start_node in &active_nodes {
             if !visited.contains(&start_node) {
+                // 🚀 FAST: Individual node filtering - only check nodes we actually encounter
                 if !self.should_visit_node(pool, space, start_node, &options)? {
                     continue;
                 }
                 
-                // BFS to find component
+                // 📊 TIMING: BFS to find component
+                let bfs_start = std::time::Instant::now();
                 let mut component_nodes = Vec::new();
                 let mut queue = VecDeque::new();
                 
@@ -508,10 +554,11 @@ impl TraversalEngine {
                 while let Some(current) = queue.pop_front() {
                     component_nodes.push(current);
                     
-                    // Use cached adjacency for optimal performance - get (neighbor, edge_id) pairs
-                    if let Some(neighbors) = self.adjacency_cache.get_neighbors(current) {
-                        for &(neighbor, _edge_id) in neighbors {
+                    // Use fresh adjacency for optimal performance - get (neighbor, edge_id) pairs
+                    if let Some(current_neighbors) = neighbors.get(&current) {
+                        for &(neighbor, _edge_id) in current_neighbors {
                             if !visited.contains(&neighbor) {
+                                // 🚀 FAST: Individual node filtering - only check nodes we actually encounter
                                 if self.should_visit_node(pool, space, neighbor, &options)? {
                                     visited.insert(neighbor);
                                     queue.push_back(neighbor);
@@ -520,29 +567,32 @@ impl TraversalEngine {
                         }
                     }
                 }
+                bfs_time += bfs_start.elapsed();
                 
                 if !component_nodes.is_empty() {
-                    // Calculate induced edges for this component
+                    // 📊 TIMING: Calculate induced edges for this component
+                    let edges_start = std::time::Instant::now();
                     let component_node_set: HashSet<NodeId> = component_nodes.iter().copied().collect();
                     let mut component_edges = Vec::new();
+                    let mut edge_set = HashSet::new(); // O(1) duplicate check instead of O(n)
                     
-                    // Use cached adjacency to find induced edges efficiently
-                    if let Some(_neighbors) = self.adjacency_cache.get_neighbors(start_node) {
-                        // For each node in the component, check its edges
-                        for &node in &component_nodes {
-                            if let Some(node_neighbors) = self.adjacency_cache.get_neighbors(node) {
-                                for &(neighbor, edge_id) in node_neighbors {
-                                    // Only include edge if both endpoints are in this component
-                                    // and we haven't already added this edge (avoid duplicates)
-                                    if component_node_set.contains(&neighbor) 
-                                        && node < neighbor // Avoid adding same edge twice
-                                        && !component_edges.contains(&edge_id) {
-                                        component_edges.push(edge_id);
-                                    }
+                    // Use fresh adjacency to find induced edges efficiently
+                    // For each node in the component, check its edges
+                    for &node in &component_nodes {
+                        if let Some(node_neighbors) = neighbors.get(&node) {
+                            for &(neighbor, edge_id) in node_neighbors {
+                                // Only include edge if both endpoints are in this component
+                                // and we haven't already added this edge (avoid duplicates)
+                                if component_node_set.contains(&neighbor) 
+                                    && node < neighbor // Avoid adding same edge twice
+                                    && edge_set.insert(edge_id) { // O(1) check + insert
+                                    component_edges.push(edge_id);
                                 }
                             }
                         }
                     }
+                    edge_computation_time += edges_start.elapsed();
+                    component_count += 1;
                     
                     components.push(ConnectedComponent {
                         nodes: component_nodes.clone(),
@@ -554,10 +604,19 @@ impl TraversalEngine {
             }
         }
         
-        // Sort components by size (largest first) for consistent results
+        let step4_duration = step4_start.elapsed();
+        println!("⏱️  CC Step 4 (main loop): {:.4}s ({} components found)", step4_duration.as_secs_f64(), component_count);
+        println!("⏱️    BFS time: {:.4}s", bfs_time.as_secs_f64());
+        println!("⏱️    Edge computation time: {:.4}s", edge_computation_time.as_secs_f64());
+        
+        // 📊 TIMING: Step 5 - Sort components by size
+        let step5_start = std::time::Instant::now();
         components.sort_unstable_by(|a, b| b.size.cmp(&a.size));
+        let step5_duration = step5_start.elapsed();
+        println!("⏱️  CC Step 5 (sort components): {:.4}s", step5_duration.as_secs_f64());
         
         let duration = start_time.elapsed();
+        println!("⏱️  CC TOTAL TIME: {:.4}s", duration.as_secs_f64());
         self.stats.record_traversal("connected_components".to_string(), components.len(), duration);
         
         let total_components = components.len();
@@ -575,8 +634,9 @@ impl TraversalEngine {
     === HELPER METHODS ===
     Internal utility methods for traversal algorithms
     */
-    
-    /// Check if a node should be visited based on filter options
+
+    /// Check if a node should be visited based on traversal options (FAST: individual filtering)
+    /// This is much faster than bulk pre-filtering for sparse traversals
     fn should_visit_node(
         &self,
         pool: &GraphPool,
@@ -591,7 +651,7 @@ impl TraversalEngine {
         }
     }
     
-    /// Inline node filter matching (since QueryEngine method is private)
+    /// Inline node filter matching for maximum performance
     fn should_visit_node_inline(
         &self,
         pool: &GraphPool,
@@ -642,23 +702,27 @@ impl TraversalEngine {
         }
     }
     
-    /// Check if traversal should terminate based on options
-    #[allow(dead_code)] // TODO: Implement termination conditions
-    fn should_terminate(&self, options: &TraversalOptions, depth: usize, nodes_found: usize) -> bool {
-        if let Some(max_depth) = options.max_depth {
-            if depth >= max_depth {
-                return true;
-            }
+    /// Pre-filter nodes using bulk operations for O(n) performance instead of O(n²)
+    /// NOTE: This is slower for sparse traversals - kept for compatibility
+    fn get_eligible_nodes(
+        &mut self,
+        pool: &GraphPool,
+        space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
+        candidate_nodes: &[NodeId],
+        options: &TraversalOptions
+    ) -> GraphResult<HashSet<NodeId>> {
+        if let Some(ref filter) = options.node_filter {
+            // Use bulk filtering - O(n) instead of O(n²)
+            let filtered_nodes = self.query_engine.find_nodes_by_filter_with_space(pool, space, filter)?;
+            // Return intersection with candidate nodes - convert filtered to HashSet for O(1) lookups
+            let filtered_set: HashSet<NodeId> = filtered_nodes.into_iter().collect();
+            Ok(candidate_nodes.iter().copied().filter(|node| filtered_set.contains(node)).collect())
+        } else {
+            // No filter - all candidates are eligible, direct conversion is faster
+            Ok(candidate_nodes.iter().copied().collect())
         }
-        
-        if let Some(max_nodes) = options.max_nodes {
-            if nodes_found >= max_nodes {
-                return true;
-            }
-        }
-        
-        false
     }
+  
     
     /// Get edge weight for pathfinding algorithms
     fn get_edge_weight(&self, pool: &GraphPool, space: &GraphSpace, edge_id: EdgeId, weight_attr: &Option<AttrName>) -> f64 {
@@ -689,7 +753,7 @@ impl TraversalEngine {
         start: NodeId,
         end: NodeId,
         pool: &GraphPool,
-        space: &mut GraphSpace
+        space: &GraphSpace // Changed to &GraphSpace (no longer mutable)
     ) -> GraphResult<Path> {
         let mut path_nodes = Vec::new();
         let mut path_edges = Vec::new();
@@ -738,8 +802,8 @@ impl TraversalEngine {
     }
     
     /// Find edge between two nodes (helper for path reconstruction)
-    fn find_edge_between(&self, pool: &GraphPool, space: &mut GraphSpace, node1: NodeId, node2: NodeId) -> GraphResult<Option<EdgeId>> {
-        let (edge_ids, sources, targets) = space.get_columnar_topology();
+    fn find_edge_between(&self, pool: &GraphPool, space: &GraphSpace, node1: NodeId, node2: NodeId) -> GraphResult<Option<EdgeId>> {
+        let (edge_ids, sources, targets, _) = space.snapshot(pool);
         
         for i in 0..sources.len() {
             if (sources[i] == node1 && targets[i] == node2) || 
@@ -755,7 +819,7 @@ impl TraversalEngine {
     fn find_all_paths_recursive(
         &mut self,
         pool: &GraphPool,
-        space: &mut GraphSpace,
+        space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
         current: NodeId,
         target: NodeId,
         max_length: usize,
@@ -795,7 +859,7 @@ impl TraversalEngine {
             });
         } else {
             // Continue exploring - get topology data
-            let (_edge_ids, sources, targets) = space.get_columnar_topology();
+            let (_edge_ids, sources, targets, _) = space.snapshot(pool);
             
             // Collect neighbors first to avoid borrowing conflicts
             let mut neighbors = Vec::new();
