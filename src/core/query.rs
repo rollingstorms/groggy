@@ -4,7 +4,7 @@ use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
 use crate::core::pool::GraphPool;
 use crate::core::space::GraphSpace;
 use crate::errors::GraphResult;
-use rayon::prelude::*;
+// use rayon::prelude::*; // Commented out - RefCell not compatible with parallel processing
 use std::collections::HashSet;
 
 /// The main query engine for filtering operations
@@ -27,36 +27,17 @@ impl QueryEngine {
         self.filter_nodes(pool, space, filter)
     }
 
-    /// Find nodes with filtering - PERFORMANCE OPTIMIZED using fast individual calls (like edges)
+    /// Find nodes with filtering - PERFORMANCE OPTIMIZED using bulk columnar operations
     pub fn filter_nodes(
         &mut self,
         pool: &GraphPool,
         space: &mut GraphSpace,
         filter: &NodeFilter
     ) -> GraphResult<Vec<NodeId>> {
-        let start_time = std::time::Instant::now();
         let active_nodes: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
-        let _num_nodes = active_nodes.len();
         
-        // Pre-fetch topology if needed for filter
-        let topology_data = match filter {
-            NodeFilter::DegreeRange { .. } | NodeFilter::HasNeighbor { .. } => {
-                let (edge_ids, sources, targets) = space.get_columnar_topology();
-                Some((edge_ids.to_vec(), sources.to_vec(), targets.to_vec()))
-            },
-            _ => None
-        };
-        
-        // 🚀 USE FAST INDIVIDUAL CALLS (same approach as edge filtering) instead of slow bulk method
-        let mut results = Vec::new();
-        for node_id in active_nodes {
-            if self.node_matches_filter_with_topology(node_id, pool, space, filter, &topology_data) {
-                results.push(node_id);
-            }
-        }
-        
-        let _total_time = start_time.elapsed();
-        Ok(results)
+        // Use bulk columnar filtering for maximum performance
+        self.filter_nodes_columnar(&active_nodes, pool, space, filter)
     }
 
     /// Columnar filtering on any subset of nodes - THE CORE METHOD
@@ -78,13 +59,20 @@ impl QueryEngine {
                 let attr_time = attr_start.elapsed();
                 eprintln!("🔍 NODE COLUMNAR: get_attributes_for_nodes took {:?} for {} nodes", attr_time, nodes.len());
                 
-                for (node_id, attr_opt) in node_attr_pairs {
-                    if let Some(attr_value) = attr_opt {
-                        if filter.matches(attr_value) {
-                            matching_nodes.push(node_id);
-                        }
-                    }
-                }
+                // ULTRA-OPTIMIZED: Direct iterator processing with minimal allocations
+                matching_nodes.extend(
+                    node_attr_pairs
+                        .into_iter()
+                        .filter_map(|(node_id, attr_opt)| {
+                            attr_opt.and_then(|attr_value| {
+                                if filter.matches(attr_value) {
+                                    Some(node_id)
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                );
                 let total_time = start_time.elapsed();
                 eprintln!("🔍 NODE COLUMNAR: AttributeFilter completed in {:?}, {} matches", total_time, matching_nodes.len());
                 Ok(matching_nodes)
@@ -147,26 +135,71 @@ impl QueryEngine {
                 Ok(result_set.into_iter().collect())
             }
             
-            _ => {
-                // 🚨 FALLBACK: This uses the slow individual filtering approach
-                eprintln!("⚠️ PERFORMANCE: Using fallback individual filtering for: {:?}", filter);
+            NodeFilter::DegreeRange { min, max } => {
+                // OPTIMIZED: Bulk degree calculation using columnar topology
+                let (_, sources, targets, _) = space.snapshot(pool);
+                let mut matching_nodes = Vec::with_capacity(nodes.len() / 4);
                 
-                // Pre-fetch topology if needed
-                let topology_data = match filter {
-                    NodeFilter::DegreeRange { .. } | NodeFilter::HasNeighbor { .. } => {
-                        let (edge_ids, sources, targets) = space.get_columnar_topology();
-                        Some((edge_ids.to_vec(), sources.to_vec(), targets.to_vec()))
-                    },
-                    _ => None
-                };
-                
-                let mut results = Vec::new();
+                // Count degrees for all nodes at once using columnar scan
                 for &node_id in nodes {
-                    if self.node_matches_filter_with_topology(node_id, pool, space, filter, &topology_data) {
-                        results.push(node_id);
+                    let mut degree = 0;
+                    for i in 0..sources.len() {
+                        if sources[i] == node_id || targets[i] == node_id {
+                            degree += 1;
+                        }
+                    }
+                    if degree >= *min && degree <= *max {
+                        matching_nodes.push(node_id);
                     }
                 }
-                Ok(results)
+                Ok(matching_nodes)
+            }
+            
+            NodeFilter::HasNeighbor { neighbor_id } => {
+                // OPTIMIZED: Bulk neighbor check using columnar topology
+                let (_, sources, targets, _) = space.snapshot(pool);
+                let mut matching_nodes = Vec::with_capacity(nodes.len() / 4);
+                
+                // Check neighbor relationships for all nodes at once using columnar scan
+                for &node_id in nodes {
+                    let mut has_neighbor = false;
+                    for i in 0..sources.len() {
+                        if (sources[i] == node_id && targets[i] == *neighbor_id) ||
+                           (sources[i] == *neighbor_id && targets[i] == node_id) {
+                            has_neighbor = true;
+                            break;
+                        }
+                    }
+                    if has_neighbor {
+                        matching_nodes.push(node_id);
+                    }
+                }
+                Ok(matching_nodes)
+            }
+            
+            NodeFilter::Or(filters) => {
+                if filters.is_empty() {
+                    return Ok(Vec::new());
+                }
+                
+                let mut result_set = HashSet::new();
+                for sub_filter in filters {
+                    let filter_results = self.filter_nodes_columnar(nodes, pool, space, sub_filter)?;
+                    result_set.extend(filter_results);
+                }
+                Ok(result_set.into_iter().collect())
+            }
+            
+            NodeFilter::Not(filter) => {
+                let matching_nodes: HashSet<NodeId> = self.filter_nodes_columnar(nodes, pool, space, filter)?
+                    .into_iter()
+                    .collect();
+                let non_matching: Vec<NodeId> = nodes
+                    .iter()
+                    .copied()
+                    .filter(|node_id| !matching_nodes.contains(node_id))
+                    .collect();
+                Ok(non_matching)
             }
         }
     }
@@ -247,8 +280,8 @@ impl QueryEngine {
         // Get topology if needed
         let topology_data = match filter {
             NodeFilter::DegreeRange { .. } | NodeFilter::HasNeighbor { .. } => {
-                let (edge_ids, sources, targets) = space.get_columnar_topology();
-                Some((edge_ids.to_vec(), sources.to_vec(), targets.to_vec()))
+                let (edge_ids, sources, targets, _) = space.snapshot(pool);
+                Some((edge_ids.as_ref().clone(), sources.as_ref().clone(), targets.as_ref().clone()))
             },
             _ => None
         };
@@ -331,20 +364,12 @@ impl QueryEngine {
     ) -> GraphResult<Vec<EdgeId>> {
         let start_time = std::time::Instant::now();
         let active_edges: Vec<EdgeId> = space.get_active_edges().iter().copied().collect();
-        let num_edges = active_edges.len();
+        let _num_edges = active_edges.len();
         
-        let results: Vec<EdgeId> = if num_edges > 1000 {
-            active_edges
-                .par_iter()
-                .filter(|&edge_id| self.edge_matches_filter(*edge_id, pool, space, filter))
-                .copied()
-                .collect()
-        } else {
-            active_edges
-                .into_iter()
-                .filter(|&edge_id| self.edge_matches_filter(edge_id, pool, space, filter))
-                .collect()
-        };
+        let results: Vec<EdgeId> = active_edges
+            .into_iter()
+            .filter(|&edge_id| self.edge_matches_filter(edge_id, pool, space, filter))
+            .collect();
         
         let _total_time = start_time.elapsed();
         Ok(results)
