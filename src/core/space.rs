@@ -554,12 +554,22 @@ impl GraphSpace {
         let (edge_ids, sources, targets) = self.rebuild_topology(pool);
         
         // Build adjacency map from columnar topology (O(E))
+        // DIRECTED: Only add source → target edges
+        // UNDIRECTED: Add both source ↔ target edges for traversal
         let mut neighbors = HashMap::<NodeId, Vec<(NodeId, EdgeId)>>::new();
+        let graph_type = pool.graph_type();
+        
         for (i, &edge_id) in edge_ids.iter().enumerate() {
             let u = sources[i];
             let v = targets[i];
+            
+            // Always add the primary direction (source → target)
             neighbors.entry(u).or_default().push((v, edge_id));
-            neighbors.entry(v).or_default().push((u, edge_id));
+            
+            // For undirected graphs, also add the reverse direction (target → source)  
+            if graph_type == crate::types::GraphType::Undirected {
+                neighbors.entry(v).or_default().push((u, edge_id));
+            }
         }
 
         // Create Arc-wrapped data for zero-copy sharing

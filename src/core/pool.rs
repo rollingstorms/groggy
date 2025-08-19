@@ -36,7 +36,7 @@ This separation allows:
 */
 
 use std::collections::HashMap;
-use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
+use crate::types::{NodeId, EdgeId, AttrName, AttrValue, GraphType};
 
 /// Columnar storage for attribute values with memory pooling
 /// 
@@ -239,6 +239,15 @@ impl AttributeColumn {
 #[derive(Debug)]
 pub struct GraphPool {
     /*
+    === GRAPH CONFIGURATION ===
+    Fundamental graph properties that affect storage and retrieval
+    */
+    
+    /// Graph directionality - affects how edges are interpreted
+    /// DESIGN: Stored here for consistency and potential future optimizations
+    graph_type: GraphType,
+    
+    /*
     === COLUMNAR ATTRIBUTE STORAGE ===
     Store attributes in columns (one Vec per attribute name) rather than 
     rows (one HashMap per entity). This gives better cache locality for
@@ -274,15 +283,26 @@ pub struct GraphPool {
 }
 
 impl GraphPool {
-    /// Create new empty graph store
+    /// Create new empty graph store with default settings (undirected)
     pub fn new() -> Self {
+        Self::new_with_type(GraphType::default())
+    }
+    
+    /// Create new empty graph store with specified directionality
+    pub fn new_with_type(graph_type: GraphType) -> Self {
         Self {
+            graph_type,
             node_attributes: HashMap::new(),
             edge_attributes: HashMap::new(),
             topology: HashMap::new(),
             next_node_id: 0,
             next_edge_id: 0,
         }
+    }
+    
+    /// Get the graph type
+    pub fn graph_type(&self) -> GraphType {
+        self.graph_type
     }
     
     /// Commit changes (no-op for append-only storage)

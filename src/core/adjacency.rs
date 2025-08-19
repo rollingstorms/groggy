@@ -352,7 +352,9 @@ impl AdjacencyMatrixBuilder {
             nodes.iter().enumerate().map(|(i, &node)| (node, i)).collect()
         };
         
-        // Fill matrix based on edges
+        // Fill matrix based on edges - respect graph directionality
+        let is_directed = pool.graph_type() == crate::types::GraphType::Directed;
+        
         for i in 0..edge_ids.len() {
             let source = sources[i];
             let target = targets[i];
@@ -362,9 +364,11 @@ impl AdjacencyMatrixBuilder {
             if let (Some(&src_idx), Some(&tgt_idx)) = (node_set.get(&source), node_set.get(&target)) {
                 let value = self.get_edge_value(pool, space, edge_id)?;
                 
-                // Set matrix entries (undirected graph - symmetric)
+                // Always add the primary direction (source → target)
                 data[src_idx * size + tgt_idx] = AttrValue::Float(value as f32);
-                if src_idx != tgt_idx {  // Avoid double-counting self-loops
+                
+                // For undirected graphs, also add the reverse direction (target → source)
+                if !is_directed && src_idx != tgt_idx {  // Avoid double-counting self-loops
                     data[tgt_idx * size + src_idx] = AttrValue::Float(value as f32);
                 }
             }
@@ -403,7 +407,9 @@ impl AdjacencyMatrixBuilder {
             nodes.iter().enumerate().map(|(i, &node)| (node, i)).collect()
         };
         
-        // Collect edges within subgraph
+        // Collect edges within subgraph - respect graph directionality
+        let is_directed = pool.graph_type() == crate::types::GraphType::Directed;
+        
         for i in 0..edge_ids.len() {
             let source = sources[i];
             let target = targets[i];
@@ -412,12 +418,13 @@ impl AdjacencyMatrixBuilder {
             if let (Some(&src_idx), Some(&tgt_idx)) = (node_set.get(&source), node_set.get(&target)) {
                 let value = self.get_edge_value(pool, space, edge_id)?;
                 
-                // Add both directions for undirected graph
+                // Always add the primary direction (source → target)
                 rows.push(src_idx);
                 cols.push(tgt_idx);
                 values.push(AttrValue::Float(value as f32));
                 
-                if src_idx != tgt_idx {  // Avoid duplicate self-loops
+                // For undirected graphs, also add the reverse direction (target → source)
+                if !is_directed && src_idx != tgt_idx {  // Avoid duplicate self-loops
                     rows.push(tgt_idx);
                     cols.push(src_idx);
                     values.push(AttrValue::Float(value as f32));
