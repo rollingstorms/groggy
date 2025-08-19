@@ -210,6 +210,9 @@ class GroggyPhase3Benchmark:
             original_id = node['id']
             graph_node_id = self.bulk_node_ids[i]
             node_id_map[original_id] = graph_node_id
+            
+        # Store the mapping for use in traversal tests
+        self.node_id_map = node_id_map
         
         # Use optimized bulk attribute setting - focus on benchmark-relevant attributes only
         # Only set attributes that are actually used in the benchmark queries
@@ -252,13 +255,27 @@ class GroggyPhase3Benchmark:
             self.graph.set_node_attributes(bulk_attrs_dict)
         
         # Use bulk edge creation for better performance
+        # 🔧 DEDUPLICATE EDGES: NetworkX automatically deduplicates, so we should too
         edge_specs = []
+        edge_data_deduplicated = []
+        seen_edges = set()
+        
         for edge in edges_data:
             graph_source = node_id_map[edge['source']]
             graph_target = node_id_map[edge['target']]
-            edge_specs.append((graph_source, graph_target))
+            edge_key = (graph_source, graph_target)
+            
+            # Only add if we haven't seen this edge before (match NetworkX behavior)
+            if edge_key not in seen_edges:
+                seen_edges.add(edge_key)
+                edge_specs.append(edge_key)
+                edge_data_deduplicated.append(edge)
+        
+        print(f"🔧 Edge deduplication: {len(edges_data)} → {len(edge_specs)} edges (removed {len(edges_data) - len(edge_specs)} duplicates)")
         
         self.bulk_edge_ids = self.graph.add_edges(edge_specs)
+        # Update edges_data to use deduplicated version for attribute setting
+        edges_data = edge_data_deduplicated
         
         # Use optimized bulk edge attribute setting - focus on benchmark-relevant attributes only
         essential_edge_attributes = ['relationship', 'weight']  # Reduced from 3 to 2
@@ -317,8 +334,8 @@ class GroggyPhase3Benchmark:
     def filter_nodes_complex_and(self):
         """Test complex AND filtering"""
         start = time.time()
-        # Use optimized query parser with logical operators
-        # Use simpler 2-term AND query until we support 3+ terms
+        # Use optimized query parser with logical operators  
+        # Test with 2-term AND first to see if 3-term AND is the issue
         filter_obj = gr.parse_node_query("department == 'Engineering' AND performance > 4.0")
         result = self.graph.filter_nodes(filter_obj)
         return time.time() - start, len(result)
@@ -351,21 +368,21 @@ class GroggyPhase3Benchmark:
     def traversal_bfs(self):
         """Test BFS traversal"""
         start = time.time()
-        start_node = self.bulk_node_ids[0]  # Use first node from bulk creation
+        start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
         result = self.graph.analytics.bfs(start_node=start_node, max_depth=3)
         return time.time() - start, len(result.nodes)
     
     def traversal_dfs(self):
         """Test DFS traversal"""
         start = time.time()
-        start_node = self.bulk_node_ids[0]  # Use first node from bulk creation
+        start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
         result = self.graph.analytics.dfs(start_node=start_node, max_depth=3)
         return time.time() - start, len(result.nodes)
     
     def traversal_bfs_filtered(self):
         """Test BFS with node filtering"""
         start = time.time()
-        start_node = self.bulk_node_ids[0]  # Use first node from bulk creation
+        start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
         # Note: filtered traversal is not yet supported in analytics module
         # Fall back to basic BFS for now
         result = self.graph.analytics.bfs(start_node=start_node, max_depth=2)
@@ -469,11 +486,10 @@ class NetworkXBenchmark:
     def filter_nodes_complex_and(self):
         """Complex AND filtering"""
         start = time.time()
-        # Match Groggy's filter: department=Engineering AND performance>4.0 AND active=True
+        # Match Groggy's filter: department=Engineering AND performance>4.0 (simplified)
         result = [n for n, d in self.graph.nodes(data=True) 
                  if (d.get('department') == 'Engineering' and 
-                     d.get('performance', 0) > 4.0 and
-                     d.get('active', False))]
+                     d.get('performance', 0) > 4.0)]
         return time.time() - start, len(result)
     
     def filter_nodes_complex_or(self):

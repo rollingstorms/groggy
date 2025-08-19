@@ -722,44 +722,6 @@ impl PyGraph {
         ))
     }
     
-    /// BFS traversal using core algorithm (DEPRECATED - use graph.analytics.bfs() instead)
-    #[pyo3(signature = (start_node, max_depth = None, node_filter = None, edge_filter = None, inplace = None, attr_name = None))]
-    fn bfs(slf: PyRef<Self>, py: Python, start_node: NodeId, max_depth: Option<usize>, 
-           node_filter: Option<&PyAny>, edge_filter: Option<&PyAny>,
-           inplace: Option<bool>, attr_name: Option<String>) -> PyResult<PySubgraph> {
-        
-        // For now, ignore node_filter and edge_filter as they're not supported in analytics module
-        if node_filter.is_some() || edge_filter.is_some() {
-            return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-                "node_filter and edge_filter are not yet supported. Use graph.analytics.bfs() for basic BFS functionality."
-            ));
-        }
-        
-        // Delegate to analytics module which has proper graph reference handling
-        let analytics = PyGraph::analytics(slf, py)?;
-        let result = analytics.borrow(py).bfs(py, start_node, max_depth, inplace, attr_name);
-        result
-    }
-    
-    /// DFS traversal using core algorithm (DEPRECATED - use graph.analytics.dfs() instead)
-    #[pyo3(signature = (start_node, max_depth = None, node_filter = None, edge_filter = None, inplace = None, attr_name = None))]
-    fn dfs(slf: PyRef<Self>, py: Python, start_node: NodeId, max_depth: Option<usize>,
-           node_filter: Option<&PyAny>, edge_filter: Option<&PyAny>,
-           inplace: Option<bool>, attr_name: Option<String>) -> PyResult<PySubgraph> {
-        
-        // For now, ignore node_filter and edge_filter as they're not supported in analytics module
-        if node_filter.is_some() || edge_filter.is_some() {
-            return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-                "node_filter and edge_filter are not yet supported. Use graph.analytics.dfs() for basic DFS functionality."
-            ));
-        }
-        
-        // Delegate to analytics module which has proper graph reference handling
-        let analytics = PyGraph::analytics(slf, py)?;
-        let result = analytics.borrow(py).dfs(py, start_node, max_depth, inplace, attr_name);
-        result
-    }
-    
     /// Get analytics module for this graph
     #[getter]
     fn analytics(slf: PyRef<Self>, py: Python) -> PyResult<Py<crate::ffi::api::graph_analytics::PyGraphAnalytics>> {
