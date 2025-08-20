@@ -544,19 +544,29 @@ impl PySubgraph {
     }
     
     /// Create GraphTable for DataFrame-like view of this subgraph nodes
-    fn table(&self, _py: Python) -> PyResult<PyObject> {
-        // TODO: Fix PyGraphTable integration in Phase 2
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "Subgraph table functionality temporarily disabled during Phase 2 unification"
-        ))
+    fn table(&self, py: Python) -> PyResult<PyObject> {
+        // Create arrays with node IDs
+        let node_id_values: Vec<PyObject> = self.nodes.iter()
+            .map(|&id| (id as i64).to_object(py))
+            .collect();
+        
+        let node_array = PyGraphArray::from_py_objects(node_id_values)?;
+        let py_table = PyGraphTable::new(py, vec![Py::new(py, node_array)?], Some(vec!["node_id".to_string()]))?;
+        
+        Ok(Py::new(py, py_table)?.to_object(py))
     }
     
     /// Create GraphTable for DataFrame-like view of this subgraph edges
-    fn edges_table(&self, _py: Python) -> PyResult<PyObject> {
-        // TODO: Fix PyGraphTable integration in Phase 2
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "Subgraph edges table functionality temporarily disabled during Phase 2 unification"
-        ))
+    fn edges_table(&self, py: Python) -> PyResult<PyObject> {
+        // Create arrays with edge IDs  
+        let edge_id_values: Vec<PyObject> = self.edges.iter()
+            .map(|&id| (id as i64).to_object(py))
+            .collect();
+        
+        let edge_array = PyGraphArray::from_py_objects(edge_id_values)?;
+        let py_table = PyGraphTable::new(py, vec![Py::new(py, edge_array)?], Some(vec!["edge_id".to_string()]))?;
+        
+        Ok(Py::new(py, py_table)?.to_object(py))
     }
     
     /// Python-level access to parent graph (if attached).

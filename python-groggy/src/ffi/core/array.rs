@@ -3,7 +3,7 @@
 //! Python bindings for statistical arrays and matrices.
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PySlice};
 use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyIndexError, PyImportError, PyNotImplementedError};
 use groggy::core::array::{GraphArray, StatsSummary};
 use groggy::AttrValue as RustAttrValue;
@@ -43,25 +43,113 @@ impl PyGraphArray {
         self.inner.len()
     }
     
-    /// Get element by index - supports arr[i] with negative indexing
-    fn __getitem__(&self, py: Python, index: isize) -> PyResult<PyObject> {
-        let len = self.inner.len() as isize;
-        
-        // Handle negative indexing (Python-style)
-        let actual_index = if index < 0 {
-            len + index
-        } else {
-            index
-        };
-        
-        // Check bounds
-        if actual_index < 0 || actual_index >= len {
-            return Err(PyIndexError::new_err("Index out of range"));
+    /// Advanced indexing support: arr[i], arr[start:end], arr[start:end:step], arr[mask]
+    fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
+        // Single integer indexing: arr[5]
+        if let Ok(index) = key.extract::<isize>() {
+            let len = self.inner.len() as isize;
+            
+            // Handle negative indexing (Python-style)
+            let actual_index = if index < 0 {
+                len + index
+            } else {
+                index
+            };
+            
+            // Check bounds
+            if actual_index < 0 || actual_index >= len {
+                return Err(PyIndexError::new_err("Index out of range"));
+            }
+            
+            match self.inner.get(actual_index as usize) {
+                Some(attr_value) => attr_value_to_python_value(py, attr_value),
+                None => Err(PyIndexError::new_err("Index out of range")),
+            }
         }
-        
-        match self.inner.get(actual_index as usize) {
-            Some(attr_value) => attr_value_to_python_value(py, attr_value),
-            None => Err(PyIndexError::new_err("Index out of range")),
+        // Slice indexing: arr[start:end], arr[start:end:step]
+        else if let Ok(slice) = key.downcast::<pyo3::types::PySlice>() {
+            let len = self.inner.len();
+            let indices = slice.indices(len as i64)?;
+            let start = indices.start as usize;
+            let stop = indices.stop as usize;
+            let step = indices.step;
+            
+            let mut result_values = Vec::new();
+            
+            if step == 1 {
+                // Simple slice [start:stop]
+                for i in start..stop.min(len) {
+                    if let Some(attr_value) = self.inner.get(i) {
+                        result_values.push(attr_value.clone());
+                    }
+                }
+            } else if step > 1 {
+                // Step slice [start:stop:step]
+                let mut i = start;
+                while i < stop.min(len) {
+                    if let Some(attr_value) = self.inner.get(i) {
+                        result_values.push(attr_value.clone());
+                    }
+                    i += step as usize;
+                }
+            } else {
+                return Err(PyValueError::new_err("Negative step not supported"));
+            }
+            
+            // Return new GraphArray with sliced data
+            let result_array = groggy::GraphArray::from_vec(result_values);
+            let py_array = PyGraphArray { inner: result_array };
+            Ok(Py::new(py, py_array)?.to_object(py))
+        }
+        // List of indices: arr[[1, 3, 5]]
+        else if let Ok(indices) = key.extract::<Vec<isize>>() {
+            let len = self.inner.len() as isize;
+            let mut result_values = Vec::new();
+            
+            for &index in &indices {
+                let actual_index = if index < 0 {
+                    len + index
+                } else {
+                    index
+                };
+                
+                if actual_index >= 0 && actual_index < len {
+                    if let Some(attr_value) = self.inner.get(actual_index as usize) {
+                        result_values.push(attr_value.clone());
+                    }
+                } else {
+                    return Err(PyIndexError::new_err("Index out of range"));
+                }
+            }
+            
+            // Return new GraphArray with selected data
+            let result_array = groggy::GraphArray::from_vec(result_values);
+            let py_array = PyGraphArray { inner: result_array };
+            Ok(Py::new(py, py_array)?.to_object(py))
+        }
+        // Boolean mask indexing: arr[mask] where mask is a list of booleans
+        else if let Ok(mask) = key.extract::<Vec<bool>>() {
+            let len = self.inner.len();
+            if mask.len() != len {
+                return Err(PyValueError::new_err("Boolean mask length must match array length"));
+            }
+            
+            let mut result_values = Vec::new();
+            for (i, &include) in mask.iter().enumerate() {
+                if include {
+                    if let Some(attr_value) = self.inner.get(i) {
+                        result_values.push(attr_value.clone());
+                    }
+                }
+            }
+            
+            // Return new GraphArray with masked data
+            let result_array = groggy::GraphArray::from_vec(result_values);
+            let py_array = PyGraphArray { inner: result_array };
+            Ok(Py::new(py, py_array)?.to_object(py))
+        }
+        else {
+            Err(PyTypeError::new_err("Index must be int, slice, list of ints, or list of bools"))
         }
     }
     
@@ -98,6 +186,43 @@ impl PyGraphArray {
     /// String representation (same as __repr__ for consistency)
     fn __str__(&self, py: Python) -> PyResult<String> {
         self.__repr__(py)
+    }
+
+    /// Rich HTML representation for Jupyter notebooks
+    fn _repr_html_(&self, py: Python) -> PyResult<String> {
+        match self._try_rich_html_display(py) {
+            Ok(html) => Ok(html),
+            Err(_) => {
+                // Fallback to basic HTML
+                let len = self.inner.len();
+                let dtype = self._get_dtype();
+                Ok(format!(
+                    r#"<div style="font-family: monospace; padding: 10px; border: 1px solid #ddd;">
+                    <strong>GraphArray</strong><br>
+                    Length: {}<br>
+                    Dtype: {}
+                    </div>"#,
+                    len, dtype
+                ))
+            }
+        }
+    }
+
+    /// Try to use rich HTML display formatting
+    fn _try_rich_html_display(&self, py: Python) -> PyResult<String> {
+        // Get display data for formatting
+        let display_data = self._get_display_data(py)?;
+        
+        // Import the format_array_html function from Python
+        let groggy_module = py.import("groggy")?;
+        let display_module = groggy_module.getattr("display")?;
+        let format_array_html = display_module.getattr("format_array_html")?;
+        
+        // Call the Python HTML formatter
+        let result = format_array_html.call1((display_data,))?;
+        let html_str: String = result.extract()?;
+        
+        Ok(html_str)
     }
     
     /// Iterator support (for value in array)
