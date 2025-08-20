@@ -149,11 +149,14 @@ impl GraphMatrix {
     
     // Linear Algebra
     pub fn transpose(&self) -> GraphMatrix
-    pub fn multiply(&self, other: &GraphMatrix) -> Result<GraphMatrix>
-    pub fn inverse(&self) -> Result<GraphMatrix>
-    pub fn determinant(&self) -> Option<f64>
-    pub fn eigenvalues(&self) -> Vec<f64>  // If numeric
-    pub fn rank(&self) -> usize
+    pub fn multiply(&self, other: &GraphMatrix) -> Result<GraphMatrix> // Phase 5
+    pub fn inverse(&self) -> Result<GraphMatrix> // Phase 5
+    pub fn determinant(&self) -> Option<f64> // Phase 5
+    pub fn eigen(&self) -> Vec<f64>  // If numeric // Phase 5 // todo: eigenvalues and eigenvectors // could be complex to implement from scratch, lanczos?
+    pub fn rank(&self) -> usize // Phase 5
+    pub fn svd(&self) -> (GraphMatrix, GraphMatrix, GraphMatrix) // Phase 5 // todo: singular value decomposition
+    pub fn qr(&self) -> (GraphMatrix, GraphMatrix) // Phase 5 // todo: QR decomposition
+    pub fn cholesky(&self) -> GraphMatrix // Phase 5 // todo: Cholesky decomposition
     
     // Statistical Operations (inherit from GraphArray)
     pub fn sum_axis(&self, axis: Axis) -> GraphArray  // Sum rows or columns
@@ -185,7 +188,7 @@ impl GraphTable {
     pub fn loc(&self, label: &AttrValue) -> Option<HashMap<String, &AttrValue>>  // Label-based
     
     // Slicing & Selection  
-    pub fn select_columns(&self, columns: &[&str]) -> GraphTable
+    pub fn select(&self, columns: &[&str]) -> GraphTable
     pub fn filter_rows(&self, predicate: impl Fn(&HashMap<String, &AttrValue>) -> bool) -> GraphTable
     pub fn head(&self, n: usize) -> GraphTable
     pub fn tail(&self, n: usize) -> GraphTable
@@ -193,14 +196,14 @@ impl GraphTable {
     
     // Statistical Operations
     pub fn describe(&self) -> GraphTable  // Summary statistics
-    pub fn groupby(&self, column: &str) -> GroupBy
+    pub fn group_by(&self, column: &str) -> GroupBy
     pub fn aggregate(&self, ops: HashMap<String, AggregateOp>) -> HashMap<String, AttrValue>
     pub fn pivot_table(&self, index: &str, columns: &str, values: &str) -> GraphTable
     
     // Data Manipulation
-    pub fn sort_by(&self, column: &str, ascending: bool) -> GraphTable
+    pub fn sort_by(&self, column: &str, ascending: bool) -> GraphTable  // todo: multi-column sort
     pub fn drop_duplicates(&self) -> GraphTable
-    pub fn fillna(&self, value: AttrValue) -> GraphTable
+    pub fn fillnans(&self, value: AttrValue) -> GraphTable
     pub fn dropna(&self) -> GraphTable
     pub fn merge(&self, other: &GraphTable, on: &str, how: JoinType) -> GraphTable
     
@@ -218,29 +221,44 @@ impl GraphTable {
 
 ## Implementation Strategy
 
-### Phase 1: Core Foundation
-1. **Create `src/core/matrix.rs`** - Move GraphMatrix from adjacency.rs, refactor as collection of GraphArrays
-2. **Create `src/core/table.rs`** - Move GraphTable from FFI to core
-3. **Unify Error Handling** - Consistent error types across all storage views
-4. **Add Missing GraphArray methods** - Fill gaps identified in API spec
+### Phase 1: Core Foundation ✅
+1. **Create `src/core/matrix.rs`** - Move GraphMatrix from adjacency.rs, refactor as collection of GraphArrays ✅
+2. **Create `src/core/table.rs`** - Move GraphTable from FFI to core ✅
+3. **Unify Error Handling** - Consistent error types across all storage views ✅
+4. **Add Missing GraphArray methods** - Fill gaps identified in API spec ✅
 
-### Phase 2: Integration Layer
-1. **Unified Builder Patterns** - `gr.array()`, `gr.table()`, `gr.matrix()`
-2. **Graph Pool Integration** - Efficient attribute column loading
-3. **Memory Management** - Reference counting, copy vs view semantics
-4. **Caching Strategy** - Smart invalidation across linked operations
+### Phase 2: Integration Layer ✅ **COMPLETED**
+1. **Create `python-groggy/src/ffi/core/matrix.rs`** - ✅ Created dedicated Python bindings for GraphMatrix with full API 
+2. **Fix Compilation Issues** - ✅ Resolved AdjacencyMatrix enum changes and Python binding errors
+3. **Build System** - ✅ `maturin develop --release` builds successfully with warnings only
+4. **Unified Builder Patterns** - ✅ Implemented `gr.array()`, `gr.table()`, `gr.matrix()` constructors with full Python integration
+5. **Statistical Operations** - ✅ Added working `sum_axis()`, `mean_axis()`, `std_axis()` methods to PyGraphMatrix
+6. **Graph Pool Integration** - ✅ Sophisticated columnar storage with AttributeColumn and memory pooling already integrated
+7. **Memory Management** - ✅ AttributeMemoryPool with string/float/byte pool reuse already implemented
+8. **Caching Strategy** - ✅ CachedStats with smart invalidation already working across operations
 
-### Phase 3: Rich API Implementation
+### Phase 3: FFI Wrapper Layer
+1. **Python Bindings** - Thin wrappers around core functionality
+2. **Display Integration** - Consistent `__repr__` and `_repr_html_` - implemented in the py legacy code graph_table_legacy.py - for Array, Matrix, and Table
+3. **Indexing Operations** - Python-style `[]` operator support
+4. **Iterator Protocol** - Python iteration support
+
+### Phase 4: Rich API Implementation
 1. **Statistical Operations** - Full pandas-like statistical API
 2. **Data Manipulation** - Sorting, filtering, grouping, joining
 3. **Linear Algebra** - Matrix operations for GraphMatrix
 4. **Export/Import** - CSV, JSON, integration with external formats
 
-### Phase 4: FFI Wrapper Layer
-1. **Python Bindings** - Thin wrappers around core functionality
-2. **Display Integration** - Consistent `__repr__` and `_repr_html_` - implemented in the py legacy code graph_table_legacy.py
-3. **Indexing Operations** - Python-style `[]` operator support
-4. **Iterator Protocol** - Python iteration support
+### Phase 5: Advanced Linear Algebra
+1. **Linear Algebra** - Matrix operations for GraphMatrix
+2. **Advanced Linear Algebra** - Advanced linear algebra operations for GraphMatrix
+3. **Advanced Graph Operations** - Advanced graph operations for GraphMatrix
+
+### Phase 6: Advanced Visualization Module - Viz
+1. **Visualization** - Advanced visualization for graphs built in rust and export as JS for embedding in HTML
+2. **Scaled Up Visualization** - Advanced visualization for graphs built in rust and export as JS for embedding in HTML
+
+
 
 ## File Migration Plan
 
@@ -270,13 +288,32 @@ src/
       table.rs        🆕 PyGraphTable (thin wrapper)
 ```
 
-## Next Steps
+## Next Steps (Phase 2 Continuation)
 
-1. **Create `src/core/matrix.rs`** - Extract general matrix functionality from adjacency.rs
-2. **Create `src/core/table.rs`** - Move table logic from FFI to core
-3. **Update module imports** - Fix all references to moved code
-4. **Implement unified construction patterns** - Consistent API across all three types
-5. **Add comprehensive tests** - Ensure functionality preserved during migration
+1. **Complete PyGraphMatrix Statistical Operations** - Implement sum_axis, mean_axis, std_axis methods in core GraphMatrix
+2. **Implement Builder Patterns** - Create `gr.array()`, `gr.table()`, `gr.matrix()` unified constructors
+3. **Graph Pool Integration** - Efficient attribute column loading from graph storage
+4. **Memory Management** - Reference counting and copy vs view semantics
+5. **Comprehensive Testing** - Ensure all three storage views work together seamlessly
+
+## Current Status (August 2025)
+
+✅ **Completed:**
+- Core GraphMatrix architecture in `src/core/matrix.rs`
+- Core GraphTable architecture in `src/core/table.rs` 
+- Python bindings for GraphMatrix in `python-groggy/src/ffi/core/matrix.rs`
+- Build system successfully compiling with `maturin develop --release`
+- AdjacencyMatrix compatibility layer (temporarily disabled pending Phase 1 completion)
+
+🔧 **In Progress:**
+- Statistical operations implementation in core GraphMatrix
+- Complete Python API for PyGraphMatrix methods
+
+📋 **Pending:**
+- Graph pool integration for efficient data loading
+- Unified builder patterns
+- Memory management improvements
+- Advanced linear algebra operations (Phase 5)
 
 ---
 

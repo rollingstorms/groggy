@@ -11,7 +11,8 @@ use groggy::{Graph as RustGraph, NodeId, EdgeId, AttrValue as RustAttrValue, Att
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::core::accessors::{PyNodesAccessor, PyEdgesAccessor};
 use crate::ffi::core::views::{PyNodeView, PyEdgeView};
-use crate::ffi::core::array::{PyGraphArray, PyGraphMatrix, PyGraphSparseMatrix};
+use crate::ffi::core::array::PyGraphArray;
+use crate::ffi::core::matrix::PyGraphMatrix;
 use crate::ffi::core::subgraph::PySubgraph;
 use crate::ffi::core::query::{PyNodeFilter, PyEdgeFilter};
 use crate::ffi::core::traversal::PyGroupedAggregationResult;
@@ -46,35 +47,19 @@ impl PyAggregationResult {
 
 
 /// Helper function to convert AdjacencyMatrix to PyGraphMatrix
-fn adjacency_matrix_to_py_graph_matrix(py: Python, matrix: groggy::AdjacencyMatrix) -> PyResult<Py<PyGraphMatrix>> {
-    match matrix {
-        groggy::AdjacencyMatrix::Dense(graph_matrix) => {
-            // Wrap dense matrix in PyGraphMatrix
-            let py_graph_matrix = PyGraphMatrix { inner: graph_matrix };
-            Ok(Py::new(py, py_graph_matrix)?)
-        },
-        groggy::AdjacencyMatrix::Sparse(sparse_matrix) => {
-            // Convert sparse to dense for PyGraphMatrix compatibility
-            let py_sparse_matrix = PyGraphSparseMatrix { inner: sparse_matrix };
-            py_sparse_matrix.to_dense(py)
-        }
-    }
+fn adjacency_matrix_to_py_graph_matrix(_py: Python, _matrix: groggy::AdjacencyMatrix) -> PyResult<Py<PyGraphMatrix>> {
+    // TODO: Implement adjacency matrix to GraphMatrix conversion in Phase 2
+    Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+        "AdjacencyMatrix to GraphMatrix conversion temporarily disabled during Phase 2 unification"
+    ))
 }
 
 // Helper function to extract matrix from AdjacencyMatrix and wrap appropriately
-fn adjacency_matrix_to_py_object(py: Python, matrix: groggy::AdjacencyMatrix) -> PyResult<PyObject> {
-    match matrix {
-        groggy::AdjacencyMatrix::Dense(graph_matrix) => {
-            // Wrap dense matrix in PyGraphMatrix
-            let py_graph_matrix = PyGraphMatrix { inner: graph_matrix };
-            Ok(Py::new(py, py_graph_matrix)?.to_object(py))
-        },
-        groggy::AdjacencyMatrix::Sparse(sparse_matrix) => {
-            // Wrap sparse matrix in PyGraphSparseMatrix (keep it sparse!)
-            let py_sparse_matrix = PyGraphSparseMatrix { inner: sparse_matrix };
-            Ok(Py::new(py, py_sparse_matrix)?.to_object(py))
-        }
-    }
+fn adjacency_matrix_to_py_object(_py: Python, _matrix: groggy::AdjacencyMatrixResult) -> PyResult<PyObject> {
+    // TODO: Implement adjacency matrix to Python object conversion in Phase 2
+    Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+        "Adjacency matrix functionality temporarily disabled during Phase 2 unification"
+    ))
 }
 
 /// Python wrapper for the main Graph
@@ -997,100 +982,61 @@ impl PyGraph {
     
     /// Generate adjacency matrix for the entire graph (FFI wrapper around core matrix operations)
     /// Returns: GraphMatrix (dense) or GraphSparseMatrix (sparse) 
-    fn adjacency_matrix(&mut self, py: Python) -> PyResult<PyObject> {
-        match self.inner.adjacency_matrix() {
-            Ok(matrix) => {
-                adjacency_matrix_to_py_object(py, matrix)
-            },
-            Err(e) => Err(graph_error_to_py_err(e))
-        }
+    fn adjacency_matrix(&mut self, _py: Python) -> PyResult<PyObject> {
+        // TODO: Implement adjacency matrix in Phase 2
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Adjacency matrix temporarily disabled during Phase 2 unification"
+        ))
     }
     
     /// Generate adjacency matrix for the entire graph (cleaner API)
     /// Returns: GraphMatrix with multi-index access (matrix[0, 1])
     /// This is a cleaner alias for adjacency_matrix() but always returns dense
-    fn adjacency(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        match self.inner.adjacency_matrix() {
-            Ok(matrix) => {
-                adjacency_matrix_to_py_graph_matrix(py, matrix)
-            },
-            Err(e) => Err(graph_error_to_py_err(e))
-        }
+    fn adjacency(&mut self, _py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        // TODO: Implement adjacency in Phase 2
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Adjacency matrix temporarily disabled during Phase 2 unification"
+        ))
     }
     
     /// Generate weighted adjacency matrix using specified edge attribute (FFI wrapper around core matrix operations)
-    fn weighted_adjacency_matrix(&mut self, py: Python, weight_attr: &str) -> PyResult<Py<PyGraphMatrix>> {
-        match self.inner.weighted_adjacency_matrix(weight_attr) {
-            Ok(matrix) => {
-                adjacency_matrix_to_py_graph_matrix(py, matrix)
-            },
-            Err(e) => Err(graph_error_to_py_err(e))
-        }
+    fn weighted_adjacency_matrix(&mut self, _py: Python, _weight_attr: &str) -> PyResult<Py<PyGraphMatrix>> {
+        // TODO: Implement weighted adjacency matrix in Phase 2
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Weighted adjacency matrix temporarily disabled during Phase 2 unification"
+        ))
     }
     
     /// Generate dense adjacency matrix (FFI wrapper around core matrix operations)
-    fn dense_adjacency_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        match self.inner.dense_adjacency_matrix() {
-            Ok(matrix) => {
-                // For dense_adjacency_matrix, always return PyGraphMatrix (never sparse)
-                match matrix {
-                    groggy::AdjacencyMatrix::Dense(graph_matrix) => {
-                        let py_graph_matrix = PyGraphMatrix { inner: graph_matrix };
-                        Ok(Py::new(py, py_graph_matrix)?)
-                    },
-                    groggy::AdjacencyMatrix::Sparse(sparse_matrix) => {
-                        // Convert sparse to dense since this method explicitly asks for dense
-                        let py_sparse_matrix = PyGraphSparseMatrix { inner: sparse_matrix };
-                        py_sparse_matrix.to_dense(py)
-                    }
-                }
-            },
-            Err(e) => Err(graph_error_to_py_err(e))
-        }
+    fn dense_adjacency_matrix(&mut self, _py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        // TODO: Implement dense adjacency matrix in Phase 2
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Dense adjacency matrix temporarily disabled during Phase 2 unification"
+        ))
     }
     
     /// Generate sparse adjacency matrix (FFI wrapper around core matrix operations)
-    fn sparse_adjacency_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphSparseMatrix>> {
-        match self.inner.sparse_adjacency_matrix() {
-            Ok(matrix) => {
-                // For sparse_adjacency_matrix, always return PyGraphSparseMatrix
-                match matrix {
-                    groggy::AdjacencyMatrix::Dense(graph_matrix) => {
-                        // TODO: Convert dense to sparse format if needed
-                        // For now, return error suggesting to use dense_adjacency_matrix()
-                        Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                            "Graph produced dense matrix but sparse was requested. Use dense_adjacency_matrix() instead."
-                        ))
-                    },
-                    groggy::AdjacencyMatrix::Sparse(sparse_matrix) => {
-                        let py_sparse_matrix = PyGraphSparseMatrix { inner: sparse_matrix };
-                        Ok(Py::new(py, py_sparse_matrix)?)
-                    }
-                }
-            },
-            Err(e) => Err(graph_error_to_py_err(e))
-        }
+    fn sparse_adjacency_matrix(&mut self, _py: Python) -> PyResult<PyObject> {
+        // TODO: Implement sparse adjacency matrix in Phase 2 (will return PyGraphSparseMatrix)
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Sparse adjacency matrix temporarily disabled during Phase 2 unification"
+        ))
     }
     
     /// Generate Laplacian matrix (FFI wrapper around core matrix operations)
-    fn laplacian_matrix(&mut self, py: Python, normalized: Option<bool>) -> PyResult<Py<PyGraphMatrix>> {
-        let normalized = normalized.unwrap_or(false);
-        match self.inner.laplacian_matrix(normalized) {
-            Ok(matrix) => {
-                adjacency_matrix_to_py_graph_matrix(py, matrix)
-            },
-            Err(e) => Err(graph_error_to_py_err(e))
-        }
+    fn laplacian_matrix(&mut self, _py: Python, _normalized: Option<bool>) -> PyResult<Py<PyGraphMatrix>> {
+        // TODO: Implement Laplacian matrix in Phase 2
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Laplacian matrix temporarily disabled during Phase 2 unification"
+        ))
     }
     
     /// Generate adjacency matrix for a subgraph with specific nodes (FFI wrapper around core matrix operations)
-    fn subgraph_adjacency_matrix(&mut self, py: Python, node_ids: Vec<NodeId>) -> PyResult<Py<PyGraphMatrix>> {
-        match self.inner.subgraph_adjacency_matrix(&node_ids) {
-            Ok(matrix) => {
-                adjacency_matrix_to_py_graph_matrix(py, matrix)
-            },
-            Err(e) => Err(graph_error_to_py_err(e))
-        }
+    fn subgraph_adjacency_matrix(&mut self, _py: Python, _node_ids: Vec<NodeId>) -> PyResult<Py<PyGraphMatrix>> {
+        // TODO: Implement subgraph adjacency matrix in Phase 2
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Subgraph adjacency matrix temporarily disabled during Phase 2 unification"
+        ))
     }
     
     // === DISPLAY/TABLE METHODS ===

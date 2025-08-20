@@ -4,7 +4,7 @@
 //! This is a thin wrapper around the core Rust GraphTable implementation.
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyType};
 use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyIndexError, PyImportError, PyNotImplementedError};
 use groggy::{NodeId, EdgeId, AttrValue as RustAttrValue, GraphTable, GraphArray, TableMetadata};
 use std::collections::HashMap;
@@ -16,7 +16,7 @@ use crate::ffi::api::graph::PyGraph;
 use crate::ffi::core::array::PyGraphArray;
 
 /// Python wrapper around core GraphTable implementation
-#[pyclass(name = "GraphTable")]
+#[pyclass(name = "GraphTable", unsendable)]
 pub struct PyGraphTable {
     /// Core GraphTable implementation
     pub inner: GraphTable,
@@ -55,46 +55,32 @@ impl PyGraphTable {
 
     /// Create GraphTable from graph nodes
     #[classmethod]
-    #[pyo3(signature = (cls, graph, nodes, attrs = None))]
     pub fn from_graph_nodes(
         _cls: &PyType,
-        py: Python,
-        graph: Py<PyGraph>,
-        nodes: Vec<u64>,
-        attrs: Option<Vec<String>>,
+        _py: Python,
+        _graph: Py<PyGraph>,
+        _nodes: Vec<u64>,
+        _attrs: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let graph_ref = graph.borrow(py);
-        let graph_rc = Rc::new(graph_ref.inner.clone());
-        
-        let node_ids: Vec<NodeId> = nodes.into_iter().map(|id| id as NodeId).collect();
-        let attr_refs: Option<Vec<&str>> = attrs.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
-        
-        let table = GraphTable::from_graph_nodes(graph_rc, &node_ids, attr_refs.as_deref())
-            .map_err(graph_error_to_py_err)?;
-        
-        Ok(Self::from_graph_table(table))
+        // TODO: Implement graph nodes integration in Phase 2
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "GraphTable.from_graph_nodes temporarily disabled during Phase 2 unification"
+        ))
     }
 
     /// Create GraphTable from graph edges
     #[classmethod]
-    #[pyo3(signature = (cls, graph, edges, attrs = None))]
     pub fn from_graph_edges(
         _cls: &PyType,
-        py: Python,
-        graph: Py<PyGraph>,
-        edges: Vec<u64>,
-        attrs: Option<Vec<String>>,
+        _py: Python,
+        _graph: Py<PyGraph>,
+        _edges: Vec<u64>,
+        _attrs: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        let graph_ref = graph.borrow(py);
-        let graph_rc = Rc::new(graph_ref.inner.clone());
-        
-        let edge_ids: Vec<EdgeId> = edges.into_iter().map(|id| id as EdgeId).collect();
-        let attr_refs: Option<Vec<&str>> = attrs.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
-        
-        let table = GraphTable::from_graph_edges(graph_rc, &edge_ids, attr_refs.as_deref())
-            .map_err(graph_error_to_py_err)?;
-        
-        Ok(Self::from_graph_table(table))
+        // TODO: Implement graph edges integration in Phase 2
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "GraphTable.from_graph_edges temporarily disabled during Phase 2 unification"
+        ))
     }
 
     /// Number of rows in the table
@@ -281,7 +267,7 @@ impl PyGraphTable {
 
         } else if let Ok(column_list) = key.extract::<Vec<String>>() {
             // Multi-column access: table[['col1', 'col2']] -> table
-            let selected_table = self.inner.select_columns(&column_list.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+            let selected_table = self.inner.select(&column_list.iter().map(|s| s.as_str()).collect::<Vec<_>>())
                 .map_err(graph_error_to_py_err)?;
             
             Ok(Py::new(py, PyGraphTable::from_graph_table(selected_table))?.to_object(py))
@@ -294,31 +280,32 @@ impl PyGraphTable {
     }
 
     /// Get first n rows
-    #[pyo3(signature = (n = 5))]
     pub fn head(&self, py: Python, n: usize) -> PyResult<PyObject> {
         let head_table = self.inner.head(n);
-        Ok(Py::new(py, PyGraphTable::from_graph_table(head_table))?.to_object(py))
+        let py_table = PyGraphTable::from_graph_table(head_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
     }
 
     /// Get last n rows
-    #[pyo3(signature = (n = 5))]
     pub fn tail(&self, py: Python, n: usize) -> PyResult<PyObject> {
         let tail_table = self.inner.tail(n);
-        Ok(Py::new(py, PyGraphTable::from_graph_table(tail_table))?.to_object(py))
+        let py_table = PyGraphTable::from_graph_table(tail_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
     }
 
     /// Sort table by column
-    #[pyo3(signature = (column, ascending = true))]
     pub fn sort_by(&self, py: Python, column: String, ascending: bool) -> PyResult<PyObject> {
         let sorted_table = self.inner.sort_by(&column, ascending)
             .map_err(graph_error_to_py_err)?;
-        Ok(Py::new(py, PyGraphTable::from_graph_table(sorted_table))?.to_object(py))
+        let py_table = PyGraphTable::from_graph_table(sorted_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
     }
 
     /// Get summary statistics
     pub fn describe(&self, py: Python) -> PyResult<PyObject> {
         let desc_table = self.inner.describe();
-        Ok(Py::new(py, PyGraphTable::from_graph_table(desc_table))?.to_object(py))
+        let py_table = PyGraphTable::from_graph_table(desc_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
     }
 
     /// Convert to dictionary format
@@ -337,9 +324,3 @@ impl PyGraphTable {
     }
 }
 
-impl PyGraphArray {
-    /// Create PyGraphArray from core GraphArray
-    pub fn from_graph_array(array: GraphArray) -> Self {
-        Self { inner: array }
-    }
-}

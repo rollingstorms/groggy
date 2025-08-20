@@ -381,7 +381,7 @@ impl GraphTable {
     }
     
     /// Select specific columns by name
-    pub fn select_columns(&self, column_names: &[&str]) -> GraphResult<GraphTable> {
+    pub fn select(&self, column_names: &[&str]) -> GraphResult<GraphTable> {
         let mut selected_arrays = Vec::new();
         let mut selected_names = Vec::new();
         
@@ -513,6 +513,7 @@ impl GraphTable {
     }
     
     /// Sort table by column
+    /// todo: multi-column sort
     pub fn sort_by(&self, column: &str, ascending: bool) -> GraphResult<GraphTable> {
         let sort_array = self.get_column_by_name(column)
             .ok_or_else(|| GraphError::InvalidInput(format!("Column '{}' not found. Check available column names", column)))?;
@@ -565,7 +566,7 @@ impl GraphTable {
     }
     
     /// Group by column
-    pub fn groupby(&self, column: &str) -> GraphResult<GroupBy> {
+    pub fn group_by(&self, column: &str) -> GraphResult<GroupBy> {
         let group_array = self.get_column_by_name(column)
             .ok_or_else(|| GraphError::InvalidInput(format!("Column '{}' not found. Check available column names", column)))?;
         

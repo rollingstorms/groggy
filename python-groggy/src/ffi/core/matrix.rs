@@ -1,0 +1,402 @@
+//! Matrix FFI Bindings
+//! 
+//! Python bindings for GraphMatrix - general-purpose matrix operations.
+
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyType};
+use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyIndexError, PyImportError, PyNotImplementedError};
+use groggy::core::matrix::GraphMatrix;
+use groggy::core::array::GraphArray;
+use groggy::AttrValue as RustAttrValue;
+
+// Use utility functions from utils module
+use crate::ffi::utils::{python_value_to_attr_value, attr_value_to_python_value, graph_error_to_py_err};
+use crate::ffi::core::array::PyGraphArray;
+
+/// Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays
+#[pyclass(name = "GraphMatrix", unsendable)]
+pub struct PyGraphMatrix {
+    /// Core GraphMatrix
+    pub inner: GraphMatrix,
+}
+
+#[pymethods]
+impl PyGraphMatrix {
+    /// Create a new GraphMatrix from arrays
+    #[new]
+    pub fn new(py: Python, arrays: Vec<Py<PyGraphArray>>) -> PyResult<Self> {
+        // Convert PyGraphArrays to core GraphArrays
+        let core_arrays: Vec<GraphArray> = arrays.iter()
+            .map(|py_array| py_array.borrow(py).inner.clone())
+            .collect();
+        
+        // Create core GraphMatrix
+        let matrix = GraphMatrix::from_arrays(core_arrays)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create matrix: {:?}", e)))?;
+        
+        Ok(Self { inner: matrix })
+    }
+
+    /// Create a zero matrix with specified dimensions and type
+    #[classmethod]
+    fn zeros(_cls: &PyType, py: Python, rows: usize, cols: usize, dtype: Option<&str>) -> PyResult<Py<Self>> {
+        // Parse dtype string to AttrValueType
+        let attr_type = match dtype.unwrap_or("float") {
+            "int" | "int64" => groggy::AttrValueType::Int,
+            "float" | "float64" | "f64" => groggy::AttrValueType::Float,
+            "bool" => groggy::AttrValueType::Bool,
+            "str" | "string" | "text" => groggy::AttrValueType::Text,
+            _ => return Err(PyValueError::new_err(format!("Unsupported dtype: {}", dtype.unwrap_or("unknown"))))
+        };
+        
+        let matrix = GraphMatrix::zeros(rows, cols, attr_type);
+        Ok(Py::new(py, Self { inner: matrix })?)
+    }
+
+    /// Create an identity matrix with specified size
+    #[classmethod]
+    fn identity(_cls: &PyType, py: Python, size: usize) -> PyResult<Py<Self>> {
+        let matrix = GraphMatrix::identity(size);
+        Ok(Py::new(py, Self { inner: matrix })?)
+    }
+
+    /// Create matrix from graph attributes
+    #[classmethod] 
+    fn from_graph_attributes(
+        _cls: &PyType,
+        py: Python,
+        graph: PyObject,
+        attrs: Vec<String>,
+        entities: Vec<u64>
+    ) -> PyResult<Py<Self>> {
+        // TODO: Implement graph integration in Phase 2
+        // For now, return a placeholder error
+        Err(PyNotImplementedError::new_err("Graph integration not yet implemented in Phase 2"))
+    }
+
+    // === PROPERTIES ===
+
+    /// Get matrix dimensions as (rows, columns) tuple
+    #[getter]
+    fn shape(&self) -> (usize, usize) {
+        self.inner.shape()
+    }
+    
+    /// Get matrix data type
+    #[getter] 
+    fn dtype(&self) -> String {
+        format!("{:?}", self.inner.dtype())
+    }
+    
+    /// Get column names
+    #[getter]
+    fn columns(&self) -> Vec<String> {
+        self.inner.column_names().to_vec()
+    }
+
+    /// Check if matrix is square
+    #[getter]
+    fn is_square(&self) -> bool {
+        self.inner.is_square()
+    }
+
+    /// Check if matrix is symmetric (for square numeric matrices)
+    #[getter] 
+    fn is_symmetric(&self) -> bool {
+        // TODO: Implement is_symmetric in core GraphMatrix
+        false
+    }
+
+    /// Check if matrix contains only numeric data
+    #[getter]
+    fn is_numeric(&self) -> bool {
+        self.inner.is_numeric()
+    }
+
+    // === ACCESS & INDEXING ===
+
+    /// Multi-index access for matrix elements: matrix[row, col] -> value, matrix[row] -> row, matrix["col"] -> column
+    fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
+        // Multi-index access (row, col) -> single cell value
+        if let Ok(indices) = key.extract::<(usize, usize)>() {
+            let (row, col) = indices;
+            return self.get_cell(py, row, col);
+        }
+        
+        // Single integer -> row access
+        if let Ok(row_index) = key.extract::<usize>() {
+            return self.get_row(py, row_index);
+        }
+        
+        // String -> column access
+        if let Ok(col_name) = key.extract::<String>() {
+            return self.get_column_by_name(py, col_name);
+        }
+        
+        Err(PyTypeError::new_err(
+            "Key must be: int (row index), string (column name), or (row, col) tuple for multi-index access"
+        ))
+    }
+    
+    /// Get single cell value at (row, col)
+    fn get_cell(&self, py: Python, row: usize, col: usize) -> PyResult<PyObject> {
+        match self.inner.get(row, col) {
+            Some(attr_value) => attr_value_to_python_value(py, attr_value),
+            None => {
+                let (rows, cols) = self.inner.shape();
+                Err(PyIndexError::new_err(format!(
+                    "Index ({}, {}) out of range for {}x{} matrix", 
+                    row, col, rows, cols
+                )))
+            }
+        }
+    }
+    
+    /// Get entire row as GraphArray
+    fn get_row(&self, py: Python, row: usize) -> PyResult<PyObject> {
+        match self.inner.get_row(row) {
+            Some(row_array) => {
+                let py_array = PyGraphArray::from_graph_array(row_array);
+                Ok(Py::new(py, py_array)?.to_object(py))
+            }
+            None => {
+                let (rows, _) = self.inner.shape();
+                Err(PyIndexError::new_err(format!("Row index {} out of range for {} rows", row, rows)))
+            }
+        }
+    }
+    
+    /// Get column by name as GraphArray
+    fn get_column_by_name(&self, py: Python, name: String) -> PyResult<PyObject> {
+        match self.inner.get_column_by_name(&name) {
+            Some(column) => {
+                let py_array = PyGraphArray::from_graph_array(column.clone());
+                Ok(Py::new(py, py_array)?.to_object(py))
+            }
+            None => Err(PyKeyError::new_err(format!("Column '{}' not found", name)))
+        }
+    }
+    
+    /// Get column by index as GraphArray
+    fn get_column(&self, py: Python, col: usize) -> PyResult<PyObject> {
+        match self.inner.get_column(col) {
+            Some(column) => {
+                let py_array = PyGraphArray::from_graph_array(column.clone());
+                Ok(Py::new(py, py_array)?.to_object(py))
+            }
+            None => {
+                let (_, cols) = self.inner.shape();
+                Err(PyIndexError::new_err(format!("Column index {} out of range for {} columns", col, cols)))
+            }
+        }
+    }
+
+    // === ITERATION ===
+
+    /// Iterate over rows - returns iterator of GraphArrays
+    fn iter_rows(&self, py: Python) -> PyResult<Vec<PyObject>> {
+        let (rows, _) = self.inner.shape();
+        let mut row_arrays = Vec::with_capacity(rows);
+        
+        for i in 0..rows {
+            match self.inner.get_row(i) {
+                Some(row_array) => {
+                    let py_array = PyGraphArray::from_graph_array(row_array);
+                    row_arrays.push(Py::new(py, py_array)?.to_object(py));
+                }
+                None => return Err(PyIndexError::new_err(format!("Row {} not found", i)))
+            }
+        }
+        
+        Ok(row_arrays)
+    }
+
+    /// Iterate over columns - returns iterator of GraphArrays
+    fn iter_columns(&self, py: Python) -> PyResult<Vec<PyObject>> {
+        let (_, cols) = self.inner.shape();
+        let mut col_arrays = Vec::with_capacity(cols);
+        
+        for i in 0..cols {
+            match self.inner.get_column(i) {
+                Some(col_array) => {
+                    let py_array = PyGraphArray::from_graph_array(col_array.clone());
+                    col_arrays.push(Py::new(py, py_array)?.to_object(py));
+                }
+                None => return Err(PyIndexError::new_err(format!("Column {} not found", i)))
+            }
+        }
+        
+        Ok(col_arrays)
+    }
+
+    // === LINEAR ALGEBRA OPERATIONS ===
+
+    /// Transpose the matrix
+    fn transpose(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        let transposed = self.inner.transpose();
+        Ok(Py::new(py, PyGraphMatrix { inner: transposed })?)
+    }
+
+    /// Matrix multiplication (Phase 5 - placeholder for now)
+    fn multiply(&self, _other: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
+        Err(PyNotImplementedError::new_err("Matrix multiplication will be implemented in Phase 5"))
+    }
+
+    /// Matrix inverse (Phase 5 - placeholder for now)
+    fn inverse(&self) -> PyResult<Py<PyGraphMatrix>> {
+        Err(PyNotImplementedError::new_err("Matrix inverse will be implemented in Phase 5"))
+    }
+
+    /// Determinant calculation (Phase 5 - placeholder for now)
+    fn determinant(&self) -> PyResult<Option<f64>> {
+        Err(PyNotImplementedError::new_err("Determinant calculation will be implemented in Phase 5"))
+    }
+
+    // === STATISTICAL OPERATIONS ===
+
+    /// Sum along specified axis (0=rows, 1=columns)
+    fn sum_axis(&self, py: Python, axis: usize) -> PyResult<PyObject> {
+        let axis_enum = match axis {
+            0 => groggy::core::matrix::Axis::Rows,
+            1 => groggy::core::matrix::Axis::Columns,
+            _ => return Err(PyValueError::new_err("Axis must be 0 (rows) or 1 (columns)"))
+        };
+        
+        let result_array = self.inner.sum_axis(axis_enum);
+        let py_array = PyGraphArray::from_graph_array(result_array);
+        Ok(Py::new(py, py_array)?.to_object(py))
+    }
+
+    /// Mean along specified axis (0=rows, 1=columns)
+    fn mean_axis(&self, py: Python, axis: usize) -> PyResult<PyObject> {
+        let axis_enum = match axis {
+            0 => groggy::core::matrix::Axis::Rows,
+            1 => groggy::core::matrix::Axis::Columns,
+            _ => return Err(PyValueError::new_err("Axis must be 0 (rows) or 1 (columns)"))
+        };
+        
+        let result_array = self.inner.mean_axis(axis_enum);
+        let py_array = PyGraphArray::from_graph_array(result_array);
+        Ok(Py::new(py, py_array)?.to_object(py))
+    }
+
+    /// Standard deviation along specified axis (0=rows, 1=columns)
+    fn std_axis(&self, py: Python, axis: usize) -> PyResult<PyObject> {
+        let axis_enum = match axis {
+            0 => groggy::core::matrix::Axis::Rows,
+            1 => groggy::core::matrix::Axis::Columns,
+            _ => return Err(PyValueError::new_err("Axis must be 0 (rows) or 1 (columns)"))
+        };
+        
+        let result_array = self.inner.std_axis(axis_enum);
+        let py_array = PyGraphArray::from_graph_array(result_array);
+        Ok(Py::new(py, py_array)?.to_object(py))
+    }
+
+    // === SCIENTIFIC COMPUTING CONVERSIONS ===
+
+    /// Convert to NumPy array (when numpy available)
+    fn to_numpy(&self, py: Python) -> PyResult<PyObject> {
+        // Try to import numpy
+        let numpy = py.import("numpy").map_err(|_| {
+            PyErr::new::<PyImportError, _>("numpy is required for to_numpy(). Install with: pip install numpy")
+        })?;
+        
+        // Convert matrix to nested list representation
+        let (rows, cols) = self.inner.shape();
+        let mut matrix_data = Vec::with_capacity(rows);
+        
+        for i in 0..rows {
+            let mut row_data = Vec::with_capacity(cols);
+            for j in 0..cols {
+                match self.inner.get(i, j) {
+                    Some(attr_value) => {
+                        let py_value = attr_value_to_python_value(py, attr_value)?;
+                        row_data.push(py_value);
+                    }
+                    None => return Err(PyIndexError::new_err(format!("Missing value at ({}, {})", i, j)))
+                }
+            }
+            matrix_data.push(row_data);
+        }
+        
+        // Convert to numpy array
+        let array = numpy.call_method1("array", (matrix_data,))?;
+        Ok(array.to_object(py))
+    }
+
+    /// Convert to Pandas DataFrame (when pandas available)
+    fn to_pandas(&self, py: Python) -> PyResult<PyObject> {
+        // Try to import pandas
+        let pandas = py.import("pandas").map_err(|_| {
+            PyErr::new::<PyImportError, _>("pandas is required for to_pandas(). Install with: pip install pandas")
+        })?;
+        
+        // Convert to dictionary of column name -> values
+        let dict = pyo3::types::PyDict::new(py);
+        let column_names = self.inner.column_names();
+        let (_, cols) = self.inner.shape();
+        
+        for (col_idx, col_name) in column_names.iter().enumerate() {
+            if col_idx < cols {
+                match self.inner.get_column(col_idx) {
+                    Some(column) => {
+                        let py_array = PyGraphArray::from_graph_array(column.clone());
+                        let values = py_array.to_list(py)?;
+                        dict.set_item(col_name, values)?;
+                    }
+                    None => return Err(PyIndexError::new_err(format!("Column {} not found", col_idx)))
+                }
+            }
+        }
+        
+        // Create DataFrame
+        let dataframe = pandas.call_method1("DataFrame", (dict,))?;
+        Ok(dataframe.to_object(py))
+    }
+
+    // === DISPLAY & REPRESENTATION ===
+
+    /// String representation
+    fn __repr__(&self) -> String {
+        let (rows, cols) = self.inner.shape();
+        format!("GraphMatrix({} x {}, dtype={})", rows, cols, format!("{:?}", self.inner.dtype()))
+    }
+
+    /// Extract display data for Python display formatters
+    fn _get_display_data(&self, py: Python) -> PyResult<PyObject> {
+        let dict = pyo3::types::PyDict::new(py);
+        let (rows, cols) = self.inner.shape();
+        
+        // Convert matrix to nested list for display
+        let mut matrix_data = Vec::with_capacity(rows);
+        for i in 0..rows {
+            let mut row_data = Vec::with_capacity(cols);
+            for j in 0..cols {
+                match self.inner.get(i, j) {
+                    Some(attr_value) => {
+                        row_data.push(attr_value_to_python_value(py, attr_value)?);
+                    }
+                    None => row_data.push(py.None())
+                }
+            }
+            matrix_data.push(row_data);
+        }
+        
+        dict.set_item("data", matrix_data)?;
+        dict.set_item("shape", (rows, cols))?;
+        dict.set_item("dtype", self.dtype())?;
+        dict.set_item("columns", self.columns())?;
+        dict.set_item("is_square", self.is_square())?;
+        dict.set_item("is_symmetric", self.is_symmetric())?;
+        
+        Ok(dict.to_object(py))
+    }
+}
+
+impl PyGraphMatrix {
+    /// Create PyGraphMatrix from core GraphMatrix
+    pub fn from_graph_matrix(matrix: GraphMatrix) -> Self {
+        Self { inner: matrix }
+    }
+}

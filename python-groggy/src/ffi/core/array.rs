@@ -109,7 +109,7 @@ impl PyGraphArray {
     }
     
     /// Convert to plain Python list
-    fn to_list(&self, py: Python) -> PyResult<Vec<PyObject>> {
+    pub fn to_list(&self, py: Python) -> PyResult<Vec<PyObject>> {
         let mut py_values = Vec::with_capacity(self.inner.len());
         
         for attr_value in self.inner.iter() {
@@ -425,144 +425,6 @@ impl PyStatsSummary {
     }
 }
 
-/// Python wrapper for GraphMatrix - wraps core GraphMatrix  
-/// This is the general-purpose matrix type for collections of GraphArrays
-#[pyclass(name = "GraphMatrix")]
-pub struct PyGraphMatrix {
-    /// Core GraphMatrix
-    pub inner: groggy::GraphMatrix,
-}
-
-#[pymethods]
-impl PyGraphMatrix {
-    /// Create a new GraphMatrix from arrays
-    #[new]
-    pub fn new(py: Python, arrays: Vec<Py<PyGraphArray>>) -> PyResult<Self> {
-        // Convert PyGraphArrays to core GraphArrays
-        let core_arrays: Vec<groggy::GraphArray> = arrays.iter()
-            .map(|py_array| py_array.borrow(py).inner.clone())
-            .collect();
-        
-        // Create core GraphMatrix
-        let matrix = groggy::GraphMatrix::from_arrays(core_arrays)
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create matrix: {:?}", e)))?;
-        
-        Ok(Self { inner: matrix })
-    }
-
-    /// Get matrix dimensions as (rows, columns) tuple
-    #[getter]
-    fn shape(&self) -> (usize, usize) {
-        self.inner.shape()
-    }
-    
-    /// Get matrix data type
-    #[getter] 
-    fn dtype(&self) -> String {
-        format!("{:?}", self.inner.dtype())
-    }
-    
-    /// Get column names
-    #[getter]
-    fn columns(&self) -> Vec<String> {
-        self.inner.column_names().to_vec()
-    }
-    
-    /// Multi-index access for matrix elements: matrix[row, col] -> value
-    fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
-        // Multi-index access (row, col) -> single cell value
-        if let Ok(indices) = key.extract::<(usize, usize)>() {
-            let (row, col) = indices;
-            return self.get_cell(py, row, col);
-        }
-        
-        // Single integer -> row access
-        if let Ok(row_index) = key.extract::<usize>() {
-            return self.get_row(py, row_index);
-        }
-        
-        // String -> column access
-        if let Ok(col_name) = key.extract::<String>() {
-            return self.get_column_by_name(py, col_name);
-        }
-        
-        Err(PyTypeError::new_err(
-            "Key must be: int (row index), string (column name), or (row, col) tuple for multi-index access"
-        ))
-    }
-    
-    /// Get single cell value at (row, col)
-    fn get_cell(&self, py: Python, row: usize, col: usize) -> PyResult<PyObject> {
-        match self.inner.get(row, col) {
-            Some(attr_value) => attr_value_to_python_value(py, attr_value),
-            None => {
-                let (rows, cols) = self.inner.shape();
-                Err(PyIndexError::new_err(format!(
-                    "Index ({}, {}) out of range for {}x{} matrix", 
-                    row, col, rows, cols
-                )))
-            }
-        }
-    }
-    
-    /// Get entire row as GraphArray
-    fn get_row(&self, py: Python, row: usize) -> PyResult<PyObject> {
-        match self.inner.get_row(row) {
-            Some(row_array) => {
-                let py_array = PyGraphArray::from_graph_array(row_array);
-                Ok(Py::new(py, py_array)?.to_object(py))
-            }
-            None => {
-                let (rows, _) = self.inner.shape();
-                Err(PyIndexError::new_err(format!("Row index {} out of range for {} rows", row, rows)))
-            }
-        }
-    }
-    
-    /// Get column by name as GraphArray
-    fn get_column_by_name(&self, py: Python, name: String) -> PyResult<PyObject> {
-        match self.inner.get_column_by_name(&name) {
-            Some(column) => {
-                let py_array = PyGraphArray::from_graph_array(column.clone());
-                Ok(Py::new(py, py_array)?.to_object(py))
-            }
-            None => Err(PyKeyError::new_err(format!("Column '{}' not found", name)))
-        }
-    }
-    
-    /// Transpose the matrix
-    fn transpose(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        let transposed = self.inner.transpose();
-        Ok(Py::new(py, PyGraphMatrix { inner: transposed })?)
-    }
-    
-    /// Get column by index as GraphArray
-    fn get_column(&self, py: Python, col: usize) -> PyResult<PyObject> {
-        match self.inner.get_column(col) {
-            Some(column) => {
-                let py_array = PyGraphArray::from_graph_array(column.clone());
-                Ok(Py::new(py, py_array)?.to_object(py))
-            }
-            None => {
-                let (_, cols) = self.inner.shape();
-                Err(PyIndexError::new_err(format!("Column index {} out of range for {} columns", col, cols)))
-            }
-        }
-    }
-    
-    /// String representation
-    fn __repr__(&self) -> String {
-        let (rows, cols) = self.inner.shape();
-        format!("GraphMatrix({} x {}, dtype={})", rows, cols, format!("{:?}", self.inner.dtype()))
-    }
-}
-
-impl PyGraphMatrix {
-    /// Create PyGraphMatrix from core GraphMatrix
-    pub fn from_graph_matrix(matrix: groggy::GraphMatrix) -> Self {
-        Self { inner: matrix }
-    }
-}
 
 /// Iterator for GraphArray
 #[pyclass]
@@ -592,5 +454,21 @@ impl GraphArrayIterator {
 impl PyGraphArray {
     pub fn from_graph_array(array: GraphArray) -> Self {
         PyGraphArray { inner: array }
+    }
+    
+    /// Public constructor for use by builder functions
+    pub fn from_py_objects(values: Vec<PyObject>) -> PyResult<Self> {
+        Python::with_gil(|py| {
+            let mut attr_values = Vec::with_capacity(values.len());
+            
+            for value in values {
+                let attr_value = python_value_to_attr_value(value.as_ref(py))?;
+                attr_values.push(attr_value);
+            }
+            
+            Ok(PyGraphArray {
+                inner: GraphArray::from_vec(attr_values),
+            })
+        })
     }
 }
