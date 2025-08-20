@@ -15,6 +15,7 @@ use crate::ffi::types::PyAttrValue;
 use crate::ffi::core::array::{PyGraphArray, PyGraphMatrix};
 use crate::ffi::core::accessors::{PyNodesAccessor, PyEdgesAccessor};
 use crate::ffi::core::query::PyNodeFilter;
+use crate::ffi::core::table::PyGraphTable;
 use crate::ffi::utils::graph_error_to_py_err;
 
 // Import the core Subgraph type
@@ -543,24 +544,28 @@ impl PySubgraph {
     
     /// Create GraphTable for DataFrame-like view of this subgraph nodes
     fn table(&self, py: Python) -> PyResult<PyObject> {
-        // Import the Python GraphTable class
-        let groggy = py.import("groggy")?;
-        let graph_table_class = groggy.getattr("GraphTable")?;
+        // Create Rust PyGraphTable directly
+        let table = PyGraphTable::new(
+            py,
+            self.nodes.clone().to_object(py),
+            "nodes".to_string(),
+            self.graph.clone(),
+        )?;
         
-        // Create GraphTable with nodes data source
-        let table = graph_table_class.call1((self.nodes.clone(), "nodes", self.graph.clone()))?;
-        Ok(table.to_object(py))
+        Ok(Py::new(py, table)?.to_object(py))
     }
     
     /// Create GraphTable for DataFrame-like view of this subgraph edges
     fn edges_table(&self, py: Python) -> PyResult<PyObject> {
-        // Import the Python GraphTable class
-        let groggy = py.import("groggy")?;
-        let graph_table_class = groggy.getattr("GraphTable")?;
+        // Create Rust PyGraphTable directly
+        let table = PyGraphTable::new(
+            py,
+            self.edges.clone().to_object(py),
+            "edges".to_string(),
+            self.graph.clone(),
+        )?;
         
-        // Create GraphTable with edges data source
-        let table = graph_table_class.call1((self.edges.clone(), "edges", self.graph.clone()))?;
-        Ok(table.to_object(py))
+        Ok(Py::new(py, table)?.to_object(py))
     }
     
     /// Python-level access to parent graph (if attached).

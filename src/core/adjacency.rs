@@ -1,10 +1,10 @@
-//! GraphMatrix Operations - High-Performance Matrix Generation using GraphArray
+//! AdjacencyMatrix Operations - High-Performance Matrix Generation using GraphArray
 //!
 //! This module provides efficient adjacency matrix generation for graphs and subgraphs
 //! with native Rust performance using our existing GraphArray infrastructure.
 //!
 //! # Features
-//! - GraphMatrix built on GraphArray for consistency and statistical operations
+//! - AdjacencyMatrix built on GraphArray for consistency and statistical operations
 //! - Dense and sparse matrix representations
 //! - Compact indexing for subgraphs  
 //! - Weighted and unweighted matrices
@@ -20,9 +20,9 @@ use crate::core::array::GraphArray;  // Our enhanced array type
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// GraphMatrix - dense matrix representation using GraphArray for efficiency
+/// AdjacencyMatrix - dense matrix representation using GraphArray for efficiency  
 #[derive(Debug, Clone)]
-pub struct GraphMatrix {
+pub struct AdjacencyMatrix {
     /// Matrix data stored as GraphArray for native statistical operations
     pub data: GraphArray,
     /// Number of rows (and columns, since square)
@@ -33,7 +33,7 @@ pub struct GraphMatrix {
     pub labels: Option<Vec<NodeId>>,
 }
 
-impl GraphMatrix {
+impl AdjacencyMatrix {
     /// Get matrix element at (row, col) position
     pub fn get(&self, row: usize, col: usize) -> Option<&AttrValue> {
         if row < self.size && col < self.size {
@@ -94,7 +94,7 @@ impl GraphMatrix {
 
 /// Sparse adjacency matrix representation using COO format with GraphArray values
 #[derive(Debug, Clone)]
-pub struct SparseGraphMatrix {
+pub struct SparseAdjacencyMatrix {
     /// Row indices
     pub rows: Vec<usize>,
     /// Column indices  
@@ -107,7 +107,7 @@ pub struct SparseGraphMatrix {
     pub labels: Option<Vec<NodeId>>,
 }
 
-impl SparseGraphMatrix {
+impl SparseAdjacencyMatrix {
     /// Get matrix element at (row, col) position
     pub fn get(&self, row: usize, col: usize) -> Option<&AttrValue> {
         if row >= self.shape.0 || col >= self.shape.1 {
@@ -162,7 +162,7 @@ impl SparseGraphMatrix {
     }
     
     /// Convert to dense representation if needed for certain operations
-    pub fn to_dense(&self) -> GraphMatrix {
+    pub fn to_dense(&self) -> AdjacencyMatrix {
         let mut data = vec![AttrValue::Float(0.0); self.shape.0 * self.shape.1];
         
         // Fill in non-zero values
@@ -175,7 +175,7 @@ impl SparseGraphMatrix {
             }
         }
         
-        GraphMatrix {
+        AdjacencyMatrix {
             data: GraphArray::from_vec(data),
             size: self.shape.0,
             row_major: true,
@@ -321,16 +321,15 @@ impl AdjacencyMatrixBuilder {
         
         match self.format {
             MatrixFormat::Dense => {
-                let dense = self.build_dense_matrix(
+                self.build_dense_matrix(
                     pool, space, nodes, &neighbors, size, &mapping
-                )?;
-                Ok(AdjacencyMatrix::Dense(dense))
+                )
             },
             MatrixFormat::Sparse => {
                 let sparse = self.build_sparse_matrix(
                     pool, space, nodes, &edge_ids, &sources, &targets, size, &mapping
                 )?;
-                Ok(AdjacencyMatrix::Sparse(sparse))
+                Ok(sparse.to_dense())
             },
         }
     }
@@ -344,7 +343,7 @@ impl AdjacencyMatrixBuilder {
         neighbors: &Arc<HashMap<NodeId, Vec<(NodeId, EdgeId)>>>,
         size: usize,
         mapping: &Option<IndexMapping>,
-    ) -> GraphResult<GraphMatrix> {
+    ) -> GraphResult<AdjacencyMatrix> {
         let mut data = vec![AttrValue::Float(0.0); size * size];
         let node_set: HashMap<NodeId, usize> = if let Some(ref map) = mapping {
             map.node_to_index.clone()
@@ -371,7 +370,7 @@ impl AdjacencyMatrixBuilder {
         // Apply matrix type transformations
         self.apply_matrix_type_dense(&mut data, size)?;
         
-        Ok(GraphMatrix {
+        Ok(AdjacencyMatrix {
             data: GraphArray::from_vec(data),
             size,
             row_major: true,
@@ -390,7 +389,7 @@ impl AdjacencyMatrixBuilder {
         targets: &[NodeId],
         size: usize,
         mapping: &Option<IndexMapping>,
-    ) -> GraphResult<SparseGraphMatrix> {
+    ) -> GraphResult<SparseAdjacencyMatrix> {
         let mut rows = Vec::new();
         let mut cols = Vec::new();
         let mut values = Vec::new();
@@ -429,7 +428,7 @@ impl AdjacencyMatrixBuilder {
         // Apply matrix type transformations  
         self.apply_matrix_type_sparse(&mut rows, &mut cols, &mut values, size)?;
         
-        Ok(SparseGraphMatrix {
+        Ok(SparseAdjacencyMatrix {
             rows,
             cols,
             values: GraphArray::from_vec(values),
@@ -590,41 +589,41 @@ impl Default for AdjacencyMatrixBuilder {
 
 /// Adjacency matrix result using our GraphArray infrastructure
 #[derive(Debug, Clone)]
-pub enum AdjacencyMatrix {
-    Dense(GraphMatrix),
-    Sparse(SparseGraphMatrix),
+pub enum AdjacencyMatrixResult {
+    Dense(AdjacencyMatrix),
+    Sparse(SparseAdjacencyMatrix),
 }
 
-impl AdjacencyMatrix {
+impl AdjacencyMatrixResult {
     /// Get matrix dimensions
     pub fn shape(&self) -> (usize, usize) {
         match self {
-            AdjacencyMatrix::Dense(m) => (m.size, m.size),
-            AdjacencyMatrix::Sparse(m) => m.shape,
+            AdjacencyMatrixResult::Dense(m) => (m.size, m.size),
+            AdjacencyMatrixResult::Sparse(m) => m.shape,
         }
     }
     
     /// Get node labels if available
     pub fn labels(&self) -> Option<&[NodeId]> {
         match self {
-            AdjacencyMatrix::Dense(m) => m.labels.as_deref(),
-            AdjacencyMatrix::Sparse(m) => m.labels.as_deref(),
+            AdjacencyMatrixResult::Dense(m) => m.labels.as_deref(),
+            AdjacencyMatrixResult::Sparse(m) => m.labels.as_deref(),
         }
     }
     
     /// Check if matrix is sparse
     pub fn is_sparse(&self) -> bool {
-        matches!(self, AdjacencyMatrix::Sparse(_))
+        matches!(self, AdjacencyMatrixResult::Sparse(_))
     }
     
     /// Get memory usage in bytes (approximate)
     pub fn memory_usage(&self) -> usize {
         match self {
-            AdjacencyMatrix::Dense(m) => {
+            AdjacencyMatrixResult::Dense(m) => {
                 m.data.len() * std::mem::size_of::<AttrValue>() +
                 m.labels.as_ref().map_or(0, |l| l.len() * std::mem::size_of::<NodeId>())
             },
-            AdjacencyMatrix::Sparse(m) => {
+            AdjacencyMatrixResult::Sparse(m) => {
                 (m.rows.len() + m.cols.len()) * std::mem::size_of::<usize>() +
                 m.values.len() * std::mem::size_of::<AttrValue>() +
                 m.labels.as_ref().map_or(0, |l| l.len() * std::mem::size_of::<NodeId>())

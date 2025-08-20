@@ -130,6 +130,8 @@ pub mod core {
     pub mod strategies;
     pub mod subgraph;
     pub mod adjacency;
+    pub mod matrix;
+    pub mod table;
 }
 
 // Display formatting
@@ -141,7 +143,7 @@ pub mod api {
 }
 
 // Re-export commonly used types and the main API
-pub use types::{NodeId, EdgeId, AttrName, AttrValue, StateId, BranchName};
+pub use types::{NodeId, EdgeId, AttrName, AttrValue, AttrValueType, StateId, BranchName};
 pub use config::GraphConfig;
 pub use errors::{GraphError, GraphResult};
 pub use api::graph::Graph;
@@ -159,8 +161,10 @@ pub use core::delta::{ColumnDelta, DeltaObject};
 pub use core::change_tracker::ChangeTracker;
 pub use core::pool::GraphPool;
 pub use core::space::GraphSpace;
-pub use core::adjacency::{AdjacencyMatrix, GraphMatrix, SparseGraphMatrix, MatrixFormat, MatrixType, IndexMapping};
+pub use core::adjacency::{AdjacencyMatrix, SparseAdjacencyMatrix, AdjacencyMatrixResult, MatrixFormat, MatrixType, IndexMapping};
+pub use core::matrix::{GraphMatrix, MatrixProperties, Axis};
 pub use core::array::{GraphArray, StatsSummary};
+pub use core::table::{GraphTable, TableMetadata, JoinType, AggregateOp, GroupBy};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

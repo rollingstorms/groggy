@@ -14,6 +14,7 @@ pub use ffi::core::subgraph::PySubgraph;
 pub use ffi::core::array::{PyGraphArray, PyGraphMatrix};
 pub use ffi::core::accessors::{PyNodesAccessor, PyEdgesAccessor};
 pub use ffi::core::views::{PyNodeView, PyEdgeView};
+pub use ffi::core::table::PyGraphTable;
 pub use ffi::types::{PyAttrValue, PyResultHandle, PyAttributeCollection};
 pub use ffi::core::query::{PyAttributeFilter, PyNodeFilter, PyEdgeFilter};
 pub use ffi::core::history::{PyCommit, PyBranchInfo, PyHistoryStatistics};
@@ -30,6 +31,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Register array and matrix types
     m.add_class::<PyGraphArray>()?;
     m.add_class::<PyGraphMatrix>()?;
+    m.add_class::<PyGraphTable>()?;
     
     // Register accessor and view types
     m.add_class::<PyNodesAccessor>()?;
