@@ -4,6 +4,7 @@
 
 // Core component FFI bindings
 pub mod array;
+pub mod matrix;
 pub mod subgraph;  
 pub mod query;
 pub mod history;
@@ -15,6 +16,7 @@ pub mod table;
 
 // Re-export core FFI types
 pub use array::*;
+pub use matrix::*;
 pub use subgraph::*;
 pub use query::*;
 pub use history::*;

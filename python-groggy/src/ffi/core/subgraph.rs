@@ -12,7 +12,8 @@ use std::collections::{HashMap, HashSet};
 // Import types from our FFI modules
 use crate::ffi::api::graph::PyGraph;
 use crate::ffi::types::PyAttrValue;
-use crate::ffi::core::array::{PyGraphArray, PyGraphMatrix};
+use crate::ffi::core::array::PyGraphArray;
+use crate::ffi::core::matrix::PyGraphMatrix;
 use crate::ffi::core::accessors::{PyNodesAccessor, PyEdgesAccessor};
 use crate::ffi::core::query::PyNodeFilter;
 use crate::ffi::core::table::PyGraphTable;
@@ -543,29 +544,19 @@ impl PySubgraph {
     }
     
     /// Create GraphTable for DataFrame-like view of this subgraph nodes
-    fn table(&self, py: Python) -> PyResult<PyObject> {
-        // Create Rust PyGraphTable directly
-        let table = PyGraphTable::new(
-            py,
-            self.nodes.clone().to_object(py),
-            "nodes".to_string(),
-            self.graph.clone(),
-        )?;
-        
-        Ok(Py::new(py, table)?.to_object(py))
+    fn table(&self, _py: Python) -> PyResult<PyObject> {
+        // TODO: Fix PyGraphTable integration in Phase 2
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Subgraph table functionality temporarily disabled during Phase 2 unification"
+        ))
     }
     
     /// Create GraphTable for DataFrame-like view of this subgraph edges
-    fn edges_table(&self, py: Python) -> PyResult<PyObject> {
-        // Create Rust PyGraphTable directly
-        let table = PyGraphTable::new(
-            py,
-            self.edges.clone().to_object(py),
-            "edges".to_string(),
-            self.graph.clone(),
-        )?;
-        
-        Ok(Py::new(py, table)?.to_object(py))
+    fn edges_table(&self, _py: Python) -> PyResult<PyObject> {
+        // TODO: Fix PyGraphTable integration in Phase 2
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Subgraph edges table functionality temporarily disabled during Phase 2 unification"
+        ))
     }
     
     /// Python-level access to parent graph (if attached).
