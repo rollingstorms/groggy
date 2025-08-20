@@ -63,7 +63,7 @@ This is the heart of the flexible attribute system. Should support:
 
 /// Efficient storage for attribute values supporting multiple data types
 /// DESIGN: Enum dispatch is fast, Hash implementation handles f32 properly
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum AttrValue {
     /// 32-bit float (embeddings, coordinates, ML features)
     Float(f32),
@@ -173,7 +173,7 @@ impl PartialEq for AttrValue {
 
 /// Memory-efficient string storage that avoids heap allocation for short strings
 /// MEMORY OPTIMIZATION: Stores strings <= 15 bytes inline, larger ones on heap
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum CompactString {
     /// Inline storage for strings up to 15 bytes (fits in 16 bytes total)
     Inline { data: [u8; 15], len: u8 },
@@ -275,9 +275,70 @@ impl Hash for AttrValue {
 // Manual Eq implementation to handle f32 comparison
 impl Eq for AttrValue {}
 
+impl PartialOrd for AttrValue {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for AttrValue {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use AttrValue::*;
+        use std::cmp::Ordering;
+        
+        match (self, other) {
+            // Same variant comparisons
+            (Int(a), Int(b)) => a.cmp(b),
+            (SmallInt(a), SmallInt(b)) => a.cmp(b),
+            (Float(a), Float(b)) => a.partial_cmp(b).unwrap_or(Ordering::Equal),
+            (Bool(a), Bool(b)) => a.cmp(b),
+            (Text(a), Text(b)) => a.cmp(b),
+            (CompactText(a), CompactText(b)) => a.as_str().cmp(b.as_str()),
+            (FloatVec(a), FloatVec(b)) => a.len().cmp(&b.len()).then_with(|| {
+                // Compare vectors lexicographically
+                for (va, vb) in a.iter().zip(b.iter()) {
+                    match va.partial_cmp(vb).unwrap_or(Ordering::Equal) {
+                        Ordering::Equal => continue,
+                        other => return other,
+                    }
+                }
+                Ordering::Equal
+            }),
+            (Bytes(a), Bytes(b)) => a.cmp(b),
+            (CompressedText(a), CompressedText(b)) => a.data.cmp(&b.data),
+            (CompressedFloatVec(a), CompressedFloatVec(b)) => a.data.cmp(&b.data),
+            
+            // Cross-type comparisons - order by type discriminant first
+            (Int(a), SmallInt(b)) => (*a as i64).cmp(&(*b as i64)),
+            (SmallInt(a), Int(b)) => (*a as i64).cmp(b),
+            
+            // Text comparisons across storage types
+            (Text(a), CompactText(b)) => a.as_str().cmp(b.as_str()),
+            (CompactText(a), Text(b)) => a.as_str().cmp(b.as_str()),
+            
+            // Different types - order by discriminant (type priority)
+            _ => self.type_discriminant().cmp(&other.type_discriminant()),
+        }
+    }
+}
+
+impl AttrValue {
+    /// Get type discriminant for ordering different types
+    fn type_discriminant(&self) -> u8 {
+        match self {
+            AttrValue::Int(_) | AttrValue::SmallInt(_) => 0,
+            AttrValue::Float(_) => 1,
+            AttrValue::Bool(_) => 2,
+            AttrValue::Text(_) | AttrValue::CompactText(_) | AttrValue::CompressedText(_) => 3,
+            AttrValue::FloatVec(_) | AttrValue::CompressedFloatVec(_) => 4,
+            AttrValue::Bytes(_) => 5,
+        }
+    }
+}
+
 /// Compressed data storage for large values (Memory Optimization 3)
 /// Uses simple run-length encoding and basic compression
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct CompressedData {
     /// Compressed bytes
     pub data: Vec<u8>,
@@ -287,7 +348,7 @@ pub struct CompressedData {
     algorithm: CompressionAlgorithm,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum CompressionAlgorithm {
     /// No compression (passthrough)
     None,
@@ -470,6 +531,55 @@ impl Hash for CompactString {
     }
 }
 
+/// Type enumeration for AttrValue variants
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AttrValueType {
+    Float,
+    Int,
+    Text,
+    FloatVec,
+    Bool,
+    CompactText,
+    SmallInt,
+    Bytes,
+    CompressedText,
+    CompressedFloatVec,
+}
+
+impl AttrValueType {
+    /// Check if this type is numeric
+    pub fn is_numeric(&self) -> bool {
+        matches!(self, AttrValueType::Float | AttrValueType::Int | AttrValueType::SmallInt)
+    }
+}
+
+impl std::fmt::Display for AttrValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AttrValue::Float(val) => write!(f, "{}", val),
+            AttrValue::Int(val) => write!(f, "{}", val),
+            AttrValue::Text(val) => write!(f, "{}", val),
+            AttrValue::Bool(val) => write!(f, "{}", val),
+            AttrValue::SmallInt(val) => write!(f, "{}", val),
+            AttrValue::CompactText(val) => write!(f, "{}", val.as_str()),
+            AttrValue::FloatVec(val) => write!(f, "{:?}", val),
+            AttrValue::Bytes(val) => write!(f, "{:?}", val),
+            AttrValue::CompressedText(val) => {
+                match val.decompress_text() {
+                    Ok(text) => write!(f, "{}", text),
+                    Err(_) => write!(f, "[compressed text]"),
+                }
+            }
+            AttrValue::CompressedFloatVec(val) => {
+                match val.decompress_float_vec() {
+                    Ok(vec) => write!(f, "{:?}", vec),
+                    Err(_) => write!(f, "[compressed float vec]"),
+                }
+            }
+        }
+    }
+}
+
 impl AttrValue {
     /// Get runtime type information as string
     pub fn type_name(&self) -> &'static str {
@@ -484,6 +594,22 @@ impl AttrValue {
             AttrValue::Bytes(_) => "Bytes",
             AttrValue::CompressedText(_) => "CompressedText",
             AttrValue::CompressedFloatVec(_) => "CompressedFloatVec",
+        }
+    }
+    
+    /// Get the type enum for this value
+    pub fn dtype(&self) -> AttrValueType {
+        match self {
+            AttrValue::Float(_) => AttrValueType::Float,
+            AttrValue::Int(_) => AttrValueType::Int,
+            AttrValue::Text(_) => AttrValueType::Text,
+            AttrValue::FloatVec(_) => AttrValueType::FloatVec,
+            AttrValue::Bool(_) => AttrValueType::Bool,
+            AttrValue::CompactText(_) => AttrValueType::CompactText,
+            AttrValue::SmallInt(_) => AttrValueType::SmallInt,
+            AttrValue::Bytes(_) => AttrValueType::Bytes,
+            AttrValue::CompressedText(_) => AttrValueType::CompressedText,
+            AttrValue::CompressedFloatVec(_) => AttrValueType::CompressedFloatVec,
         }
     }
     

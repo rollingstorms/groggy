@@ -56,6 +56,8 @@ impl CachedStats {
 pub struct GraphArray {
     /// Core data storage
     values: Vec<AttrValue>,
+    /// Optional name/label for the array
+    name: Option<String>,
     /// Cached statistical computations (lazy evaluation)
     cached_stats: RefCell<CachedStats>,
 }
@@ -65,6 +67,7 @@ impl GraphArray {
     pub fn from_vec(values: Vec<AttrValue>) -> Self {
         Self {
             values,
+            name: None,
             cached_stats: RefCell::new(CachedStats::new()),
         }
     }
@@ -338,6 +341,113 @@ impl GraphArray {
             q25: self.quantile(0.25),
             q75: self.quantile(0.75),
         }
+    }
+    
+    /// Set or update the name of this array
+    pub fn with_name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
+    }
+    
+    /// Get the name of this array
+    pub fn name(&self) -> Option<&String> {
+        self.name.as_ref()
+    }
+    
+    /// Get the data type of this array
+    pub fn dtype(&self) -> crate::types::AttrValueType {
+        use crate::types::AttrValueType;
+        
+        if self.values.is_empty() {
+            return AttrValueType::Text; // Default
+        }
+        
+        // Determine type from first non-null value
+        for value in &self.values {
+            match value {
+                crate::types::AttrValue::Int(_) | crate::types::AttrValue::SmallInt(_) => {
+                    return AttrValueType::Int;
+                }
+                crate::types::AttrValue::Float(_) => {
+                    return AttrValueType::Float;
+                }
+                crate::types::AttrValue::Bool(_) => {
+                    return AttrValueType::Bool;
+                }
+                crate::types::AttrValue::Text(_) | crate::types::AttrValue::CompactText(_) => {
+                    return AttrValueType::Text;
+                }
+                // Add other types as needed
+                _ => continue,
+            }
+        }
+        
+        AttrValueType::Text // Fallback
+    }
+    
+    /// Convert this array to a different type (if possible)
+    pub fn convert_to(&self, target_type: crate::types::AttrValueType) -> Result<GraphArray, crate::errors::GraphError> {
+        use crate::types::{AttrValue, AttrValueType};
+        use crate::errors::GraphError;
+        
+        let converted_values: Result<Vec<AttrValue>, GraphError> = self.values.iter()
+            .map(|value| {
+                match (value, target_type) {
+                    // Int conversions
+                    (AttrValue::Int(i), AttrValueType::Float) => Ok(AttrValue::Float(*i as f32)),
+                    (AttrValue::SmallInt(i), AttrValueType::Float) => Ok(AttrValue::Float(*i as f32)),
+                    (AttrValue::Int(i), AttrValueType::Text) => Ok(AttrValue::Text(i.to_string())),
+                    (AttrValue::SmallInt(i), AttrValueType::Text) => Ok(AttrValue::Text(i.to_string())),
+                    
+                    // Float conversions
+                    (AttrValue::Float(f), AttrValueType::Int) => Ok(AttrValue::Int(*f as i64)),
+                    (AttrValue::Float(f), AttrValueType::Text) => Ok(AttrValue::Text(f.to_string())),
+                    
+                    // Bool conversions
+                    (AttrValue::Bool(b), AttrValueType::Int) => Ok(AttrValue::Int(if *b { 1 } else { 0 })),
+                    (AttrValue::Bool(b), AttrValueType::Text) => Ok(AttrValue::Text(b.to_string())),
+                    
+                    // Text conversions
+                    (AttrValue::Text(s), AttrValueType::Int) => {
+                        s.parse::<i64>()
+                            .map(AttrValue::Int)
+                            .map_err(|_| GraphError::InvalidInput(format!("Cannot convert '{}' to integer", s)))
+                    }
+                    (AttrValue::Text(s), AttrValueType::Float) => {
+                        s.parse::<f32>()
+                            .map(AttrValue::Float)
+                            .map_err(|_| GraphError::InvalidInput(format!("Cannot convert '{}' to float", s)))
+                    }
+                    
+                    // Same type - no conversion needed
+                    (v, _) if self.dtype() == target_type => Ok(v.clone()),
+                    
+                    // Unsupported conversion
+                    _ => Err(GraphError::InvalidInput(format!("Cannot convert {:?} to {:?}", self.dtype(), target_type))),
+                }
+            })
+            .collect();
+        
+        Ok(Self {
+            values: converted_values?,
+            name: self.name.clone(),
+            cached_stats: RefCell::new(CachedStats::new()),
+        })
+    }
+    
+    /// Create a GraphArray from a graph attribute column
+    pub fn from_graph_attribute(
+        graph: &crate::api::graph::Graph,
+        attr: &str,
+        entities: &[crate::types::NodeId]
+    ) -> Result<Self, crate::errors::GraphError> {
+        // This would need to be implemented with proper graph integration
+        // For now, return a placeholder
+        let values = entities.iter()
+            .map(|_| crate::types::AttrValue::Int(0))
+            .collect();
+            
+        Ok(Self::from_vec(values).with_name(attr.to_string()))
     }
 }
 

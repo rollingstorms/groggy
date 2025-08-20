@@ -24,6 +24,7 @@ from ._groggy import (
     # Statistical arrays and matrices
     GraphArray,
     GraphMatrix,
+    GraphTable,
     # Display functionality
     DisplayConfig,
     format_array,
@@ -58,7 +59,7 @@ from .generators import (
 )
 from . import networkx_compat
 from .enhanced_query import enhanced_filter_nodes, enhanced_filter_edges
-from .graph_table import GraphTable
+# GraphTable now comes from Rust FFI
 from . import table_extensions
 
 # Convenient aliases for core data structures

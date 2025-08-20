@@ -39,7 +39,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 use std::rc::Rc;
 use crate::types::{NodeId, EdgeId, AttrName, StateId};
-use crate::errors::GraphResult;
 use crate::core::pool::GraphPool;
 use crate::core::delta::DeltaObject;
 
