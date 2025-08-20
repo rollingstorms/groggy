@@ -6,16 +6,19 @@ This document outlines the comprehensive plan to unify the three main storage vi
 
 ## Current State Analysis
 
-### Issues Identified
+### Issues Identified ✅ **RESOLVED**
 1. **GraphArray**: ✅ Well-designed, lives in core, has statistical operations
-2. **GraphMatrix**: ❌ Currently specialized for adjacency matrices (square), not general collection
-3. **GraphTable**: ❌ Lives in FFI, should be in core for consistency  
-4. **Architecture**: ❌ Mixed core/FFI responsibilities, hard to debug/maintain
+2. **GraphMatrix**: ✅ **FIXED** - Now general collection in `src/core/matrix.rs` with full API
+3. **GraphTable**: ✅ **FIXED** - Now in core at `src/core/table.rs` with pandas-like operations  
+4. **Architecture**: ✅ **FIXED** - Clean separation of core/FFI responsibilities
 
-### Current File Locations
-- `src/core/array.rs` - GraphArray (✅ good)
-- `src/core/adjacency.rs` - GraphMatrix (❌ should be `src/core/matrix.rs`)
-- `src/ffi/core/table.rs` - GraphTable (❌ should be `src/core/table.rs`)
+### Current File Locations ✅ **UNIFIED**
+- `src/core/array.rs` - GraphArray (✅ enhanced with advanced features)
+- `src/core/matrix.rs` - GraphMatrix (✅ **NEW** - collection of GraphArrays)
+- `src/core/table.rs` - GraphTable (✅ **NEW** - pandas-like operations)
+- `python-groggy/src/ffi/core/array.rs` - PyGraphArray (✅ full Python integration)
+- `python-groggy/src/ffi/core/matrix.rs` - PyGraphMatrix (✅ **NEW** - statistical operations)
+- `python-groggy/src/ffi/core/table.rs` - PyGraphTable (✅ **NEW** - table operations)
 
 ## Unified Architecture Design
 
@@ -237,64 +240,66 @@ impl GraphTable {
 7. **Memory Management** - ✅ AttributeMemoryPool with string/float/byte pool reuse already implemented
 8. **Caching Strategy** - ✅ CachedStats with smart invalidation already working across operations
 
-### Phase 3: FFI Wrapper Layer
-1. **Python Bindings** - Thin wrappers around core functionality
-2. **Display Integration** - Consistent `__repr__` and `_repr_html_` - implemented in the py legacy code graph_table_legacy.py - for Array, Matrix, and Table
-3. **Indexing Operations** - Python-style `[]` operator support
-4. **Iterator Protocol** - Python iteration support
+### Phase 3: FFI Implementation ✅ **COMPLETED**
+1. **Python Bindings** - ✅ Complete thin wrappers around core functionality
+2. **Display Integration** - ✅ Consistent `__repr__` and `_repr_html_` for Array, Matrix, and Table
+3. **Indexing Operations** - ✅ Advanced Python-style `[]` operator with slicing, boolean masks, fancy indexing
+4. **Iterator Protocol** - ✅ Full Python iteration support for PyGraphArray
+5. **Graph Integration** - ✅ `from_graph_nodes()` and `from_graph_edges()` methods
+6. **Builder Patterns** - ✅ Unified `gr.array()`, `gr.table()`, `gr.matrix()` API
+7. **Table Operations** - ✅ head, tail, sort_by, describe, to_dict methods
+8. **Subgraph Integration** - ✅ table() and edges_table() methods
 
-### Phase 4: Rich API Implementation
-1. **Statistical Operations** - Full pandas-like statistical API
-2. **Data Manipulation** - Sorting, filtering, grouping, joining
-3. **Linear Algebra** - Matrix operations for GraphMatrix
-4. **Export/Import** - CSV, JSON, integration with external formats
+### Phase 4: Advanced Operations 🔧 **NEXT**
+1. **Advanced Statistical Operations** - Full pandas-like statistical API (groupby, pivot, aggregations)
+2. **Complex Data Manipulation** - Multi-column sorting, advanced filtering, joins across tables
+3. **Query Integration** - Integration with graph query language and traversal operations
+4. **Export/Import Enhancement** - CSV, JSON, Arrow, Parquet integration with external formats
+5. **Performance Optimization** - Memory-efficient operations, parallel processing hints
 
-### Phase 5: Advanced Linear Algebra
-1. **Linear Algebra** - Matrix operations for GraphMatrix
-2. **Advanced Linear Algebra** - Advanced linear algebra operations for GraphMatrix
-3. **Advanced Graph Operations** - Advanced graph operations for GraphMatrix
+### Phase 5: Advanced Linear Algebra 🚀 **FUTURE**
+1. **Matrix Operations** - multiply, inverse, determinant for GraphMatrix
+2. **Decompositions** - SVD, QR, Cholesky, eigenvalue decomposition
+3. **Advanced Algorithms** - Lanczos, sparse matrix operations, BLAS integration
+4. **Parallel Processing** - Multi-threaded linear algebra operations
+5. **SIMD Optimizations** - Vectorized operations for numerical computations
 
-### Phase 6: Advanced Visualization Module - Viz
-1. **Visualization** - Advanced visualization for graphs built in rust and export as JS for embedding in HTML
-2. **Scaled Up Visualization** - Advanced visualization for graphs built in rust and export as JS for embedding in HTML
+### Phase 6: Advanced Visualization & Export 🎨 **FUTURE**
+1. **Rust-based Visualization** - High-performance graph rendering in Rust
+2. **Web Export** - Generate interactive JavaScript visualizations 
+3. **Format Integration** - Arrow, Parquet, HDF5 for large-scale data exchange
+4. **Streaming Operations** - Memory-efficient operations on massive datasets
 
 
 
-## File Migration Plan
+## File Migration Plan ✅ **COMPLETED**
 
-### Current Structure
+### ✅ **Implemented Structure**  
 ```
 src/
   core/
-    array.rs          ✅ Keep
-    adjacency.rs      ❌ Rename to matrix.rs, refactor
-  ffi/
-    core/
-      table.rs        ❌ Move to src/core/table.rs
-```
-
-### Target Structure  
-```
-src/
-  core/
-    array.rs          ✅ GraphArray (enhanced)
-    matrix.rs         🆕 GraphMatrix (collection of arrays)
-    table.rs          🆕 GraphTable (collection of arrays) 
+    array.rs          ✅ GraphArray (enhanced with advanced features)
+    matrix.rs         ✅ GraphMatrix (collection of arrays, full statistical API)
+    table.rs          ✅ GraphTable (pandas-like operations, graph integration) 
     adjacency.rs      ✅ Keep for specialized adjacency operations
+python-groggy/src/
   ffi/
     core/
-      array.rs        ✅ PyGraphArray (thin wrapper)
-      matrix.rs       🆕 PyGraphMatrix (thin wrapper)
-      table.rs        🆕 PyGraphTable (thin wrapper)
+      array.rs        ✅ PyGraphArray (advanced indexing, iteration)
+      matrix.rs       ✅ PyGraphMatrix (statistical operations, display)
+      table.rs        ✅ PyGraphTable (table operations, graph integration)
+      subgraph.rs     ✅ Enhanced with table() and edges_table() methods
 ```
 
-## Next Steps (Phase 2 Continuation)
+## Architecture Achievements ✅ **UNIFIED**
 
-1. **Complete PyGraphMatrix Statistical Operations** - Implement sum_axis, mean_axis, std_axis methods in core GraphMatrix
-2. **Implement Builder Patterns** - Create `gr.array()`, `gr.table()`, `gr.matrix()` unified constructors
-3. **Graph Pool Integration** - Efficient attribute column loading from graph storage
-4. **Memory Management** - Reference counting and copy vs view semantics
-5. **Comprehensive Testing** - Ensure all three storage views work together seamlessly
+1. **✅ Unified Storage Views** - All three storage types now share consistent architecture
+2. **✅ Core/FFI Separation** - Clean boundary between Rust core and Python bindings  
+3. **✅ Memory Management** - Sophisticated AttributeMemoryPool with string/float/byte reuse
+4. **✅ Graph Integration** - Seamless conversion between graph data and storage views
+5. **✅ Python Integration** - Rich display, advanced indexing, builder patterns
+6. **✅ Statistical Operations** - Working sum_axis, mean_axis, std_axis across all types
+7. **✅ Build System** - Clean compilation with `maturin develop --release`
 
 ## Current Status (August 2025)
 
@@ -309,6 +314,43 @@ src/
 - **Table Operations**: head, tail, sort_by, describe, to_dict methods
 - **Subgraph Integration**: table() and edges_table() methods
 - **Build System**: Clean compilation with `maturin develop --release`
+
+## Technical Implementation Highlights
+
+### ✅ **Advanced Indexing System**
+```python
+# Single indexing with negative support
+arr[5], arr[-1]
+
+# Slice indexing with step
+arr[1:5], arr[::2], arr[1:10:3]
+
+# Fancy indexing with lists  
+arr[[1, 3, 5, 8]]
+
+# Boolean mask indexing
+arr[[True, False, True, False]]
+```
+
+### ✅ **Unified Builder API**
+```python
+import groggy as gr
+
+# Unified constructors
+array = gr.array([1, 2, 3, 4])
+matrix = gr.matrix([[1, 2], [3, 4]]) 
+table = gr.table({"col1": [1, 2], "col2": [3, 4]})
+
+# Graph integration
+nodes_table = gr.table.from_graph_nodes(graph, node_ids, ["attr1", "attr2"])
+edges_table = gr.table.from_graph_edges(graph, edge_ids, ["weight", "type"])
+```
+
+### ✅ **Memory-Efficient Architecture**
+- **AttributeMemoryPool**: String/float/byte pool reuse across operations
+- **CachedStats**: Smart invalidation for statistical computations  
+- **View vs Copy**: Clear semantics for performance-critical operations
+- **Columnar Storage**: AttributeColumn integration with graph pool
 
 ⚠️ **Remaining NotImplementedError Placeholders:**
 - **PyGraphMatrix.is_symmetric()**: Returns false, needs core implementation
