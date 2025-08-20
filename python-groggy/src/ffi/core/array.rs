@@ -550,6 +550,91 @@ impl PyGraphMatrix {
     }
 }
 
+/// Python wrapper for SparseGraphMatrix - wraps core sparse matrix
+#[pyclass(name = "GraphSparseMatrix")]
+pub struct PyGraphSparseMatrix {
+    /// Core SparseGraphMatrix
+    pub inner: groggy::core::adjacency::SparseGraphMatrix,
+}
+
+#[pymethods]
+impl PyGraphSparseMatrix {
+    /// Get matrix dimensions as (rows, columns) tuple
+    #[getter]
+    fn shape(&self) -> (usize, usize) {
+        self.inner.shape
+    }
+    
+    /// Get number of non-zero entries
+    fn nnz(&self) -> usize {
+        self.inner.values.len()
+    }
+    
+    /// Get row indices (for COO format access)
+    #[getter]
+    fn rows(&self) -> Vec<usize> {
+        self.inner.rows.clone()
+    }
+    
+    /// Get column indices (for COO format access)  
+    #[getter]
+    fn cols(&self) -> Vec<usize> {
+        self.inner.cols.clone()
+    }
+    
+    /// Convert to dense matrix (when needed)
+    pub fn to_dense(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        let (rows, cols) = self.inner.shape;
+        let size = rows; // Square matrix
+        
+        // Build dense data from sparse representation
+        let mut dense_data = Vec::with_capacity(size * size);
+        let default_value = groggy::AttrValue::Int(0);
+        
+        // Initialize with zeros
+        for _ in 0..(size * size) {
+            dense_data.push(default_value.clone());
+        }
+        
+        // Fill in non-zero values from sparse matrix
+        for i in 0..self.inner.rows.len() {
+            let row = self.inner.rows[i];
+            let col = self.inner.cols[i];
+            if let Some(value) = self.inner.values.get(i) {
+                let index = row * size + col;
+                if index < dense_data.len() {
+                    dense_data[index] = value.clone();
+                }
+            }
+        }
+        
+        // Create GraphMatrix from dense data
+        let graph_array = groggy::GraphArray::from_vec(dense_data);
+        let dense_matrix = groggy::core::adjacency::GraphMatrix {
+            data: graph_array,
+            size,
+            row_major: true,
+            labels: self.inner.labels.clone(),
+        };
+        
+        let py_graph_matrix = PyGraphMatrix { inner: dense_matrix };
+        Ok(Py::new(py, py_graph_matrix)?)
+    }
+    
+    fn __repr__(&self) -> String {
+        let (rows, cols) = self.inner.shape;
+        let nnz = self.inner.values.len();
+        let density = if rows * cols > 0 {
+            (nnz as f64) / ((rows * cols) as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        format!("GraphSparseMatrix({}x{}, {} non-zeros, {:.1}% dense)", 
+                rows, cols, nnz, density)
+    }
+}
+
 /// Iterator for GraphArray
 #[pyclass]
 pub struct GraphArrayIterator {

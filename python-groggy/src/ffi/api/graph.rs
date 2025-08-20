@@ -11,7 +11,7 @@ use groggy::{Graph as RustGraph, NodeId, EdgeId, AttrValue as RustAttrValue, Att
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::core::accessors::{PyNodesAccessor, PyEdgesAccessor};
 use crate::ffi::core::views::{PyNodeView, PyEdgeView};
-use crate::ffi::core::array::{PyGraphArray, PyGraphMatrix};
+use crate::ffi::core::array::{PyGraphArray, PyGraphMatrix, PyGraphSparseMatrix};
 use crate::ffi::core::subgraph::PySubgraph;
 use crate::ffi::core::query::{PyNodeFilter, PyEdgeFilter};
 use crate::ffi::core::traversal::PyGroupedAggregationResult;
@@ -45,52 +45,34 @@ impl PyAggregationResult {
 }
 
 
-// Helper function to extract GraphMatrix from AdjacencyMatrix and wrap in PyGraphMatrix
+/// Helper function to convert AdjacencyMatrix to PyGraphMatrix
 fn adjacency_matrix_to_py_graph_matrix(py: Python, matrix: groggy::AdjacencyMatrix) -> PyResult<Py<PyGraphMatrix>> {
     match matrix {
         groggy::AdjacencyMatrix::Dense(graph_matrix) => {
-            // Directly wrap the core GraphMatrix in PyGraphMatrix
+            // Wrap dense matrix in PyGraphMatrix
             let py_graph_matrix = PyGraphMatrix { inner: graph_matrix };
             Ok(Py::new(py, py_graph_matrix)?)
         },
         groggy::AdjacencyMatrix::Sparse(sparse_matrix) => {
-            // Convert sparse matrix to dense format for Python interface
-            // This provides full compatibility while we implement native sparse support
-            let (rows, cols) = sparse_matrix.shape;
-            let size = rows; // Square matrix
-            
-            // Build dense data from sparse representation
-            let mut dense_data = Vec::with_capacity(size * size);
-            let default_value = groggy::AttrValue::Int(0);
-            
-            // Initialize with zeros
-            for _ in 0..(size * size) {
-                dense_data.push(default_value.clone());
-            }
-            
-            // Fill in non-zero values from sparse matrix
-            for i in 0..sparse_matrix.rows.len() {
-                let row = sparse_matrix.rows[i];
-                let col = sparse_matrix.cols[i];
-                if let Some(value) = sparse_matrix.values.get(i) {
-                    let index = row * size + col;
-                    if index < dense_data.len() {
-                        dense_data[index] = value.clone();
-                    }
-                }
-            }
-            
-            // Create GraphMatrix from dense data
-            let graph_array = groggy::GraphArray::from_vec(dense_data);
-            let dense_matrix = groggy::core::adjacency::GraphMatrix {
-                data: graph_array,
-                size,
-                row_major: true,
-                labels: sparse_matrix.labels.clone(),
-            };
-            
-            let py_graph_matrix = PyGraphMatrix { inner: dense_matrix };
-            Ok(Py::new(py, py_graph_matrix)?)
+            // Convert sparse to dense for PyGraphMatrix compatibility
+            let py_sparse_matrix = PyGraphSparseMatrix { inner: sparse_matrix };
+            py_sparse_matrix.to_dense(py)
+        }
+    }
+}
+
+// Helper function to extract matrix from AdjacencyMatrix and wrap appropriately
+fn adjacency_matrix_to_py_object(py: Python, matrix: groggy::AdjacencyMatrix) -> PyResult<PyObject> {
+    match matrix {
+        groggy::AdjacencyMatrix::Dense(graph_matrix) => {
+            // Wrap dense matrix in PyGraphMatrix
+            let py_graph_matrix = PyGraphMatrix { inner: graph_matrix };
+            Ok(Py::new(py, py_graph_matrix)?.to_object(py))
+        },
+        groggy::AdjacencyMatrix::Sparse(sparse_matrix) => {
+            // Wrap sparse matrix in PyGraphSparseMatrix (keep it sparse!)
+            let py_sparse_matrix = PyGraphSparseMatrix { inner: sparse_matrix };
+            Ok(Py::new(py, py_sparse_matrix)?.to_object(py))
         }
     }
 }
@@ -1014,11 +996,11 @@ impl PyGraph {
     // === ADJACENCY MATRIX OPERATIONS ===
     
     /// Generate adjacency matrix for the entire graph (FFI wrapper around core matrix operations)
-    /// Returns: GraphMatrix with multi-index access (matrix[0, 1])
-    fn adjacency_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+    /// Returns: GraphMatrix (dense) or GraphSparseMatrix (sparse) 
+    fn adjacency_matrix(&mut self, py: Python) -> PyResult<PyObject> {
         match self.inner.adjacency_matrix() {
             Ok(matrix) => {
-                adjacency_matrix_to_py_graph_matrix(py, matrix)
+                adjacency_matrix_to_py_object(py, matrix)
             },
             Err(e) => Err(graph_error_to_py_err(e))
         }
@@ -1026,9 +1008,14 @@ impl PyGraph {
     
     /// Generate adjacency matrix for the entire graph (cleaner API)
     /// Returns: GraphMatrix with multi-index access (matrix[0, 1])
-    /// This is a cleaner alias for adjacency_matrix()
+    /// This is a cleaner alias for adjacency_matrix() but always returns dense
     fn adjacency(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        self.adjacency_matrix(py)
+        match self.inner.adjacency_matrix() {
+            Ok(matrix) => {
+                adjacency_matrix_to_py_graph_matrix(py, matrix)
+            },
+            Err(e) => Err(graph_error_to_py_err(e))
+        }
     }
     
     /// Generate weighted adjacency matrix using specified edge attribute (FFI wrapper around core matrix operations)
@@ -1045,17 +1032,41 @@ impl PyGraph {
     fn dense_adjacency_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
         match self.inner.dense_adjacency_matrix() {
             Ok(matrix) => {
-                adjacency_matrix_to_py_graph_matrix(py, matrix)
+                // For dense_adjacency_matrix, always return PyGraphMatrix (never sparse)
+                match matrix {
+                    groggy::AdjacencyMatrix::Dense(graph_matrix) => {
+                        let py_graph_matrix = PyGraphMatrix { inner: graph_matrix };
+                        Ok(Py::new(py, py_graph_matrix)?)
+                    },
+                    groggy::AdjacencyMatrix::Sparse(sparse_matrix) => {
+                        // Convert sparse to dense since this method explicitly asks for dense
+                        let py_sparse_matrix = PyGraphSparseMatrix { inner: sparse_matrix };
+                        py_sparse_matrix.to_dense(py)
+                    }
+                }
             },
             Err(e) => Err(graph_error_to_py_err(e))
         }
     }
     
     /// Generate sparse adjacency matrix (FFI wrapper around core matrix operations)
-    fn sparse_adjacency_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+    fn sparse_adjacency_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphSparseMatrix>> {
         match self.inner.sparse_adjacency_matrix() {
             Ok(matrix) => {
-                adjacency_matrix_to_py_graph_matrix(py, matrix)
+                // For sparse_adjacency_matrix, always return PyGraphSparseMatrix
+                match matrix {
+                    groggy::AdjacencyMatrix::Dense(graph_matrix) => {
+                        // TODO: Convert dense to sparse format if needed
+                        // For now, return error suggesting to use dense_adjacency_matrix()
+                        Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                            "Graph produced dense matrix but sparse was requested. Use dense_adjacency_matrix() instead."
+                        ))
+                    },
+                    groggy::AdjacencyMatrix::Sparse(sparse_matrix) => {
+                        let py_sparse_matrix = PyGraphSparseMatrix { inner: sparse_matrix };
+                        Ok(Py::new(py, py_sparse_matrix)?)
+                    }
+                }
             },
             Err(e) => Err(graph_error_to_py_err(e))
         }
