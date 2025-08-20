@@ -548,6 +548,198 @@ impl PyGraphMatrix {
             format!("GraphMatrix({}x{} adjacency matrix)", rows, cols)
         }
     }
+    
+    /// Rich HTML representation for Jupyter notebooks
+    fn _repr_html_(&self) -> String {
+        let (rows, cols) = (self.inner.size, self.inner.size);
+        
+        if rows <= 50 && cols <= 50 {
+            // For reasonably sized matrices, show interactive HTML table
+            self._generate_html_table()
+        } else {
+            // For very large matrices, show summary with sample
+            self._generate_html_summary()
+        }
+    }
+    
+    /// Generate interactive HTML table for small-medium matrices
+    fn _generate_html_table(&self) -> String {
+        let (rows, cols) = (self.inner.size, self.inner.size);
+        let mut html = String::new();
+        
+        // Modern rounded CSS styling like the example
+        html.push_str(r#"
+<style>
+.df-rounded {
+  --bg: #ffffff; --fg: #222; --muted: #6b7280;
+  --border: #e5e7eb; --border-strong: #d1d5db;
+  --row-odd: #fafafa;
+  font-family: 'SFMono-Regular','Menlo','Consolas','Liberation Mono',monospace;
+  font-size: 12.5px; line-height: 1.5;
+  color: var(--fg); background: var(--bg);
+}
+.df-rounded table {
+  border-collapse: separate; border-spacing: 0; margin: .25rem 0 .125rem 0;
+  border: 2px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.df-rounded th, .df-rounded td {
+  padding: 2px 8px; border-right: 1px solid var(--border);
+  white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis;
+}
+.df-rounded tr:nth-child(odd) td.data { background: var(--row-odd); }
+.df-rounded thead th {
+  font-weight: 600; background: rgba(127,127,127,0.06);
+  border-bottom: 1px solid var(--border-strong);
+}
+.df-rounded thead tr.dtype th {
+  font-weight: 400; color: var(--muted);
+}
+.df-rounded td.index, .df-rounded th.index {
+  color: var(--muted); text-align: right; background: rgba(127,127,127,0.04);
+}
+.df-rounded td:last-child, .df-rounded th:last-child { border-right: none; }
+.df-rounded tfoot {
+  color: var(--muted); font-size: 12px; padding-top: 2px;
+}
+.df-rounded td.ellipsis, .df-rounded th.ellipsis { text-align:center; color: var(--muted); }
+.df-rounded .footer {
+  margin-top: 2px; color: var(--muted); font-family: 'SFMono-Regular','Menlo','Consolas','Liberation Mono',monospace; font-size: 12px;
+}
+</style>
+"#);
+        
+        html.push_str(r#"<div class="df-rounded">"#);
+        html.push_str(r#"<table>"#);
+        
+        // Header row with column indices (if matrix is reasonably sized)
+        if cols <= 20 && rows <= 20 {
+            html.push_str("<thead><tr><th class=\"index\">#</th>");
+            for j in 0..cols.min(20) {
+                html.push_str(&format!("<th class=\"\">{}</th>", j));
+            }
+            if cols > 20 {
+                html.push_str("<th class=\"ellipsis\">⋯</th>");
+            }
+            html.push_str("</tr>");
+            
+            // Type row (simplified for adjacency matrices)
+            html.push_str("<tr class=\"dtype\"><th class=\"index\"></th>");
+            for _ in 0..cols.min(20) {
+                html.push_str("<th class=\"dtype\">adj</th>");
+            }
+            if cols > 20 {
+                html.push_str("<th class=\"ellipsis\"></th>");
+            }
+            html.push_str("</tr></thead>");
+        }
+        
+        // Data rows
+        html.push_str("<tbody>");
+        let display_rows = rows.min(20);
+        for i in 0..display_rows {
+            html.push_str("<tr>");
+            
+            // Row index (if we have headers)
+            if cols <= 20 && rows <= 20 {
+                html.push_str(&format!("<td class=\"index\">{}</td>", i));
+            }
+            
+            let display_cols = cols.min(20);
+            for j in 0..display_cols {
+                if let Some(value) = self.inner.get(i, j) {
+                    let val_str = match value {
+                        groggy::AttrValue::Int(v) => {
+                            if *v == 0 { 
+                                "0".to_string()
+                            } else { 
+                                v.to_string()
+                            }
+                        },
+                        groggy::AttrValue::Float(v) => {
+                            if *v == 0.0 { 
+                                "0.00".to_string()
+                            } else { 
+                                format!("{:.2}", v)
+                            }
+                        },
+                        groggy::AttrValue::Bool(true) => "1".to_string(),
+                        groggy::AttrValue::Bool(false) => "0".to_string(),
+                        _ => "?".to_string(),
+                    };
+                    html.push_str(&format!(r#"<td class="data" style="text-align:right">{}</td>"#, val_str));
+                } else {
+                    html.push_str(r#"<td class="data" style="text-align:right">0</td>"#);
+                }
+            }
+            
+            if cols > 20 {
+                html.push_str("<td class=\"ellipsis\">⋯</td>");
+            }
+            html.push_str("</tr>");
+        }
+        
+        if rows > 20 {
+            html.push_str("<tr>");
+            if cols <= 20 && rows <= 20 {
+                html.push_str("<td class=\"ellipsis\">⋮</td>");
+            }
+            for _ in 0..cols.min(20) {
+                html.push_str("<td class=\"ellipsis\">⋮</td>");
+            }
+            if cols > 20 {
+                html.push_str("<td class=\"ellipsis\">⋱</td>");
+            }
+            html.push_str("</tr>");
+        }
+        
+        html.push_str("</tbody></table>");
+        
+        // Footer with shape and type info
+        html.push_str(&format!(r#"<div class="footer">shape: ({}, {}) • dtype: adjacency • type: GraphMatrix</div>"#, rows, cols));
+        html.push_str("</div>");
+        
+        html
+    }
+    
+    /// Generate HTML summary for very large matrices
+    fn _generate_html_summary(&self) -> String {
+        let (rows, cols) = (self.inner.size, self.inner.size);
+        
+        // Count non-zero elements in a sample
+        let mut nonzero_count = 0;
+        let sample_size = 100.min(rows);
+        
+        for i in 0..sample_size {
+            for j in 0..cols.min(100) {
+                if let Some(value) = self.inner.get(i, j) {
+                    match value {
+                        groggy::AttrValue::Int(v) if *v != 0 => nonzero_count += 1,
+                        groggy::AttrValue::Float(v) if *v != 0.0 => nonzero_count += 1,
+                        groggy::AttrValue::Bool(true) => nonzero_count += 1,
+                        _ => {}
+                    }
+                }
+            }
+        }
+        
+        let sample_total = sample_size * cols.min(100);
+        let density = if sample_total > 0 {
+            (nonzero_count as f64 / sample_total as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        format!(r#"
+<div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; background-color: #f9f9f9;">
+    <strong>GraphMatrix</strong><br>
+    <strong>Shape:</strong> {} × {}<br>
+    <strong>Type:</strong> Adjacency Matrix<br>
+    <strong>Estimated Density:</strong> {:.2}% (sample)<br>
+    <strong>Total Elements:</strong> {}<br>
+    <em>Matrix too large for full display. Use .to_dense() for smaller subsets.</em>
+</div>
+"#, rows, cols, density, rows * cols)
+    }
 }
 
 /// Python wrapper for SparseGraphMatrix - wraps core sparse matrix
@@ -632,6 +824,80 @@ impl PyGraphSparseMatrix {
         
         format!("GraphSparseMatrix({}x{}, {} non-zeros, {:.1}% dense)", 
                 rows, cols, nnz, density)
+    }
+    
+    /// Rich HTML representation for Jupyter notebooks
+    fn _repr_html_(&self) -> String {
+        let (rows, cols) = self.inner.shape;
+        let nnz = self.inner.values.len();
+        let density = if rows * cols > 0 {
+            (nnz as f64) / ((rows * cols) as f64) * 100.0
+        } else {
+            0.0
+        };
+        
+        let mut html = format!(r#"
+<div style="border: 1px solid #ddd; padding: 15px; margin: 10px 0; background-color: #f8f9fa; border-radius: 5px;">
+    <h4 style="margin: 0 0 10px 0; color: #2c3e50;">GraphSparseMatrix</h4>
+    <table style="border-collapse: collapse; width: 100%;">
+        <tr>
+            <td style="padding: 5px; font-weight: bold; color: #34495e;">Shape:</td>
+            <td style="padding: 5px;">{} × {}</td>
+        </tr>
+        <tr>
+            <td style="padding: 5px; font-weight: bold; color: #34495e;">Non-zeros:</td>
+            <td style="padding: 5px;">{}</td>
+        </tr>
+        <tr>
+            <td style="padding: 5px; font-weight: bold; color: #34495e;">Density:</td>
+            <td style="padding: 5px;">{:.2}%</td>
+        </tr>
+        <tr>
+            <td style="padding: 5px; font-weight: bold; color: #34495e;">Total Elements:</td>
+            <td style="padding: 5px;">{}</td>
+        </tr>
+    </table>
+"#, rows, cols, nnz, density, rows * cols);
+        
+        // Show some sample non-zero values if available
+        if nnz > 0 {
+            html.push_str(r#"<h5 style="margin: 15px 0 5px 0; color: #2c3e50;">Sample Non-zero Values:</h5>"#);
+            html.push_str(r#"<table style="border-collapse: collapse; font-family: monospace; font-size: 12px;">"#);
+            html.push_str(r#"<tr style="background-color: #ecf0f1;"><th style="padding: 3px 8px; border: 1px solid #bdc3c7;">Row</th><th style="padding: 3px 8px; border: 1px solid #bdc3c7;">Col</th><th style="padding: 3px 8px; border: 1px solid #bdc3c7;">Value</th></tr>"#);
+            
+            let sample_count = nnz.min(10);
+            for i in 0..sample_count {
+                if i < self.inner.rows.len() && i < self.inner.cols.len() && i < self.inner.values.len() {
+                    let row = self.inner.rows[i];
+                    let col = self.inner.cols[i];
+                    let value = &self.inner.values[i];
+                    
+                    let value_str = match value {
+                        groggy::AttrValue::Int(v) => v.to_string(),
+                        groggy::AttrValue::Float(v) => format!("{:.3}", v),
+                        groggy::AttrValue::Bool(true) => "1".to_string(),
+                        groggy::AttrValue::Bool(false) => "0".to_string(),
+                        _ => "?".to_string(),
+                    };
+                    
+                    html.push_str(&format!(
+                        r#"<tr><td style="padding: 3px 8px; border: 1px solid #bdc3c7; text-align: center;">{}</td><td style="padding: 3px 8px; border: 1px solid #bdc3c7; text-align: center;">{}</td><td style="padding: 3px 8px; border: 1px solid #bdc3c7; text-align: center; font-weight: bold; color: #e74c3c;">{}</td></tr>"#,
+                        row, col, value_str
+                    ));
+                }
+            }
+            
+            html.push_str("</table>");
+            
+            if nnz > 10 {
+                html.push_str(&format!(r#"<p style="margin: 5px 0 0 0; font-style: italic; color: #7f8c8d;">... and {} more non-zero values</p>"#, nnz - 10));
+            }
+        }
+        
+        html.push_str(r#"<p style="margin: 10px 0 0 0; font-style: italic; color: #7f8c8d;">Use .to_dense() to convert to dense matrix for full display</p>"#);
+        html.push_str("</div>");
+        
+        html
     }
 }
 
