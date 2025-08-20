@@ -53,11 +53,44 @@ fn adjacency_matrix_to_py_graph_matrix(py: Python, matrix: groggy::AdjacencyMatr
             let py_graph_matrix = PyGraphMatrix { inner: graph_matrix };
             Ok(Py::new(py, py_graph_matrix)?)
         },
-        groggy::AdjacencyMatrix::Sparse(_sparse_matrix) => {
-            // For now, convert sparse to dense - TODO: implement PyGraphMatrix for sparse
-            Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "Sparse adjacency matrices not yet supported in Python interface"
-            ))
+        groggy::AdjacencyMatrix::Sparse(sparse_matrix) => {
+            // Convert sparse matrix to dense format for Python interface
+            // This provides full compatibility while we implement native sparse support
+            let (rows, cols) = sparse_matrix.shape;
+            let size = rows; // Square matrix
+            
+            // Build dense data from sparse representation
+            let mut dense_data = Vec::with_capacity(size * size);
+            let default_value = groggy::AttrValue::Int(0);
+            
+            // Initialize with zeros
+            for _ in 0..(size * size) {
+                dense_data.push(default_value.clone());
+            }
+            
+            // Fill in non-zero values from sparse matrix
+            for i in 0..sparse_matrix.rows.len() {
+                let row = sparse_matrix.rows[i];
+                let col = sparse_matrix.cols[i];
+                if let Some(value) = sparse_matrix.values.get(i) {
+                    let index = row * size + col;
+                    if index < dense_data.len() {
+                        dense_data[index] = value.clone();
+                    }
+                }
+            }
+            
+            // Create GraphMatrix from dense data
+            let graph_array = groggy::GraphArray::from_vec(dense_data);
+            let dense_matrix = groggy::core::adjacency::GraphMatrix {
+                data: graph_array,
+                size,
+                row_major: true,
+                labels: sparse_matrix.labels.clone(),
+            };
+            
+            let py_graph_matrix = PyGraphMatrix { inner: dense_matrix };
+            Ok(Py::new(py, py_graph_matrix)?)
         }
     }
 }
