@@ -18,6 +18,7 @@ use crate::core::space::GraphSpace;
 use crate::core::pool::GraphPool;
 use crate::core::array::GraphArray;  // Our enhanced array type
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// GraphMatrix - dense matrix representation using GraphArray for efficiency
 #[derive(Debug, Clone)]
@@ -311,16 +312,17 @@ impl AdjacencyMatrixBuilder {
         let size = nodes.len();
         
         // Get graph topology (separate from matrix building to avoid borrow conflicts)
-        let (edge_ids_ref, sources_ref, targets_ref, _) = space.snapshot(pool);
-        // Clone the vectors to avoid borrow conflicts
+        let (edge_ids_ref, sources_ref, targets_ref, neighbors_ref) = space.snapshot(pool);
+        // Clone the vectors to avoid borrow conflicts (but keep neighbors as Arc for efficiency)
         let edge_ids: Vec<EdgeId> = edge_ids_ref.as_ref().clone();
         let sources: Vec<NodeId> = sources_ref.as_ref().clone();
         let targets: Vec<NodeId> = targets_ref.as_ref().clone();
+        let neighbors = neighbors_ref; // Keep as Arc - no need to clone the whole HashMap
         
         match self.format {
             MatrixFormat::Dense => {
                 let dense = self.build_dense_matrix(
-                    pool, space, nodes, &edge_ids, &sources, &targets, size, &mapping
+                    pool, space, nodes, &neighbors, size, &mapping
                 )?;
                 Ok(AdjacencyMatrix::Dense(dense))
             },
@@ -333,15 +335,13 @@ impl AdjacencyMatrixBuilder {
         }
     }
     
-    /// Build dense adjacency matrix
+    /// Build dense adjacency matrix using neighbors cache for O(V²) instead of O(E) performance
     fn build_dense_matrix(
         &self,
         pool: &GraphPool,
         space: &mut GraphSpace,
         nodes: &[NodeId],
-        edge_ids: &[EdgeId],
-        sources: &[NodeId],
-        targets: &[NodeId],
+        neighbors: &Arc<HashMap<NodeId, Vec<(NodeId, EdgeId)>>>,
         size: usize,
         mapping: &Option<IndexMapping>,
     ) -> GraphResult<GraphMatrix> {
@@ -352,24 +352,18 @@ impl AdjacencyMatrixBuilder {
             nodes.iter().enumerate().map(|(i, &node)| (node, i)).collect()
         };
         
-        // Fill matrix based on edges - respect graph directionality
-        let is_directed = pool.graph_type() == crate::types::GraphType::Directed;
-        
-        for i in 0..edge_ids.len() {
-            let source = sources[i];
-            let target = targets[i];
-            let edge_id = edge_ids[i];
-            
-            // Only include edges where both nodes are in our subgraph
-            if let (Some(&src_idx), Some(&tgt_idx)) = (node_set.get(&source), node_set.get(&target)) {
-                let value = self.get_edge_value(pool, space, edge_id)?;
-                
-                // Always add the primary direction (source → target)
-                data[src_idx * size + tgt_idx] = AttrValue::Float(value as f32);
-                
-                // For undirected graphs, also add the reverse direction (target → source)
-                if !is_directed && src_idx != tgt_idx {  // Avoid double-counting self-loops
-                    data[tgt_idx * size + src_idx] = AttrValue::Float(value as f32);
+        // Fill matrix using neighbors cache for much faster performance
+        // PERFORMANCE: O(degree(v)) per node instead of O(E) edge iteration
+        for (node_id, &node_idx) in &node_set {
+            if let Some(node_neighbors) = neighbors.get(node_id) {
+                for &(neighbor_id, edge_id) in node_neighbors {
+                    // Only include edges where neighbor is also in our subgraph
+                    if let Some(&neighbor_idx) = node_set.get(&neighbor_id) {
+                        let value = self.get_edge_value(pool, space, edge_id)?;
+                        
+                        // Add the edge (node → neighbor)
+                        data[node_idx * size + neighbor_idx] = AttrValue::Float(value as f32);
+                    }
                 }
             }
         }

@@ -50,6 +50,8 @@ pub struct TopologySnapshot {
     pub sources: Arc<Vec<NodeId>>,
     pub targets: Arc<Vec<NodeId>>,
     pub neighbors: Arc<HashMap<NodeId, Vec<(NodeId, EdgeId)>>>,
+    /// Cached adjacency matrix (computed from neighbors for fast access)
+    pub adjacency_matrix: Option<Arc<crate::core::adjacency::AdjacencyMatrix>>,
     pub version: u64,
 }
 
@@ -583,6 +585,7 @@ impl GraphSpace {
             sources: sources_arc.clone(),
             targets: targets_arc.clone(),
             neighbors: neighbors_arc.clone(),
+            adjacency_matrix: None,  // Will be computed on-demand later
             version: current_version,
         };
 
