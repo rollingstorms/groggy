@@ -179,10 +179,34 @@ impl PySubgraph {
         self.edges.contains(&edge_id)
     }
     
-    /// String representation
+    /// String representation  
     fn __repr__(&self) -> String {
         format!("Subgraph(nodes={}, edges={}, type={})", 
                 self.nodes.len(), self.edges.len(), self.subgraph_type)
+    }
+    
+    /// Detailed string representation with helpful information
+    fn __str__(&self) -> String {
+        let mut info = format!("Subgraph with {} nodes and {} edges", 
+                              self.nodes.len(), self.edges.len());
+        
+        if !self.subgraph_type.is_empty() {
+            info.push_str(&format!("\nType: {}", self.subgraph_type));
+        }
+        
+        if !self.nodes.is_empty() {
+            let node_sample = if self.nodes.len() <= 5 {
+                format!("{:?}", self.nodes)
+            } else {
+                format!("[{}, {}, {}, ... {} more]", 
+                       self.nodes[0], self.nodes[1], self.nodes[2], 
+                       self.nodes.len() - 3)
+            };
+            info.push_str(&format!("\nNodes: {}", node_sample));
+        }
+        
+        info.push_str("\nAvailable methods: .set(**attrs), .filter_nodes(filter), .table(), .nodes, .edges");
+        info
     }
     
     /// Filter edges within this subgraph (chainable)
@@ -505,11 +529,12 @@ impl PySubgraph {
             if attr_names.len() == 1 {
                 return Ok(columns[0].clone_ref(py).to_object(py));
             } else {
-                // TODO: Implement proper multi-column access for attribute data
-                // This needs a different approach than adjacency PyGraphMatrix
-                return Err(PyNotImplementedError::new_err(
-                    "Multi-column attribute access not yet implemented with new GraphMatrix architecture"
-                ));
+                // Multi-column access: return a list of GraphArrays
+                // This allows users to work with multiple columns programmatically
+                let column_objects: Vec<PyObject> = columns.into_iter()
+                    .map(|col| col.to_object(py))
+                    .collect();
+                return Ok(column_objects.to_object(py));
             }
         }
         

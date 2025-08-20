@@ -61,6 +61,11 @@ from .enhanced_query import enhanced_filter_nodes, enhanced_filter_edges
 from .graph_table import GraphTable
 from . import table_extensions
 
+# Convenient aliases for core data structures
+array = GraphArray
+table = GraphTable  
+matrix = GraphMatrix
+
 # Import display formatters for rich display integration
 try:
     from .display.formatters import format_array, format_matrix, format_table
@@ -138,4 +143,8 @@ __all__ = [
     "enhanced_filter_edges",
     # Graph table functionality
     "GraphTable",
+    # Convenient aliases
+    "array",
+    "table", 
+    "matrix",
 ]
