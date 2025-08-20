@@ -47,69 +47,6 @@ pub struct TraversalEngine {
     query_engine: QueryEngine,
 }
 
-/// Adjacency list cache for fast neighbor lookups
-#[derive(Debug, Clone)]
-pub struct AdjacencyCache {
-    /// Map from node_id to list of (neighbor, edge_id)
-    adjacency_map: HashMap<NodeId, Vec<(NodeId, EdgeId)>>,
-    /// Whether the cache is valid
-    is_valid: bool,
-    /// Cache generation (for invalidation)
-    generation: usize,
-}
-
-impl AdjacencyCache {
-    pub fn new() -> Self {
-        Self {
-            adjacency_map: HashMap::new(),
-            is_valid: false,
-            generation: 0,
-        }
-    }
-    
-    /// Build adjacency cache from columnar topology
-    pub fn rebuild(&mut self, edge_ids: &[EdgeId], sources: &[NodeId], targets: &[NodeId], topology_generation: usize) {
-        self.adjacency_map.clear();
-        
-        for i in 0..sources.len() {
-            let source = sources[i];
-            let target = targets[i];
-            let edge_id = edge_ids[i];
-            
-            // Add both directions for undirected edges
-            self.adjacency_map.entry(source)
-                .or_insert_with(Vec::new)
-                .push((target, edge_id));
-                
-            self.adjacency_map.entry(target)
-                .or_insert_with(Vec::new)
-                .push((source, edge_id));
-        }
-        
-        self.is_valid = true;
-        self.generation = topology_generation;  // Set to current topology generation
-    }
-    
-    /// Get neighbors for a node using the cache
-    pub fn get_neighbors(&self, node_id: NodeId) -> Option<&Vec<(NodeId, EdgeId)>> {
-        if self.is_valid {
-            self.adjacency_map.get(&node_id)
-        } else {
-            None
-        }
-    }
-    
-    /// Check if cache is up to date with topology generation
-    pub fn is_up_to_date(&self, topology_generation: usize) -> bool {
-        self.is_valid && self.generation == topology_generation
-    }
-    
-    /// Invalidate the cache
-    pub fn invalidate(&mut self) {
-        self.is_valid = false;
-    }
-}
-
 /// Filter result cache for avoiding repeated evaluations
 #[derive(Debug)]
 pub struct FilterCache {
