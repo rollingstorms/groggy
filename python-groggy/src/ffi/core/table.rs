@@ -57,30 +57,109 @@ impl PyGraphTable {
     #[classmethod]
     pub fn from_graph_nodes(
         _cls: &PyType,
-        _py: Python,
-        _graph: Py<PyGraph>,
-        _nodes: Vec<u64>,
-        _attrs: Option<Vec<String>>,
+        py: Python,
+        graph: Py<PyGraph>,
+        nodes: Vec<u64>,
+        attrs: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        // TODO: Implement graph nodes integration in Phase 2
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "GraphTable.from_graph_nodes temporarily disabled during Phase 2 unification"
-        ))
+        let graph_ref = graph.borrow(py);
+        
+        // Default to just node_id if no attributes specified
+        let attr_names = attrs.unwrap_or_else(|| vec!["node_id".to_string()]);
+        let mut columns = Vec::new();
+        
+        for attr_name in &attr_names {
+            let mut attr_values = Vec::new();
+            
+            if attr_name == "node_id" {
+                // Special case: node IDs
+                for &node_id in &nodes {
+                    attr_values.push(RustAttrValue::Int(node_id as i64));
+                }
+            } else {
+                // Regular node attributes
+                for &node_id in &nodes {
+                    if let Ok(Some(attr_value)) = graph_ref.inner.get_node_attr(node_id as usize, attr_name) {
+                        attr_values.push(attr_value);
+                    } else {
+                        // Handle missing attributes with default value
+                        attr_values.push(RustAttrValue::Int(0));
+                    }
+                }
+            }
+            
+            // Create GraphArray from attribute values
+            let graph_array = GraphArray::from_vec(attr_values);
+            columns.push(graph_array);
+        }
+        
+        // Create GraphTable from arrays
+        let table = GraphTable::from_arrays_standalone(columns, Some(attr_names))
+            .map_err(graph_error_to_py_err)?;
+        
+        Ok(Self::from_graph_table(table))
     }
 
     /// Create GraphTable from graph edges
     #[classmethod]
     pub fn from_graph_edges(
         _cls: &PyType,
-        _py: Python,
-        _graph: Py<PyGraph>,
-        _edges: Vec<u64>,
-        _attrs: Option<Vec<String>>,
+        py: Python,
+        graph: Py<PyGraph>,
+        edges: Vec<u64>,
+        attrs: Option<Vec<String>>,
     ) -> PyResult<Self> {
-        // TODO: Implement graph edges integration in Phase 2
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "GraphTable.from_graph_edges temporarily disabled during Phase 2 unification"
-        ))
+        let graph_ref = graph.borrow(py);
+        
+        // Default to edge_id, source, target if no attributes specified
+        let attr_names = attrs.unwrap_or_else(|| vec![
+            "edge_id".to_string(),
+            "source".to_string(), 
+            "target".to_string()
+        ]);
+        let mut columns = Vec::new();
+        
+        for attr_name in &attr_names {
+            let mut attr_values = Vec::new();
+            
+            if attr_name == "edge_id" {
+                // Special case: edge IDs
+                for &edge_id in &edges {
+                    attr_values.push(RustAttrValue::Int(edge_id as i64));
+                }
+            } else if attr_name == "source" || attr_name == "target" {
+                // Special case: edge endpoints
+                for &edge_id in &edges {
+                    if let Ok((source, target)) = graph_ref.inner.edge_endpoints(edge_id as usize) {
+                        let endpoint_id = if attr_name == "source" { source } else { target };
+                        attr_values.push(RustAttrValue::Int(endpoint_id as i64));
+                    } else {
+                        // Handle missing edges with default value
+                        attr_values.push(RustAttrValue::Int(0));
+                    }
+                }
+            } else {
+                // Regular edge attributes
+                for &edge_id in &edges {
+                    if let Ok(Some(attr_value)) = graph_ref.inner.get_edge_attr(edge_id as usize, attr_name) {
+                        attr_values.push(attr_value);
+                    } else {
+                        // Handle missing attributes with default value
+                        attr_values.push(RustAttrValue::Int(0));
+                    }
+                }
+            }
+            
+            // Create GraphArray from attribute values
+            let graph_array = GraphArray::from_vec(attr_values);
+            columns.push(graph_array);
+        }
+        
+        // Create GraphTable from arrays
+        let table = GraphTable::from_arrays_standalone(columns, Some(attr_names))
+            .map_err(graph_error_to_py_err)?;
+        
+        Ok(Self::from_graph_table(table))
     }
 
     /// Number of rows in the table
@@ -322,5 +401,13 @@ impl PyGraphTable {
         
         Ok(py_dict.to_object(py))
     }
+
+    /// Iterator support - iterates over rows as dictionaries (temporarily disabled)
+    fn __iter__(slf: PyRef<Self>) -> PyResult<PyObject> {
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Table iteration temporarily disabled during Phase 3 - use table[i] for row access"
+        ))
+    }
 }
+
 

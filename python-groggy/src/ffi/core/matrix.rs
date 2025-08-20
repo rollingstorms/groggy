@@ -357,10 +357,74 @@ impl PyGraphMatrix {
 
     // === DISPLAY & REPRESENTATION ===
 
-    /// String representation
-    fn __repr__(&self) -> String {
-        let (rows, cols) = self.inner.shape();
-        format!("GraphMatrix({} x {}, dtype={})", rows, cols, format!("{:?}", self.inner.dtype()))
+    /// String representation with rich display formatting
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        // Try rich display formatting first
+        match self._try_rich_display(py) {
+            Ok(formatted) => Ok(formatted),
+            Err(_) => {
+                // Fallback to simple representation
+                let (rows, cols) = self.inner.shape();
+                Ok(format!("GraphMatrix({} x {}, dtype={})", rows, cols, format!("{:?}", self.inner.dtype())))
+            }
+        }
+    }
+
+    /// String representation (same as __repr__ for consistency)
+    fn __str__(&self, py: Python) -> PyResult<String> {
+        self.__repr__(py)
+    }
+
+    /// Rich HTML representation for Jupyter notebooks
+    fn _repr_html_(&self, py: Python) -> PyResult<String> {
+        match self._try_rich_html_display(py) {
+            Ok(html) => Ok(html),
+            Err(_) => {
+                // Fallback to basic HTML
+                let (rows, cols) = self.inner.shape();
+                Ok(format!(
+                    r#"<div style="font-family: monospace; padding: 10px; border: 1px solid #ddd;">
+                    <strong>GraphMatrix</strong><br>
+                    Shape: {} x {}<br>
+                    Dtype: {}
+                    </div>"#,
+                    rows, cols, format!("{:?}", self.inner.dtype())
+                ))
+            }
+        }
+    }
+
+    /// Try to use rich display formatting
+    fn _try_rich_display(&self, py: Python) -> PyResult<String> {
+        // Get display data for formatting
+        let display_data = self._get_display_data(py)?;
+        
+        // Import the format_matrix function from Python
+        let groggy_module = py.import("groggy")?;
+        let format_matrix = groggy_module.getattr("format_matrix")?;
+        
+        // Call the Python formatter
+        let result = format_matrix.call1((display_data,))?;
+        let formatted_str: String = result.extract()?;
+        
+        Ok(formatted_str)
+    }
+
+    /// Try to use rich HTML display formatting
+    fn _try_rich_html_display(&self, py: Python) -> PyResult<String> {
+        // Get display data for formatting
+        let display_data = self._get_display_data(py)?;
+        
+        // Import the format_matrix_html function from Python
+        let groggy_module = py.import("groggy")?;
+        let display_module = groggy_module.getattr("display")?;
+        let format_matrix_html = display_module.getattr("format_matrix_html")?;
+        
+        // Call the Python HTML formatter
+        let result = format_matrix_html.call1((display_data,))?;
+        let html_str: String = result.extract()?;
+        
+        Ok(html_str)
     }
 
     /// Extract display data for Python display formatters
@@ -392,6 +456,13 @@ impl PyGraphMatrix {
         
         Ok(dict.to_object(py))
     }
+
+    /// Iterator support - iterates over rows as lists (temporarily disabled)
+    fn __iter__(slf: PyRef<Self>) -> PyResult<PyObject> {
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Matrix iteration temporarily disabled during Phase 3 - use matrix[i] for row access"
+        ))
+    }
 }
 
 impl PyGraphMatrix {
@@ -400,3 +471,4 @@ impl PyGraphMatrix {
         Self { inner: matrix }
     }
 }
+
