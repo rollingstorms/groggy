@@ -158,6 +158,35 @@ impl PyNodesAccessor {
         Ok(format!("NodesAccessor({} nodes)", count))
     }
     
+    /// Get all unique attribute names across all nodes
+    fn attributes(&self, py: Python) -> PyResult<Vec<String>> {
+        let graph = self.graph.borrow(py);
+        let mut all_attrs = std::collections::HashSet::new();
+        
+        // Determine which nodes to check
+        let node_ids = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            // Get all node IDs from the graph
+            (0..graph.get_node_count() as NodeId).collect()
+        };
+        
+        // Collect attributes from all nodes
+        for &node_id in &node_ids {
+            if graph.has_node_internal(node_id) {
+                let attrs = graph.node_attribute_keys(node_id);
+                for attr in attrs {
+                    all_attrs.insert(attr);
+                }
+            }
+        }
+        
+        // Convert to sorted vector
+        let mut result: Vec<String> = all_attrs.into_iter().collect();
+        result.sort();
+        Ok(result)
+    }
+    
     /// Get table view of nodes (GraphTable with node attributes)
     fn table(&self, py: Python) -> PyResult<PyObject> {
         // Import the Python GraphTable class
@@ -312,6 +341,33 @@ impl PyEdgesAccessor {
         let graph = self.graph.borrow(py);
         let count = graph.get_edge_count();
         Ok(format!("EdgesAccessor({} edges)", count))
+    }
+    
+    /// Get all unique attribute names across all edges
+    fn attributes(&self, py: Python) -> PyResult<Vec<String>> {
+        let graph = self.graph.borrow(py);
+        let mut all_attrs = std::collections::HashSet::new();
+        
+        // Determine which edges to check
+        let edge_ids = if let Some(ref constrained) = self.constrained_edges {
+            constrained.clone()
+        } else {
+            // Get all edge IDs from the graph
+            graph.inner.edge_ids()
+        };
+        
+        // Collect attributes from all edges
+        for &edge_id in &edge_ids {
+            let attrs = graph.edge_attribute_keys(edge_id);
+            for attr in attrs {
+                all_attrs.insert(attr);
+            }
+        }
+        
+        // Convert to sorted vector
+        let mut result: Vec<String> = all_attrs.into_iter().collect();
+        result.sort();
+        Ok(result)
     }
     
     /// Get table view of edges (GraphTable with edge attributes)

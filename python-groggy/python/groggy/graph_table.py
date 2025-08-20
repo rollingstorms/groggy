@@ -94,56 +94,35 @@ class GraphTable:
     def _discover_attributes(self) -> Set[str]:
         """Discover all attributes present across nodes or edges."""
         graph = self._get_graph()
-        ids = self._get_ids()
-        attributes = set()
         
-        # Comprehensive list of common attributes to check
-        # TODO: Replace with dynamic attribute discovery from graph API
-        if self.table_type == "nodes":
-            common_attrs = [
-                'name', 'age', 'dept', 'salary', 'seniority', 'index', 'level', 
-                'component_id', 'influence_score', 'id', 'value', 'test_val',
-                'height', 'active', 'years_experience', 'department'
-            ]
-        else:
-            common_attrs = [
-                'weight', 'type', 'relationship', 'strength', 'frequency', 
-                'last_contact', 'source', 'target'
-            ]
-        
-        if self.table_type == "nodes":
-            for node_id in ids:
-                try:
-                    node_view = graph.nodes[node_id]
-                    # Check all common attributes
-                    for attr_name in common_attrs:
-                        try:
-                            if hasattr(node_view, '__getitem__'):
-                                _ = node_view[attr_name]
-                                attributes.add(attr_name)
-                        except (KeyError, AttributeError):
-                            continue
-                except Exception:
-                    continue
-        else:  # edges
-            for edge_id in ids:
-                try:
-                    edge_view = graph.edges[edge_id]
-                    # Check all common attributes
-                    for attr_name in common_attrs:
-                        try:
-                            if hasattr(edge_view, '__getitem__'):
-                                _ = edge_view[attr_name]
-                                attributes.add(attr_name)
-                        except (KeyError, AttributeError):
-                            continue
-                    # Always include source and target for edges
-                    attributes.add('source')
-                    attributes.add('target')
-                except Exception:
-                    continue
-        
-        return attributes
+        # Use the accessor's dynamic attribute discovery
+        # This automatically finds all attributes that actually exist
+        try:
+            if self.table_type == "nodes":
+                # Get attributes from nodes accessor - handles both full graph and subgraphs
+                if hasattr(self.data_source, 'nodes') and hasattr(self.data_source.nodes, 'attributes'):
+                    # This is a subgraph with constrained nodes
+                    attrs = self.data_source.nodes.attributes()
+                else:
+                    # This is a full graph or simple list of IDs
+                    attrs = graph.nodes.attributes()
+            else:  # edges
+                # Get attributes from edges accessor - handles both full graph and subgraphs  
+                if hasattr(self.data_source, 'edges') and hasattr(self.data_source.edges, 'attributes'):
+                    # This is a subgraph with constrained edges
+                    attrs = self.data_source.edges.attributes()
+                else:
+                    # This is a full graph or simple list of IDs
+                    attrs = graph.edges.attributes()
+                
+                # Always include source and target for edges
+                attrs.extend(['source', 'target'])
+            
+            return set(attrs)
+        except Exception as e:
+            # Fallback to minimal set if dynamic discovery fails
+            print(f"Warning: Dynamic attribute discovery failed ({e}), using minimal fallback")
+            return {'id'}
     
     def _detect_column_types(self, rows, columns):
         """Detect the data type of each column based on sample values."""
