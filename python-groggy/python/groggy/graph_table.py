@@ -241,6 +241,10 @@ class GraphTable:
         if self._cached_data is not None:
             return self._cached_data, self._cached_columns
         
+        # Handle filtered tables (column-selected tables)
+        if getattr(self, '_is_filtered_table', False):
+            return self._cached_data, self._cached_columns
+        
         # Handle array tables differently
         if getattr(self, '_is_array_table', False):
             return self._build_array_table_data()
@@ -529,21 +533,43 @@ class GraphTable:
             return new_table
             
         elif isinstance(key, list):
-            # Multi-column access - return list of GraphArrays or new GraphTable
+            # Multi-column access - return new GraphTable with selected columns (pandas-like behavior)
             if all(isinstance(col, str) for col in key):
-                # All elements are column names
-                result_columns = []
+                # Validate all column names exist
                 for col_name in key:
                     if col_name not in columns:
                         raise KeyError(f"Column '{col_name}' not found")
-                    # Get each column as GraphArray (reusing single column logic)
-                    column_data = [row.get(col_name) for row in rows]
-                    try:
-                        import groggy
-                        result_columns.append(groggy.GraphArray(column_data))
-                    except Exception:
-                        result_columns.append(column_data)
-                return result_columns
+                
+                # Create new table data with only selected columns
+                filtered_rows = []
+                for row in rows:
+                    filtered_row = {col_name: row.get(col_name) for col_name in key}
+                    filtered_rows.append(filtered_row)
+                
+                # Create a data source that represents the filtered data
+                class FilteredDataSource:
+                    def __init__(self, filtered_data, selected_columns, original_table):
+                        self.filtered_data = filtered_data
+                        self.selected_columns = selected_columns
+                        self.original_table = original_table
+                    
+                    def __len__(self):
+                        return len(self.filtered_data)
+                    
+                    def __iter__(self):
+                        # For compatibility, return IDs if available
+                        return iter(row.get('id') for row in self.filtered_data if 'id' in row)
+                
+                filtered_source = FilteredDataSource(filtered_rows, key, self)
+                new_table = GraphTable(filtered_source, self.table_type, self.graph_override)
+                
+                # Cache the filtered data and set the selected columns
+                new_table._cached_data = filtered_rows
+                new_table._cached_columns = key
+                new_table._is_filtered_table = True
+                new_table._selected_columns = key
+                
+                return new_table
             else:
                 raise TypeError("All elements in list must be column names (strings)")
         else:
