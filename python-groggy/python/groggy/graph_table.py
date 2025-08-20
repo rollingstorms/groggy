@@ -15,10 +15,10 @@ class GraphTable:
     
     def __init__(self, data_source, table_type="nodes", graph=None):
         """
-        Initialize GraphTable from a graph data source.
+        Initialize GraphTable from a graph data source or list of arrays.
         
         Args:
-            data_source: Graph, Subgraph, or list of node/edge IDs
+            data_source: Graph, Subgraph, list of node/edge IDs, or list of GraphArrays
             table_type: "nodes" or "edges"
             graph: Optional graph reference for subgraphs that don't have graph access
         """
@@ -27,11 +27,25 @@ class GraphTable:
         self.graph_override = graph
         self._cached_data = None
         self._cached_columns = None
+        
+        # Check if data_source is a list of GraphArrays (direct table construction)
+        if isinstance(data_source, list) and len(data_source) > 0:
+            # Check if all elements are GraphArray-like objects
+            if all(hasattr(item, 'to_list') for item in data_source):
+                self._is_array_table = True
+                self._array_columns = data_source
+            else:
+                self._is_array_table = False
+        else:
+            self._is_array_table = False
     
     def _get_graph(self):
         """Get the underlying graph object."""
+        # For array tables, no graph is needed
+        if getattr(self, '_is_array_table', False):
+            return None
         # Use override graph if provided
-        if self.graph_override is not None:
+        elif self.graph_override is not None:
             return self.graph_override
         # Check if it's a EnhancedSubgraph - these don't have graph references
         elif hasattr(self.data_source, 'subgraph_type') and hasattr(self.data_source, 'nodes'):
@@ -185,10 +199,51 @@ class GraphTable:
         
         return dtypes
     
+    def _build_array_table_data(self):
+        """Build table data from a list of GraphArrays."""
+        if not hasattr(self, '_array_columns') or not self._array_columns:
+            return [], []
+        
+        # Convert each GraphArray to a list
+        columns_data = []
+        for array in self._array_columns:
+            if hasattr(array, 'to_list'):
+                columns_data.append(array.to_list())
+            else:
+                columns_data.append(list(array))
+        
+        # Determine number of rows
+        if not columns_data:
+            return [], []
+        
+        num_rows = max(len(col) for col in columns_data) if columns_data else 0
+        
+        # Build column names
+        columns = [f'col_{i}' for i in range(len(columns_data))]
+        self._cached_columns = columns
+        
+        # Build rows as list of dicts
+        rows = []
+        for row_idx in range(num_rows):
+            row = {}
+            for col_idx, col_name in enumerate(columns):
+                if col_idx < len(columns_data) and row_idx < len(columns_data[col_idx]):
+                    row[col_name] = columns_data[col_idx][row_idx]
+                else:
+                    row[col_name] = None
+            rows.append(row)
+        
+        self._cached_data = rows
+        return rows, columns
+    
     def _build_table_data(self):
         """Build the complete table data with all attributes."""
         if self._cached_data is not None:
             return self._cached_data, self._cached_columns
+        
+        # Handle array tables differently
+        if getattr(self, '_is_array_table', False):
+            return self._build_array_table_data()
         
         graph = self._get_graph()
         ids = self._get_ids()
@@ -473,8 +528,26 @@ class GraphTable:
             
             return new_table
             
+        elif isinstance(key, list):
+            # Multi-column access - return list of GraphArrays or new GraphTable
+            if all(isinstance(col, str) for col in key):
+                # All elements are column names
+                result_columns = []
+                for col_name in key:
+                    if col_name not in columns:
+                        raise KeyError(f"Column '{col_name}' not found")
+                    # Get each column as GraphArray (reusing single column logic)
+                    column_data = [row.get(col_name) for row in rows]
+                    try:
+                        import groggy
+                        result_columns.append(groggy.GraphArray(column_data))
+                    except Exception:
+                        result_columns.append(column_data)
+                return result_columns
+            else:
+                raise TypeError("All elements in list must be column names (strings)")
         else:
-            raise TypeError("Key must be string (column), int (row), or slice")
+            raise TypeError("Key must be string (column), int (row), slice, or list of strings")
     
     @property
     def columns(self):

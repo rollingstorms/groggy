@@ -517,8 +517,36 @@ impl PyGraphMatrix {
     }
     
     fn __repr__(&self) -> String {
-        format!("GraphMatrix({}x{} adjacency matrix)", 
-                self.inner.size, self.inner.size)
+        let (rows, cols) = (self.inner.size, self.inner.size);
+        
+        // For small matrices, show some data
+        if rows <= 8 && cols <= 8 {
+            let mut result = format!("GraphMatrix({}x{}):\n", rows, cols);
+            for i in 0..rows {
+                result.push_str("  [");
+                for j in 0..cols {
+                    if let Some(value) = self.inner.get(i, j) {
+                        match value {
+                            groggy::AttrValue::Int(v) => result.push_str(&format!("{:3}", v)),
+                            groggy::AttrValue::Float(v) => result.push_str(&format!("{:6.2}", v)),
+                            groggy::AttrValue::Bool(true) => result.push_str("  1"),
+                            groggy::AttrValue::Bool(false) => result.push_str("  0"),
+                            _ => result.push_str("  ?"),
+                        }
+                    } else {
+                        result.push_str("  0");
+                    }
+                    if j < cols - 1 {
+                        result.push_str(" ");
+                    }
+                }
+                result.push_str("]\n");
+            }
+            result.trim_end().to_string()
+        } else {
+            // For large matrices, just show dimensions and type
+            format!("GraphMatrix({}x{} adjacency matrix)", rows, cols)
+        }
     }
 }
 
