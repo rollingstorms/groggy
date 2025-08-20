@@ -7,16 +7,19 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyIndexError, PyImportError, PyNotImplementedError};
 use groggy::{NodeId, EdgeId, AttrValue};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // Import types from our FFI modules
 use crate::ffi::api::graph::PyGraph;
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::core::array::{PyGraphArray, PyGraphMatrix};
 use crate::ffi::core::accessors::{PyNodesAccessor, PyEdgesAccessor};
+use crate::ffi::core::query::PyNodeFilter;
+use crate::ffi::utils::graph_error_to_py_err;
 
 // Import the core Subgraph type
 use groggy::core::subgraph::Subgraph as RustSubgraph;
+
 
 /// Utility function to convert Python values to AttrValue
 fn python_value_to_attr_value(value: &PyAny) -> PyResult<AttrValue> {
@@ -535,76 +538,109 @@ impl PySubgraph {
         Ok(table.to_object(py))
     }
     
-    /// Enhanced filter_nodes method using the existing graph's filter capabilities
-    /// This enables chaining: subgraph.filter_nodes('age > 30').filter_nodes('dept == "Engineering"')
-    fn filter_nodes(&self, py: Python, filter_obj: &PyAny) -> PyResult<PySubgraph> {
-        if let Some(graph_ref) = &self.graph {
-            let graph = graph_ref.borrow(py);
-            
-            // Convert the filter and apply it to this subgraph's nodes
-            // For now, we'll create a basic attribute filter implementation
-            if let Ok(filter_str) = filter_obj.extract::<String>() {
-                // Parse the filter string and apply to our node subset
-                // This is a simplified implementation - in practice, we'd use the full parser
-                let filtered_nodes: Vec<NodeId> = self.nodes.iter()
-                    .filter(|&&node_id| {
-                        // For demonstration, let's support a simple "dept == 'Engineering'" pattern
-                        if filter_str.contains("==") {
-                            let parts: Vec<&str> = filter_str.split("==").map(|s| s.trim()).collect();
-                            if parts.len() == 2 {
-                                let attr_name = parts[0].trim();
-                                let expected_value = parts[1].trim_matches('"').trim_matches('\'');
-                                
-                                // Check if this node has the attribute with the expected value
-                                if let Ok(Some(attr_value)) = graph.inner.get_node_attr(node_id, &attr_name.to_string()) {
-                                    match attr_value {
-                                        AttrValue::Text(ref text) => text == expected_value,
-                                        AttrValue::CompactText(ref text) => text.as_str() == expected_value,
-                                        _ => false,
-                                    }
-                                } else {
-                                    false
-                                }
-                            } else {
-                                true // Invalid filter, include all
-                            }
-                        } else {
-                            true // Unsupported filter, include all
-                        }
-                    })
-                    .copied()
-                    .collect();
-                
-                // Calculate induced edges for the filtered nodes
-                let filtered_node_set: std::collections::HashSet<NodeId> = filtered_nodes.iter().copied().collect();
-                let induced_edges: Vec<EdgeId> = self.edges.iter()
-                    .filter(|&&edge_id| {
-                        if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
-                            filtered_node_set.contains(&source) && filtered_node_set.contains(&target)
-                        } else {
-                            false
-                        }
-                    })
-                    .copied()
-                    .collect();
-                
-                Ok(PySubgraph::new(
-                    filtered_nodes,
-                    induced_edges,
-                    format!("{}_filtered", self.subgraph_type),
-                    self.graph.clone(),
-                ))
-            } else {
-                // For other filter types, return current subgraph unchanged for now
-                Ok(PySubgraph::new(
-                    self.nodes.clone(),
-                    self.edges.clone(),
-                    self.subgraph_type.clone(),
-                    self.graph.clone(),
-                ))
-            }
-        } else {
-            Err(PyRuntimeError::new_err("No graph reference available for filtering"))
+    /// Python-level access to parent graph (if attached).
+    #[getter]
+    pub fn graph(&self) -> PyResult<Option<Py<PyGraph>>> {
+        Ok(self.graph.clone())
+    }
+    
+    /// Fast column accessor for node attributes on PySubgraph
+    pub fn _get_node_attribute_column(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyGraphArray>> {
+        if let Some(ref inner) = self.inner {
+            let attr_name = groggy::AttrName::from(name.to_string());
+            let arr = inner.get_node_attribute_column(&attr_name)
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get node attribute column: {}", e)))?;
+            let py_graph_array = PyGraphArray { inner: groggy::GraphArray::from_vec(arr) };
+            return Py::new(py, py_graph_array);
         }
+        Err(pyo3::exceptions::PyRuntimeError::new_err("Subgraph has no inner core; attach a graph-backed subgraph"))
+    }
+
+    /// Fast column accessor for edge attributes on PySubgraph  
+    pub fn _get_edge_attribute_column(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyGraphArray>> {
+        if let Some(ref inner) = self.inner {
+            let attr_name = groggy::AttrName::from(name.to_string());
+            let arr = inner.get_edge_attribute_column(&attr_name)
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get edge attribute column: {}", e)))?;
+            let py_graph_array = PyGraphArray { inner: groggy::GraphArray::from_vec(arr) };
+            return Py::new(py, py_graph_array);
+        }
+        Err(pyo3::exceptions::PyRuntimeError::new_err("Subgraph has no inner core; attach a graph-backed subgraph"))
+    }
+    
+    /// Filter nodes *within this subgraph* using a full NodeFilter or string expression.
+    /// Returns a new PySubgraph with filtered nodes and induced edges (within this subgraph).
+    pub fn filter_nodes(&self, py: Python<'_>, filter: &PyAny) -> PyResult<PySubgraph> {
+        // 0) Must have a parent graph to evaluate attributes efficiently
+        let Some(graph_ref) = &self.graph else {
+            return Err(PyRuntimeError::new_err("Subgraph has no parent graph reference"));
+        };
+
+        // 1) Resolve a NodeFilter:
+        //    - If caller passed a NodeFilter object -> use it
+        //    - Else if they passed a string -> parse via groggy.query_parser.parse_node_query
+        //    - Else optional dict[str, AttributeFilter] -> translate to NodeFilter::And(AttributeFilter...)
+        let node_filter = if let Ok(py_nf) = filter.extract::<PyNodeFilter>() {
+            py_nf.inner.clone()
+        } else if let Ok(query_str) = filter.extract::<String>() {
+            let qp = py.import("groggy.query_parser")?;
+            let parse = qp.getattr("parse_node_query")?;
+            let parsed: PyNodeFilter = parse.call1((query_str,))?.extract()?;
+            parsed.inner.clone()
+        } else if let Ok(dict) = filter.downcast::<pyo3::types::PyDict>() {
+            // Optional: allow dict form {"age": AttributeFilter.greater_than(21), ...}
+            use groggy::core::query::{NodeFilter as NF, AttributeFilter as AF};
+            use groggy::AttrName;
+            let mut clauses = Vec::new();
+            for (k, v) in dict.iter() {
+                let key: String = k.extract()?;
+                // Expect v is a PyAttributeFilter (FFI), so call .inner on it from Python first if needed.
+                // If your AttributeFilter is exposed as a Python class, try to extract it directly:
+                let py_attr = v.extract::<crate::ffi::core::query::PyAttributeFilter>()?;
+                clauses.push(NF::AttributeFilter { name: AttrName::from(key), filter: py_attr.inner.clone() });
+            }
+            groggy::core::query::NodeFilter::And(clauses)
+        } else {
+            return Err(PyTypeError::new_err(
+                "filter must be NodeFilter | str | dict[str, AttributeFilter]"
+            ));
+        };
+
+        // 2) Evaluate filter on the *current subgraph nodes* using the core API
+        let mut g = graph_ref.borrow_mut(py);
+        
+        // Get all nodes that match the filter from the entire graph
+        let all_filtered_nodes: Vec<groggy::NodeId> = g.inner
+            .find_nodes(node_filter)
+            .map_err(graph_error_to_py_err)?;
+        
+        // Intersect with current subgraph's nodes to get nodes that are both:
+        // 1) In this subgraph, and 2) Match the filter
+        let subgraph_node_set: HashSet<groggy::NodeId> = self.nodes.iter().copied().collect();
+        let filtered_nodes: Vec<groggy::NodeId> = all_filtered_nodes
+            .into_iter()
+            .filter(|node_id| subgraph_node_set.contains(node_id))
+            .collect();
+
+        // 3) Induce edges *within this subgraph* only
+        let node_set: HashSet<groggy::NodeId> = filtered_nodes.iter().copied().collect();
+        let mut induced_edges = Vec::with_capacity(self.edges.len() / 2);
+        for &eid in &self.edges {
+            if let Ok((s, t)) = g.inner.edge_endpoints(eid) {
+                if node_set.contains(&s) && node_set.contains(&t) {
+                    induced_edges.push(eid);
+                }
+            }
+        }
+
+        // 4) Return a new subgraph; preserve graph reference for downstream ops/tables
+        let mut out = PySubgraph::new(
+            filtered_nodes,
+            induced_edges,
+            format!("{}_filtered", self.subgraph_type),
+            None, // we'll set the graph next
+        );
+        out.set_graph_reference(graph_ref.clone());
+        Ok(out)
     }
 }
