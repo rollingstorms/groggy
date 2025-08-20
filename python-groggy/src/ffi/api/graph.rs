@@ -1051,23 +1051,39 @@ impl PyGraph {
     
     // === DISPLAY/TABLE METHODS ===
     
-    /// Create a GraphTable view for DataFrame-like access to node data (from lib_old.rs)
-    /// Returns a GraphTable object with all nodes and their attributes
-    fn table(&self, py: Python) -> PyResult<PyObject> {
-        // Temporarily return a simple placeholder until PyO3 trait issue is resolved
-        let graph_table_module = py.import("groggy.graph_table")?;
-        let graph_table_class = graph_table_module.getattr("GraphTable")?;
-        
-        // Simple approach: create empty GraphTable and set attributes manually  
-        let empty_list = py.eval("[]", None, None)?;
-        let table = graph_table_class.call1((empty_list, "nodes"))?;
-        Ok(table.to_object(py))
-    }
-
     /// Get all neighbors of a node
     fn neighbors(&mut self, node: NodeId) -> PyResult<Vec<NodeId>> {
         self.inner.neighbors(node)
             .map_err(graph_error_to_py_err)
+    }
+    
+    /// Return a full-view Subgraph (whole graph as a subgraph).
+    /// Downstream code can always resolve parent graph from this object.
+    pub fn view(self_: PyRef<Self>, py: Python<'_>) -> PyResult<Py<PySubgraph>> {
+        // Pull ids via existing accessors
+        let nodes: Vec<NodeId> = self_.inner.node_ids();
+        let edges: Vec<EdgeId> = self_.inner.edge_ids();
+
+        let mut sg = PySubgraph::new(nodes, edges, "full".to_string(), None);
+        let this_graph: Py<PyGraph> = self_.into();
+        sg.set_graph_reference(this_graph);
+        Py::new(py, sg)
+    }
+    
+    /// Create GraphTable for DataFrame-like view of this graph's nodes
+    /// Forwards to the subgraph implementation to maintain consistency
+    pub fn table(self_: PyRef<Self>, py: Python<'_>) -> PyResult<PyObject> {
+        let sg = Self::view(self_, py)?;
+        let t = sg.call_method0(py, "table")?;
+        Ok(t.to_object(py))
+    }
+    
+    /// Create GraphTable for DataFrame-like view of this graph's edges  
+    /// Forwards to the subgraph implementation to maintain consistency
+    pub fn edges_table(self_: PyRef<Self>, py: Python<'_>) -> PyResult<PyObject> {
+        let sg = Self::view(self_, py)?;
+        let t = sg.call_method0(py, "edges_table")?;
+        Ok(t.to_object(py))
     }
     
 }
