@@ -405,17 +405,8 @@ impl Subgraph {
     }
 }
 
-/// Column access syntax: subgraph[attr_name] -> Vec<AttrValue>
-impl std::ops::Index<&str> for Subgraph {
-    type Output = Vec<AttrValue>;
-    
-    fn index(&self, _attr_name: &str) -> &Self::Output {
-        // Note: This is a design challenge - we can't return references to Vec<AttrValue>
-        // because the Vec is computed on demand. We might need a different approach
-        // for true index syntax. For now, users should use get_node_attribute_column()
-        unimplemented!("Use get_node_attribute_column() for column access instead of []")
-    }
-}
+// Note: Index syntax (subgraph[attr_name]) is not implemented because we can't return 
+// references to computed Vec<AttrValue>. Use get_node_attribute_column() instead.
 
 impl std::fmt::Display for Subgraph {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

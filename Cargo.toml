@@ -1,8 +1,8 @@
 [package]
 name = "groggy"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
-description = "Groggy - A Graph Language Engine for dynamic graphs and versioned state"
+description = "Groggy - High-performance graph analytics engine with unified storage views (Arrays, Matrices, Tables)"
 license = "MIT"
 homepage = "https://github.com/rollingstorms/groggy"
 repository = "https://github.com/rollingstorms/groggy"
