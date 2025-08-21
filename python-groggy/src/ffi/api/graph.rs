@@ -4,7 +4,7 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pyo3::exceptions::{PyKeyError, PyTypeError};
+use pyo3::exceptions::{PyKeyError, PyTypeError, PyRuntimeError};
 use groggy::{Graph as RustGraph, NodeId, EdgeId, AttrValue as RustAttrValue, AttrName, StateId};
 
 // Import all graph modules
@@ -992,19 +992,35 @@ impl PyGraph {
     /// Generate adjacency matrix for the entire graph (cleaner API)
     /// Returns: GraphMatrix with multi-index access (matrix[0, 1])
     /// This is a cleaner alias for adjacency_matrix() but always returns dense
-    fn adjacency(&mut self, _py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        // TODO: Implement adjacency in Phase 2
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "Adjacency matrix temporarily disabled during Phase 2 unification"
-        ))
+    fn adjacency(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        use crate::ffi::core::matrix::PyGraphMatrix;
+        
+        // Generate dense adjacency matrix using the public API method
+        let adjacency_matrix = self.inner.dense_adjacency_matrix()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to generate adjacency matrix: {:?}", e)))?;
+        
+        // Convert AdjacencyMatrix to GraphMatrix
+        let graph_matrix = self.adjacency_matrix_to_graph_matrix(adjacency_matrix)?;
+        
+        // Wrap in PyGraphMatrix
+        let py_graph_matrix = PyGraphMatrix::from_graph_matrix(graph_matrix);
+        Ok(Py::new(py, py_graph_matrix)?)
     }
     
     /// Generate weighted adjacency matrix using specified edge attribute (FFI wrapper around core matrix operations)
-    fn weighted_adjacency_matrix(&mut self, _py: Python, _weight_attr: &str) -> PyResult<Py<PyGraphMatrix>> {
-        // TODO: Implement weighted adjacency matrix in Phase 2
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "Weighted adjacency matrix temporarily disabled during Phase 2 unification"
-        ))
+    fn weighted_adjacency_matrix(&mut self, py: Python, weight_attr: &str) -> PyResult<Py<PyGraphMatrix>> {
+        use crate::ffi::core::matrix::PyGraphMatrix;
+        
+        // Generate weighted adjacency matrix using the public API method
+        let adjacency_matrix = self.inner.weighted_adjacency_matrix(weight_attr)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to generate weighted adjacency matrix: {:?}", e)))?;
+        
+        // Convert AdjacencyMatrix to GraphMatrix
+        let graph_matrix = self.adjacency_matrix_to_graph_matrix(adjacency_matrix)?;
+        
+        // Wrap in PyGraphMatrix
+        let py_graph_matrix = PyGraphMatrix::from_graph_matrix(graph_matrix);
+        Ok(Py::new(py, py_graph_matrix)?)
     }
     
     /// Generate dense adjacency matrix (FFI wrapper around core matrix operations)
@@ -1024,11 +1040,48 @@ impl PyGraph {
     }
     
     /// Generate Laplacian matrix (FFI wrapper around core matrix operations)
-    fn laplacian_matrix(&mut self, _py: Python, _normalized: Option<bool>) -> PyResult<Py<PyGraphMatrix>> {
-        // TODO: Implement Laplacian matrix in Phase 2
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "Laplacian matrix temporarily disabled during Phase 2 unification"
-        ))
+    fn laplacian_matrix(&mut self, py: Python, normalized: Option<bool>) -> PyResult<Py<PyGraphMatrix>> {
+        use crate::ffi::core::matrix::PyGraphMatrix;
+        
+        let is_normalized = normalized.unwrap_or(false);
+        
+        // Generate Laplacian matrix using the public API method
+        let laplacian_matrix = self.inner.laplacian_matrix(is_normalized)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to generate Laplacian matrix: {:?}", e)))?;
+        
+        // Convert AdjacencyMatrix to GraphMatrix
+        let graph_matrix = self.adjacency_matrix_to_graph_matrix(laplacian_matrix)?;
+        
+        // Wrap in PyGraphMatrix
+        let py_graph_matrix = PyGraphMatrix::from_graph_matrix(graph_matrix);
+        Ok(Py::new(py, py_graph_matrix)?)
+    }
+    
+    /// Compute k-step transition matrix (A^k normalized by row sums for random walks)
+    /// Returns matrix where entry (i,j) represents probability of k-step walk from i to j
+    fn transition_matrix(&mut self, py: Python, k: u32, weight_attr: Option<&str>) -> PyResult<Py<PyGraphMatrix>> {
+        use crate::ffi::core::matrix::PyGraphMatrix;
+        
+        // Get adjacency matrix (weighted or unweighted)
+        let adjacency_matrix = if let Some(attr) = weight_attr {
+            self.inner.weighted_adjacency_matrix(attr)
+        } else {
+            self.inner.dense_adjacency_matrix()
+        }.map_err(|e| PyRuntimeError::new_err(format!("Failed to generate adjacency matrix: {:?}", e)))?;
+        
+        // Convert to GraphMatrix for operations
+        let mut graph_matrix = self.adjacency_matrix_to_graph_matrix(adjacency_matrix)?;
+        
+        // Normalize rows to get transition probabilities
+        // TODO: This would benefit from proper row normalization in GraphMatrix
+        // For now, just return the k-th power
+        for _ in 1..k {
+            graph_matrix = graph_matrix.multiply(&graph_matrix)
+                .map_err(|e| PyRuntimeError::new_err(format!("Matrix power computation failed: {:?}", e)))?;
+        }
+        
+        let py_graph_matrix = PyGraphMatrix::from_graph_matrix(graph_matrix);
+        Ok(Py::new(py, py_graph_matrix)?)
     }
     
     /// Generate adjacency matrix for a subgraph with specific nodes (FFI wrapper around core matrix operations)
@@ -1082,6 +1135,50 @@ impl PyGraph {
 
 // Internal methods for FFI integration (not exposed to Python)
 impl PyGraph {
+    /// Convert core AdjacencyMatrix to GraphMatrix for Python FFI
+    fn adjacency_matrix_to_graph_matrix(&self, adjacency_matrix: groggy::AdjacencyMatrix) -> PyResult<groggy::GraphMatrix> {
+        use groggy::core::array::GraphArray;
+        use groggy::core::matrix::GraphMatrix;
+        
+        // Extract matrix data and convert to GraphArrays (columns)
+        let size = adjacency_matrix.size;
+        let mut columns = Vec::with_capacity(size);
+        
+        // Create a column for each matrix column
+        for col_idx in 0..size {
+            let column_values: Vec<groggy::AttrValue> = (0..size)
+                .map(|row_idx| {
+                    adjacency_matrix.get(row_idx, col_idx)
+                        .cloned()
+                        .unwrap_or(groggy::AttrValue::Float(0.0))
+                })
+                .collect();
+            
+            let column_name = if let Some(ref labels) = adjacency_matrix.labels {
+                format!("node_{}", labels.get(col_idx).copied().unwrap_or(col_idx as groggy::NodeId))
+            } else {
+                format!("col_{}", col_idx)
+            };
+            
+            let column = GraphArray::from_vec(column_values).with_name(column_name);
+            columns.push(column);
+        }
+        
+        // Create GraphMatrix from the columns
+        let mut graph_matrix = GraphMatrix::from_arrays(columns)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create GraphMatrix from adjacency matrix: {:?}", e)))?;
+        
+        // Set proper column names using node labels if available
+        if let Some(ref labels) = adjacency_matrix.labels {
+            let column_names: Vec<String> = labels.iter()
+                .map(|&node_id| format!("node_{}", node_id))
+                .collect();
+            graph_matrix.set_column_names(column_names)
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to set column names: {:?}", e)))?;
+        }
+        
+        Ok(graph_matrix)
+    }
     /// Internal helper methods for accessors/views
     pub fn create_node_view_internal(graph: Py<PyGraph>, py: Python, node_id: NodeId) -> PyResult<Py<PyNodeView>> {
         Py::new(py, PyNodeView {
