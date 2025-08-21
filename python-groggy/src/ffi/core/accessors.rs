@@ -189,7 +189,7 @@ impl PyNodesAccessor {
     }
     
     /// Get table view of nodes (GraphTable with node attributes)
-    fn table(&self, py: Python) -> PyResult<PyObject> {
+    pub fn table(&self, py: Python) -> PyResult<PyObject> {
         use crate::ffi::core::table::PyGraphTable;
         
         // Determine node list based on constraints
@@ -375,7 +375,7 @@ impl PyEdgesAccessor {
     }
     
     /// Get table view of edges (GraphTable with edge attributes)  
-    fn table(&self, py: Python) -> PyResult<PyObject> {
+    pub fn table(&self, py: Python) -> PyResult<PyObject> {
         use crate::ffi::core::table::PyGraphTable;
         
         // Determine edge list based on constraints
