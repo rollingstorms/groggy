@@ -545,27 +545,119 @@ impl PySubgraph {
     
     /// Create GraphTable for DataFrame-like view of this subgraph nodes
     fn table(&self, py: Python) -> PyResult<PyObject> {
-        // Create arrays with node IDs
-        let node_id_values: Vec<PyObject> = self.nodes.iter()
-            .map(|&id| (id as i64).to_object(py))
-            .collect();
+        // Get the graph reference
+        let graph_py = self.graph.as_ref().ok_or_else(|| 
+            PyRuntimeError::new_err("Subgraph is not attached to a graph")
+        )?;
+        let graph = graph_py.borrow(py);
         
-        let node_array = PyGraphArray::from_py_objects(node_id_values)?;
-        let py_table = PyGraphTable::new(py, vec![Py::new(py, node_array)?], Some(vec!["node_id".to_string()]))?;
+        // Get all available node attributes
+        let mut all_attrs = std::collections::HashSet::new();
+        for &node_id in &self.nodes {
+            if let Ok(attrs) = graph.inner.get_node_attrs(node_id) {
+                for attr_name in attrs.keys() {
+                    all_attrs.insert(attr_name.clone());
+                }
+            }
+        }
         
+        // Always include node_id as first column
+        let mut column_names = vec!["node_id".to_string()];
+        column_names.extend(all_attrs.into_iter());
+        
+        let mut columns = Vec::new();
+        
+        // Create each column
+        for column_name in &column_names {
+            let mut attr_values = Vec::new();
+            
+            if column_name == "node_id" {
+                // Node ID column
+                for &node_id in &self.nodes {
+                    attr_values.push(groggy::AttrValue::Int(node_id as i64));
+                }
+            } else {
+                // Attribute column
+                for &node_id in &self.nodes {
+                    if let Ok(Some(attr_value)) = graph.inner.get_node_attr(node_id, column_name) {
+                        attr_values.push(attr_value);
+                    } else {
+                        // Default to null/empty for missing attributes
+                        attr_values.push(groggy::AttrValue::Int(0));
+                    }
+                }
+            }
+            
+            let graph_array = groggy::GraphArray::from_vec(attr_values);
+            let py_array = PyGraphArray::from_graph_array(graph_array);
+            columns.push(Py::new(py, py_array)?);
+        }
+        
+        let py_table = PyGraphTable::new(py, columns, Some(column_names))?;
         Ok(Py::new(py, py_table)?.to_object(py))
     }
     
     /// Create GraphTable for DataFrame-like view of this subgraph edges
     fn edges_table(&self, py: Python) -> PyResult<PyObject> {
-        // Create arrays with edge IDs  
-        let edge_id_values: Vec<PyObject> = self.edges.iter()
-            .map(|&id| (id as i64).to_object(py))
-            .collect();
+        // Get the graph reference
+        let graph_py = self.graph.as_ref().ok_or_else(|| 
+            PyRuntimeError::new_err("Subgraph is not attached to a graph")
+        )?;
+        let graph = graph_py.borrow(py);
         
-        let edge_array = PyGraphArray::from_py_objects(edge_id_values)?;
-        let py_table = PyGraphTable::new(py, vec![Py::new(py, edge_array)?], Some(vec!["edge_id".to_string()]))?;
+        // Get all available edge attributes
+        let mut all_attrs = std::collections::HashSet::new();
+        for &edge_id in &self.edges {
+            if let Ok(attrs) = graph.inner.get_edge_attrs(edge_id) {
+                for attr_name in attrs.keys() {
+                    all_attrs.insert(attr_name.clone());
+                }
+            }
+        }
         
+        // Always include edge_id, source, target as first columns
+        let mut column_names = vec!["edge_id".to_string(), "source".to_string(), "target".to_string()];
+        column_names.extend(all_attrs.into_iter());
+        
+        let mut columns = Vec::new();
+        
+        // Create each column
+        for column_name in &column_names {
+            let mut attr_values = Vec::new();
+            
+            if column_name == "edge_id" {
+                // Edge ID column
+                for &edge_id in &self.edges {
+                    attr_values.push(groggy::AttrValue::Int(edge_id as i64));
+                }
+            } else if column_name == "source" || column_name == "target" {
+                // Source/Target columns
+                for &edge_id in &self.edges {
+                    if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                        let endpoint_id = if column_name == "source" { source } else { target };
+                        attr_values.push(groggy::AttrValue::Int(endpoint_id as i64));
+                    } else {
+                        attr_values.push(groggy::AttrValue::Int(0));
+                    }
+                }
+            } else {
+                // Attribute column
+                for &edge_id in &self.edges {
+                    if let Ok(Some(attr_value)) = graph.inner.get_edge_attr(edge_id, column_name) {
+                        attr_values.push(attr_value);
+                    } else {
+                        // Default to null/empty for missing attributes
+                        attr_values.push(groggy::AttrValue::Int(0));
+                    }
+                }
+            }
+            
+            let graph_array = groggy::GraphArray::from_vec(attr_values);
+            let py_array = PyGraphArray::from_graph_array(graph_array);
+            columns.push(Py::new(py, py_array)?);
+        }
+        
+        let py_table = PyGraphTable::new(py, columns, Some(column_names))?;
         Ok(Py::new(py, py_table)?.to_object(py))
     }
     
