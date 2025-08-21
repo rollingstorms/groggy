@@ -464,6 +464,30 @@ impl PyGraphTable {
         Ok(py_dict.to_object(py))
     }
 
+    /// Convert to pandas DataFrame
+    pub fn to_pandas(&self, py: Python) -> PyResult<PyObject> {
+        // Import pandas
+        let pandas = py.import("pandas")?;
+        
+        // Get table data as dictionary
+        let dict_data = self.inner.to_dict();
+        let py_dict = pyo3::types::PyDict::new(py);
+        
+        // Convert each column to Python list
+        for (column, values) in dict_data {
+            let py_values: Vec<PyObject> = values.iter()
+                .map(|v| attr_value_to_python_value(py, v))
+                .collect::<PyResult<Vec<_>>>()?;
+            py_dict.set_item(column, py_values)?;
+        }
+        
+        // Create DataFrame from dictionary
+        let dataframe_class = pandas.getattr("DataFrame")?;
+        let df = dataframe_class.call1((py_dict,))?;
+        
+        Ok(df.to_object(py))
+    }
+
     /// Iterator support - iterates over rows as dictionaries (temporarily disabled)
     fn __iter__(slf: PyRef<Self>) -> PyResult<PyObject> {
         Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
