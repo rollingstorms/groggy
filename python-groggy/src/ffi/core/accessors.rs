@@ -159,6 +159,7 @@ impl PyNodesAccessor {
     }
     
     /// Get all unique attribute names across all nodes
+    #[getter]
     fn attributes(&self, py: Python) -> PyResult<Vec<String>> {
         let graph = self.graph.borrow(py);
         let mut all_attrs = std::collections::HashSet::new();
@@ -189,26 +190,28 @@ impl PyNodesAccessor {
     
     /// Get table view of nodes (GraphTable with node attributes)
     fn table(&self, py: Python) -> PyResult<PyObject> {
-        // Import the Python GraphTable class
-        let groggy = py.import("groggy")?;
-        let graph_table_class = groggy.getattr("GraphTable")?;
-        
-        // Get the underlying graph
-        let graph = self.graph.borrow(py);
+        use crate::ffi::core::table::PyGraphTable;
         
         // Determine node list based on constraints
         let node_data = if let Some(ref constrained) = self.constrained_nodes {
             // Subgraph case: use constrained nodes
-            constrained.clone()
+            constrained.iter().map(|&id| id as u64).collect()
         } else {
             // Full graph case: get all node IDs from the graph
-            // Use the inner graph's node_ids method directly
-            graph.inner.node_ids()
+            let graph = self.graph.borrow(py);
+            graph.inner.node_ids().into_iter().map(|id| id as u64).collect()
         };
         
-        // Create GraphTable with nodes data source
-        let table = graph_table_class.call1((node_data, "nodes", self.graph.clone()))?;
-        Ok(table.to_object(py))
+        // Use PyGraphTable::from_graph_nodes to create the table
+        let py_table = PyGraphTable::from_graph_nodes(
+            py.get_type::<PyGraphTable>(),
+            py,
+            self.graph.clone(),
+            node_data,
+            None, // Get all attributes
+        )?;
+        
+        Ok(Py::new(py, py_table)?.to_object(py))
     }
 }
 
@@ -370,26 +373,29 @@ impl PyEdgesAccessor {
         Ok(result)
     }
     
-    /// Get table view of edges (GraphTable with edge attributes)
+    /// Get table view of edges (GraphTable with edge attributes)  
     fn table(&self, py: Python) -> PyResult<PyObject> {
-        // Import the Python GraphTable class
-        let groggy = py.import("groggy")?;
-        let graph_table_class = groggy.getattr("GraphTable")?;
-        
-        // Get the underlying graph
-        let graph = self.graph.borrow(py);
+        use crate::ffi::core::table::PyGraphTable;
         
         // Determine edge list based on constraints
         let edge_data = if let Some(ref constrained) = self.constrained_edges {
             // Subgraph case: use constrained edges
-            constrained.clone()
+            constrained.iter().map(|&id| id as u64).collect()
         } else {
             // Full graph case: get all edge IDs from the graph
-            graph.inner.edge_ids()
+            let graph = self.graph.borrow(py);
+            graph.inner.edge_ids().into_iter().map(|id| id as u64).collect()
         };
         
-        // Create GraphTable with edges data source
-        let table = graph_table_class.call1((edge_data, "edges", self.graph.clone()))?;
-        Ok(table.to_object(py))
+        // Use PyGraphTable::from_graph_edges to create the table
+        let py_table = PyGraphTable::from_graph_edges(
+            py.get_type::<PyGraphTable>(),
+            py,
+            self.graph.clone(),
+            edge_data,
+            None, // Get all attributes
+        )?;
+        
+        Ok(Py::new(py, py_table)?.to_object(py))
     }
 }
