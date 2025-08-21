@@ -320,36 +320,6 @@ impl PyGraphMatrix {
 
     // === SCIENTIFIC COMPUTING CONVERSIONS ===
 
-    /// Convert to NumPy array (when numpy available)
-    fn to_numpy(&self, py: Python) -> PyResult<PyObject> {
-        // Try to import numpy
-        let numpy = py.import("numpy").map_err(|_| {
-            PyErr::new::<PyImportError, _>("numpy is required for to_numpy(). Install with: pip install numpy")
-        })?;
-        
-        // Convert matrix to nested list representation
-        let (rows, cols) = self.inner.shape();
-        let mut matrix_data = Vec::with_capacity(rows);
-        
-        for i in 0..rows {
-            let mut row_data = Vec::with_capacity(cols);
-            for j in 0..cols {
-                match self.inner.get(i, j) {
-                    Some(attr_value) => {
-                        let py_value = attr_value_to_python_value(py, attr_value)?;
-                        row_data.push(py_value);
-                    }
-                    None => return Err(PyIndexError::new_err(format!("Missing value at ({}, {})", i, j)))
-                }
-            }
-            matrix_data.push(row_data);
-        }
-        
-        // Convert to numpy array
-        let array = numpy.call_method1("array", (matrix_data,))?;
-        Ok(array.to_object(py))
-    }
-
     /// Convert to Pandas DataFrame (when pandas available)
     fn to_pandas(&self, py: Python) -> PyResult<PyObject> {
         // Try to import pandas
@@ -487,6 +457,69 @@ impl PyGraphMatrix {
         Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
             "Matrix iteration temporarily disabled during Phase 3 - use matrix[i] for row access"
         ))
+    }
+    
+    // ========================================================================
+    // LAZY EVALUATION & MATERIALIZATION
+    // ========================================================================
+    
+    /// Get matrix data (materializes data to Python objects)
+    /// This is the primary materialization method - use sparingly for large matrices
+    #[getter]
+    fn data(&self, py: Python) -> PyResult<PyObject> {
+        let materialized = self.inner.materialize();
+        let py_matrix: PyResult<Vec<Vec<PyObject>>> = materialized.iter()
+            .map(|row| {
+                row.iter()
+                    .map(|val| attr_value_to_python_value(py, val))
+                    .collect()
+            })
+            .collect();
+        
+        Ok(py_matrix?.to_object(py))
+    }
+    
+    /// Get preview of matrix for display (first N rows/cols by default)
+    fn preview(&self, py: Python, row_limit: Option<usize>, col_limit: Option<usize>) -> PyResult<PyObject> {
+        let row_limit = row_limit.unwrap_or(10);
+        let col_limit = col_limit.unwrap_or(10);
+        let (preview_data, _col_names) = self.inner.preview(row_limit, col_limit);
+        
+        Ok(preview_data.to_object(py))
+    }
+    
+    /// Check if matrix is sparse (has many default values)
+    #[getter]
+    fn is_sparse(&self) -> bool {
+        self.inner.is_sparse()
+    }
+    
+    /// Get summary information without materializing data
+    fn summary(&self) -> String {
+        self.inner.summary_info()
+    }
+    
+    /// Create a dense materialized version of the matrix
+    fn dense(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        let dense_matrix = self.inner.dense();
+        let py_result = PyGraphMatrix::from_graph_matrix(dense_matrix);
+        Ok(Py::new(py, py_result)?)
+    }
+    
+    /// Convert to NumPy array (when numpy available)
+    /// Uses .data property to materialize data
+    fn to_numpy(&self, py: Python) -> PyResult<PyObject> {
+        // Try to import numpy
+        let numpy = py.import("numpy").map_err(|_| {
+            PyErr::new::<PyImportError, _>("numpy is required for to_numpy(). Install with: pip install numpy")
+        })?;
+        
+        // Get materialized data using .data property
+        let data = self.data(py)?;
+        
+        // Convert to numpy array
+        let array = numpy.call_method1("array", (data,))?;
+        Ok(array.to_object(py))
     }
 }
 

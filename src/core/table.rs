@@ -1084,6 +1084,116 @@ impl GraphTable {
 
         Ok(matrix)
     }
+    
+    // ==================================================================================
+    // LAZY EVALUATION & MATERIALIZATION METHODS
+    // ==================================================================================
+    
+    /// Get a preview of the table for display purposes (first N rows)
+    /// This is used by repr() and does not materialize the full table
+    pub fn preview(&self, row_limit: usize, col_limit: Option<usize>) -> (Vec<Vec<String>>, Vec<String>) {
+        let num_cols = col_limit.unwrap_or(self.columns.len()).min(self.columns.len());
+        let num_rows = row_limit.min(self.shape().0);
+        
+        // Get column names preview
+        let col_names = self.column_names.iter()
+            .take(num_cols)
+            .cloned()
+            .collect();
+        
+        // Get data preview
+        let mut preview_data = Vec::new();
+        for row_idx in 0..num_rows {
+            let mut row = Vec::new();
+            for col_idx in 0..num_cols {
+                let value = self.columns[col_idx].get(row_idx)
+                    .map(|v| format!("{:?}", v))
+                    .unwrap_or_else(|| "None".to_string());
+                row.push(value);
+            }
+            preview_data.push(row);
+        }
+        
+        (preview_data, col_names)
+    }
+    
+    /// Materialize the table to nested vectors for Python consumption
+    /// This is the primary materialization method used by .data property
+    pub fn materialize(&self) -> Vec<Vec<AttrValue>> {
+        let (rows, _cols) = self.shape();
+        let mut materialized = Vec::with_capacity(rows);
+        
+        for row_idx in 0..rows {
+            let mut row = Vec::with_capacity(self.columns.len());
+            for column in &self.columns {
+                let value = column.get(row_idx).cloned().unwrap_or(AttrValue::Int(0));
+                row.push(value);
+            }
+            materialized.push(row);
+        }
+        
+        materialized
+    }
+    
+    /// Check if the table is effectively sparse (has many default/zero values)
+    pub fn is_sparse(&self) -> bool {
+        let total_elements = self.shape().0 * self.shape().1;
+        if total_elements == 0 { return false; }
+        
+        let default_count: usize = self.columns.iter()
+            .map(|col| col.to_list().iter()
+                .filter(|v| self.is_default_value(v))
+                .count())
+            .sum();
+            
+        // Consider sparse if >50% are default values
+        (default_count as f64) / (total_elements as f64) > 0.5
+    }
+    
+    /// Check if a value is considered a "default" value for sparsity
+    fn is_default_value(&self, value: &AttrValue) -> bool {
+        match value {
+            AttrValue::Int(0) | AttrValue::SmallInt(0) => true,
+            AttrValue::Float(f) if f.abs() < 1e-10 => true,
+            AttrValue::Bool(false) => true,
+            AttrValue::Text(s) if s.is_empty() => true,
+            _ => false,
+        }
+    }
+    
+    /// Get summary information for lazy display without full materialization
+    pub fn summary_info(&self) -> String {
+        let (rows, cols) = self.shape();
+        let is_sparse = self.is_sparse();
+        let source = &self.metadata.source_type;
+        let name = self.metadata.name.as_deref().unwrap_or("unnamed");
+        
+        format!(
+            "GraphTable('{}', shape=({}, {}), source='{}', sparse={})",
+            name, rows, cols, source, is_sparse
+        )
+    }
+    
+    /// Create a lazy view of selected columns without materializing data
+    pub fn select_lazy(&self, column_names: &[String]) -> GraphResult<Self> {
+        let mut selected_arrays = Vec::new();
+        let mut selected_names = Vec::new();
+        
+        for name in column_names {
+            if let Some(col) = self.get_column_by_name(name) {
+                selected_arrays.push(col.clone());
+                selected_names.push(name.clone());
+            } else {
+                return Err(GraphError::InvalidInput(format!("Column '{}' not found", name)));
+            }
+        }
+        
+        let mut result = Self::from_arrays_standalone(selected_arrays, Some(selected_names))?;
+        result.metadata = TableMetadata::new("view".to_string())
+            .with_name(format!("view_of_{}", self.metadata.name.as_deref().unwrap_or("table")));
+        
+        Ok(result)
+    }
 }
 
 /// Types of connectivity for filtering

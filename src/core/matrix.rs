@@ -756,6 +756,97 @@ impl GraphMatrix {
             })
             .sum()
     }
+    
+    // ==================================================================================
+    // LAZY EVALUATION & MATERIALIZATION METHODS
+    // ==================================================================================
+    
+    /// Get a preview of the matrix for display purposes (first N rows/cols)
+    /// This is used by repr() and does not materialize the full matrix
+    pub fn preview(&self, row_limit: usize, col_limit: usize) -> (Vec<Vec<String>>, Vec<String>) {
+        let (rows, cols) = self.shape();
+        let num_rows = row_limit.min(rows);
+        let num_cols = col_limit.min(cols);
+        
+        // Get column names preview
+        let col_names = self.column_names.iter()
+            .take(num_cols)
+            .cloned()
+            .collect();
+        
+        // Get data preview
+        let mut preview_data = Vec::new();
+        for row_idx in 0..num_rows {
+            let mut row = Vec::new();
+            for col_idx in 0..num_cols {
+                let value = self.get(row_idx, col_idx)
+                    .map(|v| format!("{:?}", v))
+                    .unwrap_or_else(|| "0".to_string());
+                row.push(value);
+            }
+            preview_data.push(row);
+        }
+        
+        (preview_data, col_names)
+    }
+    
+    /// Materialize the matrix to nested vectors for Python consumption
+    /// This is the primary materialization method used by .data property
+    pub fn materialize(&self) -> Vec<Vec<AttrValue>> {
+        let (rows, cols) = self.shape();
+        let mut materialized = Vec::with_capacity(rows);
+        
+        for row_idx in 0..rows {
+            let mut row = Vec::with_capacity(cols);
+            for col_idx in 0..cols {
+                let value = self.get(row_idx, col_idx).cloned().unwrap_or(AttrValue::Int(0));
+                row.push(value);
+            }
+            materialized.push(row);
+        }
+        
+        materialized
+    }
+    
+    /// Check if the matrix is effectively sparse (has many default/zero values)
+    pub fn is_sparse(&self) -> bool {
+        let (rows, cols) = self.shape();
+        let total_elements = rows * cols;
+        if total_elements == 0 { return false; }
+        
+        let zero_count = self.count_zeros();
+        
+        // Consider sparse if >50% are zero/default values
+        (zero_count as f64) / (total_elements as f64) > 0.5
+    }
+    
+    /// Get summary information for lazy display without full materialization
+    pub fn summary_info(&self) -> String {
+        let (rows, cols) = self.shape();
+        let is_sparse = self.is_sparse();
+        let is_square = self.is_square();
+        let dtype = self.dtype;
+        
+        format!(
+            "GraphMatrix(shape=({}, {}), dtype={:?}, sparse={}, square={})",
+            rows, cols, dtype, is_sparse, is_square
+        )
+    }
+    
+    /// Create a lazy view of the transposed matrix without materializing data
+    pub fn transpose_lazy(&self) -> Self {
+        // For now, we'll create a new matrix with transposed columns
+        // In a full lazy implementation, this would just record the transpose operation
+        self.transpose()
+    }
+    
+    /// Create a dense materialized version of the matrix
+    /// This forces full computation and storage
+    pub fn dense(&self) -> Self {
+        // For now, the matrix is already dense
+        // In a sparse implementation, this would convert from sparse to dense storage
+        self.clone()
+    }
 }
 
 impl fmt::Display for GraphMatrix {

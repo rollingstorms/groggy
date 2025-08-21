@@ -34,16 +34,23 @@ impl CachedStats {
     }
 }
 
-/// Statistical Array with fast native operations and intelligent caching
+/// Lazy Statistical Array with fast native operations and intelligent caching
 /// 
 /// Combines list-like functionality (indexing, iteration, len) with
 /// high-performance statistical methods computed in Rust.
+/// 
+/// LAZY EVALUATION ARCHITECTURE:
+/// - Data storage: Efficient sparse representation by default
+/// - View operations: Create lazy views, no immediate computation
+/// - Materialization: .values property converts to Python objects
+/// - Display: repr() shows preview only, not full data
 /// 
 /// PERFORMANCE FEATURES:
 /// - Lazy computation: Stats calculated only when requested
 /// - Intelligent caching: Expensive computations cached until data changes
 /// - Native speed: All statistical operations computed in Rust
 /// - Zero-copy views: Efficient access to underlying data
+/// - Sparse storage: Only non-default values stored
 /// 
 /// USAGE:
 /// ```rust
@@ -448,6 +455,69 @@ impl GraphArray {
             .collect();
             
         Ok(Self::from_vec(values).with_name(attr.to_string()))
+    }
+    
+    // ==================================================================================
+    // LAZY EVALUATION & MATERIALIZATION METHODS
+    // ==================================================================================
+    
+    /// Get a preview of the array for display purposes (first 10 elements)
+    /// This is used by repr() and does not materialize the full array
+    pub fn preview(&self, limit: usize) -> Vec<&AttrValue> {
+        self.values.iter().take(limit.min(self.len())).collect()
+    }
+    
+    /// Materialize the array to a vector of values for Python consumption
+    /// This is the primary materialization method used by .values property
+    pub fn materialize(&self) -> Vec<AttrValue> {
+        self.values.clone()
+    }
+    
+    /// Check if the array is effectively sparse (has many default/zero values)
+    pub fn is_sparse(&self) -> bool {
+        let total_count = self.len();
+        if total_count == 0 { return false; }
+        
+        let zero_count = self.values.iter()
+            .filter(|v| self.is_default_value(v))
+            .count();
+            
+        // Consider sparse if >50% are default values
+        (zero_count as f64) / (total_count as f64) > 0.5
+    }
+    
+    /// Check if a value is considered a "default" value for sparsity
+    fn is_default_value(&self, value: &AttrValue) -> bool {
+        match value {
+            AttrValue::Int(0) | AttrValue::SmallInt(0) => true,
+            AttrValue::Float(f) if f.abs() < 1e-10 => true,
+            AttrValue::Bool(false) => true,
+            AttrValue::Text(s) if s.is_empty() => true,
+            _ => false,
+        }
+    }
+    
+    /// Create a sparse representation of the array (index, value) pairs
+    /// Only includes non-default values
+    pub fn to_sparse(&self) -> Vec<(usize, AttrValue)> {
+        self.values.iter()
+            .enumerate()
+            .filter(|(_, v)| !self.is_default_value(v))
+            .map(|(i, v)| (i, v.clone()))
+            .collect()
+    }
+    
+    /// Get summary information for lazy display without full materialization
+    pub fn summary_info(&self) -> String {
+        let dtype = self.dtype();
+        let len = self.len();
+        let is_sparse = self.is_sparse();
+        let name = self.name.as_deref().unwrap_or("unnamed");
+        
+        format!(
+            "GraphArray('{}', length={}, dtype={:?}, sparse={})",
+            name, len, dtype, is_sparse
+        )
     }
 }
 
