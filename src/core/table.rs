@@ -13,6 +13,7 @@
 use crate::types::{NodeId, EdgeId, AttrValue, AttrValueType};
 use crate::errors::{GraphResult, GraphError};
 use crate::core::array::GraphArray;
+use crate::core::matrix::JoinType;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -46,14 +47,6 @@ impl TableMetadata {
 }
 
 /// Join types for table operations
-#[derive(Debug, Clone, Copy)]
-pub enum JoinType {
-    Inner,
-    Left,
-    Right,
-    Outer,
-}
-
 /// Aggregate operations for statistical functions
 #[derive(Debug, Clone)]
 pub enum AggregateOp {
@@ -676,6 +669,182 @@ impl GraphTable {
             operation: "serialize".to_string(),
             underlying_error: e.to_string(),
         })
+    }
+
+    /// Inner join with another table on specified columns
+    pub fn inner_join(&self, other: &GraphTable, left_on: &str, right_on: &str) -> GraphResult<GraphTable> {
+        self.join_impl(other, left_on, right_on, JoinType::Inner)
+    }
+
+    /// Left join with another table on specified columns
+    pub fn left_join(&self, other: &GraphTable, left_on: &str, right_on: &str) -> GraphResult<GraphTable> {
+        self.join_impl(other, left_on, right_on, JoinType::Left)
+    }
+
+    /// Right join with another table on specified columns
+    pub fn right_join(&self, other: &GraphTable, left_on: &str, right_on: &str) -> GraphResult<GraphTable> {
+        self.join_impl(other, left_on, right_on, JoinType::Right)
+    }
+
+    /// Outer join with another table on specified columns
+    pub fn outer_join(&self, other: &GraphTable, left_on: &str, right_on: &str) -> GraphResult<GraphTable> {
+        self.join_impl(other, left_on, right_on, JoinType::Outer)
+    }
+
+    /// Implementation of JOIN operations
+    fn join_impl(&self, other: &GraphTable, left_on: &str, right_on: &str, join_type: JoinType) -> GraphResult<GraphTable> {
+        // Get join columns
+        let left_col = self.get_column_by_name(left_on)
+            .ok_or_else(|| GraphError::InvalidInput(format!("Column '{}' not found in left table", left_on)))?;
+        let right_col = other.get_column_by_name(right_on)
+            .ok_or_else(|| GraphError::InvalidInput(format!("Column '{}' not found in right table", right_on)))?;
+
+        // Build join index from right table for efficient lookup
+        let mut right_index: HashMap<AttrValue, Vec<usize>> = HashMap::new();
+        for (idx, value) in right_col.iter().enumerate() {
+            right_index.entry(value.clone()).or_insert_with(Vec::new).push(idx);
+        }
+
+        // Result vectors
+        let mut result_rows = Vec::new();
+        let mut matched_right_indices = std::collections::HashSet::new();
+
+        // Process left table
+        for left_idx in 0..self.shape().0 {
+            if let Some(left_value) = left_col.get(left_idx) {
+                if let Some(right_indices) = right_index.get(left_value) {
+                    // Found matches - add all combinations
+                    for &right_idx in right_indices {
+                        result_rows.push((Some(left_idx), Some(right_idx)));
+                        matched_right_indices.insert(right_idx);
+                    }
+                } else if matches!(join_type, JoinType::Left | JoinType::Outer) {
+                    // No match in right table, include left row with nulls for right
+                    result_rows.push((Some(left_idx), None));
+                }
+            }
+        }
+
+        // For right and outer joins, add unmatched rows from right table
+        if matches!(join_type, JoinType::Right | JoinType::Outer) {
+            for right_idx in 0..other.shape().0 {
+                if !matched_right_indices.contains(&right_idx) {
+                    result_rows.push((None, Some(right_idx)));
+                }
+            }
+        }
+
+        // Build result columns
+        let mut result_columns = Vec::new();
+        let mut result_column_names = Vec::new();
+
+        // Add columns from left table
+        for (col_idx, col_name) in self.column_names.iter().enumerate() {
+            let left_array = &self.columns[col_idx];
+            let result_values: Vec<AttrValue> = result_rows.iter()
+                .map(|(left_idx, _)| {
+                    if let Some(idx) = left_idx {
+                        left_array.get(*idx).cloned().unwrap_or(AttrValue::Int(0))
+                    } else {
+                        AttrValue::Int(0) // NULL value for unmatched rows
+                    }
+                })
+                .collect();
+            result_columns.push(GraphArray::from_vec(result_values));
+            result_column_names.push(format!("left_{}", col_name));
+        }
+
+        // Add columns from right table (excluding the join column to avoid duplicates)
+        for (col_idx, col_name) in other.column_names.iter().enumerate() {
+            if col_name != right_on {
+                let right_array = &other.columns[col_idx];
+                let result_values: Vec<AttrValue> = result_rows.iter()
+                    .map(|(_, right_idx)| {
+                        if let Some(idx) = right_idx {
+                            right_array.get(*idx).cloned().unwrap_or(AttrValue::Int(0))
+                        } else {
+                            AttrValue::Int(0) // NULL value for unmatched rows
+                        }
+                    })
+                    .collect();
+                result_columns.push(GraphArray::from_vec(result_values));
+                result_column_names.push(format!("right_{}", col_name));
+            }
+        }
+
+        // Create result table
+        GraphTable::from_arrays_standalone(result_columns, Some(result_column_names))
+    }
+
+    /// Union with another table (combine rows)
+    pub fn union(&self, other: &GraphTable) -> GraphResult<GraphTable> {
+        // Check that column names match
+        if self.column_names != other.column_names {
+            return Err(GraphError::InvalidInput(
+                "Cannot union tables with different column names".to_string()
+            ));
+        }
+
+        let mut result_columns = Vec::new();
+        
+        // Combine columns
+        for (idx, col_name) in self.column_names.iter().enumerate() {
+            let left_array = &self.columns[idx];
+            let right_array = &other.columns[idx];
+            
+            // Combine values from both arrays
+            let mut combined_values = left_array.iter().cloned().collect::<Vec<_>>();
+            combined_values.extend(right_array.iter().cloned());
+            
+            result_columns.push(GraphArray::from_vec(combined_values));
+        }
+
+        GraphTable::from_arrays_standalone(result_columns, Some(self.column_names.clone()))
+    }
+
+    /// Intersect with another table (rows present in both)
+    pub fn intersect(&self, other: &GraphTable) -> GraphResult<GraphTable> {
+        // Check that column names match
+        if self.column_names != other.column_names {
+            return Err(GraphError::InvalidInput(
+                "Cannot intersect tables with different column names".to_string()
+            ));
+        }
+
+        // Build set of rows from other table for efficient lookup
+        let mut other_rows: std::collections::HashSet<Vec<AttrValue>> = std::collections::HashSet::new();
+        for row_idx in 0..other.shape().0 {
+            if let Some(row_data) = other.iloc(row_idx) {
+                let row_values: Vec<AttrValue> = self.column_names.iter()
+                    .map(|col_name| row_data.get(col_name).cloned().unwrap_or(AttrValue::Int(0)))
+                    .collect();
+                other_rows.insert(row_values);
+            }
+        }
+
+        // Find matching rows in this table
+        let mut result_indices = Vec::new();
+        for row_idx in 0..self.shape().0 {
+            if let Some(row_data) = self.iloc(row_idx) {
+                let row_values: Vec<AttrValue> = self.column_names.iter()
+                    .map(|col_name| row_data.get(col_name).cloned().unwrap_or(AttrValue::Int(0)))
+                    .collect();
+                if other_rows.contains(&row_values) {
+                    result_indices.push(row_idx);
+                }
+            }
+        }
+
+        // Build result columns with matching rows
+        let mut result_columns = Vec::new();
+        for array in &self.columns {
+            let result_values: Vec<AttrValue> = result_indices.iter()
+                .filter_map(|&idx| array.get(idx).cloned())
+                .collect();
+            result_columns.push(GraphArray::from_vec(result_values));
+        }
+
+        GraphTable::from_arrays_standalone(result_columns, Some(self.column_names.clone()))
     }
 }
 
