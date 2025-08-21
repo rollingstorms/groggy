@@ -392,12 +392,6 @@ impl PyGraphArray {
         Ok(dict.to_object(py))
     }
     
-    /// Get raw data as Python list (like pandas .values property) 
-    #[getter]
-    fn values(&self, py: Python) -> PyResult<Vec<PyObject>> {
-        self.to_list(py)
-    }
-    
     /// Get comprehensive statistical summary
     fn describe(&self, _py: Python) -> PyResult<PyStatsSummary> {
         Ok(PyStatsSummary {
@@ -406,17 +400,56 @@ impl PyGraphArray {
     }
     
     // ========================================================================
+    // LAZY EVALUATION & MATERIALIZATION
+    // ========================================================================
+    
+    /// Get array values (materializes data to Python objects)
+    /// This is the primary materialization method - use sparingly for large arrays
+    #[getter]
+    fn values(&self, py: Python) -> PyResult<PyObject> {
+        let materialized = self.inner.materialize();
+        let py_values: PyResult<Vec<PyObject>> = materialized.iter()
+            .map(|val| attr_value_to_python_value(py, val))
+            .collect();
+        
+        Ok(py_values?.to_object(py))
+    }
+    
+    /// Get preview of array for display (first 10 elements by default)
+    fn preview(&self, py: Python, limit: Option<usize>) -> PyResult<PyObject> {
+        let limit = limit.unwrap_or(10);
+        let preview_values = self.inner.preview(limit);
+        let py_values: PyResult<Vec<PyObject>> = preview_values.iter()
+            .map(|val| attr_value_to_python_value(py, val))
+            .collect();
+        
+        Ok(py_values?.to_object(py))
+    }
+    
+    /// Check if array is sparse (has many default values)
+    #[getter]
+    fn is_sparse(&self) -> bool {
+        self.inner.is_sparse()
+    }
+    
+    /// Get summary information without materializing data
+    fn summary(&self) -> String {
+        self.inner.summary_info()
+    }
+    
+    // ========================================================================
     // SCIENTIFIC COMPUTING CONVERSIONS
     // ========================================================================
     
     /// Convert to NumPy array (when numpy available)
+    /// Uses .values property to materialize data
     fn to_numpy(&self, py: Python) -> PyResult<PyObject> {
         // Try to import numpy
         let numpy = py.import("numpy").map_err(|_| {
             PyErr::new::<PyImportError, _>("numpy is required for to_numpy(). Install with: pip install numpy")
         })?;
         
-        // Get data as Python list
+        // Get materialized data using .values property
         let values = self.values(py)?;
         
         // Convert to numpy array

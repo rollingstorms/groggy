@@ -492,29 +492,6 @@ impl PyGraphTable {
         Ok(py_dict.to_object(py))
     }
 
-    /// Convert to pandas DataFrame
-    pub fn to_pandas(&self, py: Python) -> PyResult<PyObject> {
-        // Import pandas
-        let pandas = py.import("pandas")?;
-        
-        // Get table data as dictionary
-        let dict_data = self.inner.to_dict();
-        let py_dict = pyo3::types::PyDict::new(py);
-        
-        // Convert each column to Python list
-        for (column, values) in dict_data {
-            let py_values: Vec<PyObject> = values.iter()
-                .map(|v| attr_value_to_python_value(py, v))
-                .collect::<PyResult<Vec<_>>>()?;
-            py_dict.set_item(column, py_values)?;
-        }
-        
-        // Create DataFrame from dictionary
-        let dataframe_class = pandas.getattr("DataFrame")?;
-        let df = dataframe_class.call1((py_dict,))?;
-        
-        Ok(df.to_object(py))
-    }
 
     /// Group by a column for aggregation operations
     pub fn group_by(&self, py: Python, column: String) -> PyResult<PyObject> {
@@ -684,6 +661,80 @@ impl PyGraphTable {
         Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
             "Table iteration temporarily disabled during Phase 3 - use table[i] for row access"
         ))
+    }
+    
+    // ========================================================================
+    // LAZY EVALUATION & MATERIALIZATION
+    // ========================================================================
+    
+    /// Get table data (materializes data to Python objects)
+    /// This is the primary materialization method - use sparingly for large tables
+    #[getter]
+    fn data(&self, py: Python) -> PyResult<PyObject> {
+        let materialized = self.inner.materialize();
+        let py_rows: PyResult<Vec<Vec<PyObject>>> = materialized.iter()
+            .map(|row| {
+                row.iter()
+                    .map(|val| attr_value_to_python_value(py, val))
+                    .collect()
+            })
+            .collect();
+        
+        Ok(py_rows?.to_object(py))
+    }
+    
+    /// Get preview of table for display (first N rows by default)
+    fn preview(&self, py: Python, row_limit: Option<usize>, col_limit: Option<usize>) -> PyResult<PyObject> {
+        let row_limit = row_limit.unwrap_or(10);
+        let (preview_data, _col_names) = self.inner.preview(row_limit, col_limit);
+        
+        Ok(preview_data.to_object(py))
+    }
+    
+    /// Check if table is sparse (has many default values)
+    #[getter]
+    fn is_sparse(&self) -> bool {
+        self.inner.is_sparse()
+    }
+    
+    /// Get summary information without materializing data
+    fn summary(&self) -> String {
+        self.inner.summary_info()
+    }
+    
+    /// Convert to NumPy array (when numpy available)
+    /// Uses .data property to materialize data
+    fn to_numpy(&self, py: Python) -> PyResult<PyObject> {
+        // Try to import numpy
+        let numpy = py.import("numpy").map_err(|_| {
+            PyErr::new::<PyImportError, _>("numpy is required for to_numpy(). Install with: pip install numpy")
+        })?;
+        
+        // Get materialized data using .data property
+        let data = self.data(py)?;
+        
+        // Convert to numpy array
+        let array = numpy.call_method1("array", (data,))?;
+        Ok(array.to_object(py))
+    }
+    
+    /// Convert to Pandas DataFrame (when pandas available)
+    /// Uses .data property to materialize data
+    fn to_pandas(&self, py: Python) -> PyResult<PyObject> {
+        // Try to import pandas
+        let pandas = py.import("pandas").map_err(|_| {
+            PyErr::new::<PyImportError, _>("pandas is required for to_pandas(). Install with: pip install pandas")
+        })?;
+        
+        // Get materialized data and column names
+        let data = self.data(py)?;
+        let columns = self.inner.columns();
+        
+        // Create DataFrame
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("columns", columns)?;
+        let df = pandas.call_method("DataFrame", (data,), Some(kwargs))?;
+        Ok(df.to_object(py))
     }
 }
 
