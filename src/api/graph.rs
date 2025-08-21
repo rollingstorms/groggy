@@ -20,6 +20,7 @@ use crate::core::space::GraphSpace;
 use crate::core::history::{HistoryForest, HistoricalView, CommitDiff};
 use crate::core::query::{QueryEngine, NodeFilter, EdgeFilter};
 use crate::core::traversal::TraversalEngine;
+use crate::core::neighborhood::NeighborhoodSampler;
 use crate::core::ref_manager::BranchInfo;
 use crate::core::adjacency::{AdjacencyMatrixBuilder, AdjacencyMatrix, MatrixFormat, MatrixType};
 use crate::config::GraphConfig;
@@ -93,6 +94,10 @@ pub struct Graph {
     /// Graph traversal engine for BFS, DFS, pathfinding
     /// Handles connectivity analysis and traversal algorithms
     traversal_engine: TraversalEngine,
+
+    /// Neighborhood subgraph sampler for generating neighborhood views
+    /// Handles 1-hop, k-hop, and multi-node neighborhood generation
+    neighborhood_sampler: NeighborhoodSampler,
     
     /*
     === TRANSACTION MANAGEMENT ===
@@ -149,6 +154,7 @@ impl Graph {
             current_commit: 0,
             query_engine: QueryEngine::new(),
             traversal_engine: TraversalEngine::new(),
+            neighborhood_sampler: NeighborhoodSampler::new(),
             change_tracker: ChangeTracker::new(),
             config,
         }
@@ -179,6 +185,7 @@ impl Graph {
             current_commit: 0,
             query_engine: QueryEngine::new(),
             traversal_engine: TraversalEngine::new(),
+            neighborhood_sampler: NeighborhoodSampler::new(),
             change_tracker: ChangeTracker::new(),
             config,
         }
@@ -1136,6 +1143,41 @@ impl Graph {
     /// Get traversal performance statistics
     pub fn traversal_statistics(&self) -> &crate::core::traversal::TraversalStats {
         self.traversal_engine.statistics()
+    }
+
+    // ===== NEIGHBORHOOD SUBGRAPH SAMPLING =====
+
+    /// Generate 1-hop neighborhood subgraph for a single node
+    /// Returns a Subgraph containing the central node and all its direct neighbors
+    pub fn neighborhood(&mut self, node_id: NodeId) -> Result<crate::core::neighborhood::NeighborhoodSubgraph, GraphError> {
+        self.neighborhood_sampler.single_neighborhood(&*self.pool.borrow(), &self.space, node_id)
+            .map_err(|e| e.into())
+    }
+
+    /// Generate 1-hop neighborhoods for multiple nodes
+    /// Returns separate neighborhood subgraphs for each central node
+    pub fn multi_neighborhood(&mut self, node_ids: &[NodeId]) -> Result<crate::core::neighborhood::NeighborhoodResult, GraphError> {
+        self.neighborhood_sampler.multi_neighborhood(&*self.pool.borrow(), &self.space, node_ids)
+            .map_err(|e| e.into())
+    }
+
+    /// Generate k-hop neighborhood subgraph for a single node
+    /// Returns a Subgraph containing all nodes within k hops of the central node
+    pub fn k_hop_neighborhood(&mut self, node_id: NodeId, k: usize) -> Result<crate::core::neighborhood::NeighborhoodSubgraph, GraphError> {
+        self.neighborhood_sampler.k_hop_neighborhood(&*self.pool.borrow(), &self.space, node_id, k)
+            .map_err(|e| e.into())
+    }
+
+    /// Generate unified neighborhood for multiple nodes
+    /// Returns a single subgraph containing all nodes and their combined k-hop neighborhoods
+    pub fn unified_neighborhood(&mut self, node_ids: &[NodeId], k: usize) -> Result<crate::core::neighborhood::NeighborhoodSubgraph, GraphError> {
+        self.neighborhood_sampler.unified_neighborhood(&*self.pool.borrow(), &self.space, node_ids, k)
+            .map_err(|e| e.into())
+    }
+
+    /// Get neighborhood sampling performance statistics
+    pub fn neighborhood_statistics(&self) -> &crate::core::neighborhood::NeighborhoodStats {
+        self.neighborhood_sampler.stats()
     }
     
     // TODO: Implement complex query composition when needed

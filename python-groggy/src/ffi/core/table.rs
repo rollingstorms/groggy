@@ -14,6 +14,7 @@ use std::rc::Rc;
 use crate::ffi::utils::{python_value_to_attr_value, attr_value_to_python_value, graph_error_to_py_err};
 use crate::ffi::api::graph::PyGraph;
 use crate::ffi::core::array::PyGraphArray;
+use crate::ffi::core::matrix::PyGraphMatrix;
 
 /// Python wrapper around core GraphTable implementation
 #[pyclass(name = "GraphTable", unsendable)]
@@ -430,6 +431,7 @@ impl PyGraphTable {
     }
 
     /// Get first n rows
+    #[pyo3(signature = (n = 5))]
     pub fn head(&self, py: Python, n: usize) -> PyResult<PyObject> {
         let head_table = self.inner.head(n);
         let py_table = PyGraphTable::from_graph_table(head_table);
@@ -437,6 +439,7 @@ impl PyGraphTable {
     }
 
     /// Get last n rows
+    #[pyo3(signature = (n = 5))]
     pub fn tail(&self, py: Python, n: usize) -> PyResult<PyObject> {
         let tail_table = self.inner.tail(n);
         let py_table = PyGraphTable::from_graph_table(tail_table);
@@ -444,6 +447,7 @@ impl PyGraphTable {
     }
 
     /// Sort table by column
+    #[pyo3(signature = (column, ascending = true))]
     pub fn sort_by(&self, py: Python, column: String, ascending: bool) -> PyResult<PyObject> {
         let sorted_table = self.inner.sort_by(&column, ascending)
             .map_err(graph_error_to_py_err)?;
@@ -505,72 +509,6 @@ impl PyGraphTable {
         Ok(Py::new(py, py_group_by)?.to_object(py))
     }
 
-    /// Extract neighborhood table for a given node
-    #[classmethod]
-    pub fn neighborhood_table(
-        _cls: &PyType,
-        py: Python,
-        graph: Py<PyGraph>,
-        node_id: u64,
-        attrs: Option<Vec<String>>,
-    ) -> PyResult<Self> {
-        let graph_ref = graph.borrow(py);
-        
-        // Convert attribute names to &str slice
-        let attr_refs: Option<Vec<&str>> = attrs.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
-        let attr_slice = attr_refs.as_ref().map(|v| v.as_slice());
-        
-        let table = GraphTable::neighborhood_table(&graph_ref.inner, node_id as usize, attr_slice)
-            .map_err(graph_error_to_py_err)?;
-        
-        Ok(Self::from_graph_table(table))
-    }
-
-    /// Extract neighborhood tables for multiple nodes
-    #[classmethod]
-    pub fn multi_neighborhood_table(
-        _cls: &PyType,
-        py: Python,
-        graph: Py<PyGraph>,
-        node_ids: Vec<u64>,
-        attrs: Option<Vec<String>>,
-    ) -> PyResult<Self> {
-        let graph_ref = graph.borrow(py);
-        
-        // Convert node IDs to usize
-        let node_usize: Vec<usize> = node_ids.iter().map(|&id| id as usize).collect();
-        
-        // Convert attribute names to &str slice
-        let attr_refs: Option<Vec<&str>> = attrs.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
-        let attr_slice = attr_refs.as_ref().map(|v| v.as_slice());
-        
-        let table = GraphTable::multi_neighborhood_table(&graph_ref.inner, &node_usize, attr_slice)
-            .map_err(graph_error_to_py_err)?;
-        
-        Ok(Self::from_graph_table(table))
-    }
-
-    /// Extract k-hop neighborhood table for a given node
-    #[classmethod]
-    pub fn k_hop_neighborhood_table(
-        _cls: &PyType,
-        py: Python,
-        graph: Py<PyGraph>,
-        node_id: u64,
-        k: usize,
-        attrs: Option<Vec<String>>,
-    ) -> PyResult<Self> {
-        let graph_ref = graph.borrow(py);
-        
-        // Convert attribute names to &str slice
-        let attr_refs: Option<Vec<&str>> = attrs.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
-        let attr_slice = attr_refs.as_ref().map(|v| v.as_slice());
-        
-        let table = GraphTable::k_hop_neighborhood_table(&graph_ref.inner, node_id as usize, k, attr_slice)
-            .map_err(graph_error_to_py_err)?;
-        
-        Ok(Self::from_graph_table(table))
-    }
 
     /// Filter table by node degree (number of connections)
     pub fn filter_by_degree(
@@ -799,6 +737,32 @@ impl PyGroupBy {
         let py_table = PyGraphTable::from_graph_table(result_table);
         Ok(Py::new(py, py_table)?.to_object(py))
     }
+
+    // TODO: Uncomment when GroupBy type issue is resolved
+    // /// Convert this table to a GraphMatrix if all columns are compatible numeric types
+    // /// 
+    // /// Returns a PyGraphMatrix that can be used for matrix operations.
+    // /// 
+    // /// Examples:
+    // ///   # This works - both columns are numeric
+    // ///   matrix = table[['age', 'height']].matrix()
+    // ///   
+    // ///   # This fails - mixed numeric and text types
+    // ///   matrix = table[['age', 'name']].matrix()  # Raises ValueError
+    // /// 
+    // /// Raises:
+    // ///   ValueError: If columns have incompatible types (e.g., mixing numeric and text)
+    // ///   ValueError: If the table is empty
+    // /// 
+    // /// Returns:
+    // ///   PyGraphMatrix: A matrix representation of the numeric table data
+    // pub fn matrix(&self, py: Python) -> PyResult<PyObject> {
+    //     let matrix = self.inner.matrix()
+    //         .map_err(graph_error_to_py_err)?;
+    //     
+    //     let py_matrix = PyGraphMatrix::from_graph_matrix(matrix);
+    //     Ok(Py::new(py, py_matrix)?.to_object(py))
+    // }
 }
 
 
