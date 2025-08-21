@@ -347,6 +347,7 @@ impl PyEdgesAccessor {
     }
     
     /// Get all unique attribute names across all edges
+    #[getter]
     fn attributes(&self, py: Python) -> PyResult<Vec<String>> {
         let graph = self.graph.borrow(py);
         let mut all_attrs = std::collections::HashSet::new();
