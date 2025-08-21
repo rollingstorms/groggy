@@ -857,223 +857,6 @@ impl GraphTable {
         GraphTable::from_arrays_standalone(result_columns, Some(self.column_names.clone()))
     }
     
-    /// Extract neighborhood table for a given node
-    /// Returns a table containing all neighbors of the specified node with their attributes
-    pub fn neighborhood_table(
-        graph: &crate::api::graph::Graph,
-        node_id: NodeId,
-        attrs: Option<&[&str]>
-    ) -> GraphResult<Self> {
-        // Get neighbors of the node
-        let neighbors = graph.neighbors(node_id)?;
-        
-        if neighbors.is_empty() {
-            // Return empty table with proper structure
-            let default_attrs = attrs.unwrap_or(&["node_id"]);
-            let empty_columns: Vec<GraphArray> = default_attrs.iter()
-                .map(|_| GraphArray::from_vec(Vec::<AttrValue>::new()))
-                .collect();
-            let column_names = default_attrs.iter().map(|s| s.to_string()).collect();
-            return Self::from_arrays_standalone(empty_columns, Some(column_names));
-        }
-        
-        // Default to just node_id if no attributes specified
-        let attr_names = attrs.unwrap_or(&["node_id"]);
-        let mut columns = Vec::new();
-        
-        for attr_name in attr_names {
-            let mut attr_values = Vec::new();
-            
-            if *attr_name == "node_id" {
-                // Special case: node IDs
-                for &neighbor_id in &neighbors {
-                    attr_values.push(AttrValue::Int(neighbor_id as i64));
-                }
-            } else {
-                // Regular node attributes
-                for &neighbor_id in &neighbors {
-                    if let Ok(Some(attr_value)) = graph.get_node_attr(neighbor_id, &attr_name.to_string()) {
-                        attr_values.push(attr_value);
-                    } else {
-                        // Handle missing attributes with null value
-                        attr_values.push(AttrValue::Text("".to_string()));
-                    }
-                }
-            }
-            
-            // Create GraphArray from attribute values
-            let graph_array = GraphArray::from_vec(attr_values);
-            columns.push(graph_array);
-        }
-        
-        // Create GraphTable from arrays
-        let column_names = attr_names.iter().map(|s| s.to_string()).collect();
-        let mut table = Self::from_arrays_standalone(columns, Some(column_names))?;
-        table.metadata = TableMetadata::new("neighborhood".to_string())
-            .with_name(format!("neighbors_of_{}", node_id));
-        
-        Ok(table)
-    }
-    
-    /// Extract neighborhood tables for multiple nodes
-    /// Returns a table containing all neighbors of the specified nodes with their attributes
-    pub fn multi_neighborhood_table(
-        graph: &crate::api::graph::Graph,
-        node_ids: &[NodeId],
-        attrs: Option<&[&str]>
-    ) -> GraphResult<Self> {
-        use std::collections::HashSet;
-        
-        // Collect all unique neighbors
-        let mut all_neighbors = HashSet::new();
-        for &node_id in node_ids {
-            let neighbors = graph.neighbors(node_id)?;
-            all_neighbors.extend(neighbors);
-        }
-        
-        let neighbors_vec: Vec<NodeId> = all_neighbors.into_iter().collect();
-        
-        if neighbors_vec.is_empty() {
-            // Return empty table with proper structure
-            let default_attrs = attrs.unwrap_or(&["node_id"]);
-            let empty_columns: Vec<GraphArray> = default_attrs.iter()
-                .map(|_| GraphArray::from_vec(Vec::<AttrValue>::new()))
-                .collect();
-            let column_names = default_attrs.iter().map(|s| s.to_string()).collect();
-            return Self::from_arrays_standalone(empty_columns, Some(column_names));
-        }
-        
-        // Default to just node_id if no attributes specified
-        let attr_names = attrs.unwrap_or(&["node_id"]);
-        let mut columns = Vec::new();
-        
-        for attr_name in attr_names {
-            let mut attr_values = Vec::new();
-            
-            if *attr_name == "node_id" {
-                // Special case: node IDs
-                for &neighbor_id in &neighbors_vec {
-                    attr_values.push(AttrValue::Int(neighbor_id as i64));
-                }
-            } else {
-                // Regular node attributes
-                for &neighbor_id in &neighbors_vec {
-                    if let Ok(Some(attr_value)) = graph.get_node_attr(neighbor_id, &attr_name.to_string()) {
-                        attr_values.push(attr_value);
-                    } else {
-                        // Handle missing attributes with null value
-                        attr_values.push(AttrValue::Text("".to_string()));
-                    }
-                }
-            }
-            
-            // Create GraphArray from attribute values
-            let graph_array = GraphArray::from_vec(attr_values);
-            columns.push(graph_array);
-        }
-        
-        // Create GraphTable from arrays
-        let column_names = attr_names.iter().map(|s| s.to_string()).collect();
-        let mut table = Self::from_arrays_standalone(columns, Some(column_names))?;
-        table.metadata = TableMetadata::new("multi_neighborhood".to_string())
-            .with_name(format!("neighbors_of_{}_nodes", node_ids.len()));
-        
-        Ok(table)
-    }
-    
-    /// Extract k-hop neighborhood table for a given node
-    /// Returns a table containing all nodes within k hops of the specified node
-    pub fn k_hop_neighborhood_table(
-        graph: &crate::api::graph::Graph,
-        node_id: NodeId,
-        k: usize,
-        attrs: Option<&[&str]>
-    ) -> GraphResult<Self> {
-        use std::collections::{HashSet, VecDeque};
-        
-        if k == 0 {
-            // Return just the node itself
-            let default_attrs = attrs.unwrap_or(&["node_id"]);
-            let mut columns = Vec::new();
-            
-            for attr_name in default_attrs {
-                let attr_value = if *attr_name == "node_id" {
-                    vec![AttrValue::Int(node_id as i64)]
-                } else if let Ok(Some(value)) = graph.get_node_attr(node_id, &attr_name.to_string()) {
-                    vec![value]
-                } else {
-                    vec![AttrValue::Text("".to_string())]
-                };
-                columns.push(GraphArray::from_vec(attr_value));
-            }
-            
-            let column_names = default_attrs.iter().map(|s| s.to_string()).collect();
-            return Self::from_arrays_standalone(columns, Some(column_names));
-        }
-        
-        // BFS to find all nodes within k hops
-        let mut visited = HashSet::new();
-        let mut queue = VecDeque::new();
-        let mut k_hop_nodes = HashSet::new();
-        
-        queue.push_back((node_id, 0));
-        visited.insert(node_id);
-        
-        while let Some((current_node, distance)) = queue.pop_front() {
-            if distance <= k {
-                k_hop_nodes.insert(current_node);
-            }
-            
-            if distance < k {
-                let neighbors = graph.neighbors(current_node)?;
-                for neighbor in neighbors {
-                    if !visited.contains(&neighbor) {
-                        visited.insert(neighbor);
-                        queue.push_back((neighbor, distance + 1));
-                    }
-                }
-            }
-        }
-        
-        let k_hop_vec: Vec<NodeId> = k_hop_nodes.into_iter().collect();
-        
-        // Default to just node_id if no attributes specified
-        let attr_names = attrs.unwrap_or(&["node_id"]);
-        let mut columns = Vec::new();
-        
-        for attr_name in attr_names {
-            let mut attr_values = Vec::new();
-            
-            if *attr_name == "node_id" {
-                // Special case: node IDs
-                for &hop_node_id in &k_hop_vec {
-                    attr_values.push(AttrValue::Int(hop_node_id as i64));
-                }
-            } else {
-                // Regular node attributes
-                for &hop_node_id in &k_hop_vec {
-                    if let Ok(Some(attr_value)) = graph.get_node_attr(hop_node_id, &attr_name.to_string()) {
-                        attr_values.push(attr_value);
-                    } else {
-                        // Handle missing attributes with null value
-                        attr_values.push(AttrValue::Text("".to_string()));
-                    }
-                }
-            }
-            
-            // Create GraphArray from attribute values
-            let graph_array = GraphArray::from_vec(attr_values);
-            columns.push(graph_array);
-        }
-        
-        // Create GraphTable from arrays
-        let column_names = attr_names.iter().map(|s| s.to_string()).collect();
-        let mut table = Self::from_arrays_standalone(columns, Some(column_names))?;
-        table.metadata = TableMetadata::new("k_hop_neighborhood".to_string())
-            .with_name(format!("{}_hop_neighbors_of_{}", k, node_id));
-        
-        Ok(table)
-    }
     
     /// Filter table rows based on graph-aware predicates
     /// This allows filtering based on node properties, connectivity, and graph topology
@@ -1238,6 +1021,68 @@ impl GraphTable {
             // For now, just ensure the node exists in the graph
             graph.neighbors(node_id).is_ok()
         })
+    }
+
+    /// Convert this table to a GraphMatrix if all columns are compatible numeric types
+    /// 
+    /// # Examples
+    /// ```rust
+    /// // This works - both columns are numeric
+    /// let matrix = table.select_columns(&["age", "height"])?.matrix()?;
+    /// 
+    /// // This fails - mixed numeric and text types
+    /// let result = table.select_columns(&["age", "name"])?.matrix(); // Returns error
+    /// ```
+    /// 
+    /// # Errors
+    /// Returns an error if:
+    /// - The table has columns with incompatible types (e.g., mixing numeric and text)
+    /// - Any column contains non-numeric data when numeric is expected
+    /// - The table is empty
+    pub fn matrix(&self) -> GraphResult<crate::core::matrix::GraphMatrix> {
+        use crate::core::matrix::GraphMatrix;
+
+        if self.columns.is_empty() {
+            return Err(GraphError::InvalidInput("Cannot convert empty table to matrix".to_string()));
+        }
+
+        // Check if all columns have compatible types for matrix conversion
+        let first_dtype = self.columns[0].dtype();
+        
+        // Only allow numeric types for matrix conversion
+        if !first_dtype.is_numeric() {
+            return Err(GraphError::InvalidInput(format!(
+                "Cannot convert table to matrix: column '{}' has non-numeric type {:?}. Only numeric columns (Int, SmallInt, Float, Bool) can be converted to matrices.", 
+                self.column_names.get(0).unwrap_or(&"<unnamed>".to_string()), 
+                first_dtype
+            )));
+        }
+
+        // Verify all columns have compatible numeric types
+        for (i, column) in self.columns.iter().enumerate() {
+            let column_dtype = column.dtype();
+            
+            // Fix the temporary borrow issue
+            let default_name = format!("column_{}", i);
+            let column_name = self.column_names.get(i).unwrap_or(&default_name);
+
+            if !column_dtype.is_numeric() {
+                return Err(GraphError::InvalidInput(format!(
+                    "Cannot convert table to matrix: column '{}' has non-numeric type {:?}. All columns must be numeric (Int, SmallInt, Float, Bool) for matrix conversion.", 
+                    column_name, 
+                    column_dtype
+                )));
+            }
+        }
+
+        // Create GraphMatrix from the table's columns
+        let matrix = GraphMatrix::from_arrays(self.columns.clone())
+            .map_err(|e| GraphError::InvalidInput(format!(
+                "Failed to convert table to matrix: {}. This usually means the column types are not compatible for matrix operations.", 
+                e
+            )))?;
+
+        Ok(matrix)
     }
 }
 

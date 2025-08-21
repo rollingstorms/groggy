@@ -132,6 +132,7 @@ pub mod core {
     pub mod adjacency;
     pub mod matrix;
     pub mod table;
+    pub mod neighborhood;
 }
 
 // Display formatting
