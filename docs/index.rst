@@ -109,7 +109,7 @@ Table of Contents
    advanced/custom-algorithms
    advanced/performance-optimization
    advanced/extending-groggy
-   advanced/visualization
+   advanced/visualization  
 
 .. toctree::
    :maxdepth: 2
