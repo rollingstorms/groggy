@@ -251,7 +251,7 @@ impl GraphTable {
 8. **Subgraph Integration** - ✅ table() and edges_table() methods
 
 ### Phase 4: Advanced Operations 🔧 **NEXT**
-1. **Advanced Statistical Operations** - Full pandas-like statistical API (groupby, pivot, aggregations)
+1. **Advanced Statistical Operations** - Full pandas-like statistical API (group_by, pivot, aggregations)
 2. **Complex Data Manipulation** - Multi-column sorting, advanced filtering, joins across tables
 3. **Query Integration** - Integration with graph query language and traversal operations
 4. **Export/Import Enhancement** - CSV, JSON, Arrow, Parquet integration with external formats
@@ -264,11 +264,10 @@ impl GraphTable {
 4. **Parallel Processing** - Multi-threaded linear algebra operations
 5. **SIMD Optimizations** - Vectorized operations for numerical computations
 
-### Phase 6: Advanced Visualization & Export 🎨 **FUTURE**
-1. **Rust-based Visualization** - High-performance graph rendering in Rust
-2. **Web Export** - Generate interactive JavaScript visualizations 
-3. **Format Integration** - Arrow, Parquet, HDF5 for large-scale data exchange
-4. **Streaming Operations** - Memory-efficient operations on massive datasets
+### Phase 6: Cleanup 🧹 **FUTURE*
+1. **Remove Dead Code** - Remove unused code 
+2. **create new doc with todos and placeholders**
+3. **remove warnings from build system**
 
 
 
@@ -303,25 +302,17 @@ python-groggy/src/
 
 ## Current Status (August 2025)
 
-✅ **Phase 3 COMPLETED - FFI Implementation:**
+✅ **Phase 3 Complete - FFI Implementation:**
 - **Core Architecture**: GraphMatrix and GraphTable fully implemented in `src/core/`
-- **Python Bindings**: Complete FFI layer for all storage views  
+- **Python Bindings**: Complete FFI layer for all storage views
 - **Builder Patterns**: Unified `gr.array()`, `gr.table()`, `gr.matrix()` API
 - **Graph Integration**: `from_graph_nodes()` and `from_graph_edges()` methods
-- **Display Integration**: Rich HTML tables with clean value formatting in Jupyter
-- **pandas Integration**: `table.to_pandas()` for seamless DataFrame conversion
+- **Display Integration**: Consistent `__repr__` and `_repr_html_` across all types
 - **Advanced Indexing**: Slice, boolean mask, and fancy indexing for PyGraphArray
 - **Iterator Protocol**: Full Python iteration support for PyGraphArray
-- **Table Operations**: head, tail, sort_by, describe, to_dict, to_pandas methods
-- **Unified Accessors**: `g.nodes.table()` and `g.edges.table()` with full attributes
-- **Subgraph Integration**: `subgraph.table()` and `subgraph.edges_table()` methods
+- **Table Operations**: head, tail, sort_by, describe, to_dict methods
+- **Subgraph Integration**: table() and edges_table() methods
 - **Build System**: Clean compilation with `maturin develop --release`
-
-🚀 **Phase 4 STARTED - Advanced Operations:**
-- Complex data manipulation and analytics
-- Multi-table operations and joins
-- Advanced statistical operations  
-- Graph-aware table operations
 
 ## Technical Implementation Highlights
 
@@ -352,14 +343,6 @@ table = gr.table({"col1": [1, 2], "col2": [3, 4]})
 # Graph integration
 nodes_table = gr.table.from_graph_nodes(graph, node_ids, ["attr1", "attr2"])
 edges_table = gr.table.from_graph_edges(graph, edge_ids, ["weight", "type"])
-
-# Accessor integration
-nodes_df = g.nodes.table().to_pandas()  # All nodes with all attributes
-edges_df = g.edges.table().to_pandas()  # All edges with all attributes
-
-# Subgraph analysis
-subgraph_nodes = subgraph.table().to_pandas()
-subgraph_edges = subgraph.edges_table().to_pandas()
 ```
 
 ### ✅ **Memory-Efficient Architecture**
@@ -368,27 +351,21 @@ subgraph_edges = subgraph.edges_table().to_pandas()
 - **View vs Copy**: Clear semantics for performance-critical operations
 - **Columnar Storage**: AttributeColumn integration with graph pool
 
-✅ **All Core Functionality Complete:**
-- All major table operations implemented and working
-- pandas integration provides seamless data science workflows
-- Rich display and indexing provide excellent user experience
-- Graph integration enables sophisticated analysis patterns
+⚠️ **Remaining NotImplementedError Placeholders:**
+- **PyGraphMatrix.is_symmetric()**: Returns false, needs core implementation
+- **PyGraphMatrix.__iter__()**: Temporarily disabled for compilation stability  
+- **PyGraphTable.__iter__()**: Temporarily disabled for compilation stability
+- **Matrix/Sparse adjacency methods**: Temporarily disabled pending sparse matrix implementation
 
-⚠️ **Minor Remaining Placeholders (Non-Critical):**
-- **PyGraphMatrix.is_symmetric()**: Returns false, needs core symmetric matrix detection
-- **PyGraphMatrix/PyGraphTable.__iter__()**: Temporarily disabled, indexing provides better UX
-- **Matrix sparse operations**: Deferred to Phase 5 for advanced linear algebra
+🔧 **Ready for Phase 4:**
+- Advanced Operations: Complex queries, joins, aggregations
+- Performance optimization candidates identified
+- Memory management architecture established
 
-🚀 **Phase 4 Objectives - Advanced Operations:**
-1. **Multi-Table Operations**: JOIN, UNION, INTERSECT between node/edge tables
-2. **Advanced Analytics**: GROUP BY, aggregations, window functions
-3. **Graph-Aware Operations**: Neighborhood tables, path analysis, subgraph filtering
-4. **Performance Optimization**: Parallel operations, streaming large datasets
-5. **Integration Enhancements**: Arrow/Parquet export, SQL-like query interface
-
-📋 **Future Phases:**
-- **Phase 5**: Advanced linear algebra and sparse matrix operations
-- **Phase 6**: Visualization integration and web export capabilities
+📋 **Phase 5 Pending:**
+- Advanced linear algebra operations
+- Parallel processing integration
+- SIMD optimizations
 
 ---
 
