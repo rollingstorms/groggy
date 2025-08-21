@@ -6,7 +6,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyIndexError, PyImportError, PyNotImplementedError};
-use groggy::{NodeId, EdgeId, AttrValue as RustAttrValue, GraphTable, GraphArray, TableMetadata, GroupBy, AggregateOp};
+use groggy::{NodeId, EdgeId, AttrValue as RustAttrValue, GraphTable, GraphArray, TableMetadata, GroupBy, AggregateOp, ConnectivityType};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -570,6 +570,88 @@ impl PyGraphTable {
             .map_err(graph_error_to_py_err)?;
         
         Ok(Self::from_graph_table(table))
+    }
+
+    /// Filter table by node degree (number of connections)
+    pub fn filter_by_degree(
+        &self,
+        py: Python,
+        graph: Py<PyGraph>,
+        node_id_column: String,
+        min_degree: Option<usize>,
+        max_degree: Option<usize>,
+    ) -> PyResult<PyObject> {
+        let graph_ref = graph.borrow(py);
+        
+        let filtered_table = self.inner.filter_by_degree(
+            &graph_ref.inner,
+            &node_id_column,
+            min_degree,
+            max_degree
+        ).map_err(graph_error_to_py_err)?;
+        
+        let py_table = PyGraphTable::from_graph_table(filtered_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+
+    /// Filter table by connectivity to target nodes
+    pub fn filter_by_connectivity(
+        &self,
+        py: Python,
+        graph: Py<PyGraph>,
+        node_id_column: String,
+        target_nodes: Vec<u64>,
+        connection_type: String,
+    ) -> PyResult<PyObject> {
+        let graph_ref = graph.borrow(py);
+        
+        // Convert target nodes to usize
+        let target_usize: Vec<usize> = target_nodes.iter().map(|&id| id as usize).collect();
+        
+        // Parse connection type
+        let connectivity = match connection_type.as_str() {
+            "any" => ConnectivityType::ConnectedToAny,
+            "all" => ConnectivityType::ConnectedToAll,
+            "none" => ConnectivityType::NotConnectedToAny,
+            _ => return Err(PyValueError::new_err(format!(
+                "Invalid connection type: {}. Use 'any', 'all', or 'none'", connection_type
+            ))),
+        };
+        
+        let filtered_table = self.inner.filter_by_connectivity(
+            &graph_ref.inner,
+            &node_id_column,
+            &target_usize,
+            connectivity
+        ).map_err(graph_error_to_py_err)?;
+        
+        let py_table = PyGraphTable::from_graph_table(filtered_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+
+    /// Filter table by distance from target nodes
+    pub fn filter_by_distance(
+        &self,
+        py: Python,
+        graph: Py<PyGraph>,
+        node_id_column: String,
+        target_nodes: Vec<u64>,
+        max_distance: usize,
+    ) -> PyResult<PyObject> {
+        let graph_ref = graph.borrow(py);
+        
+        // Convert target nodes to usize
+        let target_usize: Vec<usize> = target_nodes.iter().map(|&id| id as usize).collect();
+        
+        let filtered_table = self.inner.filter_by_distance(
+            &graph_ref.inner,
+            &node_id_column,
+            &target_usize,
+            max_distance
+        ).map_err(graph_error_to_py_err)?;
+        
+        let py_table = PyGraphTable::from_graph_table(filtered_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
     }
 
     /// Inner join with another table

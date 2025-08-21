@@ -1074,6 +1074,182 @@ impl GraphTable {
         
         Ok(table)
     }
+    
+    /// Filter table rows based on graph-aware predicates
+    /// This allows filtering based on node properties, connectivity, and graph topology
+    pub fn filter_by_graph_predicate<F>(
+        &self,
+        graph: &crate::api::graph::Graph,
+        node_id_column: &str,
+        predicate: F
+    ) -> GraphResult<Self>
+    where
+        F: Fn(&crate::api::graph::Graph, NodeId, &HashMap<String, AttrValue>) -> bool,
+    {
+        let node_col = self.get_column_by_name(node_id_column)
+            .ok_or_else(|| GraphError::InvalidInput(format!("Node ID column '{}' not found", node_id_column)))?;
+        
+        let (rows, _) = self.shape();
+        let mut filtered_indices = Vec::new();
+        
+        // Check each row against the graph-aware predicate
+        for row_idx in 0..rows {
+            // Get node ID from the specified column
+            if let Some(AttrValue::Int(node_id)) = node_col.get(row_idx) {
+                let node_id = *node_id as NodeId;
+                
+                // Collect row attributes for the predicate
+                let mut row_attrs = HashMap::new();
+                for (col_idx, col_name) in self.column_names.iter().enumerate() {
+                    if let Some(array) = self.columns.get(col_idx) {
+                        if let Some(value) = array.get(row_idx) {
+                            row_attrs.insert(col_name.clone(), value.clone());
+                        }
+                    }
+                }
+                
+                // Apply the graph-aware predicate
+                if predicate(graph, node_id, &row_attrs) {
+                    filtered_indices.push(row_idx);
+                }
+            }
+        }
+        
+        // Create filtered table
+        let filtered_arrays: Vec<GraphArray> = self.columns.iter()
+            .map(|array| {
+                let filtered_values: Vec<AttrValue> = filtered_indices.iter()
+                    .filter_map(|&idx| array.get(idx).cloned())
+                    .collect();
+                GraphArray::from_vec(filtered_values)
+            })
+            .collect();
+        
+        let mut filtered_table = Self::from_arrays_standalone(filtered_arrays, Some(self.column_names.clone()))?;
+        filtered_table.metadata = TableMetadata::new("filtered".to_string())
+            .with_name(format!("filtered_{}", self.metadata.name.as_deref().unwrap_or("table")));
+        
+        Ok(filtered_table)
+    }
+    
+    /// Filter nodes by degree (number of connections)
+    pub fn filter_by_degree(
+        &self,
+        graph: &crate::api::graph::Graph,
+        node_id_column: &str,
+        min_degree: Option<usize>,
+        max_degree: Option<usize>
+    ) -> GraphResult<Self> {
+        self.filter_by_graph_predicate(graph, node_id_column, |graph, node_id, _attrs| {
+            let degree = graph.neighbors(node_id).map(|neighbors| neighbors.len()).unwrap_or(0);
+            
+            let meets_min = min_degree.map_or(true, |min| degree >= min);
+            let meets_max = max_degree.map_or(true, |max| degree <= max);
+            
+            meets_min && meets_max
+        })
+    }
+    
+    /// Filter nodes by connectivity to specific target nodes
+    pub fn filter_by_connectivity(
+        &self,
+        graph: &crate::api::graph::Graph,
+        node_id_column: &str,
+        target_nodes: &[NodeId],
+        connection_type: ConnectivityType
+    ) -> GraphResult<Self> {
+        self.filter_by_graph_predicate(graph, node_id_column, |graph, node_id, _attrs| {
+            let neighbors = graph.neighbors(node_id).unwrap_or_default();
+            
+            match connection_type {
+                ConnectivityType::ConnectedToAny => {
+                    target_nodes.iter().any(|&target| neighbors.contains(&target))
+                }
+                ConnectivityType::ConnectedToAll => {
+                    target_nodes.iter().all(|&target| neighbors.contains(&target))
+                }
+                ConnectivityType::NotConnectedToAny => {
+                    !target_nodes.iter().any(|&target| neighbors.contains(&target))
+                }
+            }
+        })
+    }
+    
+    /// Filter nodes within a certain distance of target nodes
+    pub fn filter_by_distance(
+        &self,
+        graph: &crate::api::graph::Graph,
+        node_id_column: &str,
+        target_nodes: &[NodeId],
+        max_distance: usize
+    ) -> GraphResult<Self> {
+        use std::collections::{HashSet, VecDeque};
+        
+        // Pre-compute reachable nodes within max_distance from any target
+        let mut reachable_nodes = HashSet::new();
+        
+        for &target in target_nodes {
+            let mut visited = HashSet::new();
+            let mut queue = VecDeque::new();
+            
+            queue.push_back((target, 0));
+            visited.insert(target);
+            
+            while let Some((current_node, distance)) = queue.pop_front() {
+                if distance <= max_distance {
+                    reachable_nodes.insert(current_node);
+                }
+                
+                if distance < max_distance {
+                    if let Ok(neighbors) = graph.neighbors(current_node) {
+                        for neighbor in neighbors {
+                            if !visited.contains(&neighbor) {
+                                visited.insert(neighbor);
+                                queue.push_back((neighbor, distance + 1));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        self.filter_by_graph_predicate(graph, node_id_column, |_graph, node_id, _attrs| {
+            reachable_nodes.contains(&node_id)
+        })
+    }
+    
+    /// Filter nodes by attribute values combined with graph properties
+    pub fn filter_by_attribute_and_graph<F>(
+        &self,
+        graph: &crate::api::graph::Graph,
+        node_id_column: &str,
+        attribute_predicate: F
+    ) -> GraphResult<Self>
+    where
+        F: Fn(&HashMap<String, AttrValue>) -> bool,
+    {
+        self.filter_by_graph_predicate(graph, node_id_column, |graph, node_id, row_attrs| {
+            // First check if the row attributes satisfy the predicate
+            if !attribute_predicate(row_attrs) {
+                return false;
+            }
+            
+            // Additional graph-based checks can be added here
+            // For now, just ensure the node exists in the graph
+            graph.neighbors(node_id).is_ok()
+        })
+    }
+}
+
+/// Types of connectivity for filtering
+#[derive(Debug, Clone, Copy)]
+pub enum ConnectivityType {
+    /// Node is connected to at least one of the target nodes
+    ConnectedToAny,
+    /// Node is connected to all of the target nodes
+    ConnectedToAll,
+    /// Node is not connected to any of the target nodes
+    NotConnectedToAny,
 }
 
 impl fmt::Display for GraphTable {
