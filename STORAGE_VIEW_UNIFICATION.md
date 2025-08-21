@@ -314,6 +314,12 @@ python-groggy/src/
 - **Subgraph Integration**: table() and edges_table() methods
 - **Build System**: Clean compilation with `maturin develop --release`
 
+🚀 **Phase 4 IN PROGRESS - Advanced Operations:**
+- **✅ Multi-Table Operations**: Complete JOIN (inner, left, right, outer), UNION, INTERSECT operations
+- **✅ Advanced Analytics**: Full GROUP BY with comprehensive aggregation functions (sum, count, mean, min, max, std, var, first, last, unique)
+- **⏳ Graph-Aware Operations**: Neighborhood tables, path analysis, subgraph filtering (next)
+- **⏳ Performance Optimization**: Parallel operations, streaming large datasets
+
 ## Technical Implementation Highlights
 
 ### ✅ **Advanced Indexing System**
