@@ -505,6 +505,73 @@ impl PyGraphTable {
         Ok(Py::new(py, py_group_by)?.to_object(py))
     }
 
+    /// Extract neighborhood table for a given node
+    #[classmethod]
+    pub fn neighborhood_table(
+        _cls: &PyType,
+        py: Python,
+        graph: Py<PyGraph>,
+        node_id: u64,
+        attrs: Option<Vec<String>>,
+    ) -> PyResult<Self> {
+        let graph_ref = graph.borrow(py);
+        
+        // Convert attribute names to &str slice
+        let attr_refs: Option<Vec<&str>> = attrs.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+        let attr_slice = attr_refs.as_ref().map(|v| v.as_slice());
+        
+        let table = GraphTable::neighborhood_table(&graph_ref.inner, node_id as usize, attr_slice)
+            .map_err(graph_error_to_py_err)?;
+        
+        Ok(Self::from_graph_table(table))
+    }
+
+    /// Extract neighborhood tables for multiple nodes
+    #[classmethod]
+    pub fn multi_neighborhood_table(
+        _cls: &PyType,
+        py: Python,
+        graph: Py<PyGraph>,
+        node_ids: Vec<u64>,
+        attrs: Option<Vec<String>>,
+    ) -> PyResult<Self> {
+        let graph_ref = graph.borrow(py);
+        
+        // Convert node IDs to usize
+        let node_usize: Vec<usize> = node_ids.iter().map(|&id| id as usize).collect();
+        
+        // Convert attribute names to &str slice
+        let attr_refs: Option<Vec<&str>> = attrs.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+        let attr_slice = attr_refs.as_ref().map(|v| v.as_slice());
+        
+        let table = GraphTable::multi_neighborhood_table(&graph_ref.inner, &node_usize, attr_slice)
+            .map_err(graph_error_to_py_err)?;
+        
+        Ok(Self::from_graph_table(table))
+    }
+
+    /// Extract k-hop neighborhood table for a given node
+    #[classmethod]
+    pub fn k_hop_neighborhood_table(
+        _cls: &PyType,
+        py: Python,
+        graph: Py<PyGraph>,
+        node_id: u64,
+        k: usize,
+        attrs: Option<Vec<String>>,
+    ) -> PyResult<Self> {
+        let graph_ref = graph.borrow(py);
+        
+        // Convert attribute names to &str slice
+        let attr_refs: Option<Vec<&str>> = attrs.as_ref().map(|v| v.iter().map(|s| s.as_str()).collect());
+        let attr_slice = attr_refs.as_ref().map(|v| v.as_slice());
+        
+        let table = GraphTable::k_hop_neighborhood_table(&graph_ref.inner, node_id as usize, k, attr_slice)
+            .map_err(graph_error_to_py_err)?;
+        
+        Ok(Self::from_graph_table(table))
+    }
+
     /// Inner join with another table
     pub fn inner_join(&self, py: Python, other: &PyGraphTable, left_on: String, right_on: String) -> PyResult<PyObject> {
         let result_table = self.inner.inner_join(&other.inner, &left_on, &right_on)
