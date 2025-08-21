@@ -314,10 +314,11 @@ python-groggy/src/
 - **Subgraph Integration**: table() and edges_table() methods
 - **Build System**: Clean compilation with `maturin develop --release`
 
-🚀 **Phase 4 IN PROGRESS - Advanced Operations:**
+🚀 **Phase 4 NEARLY COMPLETE - Advanced Operations:**
 - **✅ Multi-Table Operations**: Complete JOIN (inner, left, right, outer), UNION, INTERSECT operations
 - **✅ Advanced Analytics**: Full GROUP BY with comprehensive aggregation functions (sum, count, mean, min, max, std, var, first, last, unique)
-- **⏳ Graph-Aware Operations**: Neighborhood tables, path analysis, subgraph filtering (next)
+- **✅ Graph-Aware Operations**: Complete neighborhood table extraction (direct, multi-node, k-hop with BFS)
+- **⏳ Table Filtering**: Graph-aware predicates (next)
 - **⏳ Performance Optimization**: Parallel operations, streaming large datasets
 
 ## Technical Implementation Highlights
@@ -356,6 +357,27 @@ edges_table = gr.table.from_graph_edges(graph, edge_ids, ["weight", "type"])
 - **CachedStats**: Smart invalidation for statistical computations  
 - **View vs Copy**: Clear semantics for performance-critical operations
 - **Columnar Storage**: AttributeColumn integration with graph pool
+
+### ✅ **Graph-Aware Neighborhood Analysis**
+```python
+# Direct neighborhood extraction
+neighbors = gr.GraphTable.neighborhood_table(graph, node_id, ["name", "age", "type"])
+
+# Multi-node neighborhood analysis
+multi_neighbors = gr.GraphTable.multi_neighborhood_table(
+    graph, [alice_id, bob_id], ["name", "connections", "score"]
+)
+
+# K-hop neighborhood with BFS traversal
+# Get all nodes within 2 hops of a central node
+k2_neighborhood = gr.GraphTable.k_hop_neighborhood_table(
+    graph, center_node, k=2, ["node_id", "community", "influence"]
+)
+
+# Analyze local network structure
+local_network = gr.GraphTable.k_hop_neighborhood_table(graph, user_id, 1)
+grouped_by_type = local_network.group_by("type").count("node_id")
+```
 
 ⚠️ **Remaining NotImplementedError Placeholders:**
 - **PyGraphMatrix.is_symmetric()**: Returns false, needs core implementation
