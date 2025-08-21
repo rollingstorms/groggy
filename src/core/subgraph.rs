@@ -325,47 +325,70 @@ impl Subgraph {
 impl Subgraph {
     /// Set an attribute on all nodes in this subgraph
     /// This enables: subgraph.set_node_attribute_bulk("department", "Engineering")
+    /// OPTIMIZED: Uses bulk API instead of O(n) individual calls
     pub fn set_node_attribute_bulk(&self, attr_name: &AttrName, attr_value: AttrValue) -> GraphResult<()> {
         let mut graph_borrow = self.graph.borrow_mut();
         
-        for &node_id in &self.nodes {
-            graph_borrow.set_node_attr(node_id, attr_name.clone(), attr_value.clone())?;
-        }
+        // Use the optimized bulk API instead of individual calls
+        let mut attrs_values = std::collections::HashMap::new();
+        let node_value_pairs: Vec<(NodeId, AttrValue)> = self.nodes.iter()
+            .map(|&node_id| (node_id, attr_value.clone()))
+            .collect();
+        
+        attrs_values.insert(attr_name.clone(), node_value_pairs);
+        
+        // Single bulk operation instead of O(n) individual calls
+        graph_borrow.set_node_attrs(attrs_values)?;
         
         Ok(())
     }
     
     /// Set attributes on specific nodes within this subgraph
+    /// OPTIMIZED: Uses bulk API instead of O(n) individual calls
     pub fn set_node_attributes_for_nodes(
         &self,
         node_ids: &[NodeId],
         attr_name: &AttrName,
         attr_value: AttrValue,
     ) -> GraphResult<()> {
+        // Validate all nodes exist in this subgraph upfront
         for &node_id in node_ids {
             if !self.has_node(node_id) {
                 return Err(GraphError::node_not_found(node_id, "subgraph batch operation"));
             }
         }
         
+        // Use optimized bulk API
         let mut graph_borrow = self.graph.borrow_mut();
-        for &node_id in node_ids {
-            graph_borrow.set_node_attr(node_id, attr_name.clone(), attr_value.clone())?;
-        }
+        let mut attrs_values = std::collections::HashMap::new();
+        let node_value_pairs: Vec<(NodeId, AttrValue)> = node_ids.iter()
+            .map(|&node_id| (node_id, attr_value.clone()))
+            .collect();
+        
+        attrs_values.insert(attr_name.clone(), node_value_pairs);
+        graph_borrow.set_node_attrs(attrs_values)?;
         
         Ok(())
     }
     
     /// Set multiple attributes on all nodes in this subgraph
     /// This enables: subgraph.set_bulk({attr1: val1, attr2: val2})
+    /// OPTIMIZED: Uses bulk API instead of O(n*m) individual calls
     pub fn set_node_attributes_bulk(&self, attributes: std::collections::HashMap<AttrName, AttrValue>) -> GraphResult<()> {
         let mut graph_borrow = self.graph.borrow_mut();
         
-        for &node_id in &self.nodes {
-            for (attr_name, attr_value) in &attributes {
-                graph_borrow.set_node_attr(node_id, attr_name.clone(), attr_value.clone())?;
-            }
+        // Transform to bulk API format: HashMap<AttrName, Vec<(NodeId, AttrValue)>>
+        let mut attrs_values = std::collections::HashMap::new();
+        
+        for (attr_name, attr_value) in attributes {
+            let node_value_pairs: Vec<(NodeId, AttrValue)> = self.nodes.iter()
+                .map(|&node_id| (node_id, attr_value.clone()))
+                .collect();
+            attrs_values.insert(attr_name, node_value_pairs);
         }
+        
+        // Single bulk operation instead of O(n*m) individual calls
+        graph_borrow.set_node_attrs(attrs_values)?;
         
         Ok(())
     }
