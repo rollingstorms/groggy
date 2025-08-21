@@ -237,14 +237,39 @@ impl PyGraphMatrix {
         Ok(Py::new(py, PyGraphMatrix { inner: transposed })?)
     }
 
-    /// Matrix multiplication (Phase 5 - placeholder for now)
-    fn multiply(&self, _other: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
-        Err(PyNotImplementedError::new_err("Matrix multiplication will be implemented in Phase 5"))
+    /// Matrix multiplication - multiply this matrix with another
+    /// Returns: new GraphMatrix that is the product of self * other
+    fn multiply(&self, py: Python, other: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
+        let result_matrix = self.inner.multiply(&other.inner)
+            .map_err(|e| PyRuntimeError::new_err(format!("Matrix multiplication failed: {:?}", e)))?;
+        
+        let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
+        Ok(Py::new(py, py_result)?)
     }
 
     /// Matrix inverse (Phase 5 - placeholder for now)
     fn inverse(&self) -> PyResult<Py<PyGraphMatrix>> {
         Err(PyNotImplementedError::new_err("Matrix inverse will be implemented in Phase 5"))
+    }
+
+    /// Matrix power - raise matrix to integer power
+    /// Returns: new GraphMatrix that is self^n
+    fn power(&self, py: Python, n: u32) -> PyResult<Py<PyGraphMatrix>> {
+        let result_matrix = self.inner.power(n)
+            .map_err(|e| PyRuntimeError::new_err(format!("Matrix power failed: {:?}", e)))?;
+        
+        let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
+        Ok(Py::new(py, py_result)?)
+    }
+    
+    /// Elementwise multiplication (Hadamard product)
+    /// Returns: new GraphMatrix with elementwise product
+    fn elementwise_multiply(&self, py: Python, other: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
+        let result_matrix = self.inner.elementwise_multiply(&other.inner)
+            .map_err(|e| PyRuntimeError::new_err(format!("Elementwise multiplication failed: {:?}", e)))?;
+        
+        let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
+        Ok(Py::new(py, py_result)?)
     }
 
     /// Determinant calculation (Phase 5 - placeholder for now)
