@@ -182,20 +182,70 @@ impl PyGraphTable {
 
     /// Rich HTML representation for Jupyter notebooks
     fn _repr_html_(&self, py: Python) -> PyResult<String> {
-        match self._try_rich_html_display(py) {
-            Ok(html) => Ok(html),
-            Err(_) => {
-                // Fallback to basic HTML
-                let (rows, cols) = self.inner.shape();
-                Ok(format!(
-                    r#"<div style="font-family: monospace; padding: 10px; border: 1px solid #ddd;">
-                    <strong>GraphTable</strong><br>
-                    Shape: ({}, {})
-                    </div>"#,
-                    rows, cols
-                ))
-            }
+        let (rows, cols) = self.inner.shape();
+        let columns = self.inner.columns();
+        
+        // Create HTML table with data
+        let mut html = String::new();
+        html.push_str(r#"<div style="max-height: 400px; overflow: auto;">"#);
+        html.push_str(r#"<table border="1" class="dataframe" style="border-collapse: collapse; margin: 0;">"#);
+        
+        // Table header
+        html.push_str("<thead><tr style=\"text-align: right;\">");
+        html.push_str("<th style=\"padding: 8px; background-color: #f0f0f0;\"></th>"); // Index column
+        for column in columns {
+            html.push_str(&format!("<th style=\"padding: 8px; background-color: #f0f0f0;\">{}</th>", column));
         }
+        html.push_str("</tr></thead>");
+        
+        // Table body - show first 10 rows for performance
+        html.push_str("<tbody>");
+        let display_rows = std::cmp::min(rows, 10);
+        
+        for row_idx in 0..display_rows {
+            html.push_str("<tr>");
+            // Index column
+            html.push_str(&format!("<th style=\"padding: 8px; background-color: #f9f9f9;\">{}</th>", row_idx));
+            
+            // Data columns
+            if let Some(row_data) = self.inner.iloc(row_idx) {
+                for column in columns {
+                    let value = row_data.get(column).cloned().unwrap_or(groggy::AttrValue::Int(0));
+                    let display_value = match attr_value_to_python_value(py, &value) {
+                        Ok(py_obj) => {
+                            // Convert Python object back to string for display
+                            match py_obj.extract::<String>(py) {
+                                Ok(s) => s,
+                                Err(_) => format!("{:?}", value)
+                            }
+                        }
+                        Err(_) => format!("{:?}", value)
+                    };
+                    html.push_str(&format!("<td style=\"padding: 8px;\">{}</td>", display_value));
+                }
+            }
+            html.push_str("</tr>");
+        }
+        
+        // Show truncation message if needed
+        if rows > display_rows {
+            html.push_str(&format!(
+                "<tr><td colspan=\"{}\" style=\"padding: 8px; text-align: center; font-style: italic;\">... {} more rows</td></tr>",
+                cols + 1, rows - display_rows
+            ));
+        }
+        
+        html.push_str("</tbody></table></div>");
+        
+        // Add summary info
+        html.push_str(&format!(
+            r#"<div style="margin-top: 8px; font-size: 12px; color: #666;">
+            <strong>GraphTable:</strong> {} rows × {} columns
+            </div>"#,
+            rows, cols
+        ));
+        
+        Ok(html)
     }
 
     /// Try to use rich display formatting
