@@ -509,6 +509,30 @@ impl PyGraphTable {
         Ok(Py::new(py, py_group_by)?.to_object(py))
     }
 
+    /// Convert this table to a GraphMatrix if all columns are compatible numeric types
+    /// 
+    /// Returns a PyGraphMatrix that can be used for matrix operations.
+    /// 
+    /// Examples:
+    ///   # This works - both columns are numeric
+    ///   matrix = table[['age', 'height']].matrix()
+    ///   
+    ///   # This fails - mixed numeric and text types
+    ///   matrix = table[['age', 'name']].matrix()  # Raises ValueError
+    /// 
+    /// Raises:
+    ///   ValueError: If columns have incompatible types (e.g., mixing numeric and text)
+    ///   ValueError: If the table is empty
+    /// 
+    /// Returns:
+    ///   PyGraphMatrix: A matrix representation of the numeric table data
+    pub fn matrix(&self, py: Python) -> PyResult<PyObject> {
+        let matrix = self.inner.matrix()
+            .map_err(graph_error_to_py_err)?;
+        
+        let py_matrix = PyGraphMatrix::from_graph_matrix(matrix);
+        Ok(Py::new(py, py_matrix)?.to_object(py))
+    }
 
     /// Filter table by node degree (number of connections)
     pub fn filter_by_degree(
@@ -737,32 +761,6 @@ impl PyGroupBy {
         let py_table = PyGraphTable::from_graph_table(result_table);
         Ok(Py::new(py, py_table)?.to_object(py))
     }
-
-    // TODO: Uncomment when GroupBy type issue is resolved
-    // /// Convert this table to a GraphMatrix if all columns are compatible numeric types
-    // /// 
-    // /// Returns a PyGraphMatrix that can be used for matrix operations.
-    // /// 
-    // /// Examples:
-    // ///   # This works - both columns are numeric
-    // ///   matrix = table[['age', 'height']].matrix()
-    // ///   
-    // ///   # This fails - mixed numeric and text types
-    // ///   matrix = table[['age', 'name']].matrix()  # Raises ValueError
-    // /// 
-    // /// Raises:
-    // ///   ValueError: If columns have incompatible types (e.g., mixing numeric and text)
-    // ///   ValueError: If the table is empty
-    // /// 
-    // /// Returns:
-    // ///   PyGraphMatrix: A matrix representation of the numeric table data
-    // pub fn matrix(&self, py: Python) -> PyResult<PyObject> {
-    //     let matrix = self.inner.matrix()
-    //         .map_err(graph_error_to_py_err)?;
-    //     
-    //     let py_matrix = PyGraphMatrix::from_graph_matrix(matrix);
-    //     Ok(Py::new(py, py_matrix)?.to_object(py))
-    // }
 }
 
 
