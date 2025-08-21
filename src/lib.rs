@@ -164,7 +164,8 @@ pub use core::space::GraphSpace;
 pub use core::adjacency::{AdjacencyMatrix, SparseAdjacencyMatrix, AdjacencyMatrixResult, MatrixFormat, MatrixType, IndexMapping};
 pub use core::matrix::{GraphMatrix, MatrixProperties, Axis};
 pub use core::array::{GraphArray, StatsSummary};
-pub use core::table::{GraphTable, TableMetadata, JoinType, AggregateOp, GroupBy};
+pub use core::table::{GraphTable, TableMetadata, AggregateOp, GroupBy};
+pub use core::matrix::JoinType;
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

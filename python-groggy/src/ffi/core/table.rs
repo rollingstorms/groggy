@@ -497,6 +497,54 @@ impl PyGraphTable {
         Ok(df.to_object(py))
     }
 
+    /// Inner join with another table
+    pub fn inner_join(&self, py: Python, other: &PyGraphTable, left_on: String, right_on: String) -> PyResult<PyObject> {
+        let result_table = self.inner.inner_join(&other.inner, &left_on, &right_on)
+            .map_err(graph_error_to_py_err)?;
+        let py_table = PyGraphTable::from_graph_table(result_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+
+    /// Left join with another table
+    pub fn left_join(&self, py: Python, other: &PyGraphTable, left_on: String, right_on: String) -> PyResult<PyObject> {
+        let result_table = self.inner.left_join(&other.inner, &left_on, &right_on)
+            .map_err(graph_error_to_py_err)?;
+        let py_table = PyGraphTable::from_graph_table(result_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+
+    /// Right join with another table
+    pub fn right_join(&self, py: Python, other: &PyGraphTable, left_on: String, right_on: String) -> PyResult<PyObject> {
+        let result_table = self.inner.right_join(&other.inner, &left_on, &right_on)
+            .map_err(graph_error_to_py_err)?;
+        let py_table = PyGraphTable::from_graph_table(result_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+
+    /// Outer join with another table
+    pub fn outer_join(&self, py: Python, other: &PyGraphTable, left_on: String, right_on: String) -> PyResult<PyObject> {
+        let result_table = self.inner.outer_join(&other.inner, &left_on, &right_on)
+            .map_err(graph_error_to_py_err)?;
+        let py_table = PyGraphTable::from_graph_table(result_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+
+    /// Union with another table (combine rows)
+    pub fn union(&self, py: Python, other: &PyGraphTable) -> PyResult<PyObject> {
+        let result_table = self.inner.union(&other.inner)
+            .map_err(graph_error_to_py_err)?;
+        let py_table = PyGraphTable::from_graph_table(result_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+
+    /// Intersect with another table (rows present in both)
+    pub fn intersect(&self, py: Python, other: &PyGraphTable) -> PyResult<PyObject> {
+        let result_table = self.inner.intersect(&other.inner)
+            .map_err(graph_error_to_py_err)?;
+        let py_table = PyGraphTable::from_graph_table(result_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+
     /// Iterator support - iterates over rows as dictionaries (temporarily disabled)
     fn __iter__(slf: PyRef<Self>) -> PyResult<PyObject> {
         Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
