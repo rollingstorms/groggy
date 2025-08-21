@@ -65,8 +65,23 @@ impl PyGraphTable {
     ) -> PyResult<Self> {
         let graph_ref = graph.borrow(py);
         
-        // Default to just node_id if no attributes specified
-        let attr_names = attrs.unwrap_or_else(|| vec!["node_id".to_string()]);
+        // If no attributes specified, discover all available attributes  
+        let attr_names = attrs.unwrap_or_else(|| {
+            // Discover all available node attributes
+            let mut all_attrs = std::collections::HashSet::new();
+            for &node_id in &nodes {
+                if let Ok(attrs) = graph_ref.inner.get_node_attrs(node_id as usize) {
+                    for attr_name in attrs.keys() {
+                        all_attrs.insert(attr_name.clone());
+                    }
+                }
+            }
+            
+            // Always include node_id as first column
+            let mut column_names = vec!["node_id".to_string()];
+            column_names.extend(all_attrs.into_iter());
+            column_names
+        });
         let mut columns = Vec::new();
         
         for attr_name in &attr_names {

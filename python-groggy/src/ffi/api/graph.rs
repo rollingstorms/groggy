@@ -1061,19 +1061,21 @@ impl PyGraph {
     }
     
     /// Create GraphTable for DataFrame-like view of this graph's nodes
-    /// Forwards to the subgraph implementation to maintain consistency
+    /// Alias for g.nodes.table() for convenience
     pub fn table(self_: PyRef<Self>, py: Python<'_>) -> PyResult<PyObject> {
-        let sg = Self::view(self_, py)?;
-        let t = sg.call_method0(py, "table")?;
-        Ok(t.to_object(py))
+        // Forward to g.nodes.table() for consistency
+        let nodes_accessor = Self::nodes(self_, py)?;
+        let result = nodes_accessor.borrow(py).table(py);
+        result
     }
     
-    /// Create GraphTable for DataFrame-like view of this graph's edges  
-    /// Forwards to the subgraph implementation to maintain consistency
+    /// Create GraphTable for DataFrame-like view of this graph's edges
+    /// Alias for g.edges.table() for convenience
     pub fn edges_table(self_: PyRef<Self>, py: Python<'_>) -> PyResult<PyObject> {
-        let sg = Self::view(self_, py)?;
-        let t = sg.call_method0(py, "edges_table")?;
-        Ok(t.to_object(py))
+        // Forward to g.edges.table() for consistency
+        let edges_accessor = Self::edges(self_, py)?;
+        let result = edges_accessor.borrow(py).table(py);
+        result
     }
     
 }
