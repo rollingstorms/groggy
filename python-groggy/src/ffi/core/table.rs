@@ -222,6 +222,7 @@ impl PyGraphTable {
                             }
                         },
                         groggy::AttrValue::Text(s) => s.clone(),
+                        groggy::AttrValue::CompactText(compact_str) => compact_str.as_str().to_string(),
                         groggy::AttrValue::Bool(b) => if *b { "True".to_string() } else { "False".to_string() },
                         groggy::AttrValue::Bytes(b) => format!("bytes[{}]", b.len()),
                         groggy::AttrValue::FloatVec(items) => {
@@ -230,6 +231,14 @@ impl PyGraphTable {
                             } else {
                                 format!("[{}, ... {} items]", items.iter().take(2).map(|f| f.to_string()).collect::<Vec<_>>().join(", "), items.len())
                             }
+                        },
+                        groggy::AttrValue::CompressedText(_compressed) => {
+                            // Compressed text - show placeholder for now
+                            "compressed_text".to_string()
+                        },
+                        groggy::AttrValue::CompressedFloatVec(_compressed) => {
+                            // Compressed float vector - show placeholder for now
+                            "compressed_vec".to_string()
                         },
                         _ => format!("{:?}", value)
                     };
