@@ -93,19 +93,29 @@ impl GroupBy {
                     
                     let agg_result = match op {
                         AggregateOp::Sum => {
-                            let sum: f32 = group_values.iter()
-                                .filter_map(|v| v.as_float())
+                            let sum: f64 = group_values.iter()
+                                .filter_map(|v| match v {
+                                    AttrValue::Int(i) => Some(*i as f64),
+                                    AttrValue::SmallInt(i) => Some(*i as f64),
+                                    AttrValue::Float(f) => Some(*f as f64),
+                                    _ => None,
+                                })
                                 .sum();
-                            AttrValue::Float(sum)
+                            AttrValue::Float(sum as f32)
                         }
                         AggregateOp::Mean => {
-                            let values: Vec<f32> = group_values.iter()
-                                .filter_map(|v| v.as_float())
+                            let values: Vec<f64> = group_values.iter()
+                                .filter_map(|v| match v {
+                                    AttrValue::Int(i) => Some(*i as f64),
+                                    AttrValue::SmallInt(i) => Some(*i as f64),
+                                    AttrValue::Float(f) => Some(*f as f64),
+                                    _ => None,
+                                })
                                 .collect();
                             if values.is_empty() {
                                 AttrValue::Int(0)
                             } else {
-                                AttrValue::Float(values.iter().sum::<f32>() / values.len() as f32)
+                                AttrValue::Float((values.iter().sum::<f64>() / values.len() as f64) as f32)
                             }
                         }
                         AggregateOp::Count => AttrValue::Int(group_values.len() as i64),

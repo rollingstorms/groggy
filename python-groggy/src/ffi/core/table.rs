@@ -6,7 +6,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyIndexError, PyImportError, PyNotImplementedError};
-use groggy::{NodeId, EdgeId, AttrValue as RustAttrValue, GraphTable, GraphArray, TableMetadata};
+use groggy::{NodeId, EdgeId, AttrValue as RustAttrValue, GraphTable, GraphArray, TableMetadata, GroupBy, AggregateOp};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -497,6 +497,14 @@ impl PyGraphTable {
         Ok(df.to_object(py))
     }
 
+    /// Group by a column for aggregation operations
+    pub fn group_by(&self, py: Python, column: String) -> PyResult<PyObject> {
+        let group_by = self.inner.group_by(&column)
+            .map_err(graph_error_to_py_err)?;
+        let py_group_by = PyGroupBy::from_group_by(group_by);
+        Ok(Py::new(py, py_group_by)?.to_object(py))
+    }
+
     /// Inner join with another table
     pub fn inner_join(&self, py: Python, other: &PyGraphTable, left_on: String, right_on: String) -> PyResult<PyObject> {
         let result_table = self.inner.inner_join(&other.inner, &left_on, &right_on)
@@ -550,6 +558,97 @@ impl PyGraphTable {
         Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
             "Table iteration temporarily disabled during Phase 3 - use table[i] for row access"
         ))
+    }
+}
+
+/// Python wrapper around GroupBy for aggregation operations
+#[pyclass(name = "GroupBy", unsendable)]
+pub struct PyGroupBy {
+    /// Core GroupBy implementation
+    pub inner: GroupBy,
+}
+
+impl PyGroupBy {
+    /// Create from a core GroupBy
+    pub fn from_group_by(group_by: GroupBy) -> Self {
+        Self {
+            inner: group_by,
+        }
+    }
+}
+
+#[pymethods]
+impl PyGroupBy {
+    /// Apply aggregation operations to grouped data
+    /// 
+    /// Args:
+    ///     operations: Dictionary mapping column names to aggregation operations
+    ///                 Valid operations: "sum", "mean", "count", "min", "max", "std", "var"
+    /// 
+    /// Returns:
+    ///     PyGraphTable: Aggregated results with group keys and aggregated values
+    /// 
+    /// Example:
+    ///     grouped = table.group_by("category")
+    ///     result = grouped.agg({"price": "mean", "quantity": "sum"})
+    pub fn agg(&self, py: Python, operations: HashMap<String, String>) -> PyResult<PyObject> {
+        // Convert string operations to AggregateOp enum
+        let mut ops = HashMap::new();
+        for (column, op_str) in operations {
+            let op = match op_str.as_str() {
+                "sum" => AggregateOp::Sum,
+                "mean" => AggregateOp::Mean,
+                "count" => AggregateOp::Count,
+                "min" => AggregateOp::Min,
+                "max" => AggregateOp::Max,
+                "std" => AggregateOp::Std,
+                "var" => AggregateOp::Var,
+                "first" => AggregateOp::First,
+                "last" => AggregateOp::Last,
+                "unique" => AggregateOp::Unique,
+                _ => return Err(PyValueError::new_err(format!("Unknown aggregation operation: {}", op_str))),
+            };
+            ops.insert(column, op);
+        }
+        
+        // Apply aggregation
+        let result_table = self.inner.agg(ops)
+            .map_err(graph_error_to_py_err)?;
+        let py_table = PyGraphTable::from_graph_table(result_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+    
+    /// Convenience method for summing grouped values
+    pub fn sum(&self, py: Python, column: String) -> PyResult<PyObject> {
+        let mut ops = HashMap::new();
+        ops.insert(column, AggregateOp::Sum);
+        
+        let result_table = self.inner.agg(ops)
+            .map_err(graph_error_to_py_err)?;
+        let py_table = PyGraphTable::from_graph_table(result_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+    
+    /// Convenience method for averaging grouped values
+    pub fn mean(&self, py: Python, column: String) -> PyResult<PyObject> {
+        let mut ops = HashMap::new();
+        ops.insert(column, AggregateOp::Mean);
+        
+        let result_table = self.inner.agg(ops)
+            .map_err(graph_error_to_py_err)?;
+        let py_table = PyGraphTable::from_graph_table(result_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+    
+    /// Convenience method for counting grouped values
+    pub fn count(&self, py: Python, column: String) -> PyResult<PyObject> {
+        let mut ops = HashMap::new();
+        ops.insert(column, AggregateOp::Count);
+        
+        let result_table = self.inner.agg(ops)
+            .map_err(graph_error_to_py_err)?;
+        let py_table = PyGraphTable::from_graph_table(result_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
     }
 }
 
