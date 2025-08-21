@@ -198,9 +198,9 @@ impl PyGraphTable {
         }
         html.push_str("</tr></thead>");
         
-        // Table body - show first 10 rows for performance
+        // Table body - show first 5 rows for performance  
         html.push_str("<tbody>");
-        let display_rows = std::cmp::min(rows, 10);
+        let display_rows = std::cmp::min(rows, 5);
         
         for row_idx in 0..display_rows {
             html.push_str("<tr>");
@@ -211,15 +211,27 @@ impl PyGraphTable {
             if let Some(row_data) = self.inner.iloc(row_idx) {
                 for column in columns {
                     let value = row_data.get(column).cloned().unwrap_or(groggy::AttrValue::Int(0));
-                    let display_value = match attr_value_to_python_value(py, &value) {
-                        Ok(py_obj) => {
-                            // Convert Python object back to string for display
-                            match py_obj.extract::<String>(py) {
-                                Ok(s) => s,
-                                Err(_) => format!("{:?}", value)
+                    let display_value = match &value {
+                        groggy::AttrValue::Int(i) => i.to_string(),
+                        groggy::AttrValue::SmallInt(i) => i.to_string(),
+                        groggy::AttrValue::Float(f) => {
+                            if f.fract() == 0.0 {
+                                format!("{:.0}", f)
+                            } else {
+                                format!("{:.6}", f).trim_end_matches('0').trim_end_matches('.').to_string()
                             }
-                        }
-                        Err(_) => format!("{:?}", value)
+                        },
+                        groggy::AttrValue::Text(s) => s.clone(),
+                        groggy::AttrValue::Bool(b) => if *b { "True".to_string() } else { "False".to_string() },
+                        groggy::AttrValue::Bytes(b) => format!("bytes[{}]", b.len()),
+                        groggy::AttrValue::FloatVec(items) => {
+                            if items.len() <= 3 {
+                                format!("[{}]", items.iter().map(|f| f.to_string()).collect::<Vec<_>>().join(", "))
+                            } else {
+                                format!("[{}, ... {} items]", items.iter().take(2).map(|f| f.to_string()).collect::<Vec<_>>().join(", "), items.len())
+                            }
+                        },
+                        _ => format!("{:?}", value)
                     };
                     html.push_str(&format!("<td style=\"padding: 8px;\">{}</td>", display_value));
                 }
