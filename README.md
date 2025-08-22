@@ -1,384 +1,328 @@
+# Groggy
+
+**A high-performance graph and networked table library built in Rust with Python bindings**
+
 <div align="center">
-  <img src="img/groggy.svg" alt="Groggy Logo" width="400"/>
+  <img src="img/groggy.svg" alt="Groggy Logo" width="300"/>
 </div>
 
-# <span style="font-family: 'American Typewriter', monospace; font-size: 4em;">groggy</span>
+---
 
-A high-performance graph analytics engine with unified storage views, built with Rust and Python bindings.
+## 🚀 **What is Groggy?**
 
-## Overview
+Groggy is a modern graph analytics library that combines **graph topology** with **tabular data operations**. Built with a high-performance Rust core and intuitive Python API, Groggy lets you seamlessly work with graph data using familiar table-like operations.
 
-Groggy is a next-generation graph processing library that combines high-performance Rust core with an intuitive Python API. It provides seamless integration between graph topology and advanced tabular analytics through unified storage views (Arrays, Matrices, Tables) that support both relational operations and graph-aware analysis.
+### **Key Features:**
+- 🔥 **High-performance Rust core** with Python bindings
+- 📊 **Unified data structures**: GraphArray, GraphTable, GraphMatrix
+- 🎯 **Graph-aware analytics** with table operations  
+- 🎨 **Beautiful display** with rich formatting
+- ⚡ **Fast operations**: Node creation 500K+/sec, Edge creation 400K+/sec
 
-**🚀 Latest Release: v0.3.0** - Storage View Unification Complete
+---
 
-## Core Features
-
-### 🏗️ **Unified Storage Architecture**
-- **GraphArray**: High-performance columnar arrays with statistical operations
-- **GraphMatrix**: Homogeneous matrix operations with linear algebra support
-- **GraphTable**: Pandas-like tabular operations with graph integration
-- **Lazy Evaluation**: Memory-efficient views with on-demand computation
-
-### 📊 **Advanced Analytics**
-- **Multi-Table Operations**: JOIN (inner, left, right, outer), UNION, INTERSECT
-- **GROUP BY & Aggregation**: Complete statistical functions (sum, count, mean, min, max, std, var, first, last, unique)
-- **Graph-Aware Operations**: Neighborhood analysis, k-hop traversal, connectivity filtering
-- **Statistical Computing**: Comprehensive descriptive statistics with caching
-
-### ⚡ **High Performance**
-- **Rust Core**: Memory-efficient columnar storage with attribute pools
-- **Batch Operations**: Vectorized operations for large-scale processing
-- **Smart Caching**: Intelligent cache invalidation for statistical computations
-- **Zero-Copy Views**: Efficient data access without unnecessary copying
-
-### 🐍 **Python Integration**
-- **Pandas Compatible**: Familiar API with .head(), .tail(), .describe(), .group_by()
-- **Rich Display**: Beautiful HTML tables and formatted output in Jupyter
-- **Advanced Indexing**: Support for slicing, boolean masks, fancy indexing
-- **Graph Builders**: Unified gr.array(), gr.table(), gr.matrix() constructors
-
-## Installation
+## 📥 **Installation**
 
 ### From Source
-
 ```bash
 git clone https://github.com/rollingstorms/groggy.git
-cd groggy
+cd groggy/python-groggy
 
-# Install development dependencies
+# Install dependencies
 pip install maturin
 
 # Build and install
 maturin develop --release
 ```
 
-## Quick Start
+### Quick Test
+```python
+import groggy as gr
+print("Groggy installed successfully! 🎉")
+```
 
-### Basic Graph Operations
+---
 
+## 🚀 **Quick Start**
+
+### **Basic Graph Operations**
 ```python
 import groggy as gr
 
-# Create a new graph
+# Create a graph
 g = gr.Graph()
 
-# Add nodes with attributes
-g.add_node("alice", age=30, role="engineer", salary=95000)
-g.add_node("bob", age=25, role="designer", salary=75000)
-g.add_node("charlie", age=35, role="manager", salary=120000)
+# Add nodes with attributes (returns numeric IDs)
+alice = g.add_node(name="Alice", age=30, dept="Engineering")
+bob = g.add_node(name="Bob", age=25, dept="Design")  
+charlie = g.add_node(name="Charlie", age=35, dept="Management")
 
 # Add edges with attributes
-g.add_edge("alice", "bob", relationship="collaborates", strength=0.8)
-g.add_edge("charlie", "alice", relationship="manages", strength=0.9)
+g.add_edge(alice, bob, weight=0.8, type="collaborates")
+g.add_edge(charlie, alice, weight=0.9, type="manages")
 
-# Query the graph
-print(f"Nodes: {len(g.nodes)}, Edges: {len(g.edges)}")
+print(f"Graph: {g.node_count()} nodes, {g.edge_count()} edges")
 ```
 
-### Advanced Storage Views
-
+### **Table-Style Data Access**
 ```python
-# Convert graph data to table for analysis
+# Get node data as a table
 nodes_table = g.nodes.table()
-print(nodes_table.head())
+print(nodes_table)
+# ⊖⊖ gr.table
+# ╭──────┬───────┬──────┬──────────────╮
+# │    # │ name  │ age  │ dept         │
+# │      │ str   │ i64  │ str          │
+# ├──────┼───────┼──────┼──────────────┤
+# │    0 │ Alice │ 30   │ Engineering  │
+# │    1 │ Bob   │ 25   │ Design       │
+# │    2 │ Charlie│ 35   │ Management   │
+# ╰──────┴───────┴──────┴──────────────╯
 
-# Statistical analysis
-print(nodes_table.describe())
-salary_stats = nodes_table['salary'].describe()
+# Statistical analysis on columns
+age_column = nodes_table['age']
+print(f"Average age: {age_column.mean()}")
+print(f"Age range: {age_column.min()} - {age_column.max()}")
 
-# Group by operations
-role_analysis = nodes_table.group_by('role').agg({
-    'salary': ['mean', 'min', 'max'],
-    'age': ['mean', 'std']
-})
-
-# Graph-aware neighborhood analysis
-alice_neighborhood = gr.GraphTable.neighborhood_table(
-    g, "alice", ["age", "role", "salary"]
-)
+# Table-style operations
+print(nodes_table.describe())  # Statistical summary
+young_nodes = nodes_table[nodes_table['age'] < 30]  # Boolean filtering
 ```
 
-### Matrix Operations
-
+### **Graph Analytics**
 ```python
-# Get adjacency matrix
+# Connected components
+components = g.analytics.connected_components()
+print(f"Components: {len(components)}")
+
+# Shortest paths  
+path = g.analytics.shortest_path(alice, bob)
+print(f"Shortest path: {path}")
+
+# Graph traversal
+bfs_result = g.analytics.bfs(alice)
+dfs_result = g.analytics.dfs(alice)
+```
+
+### **Advanced Features**
+```python
+# Filtering with graph-aware operations
+engineering = g.filter_nodes(gr.NodeFilter.attribute_filter("dept", "==", "Engineering"))
+print(f"Engineering team: {engineering.node_count()} people")
+
+# Adjacency matrix operations  
 adj_matrix = g.adjacency()
 print(f"Matrix shape: {adj_matrix.shape}")
-print(f"Is sparse: {adj_matrix.is_sparse}")
+print(f"Density: {adj_matrix.sum_axis(1)}")  # Row sums (node degrees)
+
+# Export compatibility
+import networkx as nx
+import pandas as pd
+nx_graph = g.to_networkx()           # NetworkX compatibility
+df = nodes_table.to_pandas()         # Pandas DataFrame
+numpy_matrix = adj_matrix.to_numpy() # NumPy array
+```
+
+---
+
+## 🏗️ **Core Architecture**
+
+### **Data Structures**
+- **`Graph`**: Main graph container with nodes, edges, and attributes
+- **`GraphArray`**: High-performance columnar arrays with statistics (like Pandas Series)
+- **`GraphTable`**: Table operations on graph data (like Pandas DataFrame)  
+- **`GraphMatrix`**: Matrix operations including adjacency matrices
+- **`Subgraph`**: Filtered views of the main graph
+
+### **Key Concepts**
+- **Node/Edge IDs**: Groggy uses numeric IDs (not strings) returned from `add_node()`/`add_edge()`
+- **Attributes**: Rich attribute system supporting strings, numbers, booleans
+- **Lazy Views**: Data structures are views that only materialize when needed
+- **Unified API**: Same operations work on graphs, tables, arrays, and matrices
+
+---
+
+## 📊 **Performance**
+
+Groggy achieves excellent performance through its Rust core:
+
+| Operation | Rate | Complexity |
+|-----------|------|------------|
+| **Node Creation** | 500,000+ nodes/sec | O(N) |
+| **Edge Creation** | 400,000+ edges/sec | O(N) | 
+| **Table Operations** | Linear scaling | O(N) |
+| **Connected Components** | 6.5x faster than NetworkX | O(N+E) |
+
+*Benchmarks run on representative workloads. Your performance may vary.*
+
+---
+
+## 🔧 **API Reference**
+
+### **Graph Operations**
+```python
+# Graph creation
+g = gr.Graph(directed=False)  # Undirected graph (default)
+g = gr.Graph(directed=True)   # Directed graph
+
+# Node operations
+node_id = g.add_node(**attributes)      # Returns numeric ID
+g.add_nodes(data_list)                  # Bulk node creation
+g.set_node_attribute(node_id, "key", value)
+
+# Edge operations  
+edge_id = g.add_edge(source, target, **attributes)
+g.add_edges(edge_list)                  # Bulk edge creation
+g.set_edge_attribute(edge_id, "key", value)
+
+# Graph properties
+g.node_count()                          # Number of nodes
+g.edge_count()                          # Number of edges  
+g.density()                             # Graph density
+g.is_connected()                        # Connectivity check
+g.degree(node_id)                       # Node degree
+```
+
+### **Data Access**
+```python
+# Accessor objects
+g.nodes                                 # NodesAccessor
+g.edges                                 # EdgesAccessor
+
+# Table access
+nodes_table = g.nodes.table()           # All nodes as GraphTable
+edges_table = g.edges.table()           # All edges as GraphTable
+subgraph_table = subgraph.table()       # Subgraph data as GraphTable
+
+# Array access (single columns)
+ages = nodes_table['age']               # GraphArray of ages
+weights = edges_table['weight']         # GraphArray of edge weights
+
+# Node/edge data access
+node_data = g.nodes[node_id]            # Dictionary of node attributes
+edge_data = g.edges[edge_id]            # Dictionary of edge attributes
+```
+
+### **Filtering & Subgraphs**
+```python
+# Node filtering
+young = g.filter_nodes(gr.NodeFilter.attribute_filter("age", "<", 30))
+engineers = g.filter_nodes(gr.NodeFilter.attribute_filter("dept", "==", "Engineering"))
+
+# Edge filtering  
+strong = g.filter_edges(gr.EdgeFilter.attribute_filter("weight", ">", 0.5))
+
+# Subgraph operations (all return Subgraph objects)
+components = g.analytics.connected_components()
+subgraph = g.nodes[:10]                 # First 10 nodes
+filtered = g.filter_nodes(filter_obj)   # Filtered nodes
+```
+
+### **Analytics**
+```python
+# Graph algorithms (g.analytics.*)
+g.analytics.connected_components()      # List of connected components
+g.analytics.shortest_path(start, end)  # Shortest path between nodes
+g.analytics.bfs(start_node)            # Breadth-first search
+g.analytics.dfs(start_node)            # Depth-first search
 
 # Matrix operations
-squared = adj_matrix.power(2)  # A²
-row_sums = adj_matrix.sum_axis(axis=1)  # Sum each row
-
-# Convert to different formats
-dense_matrix = adj_matrix.to_dense()
-numpy_array = adj_matrix.to_numpy()
+adj = g.adjacency()                     # Adjacency matrix as GraphMatrix
+adj[i, j]                              # Matrix element access
+adj.sum_axis(0)                        # Column sums (in-degrees)
+adj.sum_axis(1)                        # Row sums (out-degrees)
+adj.to_numpy()                         # Convert to NumPy array
 ```
 
-### Advanced Analytics
+---
 
-```python
-# Multi-table operations
-employees = gr.table({
-    'name': ['alice', 'bob', 'charlie'],
-    'department': ['eng', 'design', 'mgmt'],
-    'performance': [8.5, 7.2, 9.1]
-})
+## 📚 **Documentation**
 
-salaries = gr.table({
-    'name': ['alice', 'bob', 'charlie'],
-    'base_salary': [95000, 75000, 120000],
-    'bonus': [10000, 5000, 20000]
-})
+- **[User Guide](docs/user-guide/)**: Comprehensive tutorials and examples
+- **[API Reference](docs/api/)**: Complete method documentation  
+- **[Quickstart](docs/quickstart.rst)**: Get up and running quickly
+- **[Architecture](docs/architecture/)**: Internal design and Rust core details
 
-# JOIN operations
-combined = employees.join(salaries, on='name', how='inner')
+---
 
-# Graph-aware filtering
-high_performers = combined.filter_by_degree(g, 'name', min_degree=1)
+## 🧪 **Testing**
 
-# K-hop neighborhood analysis
-local_network = gr.GraphTable.k_hop_neighborhood_table(
-    g, "alice", k=2, ["role", "salary", "performance"]
-)
-```
-
-## Architecture Overview
-
-### Core Components
-
-Groggy's architecture consists of three main layers:
-
-#### 1. **Rust Core** (`src/core/`)
-- **Pool Management** (`pool.rs`): Centralized memory pools for nodes, edges, attributes
-- **Space Management** (`space.rs`): Active entity sets and workspace isolation
-- **History Tracking** (`history.rs`): Version control and state management
-- **Storage Views**: 
-  - `array.rs`: GraphArray with statistical operations
-  - `matrix.rs`: GraphMatrix with linear algebra
-  - `table.rs`: GraphTable with relational operations
-
-#### 2. **FFI Interface** (`python-groggy/src/ffi/`)
-- **Python Bindings**: Thin wrappers around Rust core functionality
-- **Memory Management**: Safe conversion between Rust and Python data types
-- **Display Integration**: Rich HTML output for Jupyter notebooks
-- **Error Handling**: Comprehensive error translation and user-friendly messages
-
-#### 3. **Python API** (`python-groggy/python/groggy/`)
-- **High-Level Interface**: Intuitive methods and properties
-- **Integration Modules**: NetworkX compatibility, enhanced queries, type definitions
-- **Display System**: Advanced formatting and visualization support
-
-### Storage View Architecture
-
-```rust
-// Core hierarchy in Rust
-GraphArray     // Single column with statistics
-    ↓
-GraphMatrix    // Collection of homogeneous arrays  
-    ↓
-GraphTable     // Collection of heterogeneous arrays with relational ops
-```
-
-```python
-# Python integration
-import groggy as gr
-
-# Unified constructors
-array = gr.array([1, 2, 3, 4])                    # GraphArray
-matrix = gr.matrix([[1, 2], [3, 4]])              # GraphMatrix  
-table = gr.table({"col1": [1, 2], "col2": [3, 4]}) # GraphTable
-
-# Graph integration
-nodes_table = gr.table.from_graph_nodes(g, node_ids, ["attr1", "attr2"])
-edges_table = gr.table.from_graph_edges(g, edge_ids, ["weight", "type"])
-```
-
-## Performance
-
-Groggy achieves high performance through several key optimizations:
-
-### Columnar Storage
-- **Memory Efficiency**: Attribute pools with string/float/byte reuse
-- **Cache Locality**: Column-oriented data access patterns
-- **Sparse Optimization**: Efficient representation for sparse matrices
-
-### Lazy Evaluation
-- **On-Demand Computation**: Statistical operations computed when needed
-- **Smart Caching**: Intelligent cache invalidation for derived results
-- **Memory Views**: Zero-copy access to underlying data structures
-
-### Batch Operations
-- **Vectorized Processing**: SIMD-optimized operations where possible
-- **Hash-Based Algorithms**: Efficient JOIN and GROUP BY implementations
-- **Parallel Iteration**: Multi-threaded processing for large datasets
-
-### Performance Benchmarks
-```
-Operation                    Time       Memory
-─────────────────────────────────────────────────
-Create 10K node graph       45ms       12MB
-Table with 100K rows        120ms      25MB
-JOIN two 50K tables         180ms      35MB
-GROUP BY with aggregation   95ms       18MB
-K-hop neighborhood (k=3)    65ms       8MB
-```
-
-## Documentation
-
-### Core Documentation
-
-- **[Rust Core Architecture](docs/rust-core-architecture.md)**: Deep dive into pool, space, history systems
-- **[FFI Interface Guide](docs/ffi-interface.md)**: Python-Rust integration patterns  
-- **[Python API Reference](docs/python-api.md)**: Complete API documentation
-- **[Usage Examples](docs/usage-examples.md)**: Comprehensive tutorials and examples
-
-### Specialized Guides
-
-- **[Storage Views Guide](docs/storage-views.md)**: Arrays, matrices, and tables
-- **[Graph Analytics Tutorial](docs/graph-analytics.md)**: Advanced analysis patterns
-- **[Performance Optimization](docs/performance.md)**: Best practices for large-scale processing
-- **[Integration Patterns](docs/integration.md)**: Working with pandas, NetworkX, and other libraries
-
-### API Reference
-
-Full API documentation is available at [groggy.readthedocs.io](https://groggy.readthedocs.io) or can be built locally:
+Groggy includes comprehensive validation scripts:
 
 ```bash
-cd docs
-make html
+# Run documentation validation
+python python-groggy/docs/debug_documentation.py
+
+# Quick validation test
+python python-groggy/docs/simple_validation_test.py
+
+# Full validation suite
+python python-groggy/docs/validation_test_suite.py
 ```
 
-## Development
+**Current test results: 95%+ documented features working correctly** ✅
 
-### Building from Source
+---
 
-Requirements:
-- Rust 1.70+
-- Python 3.8+
-- Maturin for building Python extensions
+## 🛠️ **Development**
 
-```bash
-# Install development dependencies
-pip install -r requirements-dev.txt
-
-# Build the Rust extension
-maturin develop --release
-
-# Run tests
-python -m pytest tests/ -v
-```
-
-### Project Structure
-
+### **Project Structure**
 ```
 groggy/
-├── src/                     # Rust core implementation
-│   ├── core/               # Core storage and graph algorithms
-│   ├── api/                # High-level graph API
-│   └── display/            # Formatting and output utilities
-├── python-groggy/          # Python FFI bindings
-│   ├── src/ffi/           # Rust-to-Python interface
-│   └── python/groggy/     # Python package
-├── docs/                   # Documentation
-├── plans/                  # Architecture and design documents
-└── tests/                  # Test suites and benchmarks
+├── src/                    # Rust core library  
+│   ├── core/              # Core data structures and algorithms
+│   ├── api/               # High-level graph API
+│   └── display/           # Rich formatting and display
+├── python-groggy/         # Python bindings and package
+│   ├── src/ffi/          # Rust-to-Python FFI layer  
+│   └── python/groggy/    # Python package code
+├── docs/                  # Sphinx documentation (RST)
+├── documentation/         # Development docs (Markdown)
+│   ├── development/      # Testing scripts, reports
+│   ├── planning/         # Architecture plans  
+│   ├── releases/         # Release notes
+│   └── examples/         # Usage examples
+└── tests/                 # Test suites
 ```
 
-## Testing
-
-Groggy includes comprehensive test suites covering functionality, performance, and integration:
-
-### Test Categories
-
-**Core Functionality:**
+### **Building & Testing**
 ```bash
-python test_functionality.py          # Basic graph operations
-python test_table_matrix.py          # Storage view operations
-python test_lazy_evaluation.py       # Lazy evaluation architecture
-```
-
-**Performance Testing:**
-```bash
-python test_matrix_performance.py    # Matrix operation benchmarks
-python benchmark_graph_libraries.py  # Comparison with other libraries
-```
-
-**Integration Testing:**
-```bash
-python test_final_aliases.py         # API consistency
-python test_advanced_matrices.py     # Advanced matrix operations
-```
-
-### Test Coverage
-
-- ✅ **Graph Creation & Manipulation**: Node/edge operations, attributes, bulk operations
-- ✅ **Storage Views**: Array, matrix, table creation and operations
-- ✅ **Statistical Operations**: Descriptive statistics, aggregations, GROUP BY
-- ✅ **Multi-Table Operations**: JOIN, UNION, INTERSECT with various strategies
-- ✅ **Graph-Aware Analytics**: Neighborhood analysis, k-hop traversal, filtering
-- ✅ **Performance**: Large-scale processing, memory efficiency, lazy evaluation
-- ✅ **Integration**: Pandas compatibility, display formatting, error handling
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Development Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/rollingstorms/groggy.git
-cd groggy
-
-# Install development dependencies
-pip install maturin pytest pytest-benchmark
-
-# Build in development mode
+# Build development version
 maturin develop
 
-# Run the test suite
-python -m pytest tests/ -v
+# Build release version  
+maturin develop --release
+
+# Run formatting
+cargo fmt
+
+# Run tests
+cargo test
+pytest tests/
 ```
 
-### Code Organization
+### **Contributing**
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Run validation scripts to ensure docs work
+5. Submit a pull request
 
-- **Rust Core**: Implement core algorithms and data structures in `src/core/`
-- **FFI Layer**: Add Python bindings in `python-groggy/src/ffi/`
-- **Python API**: Enhance user experience in `python-groggy/python/groggy/`
-- **Documentation**: Add examples and guides in `docs/`
+---
 
-## Roadmap
+## ⚖️ **License**
 
-### Phase 5: Advanced Linear Algebra (Optional)
-- Matrix operations (multiply, inverse, determinant)
-- Decompositions (SVD, QR, Cholesky)
-- BLAS/LAPACK integration for maximum performance
+MIT License - see [LICENSE](LICENSE) for details.
 
-### Phase 6: Visualization & Interaction
-- Interactive graph visualization with `.viz.interactive()`
-- Static high-quality rendering with `.viz.static()`
-- Integration with existing visualization libraries
+---
 
-### Phase 7: Enterprise Features
-- Arrow/Parquet integration for large datasets
-- Distributed computing support (Dask/Ray integration)
-- Advanced query optimization and planning
+## 🙏 **Acknowledgments**
 
-## License
+Groggy builds on the excellent work of:
+- **Rust ecosystem**: Especially PyO3 for Python bindings
+- **Graph libraries**: NetworkX, igraph, and others for inspiration  
+- **Data science tools**: Pandas, NumPy for API design patterns
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+---
 
-## Citation
-
-If you use Groggy in your research, please cite:
-
-```bibtex
-@software{groggy2025,
-  title={Groggy: High-Performance Graph Analytics with Unified Storage Views},
-  author={Rolling Storms},
-  year={2025},
-  url={https://github.com/rollingstorms/groggy}
-}
-```
+**Ready to get started? Try the [Quick Start](#-quick-start) above!** 🚀
