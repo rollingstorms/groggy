@@ -43,8 +43,8 @@ Adding Nodes
 
    .. code-block:: python
 
-      g.add_node("alice", age=30, role="engineer")
-      g.add_node(1, name="Node 1", active=True)
+      alice = g.add_node(name="Alice", age=30, role="engineer")
+      node1 = g.add_node(name="Node 1", active=True)
 
 .. method:: Graph.add_nodes(nodes)
 
@@ -58,10 +58,10 @@ Adding Nodes
    .. code-block:: python
 
       nodes = [
-          {'id': 'alice', 'age': 30, 'role': 'engineer'},
-          {'id': 'bob', 'age': 25, 'role': 'designer'}
+          {'name': 'Alice', 'age': 30, 'role': 'engineer'},
+          {'name': 'Bob', 'age': 25, 'role': 'designer'}
       ]
-      g.add_nodes(nodes)
+      node_ids = g.add_nodes(nodes)  # Returns list of node IDs
 
 Querying Nodes
 ~~~~~~~~~~~~~~
@@ -75,16 +75,6 @@ Querying Nodes
    :returns: True if node exists, False otherwise
    :rtype: bool
 
-.. method:: Graph.get_node(node_id)
-
-   Get node attributes.
-
-   :param node_id: Node ID
-   :type node_id: str or int
-   :returns: Dictionary of node attributes
-   :rtype: dict
-   :raises KeyError: If node doesn't exist
-
 .. method:: Graph.node_count()
 
    Get the number of nodes in the graph.
@@ -92,24 +82,22 @@ Querying Nodes
    :returns: Number of nodes
    :rtype: int
 
+   **Note:** To access node attributes, use ``g.nodes[node_id]`` instead of ``get_node()``.
+
 Modifying Nodes
 ~~~~~~~~~~~~~~~
 
-.. method:: Graph.update_node(node_id, attributes)
+.. method:: Graph.set_node_attribute(node_id, name, value)
 
-   Update node attributes.
+   Set a single node attribute.
 
    :param node_id: Node ID
-   :type node_id: str or int
-   :param dict attributes: Dictionary of attributes to update
+   :type node_id: str or int  
+   :param str name: Attribute name
+   :param value: Attribute value
    :raises KeyError: If node doesn't exist
 
-.. method:: Graph.update_nodes(updates)
-
-   Update multiple nodes efficiently.
-
-   :param dict updates: Dictionary mapping node_id -> attributes
-   :raises KeyError: If any node doesn't exist
+   **Note:** For batch updates, use ``g.set_node_attributes()`` instead of ``update_node()``.
 
 .. method:: Graph.remove_node(node_id)
 
@@ -147,7 +135,7 @@ Adding Edges
 
    .. code-block:: python
 
-      g.add_edge("alice", "bob", weight=0.8, relationship="friend")
+      g.add_edge(alice, bob, weight=0.8, relationship="friend")
 
 .. method:: Graph.add_edges(edges)
 
@@ -161,8 +149,8 @@ Adding Edges
    .. code-block:: python
 
       edges = [
-          {'source': 'alice', 'target': 'bob', 'weight': 0.8},
-          {'source': 'bob', 'target': 'charlie', 'weight': 0.6}
+          (alice, bob, {'weight': 0.8}),
+          (bob, charlie, {'weight': 0.6})
       ]
       g.add_edges(edges)
 
@@ -180,18 +168,6 @@ Querying Edges
    :returns: True if edge exists, False otherwise
    :rtype: bool
 
-.. method:: Graph.get_edge(source, target)
-
-   Get edge attributes.
-
-   :param source: Source node ID
-   :type source: str or int
-   :param target: Target node ID
-   :type target: str or int
-   :returns: Dictionary of edge attributes
-   :rtype: dict
-   :raises KeyError: If edge doesn't exist
-
 .. method:: Graph.edge_count()
 
    Get the number of edges in the graph.
@@ -199,18 +175,21 @@ Querying Edges
    :returns: Number of edges
    :rtype: int
 
+   **Note:** To access edge attributes, use the edges table: ``g.edges.table()``
+
 Modifying Edges
 ~~~~~~~~~~~~~~~
 
-.. method:: Graph.update_edge(source, target, attributes)
+.. method:: Graph.set_edge_attribute(source, target, name, value)
 
-   Update edge attributes.
+   Set a single edge attribute.
 
    :param source: Source node ID
    :type source: str or int
-   :param target: Target node ID
+   :param target: Target node ID  
    :type target: str or int
-   :param dict attributes: Dictionary of attributes to update
+   :param str name: Attribute name
+   :param value: Attribute value
    :raises KeyError: If edge doesn't exist
 
 .. method:: Graph.remove_edge(source, target)
@@ -529,43 +508,31 @@ Connectivity Analysis
       largest = max(components, key=lambda c: len(c.node_ids))
       print(f"Largest component: {len(largest.node_ids)} nodes")
 
-Analytics Modules
------------------
+Analytics Module
+----------------
 
-.. attribute:: Graph.centrality
+.. attribute:: Graph.analytics
 
-   Access to centrality algorithms.
+   Access to basic graph algorithms and analysis functions.
 
-   **Methods:**
+   **Available Methods:**
 
-   - ``betweenness()`` - Betweenness centrality
-   - ``closeness()`` - Closeness centrality  
-   - ``pagerank(alpha=0.85)`` - PageRank algorithm
-   - ``eigenvector()`` - Eigenvector centrality
-
-   **Example:**
-
-   .. code-block:: python
-
-      betweenness = g.centrality.betweenness()
-      pagerank = g.centrality.pagerank(alpha=0.85)
-
-.. attribute:: Graph.communities
-
-   Access to community detection algorithms.
-
-   **Methods:**
-
-   - ``louvain(resolution=1.0)`` - Louvain algorithm
-   - ``leiden(resolution=1.0)`` - Leiden algorithm
-   - ``modularity(communities)`` - Calculate modularity
+   - ``connected_components()`` - Find connected components
+   - ``shortest_path(source, target)`` - Find shortest path between nodes
+   - ``has_path(source, target)`` - Check if path exists
+   - ``bfs(start_node)`` - Breadth-first search traversal
+   - ``dfs(start_node)`` - Depth-first search traversal
 
    **Example:**
 
    .. code-block:: python
 
-      communities = g.communities.louvain()
-      modularity = g.communities.modularity(communities)
+      components = g.analytics.connected_components()
+      path = g.analytics.shortest_path(node1, node2)
+
+   .. note::
+      Advanced centrality measures and community detection algorithms 
+      will be available in future releases.
 
 Utility Methods
 ---------------

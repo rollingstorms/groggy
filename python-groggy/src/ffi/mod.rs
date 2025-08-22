@@ -1,12 +1,12 @@
 //! FFI Module Coordinator
-//! 
+//!
 //! This module coordinates all FFI submodules that provide Python bindings
 //! for the Groggy graph library components.
 
 // Core type wrappers and utilities
-pub mod types;
 pub mod config;
 pub mod errors;
+pub mod types;
 
 // Move existing utils here
 pub mod utils;
@@ -21,6 +21,6 @@ pub mod api;
 pub mod display;
 
 // Re-export commonly used FFI types
-pub use types::*;
 pub use errors::*;
+pub use types::*;
 pub use utils::*;

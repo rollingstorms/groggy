@@ -1,11 +1,11 @@
 //! History FFI Bindings
-//! 
+//!
 //! Python bindings for version control and history operations.
 
-use pyo3::prelude::*;
-use groggy::{NodeId, EdgeId, StateId};
 use groggy::core::history::{Commit, HistoryStatistics};
 use groggy::core::ref_manager::BranchInfo;
+use groggy::{EdgeId, NodeId, StateId};
+use pyo3::prelude::*;
 
 /// Python wrapper for Commit
 #[pyclass(name = "Commit")]
@@ -20,38 +20,40 @@ impl PyCommit {
     fn id(&self) -> StateId {
         self.inner.id
     }
-    
+
     #[getter]
     fn parents(&self) -> Vec<StateId> {
         self.inner.parents.clone()
     }
-    
+
     #[getter]
     fn message(&self) -> String {
         self.inner.message.clone()
     }
-    
+
     #[getter]
     fn author(&self) -> String {
         self.inner.author.clone()
     }
-    
+
     #[getter]
     fn timestamp(&self) -> u64 {
         self.inner.timestamp
     }
-    
+
     fn is_root(&self) -> bool {
         self.inner.is_root()
     }
-    
+
     fn is_merge(&self) -> bool {
         self.inner.is_merge()
     }
-    
+
     fn __repr__(&self) -> String {
-        format!("Commit(id={}, message='{}', author='{}')", 
-                self.inner.id, self.inner.message, self.inner.author)
+        format!(
+            "Commit(id={}, message='{}', author='{}')",
+            self.inner.id, self.inner.message, self.inner.author
+        )
     }
 }
 
@@ -68,25 +70,27 @@ impl PyBranchInfo {
     fn name(&self) -> String {
         self.inner.name.clone()
     }
-    
+
     #[getter]
     fn head(&self) -> StateId {
         self.inner.head
     }
-    
+
     #[getter]
     fn is_default(&self) -> bool {
         self.inner.is_default
     }
-    
+
     #[getter]
     fn is_current(&self) -> bool {
         self.inner.is_current
     }
-    
+
     fn __repr__(&self) -> String {
-        format!("BranchInfo(name='{}', head={})", 
-                self.inner.name, self.inner.head)
+        format!(
+            "BranchInfo(name='{}', head={})",
+            self.inner.name, self.inner.head
+        )
     }
 }
 
@@ -103,35 +107,37 @@ impl PyHistoryStatistics {
     fn total_commits(&self) -> usize {
         self.inner.total_commits
     }
-    
+
     #[getter]
     fn total_branches(&self) -> usize {
         self.inner.total_branches
     }
-    
+
     #[getter]
     fn total_tags(&self) -> usize {
         self.inner.total_tags
     }
-    
+
     #[getter]
     fn storage_efficiency(&self) -> f64 {
         self.inner.storage_efficiency
     }
-    
+
     #[getter]
     fn oldest_commit_age(&self) -> u64 {
         self.inner.oldest_commit_age
     }
-    
+
     #[getter]
     fn newest_commit_age(&self) -> u64 {
         self.inner.newest_commit_age
     }
-    
+
     fn __repr__(&self) -> String {
-        format!("HistoryStatistics(commits={}, branches={}, efficiency={:.2})", 
-                self.inner.total_commits, self.inner.total_branches, self.inner.storage_efficiency)
+        format!(
+            "HistoryStatistics(commits={}, branches={}, efficiency={:.2})",
+            self.inner.total_commits, self.inner.total_branches, self.inner.storage_efficiency
+        )
     }
 }
 
@@ -150,7 +156,7 @@ impl PyHistoricalView {
     fn state_id(&self) -> StateId {
         self.state_id
     }
-    
+
     /// Get nodes from this historical state
     /// Note: This is a simplified implementation. In practice, you'd need
     /// access to the graph to reconstruct the state.
@@ -158,13 +164,13 @@ impl PyHistoricalView {
         // Placeholder - in real implementation, would query graph state
         Ok(Vec::new())
     }
-    
+
     /// Get edges from this historical state
     fn get_edge_ids(&self) -> PyResult<Vec<EdgeId>> {
         // Placeholder - in real implementation, would query graph state
         Ok(Vec::new())
     }
-    
+
     fn __repr__(&self) -> String {
         format!("HistoricalView(state_id={})", self.state_id)
     }

@@ -17,12 +17,12 @@ Connectivity Analysis
    # ... build your graph ...
 
    # Find connected components
-   components = g.connected_components()
+   components = g.analytics.connected_components()
    print(f"Number of components: {len(components)}")
 
    # Get the largest component
-   largest = max(components, key=lambda c: len(c.node_ids))
-   print(f"Largest component: {len(largest.node_ids)} nodes")
+   largest = max(components, key=lambda c: len(c))
+   print(f"Largest component: {len(largest)} nodes")
 
    # Check if graph is connected
    is_connected = g.is_connected()
@@ -33,20 +33,21 @@ Path Finding
 
 .. code-block:: python
 
-   # Find shortest path between nodes
+   # Find shortest path between nodes (using node IDs)
+   # Assuming alice and bob are node IDs from previous examples
    try:
-       path = g.shortest_path("alice", "bob")
-       print(f"Shortest path: {' -> '.join(path)}")
+       path = g.analytics.shortest_path(alice, bob)
+       print(f"Shortest path: {path}")
        print(f"Path length: {len(path) - 1}")
    except ValueError:
-       print("No path exists between alice and bob")
+       print("No path exists between nodes")
 
    # Check if path exists
-   has_path = g.has_path("alice", "bob")
+   has_path = g.analytics.has_path(alice, bob)
+   print(f"Path exists: {has_path}")
 
-   # Find all simple paths (limited length)
-   all_paths = g.all_simple_paths("alice", "bob", max_length=5)
-   print(f"Found {len(all_paths)} simple paths")
+   # Note: all_simple_paths not available in current implementation
+   # Will be added in future releases
 
 Graph Traversal
 ~~~~~~~~~~~~~~~
@@ -54,422 +55,493 @@ Graph Traversal
 .. code-block:: python
 
    # Breadth-first search
-   bfs_order = g.bfs(start_node="alice")
+   bfs_order = g.analytics.bfs(alice)
    print(f"BFS traversal: {bfs_order}")
 
    # Depth-first search  
-   dfs_order = g.dfs(start_node="alice")
+   dfs_order = g.analytics.dfs(alice)
    print(f"DFS traversal: {dfs_order}")
 
-   # Custom traversal with visitor pattern
-   visited_nodes = []
-   def visitor(node_id):
-       visited_nodes.append(node_id)
-       return True  # Continue traversal
+   # Note: Custom visitor patterns not available in current implementation
+   # Basic traversal orders are returned as lists
 
-   g.bfs(start_node="alice", visitor=visitor)
+Basic Network Analysis
+----------------------
 
-Centrality Measures
--------------------
+The current release focuses on fundamental graph operations. Advanced centrality measures will be added in future releases.
 
-Centrality measures identify the most important or influential nodes in a network.
-
-Degree Centrality
-~~~~~~~~~~~~~~~~~
+Degree Analysis
+~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # Basic degree centrality
+   # Basic degree centrality (available now)
    degrees = g.degree()
+   print(f"Node degrees: {degrees}")
    
    # Normalize by maximum possible degree
    n = g.node_count()
-   normalized_degrees = {node: deg/(n-1) for node, deg in degrees.items()}
+   if isinstance(degrees, dict):
+       normalized_degrees = {node: deg/(n-1) for node, deg in degrees.items()}
+   else:
+       # degrees is a list/array
+       max_possible = n - 1
+       normalized_degrees = [deg/max_possible for deg in degrees]
 
    # For directed graphs
-   if g.directed:
+   if g.is_directed:
        in_degrees = g.in_degree()
        out_degrees = g.out_degree()
+       print(f"In-degrees: {in_degrees}")
+       print(f"Out-degrees: {out_degrees}")
 
-Betweenness Centrality
-~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   # Calculate betweenness centrality
-   betweenness = g.centrality.betweenness()
-   
-   # Find most central nodes
-   sorted_nodes = sorted(betweenness.items(), key=lambda x: x[1], reverse=True)
-   print("Most central nodes (betweenness):")
-   for node, centrality in sorted_nodes[:5]:
-       print(f"  {node}: {centrality:.3f}")
-
-Closeness Centrality
-~~~~~~~~~~~~~~~~~~~~
+Node Importance by Degree
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # Calculate closeness centrality
-   closeness = g.centrality.closeness()
+   # Identify highly connected nodes
+   degrees = g.degree()
    
-   # Analyze results
-   max_closeness = max(closeness.values())
-   most_central = [node for node, c in closeness.items() if c == max_closeness]
-   print(f"Most central nodes (closeness): {most_central}")
+   # Get nodes table for analysis
+   nodes_table = g.nodes.table()
+   
+   # Combine with degree information
+   degree_analysis = []
+   for i, degree in enumerate(degrees):
+       if i < len(nodes_table):
+           node_data = nodes_table[i].to_dict() if hasattr(nodes_table[i], 'to_dict') else dict(nodes_table[i])
+           node_data['degree'] = degree
+           node_data['node_id'] = i
+           degree_analysis.append(node_data)
+   
+   # Create analysis table
+   degree_table = gr.table(degree_analysis)
+   
+   # Sort by degree to find most connected nodes
+   top_nodes = degree_table.sort_by('degree', ascending=False)
+   print("Most connected nodes:")
+   print(top_nodes.head())
 
-PageRank
-~~~~~~~~
+Advanced Centrality Measures
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. note::
+   Advanced centrality measures (betweenness, PageRank, eigenvector centrality) 
+   will be available in the next major release as part of the analytics module expansion.
+
+Connected Components Analysis
+------------------------------
+
+The current release provides connected component analysis. Advanced community detection algorithms will be added in future releases.
+
+Component Detection
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # Calculate PageRank
-   pagerank = g.centrality.pagerank(alpha=0.85, max_iter=100, tolerance=1e-6)
+   # Find connected components (basic clustering)
+   components = g.analytics.connected_components()
    
-   # Find top-ranked nodes
-   top_nodes = sorted(pagerank.items(), key=lambda x: x[1], reverse=True)[:10]
-   print("Top PageRank nodes:")
-   for node, score in top_nodes:
-       print(f"  {node}: {score:.4f}")
-
-Eigenvector Centrality
-~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   # Calculate eigenvector centrality
-   eigenvector = g.centrality.eigenvector(max_iter=100, tolerance=1e-6)
-   
-   # Compare with other centrality measures
-   import pandas as pd
-   centrality_df = pd.DataFrame({
-       'betweenness': betweenness,
-       'closeness': closeness,
-       'pagerank': pagerank,
-       'eigenvector': eigenvector
-   })
-   
-   print(centrality_df.corr())
-
-Community Detection
--------------------
-
-Community detection algorithms identify groups of densely connected nodes.
-
-Louvain Algorithm
-~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   # Find communities using Louvain algorithm
-   communities = g.communities.louvain(resolution=1.0)
-   
-   print(f"Found {len(communities)} communities")
-   for i, community in enumerate(communities):
-       print(f"Community {i}: {len(community)} nodes")
+   print(f"Found {len(components)} connected components")
+   for i, component in enumerate(components):
+       print(f"Component {i}: {len(component)} nodes")
        
-   # Analyze community sizes
-   sizes = [len(community) for community in communities]
-   print(f"Average community size: {sum(sizes) / len(sizes):.1f}")
-   print(f"Largest community: {max(sizes)} nodes")
+   # Analyze component sizes
+   sizes = [len(component) for component in components]
+   if sizes:
+       print(f"Average component size: {sum(sizes) / len(sizes):.1f}")
+       print(f"Largest component: {max(sizes)} nodes")
 
-Modularity
-~~~~~~~~~~
-
-.. code-block:: python
-
-   # Calculate modularity of detected communities
-   modularity = g.communities.modularity(communities)
-   print(f"Modularity: {modularity:.3f}")
-   
-   # Compare different resolutions
-   resolutions = [0.5, 1.0, 1.5, 2.0]
-   for res in resolutions:
-       comms = g.communities.louvain(resolution=res)
-       mod = g.communities.modularity(comms)
-       print(f"Resolution {res}: {len(comms)} communities, modularity {mod:.3f}")
-
-Leiden Algorithm
-~~~~~~~~~~~~~~~~
+Component Analysis
+~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # Use Leiden algorithm for higher quality communities
-   leiden_communities = g.communities.leiden(resolution=1.0)
-   leiden_modularity = g.communities.modularity(leiden_communities)
-   
-   print(f"Leiden: {len(leiden_communities)} communities, modularity {leiden_modularity:.3f}")
+   # Analyze the largest component
+   if components:
+       largest_component = max(components, key=lambda c: len(c))
+       
+       # Create subgraph of largest component
+       largest_subgraph = g.subgraph(largest_component)
+       
+       # Analyze the largest component
+       print(f"Largest component analysis:")
+       print(f"  Nodes: {largest_subgraph.node_count()}")
+       print(f"  Edges: {largest_subgraph.edge_count()}")
+       print(f"  Density: {largest_subgraph.density():.3f}")
 
-Network Properties
-------------------
+Advanced Community Detection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Density and Clustering
-~~~~~~~~~~~~~~~~~~~~~~~
+.. note::
+   Advanced community detection algorithms (Louvain, Leiden, modularity optimization) 
+   will be available in the next major release.
 
-.. code-block:: python
+Basic Network Properties
+------------------------
 
-   # Graph density
-   density = g.density()
-   print(f"Graph density: {density:.3f}")
-   
-   # Clustering coefficient
-   clustering = g.clustering()
-   print(f"Average clustering: {clustering:.3f}")
-   
-   # Local clustering for each node
-   local_clustering = g.local_clustering()
-   high_clustering = {node: c for node, c in local_clustering.items() if c > 0.5}
+The current release provides fundamental network properties. Advanced metrics will be available in future releases.
 
-Assortativity
+Graph Density
 ~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # Degree assortativity
-   degree_assortativity = g.assortativity.degree()
-   print(f"Degree assortativity: {degree_assortativity:.3f}")
+   # Graph density (available now)
+   density = g.density()
+   print(f"Graph density: {density:.3f}")
    
-   # Attribute assortativity
-   if 'department' in g.nodes.table().columns:
-       dept_assortativity = g.assortativity.attribute('department')
-       print(f"Department assortativity: {dept_assortativity:.3f}")
+   # Basic connectivity
+   is_connected = g.is_connected()
+   print(f"Graph is connected: {is_connected}")
+   
+   # Size information
+   print(f"Nodes: {g.node_count()}")
+   print(f"Edges: {g.edge_count()}")
 
-Diameter and Paths
-~~~~~~~~~~~~~~~~~~
+Degree Distribution Analysis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # Graph diameter (longest shortest path)
-   try:
-       diameter = g.diameter()
-       print(f"Graph diameter: {diameter}")
-   except ValueError:
-       print("Graph is not connected - no diameter")
+   # Analyze degree distribution
+   degrees = g.degree()
+   
+   if degrees:
+       if isinstance(degrees, dict):
+           degree_values = list(degrees.values())
+       else:
+           degree_values = degrees
+           
+       avg_degree = sum(degree_values) / len(degree_values)
+       max_degree = max(degree_values)
+       min_degree = min(degree_values)
        
-   # Average path length
-   avg_path_length = g.average_path_length()
-   print(f"Average path length: {avg_path_length:.2f}")
+       print(f"Average degree: {avg_degree:.2f}")
+       print(f"Degree range: {min_degree} - {max_degree}")
 
-Structural Analysis
--------------------
-
-Bridges and Articulation Points
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Path Analysis
+~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # Find bridges (edges whose removal increases components)
-   bridges = g.bridges()
-   print(f"Number of bridges: {len(bridges)}")
-   
-   # Find articulation points (nodes whose removal increases components)
-   articulation_points = g.articulation_points()
-   print(f"Number of articulation points: {len(articulation_points)}")
+   # Basic path analysis (for connected graphs)
+   if g.is_connected():
+       # Sample path analysis between two nodes
+       nodes_table = g.nodes.table()
+       if len(nodes_table) >= 2:
+           # Get first two node IDs
+           node1 = 0 if 0 < g.node_count() else None
+           node2 = 1 if 1 < g.node_count() else None
+           
+           if node1 is not None and node2 is not None:
+               try:
+                   path = g.analytics.shortest_path(node1, node2)
+                   print(f"Sample shortest path length: {len(path) - 1}")
+               except:
+                   print("Could not compute sample path")
 
-Core Decomposition
-~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   # K-core decomposition
-   k_cores = g.k_core_decomposition()
-   max_k = max(k_cores.values())
-   print(f"Maximum k-core: {max_k}")
-   
-   # Nodes in the main core
-   main_core_nodes = [node for node, k in k_cores.items() if k == max_k]
-   print(f"Main core size: {len(main_core_nodes)}")
-
-Motif Analysis
-~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   # Count triangles
-   triangles = g.triangles()
-   print(f"Number of triangles: {triangles}")
-   
-   # Triangle participation per node
-   triangle_participation = g.triangle_participation()
-   high_participation = {node: t for node, t in triangle_participation.items() if t > 5}
-
-Advanced Analytics
-------------------
-
-Multi-Layer Analysis
-~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   # Analyze graph at different scales
-   # 1. Node level
-   node_metrics = {
-       'degree': g.degree(),
-       'clustering': g.local_clustering(),
-       'betweenness': g.centrality.betweenness()
-   }
-   
-   # 2. Community level
-   communities = g.communities.louvain()
-   community_sizes = [len(c) for c in communities]
-   
-   # 3. Global level
-   global_metrics = {
-       'density': g.density(),
-       'clustering': g.clustering(),
-       'modularity': g.communities.modularity(communities)
-   }
-
-Temporal Analysis
-~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   # If your graph has temporal information
-   if 'timestamp' in g.edges.table().columns:
-       # Analyze edge creation over time
-       edges_table = g.edges.table()
-       
-       # Group by time periods
-       temporal_analysis = edges_table.group_by('timestamp').agg({
-           'weight': ['mean', 'count'],
-           'source': 'nunique',
-           'target': 'nunique'
-       })
-       
-       print("Temporal edge patterns:")
-       print(temporal_analysis)
-
-Similarity and Recommendation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   # Node similarity based on common neighbors
-   def jaccard_similarity(g, node1, node2):
-       neighbors1 = set(g.neighbors(node1))
-       neighbors2 = set(g.neighbors(node2))
-       
-       intersection = len(neighbors1 & neighbors2)
-       union = len(neighbors1 | neighbors2)
-       
-       return intersection / union if union > 0 else 0
-
-   # Find similar nodes to Alice
-   alice_similarities = {}
-   for node in g.nodes:
-       if node != 'alice':
-           sim = jaccard_similarity(g, 'alice', node)
-           if sim > 0:
-               alice_similarities[node] = sim
-   
-   # Top similar nodes
-   similar = sorted(alice_similarities.items(), key=lambda x: x[1], reverse=True)[:5]
-
-Integration with Storage Views
-------------------------------
-
-Combining Graph Algorithms with Tabular Analysis
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   # Calculate centrality measures
-   betweenness = g.centrality.betweenness()
-   pagerank = g.centrality.pagerank()
-   
-   # Create analysis table
-   nodes_table = g.nodes.table()
-   
-   # Add centrality as new columns
-   centrality_data = []
-   for node_id in nodes_table['node_id']:
-       centrality_data.append({
-           'node_id': node_id,
-           'betweenness': betweenness.get(node_id, 0),
-           'pagerank': pagerank.get(node_id, 0)
-       })
-   
-   centrality_table = gr.table(centrality_data)
-   
-   # Join with node attributes
-   enriched = nodes_table.join(centrality_table, on='node_id')
-
-Community-Based Analysis
+Advanced Network Metrics
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: python
+.. note::
+   Advanced network metrics (clustering coefficients, assortativity, diameter) 
+   will be available in the next major release.
 
-   # Detect communities
-   communities = g.communities.louvain()
-   
-   # Create community membership table
-   membership_data = []
-   for i, community in enumerate(communities):
-       for node in community:
-           membership_data.append({'node_id': node, 'community': i})
-   
-   membership_table = gr.table(membership_data)
-   
-   # Analyze communities with node attributes
-   community_analysis = enriched.join(membership_table, on='node_id')
-   
-   # Group by community and analyze
-   community_stats = community_analysis.group_by('community').agg({
-       'age': ['mean', 'std'],
-       'department': 'nunique',
-       'betweenness': 'mean',
-       'pagerank': 'mean'
-   })
-
-Visualization Integration
--------------------------
-
-Preparing Data for Visualization
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   # Prepare node data for visualization
-   viz_nodes = enriched.to_pandas()
-   
-   # Prepare edge data
-   edges_table = g.edges.table()
-   viz_edges = edges_table.to_pandas()
-   
-   # Export for external visualization tools
-   viz_nodes.to_csv('nodes_for_viz.csv', index=False)
-   viz_edges.to_csv('edges_for_viz.csv', index=False)
-
-Performance Optimization
+Practical Graph Analysis
 ------------------------
 
-Large Graph Analysis
-~~~~~~~~~~~~~~~~~~~~
+Working with Real Networks
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # For very large graphs, process in chunks
-   if g.node_count() > 100000:
-       # Sample for exploratory analysis
-       sample_nodes = g.nodes.sample(10000)
-       sample_subgraph = g.subgraph(sample_nodes)
+   # Comprehensive graph analysis workflow
+   def analyze_graph(g):
+       """Basic analysis of graph structure"""
        
-       # Run algorithms on sample
-       sample_communities = sample_subgraph.communities.louvain()
+       print("=== Graph Overview ===")
+       print(f"Nodes: {g.node_count()}")
+       print(f"Edges: {g.edge_count()}")
+       print(f"Directed: {g.is_directed}")
+       print(f"Density: {g.density():.4f}")
+       print(f"Connected: {g.is_connected()}")
        
-       # Use results to guide full analysis
+       print("\n=== Connectivity Analysis ===")
+       components = g.analytics.connected_components()
+       print(f"Connected components: {len(components)}")
        
-   # Use approximation algorithms for very large graphs
-   approx_betweenness = g.centrality.betweenness_approximate(k=1000)
+       if components:
+           component_sizes = [len(comp) for comp in components]
+           print(f"Largest component: {max(component_sizes)} nodes")
+           print(f"Average component size: {sum(component_sizes)/len(component_sizes):.1f}")
+       
+       print("\n=== Degree Analysis ===")
+       degrees = g.degree()
+       if degrees:
+           if isinstance(degrees, dict):
+               degree_vals = list(degrees.values())
+           else:
+               degree_vals = degrees
+           
+           print(f"Average degree: {sum(degree_vals)/len(degree_vals):.2f}")
+           print(f"Max degree: {max(degree_vals)}")
+           print(f"Min degree: {min(degree_vals)}")
+       
+       return {
+           'nodes': g.node_count(),
+           'edges': g.edge_count(),
+           'density': g.density(),
+           'connected': g.is_connected(),
+           'components': len(components) if components else 0
+       }
+   
+   # Run analysis
+   results = analyze_graph(g)
 
-Best Practices
---------------
+Advanced Structural Analysis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. **Start Simple**: Begin with basic measures (degree, clustering) before advanced algorithms
-2. **Validate Results**: Check if algorithmic results make sense for your domain
-3. **Combine Measures**: Use multiple centrality measures for robust identification of important nodes
-4. **Consider Scale**: Choose algorithms appropriate for your graph size
-5. **Iterate**: Use initial results to refine analysis and ask better questions
+.. note::
+   Advanced structural analysis (bridges, articulation points, k-core decomposition, 
+   motif analysis) will be available in the next major release.
 
-The analytics capabilities in Groggy provide powerful tools for understanding network structure. Next, explore :doc:`performance` for optimization techniques and :doc:`integration` for working with other libraries.
+Data Integration and Analysis
+-----------------------------
+
+Combining Graph and Table Operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+   # Leverage Groggy's unified storage views
+   # 1. Node-level analysis
+   node_metrics = []
+   degrees = g.degree()
+   nodes_table = g.nodes.table()
+   
+   for i, degree in enumerate(degrees):
+       if i < len(nodes_table):
+           node_data = nodes_table[i].to_dict() if hasattr(nodes_table[i], 'to_dict') else dict(nodes_table[i])
+           node_data['degree'] = degree
+           node_data['node_id'] = i
+           node_metrics.append(node_data)
+   
+   # Create analysis table
+   analysis_table = gr.table(node_metrics)
+   
+   # 2. Component-level analysis
+   components = g.analytics.connected_components()
+   component_info = [{'component_id': i, 'size': len(comp)} for i, comp in enumerate(components)]
+   component_table = gr.table(component_info)
+   
+   # 3. Global-level metrics
+   global_metrics = {
+       'density': g.density(),
+       'node_count': g.node_count(),
+       'edge_count': g.edge_count(),
+       'component_count': len(components),
+       'is_connected': g.is_connected()
+   }
+
+Working with Edge Attributes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+   # Analyze edge attributes if available
+   edges_table = g.edges.table()
+   print(f"Edge table columns: {edges_table.columns}")
+   
+   # Example: analyze edge weights if they exist
+   if 'weight' in edges_table.columns:
+       weights = edges_table['weight']
+       print(f"Average edge weight: {weights.mean():.3f}")
+       print(f"Weight range: {weights.min():.3f} - {weights.max():.3f}")
+   
+   # Example: analyze edge types if they exist
+   if 'type' in edges_table.columns:
+       edge_types = edges_table['type'].value_counts()
+       print("Edge type distribution:")
+       for edge_type, count in edge_types.items():
+           print(f"  {edge_type}: {count}")
+
+Node Similarity Analysis
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+   # Simple node similarity based on common neighbors
+   def jaccard_similarity(g, node1, node2):
+       """Calculate Jaccard similarity between two nodes"""
+       try:
+           neighbors1 = set(g.neighbors(node1))
+           neighbors2 = set(g.neighbors(node2))
+           
+           intersection = len(neighbors1 & neighbors2)
+           union = len(neighbors1 | neighbors2)
+           
+           return intersection / union if union > 0 else 0
+       except:
+           return 0
+
+   # Example: find similar nodes
+   if g.node_count() >= 2:
+       node1, node2 = 0, 1  # First two nodes
+       similarity = jaccard_similarity(g, node1, node2)
+       print(f"Similarity between nodes {node1} and {node2}: {similarity:.3f}")
+
+Working with Storage Views
+--------------------------
+
+Combining Graph and Table Analysis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+   # Groggy's strength: seamless graph-table integration
+   
+   # 1. Start with graph analysis
+   degrees = g.degree()
+   components = g.analytics.connected_components()
+   
+   # 2. Get tabular view of nodes
+   nodes_table = g.nodes.table()
+   
+   # 3. Enrich with graph metrics
+   enriched_data = []
+   for i, degree in enumerate(degrees):
+       if i < len(nodes_table):
+           node_data = nodes_table[i].to_dict() if hasattr(nodes_table[i], 'to_dict') else dict(nodes_table[i])
+           node_data['degree'] = degree
+           
+           # Add component membership
+           for comp_id, component in enumerate(components):
+               if i in component:
+                   node_data['component'] = comp_id
+                   break
+           else:
+               node_data['component'] = -1  # Isolated node
+           
+           enriched_data.append(node_data)
+   
+   # 4. Create enriched analysis table
+   enriched_table = gr.table(enriched_data)
+   
+   # 5. Perform tabular analysis
+   print("Analysis by component:")
+   for comp_id in set(item['component'] for item in enriched_data):
+       comp_nodes = [item for item in enriched_data if item['component'] == comp_id]
+       if comp_nodes:
+           avg_degree = sum(node['degree'] for node in comp_nodes) / len(comp_nodes)
+           print(f"  Component {comp_id}: {len(comp_nodes)} nodes, avg degree {avg_degree:.2f}")
+
+Export for External Analysis
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+   # Prepare data for external tools
+   
+   # Export node data with graph metrics
+   export_data = []
+   degrees = g.degree()
+   nodes_table = g.nodes.table()
+   
+   for i, degree in enumerate(degrees):
+       if i < len(nodes_table):
+           node_data = nodes_table[i].to_dict() if hasattr(nodes_table[i], 'to_dict') else dict(nodes_table[i])
+           node_data.update({
+               'node_id': i,
+               'degree': degree,
+               'graph_density': g.density(),
+               'total_nodes': g.node_count(),
+               'total_edges': g.edge_count()
+           })
+           export_data.append(node_data)
+   
+   # Create export table
+   export_table = gr.table(export_data)
+   
+   # Can convert to pandas for external analysis
+   # pandas_df = export_table.to_pandas()
+   
+   print(f"Export table ready with {len(export_table)} rows")
+
+Next Steps and Future Features
+-----------------------------
+
+Current Capabilities Summary
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The current release provides a solid foundation for graph analysis:
+
+- **Core Graph Operations**: Node/edge management, filtering, subgraphs
+- **Basic Analytics**: Connectivity, components, degree analysis, shortest paths
+- **Storage Views**: Seamless graph-table integration
+- **Data Export**: NetworkX compatibility, table exports
+
+Roadmap for Advanced Analytics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Future releases will include:
+
+- **Advanced Centrality**: Betweenness, PageRank, eigenvector centrality
+- **Community Detection**: Louvain, Leiden algorithms with modularity optimization
+- **Network Metrics**: Clustering coefficients, assortativity, diameter calculations
+- **Structural Analysis**: Bridges, articulation points, k-core decomposition
+- **Visualization Engine**: Built-in graph visualization and plotting
+- **Linear Algebra Module**: Advanced matrix operations for graph algorithms
+
+Best Practices for Current Release
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+1. **Leverage Storage Views**: Use graph-table integration for analysis workflows
+2. **Start with Basics**: Degree analysis and connectivity provide rich insights
+3. **Use Filtering**: Create focused subgraphs for detailed analysis  
+4. **Export When Needed**: Use NetworkX integration for advanced algorithms
+5. **Build Incrementally**: Combine basic operations for complex analysis
+
+Example Complete Workflow
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+   # Complete analysis workflow with current capabilities
+   def complete_graph_analysis(g):
+       """Comprehensive analysis using available features"""
+       
+       print("=== GRAPH ANALYSIS REPORT ===")
+       
+       # Basic properties
+       print(f"Nodes: {g.node_count()}, Edges: {g.edge_count()}")
+       print(f"Density: {g.density():.4f}")
+       print(f"Directed: {g.is_directed}")
+       
+       # Connectivity
+       print(f"Connected: {g.is_connected()}")
+       components = g.analytics.connected_components()
+       print(f"Components: {len(components)}")
+       
+       # Degree analysis
+       degrees = g.degree()
+       if degrees:
+           degree_vals = degrees if not isinstance(degrees, dict) else list(degrees.values())
+           print(f"Avg degree: {sum(degree_vals)/len(degree_vals):.2f}")
+           print(f"Max degree: {max(degree_vals)}")
+       
+       # Create analysis table
+       nodes_table = g.nodes.table()
+       enriched_data = []
+       for i, degree in enumerate(degrees):
+           if i < len(nodes_table):
+               node_data = {'node_id': i, 'degree': degree}
+               enriched_data.append(node_data)
+       
+       analysis_table = gr.table(enriched_data)
+       print(f"Analysis table created with {len(analysis_table)} rows")
+       
+       return analysis_table
+
+This foundation provides everything needed for robust graph analysis workflows. Future releases will add advanced algorithms while maintaining the same intuitive API.

@@ -1,5 +1,5 @@
 //! FFI Configuration
-//! 
+//!
 //! This module provides Python bindings for Groggy configuration.
 
 use pyo3::prelude::*;

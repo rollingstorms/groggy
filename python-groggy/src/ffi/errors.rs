@@ -1,10 +1,10 @@
 //! FFI Error Handling
-//! 
+//!
 //! This module provides error conversion between Rust and Python.
 
-use pyo3::prelude::*;
-use pyo3::exceptions::{PyValueError, PyRuntimeError, PyKeyError, PyIndexError, PyTypeError};
 use groggy::GraphError;
+use pyo3::exceptions::{PyIndexError, PyKeyError, PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::prelude::*;
 
 /// Convert GraphError to Python exception
 pub fn graph_error_to_py_err(error: GraphError) -> PyErr {

@@ -24,13 +24,13 @@ Individual Nodes
 
 .. code-block:: python
 
-   # Add a node with attributes
-   g.add_node("alice", age=30, role="engineer", active=True)
-   g.add_node("bob", age=25, role="designer", active=False)
+   # Add nodes with attributes (returns numeric IDs)
+   alice = g.add_node(name="Alice", age=30, role="engineer", active=True)
+   bob = g.add_node(name="Bob", age=25, role="designer", active=False)
 
-   # Nodes can have any ID type
-   g.add_node(1, name="Node 1", value=100)
-   g.add_node("user_123", email="user@example.com")
+   # Store the returned IDs for later use
+   node1 = g.add_node(name="Node 1", value=100)
+   user_node = g.add_node(user_id="user_123", email="user@example.com")
 
 Batch Node Addition
 ~~~~~~~~~~~~~~~~~~~
@@ -39,15 +39,15 @@ For better performance with large datasets:
 
 .. code-block:: python
 
-   # Prepare node data
+   # Prepare node data (no 'id' field needed)
    nodes = [
-       {'id': 'alice', 'age': 30, 'department': 'engineering'},
-       {'id': 'bob', 'age': 25, 'department': 'design'},
-       {'id': 'charlie', 'age': 35, 'department': 'management'}
+       {'name': 'Alice', 'age': 30, 'department': 'engineering'},
+       {'name': 'Bob', 'age': 25, 'department': 'design'},
+       {'name': 'Charlie', 'age': 35, 'department': 'management'}
    ]
 
-   # Add all nodes at once (much faster)
-   g.add_nodes(nodes)
+   # Add all nodes at once (returns list of node IDs)
+   node_ids = g.add_nodes(nodes)
 
 Adding Edges
 ------------
@@ -57,19 +57,20 @@ Individual Edges
 
 .. code-block:: python
 
-   # Add edges with attributes
-   g.add_edge("alice", "bob", relationship="collaborates", weight=0.8)
-   g.add_edge("bob", "charlie", relationship="reports_to", weight=1.0)
+   # Add edges with attributes (using node IDs)
+   g.add_edge(alice, bob, relationship="collaborates", weight=0.8)
+   g.add_edge(bob, node_ids[2], relationship="reports_to", weight=1.0)  # charlie
 
 Batch Edge Addition
 ~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
+   # Use actual node IDs (assuming alice, bob, charlie from above)
    edges = [
-       {'source': 'alice', 'target': 'bob', 'weight': 0.8, 'type': 'collaboration'},
-       {'source': 'bob', 'target': 'charlie', 'weight': 1.0, 'type': 'reporting'},
-       {'source': 'alice', 'target': 'charlie', 'weight': 0.6, 'type': 'communication'}
+       (alice, bob, {'weight': 0.8, 'type': 'collaboration'}),
+       (bob, node_ids[2], {'weight': 1.0, 'type': 'reporting'}),
+       (alice, node_ids[2], {'weight': 0.6, 'type': 'communication'})
    ]
 
    g.add_edges(edges)
@@ -86,8 +87,8 @@ Basic Information
    print(f"Nodes: {g.node_count()}")
    print(f"Edges: {g.edge_count()}")
 
-   # Graph type
-   print(f"Directed: {g.directed}")
+   # Graph type  
+   print(f"Directed: {g.is_directed}")
 
    # Check if graph is connected
    print(f"Connected: {g.is_connected()}")
@@ -98,15 +99,17 @@ Node and Edge Queries
 .. code-block:: python
 
    # Check if entities exist
-   print(g.has_node("alice"))      # True
-   print(g.has_edge("alice", "bob"))  # True
+   print(g.has_node(alice))         # True
+   print(g.has_edge(alice, bob))    # True
 
-   # Get node/edge attributes
-   alice_data = g.get_node("alice")
-   print(alice_data)  # {'age': 30, 'role': 'engineer', 'active': True}
+   # Get node attributes using node views
+   alice_data = g.nodes[alice]
+   print(alice_data)  # Node attribute access
 
-   edge_data = g.get_edge("alice", "bob")
-   print(edge_data)   # {'relationship': 'collaborates', 'weight': 0.8}
+   # Get edge attributes using edge views  
+   edges_table = g.edges.table()
+   # Find edge between alice and bob
+   alice_bob_edges = edges_table[(edges_table['source'] == alice) & (edges_table['target'] == bob)]
 
 Degree Operations
 ~~~~~~~~~~~~~~~~~
@@ -114,17 +117,17 @@ Degree Operations
 .. code-block:: python
 
    # Get degree for specific node
-   alice_degree = g.degree("alice")
+   alice_degree = g.degree(alice)
    print(f"Alice's degree: {alice_degree}")
 
    # Get degrees for all nodes
    all_degrees = g.degree()
-   print(all_degrees)  # {'alice': 2, 'bob': 2, 'charlie': 1}
+   print(all_degrees)  # List or array of degrees
 
    # For directed graphs
-   if g.directed:
-       in_degree = g.in_degree("bob")
-       out_degree = g.out_degree("bob")
+   if g.is_directed:
+       in_degree = g.in_degree(bob)
+       out_degree = g.out_degree(bob)
        print(f"Bob - In: {in_degree}, Out: {out_degree}")
 
 Accessing Graph Data
@@ -157,16 +160,19 @@ Filtering and Querying
 
 .. code-block:: python
 
-   # Filter nodes by attributes
-   engineers = g.nodes.filter("role == 'engineer'")
-   young_people = g.nodes.filter("age < 30")
-   active_users = g.nodes.filter("active == True")
+   # Filter nodes using proper filter syntax
+   engineers = g.filter_nodes(gr.NodeFilter.attribute_equals("role", "engineer"))
+   young_people = g.filter_nodes(gr.NodeFilter.attribute_filter("age", gr.AttributeFilter.less_than(30)))
+   active_users = g.filter_nodes(gr.NodeFilter.attribute_equals("active", True))
 
    # Complex filters
-   young_engineers = g.nodes.filter("role == 'engineer' AND age < 35")
+   young_engineers = g.filter_nodes(gr.NodeFilter.and_filters([
+       gr.NodeFilter.attribute_equals("role", "engineer"),
+       gr.NodeFilter.attribute_filter("age", gr.AttributeFilter.less_than(35))
+   ]))
 
    # Filter edges
-   strong_connections = g.edges.filter("weight > 0.7")
+   strong_connections = g.filter_edges(gr.EdgeFilter.attribute_filter("weight", gr.AttributeFilter.greater_than(0.7)))
 
 Updating Graph Data
 -------------------
@@ -176,18 +182,17 @@ Modifying Attributes
 
 .. code-block:: python
 
-   # Update node attributes
-   g.update_node("alice", {"age": 31, "promoted": True})
-
-   # Update edge attributes
-   g.update_edge("alice", "bob", {"weight": 0.9, "last_interaction": "2025-08-21"})
-
-   # Update multiple nodes
-   updates = {
-       "alice": {"salary": 95000},
-       "bob": {"salary": 75000}
-   }
-   g.update_nodes(updates)
+   # Node attribute modification (limited support in current version)
+   # Individual attribute setting may have type restrictions
+   
+   # Note: Direct attribute modification is limited in current release
+   # Use node recreation for complex attribute changes
+   
+   # Access current attributes
+   alice_data = g.nodes[alice]
+   print(f"Current attributes: {alice_data.keys()}")
+   
+   # For bulk attribute updates, see storage views documentation
 
 Removing Elements
 ~~~~~~~~~~~~~~~~~
@@ -195,16 +200,16 @@ Removing Elements
 .. code-block:: python
 
    # Remove individual node (also removes connected edges)
-   g.remove_node("charlie")
+   g.remove_node(node_ids[2])  # charlie
 
    # Remove individual edge
-   g.remove_edge("alice", "bob")
+   g.remove_edge(alice, bob)
 
    # Remove multiple nodes
-   g.remove_nodes(["alice", "bob"])
+   g.remove_nodes([alice, bob])
 
    # Remove multiple edges
-   g.remove_edges([("alice", "bob"), ("bob", "charlie")])
+   g.remove_edges([(alice, bob), (bob, node_ids[2])])
 
 Graph Analysis
 --------------
@@ -215,11 +220,11 @@ Connectivity
 .. code-block:: python
 
    # Find connected components
-   components = g.connected_components()
+   components = g.analytics.connected_components()
    print(f"Number of components: {len(components)}")
 
    for i, component in enumerate(components):
-       print(f"Component {i}: {len(component.node_ids)} nodes")
+       print(f"Component {i}: {len(component)} nodes")
 
 Neighborhoods
 ~~~~~~~~~~~~~
@@ -227,13 +232,13 @@ Neighborhoods
 .. code-block:: python
 
    # Get neighbors of a node
-   alice_neighbors = g.neighbors("alice")
+   alice_neighbors = g.neighbors(alice)
    print(f"Alice's neighbors: {alice_neighbors}")
 
    # For directed graphs
-   if g.directed:
-       predecessors = g.predecessors("alice")  # Incoming edges
-       successors = g.successors("alice")     # Outgoing edges
+   if g.is_directed:
+       predecessors = g.predecessors(alice)  # Incoming edges
+       successors = g.successors(alice)     # Outgoing edges
 
 Path Finding
 ~~~~~~~~~~~~
@@ -242,13 +247,13 @@ Path Finding
 
    # Find shortest path
    try:
-       path = g.shortest_path("alice", "charlie")
+       path = g.analytics.shortest_path(alice, node_ids[2])  # alice to charlie
        print(f"Shortest path: {path}")
    except Exception:
        print("No path found")
 
    # Check if path exists
-   has_path = g.has_path("alice", "charlie")
+   has_path = g.analytics.has_path(alice, node_ids[2])
 
 Traversal
 ~~~~~~~~~
@@ -256,11 +261,11 @@ Traversal
 .. code-block:: python
 
    # Breadth-first search
-   bfs_visited = g.bfs(start_node="alice")
+   bfs_visited = g.analytics.bfs(alice)
    print(f"BFS visited: {bfs_visited}")
 
    # Depth-first search
-   dfs_visited = g.dfs(start_node="alice")
+   dfs_visited = g.analytics.dfs(alice)
    print(f"DFS visited: {dfs_visited}")
 
 Working with Subgraphs
@@ -272,13 +277,14 @@ Creating Subgraphs
 .. code-block:: python
 
    # Create subgraph from node filter
-   engineering_team = g.filter_nodes("department == 'engineering'")
+   engineering_team = g.filter_nodes(gr.NodeFilter.attribute_equals("department", "engineering"))
 
    # Create subgraph from specific nodes
-   core_team = g.subgraph(["alice", "bob"])
+   core_team = g.subgraph([alice, bob])
 
    # Get largest connected component
-   largest_component = max(g.connected_components(), key=lambda c: len(c.node_ids))
+   components = g.analytics.connected_components()
+   largest_component = max(components, key=lambda c: len(c))
 
 Subgraph Operations
 ~~~~~~~~~~~~~~~~~~~
@@ -286,12 +292,12 @@ Subgraph Operations
 .. code-block:: python
 
    # Subgraphs have the same interface as full graphs
-   print(f"Subgraph nodes: {len(engineering_team.node_ids)}")
-   print(f"Subgraph edges: {len(engineering_team.edge_ids)}")
+   print(f"Subgraph nodes: {engineering_team.node_count()}")
+   print(f"Subgraph edges: {engineering_team.edge_count()}")
 
    # Convert subgraph to table for analysis
-   team_table = engineering_team.table()
-   print(team_table.describe())
+   team_table = engineering_team.nodes.table()
+   print(f"Team size: {len(team_table)}")
 
 Best Practices
 --------------
@@ -317,12 +323,12 @@ Error Handling
 .. code-block:: python
 
    try:
-       node_data = g.get_node("nonexistent")
+       node_data = g.nodes[999]  # Nonexistent node ID
    except KeyError as e:
        print(f"Node not found: {e}")
 
    try:
-       g.add_edge("alice", "nonexistent", weight=1.0)
+       g.add_edge(alice, 999, weight=1.0)  # Nonexistent target
    except ValueError as e:
        print(f"Invalid edge: {e}")
 
@@ -364,14 +370,13 @@ Analysis Pipeline
    print(f"Average degree: {sum(g.degree().values()) / g.node_count():.2f}")
 
    # 3. Find important nodes
-   components = g.connected_components()
-   largest = max(components, key=lambda c: len(c.node_ids))
+   components = g.analytics.connected_components()
+   largest = max(components, key=lambda c: len(c))
 
-   # 4. Extract insights
-   analysis_table = largest.table()
-   summary = analysis_table.group_by('department').agg({
-       'age': ['mean', 'count'],
-       'salary': ['mean', 'std']
-   })
+   # 4. Extract insights from node table
+   analysis_table = g.nodes.table()
+   # Basic statistical analysis
+   avg_age = analysis_table['age'].mean() if 'age' in analysis_table.columns else 0
+   print(f"Average age: {avg_age}")
 
 This covers the fundamental graph operations in Groggy. Next, explore :doc:`storage-views` for advanced data analysis capabilities.

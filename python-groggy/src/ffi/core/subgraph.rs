@@ -1,27 +1,29 @@
 //! Subgraph FFI Bindings
-//! 
+//!
 //! Python bindings for PySubgraph - dual-mode architecture supporting both
 //! core RustSubgraph integration and legacy compatibility.
 
+use groggy::{AttrValue, EdgeId, NodeId};
+use pyo3::exceptions::{
+    PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
+    PyValueError,
+};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyIndexError, PyImportError, PyNotImplementedError};
-use groggy::{NodeId, EdgeId, AttrValue};
 use std::collections::{HashMap, HashSet};
 
 // Import types from our FFI modules
 use crate::ffi::api::graph::PyGraph;
-use crate::ffi::types::PyAttrValue;
+use crate::ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
 use crate::ffi::core::array::PyGraphArray;
 use crate::ffi::core::matrix::PyGraphMatrix;
-use crate::ffi::core::accessors::{PyNodesAccessor, PyEdgesAccessor};
 use crate::ffi::core::query::PyNodeFilter;
 use crate::ffi::core::table::PyGraphTable;
+use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::graph_error_to_py_err;
 
 // Import the core Subgraph type
 use groggy::core::subgraph::Subgraph as RustSubgraph;
-
 
 /// Utility function to convert Python values to AttrValue
 fn python_value_to_attr_value(value: &PyAny) -> PyResult<AttrValue> {
@@ -69,7 +71,7 @@ impl PySubgraph {
         let nodes = subgraph.node_ids();
         let edges = subgraph.edge_ids();
         let subgraph_type = subgraph.subgraph_type().to_string();
-        
+
         PySubgraph {
             inner: Some(subgraph),
             nodes,
@@ -78,9 +80,14 @@ impl PySubgraph {
             graph: None, // Not needed when we have inner
         }
     }
-    
+
     /// Standard PySubgraph constructor
-    pub fn new(nodes: Vec<NodeId>, edges: Vec<EdgeId>, subgraph_type: String, graph: Option<Py<PyGraph>>) -> Self {
+    pub fn new(
+        nodes: Vec<NodeId>,
+        edges: Vec<EdgeId>,
+        subgraph_type: String,
+        graph: Option<Py<PyGraph>>,
+    ) -> Self {
         PySubgraph {
             inner: None,
             nodes,
@@ -89,17 +96,17 @@ impl PySubgraph {
             graph,
         }
     }
-    
+
     /// Get nodes vector (for internal module access)
     pub fn get_nodes(&self) -> &Vec<NodeId> {
         &self.nodes
     }
-    
+
     /// Get edges vector (for internal module access)  
     pub fn get_edges(&self) -> &Vec<EdgeId> {
         &self.edges
     }
-    
+
     /// Set graph reference (for internal module access)
     pub fn set_graph_reference(&mut self, graph: Py<PyGraph>) {
         self.graph = Some(graph);
@@ -112,127 +119,150 @@ impl PySubgraph {
     #[getter]
     fn nodes(self_: PyRef<Self>, py: Python) -> PyResult<Py<PyNodesAccessor>> {
         if let Some(graph_ref) = &self_.graph {
-            Py::new(py, PyNodesAccessor {
-                graph: graph_ref.clone(),
-                constrained_nodes: Some(self_.nodes.clone()),
-            })
+            Py::new(
+                py,
+                PyNodesAccessor {
+                    graph: graph_ref.clone(),
+                    constrained_nodes: Some(self_.nodes.clone()),
+                },
+            )
         } else {
             Err(PyRuntimeError::new_err("No graph reference available"))
         }
     }
-    
+
     /// Get edges as a property that supports indexing and attribute access
-    #[getter] 
+    #[getter]
     fn edges(self_: PyRef<Self>, py: Python) -> PyResult<Py<PyEdgesAccessor>> {
         if let Some(graph_ref) = &self_.graph {
-            Py::new(py, PyEdgesAccessor {
-                graph: graph_ref.clone(),
-                constrained_edges: Some(self_.edges.clone()),
-            })
+            Py::new(
+                py,
+                PyEdgesAccessor {
+                    graph: graph_ref.clone(),
+                    constrained_edges: Some(self_.edges.clone()),
+                },
+            )
         } else {
             Err(PyRuntimeError::new_err("No graph reference available"))
         }
     }
-    
+
     /// Python len() support - returns number of nodes
     fn __len__(&self) -> usize {
         self.nodes.len()
     }
-    
+
     /// Node count property
     fn node_count(&self) -> usize {
         self.nodes.len()
     }
-    
+
     /// Edge count property
     fn edge_count(&self) -> usize {
         self.edges.len()
     }
-    
+
     /// Get node IDs in this subgraph as GraphArray (lazy Rust view) - use .values for Python list
     #[getter]
     fn node_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
-        let attr_values: Vec<groggy::AttrValue> = self.nodes.iter()
+        let attr_values: Vec<groggy::AttrValue> = self
+            .nodes
+            .iter()
             .map(|&id| groggy::AttrValue::Int(id as i64))
             .collect();
         let graph_array = groggy::GraphArray::from_vec(attr_values);
         let py_graph_array = PyGraphArray { inner: graph_array };
         Ok(Py::new(py, py_graph_array)?)
     }
-    
+
     /// Get edge IDs in this subgraph as GraphArray (lazy Rust view) - use .values for Python list
     #[getter]
     fn edge_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
-        let attr_values: Vec<groggy::AttrValue> = self.edges.iter()
+        let attr_values: Vec<groggy::AttrValue> = self
+            .edges
+            .iter()
             .map(|&id| groggy::AttrValue::Int(id as i64))
             .collect();
         let graph_array = groggy::GraphArray::from_vec(attr_values);
         let py_graph_array = PyGraphArray { inner: graph_array };
         Ok(Py::new(py, py_graph_array)?)
     }
-    
+
     /// Check if a node exists in this subgraph
     fn has_node(&self, node_id: NodeId) -> bool {
         self.nodes.contains(&node_id)
     }
-    
+
     /// Check if an edge exists in this subgraph
     fn has_edge(&self, edge_id: EdgeId) -> bool {
         self.edges.contains(&edge_id)
     }
-    
+
     /// String representation  
     fn __repr__(&self) -> String {
-        format!("Subgraph(nodes={}, edges={}, type={})", 
-                self.nodes.len(), self.edges.len(), self.subgraph_type)
+        format!(
+            "Subgraph(nodes={}, edges={}, type={})",
+            self.nodes.len(),
+            self.edges.len(),
+            self.subgraph_type
+        )
     }
-    
+
     /// Detailed string representation with helpful information
     fn __str__(&self) -> String {
-        let mut info = format!("Subgraph with {} nodes and {} edges", 
-                              self.nodes.len(), self.edges.len());
-        
+        let mut info = format!(
+            "Subgraph with {} nodes and {} edges",
+            self.nodes.len(),
+            self.edges.len()
+        );
+
         if !self.subgraph_type.is_empty() {
             info.push_str(&format!("\nType: {}", self.subgraph_type));
         }
-        
+
         if !self.nodes.is_empty() {
             let node_sample = if self.nodes.len() <= 5 {
                 format!("{:?}", self.nodes)
             } else {
-                format!("[{}, {}, {}, ... {} more]", 
-                       self.nodes[0], self.nodes[1], self.nodes[2], 
-                       self.nodes.len() - 3)
+                format!(
+                    "[{}, {}, {}, ... {} more]",
+                    self.nodes[0],
+                    self.nodes[1],
+                    self.nodes[2],
+                    self.nodes.len() - 3
+                )
             };
             info.push_str(&format!("\nNodes: {}", node_sample));
         }
-        
-        info.push_str("\nAvailable methods: .set(**attrs), .filter_nodes(filter), .table(), .nodes, .edges");
+
+        info.push_str(
+            "\nAvailable methods: .set(**attrs), .filter_nodes(filter), .table(), .nodes, .edges",
+        );
         info
     }
-    
+
     /// Calculate subgraph density (number of edges / number of possible edges)
     fn density(&self) -> f64 {
         let num_nodes = self.nodes.len();
         let num_edges = self.edges.len();
-        
+
         if num_nodes <= 1 {
             return 0.0;
         }
-        
+
         // For an undirected graph, max edges = n(n-1)/2
         // For a directed graph, max edges = n(n-1)
         // Since we don't have easy access to graph type here, we'll assume undirected
         // This is the most common case and matches standard network analysis conventions
         let max_possible_edges = (num_nodes * (num_nodes - 1)) / 2;
-        
+
         if max_possible_edges > 0 {
             num_edges as f64 / max_possible_edges as f64
         } else {
             0.0
         }
     }
-    
+
     /// Filter edges within this subgraph (chainable)
     fn filter_edges(&self, _py: Python, _filter: &PyAny) -> PyResult<PySubgraph> {
         // Placeholder implementation
@@ -243,14 +273,18 @@ impl PySubgraph {
             self.graph.clone(),
         ))
     }
-    
+
     /// Connected components within this subgraph
     fn connected_components(&self) -> PyResult<Vec<PySubgraph>> {
         // Use inner subgraph if available
         if let Some(ref inner_subgraph) = self.inner {
-            let components = inner_subgraph.connected_components()
-                .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("Failed to get connected components: {}", e)))?;
-            
+            let components = inner_subgraph.connected_components().map_err(|e| {
+                PyErr::new::<PyRuntimeError, _>(format!(
+                    "Failed to get connected components: {}",
+                    e
+                ))
+            })?;
+
             let mut result = Vec::new();
             for (i, component) in components.iter().enumerate() {
                 // STANDARDIZED: Use PySubgraph::new() like all other subgraph creation methods
@@ -259,7 +293,7 @@ impl PySubgraph {
                     component.node_ids(),
                     component.edge_ids(),
                     format!("connected_component_{}", i),
-                    self.graph.clone(),  // Pass the graph reference consistently
+                    self.graph.clone(), // Pass the graph reference consistently
                 ));
             }
             Ok(result)
@@ -273,19 +307,20 @@ impl PySubgraph {
             )])
         }
     }
-    
+
     /// Check if the subgraph is connected (has exactly one connected component)
     pub fn is_connected(&self) -> PyResult<bool> {
         // Use inner subgraph if available (preferred path)
         if let Some(ref inner_subgraph) = self.inner {
-            inner_subgraph.is_connected()
-                .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("Failed to check connectivity: {}", e)))
+            inner_subgraph.is_connected().map_err(|e| {
+                PyErr::new::<PyRuntimeError, _>(format!("Failed to check connectivity: {}", e))
+            })
         } else {
             // Fallback - for now assume connected if we have nodes
             Ok(!self.nodes.is_empty())
         }
     }
-    
+
     /// Set attributes on all nodes in this subgraph (batch operation)
     #[pyo3(signature = (**kwargs))]
     fn set(&mut self, py: Python, kwargs: Option<&PyDict>) -> PyResult<Py<PySubgraph>> {
@@ -295,20 +330,26 @@ impl PySubgraph {
                 for (key, value) in kwargs.iter() {
                     let attr_name: String = key.extract()?;
                     let attr_value = python_value_to_attr_value(value)?;
-                    
+
                     // Use the core Subgraph's bulk set method
-                    inner_subgraph.set_node_attribute_bulk(&attr_name, attr_value)
-                        .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("Failed to set attribute: {}", e)))?;
+                    inner_subgraph
+                        .set_node_attribute_bulk(&attr_name, attr_value)
+                        .map_err(|e| {
+                            PyErr::new::<PyRuntimeError, _>(format!(
+                                "Failed to set attribute: {}",
+                                e
+                            ))
+                        })?;
                 }
             }
-            
-            // Return self for chaining  
+
+            // Return self for chaining
             let new_subgraph = if let Some(ref inner) = self.inner {
                 PySubgraph::from_core_subgraph(inner.clone())
             } else {
                 PySubgraph::new(
                     self.nodes.clone(),
-                    self.edges.clone(), 
+                    self.edges.clone(),
                     self.subgraph_type.clone(),
                     self.graph.clone(),
                 )
@@ -319,74 +360,86 @@ impl PySubgraph {
         else if let Some(graph_ref) = &self.graph {
             if let Some(kwargs) = kwargs {
                 let mut graph = graph_ref.borrow_mut(py);
-                
+
                 // Update all nodes in this subgraph
                 for &node_id in &self.nodes {
                     for (key, value) in kwargs.iter() {
                         let attr_name: String = key.extract()?;
                         let attr_value = python_value_to_attr_value(value)?;
                         let py_attr_value = PyAttrValue::from_attr_value(attr_value);
-                        
+
                         graph.set_node_attribute(node_id, attr_name, &py_attr_value)?;
                     }
                 }
             }
-            
+
             // Return self for chaining
-            Ok(Py::new(py, PySubgraph::new(
-                self.nodes.clone(),
-                self.edges.clone(),
-                self.subgraph_type.clone(),
-                self.graph.clone(),
-            ))?)
+            Ok(Py::new(
+                py,
+                PySubgraph::new(
+                    self.nodes.clone(),
+                    self.edges.clone(),
+                    self.subgraph_type.clone(),
+                    self.graph.clone(),
+                ),
+            )?)
         } else {
             Err(PyErr::new::<PyRuntimeError, _>(
                 "Cannot set attributes on subgraph without graph reference. Use graph.filter_nodes() or similar methods."
             ))
         }
     }
-    
+
     /// Update attributes on all nodes in this subgraph using dict syntax
     fn update(&mut self, py: Python, data: &PyDict) -> PyResult<Py<PySubgraph>> {
         if let Some(graph_ref) = &self.graph {
             let mut graph = graph_ref.borrow_mut(py);
-            
+
             // Update all nodes in this subgraph
             for &node_id in &self.nodes {
                 for (key, value) in data.iter() {
                     let attr_name: String = key.extract()?;
                     let attr_value = python_value_to_attr_value(value)?;
                     let py_attr_value = PyAttrValue::from_attr_value(attr_value);
-                    
+
                     graph.set_node_attribute(node_id, attr_name, &py_attr_value)?;
                 }
             }
-            
+
             // Return self for chaining
-            Ok(Py::new(py, PySubgraph::new(
-                self.nodes.clone(),
-                self.edges.clone(),
-                self.subgraph_type.clone(),
-                self.graph.clone(),
-            ))?)
+            Ok(Py::new(
+                py,
+                PySubgraph::new(
+                    self.nodes.clone(),
+                    self.edges.clone(),
+                    self.subgraph_type.clone(),
+                    self.graph.clone(),
+                ),
+            )?)
         } else {
             Err(PyErr::new::<PyRuntimeError, _>(
                 "Cannot update attributes on subgraph without graph reference. Use graph.filter_nodes() or similar methods."
             ))
         }
     }
-    
+
     /// Column access: get all values for a node attribute within this subgraph
     /// This enables: subgraph['component_id'] -> GraphArray with statistical methods
     fn get_node_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<Py<PyGraphArray>> {
         // Use inner Subgraph if available (preferred path)
         if let Some(ref inner_subgraph) = self.inner {
-            let attr_values = inner_subgraph.get_node_attribute_column(&attr_name.to_string())
-                .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("Failed to get attribute column: {}", e)))?;
-            
+            let attr_values = inner_subgraph
+                .get_node_attribute_column(&attr_name.to_string())
+                .map_err(|e| {
+                    PyErr::new::<PyRuntimeError, _>(format!(
+                        "Failed to get attribute column: {}",
+                        e
+                    ))
+                })?;
+
             // Create GraphArray from the attribute values
             let graph_array = groggy::GraphArray::from_vec(attr_values);
-            
+
             // Wrap in Python GraphArray
             let py_graph_array = PyGraphArray { inner: graph_array };
             Ok(Py::new(py, py_graph_array)?)
@@ -395,37 +448,41 @@ impl PySubgraph {
         else if let Some(graph_ref) = &self.graph {
             let graph = graph_ref.borrow(py);
             let mut attr_values = Vec::new();
-            
+
             for &node_id in &self.nodes {
-                if let Ok(Some(attr_value)) = graph.inner.get_node_attr(node_id, &attr_name.to_string()) {
+                if let Ok(Some(attr_value)) =
+                    graph.inner.get_node_attr(node_id, &attr_name.to_string())
+                {
                     attr_values.push(attr_value);
                 } else {
                     // Handle missing attributes with default value
                     attr_values.push(groggy::AttrValue::Int(0));
                 }
             }
-            
+
             // Create GraphArray from the attribute values
             let graph_array = groggy::GraphArray::from_vec(attr_values);
-            
+
             // Wrap in Python GraphArray
             let py_graph_array = PyGraphArray { inner: graph_array };
             Ok(Py::new(py, py_graph_array)?)
         } else {
             Err(PyErr::new::<PyRuntimeError, _>(
-                "Cannot access attributes on subgraph without graph reference."
+                "Cannot access attributes on subgraph without graph reference.",
             ))
         }
     }
-    
+
     /// Column access: get all values for an edge attribute within this subgraph
     fn get_edge_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<Vec<PyObject>> {
         if let Some(graph_ref) = &self.graph {
             let graph = graph_ref.borrow(py);
             let mut values = Vec::new();
-            
+
             for &edge_id in &self.edges {
-                if let Ok(Some(attr_value)) = graph.inner.get_edge_attr(edge_id, &attr_name.to_string()) {
+                if let Ok(Some(attr_value)) =
+                    graph.inner.get_edge_attr(edge_id, &attr_name.to_string())
+                {
                     // Convert AttrValue to Python object
                     let py_value = attr_value_to_python_value(py, &attr_value)?;
                     values.push(py_value);
@@ -434,15 +491,15 @@ impl PySubgraph {
                     values.push(py.None());
                 }
             }
-            
+
             Ok(values)
         } else {
             Err(PyErr::new::<PyRuntimeError, _>(
-                "Cannot access edge attributes on subgraph without graph reference."
+                "Cannot access edge attributes on subgraph without graph reference.",
             ))
         }
     }
-    
+
     /// Python dict-like access with multi-column support
     /// - subgraph['attr_name'] -> single column (Vec<PyObject>)  
     /// - subgraph[['age', 'height']] -> multi-column 2D GraphArray of shape (2, n)
@@ -454,9 +511,11 @@ impl PySubgraph {
                 // This is an edge subgraph - route to edge attributes
                 if attr_name == "id" {
                     // Special case: edge IDs (the edges themselves)
-                    let edge_ids = self.edges.iter().map(|&edge_id| {
-                        groggy::AttrValue::Int(edge_id as i64)
-                    }).collect();
+                    let edge_ids = self
+                        .edges
+                        .iter()
+                        .map(|&edge_id| groggy::AttrValue::Int(edge_id as i64))
+                        .collect();
                     let graph_array = groggy::GraphArray::from_vec(edge_ids);
                     let py_graph_array = PyGraphArray { inner: graph_array };
                     return Ok(Py::new(py, py_graph_array)?.to_object(py));
@@ -491,48 +550,51 @@ impl PySubgraph {
                 return Ok(column.to_object(py));
             }
         }
-        
+
         // Try list of strings (multi-column access)
         if let Ok(attr_names) = key.extract::<Vec<String>>() {
             if attr_names.is_empty() {
                 return Err(PyValueError::new_err("Empty attribute list"));
             }
-            
+
             // Collect all columns as GraphArrays
             let mut columns = Vec::new();
             let mut num_rows = 0;
-            
+
             // Type checking for mixed types
             let mut column_types = Vec::new();
-            
+
             for attr_name in &attr_names {
                 let column = self.get_node_attribute_column(py, attr_name)?;
-                
+
                 // Detect column type by borrowing temporarily
                 let column_type = {
                     let graph_array = column.borrow(py);
-                    
+
                     // Get the length and detect column type
                     num_rows = graph_array.inner.len();
-                    
+
                     // Sample a few values to determine the predominant type
                     if num_rows > 0 {
                         let sample_size = std::cmp::min(num_rows, 3);
                         let mut type_counts = std::collections::HashMap::new();
-                        
+
                         for i in 0..sample_size {
                             let type_name = match &graph_array.inner[i] {
                                 groggy::AttrValue::Int(_) | groggy::AttrValue::SmallInt(_) => "int",
-                                groggy::AttrValue::Float(_) => "float", 
+                                groggy::AttrValue::Float(_) => "float",
                                 groggy::AttrValue::Bool(_) => "bool",
-                                groggy::AttrValue::Text(_) | groggy::AttrValue::CompactText(_) => "str",
+                                groggy::AttrValue::Text(_) | groggy::AttrValue::CompactText(_) => {
+                                    "str"
+                                }
                                 _ => "mixed",
                             };
                             *type_counts.entry(type_name).or_insert(0) += 1;
                         }
-                        
+
                         // Get the most common type
-                        type_counts.into_iter()
+                        type_counts
+                            .into_iter()
                             .max_by_key(|(_, count)| *count)
                             .map(|(type_name, _)| type_name)
                             .unwrap_or("mixed")
@@ -540,16 +602,18 @@ impl PySubgraph {
                         "empty"
                     }
                 }; // Borrow ends here
-                
+
                 column_types.push(column_type);
                 columns.push(column);
             }
-            
-            // Check for mixed types (GraphMatrix constraint)  
+
+            // Check for mixed types (GraphMatrix constraint)
             if attr_names.len() > 1 {
                 let first_type = column_types[0];
-                let has_mixed_types = column_types.iter().any(|&t| t != first_type && t != "empty");
-                
+                let has_mixed_types = column_types
+                    .iter()
+                    .any(|&t| t != first_type && t != "empty");
+
                 if has_mixed_types {
                     let detected_types: Vec<&str> = column_types.into_iter().collect();
                     return Err(PyTypeError::new_err(format!(
@@ -560,31 +624,33 @@ impl PySubgraph {
                     )));
                 }
             }
-            
+
             // For single column in list form: [['age']] -> return GraphArray (same as 'age')
             if attr_names.len() == 1 {
                 return Ok(columns[0].clone_ref(py).to_object(py));
             } else {
                 // Multi-column access: return a list of GraphArrays
                 // This allows users to work with multiple columns programmatically
-                let column_objects: Vec<PyObject> = columns.into_iter()
-                    .map(|col| col.to_object(py))
-                    .collect();
+                let column_objects: Vec<PyObject> =
+                    columns.into_iter().map(|col| col.to_object(py)).collect();
                 return Ok(column_objects.to_object(py));
             }
         }
-        
-        Err(PyTypeError::new_err("Key must be a string or list of strings"))
+
+        Err(PyTypeError::new_err(
+            "Key must be a string or list of strings",
+        ))
     }
-    
+
     /// Create GraphTable for DataFrame-like view of this subgraph nodes
     fn table(&self, py: Python) -> PyResult<PyObject> {
         // Get the graph reference
-        let graph_py = self.graph.as_ref().ok_or_else(|| 
-            PyRuntimeError::new_err("Subgraph is not attached to a graph")
-        )?;
+        let graph_py = self
+            .graph
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("Subgraph is not attached to a graph"))?;
         let graph = graph_py.borrow(py);
-        
+
         // Get all available node attributes
         let mut all_attrs = std::collections::HashSet::new();
         for &node_id in &self.nodes {
@@ -594,17 +660,17 @@ impl PySubgraph {
                 }
             }
         }
-        
+
         // Always include node_id as first column
         let mut column_names = vec!["node_id".to_string()];
         column_names.extend(all_attrs.into_iter());
-        
+
         let mut columns = Vec::new();
-        
+
         // Create each column
         for column_name in &column_names {
             let mut attr_values = Vec::new();
-            
+
             if column_name == "node_id" {
                 // Node ID column
                 for &node_id in &self.nodes {
@@ -621,24 +687,25 @@ impl PySubgraph {
                     }
                 }
             }
-            
+
             let graph_array = groggy::GraphArray::from_vec(attr_values);
             let py_array = PyGraphArray::from_graph_array(graph_array);
             columns.push(Py::new(py, py_array)?);
         }
-        
+
         let py_table = PyGraphTable::new(py, columns, Some(column_names))?;
         Ok(Py::new(py, py_table)?.to_object(py))
     }
-    
+
     /// Create GraphTable for DataFrame-like view of this subgraph edges
     fn edges_table(&self, py: Python) -> PyResult<PyObject> {
         // Get the graph reference
-        let graph_py = self.graph.as_ref().ok_or_else(|| 
-            PyRuntimeError::new_err("Subgraph is not attached to a graph")
-        )?;
+        let graph_py = self
+            .graph
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("Subgraph is not attached to a graph"))?;
         let graph = graph_py.borrow(py);
-        
+
         // Get all available edge attributes
         let mut all_attrs = std::collections::HashSet::new();
         for &edge_id in &self.edges {
@@ -648,17 +715,21 @@ impl PySubgraph {
                 }
             }
         }
-        
+
         // Always include edge_id, source, target as first columns
-        let mut column_names = vec!["edge_id".to_string(), "source".to_string(), "target".to_string()];
+        let mut column_names = vec![
+            "edge_id".to_string(),
+            "source".to_string(),
+            "target".to_string(),
+        ];
         column_names.extend(all_attrs.into_iter());
-        
+
         let mut columns = Vec::new();
-        
+
         // Create each column
         for column_name in &column_names {
             let mut attr_values = Vec::new();
-            
+
             if column_name == "edge_id" {
                 // Edge ID column
                 for &edge_id in &self.edges {
@@ -668,7 +739,11 @@ impl PySubgraph {
                 // Source/Target columns
                 for &edge_id in &self.edges {
                     if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
-                        let endpoint_id = if column_name == "source" { source } else { target };
+                        let endpoint_id = if column_name == "source" {
+                            source
+                        } else {
+                            target
+                        };
                         attr_values.push(groggy::AttrValue::Int(endpoint_id as i64));
                     } else {
                         attr_values.push(groggy::AttrValue::Int(0));
@@ -685,52 +760,78 @@ impl PySubgraph {
                     }
                 }
             }
-            
+
             let graph_array = groggy::GraphArray::from_vec(attr_values);
             let py_array = PyGraphArray::from_graph_array(graph_array);
             columns.push(Py::new(py, py_array)?);
         }
-        
+
         let py_table = PyGraphTable::new(py, columns, Some(column_names))?;
         Ok(Py::new(py, py_table)?.to_object(py))
     }
-    
+
     /// Python-level access to parent graph (if attached).
     #[getter]
     pub fn graph(&self) -> PyResult<Option<Py<PyGraph>>> {
         Ok(self.graph.clone())
     }
-    
+
     /// Fast column accessor for node attributes on PySubgraph
-    pub fn _get_node_attribute_column(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyGraphArray>> {
+    pub fn _get_node_attribute_column(
+        &self,
+        py: Python<'_>,
+        name: &str,
+    ) -> PyResult<Py<PyGraphArray>> {
         if let Some(ref inner) = self.inner {
             let attr_name = groggy::AttrName::from(name.to_string());
-            let arr = inner.get_node_attribute_column(&attr_name)
-                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get node attribute column: {}", e)))?;
-            let py_graph_array = PyGraphArray { inner: groggy::GraphArray::from_vec(arr) };
+            let arr = inner.get_node_attribute_column(&attr_name).map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Failed to get node attribute column: {}",
+                    e
+                ))
+            })?;
+            let py_graph_array = PyGraphArray {
+                inner: groggy::GraphArray::from_vec(arr),
+            };
             return Py::new(py, py_graph_array);
         }
-        Err(pyo3::exceptions::PyRuntimeError::new_err("Subgraph has no inner core; attach a graph-backed subgraph"))
+        Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "Subgraph has no inner core; attach a graph-backed subgraph",
+        ))
     }
 
     /// Fast column accessor for edge attributes on PySubgraph  
-    pub fn _get_edge_attribute_column(&self, py: Python<'_>, name: &str) -> PyResult<Py<PyGraphArray>> {
+    pub fn _get_edge_attribute_column(
+        &self,
+        py: Python<'_>,
+        name: &str,
+    ) -> PyResult<Py<PyGraphArray>> {
         if let Some(ref inner) = self.inner {
             let attr_name = groggy::AttrName::from(name.to_string());
-            let arr = inner.get_edge_attribute_column(&attr_name)
-                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get edge attribute column: {}", e)))?;
-            let py_graph_array = PyGraphArray { inner: groggy::GraphArray::from_vec(arr) };
+            let arr = inner.get_edge_attribute_column(&attr_name).map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Failed to get edge attribute column: {}",
+                    e
+                ))
+            })?;
+            let py_graph_array = PyGraphArray {
+                inner: groggy::GraphArray::from_vec(arr),
+            };
             return Py::new(py, py_graph_array);
         }
-        Err(pyo3::exceptions::PyRuntimeError::new_err("Subgraph has no inner core; attach a graph-backed subgraph"))
+        Err(pyo3::exceptions::PyRuntimeError::new_err(
+            "Subgraph has no inner core; attach a graph-backed subgraph",
+        ))
     }
-    
+
     /// Filter nodes *within this subgraph* using a full NodeFilter or string expression.
     /// Returns a new PySubgraph with filtered nodes and induced edges (within this subgraph).
     pub fn filter_nodes(&self, py: Python<'_>, filter: &PyAny) -> PyResult<PySubgraph> {
         // 0) Must have a parent graph to evaluate attributes efficiently
         let Some(graph_ref) = &self.graph else {
-            return Err(PyRuntimeError::new_err("Subgraph has no parent graph reference"));
+            return Err(PyRuntimeError::new_err(
+                "Subgraph has no parent graph reference",
+            ));
         };
 
         // 1) Resolve a NodeFilter:
@@ -746,7 +847,7 @@ impl PySubgraph {
             parsed.inner.clone()
         } else if let Ok(dict) = filter.downcast::<pyo3::types::PyDict>() {
             // Optional: allow dict form {"age": AttributeFilter.greater_than(21), ...}
-            use groggy::core::query::{NodeFilter as NF, AttributeFilter as AF};
+            use groggy::core::query::{AttributeFilter as AF, NodeFilter as NF};
             use groggy::AttrName;
             let mut clauses = Vec::new();
             for (k, v) in dict.iter() {
@@ -754,23 +855,27 @@ impl PySubgraph {
                 // Expect v is a PyAttributeFilter (FFI), so call .inner on it from Python first if needed.
                 // If your AttributeFilter is exposed as a Python class, try to extract it directly:
                 let py_attr = v.extract::<crate::ffi::core::query::PyAttributeFilter>()?;
-                clauses.push(NF::AttributeFilter { name: AttrName::from(key), filter: py_attr.inner.clone() });
+                clauses.push(NF::AttributeFilter {
+                    name: AttrName::from(key),
+                    filter: py_attr.inner.clone(),
+                });
             }
             groggy::core::query::NodeFilter::And(clauses)
         } else {
             return Err(PyTypeError::new_err(
-                "filter must be NodeFilter | str | dict[str, AttributeFilter]"
+                "filter must be NodeFilter | str | dict[str, AttributeFilter]",
             ));
         };
 
         // 2) Evaluate filter on the *current subgraph nodes* using the core API
         let mut g = graph_ref.borrow_mut(py);
-        
+
         // Get all nodes that match the filter from the entire graph
-        let all_filtered_nodes: Vec<groggy::NodeId> = g.inner
+        let all_filtered_nodes: Vec<groggy::NodeId> = g
+            .inner
             .find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
-        
+
         // Intersect with current subgraph's nodes to get nodes that are both:
         // 1) In this subgraph, and 2) Match the filter
         let subgraph_node_set: HashSet<groggy::NodeId> = self.nodes.iter().copied().collect();
