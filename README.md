@@ -247,20 +247,32 @@ adj.to_numpy()                         # Convert to NumPy array
 
 ## 🧪 **Testing**
 
-Groggy includes comprehensive validation scripts:
+Groggy includes tests and validation scripts:
 
+### **Rust Core Tests**
 ```bash
-# Run documentation validation
-python python-groggy/docs/debug_documentation.py
+# Run Rust unit tests
+cargo test
 
-# Quick validation test
-python python-groggy/docs/simple_validation_test.py
-
-# Full validation suite
-python python-groggy/docs/validation_test_suite.py
+# Run specific test module
+cargo test core::array
 ```
 
-**Current test results: 95%+ documented features working correctly** ✅
+### **Documentation Validation**
+```bash
+# Run documentation validation (in documentation/development/)
+python documentation/development/debug_documentation.py
+
+# Quick validation test
+python documentation/development/simple_validation_test.py
+
+# Full validation suite  
+python documentation/development/validation_test_suite.py
+```
+
+**Current validation results: 95%+ documented features working correctly** ✅
+
+**Note**: Python integration tests are in development. Current testing relies on Rust unit tests and documentation validation scripts.
 
 ---
 
@@ -270,19 +282,20 @@ python python-groggy/docs/validation_test_suite.py
 ```
 groggy/
 ├── src/                    # Rust core library  
-│   ├── core/              # Core data structures and algorithms
+│   ├── core/              # Core data structures and algorithms (with unit tests)
 │   ├── api/               # High-level graph API
 │   └── display/           # Rich formatting and display
 ├── python-groggy/         # Python bindings and package
 │   ├── src/ffi/          # Rust-to-Python FFI layer  
-│   └── python/groggy/    # Python package code
+│   ├── python/groggy/    # Python package code
+│   └── tests/            # Python tests (in development)
 ├── docs/                  # Sphinx documentation (RST)
 ├── documentation/         # Development docs (Markdown)
-│   ├── development/      # Testing scripts, reports
+│   ├── development/      # Testing scripts, validation tools
 │   ├── planning/         # Architecture plans  
 │   ├── releases/         # Release notes
 │   └── examples/         # Usage examples
-└── tests/                 # Test suites
+└── notebooks/             # Jupyter notebooks for testing/demos
 ```
 
 ### **Building & Testing**
@@ -296,9 +309,11 @@ maturin develop --release
 # Run formatting
 cargo fmt
 
-# Run tests
+# Run Rust tests
 cargo test
-pytest tests/
+
+# Run documentation validation
+python documentation/development/debug_documentation.py
 ```
 
 ### **Contributing**
