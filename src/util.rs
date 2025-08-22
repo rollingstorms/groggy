@@ -125,6 +125,10 @@ pub fn attr_value_hash(value: &AttrValue) -> u64 {
             cd.data.hash(&mut hasher);
             hasher.finish()
         },
+        AttrValue::Null => {
+            // Consistent hash for null values
+            u64::MAX // Use max value to distinguish from other values
+        },
     }
 }
 

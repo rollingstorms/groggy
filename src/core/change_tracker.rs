@@ -394,6 +394,7 @@ impl ChangeTracker {
                     AttrValue::Bytes(b) => b.len(),
                     AttrValue::CompressedText(cd) => cd.memory_size(),
                     AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+                    AttrValue::Null => 0,
                 };
             }
             total += match new_val {
@@ -407,6 +408,7 @@ impl ChangeTracker {
                 AttrValue::Bytes(b) => b.len(),
                 AttrValue::CompressedText(cd) => cd.memory_size(),
                 AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+                AttrValue::Null => 0,
             };
         }
         
@@ -425,6 +427,7 @@ impl ChangeTracker {
                     AttrValue::Bytes(b) => b.len(),
                     AttrValue::CompressedText(cd) => cd.memory_size(),
                     AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+                    AttrValue::Null => 0,
                 };
             }
             total += match new_val {
@@ -438,6 +441,7 @@ impl ChangeTracker {
                 AttrValue::Bytes(b) => b.len(),
                 AttrValue::CompressedText(cd) => cd.memory_size(),
                 AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+                AttrValue::Null => 0,
             };
         }
         

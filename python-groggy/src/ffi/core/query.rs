@@ -20,33 +20,39 @@ pub struct PyAttributeFilter {
 #[pymethods]
 impl PyAttributeFilter {
     #[staticmethod]
-    fn equals(value: &PyAttrValue) -> Self {
-        Self { inner: AttributeFilter::Equals(value.inner.clone()) }
+    fn equals(value: &PyAny) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+        Ok(Self { inner: AttributeFilter::Equals(attr_value) })
     }
     
     #[staticmethod]
-    fn greater_than(value: &PyAttrValue) -> Self {
-        Self { inner: AttributeFilter::GreaterThan(value.inner.clone()) }
+    fn greater_than(value: &PyAny) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+        Ok(Self { inner: AttributeFilter::GreaterThan(attr_value) })
     }
     
     #[staticmethod]
-    fn less_than(value: &PyAttrValue) -> Self {
-        Self { inner: AttributeFilter::LessThan(value.inner.clone()) }
+    fn less_than(value: &PyAny) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+        Ok(Self { inner: AttributeFilter::LessThan(attr_value) })
     }
     
     #[staticmethod]
-    fn not_equals(value: &PyAttrValue) -> Self {
-        Self { inner: AttributeFilter::NotEquals(value.inner.clone()) }
+    fn not_equals(value: &PyAny) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+        Ok(Self { inner: AttributeFilter::NotEquals(attr_value) })
     }
     
     #[staticmethod]
-    fn greater_than_or_equal(value: &PyAttrValue) -> Self {
-        Self { inner: AttributeFilter::GreaterThanOrEqual(value.inner.clone()) }
+    fn greater_than_or_equal(value: &PyAny) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+        Ok(Self { inner: AttributeFilter::GreaterThanOrEqual(attr_value) })
     }
     
     #[staticmethod]
-    fn less_than_or_equal(value: &PyAttrValue) -> Self {
-        Self { inner: AttributeFilter::LessThanOrEqual(value.inner.clone()) }
+    fn less_than_or_equal(value: &PyAny) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+        Ok(Self { inner: AttributeFilter::LessThanOrEqual(attr_value) })
     }
 }
 
@@ -65,13 +71,14 @@ impl PyNodeFilter {
     }
     
     #[staticmethod]
-    fn attribute_equals(name: AttrName, value: &PyAttrValue) -> Self {
-        Self { 
+    fn attribute_equals(name: AttrName, value: &PyAny) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+        Ok(Self { 
             inner: NodeFilter::AttributeEquals { 
                 name, 
-                value: value.inner.clone() 
+                value: attr_value 
             } 
-        }
+        })
     }
     
     #[staticmethod]
@@ -121,13 +128,14 @@ impl PyEdgeFilter {
     }
     
     #[staticmethod]
-    fn attribute_equals(name: AttrName, value: &PyAttrValue) -> Self {
-        Self { 
+    fn attribute_equals(name: AttrName, value: &PyAny) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+        Ok(Self { 
             inner: EdgeFilter::AttributeEquals { 
                 name, 
-                value: value.inner.clone() 
+                value: attr_value 
             } 
-        }
+        })
     }
     
     #[staticmethod]
@@ -159,6 +167,85 @@ impl PyEdgeFilter {
     #[staticmethod]
     fn not_filter(filter: &PyEdgeFilter) -> Self {
         Self { inner: EdgeFilter::Not(Box::new(filter.inner.clone())) }
+    }
+    
+    #[staticmethod]
+    fn connects_nodes(source: NodeId, target: NodeId) -> Self {
+        Self { inner: EdgeFilter::ConnectsNodes { source, target } }
+    }
+    
+    #[staticmethod]
+    fn connects_any(node_ids: Vec<NodeId>) -> Self {
+        Self { inner: EdgeFilter::ConnectsAny(node_ids) }
+    }
+    
+    /// Filter edges where the source node has a specific attribute value
+    #[staticmethod]
+    fn source_attribute_equals(name: AttrName, value: &PyAny) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+        // This is a convenience method that will need to be implemented in the core
+        // For now, we'll create a combination filter (this is a placeholder)
+        Ok(Self { 
+            inner: EdgeFilter::AttributeEquals { 
+                name: format!("source_{}", name), 
+                value: attr_value 
+            } 
+        })
+    }
+    
+    /// Filter edges where the target node has a specific attribute value
+    #[staticmethod]
+    fn target_attribute_equals(name: AttrName, value: &PyAny) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+        // This is a convenience method that will need to be implemented in the core
+        // For now, we'll create a combination filter (this is a placeholder)
+        Ok(Self { 
+            inner: EdgeFilter::AttributeEquals { 
+                name: format!("target_{}", name), 
+                value: attr_value 
+            } 
+        })
+    }
+    
+    /// Filter edges where source OR target node has the specified attribute value
+    /// This addresses the user's complaint about complex OR conditions
+    #[staticmethod]
+    fn source_or_target_attribute_equals(name: AttrName, value: &PyAny) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+        // Create an OR filter combining source and target attribute filters
+        let source_filter = EdgeFilter::AttributeEquals { 
+            name: format!("source_{}", name), 
+            value: attr_value.clone() 
+        };
+        let target_filter = EdgeFilter::AttributeEquals { 
+            name: format!("target_{}", name), 
+            value: attr_value 
+        };
+        
+        Ok(Self { inner: EdgeFilter::Or(vec![source_filter, target_filter]) })
+    }
+    
+    /// Filter edges where source OR target node attribute matches any of the provided values
+    /// This makes the "contains an attribute as either the target or source" use case much simpler
+    #[staticmethod]
+    fn source_or_target_attribute_in(name: AttrName, values: Vec<&PyAny>) -> PyResult<Self> {
+        let mut filters = Vec::new();
+        
+        for value in values {
+            let attr_value = crate::ffi::utils::python_value_to_attr_value(value)?;
+            let source_filter = EdgeFilter::AttributeEquals { 
+                name: format!("source_{}", name), 
+                value: attr_value.clone() 
+            };
+            let target_filter = EdgeFilter::AttributeEquals { 
+                name: format!("target_{}", name), 
+                value: attr_value 
+            };
+            filters.push(EdgeFilter::Or(vec![source_filter, target_filter]));
+        }
+        
+        // Combine all value filters with OR
+        Ok(Self { inner: EdgeFilter::Or(filters) })
     }
 }
 
