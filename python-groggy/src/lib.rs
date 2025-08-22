@@ -49,21 +49,38 @@ fn array(values: Vec<PyObject>) -> PyResult<PyGraphArray> {
 fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
     // Check if data is a list of lists (nested structure)
     if let Ok(nested_lists) = data.extract::<Vec<Vec<PyObject>>>(py) {
-        // Convert nested lists to GraphArrays
-        let mut arrays = Vec::new();
+        // Convert nested lists to core GraphArrays directly
+        let mut core_arrays = Vec::new();
         for row in nested_lists {
-            let array = PyGraphArray::from_py_objects(row)?;
-            arrays.push(Py::new(py, array)?);
+            let py_array = PyGraphArray::from_py_objects(row)?;
+            core_arrays.push(py_array.inner);
         }
-        PyGraphMatrix::new(py, arrays)
-    } 
+        
+        // Create core GraphMatrix directly
+        let matrix = groggy::core::matrix::GraphMatrix::from_arrays(core_arrays)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to create matrix: {:?}", e)))?;
+        
+        Ok(PyGraphMatrix { inner: matrix })
+    }
+    // Check if data is a flat list (single row)
+    else if let Ok(flat_list) = data.extract::<Vec<PyObject>>(py) {
+        // Convert single list to single-row matrix
+        let py_array = PyGraphArray::from_py_objects(flat_list)?;
+        let core_arrays = vec![py_array.inner];
+        
+        // Create core GraphMatrix directly
+        let matrix = groggy::core::matrix::GraphMatrix::from_arrays(core_arrays)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to create matrix: {:?}", e)))?;
+        
+        Ok(PyGraphMatrix { inner: matrix })
+    }
     // Check if data is a list of GraphArrays
     else if let Ok(array_list) = data.extract::<Vec<Py<PyGraphArray>>>(py) {
         PyGraphMatrix::new(py, array_list)
     }
     else {
         Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "matrix() expects either nested lists [[1,2],[3,4]] or list of GraphArrays"
+            "matrix() expects nested lists [[1,2],[3,4]], flat list [1,2,3,4], or list of GraphArrays"
         ))
     }
 }
@@ -80,20 +97,39 @@ fn table(py: Python, data: PyObject, columns: Option<Vec<String>>) -> PyResult<P
     
     // Check if data is a dictionary
     if let Ok(dict) = data.extract::<&PyDict>(py) {
-        let mut arrays = Vec::new();
+        let mut core_arrays = Vec::new();
         let mut column_names = Vec::new();
         
-        // Convert dictionary to arrays
+        // Convert dictionary to core arrays directly
         for (key, value) in dict.iter() {
             let col_name: String = key.extract()?;
             let values: Vec<PyObject> = value.extract()?;
-            let array = PyGraphArray::from_py_objects(values)?;
+            let py_array = PyGraphArray::from_py_objects(values)?;
             
-            arrays.push(Py::new(py, array)?);
+            core_arrays.push(py_array.inner);
             column_names.push(col_name);
         }
         
-        PyGraphTable::new(py, arrays, Some(column_names))
+        // Create core GraphTable directly
+        let table = groggy::core::table::GraphTable::from_arrays(core_arrays, Some(column_names), None)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to create table: {:?}", e)))?;
+        
+        Ok(PyGraphTable { inner: table })
+    }
+    // Check if data is a list of lists (nested structure for columns)
+    else if let Ok(nested_lists) = data.extract::<Vec<Vec<PyObject>>>(py) {
+        // Convert nested lists to core arrays directly
+        let mut core_arrays = Vec::new();
+        for column in nested_lists {
+            let py_array = PyGraphArray::from_py_objects(column)?;
+            core_arrays.push(py_array.inner);
+        }
+        
+        // Create core GraphTable directly
+        let table = groggy::core::table::GraphTable::from_arrays(core_arrays, columns, None)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Failed to create table: {:?}", e)))?;
+        
+        Ok(PyGraphTable { inner: table })
     }
     // Check if data is a list of arrays
     else if let Ok(array_list) = data.extract::<Vec<Py<PyGraphArray>>>(py) {
@@ -101,7 +137,7 @@ fn table(py: Python, data: PyObject, columns: Option<Vec<String>>) -> PyResult<P
     }
     else {
         Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "table() expects either a dictionary {'col': [values]} or list of GraphArrays with column names"
+            "table() expects dictionary {'col': [values]}, nested lists [[col1_values], [col2_values]], or list of GraphArrays"
         ))
     }
 }

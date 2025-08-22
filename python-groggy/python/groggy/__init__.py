@@ -25,6 +25,10 @@ from ._groggy import (
     GraphArray,
     GraphMatrix,
     GraphTable,
+    # Builder functions with auto-conversion
+    array,
+    matrix,
+    table,
     # Display functionality
     DisplayConfig,
     format_array,
@@ -62,10 +66,8 @@ from .enhanced_query import enhanced_filter_nodes, enhanced_filter_edges
 # GraphTable now comes from Rust FFI
 from . import table_extensions
 
-# Convenient aliases for core data structures
-array = GraphArray
-table = GraphTable  
-matrix = GraphMatrix
+# Note: array, matrix, table are now imported directly as auto-converting builder functions
+# The classes GraphArray, GraphMatrix, GraphTable are still available for direct instantiation
 
 # Import display formatters for rich display integration
 try:
@@ -117,6 +119,7 @@ __all__ = [
     # Statistical arrays and matrices
     "GraphArray",
     "GraphMatrix",
+    "GraphTable",
     # Display functionality  
     "DisplayConfig",
     "format_array",
@@ -142,10 +145,8 @@ __all__ = [
     # Enhanced query functions
     "enhanced_filter_nodes",
     "enhanced_filter_edges",
-    # Graph table functionality
-    "GraphTable",
-    # Convenient aliases
+    # Auto-converting builder functions
     "array",
-    "table", 
-    "matrix",
+    "matrix", 
+    "table",
 ]

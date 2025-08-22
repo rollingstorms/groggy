@@ -243,6 +243,31 @@ impl PyGraph {
         self.inner.edge_ids().len()
     }
     
+    /// Calculate graph density (number of edges / number of possible edges)
+    fn density(&self) -> f64 {
+        let num_nodes = self.inner.node_ids().len();
+        let num_edges = self.inner.edge_ids().len();
+        
+        if num_nodes <= 1 {
+            return 0.0;
+        }
+        
+        // Calculate maximum possible edges based on graph type
+        let max_possible_edges = if self.inner.is_directed() {
+            // For directed graphs: n(n-1)
+            num_nodes * (num_nodes - 1)
+        } else {
+            // For undirected graphs: n(n-1)/2
+            (num_nodes * (num_nodes - 1)) / 2
+        };
+        
+        if max_possible_edges > 0 {
+            num_edges as f64 / max_possible_edges as f64
+        } else {
+            0.0
+        }
+    }
+    
     // === ATTRIBUTE OPERATIONS ===
     
     pub fn set_node_attribute(&mut self, node: NodeId, attr: AttrName, value: &PyAttrValue) -> PyResult<()> {
@@ -250,8 +275,22 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
     
+    /// Set node attribute with automatic Python value conversion
+    pub fn set_node_attr(&mut self, node: NodeId, attr: AttrName, value: &PyAny) -> PyResult<()> {
+        let attr_value = python_value_to_attr_value(value)?;
+        self.inner.set_node_attr(node, attr, attr_value)
+            .map_err(graph_error_to_py_err)
+    }
+    
     pub fn set_edge_attribute(&mut self, edge: EdgeId, attr: AttrName, value: &PyAttrValue) -> PyResult<()> {
         self.inner.set_edge_attr(edge, attr, value.inner.clone())
+            .map_err(graph_error_to_py_err)
+    }
+    
+    /// Set edge attribute with automatic Python value conversion
+    pub fn set_edge_attr(&mut self, edge: EdgeId, attr: AttrName, value: &PyAny) -> PyResult<()> {
+        let attr_value = python_value_to_attr_value(value)?;
+        self.inner.set_edge_attr(edge, attr, attr_value)
             .map_err(graph_error_to_py_err)
     }
     
@@ -534,7 +573,7 @@ impl PyGraph {
     }
     
     /// Add multiple edges at once
-    fn add_edges(&mut self, edges: &PyAny, node_mapping: Option<std::collections::HashMap<String, NodeId>>, _uid_key: Option<String>) -> PyResult<Vec<EdgeId>> {
+    fn add_edges(&mut self, edges: &PyAny, node_mapping: Option<std::collections::HashMap<String, NodeId>>, uid_key: Option<String>) -> PyResult<Vec<EdgeId>> {
         // Format 1: List of (source, target) tuples - most common case for benchmarks
         if let Ok(edge_pairs) = edges.extract::<Vec<(NodeId, NodeId)>>() {
             return Ok(self.inner.add_edges(&edge_pairs));
@@ -660,6 +699,13 @@ impl PyGraph {
             ));
         };
         
+        // Validate that any referenced attributes exist in the graph
+        if let Err(attr_name) = Self::validate_node_filter_attributes(&slf.inner, &node_filter) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Attribute '{}' does not exist on any nodes in the graph. Use graph.nodes.table().columns to see available attributes.", attr_name)
+            ));
+        }
+        
         let start = std::time::Instant::now();
         let filtered_nodes = slf.inner.find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
@@ -714,6 +760,13 @@ impl PyGraph {
                 "filter must be an EdgeFilter object or a string query"
             ));
         };
+        
+        // Validate that any referenced attributes exist in the graph
+        if let Err(attr_name) = Self::validate_edge_filter_attributes(&slf.inner, &edge_filter) {
+            return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Attribute '{}' does not exist on any edges in the graph. Use graph.edges.table().columns to see available attributes.", attr_name)
+            ));
+        }
         
         let filtered_edges = slf.inner.find_edges(edge_filter)
             .map_err(graph_error_to_py_err)?;
@@ -951,7 +1004,8 @@ impl PyGraph {
     }
     
     /// Get node mapping for a specific attribute (FFI wrapper around core operations)
-    fn get_node_mapping(&self, py: Python, uid_key: String) -> PyResult<PyObject> {
+    #[pyo3(signature = (uid_key, return_inverse = false))]
+    fn get_node_mapping(&self, py: Python, uid_key: String, return_inverse: bool) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
         
         // Delegate to core for node IDs and attributes
@@ -961,7 +1015,7 @@ impl PyGraph {
         for node_id in node_ids {
             if let Ok(Some(attr_value)) = self.inner.get_node_attr(node_id, &uid_key) {
                 // Convert attribute value to appropriate Python type
-                let key_value = match attr_value {
+                let attr_value_py = match attr_value {
                     RustAttrValue::Text(s) => s.to_object(py),
                     RustAttrValue::CompactText(s) => s.as_str().to_object(py),
                     RustAttrValue::Int(i) => i.to_object(py),
@@ -971,7 +1025,13 @@ impl PyGraph {
                     _ => continue, // Skip unsupported types
                 };
                 
-                dict.set_item(key_value, node_id)?;
+                if return_inverse {
+                    // Return node_id -> attribute_value mapping
+                    dict.set_item(node_id, attr_value_py)?;
+                } else {
+                    // Return attribute_value -> node_id mapping (default behavior)
+                    dict.set_item(attr_value_py, node_id)?;
+                }
             }
         }
         
@@ -1100,6 +1160,176 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
     
+    /// Get the degree of nodes (number of incident edges)
+    /// 
+    /// Usage:
+    /// - degree(node_id) -> int: degree of single node
+    /// - degree(node_ids) -> dict: degrees for list of nodes  
+    /// - degree() -> dict: degrees for all nodes
+    #[pyo3(signature = (nodes = None))]
+    fn degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
+        match nodes {
+            // Single node case: degree(node_id) -> int
+            Some(node_arg) if node_arg.extract::<NodeId>().is_ok() => {
+                let node = node_arg.extract::<NodeId>()?;
+                let deg = self.inner.degree(node).map_err(graph_error_to_py_err)?;
+                Ok(deg.to_object(py))
+            },
+            // List of nodes case: degree([node1, node2, ...]) -> dict
+            Some(node_arg) if node_arg.extract::<Vec<NodeId>>().is_ok() => {
+                let node_ids = node_arg.extract::<Vec<NodeId>>()?;
+                let result_dict = pyo3::types::PyDict::new(py);
+                
+                for node_id in node_ids {
+                    match self.inner.degree(node_id) {
+                        Ok(deg) => {
+                            result_dict.set_item(node_id, deg)?;
+                        },
+                        Err(_) => {
+                            // Skip nodes that don't exist rather than failing
+                            continue;
+                        }
+                    }
+                }
+                
+                Ok(result_dict.to_object(py))
+            },
+            // All nodes case: degree() -> dict  
+            None => {
+                let result_dict = pyo3::types::PyDict::new(py);
+                let all_nodes = self.inner.node_ids();
+                
+                for node_id in all_nodes {
+                    if let Ok(deg) = self.inner.degree(node_id) {
+                        result_dict.set_item(node_id, deg)?;
+                    }
+                }
+                
+                Ok(result_dict.to_object(py))
+            },
+            // Invalid argument type
+            Some(_) => {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "degree() argument must be a NodeId, list of NodeIds, or None"
+                ))
+            }
+        }
+    }
+    
+    /// Get the in-degree of nodes (number of incoming edges) - for directed graphs
+    /// 
+    /// Usage:
+    /// - in_degree(node_id) -> int: in-degree of single node
+    /// - in_degree(node_ids) -> dict: in-degrees for list of nodes  
+    /// - in_degree() -> dict: in-degrees for all nodes
+    #[pyo3(signature = (nodes = None))]
+    fn in_degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
+        if !self.inner.is_directed() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "in_degree() is only available for directed graphs. Use degree() for undirected graphs."
+            ));
+        }
+        
+        // Get fresh topology snapshot once
+        let (_, _sources, targets) = self.inner.get_columnar_topology();
+        
+        match nodes {
+            // Single node case: in_degree(node_id) -> int
+            Some(node_arg) if node_arg.extract::<NodeId>().is_ok() => {
+                let node = node_arg.extract::<NodeId>()?;
+                let count = targets.iter().filter(|&&target| target == node).count();
+                Ok(count.to_object(py))
+            },
+            // List of nodes case: in_degree([node1, node2, ...]) -> dict
+            Some(node_arg) if node_arg.extract::<Vec<NodeId>>().is_ok() => {
+                let node_ids = node_arg.extract::<Vec<NodeId>>()?;
+                let result_dict = pyo3::types::PyDict::new(py);
+                
+                for node_id in node_ids {
+                    let count = targets.iter().filter(|&&target| target == node_id).count();
+                    result_dict.set_item(node_id, count)?;
+                }
+                
+                Ok(result_dict.to_object(py))
+            },
+            // All nodes case: in_degree() -> dict  
+            None => {
+                let result_dict = pyo3::types::PyDict::new(py);
+                let all_nodes = self.inner.node_ids();
+                
+                for node_id in all_nodes {
+                    let count = targets.iter().filter(|&&target| target == node_id).count();
+                    result_dict.set_item(node_id, count)?;
+                }
+                
+                Ok(result_dict.to_object(py))
+            },
+            // Invalid argument type
+            Some(_) => {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "in_degree() argument must be a NodeId, list of NodeIds, or None"
+                ))
+            }
+        }
+    }
+    
+    /// Get the out-degree of nodes (number of outgoing edges) - for directed graphs
+    /// 
+    /// Usage:
+    /// - out_degree(node_id) -> int: out-degree of single node
+    /// - out_degree(node_ids) -> dict: out-degrees for list of nodes  
+    /// - out_degree() -> dict: out-degrees for all nodes
+    #[pyo3(signature = (nodes = None))]
+    fn out_degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
+        if !self.inner.is_directed() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "out_degree() is only available for directed graphs. Use degree() for undirected graphs."
+            ));
+        }
+        
+        // Get fresh topology snapshot once
+        let (_, sources, _targets) = self.inner.get_columnar_topology();
+        
+        match nodes {
+            // Single node case: out_degree(node_id) -> int
+            Some(node_arg) if node_arg.extract::<NodeId>().is_ok() => {
+                let node = node_arg.extract::<NodeId>()?;
+                let count = sources.iter().filter(|&&source| source == node).count();
+                Ok(count.to_object(py))
+            },
+            // List of nodes case: out_degree([node1, node2, ...]) -> dict
+            Some(node_arg) if node_arg.extract::<Vec<NodeId>>().is_ok() => {
+                let node_ids = node_arg.extract::<Vec<NodeId>>()?;
+                let result_dict = pyo3::types::PyDict::new(py);
+                
+                for node_id in node_ids {
+                    let count = sources.iter().filter(|&&source| source == node_id).count();
+                    result_dict.set_item(node_id, count)?;
+                }
+                
+                Ok(result_dict.to_object(py))
+            },
+            // All nodes case: out_degree() -> dict  
+            None => {
+                let result_dict = pyo3::types::PyDict::new(py);
+                let all_nodes = self.inner.node_ids();
+                
+                for node_id in all_nodes {
+                    let count = sources.iter().filter(|&&source| source == node_id).count();
+                    result_dict.set_item(node_id, count)?;
+                }
+                
+                Ok(result_dict.to_object(py))
+            },
+            // Invalid argument type
+            Some(_) => {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "out_degree() argument must be a NodeId, list of NodeIds, or None"
+                ))
+            }
+        }
+    }
+    
     /// Return a full-view Subgraph (whole graph as a subgraph).
     /// Downstream code can always resolve parent graph from this object.
     pub fn view(self_: PyRef<Self>, py: Python<'_>) -> PyResult<Py<PySubgraph>> {
@@ -1111,6 +1341,14 @@ impl PyGraph {
         let this_graph: Py<PyGraph> = self_.into();
         sg.set_graph_reference(this_graph);
         Py::new(py, sg)
+    }
+    
+    /// Check if the graph is connected (delegates to subgraph implementation)
+    pub fn is_connected(self_: PyRef<Self>, py: Python<'_>) -> PyResult<bool> {
+        // Create a full-view subgraph and check if it's connected
+        let subgraph = Self::view(self_, py)?;
+        let subgraph_ref = subgraph.borrow(py);
+        subgraph_ref.is_connected()
     }
     
     /// Create GraphTable for DataFrame-like view of this graph's nodes
@@ -1328,7 +1566,7 @@ impl PyGraph {
             Ok(values) => {
                 // Convert Option<AttrValue> vector to AttrValue vector (convert None to appropriate AttrValue)
                 let attr_values: Vec<groggy::AttrValue> = values.into_iter()
-                    .map(|opt_val| opt_val.unwrap_or(groggy::AttrValue::Int(0))) // Use default for None values
+                    .map(|opt_val| opt_val.unwrap_or(groggy::AttrValue::Null)) // Use Null for missing values
                     .collect();
                 
                 // Create GraphArray and convert to PyGraphArray
@@ -1339,5 +1577,101 @@ impl PyGraph {
             },
             Err(e) => Err(graph_error_to_py_err(e))
         }
+    }
+    
+    /// Validate that all attributes referenced in a NodeFilter exist in the graph
+    /// Returns Ok(()) if valid, Err(attr_name) if an attribute doesn't exist
+    fn validate_node_filter_attributes(
+        graph: &groggy::api::graph::Graph,
+        filter: &groggy::core::query::NodeFilter
+    ) -> Result<(), String> {
+        use groggy::core::query::NodeFilter;
+        
+        match filter {
+            NodeFilter::AttributeFilter { name, .. } |
+            NodeFilter::AttributeEquals { name, .. } |
+            NodeFilter::HasAttribute { name } => {
+                // Check if this attribute exists on any nodes
+                if !Self::attribute_exists_on_nodes(graph, name) {
+                    return Err(name.clone());
+                }
+            }
+            NodeFilter::And(filters) => {
+                for f in filters {
+                    Self::validate_node_filter_attributes(graph, f)?;
+                }
+            }
+            NodeFilter::Or(filters) => {
+                for f in filters {
+                    Self::validate_node_filter_attributes(graph, f)?;
+                }
+            }
+            NodeFilter::Not(filter) => {
+                Self::validate_node_filter_attributes(graph, filter)?;
+            }
+            // Other filter types don't reference attributes
+            _ => {}
+        }
+        
+        Ok(())
+    }
+    
+    /// Validate that all attributes referenced in an EdgeFilter exist in the graph
+    /// Returns Ok(()) if valid, Err(attr_name) if an attribute doesn't exist
+    fn validate_edge_filter_attributes(
+        graph: &groggy::api::graph::Graph,
+        filter: &groggy::core::query::EdgeFilter
+    ) -> Result<(), String> {
+        use groggy::core::query::EdgeFilter;
+        
+        match filter {
+            EdgeFilter::AttributeFilter { name, .. } |
+            EdgeFilter::AttributeEquals { name, .. } |
+            EdgeFilter::HasAttribute { name } => {
+                // Check if this attribute exists on any edges
+                if !Self::attribute_exists_on_edges(graph, name) {
+                    return Err(name.clone());
+                }
+            }
+            EdgeFilter::And(filters) => {
+                for f in filters {
+                    Self::validate_edge_filter_attributes(graph, f)?;
+                }
+            }
+            EdgeFilter::Or(filters) => {
+                for f in filters {
+                    Self::validate_edge_filter_attributes(graph, f)?;
+                }
+            }
+            EdgeFilter::Not(filter) => {
+                Self::validate_edge_filter_attributes(graph, filter)?;
+            }
+            // Other filter types don't reference attributes
+            _ => {}
+        }
+        
+        Ok(())
+    }
+    
+    /// Check if an attribute exists on any nodes in the graph
+    fn attribute_exists_on_nodes(graph: &groggy::api::graph::Graph, attr_name: &str) -> bool {
+        let node_ids = graph.node_ids();
+        for node_id in node_ids.iter().take(100) { // Sample first 100 nodes for performance
+            if let Ok(Some(_)) = graph.get_node_attr(*node_id, &attr_name.to_string()) {
+                return true;
+            }
+        }
+        false
+    }
+    
+    /// Check if an attribute exists on any edges in the graph
+    fn attribute_exists_on_edges(graph: &groggy::api::graph::Graph, attr_name: &str) -> bool {
+        let edge_ids = graph.edge_ids();
+        for edge_id in edge_ids.iter().take(100) { // Sample first 100 edges for performance
+            if let Ok(Some(_)) = graph.get_edge_attr(*edge_id, &attr_name.to_string()) {
+                return true;
+            }
+        }
+        false
     }
 }

@@ -297,6 +297,62 @@ impl PyGraphArray {
         }
     }
     
+    /// Count non-null values
+    fn count(&self) -> usize {
+        let values = self.inner.materialize();
+        values.iter()
+            .filter(|value| !matches!(value, groggy::AttrValue::Null))
+            .count()
+    }
+    
+    /// Check if array contains any null values
+    fn has_null(&self) -> bool {
+        let values = self.inner.materialize();
+        values.iter()
+            .any(|value| matches!(value, groggy::AttrValue::Null))
+    }
+    
+    /// Count null values
+    fn null_count(&self) -> usize {
+        let values = self.inner.materialize();
+        values.iter()
+            .filter(|value| matches!(value, groggy::AttrValue::Null))
+            .count()
+    }
+    
+    /// Drop null values, returning a new array
+    fn drop_na(&self, py: Python) -> PyResult<PyObject> {
+        let values = self.inner.materialize();
+        let non_null_values: Vec<groggy::AttrValue> = values.iter()
+            .filter(|value| !matches!(value, groggy::AttrValue::Null))
+            .cloned()
+            .collect();
+        
+        let new_array = groggy::core::array::GraphArray::from_vec(non_null_values);
+        let py_array = PyGraphArray::from_graph_array(new_array);
+        Ok(Py::new(py, py_array)?.to_object(py))
+    }
+    
+    /// Fill null values with a specified value, returning a new array
+    fn fill_na(&self, py: Python, fill_value: &PyAny) -> PyResult<PyObject> {
+        let fill_attr_value = crate::ffi::utils::python_value_to_attr_value(fill_value)?;
+        let values = self.inner.materialize();
+        
+        let filled_values: Vec<groggy::AttrValue> = values.iter()
+            .map(|value| {
+                if matches!(value, groggy::AttrValue::Null) {
+                    fill_attr_value.clone()
+                } else {
+                    value.clone()
+                }
+            })
+            .collect();
+        
+        let new_array = groggy::core::array::GraphArray::from_vec(filled_values);
+        let py_array = PyGraphArray::from_graph_array(new_array);
+        Ok(Py::new(py, py_array)?.to_object(py))
+    }
+    
     /// Calculate quantile (percentile)
     fn quantile(&self, q: f64) -> Option<f64> {
         self.inner.quantile(q)
@@ -316,10 +372,6 @@ impl PyGraphArray {
         self.inner.median()
     }
     
-    /// Get count of elements
-    fn count(&self) -> usize {
-        self.inner.count()
-    }
     
     /// Get unique values as a new GraphArray
     fn unique(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
@@ -545,6 +597,217 @@ impl PyGraphArray {
         // For now, we don't store names in GraphArray
         // This can be enhanced later when we add named arrays
         None
+    }
+    
+    // === COMPARISON OPERATORS FOR BOOLEAN INDEXING ===
+    
+    /// Greater than comparison - returns boolean array
+    fn __gt__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+        let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
+        
+        let mut result = Vec::new();
+        for value in self.inner.iter() {
+            let comparison_result = match (value, &other_value) {
+                // Integer comparisons
+                (groggy::AttrValue::Int(a), groggy::AttrValue::Int(b)) => a > b,
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::SmallInt(b)) => a > b,
+                (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a > b,
+                
+                // Mixed numeric type comparisons
+                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => (*a as i64) > (*b as i64),
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) > *b,
+                (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => (*a as f64) > (*b as f64),
+                (groggy::AttrValue::Float(a), groggy::AttrValue::Int(b)) => (*a as f64) > (*b as f64),
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Float(b)) => (*a as f64) > (*b as f64),
+                (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => (*a as f64) > (*b as f64),
+                
+                // String comparisons
+                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a.as_str() > b.as_str(),
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => a.as_str() > b.as_str(),
+                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => a.as_str() > b.as_str(),
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => a.as_str() > b.as_str(),
+                
+                // Boolean comparisons (false < true)
+                (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a > b,
+                
+                // Handle nulls - null is less than everything
+                (groggy::AttrValue::Null, _) => false,
+                (_, groggy::AttrValue::Null) => true,
+                
+                _ => return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    format!("Comparison not supported between {:?} and {:?}", value, other_value)
+                )),
+            };
+            result.push(groggy::AttrValue::Bool(comparison_result));
+        }
+        
+        Ok(PyGraphArray {
+            inner: groggy::GraphArray::from_vec(result),
+        })
+    }
+    
+    /// Less than comparison - returns boolean array
+    fn __lt__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+        let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
+        
+        let mut result = Vec::new();
+        for value in self.inner.iter() {
+            let comparison_result = match (value, &other_value) {
+                // Integer comparisons
+                (groggy::AttrValue::Int(a), groggy::AttrValue::Int(b)) => a < b,
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::SmallInt(b)) => a < b,
+                (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a < b,
+                
+                // Mixed numeric type comparisons
+                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => (*a as i64) < (*b as i64),
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) < *b,
+                (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => (*a as f64) < (*b as f64),
+                (groggy::AttrValue::Float(a), groggy::AttrValue::Int(b)) => (*a as f64) < (*b as f64),
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Float(b)) => (*a as f64) < (*b as f64),
+                (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => (*a as f64) < (*b as f64),
+                
+                // String comparisons
+                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a.as_str() < b.as_str(),
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => a.as_str() < b.as_str(),
+                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => a.as_str() < b.as_str(),
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => a.as_str() < b.as_str(),
+                
+                // Boolean comparisons (false < true)
+                (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a < b,
+                
+                // Handle nulls - null is less than everything
+                (groggy::AttrValue::Null, _) => true,
+                (_, groggy::AttrValue::Null) => false,
+                
+                _ => return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    format!("Comparison not supported between {:?} and {:?}", value, other_value)
+                )),
+            };
+            result.push(groggy::AttrValue::Bool(comparison_result));
+        }
+        
+        Ok(PyGraphArray {
+            inner: groggy::GraphArray::from_vec(result),
+        })
+    }
+    
+    /// Greater than or equal comparison - returns boolean array
+    fn __ge__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+        let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
+        
+        let mut result = Vec::new();
+        for value in self.inner.iter() {
+            let comparison_result = match (value, &other_value) {
+                // Integer comparisons
+                (groggy::AttrValue::Int(a), groggy::AttrValue::Int(b)) => a >= b,
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::SmallInt(b)) => a >= b,
+                (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a >= b,
+                
+                // Mixed numeric type comparisons
+                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => (*a as i64) >= (*b as i64),
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) >= *b,
+                (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => (*a as f64) >= (*b as f64),
+                (groggy::AttrValue::Float(a), groggy::AttrValue::Int(b)) => (*a as f64) >= (*b as f64),
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Float(b)) => (*a as f64) >= (*b as f64),
+                (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => (*a as f64) >= (*b as f64),
+                
+                // String comparisons
+                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a.as_str() >= b.as_str(),
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => a.as_str() >= b.as_str(),
+                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => a.as_str() >= b.as_str(),
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => a.as_str() >= b.as_str(),
+                
+                // Boolean comparisons (false < true)
+                (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a >= b,
+                
+                // Handle nulls - null is less than everything
+                (groggy::AttrValue::Null, _) => false,
+                (_, groggy::AttrValue::Null) => true,
+                _ => return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Comparison not supported for these types"
+                )),
+            };
+            result.push(groggy::AttrValue::Bool(comparison_result));
+        }
+        
+        Ok(PyGraphArray {
+            inner: groggy::GraphArray::from_vec(result),
+        })
+    }
+    
+    /// Less than or equal comparison - returns boolean array
+    fn __le__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+        let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
+        
+        let mut result = Vec::new();
+        for value in self.inner.iter() {
+            let comparison_result = match (value, &other_value) {
+                // Integer comparisons
+                (groggy::AttrValue::Int(a), groggy::AttrValue::Int(b)) => a <= b,
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::SmallInt(b)) => a <= b,
+                (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a <= b,
+                
+                // Mixed numeric type comparisons
+                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => (*a as i64) <= (*b as i64),
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) <= *b,
+                (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => (*a as f64) <= (*b as f64),
+                (groggy::AttrValue::Float(a), groggy::AttrValue::Int(b)) => (*a as f64) <= (*b as f64),
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Float(b)) => (*a as f64) <= (*b as f64),
+                (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => (*a as f64) <= (*b as f64),
+                
+                // String comparisons
+                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a.as_str() <= b.as_str(),
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => a.as_str() <= b.as_str(),
+                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => a.as_str() <= b.as_str(),
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => a.as_str() <= b.as_str(),
+                
+                // Boolean comparisons (false < true)
+                (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a <= b,
+                
+                // Handle nulls - null is less than everything
+                (groggy::AttrValue::Null, _) => true,
+                (_, groggy::AttrValue::Null) => false,
+                
+                _ => return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    format!("Comparison not supported between {:?} and {:?}", value, other_value)
+                )),
+            };
+            result.push(groggy::AttrValue::Bool(comparison_result));
+        }
+        
+        Ok(PyGraphArray {
+            inner: groggy::GraphArray::from_vec(result),
+        })
+    }
+    
+    /// Equality comparison - returns boolean array
+    fn __eq__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+        let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
+        
+        let mut result = Vec::new();
+        for value in self.inner.iter() {
+            let comparison_result = value == &other_value;
+            result.push(groggy::AttrValue::Bool(comparison_result));
+        }
+        
+        Ok(PyGraphArray {
+            inner: groggy::GraphArray::from_vec(result),
+        })
+    }
+    
+    /// Not equal comparison - returns boolean array
+    fn __ne__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+        let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
+        
+        let mut result = Vec::new();
+        for value in self.inner.iter() {
+            let comparison_result = value != &other_value;
+            result.push(groggy::AttrValue::Bool(comparison_result));
+        }
+        
+        Ok(PyGraphArray {
+            inner: groggy::GraphArray::from_vec(result),
+        })
     }
 }
 

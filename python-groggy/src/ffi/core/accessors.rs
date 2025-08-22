@@ -11,6 +11,34 @@ use groggy::{NodeId, EdgeId};
 use crate::ffi::api::graph::PyGraph;
 use crate::ffi::core::subgraph::PySubgraph;
 
+/// Iterator for nodes that yields NodeViews
+#[pyclass]
+pub struct NodesIterator {
+    graph: Py<PyGraph>,
+    node_ids: Vec<NodeId>,
+    index: usize,
+}
+
+#[pymethods]
+impl NodesIterator {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
+        slf
+    }
+    
+    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+        if self.index < self.node_ids.len() {
+            let node_id = self.node_ids[self.index];
+            self.index += 1;
+            
+            // Create NodeView for this node
+            let node_view = PyGraph::create_node_view_internal(self.graph.clone(), py, node_id)?;
+            Ok(Some(node_view.to_object(py)))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 /// Wrapper for g.nodes that supports indexing syntax: g.nodes[id] -> NodeView
 #[pyclass(name = "NodesAccessor")]
 pub struct PyNodesAccessor {
@@ -23,29 +51,50 @@ pub struct PyNodesAccessor {
 impl PyNodesAccessor {
     /// Support node access: g.nodes[0] -> NodeView, g.nodes[[0,1,2]] -> Subgraph, g.nodes[0:5] -> Subgraph
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
-        // Try to extract as single integer (existing behavior)
-        if let Ok(node_id) = key.extract::<NodeId>() {
-            // Check constraint first
-            if let Some(ref constrained) = self.constrained_nodes {
-                if !constrained.contains(&node_id) {
-                    return Err(PyKeyError::new_err(format!("Node {} is not in this subgraph", node_id)));
+        // Try to extract as single integer
+        if let Ok(index_or_id) = key.extract::<NodeId>() {
+            let actual_node_id = if let Some(ref constrained) = self.constrained_nodes {
+                // Constrained case: treat as index into constrained list
+                if (index_or_id as usize) >= constrained.len() {
+                    return Err(PyIndexError::new_err(format!("Node index {} out of range (0-{})", index_or_id, constrained.len() - 1)));
                 }
-            }
+                constrained[index_or_id as usize]
+            } else {
+                // Unconstrained case: treat as actual node ID (existing behavior)
+                index_or_id
+            };
             
             // Single node access - return NodeView
             let graph = self.graph.borrow(py);
-            if !graph.has_node_internal(node_id) {
-                return Err(PyKeyError::new_err(format!("Node {} does not exist", node_id)));
+            if !graph.has_node_internal(actual_node_id) {
+                return Err(PyKeyError::new_err(format!("Node {} does not exist", actual_node_id)));
             }
             
-            let node_view = PyGraph::create_node_view_internal(self.graph.clone(), py, node_id)?;
+            let node_view = PyGraph::create_node_view_internal(self.graph.clone(), py, actual_node_id)?;
             return Ok(node_view.to_object(py));
         }
         
         // Try to extract as list of integers (batch access)
-        if let Ok(node_ids) = key.extract::<Vec<NodeId>>() {
+        if let Ok(indices_or_ids) = key.extract::<Vec<NodeId>>() {
             // Batch node access - return Subgraph
             let mut graph = self.graph.borrow_mut(py);
+            
+            // Convert indices to actual node IDs if constrained
+            let actual_node_ids: Result<Vec<NodeId>, PyErr> = if let Some(ref constrained) = self.constrained_nodes {
+                // Constrained case: treat as indices into constrained list
+                indices_or_ids.into_iter().map(|index| {
+                    if (index as usize) >= constrained.len() {
+                        Err(PyIndexError::new_err(format!("Node index {} out of range (0-{})", index, constrained.len() - 1)))
+                    } else {
+                        Ok(constrained[index as usize])
+                    }
+                }).collect()
+            } else {
+                // Unconstrained case: treat as actual node IDs
+                Ok(indices_or_ids)
+            };
+            
+            let node_ids = actual_node_ids?;
             
             // Validate all nodes exist
             for &node_id in &node_ids {
@@ -130,15 +179,28 @@ impl PyNodesAccessor {
         }
         
         // If none of the above worked, return error
-        Err(PyTypeError::new_err("Node index must be int, list of ints, or slice"))
+        Err(PyTypeError::new_err(
+            "Node index must be int, list of ints, or slice. \
+            To access node attributes, use: graph.nodes.table() for all attributes, \
+            graph.nodes.table()['attribute_name'] for specific attributes, or \
+            graph.nodes[node_id].attribute_name for a single node's attribute."
+        ))
     }
     
-    /// Support iteration: for node_id in g.nodes
-    fn __iter__(&self, py: Python) -> PyResult<PyObject> {
-        let graph = self.graph.borrow(py);
-        let node_ids = graph.get_node_ids_array(py)?;
-        // Return the GraphArray directly - Python will handle iteration
-        Ok(node_ids.to_object(py))
+    /// Support iteration: for node_view in g.nodes
+    fn __iter__(&self, py: Python) -> PyResult<NodesIterator> {
+        let node_ids = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            let graph = self.graph.borrow(py);
+            graph.inner.node_ids()
+        };
+        
+        Ok(NodesIterator {
+            graph: self.graph.clone(),
+            node_ids,
+            index: 0,
+        })
     }
     
     /// Support len(g.nodes)
@@ -215,6 +277,34 @@ impl PyNodesAccessor {
     }
 }
 
+/// Iterator for edges that yields EdgeViews
+#[pyclass]
+pub struct EdgesIterator {
+    graph: Py<PyGraph>,
+    edge_ids: Vec<EdgeId>,
+    index: usize,
+}
+
+#[pymethods]
+impl EdgesIterator {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
+        slf
+    }
+    
+    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+        if self.index < self.edge_ids.len() {
+            let edge_id = self.edge_ids[self.index];
+            self.index += 1;
+            
+            // Create EdgeView for this edge
+            let edge_view = PyGraph::create_edge_view_internal(self.graph.clone(), py, edge_id)?;
+            Ok(Some(edge_view.to_object(py)))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 /// Wrapper for g.edges that supports indexing syntax: g.edges[id] -> EdgeView  
 #[pyclass(name = "EdgesAccessor")]
 pub struct PyEdgesAccessor {
@@ -227,29 +317,50 @@ pub struct PyEdgesAccessor {
 impl PyEdgesAccessor {
     /// Support edge access: g.edges[0] -> EdgeView, g.edges[[0,1,2]] -> Subgraph, g.edges[0:5] -> Subgraph
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
-        // Try to extract as single integer (existing behavior)
-        if let Ok(edge_id) = key.extract::<EdgeId>() {
-            // Check constraint first
-            if let Some(ref constrained) = self.constrained_edges {
-                if !constrained.contains(&edge_id) {
-                    return Err(PyKeyError::new_err(format!("Edge {} is not in this subgraph", edge_id)));
+        // Try to extract as single integer
+        if let Ok(index_or_id) = key.extract::<EdgeId>() {
+            let actual_edge_id = if let Some(ref constrained) = self.constrained_edges {
+                // Constrained case: treat as index into constrained list
+                if (index_or_id as usize) >= constrained.len() {
+                    return Err(PyIndexError::new_err(format!("Edge index {} out of range (0-{})", index_or_id, constrained.len() - 1)));
                 }
-            }
+                constrained[index_or_id as usize]
+            } else {
+                // Unconstrained case: treat as actual edge ID (existing behavior)
+                index_or_id
+            };
             
             // Single edge access - return EdgeView
             let graph = self.graph.borrow(py);
-            if !graph.has_edge_internal(edge_id) {
-                return Err(PyKeyError::new_err(format!("Edge {} does not exist", edge_id)));
+            if !graph.has_edge_internal(actual_edge_id) {
+                return Err(PyKeyError::new_err(format!("Edge {} does not exist", actual_edge_id)));
             }
             
-            let edge_view = PyGraph::create_edge_view_internal(self.graph.clone(), py, edge_id)?;
+            let edge_view = PyGraph::create_edge_view_internal(self.graph.clone(), py, actual_edge_id)?;
             return Ok(edge_view.to_object(py));
         }
         
         // Try to extract as list of integers (batch access)
-        if let Ok(edge_ids) = key.extract::<Vec<EdgeId>>() {
+        if let Ok(indices_or_ids) = key.extract::<Vec<EdgeId>>() {
             // Batch edge access - return Subgraph with these edges + their endpoints
             let graph = self.graph.borrow(py);
+            
+            // Convert indices to actual edge IDs if constrained
+            let actual_edge_ids: Result<Vec<EdgeId>, PyErr> = if let Some(ref constrained) = self.constrained_edges {
+                // Constrained case: treat as indices into constrained list
+                indices_or_ids.into_iter().map(|index| {
+                    if (index as usize) >= constrained.len() {
+                        Err(PyIndexError::new_err(format!("Edge index {} out of range (0-{})", index, constrained.len() - 1)))
+                    } else {
+                        Ok(constrained[index as usize])
+                    }
+                }).collect()
+            } else {
+                // Unconstrained case: treat as actual edge IDs
+                Ok(indices_or_ids)
+            };
+            
+            let edge_ids = actual_edge_ids?;
             
             // Validate all edges exist
             for &edge_id in &edge_ids {
@@ -321,12 +432,20 @@ impl PyEdgesAccessor {
         Err(PyTypeError::new_err("Edge index must be int, list of ints, or slice"))
     }
     
-    /// Support iteration: for edge_id in g.edges
-    fn __iter__(&self, py: Python) -> PyResult<PyObject> {
-        let graph = self.graph.borrow(py);
-        let edge_ids = graph.get_edge_ids_array(py)?;
-        // Return the GraphArray directly - Python will handle iteration
-        Ok(edge_ids.to_object(py))
+    /// Support iteration: for edge_view in g.edges
+    fn __iter__(&self, py: Python) -> PyResult<EdgesIterator> {
+        let edge_ids = if let Some(ref constrained) = self.constrained_edges {
+            constrained.clone()
+        } else {
+            let graph = self.graph.borrow(py);
+            graph.inner.edge_ids()
+        };
+        
+        Ok(EdgesIterator {
+            graph: self.graph.clone(),
+            edge_ids,
+            index: 0,
+        })
     }
     
     /// Support len(g.edges)

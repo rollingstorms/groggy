@@ -7,7 +7,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 use pyo3::exceptions::{PyValueError, PyTypeError, PyRuntimeError, PyKeyError, PyIndexError, PyImportError, PyNotImplementedError};
 use groggy::{NodeId, EdgeId, AttrValue as RustAttrValue, GraphTable, GraphArray, TableMetadata, GroupBy, AggregateOp, ConnectivityType};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 // Import utilities
@@ -21,6 +21,47 @@ use crate::ffi::core::matrix::PyGraphMatrix;
 pub struct PyGraphTable {
     /// Core GraphTable implementation
     pub inner: GraphTable,
+}
+
+/// Iterator for table rows that yields dictionaries
+#[pyclass(unsendable)]
+pub struct TableIterator {
+    table: GraphTable,
+    index: usize,
+}
+
+#[pymethods]
+impl TableIterator {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
+        slf
+    }
+    
+    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+        let (num_rows, _) = self.table.shape();
+        if self.index < num_rows {
+            let row_dict = pyo3::types::PyDict::new(py);
+            
+            // Get column names and data
+            let column_names = self.table.columns();
+            
+            // Access each column by name
+            for (col_idx, col_name) in column_names.iter().enumerate() {
+                // Get the column data by name
+                if let Some(array) = self.table.get_column_by_name(col_name) {
+                    if self.index < array.len() {
+                        let value = &array[self.index];
+                        let py_value = attr_value_to_python_value(py, value)?;
+                        row_dict.set_item(col_name, py_value)?;
+                    }
+                }
+            }
+            
+            self.index += 1;
+            Ok(Some(row_dict.to_object(py)))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 impl PyGraphTable {
@@ -98,8 +139,8 @@ impl PyGraphTable {
                     if let Ok(Some(attr_value)) = graph_ref.inner.get_node_attr(node_id as usize, attr_name) {
                         attr_values.push(attr_value);
                     } else {
-                        // Handle missing attributes with default value
-                        attr_values.push(RustAttrValue::Int(0));
+                        // Handle missing attributes as Null instead of imputing to 0
+                        attr_values.push(RustAttrValue::Null);
                     }
                 }
             }
@@ -127,12 +168,23 @@ impl PyGraphTable {
     ) -> PyResult<Self> {
         let graph_ref = graph.borrow(py);
         
-        // Default to edge_id, source, target if no attributes specified
-        let attr_names = attrs.unwrap_or_else(|| vec![
-            "edge_id".to_string(),
-            "source".to_string(), 
-            "target".to_string()
-        ]);
+        // If no attributes specified, discover all available attributes  
+        let attr_names = attrs.unwrap_or_else(|| {
+            // Discover all available edge attributes
+            let mut all_attrs = std::collections::HashSet::new();
+            for &edge_id in &edges {
+                if let Ok(attrs) = graph_ref.inner.get_edge_attrs(edge_id as usize) {
+                    for attr_name in attrs.keys() {
+                        all_attrs.insert(attr_name.clone());
+                    }
+                }
+            }
+            
+            // Always include edge_id, source, target as first columns
+            let mut column_names = vec!["edge_id".to_string(), "source".to_string(), "target".to_string()];
+            column_names.extend(all_attrs.into_iter());
+            column_names
+        });
         let mut columns = Vec::new();
         
         for attr_name in &attr_names {
@@ -160,8 +212,8 @@ impl PyGraphTable {
                     if let Ok(Some(attr_value)) = graph_ref.inner.get_edge_attr(edge_id as usize, attr_name) {
                         attr_values.push(attr_value);
                     } else {
-                        // Handle missing attributes with default value
-                        attr_values.push(RustAttrValue::Int(0));
+                        // Handle missing attributes as Null instead of imputing to 0
+                        attr_values.push(RustAttrValue::Null);
                     }
                 }
             }
@@ -226,7 +278,7 @@ impl PyGraphTable {
             // Data columns
             if let Some(row_data) = self.inner.iloc(row_idx) {
                 for column in columns {
-                    let value = row_data.get(column).cloned().unwrap_or(groggy::AttrValue::Int(0));
+                    let value = row_data.get(column).cloned().unwrap_or(groggy::AttrValue::Null);
                     let display_value = match &value {
                         groggy::AttrValue::Int(i) => i.to_string(),
                         groggy::AttrValue::SmallInt(i) => i.to_string(),
@@ -256,6 +308,7 @@ impl PyGraphTable {
                             // Compressed float vector - show placeholder for now
                             "compressed_vec".to_string()
                         },
+                        groggy::AttrValue::Null => "NaN".to_string(),
                         _ => format!("{:?}", value)
                     };
                     html.push_str(&format!("<td style=\"padding: 8px;\">{}</td>", display_value));
@@ -331,7 +384,7 @@ impl PyGraphTable {
             if let Some(row_data) = self.inner.iloc(row_idx) {
                 let mut row_values = Vec::new();
                 for col_name in self.inner.columns() {
-                    let value = row_data.get(col_name).cloned().unwrap_or(RustAttrValue::Int(0));
+                    let value = row_data.get(col_name).cloned().unwrap_or(RustAttrValue::Null);
                     row_values.push(attr_value_to_python_value(py, &value)?);
                 }
                 data_rows.push(row_values);
@@ -438,9 +491,63 @@ impl PyGraphTable {
             
             Ok(Py::new(py, PyGraphTable::from_graph_table(selected_table))?.to_object(py))
 
+        } else if let Ok(mask_array_ref) = key.extract::<PyRef<PyGraphArray>>() {
+            // Boolean indexing: table[boolean_mask] -> table
+            let mask_values = mask_array_ref.inner.to_list();
+            let mut row_indices = Vec::new();
+            
+            // Check that mask is boolean and collect true indices
+            for (i, value) in mask_values.iter().enumerate() {
+                match value {
+                    groggy::AttrValue::Bool(true) => row_indices.push(i),
+                    groggy::AttrValue::Bool(false) => {}, // Skip false values
+                    _ => return Err(PyTypeError::new_err("Boolean mask must contain only boolean values")),
+                }
+            }
+            
+            // Check mask length matches table rows
+            let (table_rows, _) = self.inner.shape();
+            if mask_values.len() != table_rows {
+                return Err(PyValueError::new_err(format!(
+                    "Boolean mask length ({}) doesn't match table rows ({})", 
+                    mask_values.len(), 
+                    table_rows
+                )));
+            }
+            
+            // Create filtered table by selecting rows
+            if row_indices.is_empty() {
+                // Return empty table with same structure
+                let empty_arrays = self.inner.columns().iter()
+                    .map(|_| GraphArray::from_vec(vec![]))
+                    .collect();
+                let filtered_table = GraphTable::from_arrays_standalone(empty_arrays, Some(self.inner.columns().to_vec()))
+                    .map_err(graph_error_to_py_err)?;
+                Ok(Py::new(py, PyGraphTable::from_graph_table(filtered_table))?.to_object(py))
+            } else {
+                // Filter by row indices
+                let mut filtered_columns = Vec::new();
+                for col_name in self.inner.columns() {
+                    if let Some(column) = self.inner.get_column_by_name(col_name) {
+                        let mut filtered_values = Vec::new();
+                        let col_values = column.to_list();
+                        for &row_idx in &row_indices {
+                            if row_idx < col_values.len() {
+                                filtered_values.push(col_values[row_idx].clone());
+                            }
+                        }
+                        filtered_columns.push(GraphArray::from_vec(filtered_values));
+                    }
+                }
+                
+                let filtered_table = GraphTable::from_arrays_standalone(filtered_columns, Some(self.inner.columns().to_vec()))
+                    .map_err(graph_error_to_py_err)?;
+                Ok(Py::new(py, PyGraphTable::from_graph_table(filtered_table))?.to_object(py))
+            }
+
         } else {
             Err(PyTypeError::new_err(
-                "Key must be: int (row), slice (:), string (column), or list of strings (columns)"
+                "Key must be: int (row), slice (:), string (column), list of strings (columns), or boolean mask (GraphArray)"
             ))
         }
     }
@@ -656,11 +763,20 @@ impl PyGraphTable {
         Ok(Py::new(py, py_table)?.to_object(py))
     }
 
-    /// Iterator support - iterates over rows as dictionaries (temporarily disabled)
-    fn __iter__(slf: PyRef<Self>) -> PyResult<PyObject> {
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "Table iteration temporarily disabled during Phase 3 - use table[i] for row access"
-        ))
+    /// Iterator support - iterates over rows as dictionaries
+    fn __iter__(&self) -> TableIterator {
+        TableIterator {
+            table: self.inner.clone(),
+            index: 0,
+        }
+    }
+    
+    /// Explicit iterator method - same as __iter__ but more discoverable
+    fn iter(&self) -> TableIterator {
+        TableIterator {
+            table: self.inner.clone(),
+            index: 0,
+        }
     }
     
     // ========================================================================
@@ -718,6 +834,79 @@ impl PyGraphTable {
         Ok(array.to_object(py))
     }
     
+    /// Fill null/missing values with a specified value
+    #[pyo3(signature = (fill_value, inplace = false))]
+    fn fill_na(&self, py: Python, fill_value: &PyAny, inplace: bool) -> PyResult<PyObject> {
+        // Convert Python fill_value to AttrValue
+        let attr_fill_value = crate::ffi::utils::python_value_to_attr_value(fill_value)?;
+        
+        if inplace {
+            return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                "fill_na(inplace=True) is not yet implemented. Use fill_na(inplace=False) which returns a new table."
+            ));
+        }
+        
+        // Create new table with filled values
+        let filled_table = self.inner.fill_na(attr_fill_value)
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        
+        let py_table = PyGraphTable::from_graph_table(filled_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+    
+    /// Drop rows containing any null/missing values
+    fn drop_na(&self, py: Python) -> PyResult<PyObject> {
+        let filtered_table = self.inner.drop_na()
+            .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+        
+        let py_table = PyGraphTable::from_graph_table(filtered_table);
+        Ok(Py::new(py, py_table)?.to_object(py))
+    }
+    
+    /// Check if table contains any null values
+    fn has_null(&self) -> bool {
+        let (rows, _) = self.inner.shape();
+        let columns = self.inner.columns();
+        for row_idx in 0..rows {
+            if let Some(row_data) = self.inner.iloc(row_idx) {
+                for value in row_data.values() {
+                    if matches!(value, groggy::AttrValue::Null) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+    
+    /// Count null values in each column
+    fn null_count(&self, py: Python) -> PyResult<PyObject> {
+        let dict = pyo3::types::PyDict::new(py);
+        let (rows, _) = self.inner.shape();
+        let columns = self.inner.columns();
+        
+        for column_name in columns {
+            let mut null_count = 0;
+            
+            for row_idx in 0..rows {
+                if let Some(row_data) = self.inner.iloc(row_idx) {
+                    if let Some(value) = row_data.get(column_name) {
+                        if matches!(value, groggy::AttrValue::Null) {
+                            null_count += 1;
+                        }
+                    } else {
+                        // Missing value counts as null
+                        null_count += 1;
+                    }
+                }
+            }
+            
+            dict.set_item(column_name, null_count)?;
+        }
+        
+        Ok(dict.to_object(py))
+    }
+
     /// Convert to Pandas DataFrame (when pandas available)
     /// Uses .data property to materialize data
     fn to_pandas(&self, py: Python) -> PyResult<PyObject> {

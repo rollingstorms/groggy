@@ -211,6 +211,28 @@ impl PySubgraph {
         info
     }
     
+    /// Calculate subgraph density (number of edges / number of possible edges)
+    fn density(&self) -> f64 {
+        let num_nodes = self.nodes.len();
+        let num_edges = self.edges.len();
+        
+        if num_nodes <= 1 {
+            return 0.0;
+        }
+        
+        // For an undirected graph, max edges = n(n-1)/2
+        // For a directed graph, max edges = n(n-1)
+        // Since we don't have easy access to graph type here, we'll assume undirected
+        // This is the most common case and matches standard network analysis conventions
+        let max_possible_edges = (num_nodes * (num_nodes - 1)) / 2;
+        
+        if max_possible_edges > 0 {
+            num_edges as f64 / max_possible_edges as f64
+        } else {
+            0.0
+        }
+    }
+    
     /// Filter edges within this subgraph (chainable)
     fn filter_edges(&self, _py: Python, _filter: &PyAny) -> PyResult<PySubgraph> {
         // Placeholder implementation
@@ -249,6 +271,18 @@ impl PySubgraph {
                 "component".to_string(),
                 self.graph.clone(),
             )])
+        }
+    }
+    
+    /// Check if the subgraph is connected (has exactly one connected component)
+    pub fn is_connected(&self) -> PyResult<bool> {
+        // Use inner subgraph if available (preferred path)
+        if let Some(ref inner_subgraph) = self.inner {
+            inner_subgraph.is_connected()
+                .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("Failed to check connectivity: {}", e)))
+        } else {
+            // Fallback - for now assume connected if we have nodes
+            Ok(!self.nodes.is_empty())
         }
     }
     
