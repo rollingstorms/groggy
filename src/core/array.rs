@@ -113,14 +113,29 @@ impl GraphArray {
     /// Returns None if array contains non-numeric values
     fn extract_numeric_values(&self) -> Option<Vec<f64>> {
         let mut numeric_values = Vec::with_capacity(self.values.len());
+        let mut has_non_null_non_numeric = false;
         
         for value in &self.values {
             match value {
                 AttrValue::Int(i) => numeric_values.push(*i as f64),
                 AttrValue::SmallInt(i) => numeric_values.push(*i as f64),
                 AttrValue::Float(f) => numeric_values.push(*f as f64),
-                _ => return None, // Non-numeric value found
+                AttrValue::Null => {
+                    // Skip null values - this is the key fix!
+                    continue;
+                }
+                _ => {
+                    // Non-numeric, non-null value found (like text)
+                    has_non_null_non_numeric = true;
+                    break;
+                }
             }
+        }
+        
+        // Only fail if we found non-null, non-numeric values
+        // If we only found nulls mixed with numbers, that's fine
+        if has_non_null_non_numeric {
+            return None;
         }
         
         if numeric_values.is_empty() {
@@ -451,7 +466,7 @@ impl GraphArray {
         // This would need to be implemented with proper graph integration
         // For now, return a placeholder
         let values = entities.iter()
-            .map(|_| crate::types::AttrValue::Int(0))
+            .map(|_| crate::types::AttrValue::Null)
             .collect();
             
         Ok(Self::from_vec(values).with_name(attr.to_string()))

@@ -268,8 +268,8 @@ impl GraphTable {
                 let attr_values: Vec<AttrValue> = edges.iter()
                     .map(|&edge_id| {
                         graph.get_edge_attr(edge_id, &attr_name.to_string())
-                            .unwrap_or(Some(AttrValue::Int(0)))
-                            .unwrap_or(AttrValue::Int(0))
+                            .unwrap_or(Some(AttrValue::Null))
+                            .unwrap_or(AttrValue::Null)
                     })
                     .collect();
                 
@@ -1126,7 +1126,7 @@ impl GraphTable {
         for row_idx in 0..rows {
             let mut row = Vec::with_capacity(self.columns.len());
             for column in &self.columns {
-                let value = column.get(row_idx).cloned().unwrap_or(AttrValue::Int(0));
+                let value = column.get(row_idx).cloned().unwrap_or(AttrValue::Null);
                 row.push(value);
             }
             materialized.push(row);
@@ -1135,6 +1135,97 @@ impl GraphTable {
         materialized
     }
     
+    /// Fill null/missing values with a specified value
+    pub fn fill_na(&self, fill_value: AttrValue) -> GraphResult<Self> {
+        let mut new_columns = Vec::with_capacity(self.columns.len());
+        
+        for column in &self.columns {
+            let filled_values: Vec<AttrValue> = column.materialize().iter()
+                .map(|value| {
+                    if matches!(value, AttrValue::Null) {
+                        fill_value.clone()
+                    } else {
+                        value.clone()
+                    }
+                })
+                .collect();
+            
+            let new_column = GraphArray::from_vec(filled_values)
+                .with_name(column.name().cloned().unwrap_or_else(|| "unnamed".to_string()));
+            new_columns.push(new_column);
+        }
+        
+        let mut new_table = Self::from_arrays(
+            new_columns, 
+            Some(self.columns().to_vec()), 
+            self.graph.clone()
+        )?;
+        new_table.metadata = self.metadata.clone();
+        Ok(new_table)
+    }
+    
+    /// Fill null/missing values in place with a specified value
+    pub fn fill_na_inplace(&mut self, fill_value: AttrValue) -> GraphResult<()> {
+        // We need to rebuild the columns since GraphArray doesn't expose mutable access to values
+        for i in 0..self.columns.len() {
+            let filled_values: Vec<AttrValue> = self.columns[i].materialize().iter()
+                .map(|value| {
+                    if matches!(value, AttrValue::Null) {
+                        fill_value.clone()
+                    } else {
+                        value.clone()
+                    }
+                })
+                .collect();
+            
+            let column_name = self.columns[i].name().cloned().unwrap_or_else(|| "unnamed".to_string());
+            self.columns[i] = GraphArray::from_vec(filled_values).with_name(column_name);
+        }
+        Ok(())
+    }
+    
+    /// Drop rows containing any null/missing values
+    pub fn drop_na(&self) -> GraphResult<Self> {
+        let (rows, _) = self.shape();
+        let mut keep_rows = Vec::new();
+        
+        // Find rows without any null values
+        for row_idx in 0..rows {
+            let mut has_null = false;
+            for column in &self.columns {
+                if let Some(value) = column.get(row_idx) {
+                    if matches!(value, AttrValue::Null) {
+                        has_null = true;
+                        break;
+                    }
+                }
+            }
+            if !has_null {
+                keep_rows.push(row_idx);
+            }
+        }
+        
+        // Create new columns with only the non-null rows
+        let mut new_columns = Vec::with_capacity(self.columns.len());
+        for column in &self.columns {
+            let filtered_values: Vec<AttrValue> = keep_rows.iter()
+                .filter_map(|&row_idx| column.get(row_idx).cloned())
+                .collect();
+            
+            let new_column = GraphArray::from_vec(filtered_values)
+                .with_name(column.name().cloned().unwrap_or_else(|| "unnamed".to_string()));
+            new_columns.push(new_column);
+        }
+        
+        let mut new_table = Self::from_arrays(
+            new_columns,
+            Some(self.columns().to_vec()),
+            self.graph.clone()
+        )?;
+        new_table.metadata = self.metadata.clone();
+        Ok(new_table)
+    }
+
     /// Check if the table is effectively sparse (has many default/zero values)
     pub fn is_sparse(&self) -> bool {
         let total_elements = self.shape().0 * self.shape().1;

@@ -487,6 +487,7 @@ impl GraphSnapshot {
                     AttrValue::Bytes(b) => b.len(),
                     AttrValue::CompressedText(cd) => cd.memory_size(),
                     AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+                    AttrValue::Null => 0,
                 };
             }
         }
@@ -507,6 +508,7 @@ impl GraphSnapshot {
                     AttrValue::Bytes(b) => b.len(),
                     AttrValue::CompressedText(cd) => cd.memory_size(),
                     AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+                    AttrValue::Null => 0,
                 };
             }
         }

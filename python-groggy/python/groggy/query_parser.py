@@ -375,8 +375,8 @@ class QueryParser:
             # If it fails, treat as string (remove quotes if present)
             value = value_str.strip().strip('\'"')
         
-        # Convert to AttrValue
-        attr_value = AttrValue(value)
+        # Use raw value directly (auto-conversion in AttributeFilter)
+        attr_value = value
         
         # Create appropriate AttributeFilter
         if operator == '==':

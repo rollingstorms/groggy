@@ -87,6 +87,8 @@ pub enum AttrValue {
     CompressedText(CompressedData),
     /// Compressed large float vector (Memory Optimization 3)
     CompressedFloatVec(CompressedData),
+    /// Null/missing value - preserves the fact that an attribute is missing
+    Null,
 }
 
 /// Custom PartialEq implementation that compares logical content across storage variants
@@ -164,6 +166,9 @@ impl PartialEq for AttrValue {
                 let _ = (a, b);
                 false
             }
+            
+            // Null comparisons - Null only equals Null
+            (Null, Null) => true,
             
             // All other combinations are not equal
             _ => false,
@@ -268,6 +273,10 @@ impl Hash for AttrValue {
                 cd.data.hash(state);
                 cd.original_size.hash(state);
             }
+            AttrValue::Null => {
+                10u8.hash(state);  // Discriminant for Null variant
+                // No additional data to hash for Null
+            }
         }
     }
 }
@@ -326,12 +335,13 @@ impl AttrValue {
     /// Get type discriminant for ordering different types
     fn type_discriminant(&self) -> u8 {
         match self {
-            AttrValue::Int(_) | AttrValue::SmallInt(_) => 0,
-            AttrValue::Float(_) => 1,
-            AttrValue::Bool(_) => 2,
-            AttrValue::Text(_) | AttrValue::CompactText(_) | AttrValue::CompressedText(_) => 3,
-            AttrValue::FloatVec(_) | AttrValue::CompressedFloatVec(_) => 4,
-            AttrValue::Bytes(_) => 5,
+            AttrValue::Null => 0,  // Null sorts first
+            AttrValue::Int(_) | AttrValue::SmallInt(_) => 1,
+            AttrValue::Float(_) => 2,
+            AttrValue::Bool(_) => 3,
+            AttrValue::Text(_) | AttrValue::CompactText(_) | AttrValue::CompressedText(_) => 4,
+            AttrValue::FloatVec(_) | AttrValue::CompressedFloatVec(_) => 5,
+            AttrValue::Bytes(_) => 6,
         }
     }
 }
@@ -544,6 +554,7 @@ pub enum AttrValueType {
     Bytes,
     CompressedText,
     CompressedFloatVec,
+    Null,
 }
 
 impl AttrValueType {
@@ -576,6 +587,7 @@ impl std::fmt::Display for AttrValue {
                     Err(_) => write!(f, "[compressed float vec]"),
                 }
             }
+            AttrValue::Null => write!(f, "NaN"),
         }
     }
 }
@@ -594,6 +606,7 @@ impl AttrValue {
             AttrValue::Bytes(_) => "Bytes",
             AttrValue::CompressedText(_) => "CompressedText",
             AttrValue::CompressedFloatVec(_) => "CompressedFloatVec",
+            AttrValue::Null => "Null",
         }
     }
     
@@ -610,6 +623,7 @@ impl AttrValue {
             AttrValue::Bytes(_) => AttrValueType::Bytes,
             AttrValue::CompressedText(_) => AttrValueType::CompressedText,
             AttrValue::CompressedFloatVec(_) => AttrValueType::CompressedFloatVec,
+            AttrValue::Null => AttrValueType::Null,
         }
     }
     
@@ -626,6 +640,7 @@ impl AttrValue {
             AttrValue::Bytes(b) => std::mem::size_of::<Vec<u8>>() + b.capacity(),
             AttrValue::CompressedText(cd) => cd.memory_size(),
             AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
+            AttrValue::Null => 0, // Null values take no memory
         }
     }
     

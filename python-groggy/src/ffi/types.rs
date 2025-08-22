@@ -85,6 +85,7 @@ impl PyAttrValue {
                     Err(_) => py.None()
                 }
             },
+            RustAttrValue::Null => py.None(),
         }
     }
     
@@ -101,6 +102,7 @@ impl PyAttrValue {
             RustAttrValue::SmallInt(_) => "int",
             RustAttrValue::CompressedText(_) => "text",
             RustAttrValue::CompressedFloatVec(_) => "float_vec",
+            RustAttrValue::Null => "null",
         }
     }
     
@@ -126,6 +128,7 @@ impl PyAttrValue {
                     Err(_) => "compressed(error)".to_string()
                 }
             },
+            RustAttrValue::Null => "None".to_string(),
         })
     }
     
@@ -151,6 +154,7 @@ impl PyAttrValue {
                     Err(_) => "compressed(error)".to_string()
                 }
             },
+            RustAttrValue::Null => "None".to_string(),
         })
     }
     
@@ -213,6 +217,10 @@ impl PyAttrValue {
                     }
                 }
             },
+            RustAttrValue::Null => {
+                10u8.hash(&mut hasher);
+                // No additional data to hash for Null
+            },
         }
         hasher.finish()
     }
@@ -242,6 +250,7 @@ impl pyo3::ToPyObject for PyAttrValue {
                     Err(_) => py.None()
                 }
             },
+            RustAttrValue::Null => py.None(),
         }
     }
 }
