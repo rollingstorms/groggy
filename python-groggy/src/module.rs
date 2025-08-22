@@ -1,5 +1,5 @@
 //! Python Module Registration
-//! 
+//!
 //! This module handles registration of all Python classes and functions
 //! for the Groggy library.
 
@@ -12,6 +12,6 @@ pub fn register_classes(_py: Python, m: &PyModule) -> PyResult<()> {
     // m.add_class::<PyGraph>()?;
     // m.add_class::<PySubgraph>()?;
     // m.add_class::<PyGraphArray>()?;
-    
+
     Ok(())
 }

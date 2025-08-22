@@ -1,9 +1,9 @@
 //! Traversal result types
-//! 
+//!
 //! Python bindings for traversal result structures.
 
+use groggy::{EdgeId, NodeId};
 use pyo3::prelude::*;
-use groggy::{NodeId, EdgeId};
 
 /// Result of a graph traversal operation
 #[pyclass(name = "TraversalResult")]
@@ -20,33 +20,42 @@ impl PyTraversalResult {
     fn nodes(&self) -> Vec<NodeId> {
         self.nodes.clone()
     }
-    
-    #[getter] 
+
+    #[getter]
     fn edges(&self) -> Vec<EdgeId> {
         self.edges.clone()
     }
-    
+
     #[getter]
     fn distances(&self) -> Option<Vec<usize>> {
         self.distances.clone()
     }
-    
+
     #[getter]
     fn traversal_type(&self) -> String {
         self.traversal_type.clone()
     }
-    
+
     fn __repr__(&self) -> String {
-        format!("TraversalResult(nodes={}, edges={}, type='{}')", 
-               self.nodes.len(), self.edges.len(), self.traversal_type)
+        format!(
+            "TraversalResult(nodes={}, edges={}, type='{}')",
+            self.nodes.len(),
+            self.edges.len(),
+            self.traversal_type
+        )
     }
 }
 
 impl PyTraversalResult {
-    pub fn new(nodes: Vec<NodeId>, edges: Vec<EdgeId>, distances: Option<Vec<usize>>, traversal_type: String) -> Self {
+    pub fn new(
+        nodes: Vec<NodeId>,
+        edges: Vec<EdgeId>,
+        distances: Option<Vec<usize>>,
+        traversal_type: String,
+    ) -> Self {
         Self {
             nodes,
-            edges, 
+            edges,
             distances,
             traversal_type,
         }
@@ -68,25 +77,27 @@ impl PyAggregationResult {
     fn value(&self) -> f64 {
         self.value
     }
-    
+
     #[getter]
     fn operation(&self) -> String {
         self.operation.clone()
     }
-    
+
     #[getter]
     fn attribute(&self) -> String {
         self.attribute.clone()
     }
-    
+
     #[getter]
     fn count(&self) -> usize {
         self.count
     }
-    
+
     fn __repr__(&self) -> String {
-        format!("AggregationResult(value={}, operation='{}', attribute='{}')", 
-               self.value, self.operation, self.attribute)
+        format!(
+            "AggregationResult(value={}, operation='{}', attribute='{}')",
+            self.value, self.operation, self.attribute
+        )
     }
 }
 
@@ -115,20 +126,22 @@ impl PyGroupedAggregationResult {
     fn groups(&self) -> PyObject {
         self.groups.clone()
     }
-    
+
     #[getter]
     fn operation(&self) -> String {
         self.operation.clone()
     }
-    
+
     #[getter]
     fn attribute(&self) -> String {
         self.attribute.clone()
     }
-    
+
     fn __repr__(&self) -> String {
-        format!("GroupedAggregationResult(operation='{}', attribute='{}')", 
-               self.operation, self.attribute)
+        format!(
+            "GroupedAggregationResult(operation='{}', attribute='{}')",
+            self.operation, self.attribute
+        )
     }
 }
 

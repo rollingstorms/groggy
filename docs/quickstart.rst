@@ -15,15 +15,15 @@ Let's start by creating a simple graph:
    # Create a new graph
    g = gr.Graph()
 
-   # Add some nodes with attributes
-   g.add_node("alice", age=30, role="engineer", salary=95000)
-   g.add_node("bob", age=25, role="designer", salary=75000) 
-   g.add_node("charlie", age=35, role="manager", salary=120000)
+   # Add some nodes with attributes (returns numeric IDs)
+   alice = g.add_node(name="Alice", age=30, role="engineer", salary=95000)
+   bob = g.add_node(name="Bob", age=25, role="designer", salary=75000) 
+   charlie = g.add_node(name="Charlie", age=35, role="manager", salary=120000)
 
    # Add edges with attributes
-   g.add_edge("alice", "bob", relationship="collaborates", strength=0.8)
-   g.add_edge("charlie", "alice", relationship="manages", strength=0.9)
-   g.add_edge("charlie", "bob", relationship="manages", strength=0.7)
+   g.add_edge(alice, bob, relationship="collaborates", strength=0.8)
+   g.add_edge(charlie, alice, relationship="manages", strength=0.9)
+   g.add_edge(charlie, bob, relationship="manages", strength=0.7)
 
    print(f"Created graph with {g.node_count()} nodes and {g.edge_count()} edges")
 
@@ -40,9 +40,9 @@ Groggy's power comes from its unified storage views that let you seamlessly swit
    nodes_table = g.nodes.table()
    print(nodes_table.head())
 
-   # Get specific attributes only
-   employee_data = g.nodes.table(attributes=["age", "role", "salary"])
-   print(employee_data)
+   # Access specific columns from the table
+   employee_data = g.nodes.table()
+   print(employee_data[["age", "role", "salary"]])
 
 **Statistical Analysis**
 
@@ -87,16 +87,16 @@ For better performance, use batch operations when adding multiple entities:
 
 .. code-block:: python
 
-   # Batch add nodes
+   # Batch add nodes (note: returns list of node IDs)
    new_nodes = [
-       {'id': f'user_{i}', 'score': i * 10, 'active': i % 2 == 0}
+       {'score': i * 10, 'active': i % 2 == 0, 'user_id': f'user_{i}'}
        for i in range(100)
    ]
-   g.add_nodes(new_nodes)
+   node_ids = g.add_nodes(new_nodes)
 
-   # Batch add edges
+   # Batch add edges using returned node IDs
    new_edges = [
-       {'source': f'user_{i}', 'target': f'user_{i+1}', 'weight': 0.5}
+       (node_ids[i], node_ids[i+1], {'weight': 0.5})
        for i in range(99)
    ]
    g.add_edges(new_edges)
@@ -110,19 +110,23 @@ Advanced Analytics
 
 .. code-block:: python
 
-   # Get neighborhood information as a table
-   alice_neighbors = gr.GraphTable.neighborhood_table(
-       g, "alice", ["age", "role", "salary"]
-   )
-   print("Alice's neighbors:")
-   print(alice_neighbors)
-
-   # K-hop neighborhoods
-   extended_network = gr.GraphTable.k_hop_neighborhood_table(
-       g, "alice", k=2, ["role", "salary"]
-   )
-   print("Alice's 2-hop network:")
-   print(extended_network)
+   # Get neighbors using graph methods
+   alice_neighbors = g.neighbors(alice)
+   print(f"Alice's neighbors: {alice_neighbors}")
+   
+   # Get neighbor data as table
+   neighbor_data = []
+   for neighbor_id in alice_neighbors:
+       neighbor = g.nodes[neighbor_id]
+       neighbor_data.append({
+           'id': neighbor_id,
+           'age': neighbor['age'],
+           'role': neighbor['role'],
+           'salary': neighbor['salary']
+       })
+   neighbors_table = gr.table(neighbor_data)
+   print("Alice's neighbors data:")
+   print(neighbors_table)
 
 **Multi-Table Operations**
 
@@ -130,13 +134,13 @@ Advanced Analytics
 
    # Create another table
    performance_data = gr.table({
-       'name': ['alice', 'bob', 'charlie'],
+       'name': ['Alice', 'Bob', 'Charlie'],
        'performance_score': [8.5, 7.2, 9.1],
        'projects_completed': [12, 8, 15]
    })
 
    # Join with node data
-   employee_table = g.nodes.table(attributes=['name', 'age', 'role', 'salary'])
+   employee_table = g.nodes.table()
    complete_data = employee_table.join(performance_data, on='name', how='inner')
    
    print("Complete employee data:")
@@ -152,41 +156,45 @@ Advanced Analytics
 Graph Algorithms
 ----------------
 
-**Centrality Measures**
+**Basic Network Analysis**
 
 .. code-block:: python
 
-   # Calculate different centrality measures
-   betweenness = g.centrality.betweenness()
-   pagerank = g.centrality.pagerank()
-   closeness = g.centrality.closeness()
-
-   # Create a table with all centrality measures
-   centrality_table = gr.table({
-       'node': list(betweenness.keys()),
-       'betweenness': list(betweenness.values()),
-       'pagerank': list(pagerank.values()),
-       'closeness': list(closeness.values())
-   })
+   # Calculate basic centrality measures (degree centrality)
+   degrees = g.degree()
    
-   # Sort by PageRank
-   top_nodes = centrality_table.sort_by('pagerank', ascending=False)
-   print("Most central nodes:")
+   # Create a table with node information
+   nodes_table = g.nodes.table()
+   nodes_with_degree = []
+   
+   for i, degree in enumerate(degrees):
+       if i < len(nodes_table):
+           node_data = nodes_table[i].to_dict() if hasattr(nodes_table[i], 'to_dict') else dict(nodes_table[i])
+           node_data['degree'] = degree
+           nodes_with_degree.append(node_data)
+   
+   centrality_table = gr.table(nodes_with_degree)
+   
+   # Sort by degree (simple centrality measure)
+   top_nodes = centrality_table.sort_by('degree', ascending=False)
+   print("Most connected nodes:")
    print(top_nodes.head())
 
-**Community Detection**
+**Connected Components Analysis**
 
 .. code-block:: python
 
-   # Find communities
-   communities = g.communities.louvain()
+   # Find connected components (basic community structure)
+   components = g.analytics.connected_components()
    
-   # Analyze community structure
-   community_sizes = {}
-   for i, community in enumerate(communities):
-       community_sizes[f'community_{i}'] = len(community)
+   # Analyze component structure
+   component_sizes = {}
+   for i, component in enumerate(components):
+       component_sizes[f'component_{i}'] = len(component)
    
-   print("Community sizes:", community_sizes)
+   print("Component sizes:", component_sizes)
+   print(f"Number of components: {len(components)}")
+   print(f"Graph is connected: {g.is_connected()}")
 
 Working with Real Data
 ----------------------
@@ -201,11 +209,15 @@ Working with Real Data
    nodes_df = pd.read_csv('nodes.csv')
    nodes_table = gr.table.from_pandas(nodes_df)
    
-   # Convert to graph (assuming 'id' column exists)
+   # Convert to graph
    g_from_csv = gr.Graph()
-   for row in nodes_table.to_dict():
-       node_id = row.pop('id')  # Remove 'id' from attributes
-       g_from_csv.add_node(node_id, **row)
+   for i in range(len(nodes_table)):
+       row_data = nodes_table[i]
+       if hasattr(row_data, 'to_dict'):
+           attrs = row_data.to_dict()
+       else:
+           attrs = dict(row_data)
+       g_from_csv.add_node(**attrs)
 
 **Integration with NetworkX**
 
