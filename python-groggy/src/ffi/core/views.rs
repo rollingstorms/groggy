@@ -140,6 +140,56 @@ impl PyNodeView {
         
         Ok(dict.to_object(py))
     }
+    
+    /// Alias for to_dict() - get as dictionary
+    fn item(&self, py: Python) -> PyResult<PyObject> {
+        self.to_dict(py)
+    }
+    
+    /// Iterator support - iterates over (key, value) pairs
+    fn __iter__(&self, py: Python) -> PyResult<NodeViewIterator> {
+        let graph = self.graph.borrow(py);
+        let keys = graph.node_attribute_keys(self.node_id);
+        
+        let mut items = Vec::new();
+        for key in keys {
+            if let Some(value) = graph.get_node_attribute(self.node_id, key.clone()).ok().flatten() {
+                items.push((key, value));
+            }
+        }
+        
+        Ok(NodeViewIterator {
+            items,
+            index: 0,
+        })
+    }
+}
+
+/// Iterator for NodeView that yields (key, value) pairs
+#[pyclass]
+pub struct NodeViewIterator {
+    items: Vec<(String, crate::ffi::types::PyAttrValue)>,
+    index: usize,
+}
+
+#[pymethods]
+impl NodeViewIterator {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
+        slf
+    }
+    
+    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+        if self.index < self.items.len() {
+            let (key, value) = &self.items[self.index];
+            self.index += 1;
+            
+            // Return (key, value) tuple
+            let tuple = pyo3::types::PyTuple::new(py, [key.to_object(py), value.to_object(py)]);
+            Ok(Some(tuple.to_object(py)))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 impl Clone for PyNodeView {
@@ -179,6 +229,12 @@ impl PyEdgeView {
     /// Get edge ID
     #[getter]
     fn id(&self) -> PyResult<EdgeId> {
+        Ok(self.edge_id)
+    }
+    
+    /// Get edge ID (alias for id)
+    #[getter]
+    fn edge_id(&self) -> PyResult<EdgeId> {
         Ok(self.edge_id)
     }
     
@@ -304,6 +360,56 @@ impl PyEdgeView {
         }
         
         Ok(dict.to_object(py))
+    }
+    
+    /// Alias for to_dict() - get as dictionary
+    fn item(&self, py: Python) -> PyResult<PyObject> {
+        self.to_dict(py)
+    }
+    
+    /// Iterator support - iterates over (key, value) pairs
+    fn __iter__(&self, py: Python) -> PyResult<EdgeViewIterator> {
+        let graph = self.graph.borrow(py);
+        let keys = graph.edge_attribute_keys(self.edge_id);
+        
+        let mut items = Vec::new();
+        for key in keys {
+            if let Some(value) = graph.get_edge_attribute(self.edge_id, key.clone()).ok().flatten() {
+                items.push((key, value));
+            }
+        }
+        
+        Ok(EdgeViewIterator {
+            items,
+            index: 0,
+        })
+    }
+}
+
+/// Iterator for EdgeView that yields (key, value) pairs
+#[pyclass]
+pub struct EdgeViewIterator {
+    items: Vec<(String, crate::ffi::types::PyAttrValue)>,
+    index: usize,
+}
+
+#[pymethods]
+impl EdgeViewIterator {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
+        slf
+    }
+    
+    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+        if self.index < self.items.len() {
+            let (key, value) = &self.items[self.index];
+            self.index += 1;
+            
+            // Return (key, value) tuple
+            let tuple = pyo3::types::PyTuple::new(py, [key.to_object(py), value.to_object(py)]);
+            Ok(Some(tuple.to_object(py)))
+        } else {
+            Ok(None)
+        }
     }
 }
 

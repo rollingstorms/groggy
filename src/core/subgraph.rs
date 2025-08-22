@@ -262,6 +262,12 @@ impl Subgraph {
         // For now, return the subgraph itself as a single component
         Ok(vec![self.clone()])
     }
+    
+    /// Check if the subgraph is connected (has exactly one connected component)
+    pub fn is_connected(&self) -> GraphResult<bool> {
+        let components = self.connected_components()?;
+        Ok(components.len() == 1 && !self.nodes.is_empty())
+    }
 }
 
 /// Column access operations for bulk attribute extraction
