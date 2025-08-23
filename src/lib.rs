@@ -270,9 +270,7 @@ mod tests {
             .unwrap();
 
         // Branching
-        graph
-            .create_branch("test_branch".to_string())
-            .unwrap();
+        graph.create_branch("test_branch".to_string()).unwrap();
         graph.checkout_branch("test_branch".to_string()).unwrap();
 
         // More changes
