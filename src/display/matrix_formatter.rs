@@ -14,6 +14,7 @@ pub fn format_matrix(matrix_data: HashMap<String, serde_json::Value>, config: &D
 pub struct MatrixDisplayFormatter {
     max_rows: usize,
     max_cols: usize,
+    #[allow(dead_code)]
     use_color: bool,
 }
 

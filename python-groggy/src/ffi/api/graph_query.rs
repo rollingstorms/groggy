@@ -4,10 +4,9 @@
 
 use crate::ffi::core::query::{PyEdgeFilter, PyNodeFilter};
 use crate::ffi::core::subgraph::PySubgraph;
-use crate::ffi::types::PyAttrValue;
-use crate::ffi::utils::{attr_value_to_python_value, graph_error_to_py_err};
+use crate::ffi::utils::graph_error_to_py_err;
 use groggy::{AttrName, EdgeId, NodeId};
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashSet;

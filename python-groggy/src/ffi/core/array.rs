@@ -4,17 +4,11 @@
 
 use groggy::core::array::{GraphArray, StatsSummary};
 use groggy::AttrValue as RustAttrValue;
-use pyo3::exceptions::{
-    PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
-    PyValueError,
-};
+use pyo3::exceptions::{PyImportError, PyIndexError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySlice};
 
 // Use utility functions from utils module
-use crate::ffi::utils::{
-    attr_value_to_python_value, graph_error_to_py_err, python_value_to_attr_value,
-};
+use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
 
 /// Native performance-oriented GraphArray for statistical operations
 #[pyclass(name = "GraphArray")]
@@ -625,7 +619,7 @@ impl PyGraphArray {
     // === COMPARISON OPERATORS FOR BOOLEAN INDEXING ===
 
     /// Greater than comparison - returns boolean array
-    fn __gt__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+    fn __gt__(&self, _py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
 
         let mut result = Vec::new();
@@ -689,7 +683,7 @@ impl PyGraphArray {
     }
 
     /// Less than comparison - returns boolean array
-    fn __lt__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+    fn __lt__(&self, _py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
 
         let mut result = Vec::new();
@@ -753,7 +747,7 @@ impl PyGraphArray {
     }
 
     /// Greater than or equal comparison - returns boolean array
-    fn __ge__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+    fn __ge__(&self, _py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
 
         let mut result = Vec::new();
@@ -817,7 +811,7 @@ impl PyGraphArray {
     }
 
     /// Less than or equal comparison - returns boolean array
-    fn __le__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+    fn __le__(&self, _py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
 
         let mut result = Vec::new();
@@ -883,7 +877,7 @@ impl PyGraphArray {
     }
 
     /// Equality comparison - returns boolean array
-    fn __eq__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+    fn __eq__(&self, _py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
 
         let mut result = Vec::new();
@@ -898,7 +892,7 @@ impl PyGraphArray {
     }
 
     /// Not equal comparison - returns boolean array
-    fn __ne__(&self, py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
+    fn __ne__(&self, _py: Python, other: &PyAny) -> PyResult<PyGraphArray> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
 
         let mut result = Vec::new();

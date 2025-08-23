@@ -15,13 +15,3 @@ pub mod traversal;
 pub mod views;
 
 // Re-export core FFI types
-pub use accessors::*;
-pub use array::*;
-pub use attributes::*;
-pub use history::*;
-pub use matrix::*;
-pub use query::*;
-pub use subgraph::*;
-pub use table::*;
-pub use traversal::*;
-pub use views::*;

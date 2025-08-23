@@ -4,14 +4,9 @@
 
 use groggy::core::query::{AttributeFilter, EdgeFilter, NodeFilter};
 use groggy::{AttrName, EdgeId, NodeId};
-use pyo3::exceptions::{
-    PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
-    PyValueError,
-};
 use pyo3::prelude::*;
 
 // Import types from our FFI modules
-use crate::ffi::types::PyAttrValue;
 
 /// Python wrapper for AttributeFilter
 #[pyclass(name = "AttributeFilter")]

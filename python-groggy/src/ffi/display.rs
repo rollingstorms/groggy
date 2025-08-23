@@ -209,7 +209,7 @@ pub fn py_detect_display_type(data: &PyDict) -> PyResult<String> {
 }
 
 /// Register display functions with the Python module
-pub fn register_display_functions(py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register_display_functions(_py: Python, m: &PyModule) -> PyResult<()> {
     // Register display config class
     m.add_class::<PyDisplayConfig>()?;
 

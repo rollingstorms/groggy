@@ -44,6 +44,7 @@ pub struct TraversalEngine {
     stats: TraversalStats,
     
     /// Query engine for bulk filtering operations
+    #[allow(dead_code)]
     query_engine: QueryEngine,
 }
 
@@ -447,12 +448,12 @@ impl TraversalEngine {
         // 📊 TIMING: Step 1 - Get active nodes
         let step1_start = std::time::Instant::now();
         let active_nodes: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
-        let step1_duration = step1_start.elapsed();
+        let _step1_duration = step1_start.elapsed();
         
         // 📊 TIMING: Step 2 - Build adjacency snapshot
         let step2_start = std::time::Instant::now();
         let (_, _, _, neighbors) = space.snapshot(pool);
-        let step2_duration = step2_start.elapsed();
+        let _step2_duration = step2_start.elapsed();
         
         // 🚀 PERFORMANCE: Use Arc reference directly - no O(E) clone needed!
         // The Arc allows zero-copy sharing of the adjacency map
@@ -461,7 +462,7 @@ impl TraversalEngine {
         let step3_start = std::time::Instant::now();
         let mut visited = HashSet::new();
         let mut components = Vec::new();
-        let step3_duration = step3_start.elapsed();
+        let _step3_duration = step3_start.elapsed();
         
         // 📊 TIMING: Step 4 - Main component finding loop
         let step4_start = std::time::Instant::now();
@@ -544,12 +545,12 @@ impl TraversalEngine {
             }
         }
         
-        let step4_duration = step4_start.elapsed();
+        let _step4_duration = step4_start.elapsed();
     
         // 📊 TIMING: Step 5 - Sort components by size
         let step5_start = std::time::Instant::now();
         components.sort_unstable_by(|a, b| b.size.cmp(&a.size));
-        let step5_duration = step5_start.elapsed();
+        let _step5_duration = step5_start.elapsed();
         
         let duration = start_time.elapsed();
         self.stats.record_traversal("connected_components".to_string(), components.len(), duration);
@@ -639,6 +640,7 @@ impl TraversalEngine {
     
     /// Pre-filter nodes using bulk operations for O(n) performance instead of O(n²)
     /// NOTE: This is slower for sparse traversals - kept for compatibility
+    #[allow(dead_code)]
     fn get_eligible_nodes(
         &mut self,
         pool: &GraphPool,

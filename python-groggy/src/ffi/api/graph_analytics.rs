@@ -3,14 +3,11 @@
 //! Python bindings for graph analytics and algorithms.
 
 use crate::ffi::core::subgraph::PySubgraph;
-use crate::ffi::types::PyAttrValue;
-use crate::ffi::utils::{attr_value_to_python_value, graph_error_to_py_err};
+use crate::ffi::utils::graph_error_to_py_err;
 use groggy::core::traversal::{PathFindingOptions, TraversalOptions};
-use groggy::{AttrName, EdgeId, NodeId};
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
+use groggy::{AttrName, NodeId};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use std::collections::HashSet;
 
 /// Analytics operations for graphs
 #[pyclass(name = "GraphAnalytics")]
@@ -292,7 +289,5 @@ impl PyGraphAnalytics {
         ))
     }
 }
-
-use pyo3::prelude::*;
 
 // Placeholder - will extract analytics operations from lib_old.rs

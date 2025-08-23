@@ -206,8 +206,8 @@ impl NeighborhoodSampler {
     /// Returns a single subgraph containing all nodes and their combined neighborhoods
     pub fn unified_neighborhood(
         &mut self,
-        pool: &GraphPool,
-        space: &GraphSpace,
+        _pool: &GraphPool,
+        _space: &GraphSpace,
         node_ids: &[NodeId],
         k: usize,
     ) -> GraphResult<NeighborhoodSubgraph> {

@@ -16,12 +16,9 @@ use crate::ffi::core::subgraph::PySubgraph;
 use crate::ffi::core::traversal::PyGroupedAggregationResult;
 use crate::ffi::core::views::{PyEdgeView, PyNodeView};
 use crate::ffi::types::PyAttrValue;
-use crate::ffi::utils::{
-    attr_value_to_python_value, graph_error_to_py_err, python_value_to_attr_value,
-};
+use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
 
 // Import version control types
-use crate::ffi::api::graph_query::PyGraphQuery;
 use crate::ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoricalView};
 
 // Placeholder imports for missing types - these need to be implemented
@@ -991,7 +988,7 @@ impl PyGraph {
     #[pyo3(signature = (source, target, uid_key = None, **kwargs))]
     fn add_edge(
         &mut self,
-        py: Python,
+        _py: Python,
         source: &PyAny,
         target: &PyAny,
         uid_key: Option<String>,

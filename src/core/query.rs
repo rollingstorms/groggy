@@ -56,7 +56,7 @@ impl QueryEngine {
                 let mut matching_nodes = Vec::with_capacity(nodes.len() / 4); // estimate 25% match rate
                 let attr_start = std::time::Instant::now();
                 let node_attr_pairs = space.get_attributes_for_nodes(pool, name, nodes);
-                let attr_time = attr_start.elapsed();
+                let _attr_time = attr_start.elapsed();
                 
                 // ULTRA-OPTIMIZED: Parallel iterator processing with minimal allocations
                 let parallel_results: Vec<NodeId> = if node_attr_pairs.len() > 1000 {
@@ -89,7 +89,7 @@ impl QueryEngine {
                         .collect()
                 };
                 matching_nodes.extend(parallel_results);
-                let total_time = start_time.elapsed();
+                let _total_time = start_time.elapsed();
                 Ok(matching_nodes)
             }
             
@@ -98,7 +98,7 @@ impl QueryEngine {
                 let mut matching_nodes = Vec::with_capacity(nodes.len() / 4);
                 let attr_start = std::time::Instant::now();
                 let node_attr_pairs = space.get_attributes_for_nodes(pool, name, nodes);
-                let attr_time = attr_start.elapsed();
+                let _attr_time = attr_start.elapsed();
                 
                 // PARALLEL: Use parallel processing for large datasets
                 let parallel_results: Vec<NodeId> = if node_attr_pairs.len() > 1000 {
@@ -133,7 +133,7 @@ impl QueryEngine {
                         .collect()
                 };
                 matching_nodes.extend(parallel_results);
-                let total_time = start_time.elapsed();
+                let _total_time = start_time.elapsed();
                 Ok(matching_nodes)
             }
             
@@ -262,6 +262,7 @@ impl QueryEngine {
     }
 
     /// Check if a node matches the given filter with pre-fetched topology
+    #[allow(dead_code)]
     fn node_matches_filter_with_topology(
         &self,
         node_id: NodeId,
@@ -327,6 +328,7 @@ impl QueryEngine {
     }
 
     /// Check if a node matches the given filter (legacy method)
+    #[allow(dead_code)]
     fn node_matches_filter(
         &self,
         node_id: NodeId,

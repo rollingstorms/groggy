@@ -2,11 +2,8 @@
 //!
 //! Python bindings for NodeView and EdgeView components.
 
-use groggy::{AttrValue, EdgeId, NodeId};
-use pyo3::exceptions::{
-    PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
-    PyValueError,
-};
+use groggy::{EdgeId, NodeId};
+use pyo3::exceptions::{PyKeyError, PyRuntimeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 

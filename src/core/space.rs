@@ -116,6 +116,7 @@ pub struct GraphSpace {
     */
     
     /// Shared reference to the graph pool for topology rebuilding
+    #[allow(dead_code)]
     pool: Rc<std::cell::RefCell<GraphPool>>,
     
     /*
@@ -450,13 +451,13 @@ impl GraphSpace {
         // PERFORMANCE: Bulk index lookup in single call
         let entity_indices = self.get_node_attr_indices_for_attr(node_ids, attr_name);
         
-        let index_time = start_time.elapsed();
+        let _index_time = start_time.elapsed();
         let start_time = std::time::Instant::now();
         
         // Single pool call for bulk attribute retrieval
         let values = pool.get_attribute_values(attr_name, &entity_indices, true);
         
-        let pool_time = start_time.elapsed();
+        let _pool_time = start_time.elapsed();
         
         values
     }
