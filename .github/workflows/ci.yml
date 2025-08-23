@@ -114,6 +114,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install maturin
         pip install networkx
+        pip install pandas
 
     - name: Build sdist
       run: maturin sdist

@@ -37,6 +37,7 @@ jobs:
         pip install --upgrade pip
         pip install maturin
         pip install networkx
+        pip install pandas
     
     - name: Build wheels for current Python
       run: |
