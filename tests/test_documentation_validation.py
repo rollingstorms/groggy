@@ -225,7 +225,8 @@ def test_with_error_handling():
     else:
         print(f"\n🎉 ALL DOCUMENTED FEATURES WORK!")
     
-    return issues_found, features_working
+    # Test functions should not return anything in pytest
+    # return issues_found, features_working
 
 if __name__ == "__main__":
-    issues, working = test_with_error_handling()
+    test_with_error_handling()

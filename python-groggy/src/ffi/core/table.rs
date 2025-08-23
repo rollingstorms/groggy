@@ -659,6 +659,16 @@ impl PyGraphTable {
         Ok(Py::new(py, py_table)?.to_object(py))
     }
 
+    /// Calculate mean for a specific column
+    pub fn mean(&self, column_name: String) -> PyResult<f64> {
+        self.inner.mean(&column_name).map_err(graph_error_to_py_err)
+    }
+
+    /// Calculate sum for a specific column
+    pub fn sum(&self, column_name: String) -> PyResult<f64> {
+        self.inner.sum(&column_name).map_err(graph_error_to_py_err)
+    }
+
     /// Get summary statistics
     pub fn describe(&self, py: Python) -> PyResult<PyObject> {
         let desc_table = self.inner.describe();
