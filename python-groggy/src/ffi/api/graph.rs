@@ -1373,30 +1373,30 @@ impl PyGraph {
         self.inner.neighbors(node).map_err(graph_error_to_py_err)
     }
 
-    /// Get the degree of nodes (number of incident edges)
+    /// Get the degree of nodes (number of incident edges) as GraphArray
     ///
     /// Usage:
     /// - degree(node_id) -> int: degree of single node
-    /// - degree(node_ids) -> dict: degrees for list of nodes  
-    /// - degree() -> dict: degrees for all nodes
+    /// - degree(node_ids) -> GraphArray: degrees for list of nodes  
+    /// - degree() -> GraphArray: degrees for all nodes
     #[pyo3(signature = (nodes = None))]
     fn degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
         match nodes {
-            // Single node case: degree(node_id) -> int
+            // Single node case: degree(node_id) -> int (keep as int for backward compatibility)
             Some(node_arg) if node_arg.extract::<NodeId>().is_ok() => {
                 let node = node_arg.extract::<NodeId>()?;
                 let deg = self.inner.degree(node).map_err(graph_error_to_py_err)?;
                 Ok(deg.to_object(py))
             }
-            // List of nodes case: degree([node1, node2, ...]) -> dict
+            // List of nodes case: degree([node1, node2, ...]) -> GraphArray
             Some(node_arg) if node_arg.extract::<Vec<NodeId>>().is_ok() => {
                 let node_ids = node_arg.extract::<Vec<NodeId>>()?;
-                let result_dict = pyo3::types::PyDict::new(py);
+                let mut degrees = Vec::new();
 
                 for node_id in node_ids {
                     match self.inner.degree(node_id) {
                         Ok(deg) => {
-                            result_dict.set_item(node_id, deg)?;
+                            degrees.push(groggy::AttrValue::Int(deg as i64));
                         }
                         Err(_) => {
                             // Skip nodes that don't exist rather than failing
@@ -1405,20 +1405,24 @@ impl PyGraph {
                     }
                 }
 
-                Ok(result_dict.to_object(py))
+                let graph_array = groggy::GraphArray::from_vec(degrees);
+                let py_graph_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
             }
-            // All nodes case: degree() -> dict
+            // All nodes case: degree() -> GraphArray
             None => {
-                let result_dict = pyo3::types::PyDict::new(py);
                 let all_nodes = self.inner.node_ids();
+                let mut degrees = Vec::new();
 
                 for node_id in all_nodes {
                     if let Ok(deg) = self.inner.degree(node_id) {
-                        result_dict.set_item(node_id, deg)?;
+                        degrees.push(groggy::AttrValue::Int(deg as i64));
                     }
                 }
 
-                Ok(result_dict.to_object(py))
+                let graph_array = groggy::GraphArray::from_vec(degrees);
+                let py_graph_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
             }
             // Invalid argument type
             Some(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(

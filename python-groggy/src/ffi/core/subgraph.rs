@@ -263,6 +263,159 @@ impl PySubgraph {
         }
     }
 
+    /// Get degree of nodes in subgraph as GraphArray
+    ///
+    /// Usage:
+    /// - degree(node_id, full_graph=False) -> int: degree of single node (local or full graph)
+    /// - degree(node_ids, full_graph=False) -> GraphArray: degrees for list of nodes
+    /// - degree(full_graph=False) -> GraphArray: degrees for all nodes in subgraph
+    /// 
+    /// Parameters:
+    /// - nodes: Optional node ID, list of node IDs, or None for all nodes
+    /// - full_graph: If False (default), compute degrees within subgraph only.
+    ///               If True, compute degrees from the original full graph.
+    #[pyo3(signature = (nodes = None, *, full_graph = false))]
+    fn degree(&self, py: Python, nodes: Option<&PyAny>, full_graph: bool) -> PyResult<PyObject> {
+        // Get graph reference if we need full graph degrees
+        let graph_ref = if full_graph {
+            self.graph.as_ref().ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                    "Cannot compute full graph degrees: subgraph has no parent graph reference"
+                )
+            })?
+        } else {
+            // We'll handle local degrees without needing the graph reference
+            &self.graph.as_ref().unwrap() // Safe because subgraphs always have graph refs
+        };
+
+        match nodes {
+            // Single node case
+            Some(node_arg) if node_arg.extract::<NodeId>().is_ok() => {
+                let node_id = node_arg.extract::<NodeId>()?;
+                
+                // Verify node is in subgraph
+                if !self.nodes.contains(&node_id) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                        format!("Node {} is not in this subgraph", node_id)
+                    ));
+                }
+
+                let deg = if full_graph {
+                    // Get degree from full graph
+                    let graph = graph_ref.borrow(py);
+                    graph.inner.degree(node_id).map_err(|e| {
+                        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}", e))
+                    })?
+                } else {
+                    // Calculate local degree within subgraph
+                    self.edges.iter()
+                        .filter(|&&edge_id| {
+                            if let Some(graph_ref) = &self.graph {
+                                let graph = graph_ref.borrow(py);
+                                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                                    source == node_id || target == node_id
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        })
+                        .count()
+                };
+
+                Ok(deg.to_object(py))
+            }
+
+            // List of nodes case
+            Some(node_arg) if node_arg.extract::<Vec<NodeId>>().is_ok() => {
+                let node_ids = node_arg.extract::<Vec<NodeId>>()?;
+                let mut degrees = Vec::new();
+
+                for node_id in node_ids {
+                    // Verify node is in subgraph
+                    if !self.nodes.contains(&node_id) {
+                        continue; // Skip nodes not in subgraph
+                    }
+
+                    let deg = if full_graph {
+                        // Get degree from main graph
+                        let graph = graph_ref.borrow(py);
+                        match graph.inner.degree(node_id) {
+                            Ok(d) => d,
+                            Err(_) => continue, // Skip invalid nodes
+                        }
+                    } else {
+                        // Calculate local degree within subgraph
+                        self.edges.iter()
+                            .filter(|&&edge_id| {
+                                if let Some(graph_ref) = &self.graph {
+                                    let graph = graph_ref.borrow(py);
+                                    if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                                        source == node_id || target == node_id
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            })
+                            .count()
+                    };
+
+                    degrees.push(groggy::AttrValue::Int(deg as i64));
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(degrees);
+                let py_graph_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+
+            // All nodes case (or None)
+            None => {
+                let mut degrees = Vec::new();
+
+                for &node_id in &self.nodes {
+                    let deg = if full_graph {
+                        // Get degree from main graph
+                        let graph = graph_ref.borrow(py);
+                        match graph.inner.degree(node_id) {
+                            Ok(d) => d,
+                            Err(_) => continue, // Skip invalid nodes
+                        }
+                    } else {
+                        // Calculate local degree within subgraph
+                        self.edges.iter()
+                            .filter(|&&edge_id| {
+                                if let Some(graph_ref) = &self.graph {
+                                    let graph = graph_ref.borrow(py);
+                                    if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                                        source == node_id || target == node_id
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            })
+                            .count()
+                    };
+
+                    degrees.push(groggy::AttrValue::Int(deg as i64));
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(degrees);
+                let py_graph_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+
+            // Invalid argument type
+            Some(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "degree() nodes argument must be a NodeId, list of NodeIds, or None",
+            )),
+        }
+    }
+
     /// Filter edges within this subgraph (chainable)
     fn filter_edges(&self, _py: Python, _filter: &PyAny) -> PyResult<PySubgraph> {
         // Placeholder implementation
@@ -907,8 +1060,6 @@ impl PySubgraph {
     }
 
     /// Export subgraph to a new independent Graph object
-    // TODO: Fix compilation issues with attribute access
-    /*
     pub fn to_graph(&self, py: Python) -> PyResult<PyObject> {
         // Import the PyGraph class
         let graph_module = py.import("groggy")?;
@@ -917,7 +1068,7 @@ impl PySubgraph {
         // Create a new empty graph with the same directed property as parent
         let is_directed = if let Some(graph_ref) = &self.graph {
             let parent_graph = graph_ref.borrow(py);
-            parent_graph.is_directed()
+            parent_graph.inner.is_directed()
         } else {
             false // Default to undirected if no parent reference
         };
@@ -931,19 +1082,27 @@ impl PySubgraph {
             let mut node_id_mapping = std::collections::HashMap::new();
             
             for &old_node_id in &self.nodes {
-                // Get node attributes from parent graph
-                let node_attrs = parent_graph.inner.get_node_attrs(old_node_id)
-                    .unwrap_or_default();
+                // Get node attribute keys
+                let attr_keys = parent_graph.node_attribute_keys(old_node_id);
                 
-                // Convert attributes to Python dict
+                // Create Python dict for node attributes
                 let py_attrs = pyo3::types::PyDict::new(py);
-                for (key, value) in node_attrs {
-                    let py_value = crate::ffi::utils::attr_value_to_python_value(py, &value)?;
-                    py_attrs.set_item(key, py_value)?;
+                
+                // Get each attribute using the FFI method
+                for attr_key in attr_keys {
+                    if let Ok(Some(py_attr_value)) = parent_graph.get_node_attribute(old_node_id, attr_key.clone()) {
+                        // Convert PyAttrValue to Python object
+                        let py_value = crate::ffi::utils::attr_value_to_python_value(py, &py_attr_value.inner)?;
+                        py_attrs.set_item(attr_key, py_value)?;
+                    }
                 }
                 
-                // Add node to new graph
-                let new_node_id = new_graph.call_method1("add_node", (py_attrs,))?;
+                // Add node to new graph - call with **kwargs pattern
+                let new_node_id = if py_attrs.len() > 0 {
+                    new_graph.call_method("add_node", (), Some(py_attrs))?
+                } else {
+                    new_graph.call_method0("add_node")?
+                };
                 let new_id: u64 = new_node_id.extract()?;
                 node_id_mapping.insert(old_node_id, new_id);
             }
@@ -954,30 +1113,36 @@ impl PySubgraph {
                     if let (Some(&new_source), Some(&new_target)) = 
                         (node_id_mapping.get(&source), node_id_mapping.get(&target)) {
                         
-                        // Get edge attributes from parent graph
-                        let edge_attrs = parent_graph.inner.get_edge_attrs(old_edge_id)
-                            .unwrap_or_default();
+                        // Get edge attribute keys
+                        let attr_keys = parent_graph.edge_attribute_keys(old_edge_id);
                         
-                        // Convert attributes to Python dict
+                        // Create Python dict for edge attributes
                         let py_attrs = pyo3::types::PyDict::new(py);
-                        for (key, value) in edge_attrs {
-                            let py_value = crate::ffi::utils::attr_value_to_python_value(py, &value)?;
-                            py_attrs.set_item(key, py_value)?;
+                        
+                        // Get each attribute using the FFI method
+                        for attr_key in attr_keys {
+                            if let Ok(Some(py_attr_value)) = parent_graph.get_edge_attribute(old_edge_id, attr_key.clone()) {
+                                // Convert PyAttrValue to Python object
+                                let py_value = crate::ffi::utils::attr_value_to_python_value(py, &py_attr_value.inner)?;
+                                py_attrs.set_item(attr_key, py_value)?;
+                            }
                         }
                         
                         // Add edge to new graph
-                        new_graph.call_method1("add_edge", (new_source, new_target, py_attrs))?;
+                        if py_attrs.len() > 0 {
+                            new_graph.call_method("add_edge", (new_source, new_target), Some(py_attrs))?;
+                        } else {
+                            new_graph.call_method1("add_edge", (new_source, new_target))?;
+                        };
                     }
                 }
             }
         }
         
-        Ok(new_graph)
+        Ok(new_graph.into())
     }
 
-    /// Export subgraph to NetworkX graph object  
-    // TODO: Fix compilation issues with attribute access
-    /*
+    /// Export subgraph to NetworkX graph object
     pub fn to_networkx(&self, py: Python) -> PyResult<PyObject> {
         // Import networkx
         let nx = py.import("networkx")?;
@@ -985,7 +1150,7 @@ impl PySubgraph {
         // Determine graph type
         let is_directed = if let Some(graph_ref) = &self.graph {
             let parent_graph = graph_ref.borrow(py);
-            parent_graph.is_directed()
+            parent_graph.inner.is_directed()
         } else {
             false // Default to undirected if no parent reference
         };
@@ -1002,42 +1167,49 @@ impl PySubgraph {
             
             // Add nodes with attributes
             for &node_id in &self.nodes {
-                // Get node attributes from parent graph
-                let node_attrs = parent_graph.inner.get_node_attributes(node_id)
-                    .unwrap_or_default();
+                // Get node attribute keys
+                let attr_keys = parent_graph.node_attribute_keys(node_id);
                 
-                // Convert attributes to Python dict
+                // Create Python dict for node attributes
                 let py_attrs = pyo3::types::PyDict::new(py);
-                for (key, value) in node_attrs {
-                    let py_value = crate::ffi::utils::attr_value_to_python_value(py, &value)?;
-                    py_attrs.set_item(key, py_value)?;
+                
+                // Get each attribute using the FFI method
+                for attr_key in attr_keys {
+                    if let Ok(Some(py_attr_value)) = parent_graph.get_node_attribute(node_id, attr_key.clone()) {
+                        // Convert PyAttrValue to Python object
+                        let py_value = crate::ffi::utils::attr_value_to_python_value(py, &py_attr_value.inner)?;
+                        py_attrs.set_item(attr_key, py_value)?;
+                    }
                 }
                 
-                // Add node to NetworkX graph
-                nx_graph.call_method1("add_node", (node_id, py_attrs))?;
+                // Add node to NetworkX graph - NetworkX expects (node_id, **attrs)
+                nx_graph.call_method("add_node", (node_id,), Some(py_attrs))?;
             }
             
             // Add edges with attributes
             for &edge_id in &self.edges {
                 if let Ok((source, target)) = parent_graph.inner.edge_endpoints(edge_id) {
-                    // Get edge attributes from parent graph
-                    let edge_attrs = parent_graph.inner.get_edge_attributes(edge_id)
-                        .unwrap_or_default();
+                    // Get edge attribute keys
+                    let attr_keys = parent_graph.edge_attribute_keys(edge_id);
                     
-                    // Convert attributes to Python dict
+                    // Create Python dict for edge attributes
                     let py_attrs = pyo3::types::PyDict::new(py);
-                    for (key, value) in edge_attrs {
-                        let py_value = crate::ffi::utils::attr_value_to_python_value(py, &value)?;
-                        py_attrs.set_item(key, py_value)?;
+                    
+                    // Get each attribute using the FFI method
+                    for attr_key in attr_keys {
+                        if let Ok(Some(py_attr_value)) = parent_graph.get_edge_attribute(edge_id, attr_key.clone()) {
+                            // Convert PyAttrValue to Python object
+                            let py_value = crate::ffi::utils::attr_value_to_python_value(py, &py_attr_value.inner)?;
+                            py_attrs.set_item(attr_key, py_value)?;
+                        }
                     }
                     
-                    // Add edge to NetworkX graph
-                    nx_graph.call_method1("add_edge", (source, target, py_attrs))?;
+                    // Add edge to NetworkX graph - NetworkX expects (source, target, **attrs)  
+                    nx_graph.call_method("add_edge", (source, target), Some(py_attrs))?;
                 }
             }
         }
         
         Ok(nx_graph.to_object(py))
     }
-    */
 }

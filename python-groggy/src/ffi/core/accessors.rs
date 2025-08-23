@@ -85,75 +85,7 @@ impl PyNodesAccessor {
             return Ok(node_view.to_object(py));
         }
 
-        // Try to extract as list of integers (batch access)
-        if let Ok(indices_or_ids) = key.extract::<Vec<NodeId>>() {
-            // Batch node access - return Subgraph
-            let mut graph = self.graph.borrow_mut(py);
-
-            // Convert indices to actual node IDs if constrained
-            let actual_node_ids: Result<Vec<NodeId>, PyErr> =
-                if let Some(ref constrained) = self.constrained_nodes {
-                    // Constrained case: treat as indices into constrained list
-                    indices_or_ids
-                        .into_iter()
-                        .map(|index| {
-                            if (index as usize) >= constrained.len() {
-                                Err(PyIndexError::new_err(format!(
-                                    "Node index {} out of range (0-{})",
-                                    index,
-                                    constrained.len() - 1
-                                )))
-                            } else {
-                                Ok(constrained[index as usize])
-                            }
-                        })
-                        .collect()
-                } else {
-                    // Unconstrained case: treat as actual node IDs
-                    Ok(indices_or_ids)
-                };
-
-            let node_ids = actual_node_ids?;
-
-            // Validate all nodes exist
-            for &node_id in &node_ids {
-                if !graph.has_node_internal(node_id) {
-                    return Err(PyKeyError::new_err(format!(
-                        "Node {} does not exist",
-                        node_id
-                    )));
-                }
-            }
-
-            // 🚀 PERFORMANCE FIX: Use core columnar topology instead of O(E) FFI algorithm
-            let node_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
-            let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
-            let mut induced_edges = Vec::new();
-
-            // O(k) where k = active edges, much better than O(E)
-            for i in 0..edge_ids.len() {
-                let edge_id = edge_ids[i];
-                let source = sources[i];
-                let target = targets[i];
-
-                // O(1) HashSet lookups
-                if node_set.contains(&source) && node_set.contains(&target) {
-                    induced_edges.push(edge_id);
-                }
-            }
-
-            // Create and return Subgraph
-            let subgraph = PySubgraph::new(
-                node_ids,
-                induced_edges,
-                "node_batch_selection".to_string(),
-                Some(self.graph.clone()),
-            );
-
-            return Ok(Py::new(py, subgraph)?.to_object(py));
-        }
-
-        // Try to extract as boolean array/list (boolean indexing)
+        // Try to extract as boolean array/list (boolean indexing) - CHECK FIRST before integers
         if let Ok(boolean_mask) = key.extract::<Vec<bool>>() {
             let graph = self.graph.borrow(py);
             let all_node_ids = if let Some(ref constrained) = self.constrained_nodes {
@@ -212,6 +144,72 @@ impl PyNodesAccessor {
                 selected_nodes,
                 induced_edges,
                 "boolean_selection".to_string(),
+                Some(self.graph.clone()),
+            );
+
+            return Ok(Py::new(py, subgraph)?.to_object(py));
+        }
+
+        // Try to extract as list of integers (batch access) - CHECK AFTER boolean arrays
+        if let Ok(indices_or_ids) = key.extract::<Vec<NodeId>>() {
+            // Batch node access - return Subgraph
+            let mut graph = self.graph.borrow_mut(py);
+
+            // Convert indices to actual node IDs if constrained
+            let actual_node_ids: Result<Vec<NodeId>, PyErr> =
+                if let Some(ref constrained) = self.constrained_nodes {
+                    // Constrained case: treat as indices into constrained list
+                    indices_or_ids
+                        .into_iter()
+                        .map(|index| {
+                            if (index as usize) >= constrained.len() {
+                                Err(PyIndexError::new_err(format!(
+                                    "Node index {} out of range (0-{})",
+                                    index,
+                                    constrained.len() - 1
+                                )))
+                            } else {
+                                Ok(constrained[index as usize])
+                            }
+                        })
+                        .collect()
+                } else {
+                    // Unconstrained case: treat as actual node IDs
+                    Ok(indices_or_ids)
+                };
+
+            let node_ids = actual_node_ids?;
+
+            // Validate all nodes exist
+            for &node_id in &node_ids {
+                if !graph.has_node_internal(node_id) {
+                    return Err(PyKeyError::new_err(format!(
+                        "Node {} does not exist",
+                        node_id
+                    )));
+                }
+            }
+
+            // Get induced edges for selected nodes
+            let node_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
+            let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
+            let mut induced_edges = Vec::new();
+
+            for i in 0..edge_ids.len() {
+                let edge_id = edge_ids[i];
+                let source = sources[i];
+                let target = targets[i];
+
+                if node_set.contains(&source) && node_set.contains(&target) {
+                    induced_edges.push(edge_id);
+                }
+            }
+
+            // Create and return Subgraph
+            let subgraph = PySubgraph::new(
+                node_ids,
+                induced_edges,
+                "node_batch_selection".to_string(),
                 Some(self.graph.clone()),
             );
 
@@ -441,7 +439,66 @@ impl PyEdgesAccessor {
             return Ok(edge_view.to_object(py));
         }
 
-        // Try to extract as list of integers (batch access)
+        // Try to extract as boolean array/list (boolean indexing) - CHECK FIRST before integers
+        if let Ok(boolean_mask) = key.extract::<Vec<bool>>() {
+            let graph = self.graph.borrow(py);
+            let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
+                constrained.clone()
+            } else {
+                graph.inner.edge_ids()
+            };
+
+            // Check if boolean mask length matches edge count
+            if boolean_mask.len() != all_edge_ids.len() {
+                return Err(PyIndexError::new_err(format!(
+                    "Boolean mask length ({}) must match number of edges ({})",
+                    boolean_mask.len(),
+                    all_edge_ids.len()
+                )));
+            }
+
+            // Select edges where boolean mask is True
+            let selected_edges: Vec<EdgeId> = all_edge_ids
+                .iter()
+                .zip(boolean_mask.iter())
+                .filter_map(|(&edge_id, &include)| if include { Some(edge_id) } else { None })
+                .collect();
+
+            if selected_edges.is_empty() {
+                return Err(PyIndexError::new_err("Boolean mask selected no edges"));
+            }
+
+            // Validate all selected edges exist
+            for &edge_id in &selected_edges {
+                if !graph.has_edge_internal(edge_id) {
+                    return Err(PyKeyError::new_err(format!(
+                        "Edge {} does not exist",
+                        edge_id
+                    )));
+                }
+            }
+
+            // Get all endpoint nodes from selected edges
+            let mut endpoint_nodes = std::collections::HashSet::new();
+            for &edge_id in &selected_edges {
+                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                    endpoint_nodes.insert(source);
+                    endpoint_nodes.insert(target);
+                }
+            }
+
+            // Create and return Subgraph
+            let subgraph = PySubgraph::new(
+                endpoint_nodes.into_iter().collect(),
+                selected_edges,
+                "boolean_edge_selection".to_string(),
+                Some(self.graph.clone()),
+            );
+
+            return Ok(Py::new(py, subgraph)?.to_object(py));
+        }
+
+        // Try to extract as list of integers (batch access) - CHECK AFTER boolean arrays
         if let Ok(indices_or_ids) = key.extract::<Vec<EdgeId>>() {
             // Batch edge access - return Subgraph with these edges + their endpoints
             let graph = self.graph.borrow(py);
@@ -495,65 +552,6 @@ impl PyEdgesAccessor {
                 endpoint_nodes.into_iter().collect(),
                 edge_ids,
                 "edge_batch_selection".to_string(),
-                Some(self.graph.clone()),
-            );
-
-            return Ok(Py::new(py, subgraph)?.to_object(py));
-        }
-
-        // Try to extract as boolean array/list (boolean indexing)
-        if let Ok(boolean_mask) = key.extract::<Vec<bool>>() {
-            let graph = self.graph.borrow(py);
-            let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
-                constrained.clone()
-            } else {
-                graph.inner.edge_ids()
-            };
-
-            // Check if boolean mask length matches edge count
-            if boolean_mask.len() != all_edge_ids.len() {
-                return Err(PyIndexError::new_err(format!(
-                    "Boolean mask length ({}) must match number of edges ({})",
-                    boolean_mask.len(),
-                    all_edge_ids.len()
-                )));
-            }
-
-            // Select edges where boolean mask is True
-            let selected_edges: Vec<EdgeId> = all_edge_ids
-                .iter()
-                .zip(boolean_mask.iter())
-                .filter_map(|(&edge_id, &include)| if include { Some(edge_id) } else { None })
-                .collect();
-
-            if selected_edges.is_empty() {
-                return Err(PyIndexError::new_err("Boolean mask selected no edges"));
-            }
-
-            // Validate all selected edges exist
-            for &edge_id in &selected_edges {
-                if !graph.has_edge_internal(edge_id) {
-                    return Err(PyKeyError::new_err(format!(
-                        "Edge {} does not exist",
-                        edge_id
-                    )));
-                }
-            }
-
-            // Get all endpoint nodes from selected edges
-            let mut endpoint_nodes = std::collections::HashSet::new();
-            for &edge_id in &selected_edges {
-                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
-                    endpoint_nodes.insert(source);
-                    endpoint_nodes.insert(target);
-                }
-            }
-
-            // Create and return Subgraph
-            let subgraph = PySubgraph::new(
-                endpoint_nodes.into_iter().collect(),
-                selected_edges,
-                "boolean_edge_selection".to_string(),
                 Some(self.graph.clone()),
             );
 
