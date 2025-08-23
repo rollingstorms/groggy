@@ -512,7 +512,10 @@ impl PyGraphTable {
         } else if let Ok(slice) = key.downcast::<pyo3::types::PySlice>() {
             // Slice access: table[:2] -> table
             let (rows, _) = self.inner.shape();
-            let indices = slice.indices(rows as i64)?;
+            let indices = slice.indices(
+                rows.try_into()
+                    .map_err(|_| PyValueError::new_err("Table too large for slice"))?,
+            )?;
             let start = indices.start as usize;
             let stop = indices.stop as usize;
             let step = indices.step;

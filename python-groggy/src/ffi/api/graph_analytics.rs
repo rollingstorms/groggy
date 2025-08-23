@@ -243,14 +243,9 @@ impl PyGraphAnalytics {
     }
 
     /// Check if a path exists between two nodes
-    pub fn has_path(
-        &self,
-        py: Python,
-        source: NodeId,
-        target: NodeId,
-    ) -> PyResult<bool> {
+    pub fn has_path(&self, py: Python, source: NodeId, target: NodeId) -> PyResult<bool> {
         let mut graph = self.graph.borrow_mut(py);
-        
+
         let options = PathFindingOptions {
             weight_attribute: None,
             max_path_length: None,

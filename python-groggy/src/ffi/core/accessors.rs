@@ -3,7 +3,7 @@
 //! Python bindings for smart indexing accessors.
 
 use groggy::{EdgeId, NodeId};
-use pyo3::exceptions::{PyIndexError, PyKeyError, PyTypeError};
+use pyo3::exceptions::{PyIndexError, PyKeyError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PySlice;
 
@@ -220,7 +220,12 @@ impl PyNodesAccessor {
             let all_node_ids = graph.inner.node_ids();
 
             // Convert slice to indices
-            let slice_info = slice.indices(all_node_ids.len() as i64)?;
+            let slice_info = slice.indices(
+                all_node_ids
+                    .len()
+                    .try_into()
+                    .map_err(|_| PyValueError::new_err("Collection too large for slice"))?,
+            )?;
             let start = slice_info.start as usize;
             let stop = slice_info.stop as usize;
             let step = slice_info.step as usize;
@@ -562,7 +567,12 @@ impl PyEdgesAccessor {
             let all_edge_ids = graph.inner.edge_ids();
 
             // Convert slice to indices
-            let slice_info = slice.indices(all_edge_ids.len() as i64)?;
+            let slice_info = slice.indices(
+                all_edge_ids
+                    .len()
+                    .try_into()
+                    .map_err(|_| PyValueError::new_err("Collection too large for slice"))?,
+            )?;
             let start = slice_info.start as usize;
             let stop = slice_info.stop as usize;
             let step = slice_info.step as usize;
