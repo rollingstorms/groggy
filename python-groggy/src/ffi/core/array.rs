@@ -64,7 +64,10 @@ impl PyGraphArray {
         // Slice indexing: arr[start:end], arr[start:end:step]
         else if let Ok(slice) = key.downcast::<pyo3::types::PySlice>() {
             let len = self.inner.len();
-            let indices = slice.indices(len as i64)?;
+            let indices = slice.indices(
+                len.try_into()
+                    .map_err(|_| PyValueError::new_err("Array too large for slice"))?,
+            )?;
             let start = indices.start as usize;
             let stop = indices.stop as usize;
             let step = indices.step;
