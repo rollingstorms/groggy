@@ -106,7 +106,7 @@ impl GraphArray {
     }
 
     /// Get iterator over values
-    pub fn iter(&self) -> std::slice::Iter<AttrValue> {
+    pub fn iter(&self) -> std::slice::Iter<'_, AttrValue> {
         self.values.iter()
     }
 
