@@ -1,6 +1,6 @@
 # Groggy
 
-**A high-performance graph and networked table library built in Rust with Python bindings**
+**A graph analytics library for Python with a Rust core**
 
 <div align="center">
   <img src="img/groggy.svg" alt="Groggy Logo" width="300"/>
@@ -15,10 +15,8 @@ Groggy is a modern graph analytics library that combines **graph topology** with
 ### **Key Features:**
 - 🔥 **High-performance Rust core** with Python bindings
 - 📊 **Unified data structures**: GraphArray, GraphTable, GraphMatrix
-- 🎯 **Graph-aware analytics** with table operations  
-- 🎨 **Beautiful display** with rich formatting
-- ⚡ **Fast operations**: Node creation 500K+/sec, Edge creation 400K+/sec
-
+- 🎯 **Graph-aware analytics** with table operations 
+- 🔮 **More features to come...**
 ---
 
 ## 📥 **Installation**
@@ -139,21 +137,6 @@ numpy_matrix = adj_matrix.to_numpy() # NumPy array
 - **Attributes**: Rich attribute system supporting strings, numbers, booleans
 - **Lazy Views**: Data structures are views that only materialize when needed
 - **Unified API**: Same operations work on graphs, tables, arrays, and matrices
-
----
-
-## 📊 **Performance**
-
-Groggy achieves excellent performance through its Rust core:
-
-| Operation | Rate | Complexity |
-|-----------|------|------------|
-| **Node Creation** | 500,000+ nodes/sec | O(N) |
-| **Edge Creation** | 400,000+ edges/sec | O(N) | 
-| **Table Operations** | Linear scaling | O(N) |
-| **Connected Components** | 6.5x faster than NetworkX | O(N+E) |
-
-*Benchmarks run on representative workloads. Your performance may vary.*
 
 ---
 
