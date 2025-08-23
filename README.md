@@ -258,21 +258,21 @@ cargo test
 cargo test core::array
 ```
 
-### **Documentation Validation**
+### **Python Integration Tests**
 ```bash
-# Run documentation validation (in documentation/development/)
-python documentation/development/debug_documentation.py
+# Run comprehensive documentation validation
+python tests/test_documentation_validation.py
 
 # Quick validation test
-python documentation/development/simple_validation_test.py
+python tests/simple_validation_test.py
 
 # Full validation suite  
-python documentation/development/validation_test_suite.py
+python tests/validation_test_suite.py
 ```
 
 **Current validation results: 95%+ documented features working correctly** ✅
 
-**Note**: Python integration tests are in development. Current testing relies on Rust unit tests and documentation validation scripts.
+**Test Coverage**: Rust unit tests + comprehensive Python validation scripts ensure reliability.
 
 ---
 
@@ -287,14 +287,14 @@ groggy/
 │   └── display/           # Rich formatting and display
 ├── python-groggy/         # Python bindings and package
 │   ├── src/ffi/          # Rust-to-Python FFI layer  
-│   ├── python/groggy/    # Python package code
-│   └── tests/            # Python tests (in development)
+│   └── python/groggy/    # Python package code
 ├── docs/                  # Sphinx documentation (RST)
 ├── documentation/         # Development docs (Markdown)
-│   ├── development/      # Testing scripts, validation tools
+│   ├── development/      # Development documentation  
 │   ├── planning/         # Architecture plans  
 │   ├── releases/         # Release notes
 │   └── examples/         # Usage examples
+├── tests/                 # Python validation and integration tests
 └── notebooks/             # Jupyter notebooks for testing/demos
 ```
 
@@ -312,8 +312,8 @@ cargo fmt
 # Run Rust tests
 cargo test
 
-# Run documentation validation
-python documentation/development/debug_documentation.py
+# Run Python tests
+python tests/test_documentation_validation.py
 ```
 
 ### **Contributing**
