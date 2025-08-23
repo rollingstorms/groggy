@@ -4,25 +4,20 @@
 //! This is a thin wrapper around the core Rust GraphTable implementation.
 
 use groggy::{
-    AggregateOp, AttrValue as RustAttrValue, ConnectivityType, EdgeId, GraphArray, GraphTable,
-    GroupBy, NodeId, TableMetadata,
+    AggregateOp, AttrValue as RustAttrValue, ConnectivityType, GraphArray, GraphTable, GroupBy,
 };
 use pyo3::exceptions::{
-    PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
-    PyValueError,
+    PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyTypeError, PyValueError,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
-use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use std::collections::HashMap;
 
 // Import utilities
 use crate::ffi::api::graph::PyGraph;
 use crate::ffi::core::array::PyGraphArray;
 use crate::ffi::core::matrix::PyGraphMatrix;
-use crate::ffi::utils::{
-    attr_value_to_python_value, graph_error_to_py_err, python_value_to_attr_value,
-};
+use crate::ffi::utils::{attr_value_to_python_value, graph_error_to_py_err};
 
 /// Python wrapper around core GraphTable implementation
 #[pyclass(name = "GraphTable", unsendable)]
@@ -268,7 +263,7 @@ impl PyGraphTable {
     }
 
     /// Rich HTML representation for Jupyter notebooks
-    fn _repr_html_(&self, py: Python) -> PyResult<String> {
+    fn _repr_html_(&self, _py: Python) -> PyResult<String> {
         let (rows, cols) = self.inner.shape();
         let columns = self.inner.columns();
 

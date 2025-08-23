@@ -3,12 +3,9 @@
 //! Python bindings for smart indexing accessors.
 
 use groggy::{EdgeId, NodeId};
-use pyo3::exceptions::{
-    PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
-    PyValueError,
-};
+use pyo3::exceptions::{PyIndexError, PyKeyError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PySlice};
+use pyo3::types::PySlice;
 
 // Import types from our FFI modules
 use crate::ffi::api::graph::PyGraph;
@@ -125,7 +122,8 @@ impl PyNodesAccessor {
             }
 
             // Get induced edges for selected nodes
-            let node_set: std::collections::HashSet<NodeId> = selected_nodes.iter().copied().collect();
+            let node_set: std::collections::HashSet<NodeId> =
+                selected_nodes.iter().copied().collect();
             let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
             let mut induced_edges = Vec::new();
 
@@ -153,7 +151,7 @@ impl PyNodesAccessor {
         // Try to extract as list of integers (batch access) - CHECK AFTER boolean arrays
         if let Ok(indices_or_ids) = key.extract::<Vec<NodeId>>() {
             // Batch node access - return Subgraph
-            let mut graph = self.graph.borrow_mut(py);
+            let graph = self.graph.borrow_mut(py);
 
             // Convert indices to actual node IDs if constrained
             let actual_node_ids: Result<Vec<NodeId>, PyErr> =
@@ -218,7 +216,7 @@ impl PyNodesAccessor {
 
         // Try to extract as slice (slice access)
         if let Ok(slice) = key.downcast::<PySlice>() {
-            let mut graph = self.graph.borrow_mut(py);
+            let graph = self.graph.borrow_mut(py);
             let all_node_ids = graph.inner.node_ids();
 
             // Convert slice to indices

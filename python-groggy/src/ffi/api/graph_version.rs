@@ -4,7 +4,7 @@
 
 use crate::ffi::utils::graph_error_to_py_err;
 use groggy::{AttrValue as RustAttrValue, StateId};
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 

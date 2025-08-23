@@ -29,6 +29,7 @@ impl CachedStats {
         }
     }
     
+    #[allow(dead_code)]
     fn invalidate(&mut self) {
         *self = Self::new();
     }
@@ -459,7 +460,7 @@ impl GraphArray {
     
     /// Create a GraphArray from a graph attribute column
     pub fn from_graph_attribute(
-        graph: &crate::api::graph::Graph,
+        _graph: &crate::api::graph::Graph,
         attr: &str,
         entities: &[crate::types::NodeId]
     ) -> Result<Self, crate::errors::GraphError> {

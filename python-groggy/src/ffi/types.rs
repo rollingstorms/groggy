@@ -3,10 +3,7 @@
 //! This module provides Python wrappers for core Groggy types.
 
 use groggy::{AttrValue as RustAttrValue, EdgeId, NodeId};
-use pyo3::exceptions::{
-    PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
-    PyValueError,
-};
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 

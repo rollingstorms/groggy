@@ -83,6 +83,7 @@ pub struct GraphMatrix {
     /// Column names/labels
     column_names: Vec<String>,
     /// Row labels (optional)
+    #[allow(dead_code)]
     row_labels: Option<GraphArray>,
     /// Enforced data type (all columns must match)
     dtype: AttrValueType,
@@ -189,7 +190,7 @@ impl GraphMatrix {
         
         // Set diagonal elements to 1
         for i in 0..size {
-            if let Some(col) = matrix.columns.get_mut(i) {
+            if let Some(_col) = matrix.columns.get_mut(i) {
                 // This would need to be implemented in GraphArray
                 // col.set(i, AttrValue::Int(1));
             }
@@ -363,7 +364,7 @@ impl GraphMatrix {
                 GraphArray::from_vec(means)
             }
             Axis::Rows => {
-                let (rows, cols) = self.shape();
+                let (rows, _cols) = self.shape();
                 let means: Vec<AttrValue> = (0..rows)
                     .map(|row_idx| {
                         let row_values: Vec<f32> = self.columns.iter()
@@ -464,7 +465,7 @@ impl GraphMatrix {
     
     /// Sparse matrix multiplication optimized for adjacency matrices
     fn multiply_sparse(&self, other: &GraphMatrix) -> GraphResult<GraphMatrix> {
-        let (self_rows, self_cols) = self.shape();
+        let (self_rows, _self_cols) = self.shape();
         let (_, other_cols) = other.shape();
         
         // Extract sparse representation
@@ -612,10 +613,10 @@ impl GraphMatrix {
         if n == 0 {
             // Return identity matrix
             let size = self.shape().0;
-            let mut identity = Self::zeros(size, size, AttrValueType::Float);
+            let identity = Self::zeros(size, size, AttrValueType::Float);
             
             // Set diagonal elements to 1
-            for i in 0..size {
+            for _i in 0..size {
                 // Create identity values - we'll need to implement a way to set matrix elements
                 // For now, create identity through multiplication
             }
@@ -630,8 +631,8 @@ impl GraphMatrix {
         
         // Use repeated squaring for efficiency
         let mut result = self.clone();
-        let mut base = self.clone();
-        let mut exp = n;
+        let base = self.clone();
+        let _exp = n;
         
         // Initialize result as identity for the algorithm
         // For now, just return self^n by repeated multiplication

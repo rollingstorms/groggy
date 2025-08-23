@@ -798,7 +798,7 @@ impl GraphTable {
         let mut result_columns = Vec::new();
         
         // Combine columns
-        for (idx, col_name) in self.column_names.iter().enumerate() {
+        for (idx, _col_name) in self.column_names.iter().enumerate() {
             let left_array = &self.columns[idx];
             let right_array = &other.columns[idx];
             

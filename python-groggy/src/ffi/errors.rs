@@ -3,7 +3,6 @@
 //! This module provides error conversion between Rust and Python.
 
 use groggy::GraphError;
-use pyo3::exceptions::{PyIndexError, PyKeyError, PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 
 /// Convert GraphError to Python exception

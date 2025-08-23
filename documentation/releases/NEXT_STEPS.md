@@ -461,6 +461,52 @@ print(f"Age distribution: {ages.count()}")
 print(f"Quartiles: {ages.percentile(25)}, {ages.percentile(75)}")
 ```
 
+### **GraphArray Mathematical Operators**
+- **Priority**: HIGH - Essential for pandas/NumPy compatibility and data science workflows
+- **Missing Operations**: Basic arithmetic operators `+`, `-`, `*`, `/`, `@` (matrix multiplication)
+- **Use Case**: Mathematical operations on graph data, statistical transformations, linear algebra
+
+```python
+# Missing GraphArray mathematical operators (HIGH PRIORITY):
+ages = g.nodes[:]['age']         # GraphArray
+salaries = g.nodes[:]['salary']  # GraphArray
+
+# Element-wise arithmetic operations
+ages_plus_10 = ages + 10         # Add scalar
+age_ratios = ages / ages.mean()  # Divide by scalar
+combined = ages + salaries       # Element-wise addition (compatible sizes)
+scaled_salary = salaries * 1.1   # Multiply by scalar
+
+# Matrix multiplication for compatible arrays
+weights = g.edges[:]['weight']   # GraphArray of edge weights
+scores = node_features @ weights # Matrix multiplication with @
+
+# Statistical transformations
+normalized_ages = (ages - ages.mean()) / ages.std()    # Z-score normalization
+log_salaries = salaries.log()    # Logarithmic transformation
+
+# Real-world data science workflows
+features = g.nodes[:][['age', 'experience', 'salary']]  # GraphMatrix
+normalized_features = (features - features.mean()) / features.std()
+correlation_matrix = normalized_features.T @ normalized_features
+
+# Financial calculations
+returns = prices[1:] / prices[:-1] - 1  # Calculate returns from prices
+risk_score = returns.std() * (365 ** 0.5)  # Annualized volatility
+
+# Graph analytics with arithmetic
+centrality = g.nodes[:]['centrality']
+influence = centrality * g.nodes[:]['activity_level']  # Combined influence score
+top_influencers = influence[influence > influence.percentile(90)]
+```
+
+**Implementation Requirements**:
+- **Size compatibility**: Arrays must have same length for element-wise operations
+- **Scalar operations**: Support operations with single values (broadcasting)
+- **Type safety**: Ensure mathematical operations work with numeric types
+- **Performance**: Native Rust implementation for speed
+- **Error handling**: Clear errors for incompatible sizes or types
+
 ### **AdjacencyMatrix Design Clarification**
 - **Design Decision**: AdjacencyMatrix should inherit from GraphMatrix (not separate matrix type)
 - **Rationale**: Avoid proliferation of matrix types, leverage existing GraphMatrix functionality

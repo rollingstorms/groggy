@@ -8,7 +8,6 @@ use crate::ffi::utils::{
     attr_value_to_python_value, graph_error_to_py_err, python_value_to_attr_value,
 };
 use groggy::{AttrName, AttrValue as RustAttrValue, EdgeId, NodeId};
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 

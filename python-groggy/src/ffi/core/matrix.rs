@@ -4,19 +4,16 @@
 
 use groggy::core::array::GraphArray;
 use groggy::core::matrix::GraphMatrix;
-use groggy::AttrValue as RustAttrValue;
 use pyo3::exceptions::{
     PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
     PyValueError,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyType};
+use pyo3::types::PyType;
 
 // Use utility functions from utils module
 use crate::ffi::core::array::PyGraphArray;
-use crate::ffi::utils::{
-    attr_value_to_python_value, graph_error_to_py_err, python_value_to_attr_value,
-};
+use crate::ffi::utils::attr_value_to_python_value;
 
 /// Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays
 #[pyclass(name = "GraphMatrix", unsendable)]
@@ -81,10 +78,10 @@ impl PyGraphMatrix {
     #[classmethod]
     fn from_graph_attributes(
         _cls: &PyType,
-        py: Python,
-        graph: PyObject,
-        attrs: Vec<String>,
-        entities: Vec<u64>,
+        _py: Python,
+        _graph: PyObject,
+        _attrs: Vec<String>,
+        _entities: Vec<u64>,
     ) -> PyResult<Py<Self>> {
         // TODO: Implement graph integration in Phase 2
         // For now, return a placeholder error
@@ -516,7 +513,7 @@ impl PyGraphMatrix {
     }
 
     /// Iterator support - iterates over rows as lists (temporarily disabled)
-    fn __iter__(slf: PyRef<Self>) -> PyResult<PyObject> {
+    fn __iter__(_slf: PyRef<Self>) -> PyResult<PyObject> {
         Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
             "Matrix iteration temporarily disabled during Phase 3 - use matrix[i] for row access",
         ))
