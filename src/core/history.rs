@@ -309,7 +309,7 @@ impl HistoryForest {
             .map(|(name, &head)| {
                 BranchInfo {
                     name: name.clone(),
-                    head: head,
+                    head,
                     description: None, // TODO: add descriptions to branches
                     created_at: 0,     // TODO: track creation time
                     created_by: "".to_string(), // TODO: track creator

@@ -838,7 +838,7 @@ impl Graph {
         }
 
         // Get fresh topology snapshot
-        let (_, sources, targets, _) = self.space.snapshot(&*self.pool.borrow());
+        let (_, sources, targets, _) = self.space.snapshot(&self.pool.borrow());
         let mut count = 0;
         for i in 0..sources.len() {
             if sources[i] == node || targets[i] == node {
@@ -859,7 +859,7 @@ impl Graph {
         }
 
         // Get fresh adjacency snapshot - much more efficient than columnar scan
-        let (_, _, _, neighbors_map) = self.space.snapshot(&*self.pool.borrow());
+        let (_, _, _, neighbors_map) = self.space.snapshot(&self.pool.borrow());
 
         if let Some(neighbors) = neighbors_map.get(&node) {
             // Extract just the neighbor nodes (not the edge IDs)
@@ -881,7 +881,7 @@ impl Graph {
     ///
     /// This is used internally for optimized operations like subgraph edge calculation.
     pub fn get_columnar_topology(&self) -> (Arc<Vec<EdgeId>>, Arc<Vec<NodeId>>, Arc<Vec<NodeId>>) {
-        let (edge_ids, sources, targets, _) = self.space.snapshot(&*self.pool.borrow());
+        let (edge_ids, sources, targets, _) = self.space.snapshot(&self.pool.borrow());
         (edge_ids, sources, targets)
     }
 
@@ -1189,14 +1189,14 @@ impl Graph {
     /// Find nodes matching attribute criteria
     pub fn find_nodes(&mut self, filter: NodeFilter) -> Result<Vec<NodeId>, GraphError> {
         self.query_engine
-            .find_nodes_by_filter_with_space(&*self.pool.borrow(), &self.space, &filter)
+            .find_nodes_by_filter_with_space(&self.pool.borrow(), &self.space, &filter)
             .map_err(|e| e.into())
     }
 
     /// Find edges matching attribute criteria
     pub fn find_edges(&mut self, filter: EdgeFilter) -> Result<Vec<EdgeId>, GraphError> {
         self.query_engine
-            .find_edges_by_filter_with_space(&*self.pool.borrow(), &self.space, &filter)
+            .find_edges_by_filter_with_space(&self.pool.borrow(), &self.space, &filter)
             .map_err(|e| e.into())
     }
 
@@ -1213,7 +1213,7 @@ impl Graph {
         options: crate::core::traversal::TraversalOptions,
     ) -> Result<crate::core::traversal::TraversalResult, GraphError> {
         self.traversal_engine
-            .bfs(&*self.pool.borrow(), &mut self.space, start, options)
+            .bfs(&self.pool.borrow(), &mut self.space, start, options)
             .map_err(|e| e.into())
     }
 
@@ -1224,7 +1224,7 @@ impl Graph {
         options: crate::core::traversal::TraversalOptions,
     ) -> Result<crate::core::traversal::TraversalResult, GraphError> {
         self.traversal_engine
-            .dfs(&*self.pool.borrow(), &mut self.space, start, options)
+            .dfs(&self.pool.borrow(), &mut self.space, start, options)
             .map_err(|e| e.into())
     }
 
@@ -1236,7 +1236,7 @@ impl Graph {
         options: crate::core::traversal::PathFindingOptions,
     ) -> Result<Option<crate::core::traversal::Path>, GraphError> {
         self.traversal_engine
-            .shortest_path(&*self.pool.borrow(), &mut self.space, start, end, options)
+            .shortest_path(&self.pool.borrow(), &mut self.space, start, end, options)
             .map_err(|e| e.into())
     }
 
@@ -1249,7 +1249,7 @@ impl Graph {
     ) -> Result<Vec<crate::core::traversal::Path>, GraphError> {
         self.traversal_engine
             .all_paths(
-                &*self.pool.borrow(),
+                &self.pool.borrow(),
                 &mut self.space,
                 start,
                 end,
@@ -1264,7 +1264,7 @@ impl Graph {
         options: crate::core::traversal::TraversalOptions,
     ) -> Result<crate::core::traversal::ConnectedComponentsResult, GraphError> {
         self.traversal_engine
-            .connected_components(&*self.pool.borrow(), &mut self.space, options)
+            .connected_components(&self.pool.borrow(), &mut self.space, options)
             .map_err(|e| e.into())
     }
 
@@ -1282,7 +1282,7 @@ impl Graph {
         node_id: NodeId,
     ) -> Result<crate::core::neighborhood::NeighborhoodSubgraph, GraphError> {
         self.neighborhood_sampler
-            .single_neighborhood(&*self.pool.borrow(), &self.space, node_id)
+            .single_neighborhood(&self.pool.borrow(), &self.space, node_id)
             .map_err(|e| e.into())
     }
 
@@ -1293,7 +1293,7 @@ impl Graph {
         node_ids: &[NodeId],
     ) -> Result<crate::core::neighborhood::NeighborhoodResult, GraphError> {
         self.neighborhood_sampler
-            .multi_neighborhood(&*self.pool.borrow(), &self.space, node_ids)
+            .multi_neighborhood(&self.pool.borrow(), &self.space, node_ids)
             .map_err(|e| e.into())
     }
 
@@ -1305,7 +1305,7 @@ impl Graph {
         k: usize,
     ) -> Result<crate::core::neighborhood::NeighborhoodSubgraph, GraphError> {
         self.neighborhood_sampler
-            .k_hop_neighborhood(&*self.pool.borrow(), &self.space, node_id, k)
+            .k_hop_neighborhood(&self.pool.borrow(), &self.space, node_id, k)
             .map_err(|e| e.into())
     }
 
@@ -1317,7 +1317,7 @@ impl Graph {
         k: usize,
     ) -> Result<crate::core::neighborhood::NeighborhoodSubgraph, GraphError> {
         self.neighborhood_sampler
-            .unified_neighborhood(&*self.pool.borrow(), &self.space, node_ids, k)
+            .unified_neighborhood(&self.pool.borrow(), &self.space, node_ids, k)
             .map_err(|e| e.into())
     }
 
@@ -1341,13 +1341,11 @@ impl Graph {
     // pub fn create_view(&self) -> GraphView {
     //     // TODO: GraphView::new(&self.pool, &self.query_engine)
     // }
-
     /*
     === TIME TRAVEL OPERATIONS ===
     Working with historical states of the graph.
     These create special views that delegate to history system.
     */
-
     /// Create a read-only view of the graph at a specific commit
     pub fn view_at_commit(&self, commit_id: StateId) -> Result<HistoricalView, GraphError> {
         let _ = commit_id; // Silence unused parameter warning
@@ -1475,10 +1473,8 @@ impl Graph {
         let mut values = Vec::new();
 
         // Extract values from bulk result
-        for attr_value in bulk_attributes {
-            if let Some(value) = attr_value {
-                values.push(value);
-            }
+        for value in bulk_attributes.into_iter().flatten() {
+            values.push(value);
         }
 
         if values.is_empty() {
@@ -1562,10 +1558,8 @@ impl Graph {
         let mut values = Vec::new();
 
         // Extract values from bulk result
-        for attr_value in bulk_attributes {
-            if let Some(value) = attr_value {
-                values.push(value);
-            }
+        for value in bulk_attributes.into_iter().flatten() {
+            values.push(value);
         }
 
         if values.is_empty() {
@@ -1631,12 +1625,12 @@ impl Graph {
         let pool_ref = self.pool.borrow();
         let group_by_values =
             self.space
-                .get_attributes_for_nodes(&*pool_ref, group_by_attr, &node_ids);
+                .get_attributes_for_nodes(&pool_ref, group_by_attr, &node_ids);
 
         // BULK OPERATION 2: Get aggregate attribute for all nodes at once (O(N))
         let aggregate_values =
             self.space
-                .get_attributes_for_nodes(&*pool_ref, aggregate_attr, &node_ids);
+                .get_attributes_for_nodes(&pool_ref, aggregate_attr, &node_ids);
 
         // Create lookup maps for efficient access
         let group_by_map: std::collections::HashMap<NodeId, &AttrValue> = group_by_values
@@ -1659,7 +1653,7 @@ impl Graph {
             {
                 groups
                     .entry(group_val.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(agg_val.clone());
             }
         }
@@ -1705,7 +1699,7 @@ impl Graph {
 
     /// Generate adjacency matrix for the entire graph
     pub fn adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
-        AdjacencyMatrixBuilder::new().build_full_graph(&*self.pool.borrow(), &mut self.space)
+        AdjacencyMatrixBuilder::new().build_full_graph(&self.pool.borrow(), &mut self.space)
     }
 
     /// Generate weighted adjacency matrix using specified edge attribute
@@ -1714,28 +1708,28 @@ impl Graph {
             .matrix_type(MatrixType::Weighted {
                 weight_attr: Some(weight_attr.to_string()),
             })
-            .build_full_graph(&*self.pool.borrow(), &mut self.space)
+            .build_full_graph(&self.pool.borrow(), &mut self.space)
     }
 
     /// Generate dense adjacency matrix
     pub fn dense_adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
             .format(MatrixFormat::Dense)
-            .build_full_graph(&*self.pool.borrow(), &mut self.space)
+            .build_full_graph(&self.pool.borrow(), &mut self.space)
     }
 
     /// Generate sparse adjacency matrix
     pub fn sparse_adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
             .format(MatrixFormat::Sparse)
-            .build_full_graph(&*self.pool.borrow(), &mut self.space)
+            .build_full_graph(&self.pool.borrow(), &mut self.space)
     }
 
     /// Generate Laplacian matrix
     pub fn laplacian_matrix(&mut self, normalized: bool) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new()
             .matrix_type(MatrixType::Laplacian { normalized })
-            .build_full_graph(&*self.pool.borrow(), &mut self.space)
+            .build_full_graph(&self.pool.borrow(), &mut self.space)
     }
 
     /// Generate adjacency matrix for a subgraph with specific nodes
@@ -1744,7 +1738,7 @@ impl Graph {
         node_ids: &[NodeId],
     ) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new().build_subgraph(
-            &*self.pool.borrow(),
+            &self.pool.borrow(),
             &mut self.space,
             node_ids,
         )
@@ -1764,9 +1758,9 @@ impl Graph {
             .compact_indexing(compact_indexing);
 
         if let Some(nodes) = node_ids {
-            builder.build_subgraph(&*self.pool.borrow(), &mut self.space, nodes)
+            builder.build_subgraph(&self.pool.borrow(), &mut self.space, nodes)
         } else {
-            builder.build_full_graph(&*self.pool.borrow(), &mut self.space)
+            builder.build_full_graph(&self.pool.borrow(), &mut self.space)
         }
     }
 }

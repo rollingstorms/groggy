@@ -399,7 +399,7 @@ impl GraphConfig {
 
         if let Ok(level) = std::env::var("GROGGY_COMPRESSION_LEVEL") {
             if let Ok(compression) = level.parse::<u8>() {
-                if compression >= 1 && compression <= 9 {
+                if (1..=9).contains(&compression) {
                     self.compression_level = compression;
                 }
             }

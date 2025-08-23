@@ -385,6 +385,7 @@ impl AdjacencyMatrixBuilder {
     }
 
     /// Build sparse adjacency matrix
+    #[allow(clippy::too_many_arguments)]
     fn build_sparse_matrix(
         &self,
         pool: &GraphPool,
@@ -486,51 +487,49 @@ impl AdjacencyMatrixBuilder {
 
     /// Apply matrix type transformations to dense matrix
     fn apply_matrix_type_dense(&self, data: &mut [AttrValue], size: usize) -> GraphResult<()> {
-        match self.matrix_type {
-            MatrixType::Laplacian { normalized } => {
-                // Convert adjacency to Laplacian: L = D - A
-                let mut degrees = vec![0.0; size];
+        if let MatrixType::Laplacian { normalized } = self.matrix_type {
+            // Convert adjacency to Laplacian: L = D - A
+            let mut degrees = vec![0.0; size];
 
-                // Calculate degrees - extract float values
+            // Calculate degrees - extract float values
+            for i in 0..size {
+                for j in 0..size {
+                    if let AttrValue::Float(val) = data[i * size + j] {
+                        degrees[i] += val as f64;
+                    }
+                }
+            }
+
+            // Create Laplacian matrix
+            for i in 0..size {
+                for j in 0..size {
+                    if let AttrValue::Float(val) = data[i * size + j] {
+                        let new_val = if i == j {
+                            degrees[i] - (val as f64)
+                        } else {
+                            -(val as f64)
+                        };
+                        data[i * size + j] = AttrValue::Float(new_val as f32);
+                    }
+                }
+            }
+
+            // Normalize if requested
+            if normalized {
                 for i in 0..size {
                     for j in 0..size {
                         if let AttrValue::Float(val) = data[i * size + j] {
-                            degrees[i] += val as f64;
-                        }
-                    }
-                }
-
-                // Create Laplacian matrix
-                for i in 0..size {
-                    for j in 0..size {
-                        if let AttrValue::Float(val) = data[i * size + j] {
-                            let new_val = if i == j {
-                                degrees[i] - (val as f64)
-                            } else {
-                                -(val as f64)
-                            };
-                            data[i * size + j] = AttrValue::Float(new_val as f32);
-                        }
-                    }
-                }
-
-                // Normalize if requested
-                if normalized {
-                    for i in 0..size {
-                        for j in 0..size {
-                            if let AttrValue::Float(val) = data[i * size + j] {
-                                if degrees[i] > 0.0 && degrees[j] > 0.0 {
-                                    let normalized_val =
-                                        (val as f64) / (degrees[i] * degrees[j]).sqrt();
-                                    data[i * size + j] = AttrValue::Float(normalized_val as f32);
-                                }
+                            if degrees[i] > 0.0 && degrees[j] > 0.0 {
+                                let normalized_val =
+                                    (val as f64) / (degrees[i] * degrees[j]).sqrt();
+                                data[i * size + j] = AttrValue::Float(normalized_val as f32);
                             }
                         }
                     }
                 }
             }
-            _ => {} // No transformation needed
         }
+        // No transformation needed for other matrix types
         Ok(())
     }
 
@@ -542,62 +541,60 @@ impl AdjacencyMatrixBuilder {
         values: &mut Vec<AttrValue>,
         size: usize,
     ) -> GraphResult<()> {
-        match self.matrix_type {
-            MatrixType::Laplacian { normalized } => {
-                // Calculate degrees - extract float values
-                let mut degrees = vec![0.0; size];
-                for i in 0..rows.len() {
-                    if let AttrValue::Float(val) = values[i] {
-                        degrees[rows[i]] += val as f64;
-                    }
+        if let MatrixType::Laplacian { normalized } = self.matrix_type {
+            // Calculate degrees - extract float values
+            let mut degrees = vec![0.0; size];
+            for i in 0..rows.len() {
+                if let AttrValue::Float(val) = values[i] {
+                    degrees[rows[i]] += val as f64;
                 }
+            }
 
-                // Convert to Laplacian format
+            // Convert to Laplacian format
+            for i in 0..values.len() {
+                let row = rows[i];
+                let col = cols[i];
+
+                if let AttrValue::Float(val) = values[i] {
+                    let new_val = if row == col {
+                        degrees[row] - (val as f64)
+                    } else {
+                        -(val as f64)
+                    };
+                    values[i] = AttrValue::Float(new_val as f32);
+                }
+            }
+
+            // Add diagonal entries if missing
+            for i in 0..size {
+                let has_diagonal = rows
+                    .iter()
+                    .zip(cols.iter())
+                    .any(|(&r, &c)| r == i && c == i);
+
+                if !has_diagonal && degrees[i] > 0.0 {
+                    rows.push(i);
+                    cols.push(i);
+                    values.push(AttrValue::Float(degrees[i] as f32));
+                }
+            }
+
+            // Normalize if requested
+            if normalized {
                 for i in 0..values.len() {
                     let row = rows[i];
                     let col = cols[i];
-
                     if let AttrValue::Float(val) = values[i] {
-                        let new_val = if row == col {
-                            degrees[row] - (val as f64)
-                        } else {
-                            -(val as f64)
-                        };
-                        values[i] = AttrValue::Float(new_val as f32);
-                    }
-                }
-
-                // Add diagonal entries if missing
-                for i in 0..size {
-                    let has_diagonal = rows
-                        .iter()
-                        .zip(cols.iter())
-                        .any(|(&r, &c)| r == i && c == i);
-
-                    if !has_diagonal && degrees[i] > 0.0 {
-                        rows.push(i);
-                        cols.push(i);
-                        values.push(AttrValue::Float(degrees[i] as f32));
-                    }
-                }
-
-                // Normalize if requested
-                if normalized {
-                    for i in 0..values.len() {
-                        let row = rows[i];
-                        let col = cols[i];
-                        if let AttrValue::Float(val) = values[i] {
-                            if degrees[row] > 0.0 && degrees[col] > 0.0 {
-                                let normalized_val =
-                                    (val as f64) / (degrees[row] * degrees[col]).sqrt();
-                                values[i] = AttrValue::Float(normalized_val as f32);
-                            }
+                        if degrees[row] > 0.0 && degrees[col] > 0.0 {
+                            let normalized_val =
+                                (val as f64) / (degrees[row] * degrees[col]).sqrt();
+                            values[i] = AttrValue::Float(normalized_val as f32);
                         }
                     }
                 }
             }
-            _ => {} // No transformation needed
         }
+        // No transformation needed for other matrix types
         Ok(())
     }
 }
