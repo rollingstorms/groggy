@@ -687,7 +687,7 @@ impl GraphTable {
                 column_name, self.column_names
             ))
         })?;
-        
+
         column.mean().ok_or_else(|| {
             GraphError::InvalidInput(format!(
                 "Cannot calculate mean for column '{}': contains non-numeric data",
@@ -704,7 +704,7 @@ impl GraphTable {
                 column_name, self.column_names
             ))
         })?;
-        
+
         column.sum().ok_or_else(|| {
             GraphError::InvalidInput(format!(
                 "Cannot calculate sum for column '{}': contains non-numeric data",
