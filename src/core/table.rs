@@ -679,6 +679,40 @@ impl GraphTable {
         Ok(results)
     }
 
+    /// Calculate mean for a specific column
+    pub fn mean(&self, column_name: &str) -> GraphResult<f64> {
+        let column = self.get_column_by_name(column_name).ok_or_else(|| {
+            GraphError::InvalidInput(format!(
+                "Column '{}' not found. Available columns: {:?}",
+                column_name, self.column_names
+            ))
+        })?;
+        
+        column.mean().ok_or_else(|| {
+            GraphError::InvalidInput(format!(
+                "Cannot calculate mean for column '{}': contains non-numeric data",
+                column_name
+            ))
+        })
+    }
+
+    /// Calculate sum for a specific column
+    pub fn sum(&self, column_name: &str) -> GraphResult<f64> {
+        let column = self.get_column_by_name(column_name).ok_or_else(|| {
+            GraphError::InvalidInput(format!(
+                "Column '{}' not found. Available columns: {:?}",
+                column_name, self.column_names
+            ))
+        })?;
+        
+        column.sum().ok_or_else(|| {
+            GraphError::InvalidInput(format!(
+                "Cannot calculate sum for column '{}': contains non-numeric data",
+                column_name
+            ))
+        })
+    }
+
     /// Get summary statistics for all numeric columns
     pub fn describe(&self) -> GraphTable {
         let mut desc_arrays = Vec::new();
