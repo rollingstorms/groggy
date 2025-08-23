@@ -655,12 +655,10 @@ impl GraphSpace {
 
     /// NOTE: Topology queries (neighbors, degree, connectivity) now handled by
     /// Graph coordinator which queries Pool for topology and filters by Space's active sets
-
     /*
     === CHANGE TRACKING ===
     Workspace state and change management
     */
-
     /// Check if there are uncommitted changes
     pub fn has_uncommitted_changes(&self) -> bool {
         // NOTE: Graph manages change tracking now - Space doesn't track changes

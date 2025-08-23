@@ -318,7 +318,7 @@ impl Ord for AttrValue {
             (CompressedFloatVec(a), CompressedFloatVec(b)) => a.data.cmp(&b.data),
 
             // Cross-type comparisons - order by type discriminant first
-            (Int(a), SmallInt(b)) => (*a as i64).cmp(&(*b as i64)),
+            (Int(a), SmallInt(b)) => a.cmp(&(*b as i64)),
             (SmallInt(a), Int(b)) => (*a as i64).cmp(b),
 
             // Text comparisons across storage types
@@ -406,7 +406,7 @@ impl CompressedData {
         let bytes = unsafe {
             std::slice::from_raw_parts(
                 vec.as_ptr() as *const u8,
-                vec.len() * std::mem::size_of::<f32>(),
+                std::mem::size_of_val(vec),
             )
         };
 
