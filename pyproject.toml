@@ -56,8 +56,10 @@ Repository = "https://github.com/rollingstorms/groggy"
 Documentation = "https://groggy.readthedocs.io"
 
 [tool.maturin]
-python-source = "python"
-module-name = "groggy._core"
+python-source = "python-groggy/python"
+module-name = "groggy._groggy"
+bindings = "pyo3"
+manifest-path = "python-groggy/Cargo.toml"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
