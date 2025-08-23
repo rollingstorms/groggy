@@ -55,7 +55,15 @@ impl CachedStats {
 ///
 /// USAGE:
 /// ```rust
-/// let arr = GraphArray::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+/// use groggy::core::array::GraphArray;
+/// use groggy::AttrValue;
+/// let arr = GraphArray::from_vec(vec![
+///     AttrValue::Float(1.0),
+///     AttrValue::Float(2.0),
+///     AttrValue::Float(3.0),
+///     AttrValue::Float(4.0),
+///     AttrValue::Float(5.0)
+/// ]);
 /// let mean = arr.mean().unwrap();  // Computed and cached
 /// let std = arr.std().unwrap();    // Uses cached mean
 /// let list = arr.to_list();        // Convert to Vec for compatibility

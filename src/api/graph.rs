@@ -135,7 +135,7 @@ impl Graph {
     ///
     /// # Examples
     /// ```
-    /// use groggy::api::Graph;
+    /// use groggy::Graph;
     /// use groggy::types::GraphType;
     ///
     /// // Create a directed graph (like NetworkX DiGraph)
