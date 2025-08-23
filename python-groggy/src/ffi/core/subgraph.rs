@@ -907,6 +907,8 @@ impl PySubgraph {
     }
 
     /// Export subgraph to a new independent Graph object
+    // TODO: Fix compilation issues with attribute access
+    /*
     pub fn to_graph(&self, py: Python) -> PyResult<PyObject> {
         // Import the PyGraph class
         let graph_module = py.import("groggy")?;
@@ -930,13 +932,13 @@ impl PySubgraph {
             
             for &old_node_id in &self.nodes {
                 // Get node attributes from parent graph
-                let node_attrs = parent_graph.inner.get_node_attributes(old_node_id)
+                let node_attrs = parent_graph.inner.get_node_attrs(old_node_id)
                     .unwrap_or_default();
                 
                 // Convert attributes to Python dict
                 let py_attrs = pyo3::types::PyDict::new(py);
                 for (key, value) in node_attrs {
-                    let py_value = crate::ffi::utils::attr_value_to_py_object(py, &value)?;
+                    let py_value = crate::ffi::utils::attr_value_to_python_value(py, &value)?;
                     py_attrs.set_item(key, py_value)?;
                 }
                 
@@ -953,13 +955,13 @@ impl PySubgraph {
                         (node_id_mapping.get(&source), node_id_mapping.get(&target)) {
                         
                         // Get edge attributes from parent graph
-                        let edge_attrs = parent_graph.inner.get_edge_attributes(old_edge_id)
+                        let edge_attrs = parent_graph.inner.get_edge_attrs(old_edge_id)
                             .unwrap_or_default();
                         
                         // Convert attributes to Python dict
                         let py_attrs = pyo3::types::PyDict::new(py);
                         for (key, value) in edge_attrs {
-                            let py_value = crate::ffi::utils::attr_value_to_py_object(py, &value)?;
+                            let py_value = crate::ffi::utils::attr_value_to_python_value(py, &value)?;
                             py_attrs.set_item(key, py_value)?;
                         }
                         
@@ -973,7 +975,9 @@ impl PySubgraph {
         Ok(new_graph)
     }
 
-    /// Export subgraph to NetworkX graph object
+    /// Export subgraph to NetworkX graph object  
+    // TODO: Fix compilation issues with attribute access
+    /*
     pub fn to_networkx(&self, py: Python) -> PyResult<PyObject> {
         // Import networkx
         let nx = py.import("networkx")?;
@@ -1005,7 +1009,7 @@ impl PySubgraph {
                 // Convert attributes to Python dict
                 let py_attrs = pyo3::types::PyDict::new(py);
                 for (key, value) in node_attrs {
-                    let py_value = crate::ffi::utils::attr_value_to_py_object(py, &value)?;
+                    let py_value = crate::ffi::utils::attr_value_to_python_value(py, &value)?;
                     py_attrs.set_item(key, py_value)?;
                 }
                 
@@ -1023,7 +1027,7 @@ impl PySubgraph {
                     // Convert attributes to Python dict
                     let py_attrs = pyo3::types::PyDict::new(py);
                     for (key, value) in edge_attrs {
-                        let py_value = crate::ffi::utils::attr_value_to_py_object(py, &value)?;
+                        let py_value = crate::ffi::utils::attr_value_to_python_value(py, &value)?;
                         py_attrs.set_item(key, py_value)?;
                     }
                     
@@ -1035,4 +1039,5 @@ impl PySubgraph {
         
         Ok(nx_graph.to_object(py))
     }
+    */
 }
