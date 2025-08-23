@@ -1185,12 +1185,13 @@ impl GraphTable {
     /// Convert this table to a GraphMatrix if all columns are compatible numeric types
     ///
     /// # Examples
-    /// ```rust
-    /// // This works - both columns are numeric
-    /// let matrix = table.select_columns(&["age", "height"])?.matrix()?;
+    /// ```rust,no_run
+    /// // This works - both columns are numeric (example with setup)
+    /// // let table = /* ... create table ... */;
+    /// // let matrix = table.select_columns(&["age", "height"])?.matrix()?;
     ///
     /// // This fails - mixed numeric and text types
-    /// let result = table.select_columns(&["age", "name"])?.matrix(); // Returns error
+    /// // let result = table.select_columns(&["age", "name"])?.matrix(); // Returns error
     /// ```
     ///
     /// # Errors

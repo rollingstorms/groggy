@@ -67,11 +67,10 @@
 //! USAGE EXAMPLES:
 //!
 //! ```rust,no_run
-//! use groggy::{Graph, AttrValue, GraphConfig};
+//! use groggy::{Graph, AttrValue};
 //!
-//! // Create a graph with custom configuration
-//! let config = GraphConfig::performance_optimized();
-//! let mut graph = Graph::with_config(config);
+//! // Create a new graph
+//! let mut graph = Graph::new();
 //!
 //! // Build the graph structure
 //! let alice = graph.add_node();
@@ -79,38 +78,36 @@
 //! let friendship = graph.add_edge(alice, bob).unwrap();
 //!
 //! // Set rich attributes
-//! graph.set_node_attr(alice, "name", AttrValue::Text("Alice".into())).unwrap();
-//! graph.set_node_attr(alice, "age", AttrValue::Int(28)).unwrap();
-//! graph.set_edge_attr(friendship, "strength", AttrValue::Float(0.9)).unwrap();
+//! graph.set_node_attr(alice, "name".to_string(), AttrValue::Text("Alice".to_string())).unwrap();
+//! graph.set_node_attr(alice, "age".to_string(), AttrValue::Int(28)).unwrap();
+//! graph.set_edge_attr(friendship, "strength".to_string(), AttrValue::Float(0.9)).unwrap();
 //!
 //! // Commit to history with metadata
-//! let commit1 = graph.commit("Initial social network", "data_team").unwrap();
+//! let commit1 = graph.commit("Initial social network".to_string(), "data_team".to_string()).unwrap();
 //!
 //! // Work with branches like Git
-//! graph.create_branch("experiment").unwrap();
-//! graph.checkout_branch("experiment").unwrap();
+//! graph.create_branch("experiment".to_string()).unwrap();
+//! graph.checkout_branch("experiment".to_string()).unwrap();
 //!
 //! // Make experimental changes
 //! let charlie = graph.add_node();
-//! graph.set_node_attr(charlie, "name", AttrValue::Text("Charlie".into())).unwrap();
+//! graph.set_node_attr(charlie, "name".to_string(), AttrValue::Text("Charlie".to_string())).unwrap();
 //!
-//! // Advanced querying
-//! let adults = graph.find_nodes(|
-//!     NodeFilter::Attribute("age", AttributeFilter::GreaterThan(AttrValue::Int(18)))
-//! ).unwrap();
+//! // Advanced querying (TODO: Update when NodeFilter API is finalized)
+//! // let adults = graph.find_nodes(NodeFilter::AttributeFilter {...}).unwrap();
 //!
-//! // Time travel - view the graph at any point in history
-//! let historical_view = graph.view_at_commit(commit1).unwrap();
-//! assert_eq!(historical_view.node_count(), 2); // Before Charlie was added
+//! // Time travel - view the graph at any point in history (TODO: Implement)
+//! // let historical_view = graph.view_at_commit(commit1).unwrap();
+//! // assert_eq!(historical_view.node_count(), 2); // Before Charlie was added
 //!
-//! // Merge branches with conflict resolution
-//! graph.checkout_branch("main").unwrap();
-//! graph.merge_branch("experiment", "data_team").unwrap();
+//! // Merge branches with conflict resolution (TODO: Implement)
+//! // graph.checkout_branch("main").unwrap();
+//! // graph.merge_branch("experiment", "data_team").unwrap();
 //! ```
 //!
-//! ADVANCED FEATURES:
+//! ADVANCED FEATURES (TODO: Update when query API is implemented):
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use groggy::{Graph, GraphQuery, AggregationType};
 //!
 //! let mut graph = Graph::new();
