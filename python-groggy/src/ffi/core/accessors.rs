@@ -153,6 +153,71 @@ impl PyNodesAccessor {
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
 
+        // Try to extract as boolean array/list (boolean indexing)
+        if let Ok(boolean_mask) = key.extract::<Vec<bool>>() {
+            let graph = self.graph.borrow(py);
+            let all_node_ids = if let Some(ref constrained) = self.constrained_nodes {
+                constrained.clone()
+            } else {
+                graph.inner.node_ids()
+            };
+
+            // Check if boolean mask length matches node count
+            if boolean_mask.len() != all_node_ids.len() {
+                return Err(PyIndexError::new_err(format!(
+                    "Boolean mask length ({}) must match number of nodes ({})",
+                    boolean_mask.len(),
+                    all_node_ids.len()
+                )));
+            }
+
+            // Select nodes where boolean mask is True
+            let selected_nodes: Vec<NodeId> = all_node_ids
+                .iter()
+                .zip(boolean_mask.iter())
+                .filter_map(|(&node_id, &include)| if include { Some(node_id) } else { None })
+                .collect();
+
+            if selected_nodes.is_empty() {
+                return Err(PyIndexError::new_err("Boolean mask selected no nodes"));
+            }
+
+            // Validate all selected nodes exist
+            for &node_id in &selected_nodes {
+                if !graph.has_node_internal(node_id) {
+                    return Err(PyKeyError::new_err(format!(
+                        "Node {} does not exist",
+                        node_id
+                    )));
+                }
+            }
+
+            // Get induced edges for selected nodes
+            let node_set: std::collections::HashSet<NodeId> = selected_nodes.iter().copied().collect();
+            let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
+            let mut induced_edges = Vec::new();
+
+            for i in 0..edge_ids.len() {
+                let edge_id = edge_ids[i];
+                let source = sources[i];
+                let target = targets[i];
+
+                if node_set.contains(&source) && node_set.contains(&target) {
+                    induced_edges.push(edge_id);
+                }
+            }
+
+            // Create and return Subgraph
+            let subgraph = PySubgraph::new(
+                selected_nodes,
+                induced_edges,
+                "boolean_selection".to_string(),
+                Some(self.graph.clone()),
+            );
+
+            return Ok(Py::new(py, subgraph)?.to_object(py));
+        }
+
         // Try to extract as slice (slice access)
         if let Ok(slice) = key.downcast::<PySlice>() {
             let mut graph = self.graph.borrow_mut(py);
@@ -430,6 +495,65 @@ impl PyEdgesAccessor {
                 endpoint_nodes.into_iter().collect(),
                 edge_ids,
                 "edge_batch_selection".to_string(),
+                Some(self.graph.clone()),
+            );
+
+            return Ok(Py::new(py, subgraph)?.to_object(py));
+        }
+
+        // Try to extract as boolean array/list (boolean indexing)
+        if let Ok(boolean_mask) = key.extract::<Vec<bool>>() {
+            let graph = self.graph.borrow(py);
+            let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
+                constrained.clone()
+            } else {
+                graph.inner.edge_ids()
+            };
+
+            // Check if boolean mask length matches edge count
+            if boolean_mask.len() != all_edge_ids.len() {
+                return Err(PyIndexError::new_err(format!(
+                    "Boolean mask length ({}) must match number of edges ({})",
+                    boolean_mask.len(),
+                    all_edge_ids.len()
+                )));
+            }
+
+            // Select edges where boolean mask is True
+            let selected_edges: Vec<EdgeId> = all_edge_ids
+                .iter()
+                .zip(boolean_mask.iter())
+                .filter_map(|(&edge_id, &include)| if include { Some(edge_id) } else { None })
+                .collect();
+
+            if selected_edges.is_empty() {
+                return Err(PyIndexError::new_err("Boolean mask selected no edges"));
+            }
+
+            // Validate all selected edges exist
+            for &edge_id in &selected_edges {
+                if !graph.has_edge_internal(edge_id) {
+                    return Err(PyKeyError::new_err(format!(
+                        "Edge {} does not exist",
+                        edge_id
+                    )));
+                }
+            }
+
+            // Get all endpoint nodes from selected edges
+            let mut endpoint_nodes = std::collections::HashSet::new();
+            for &edge_id in &selected_edges {
+                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                    endpoint_nodes.insert(source);
+                    endpoint_nodes.insert(target);
+                }
+            }
+
+            // Create and return Subgraph
+            let subgraph = PySubgraph::new(
+                endpoint_nodes.into_iter().collect(),
+                selected_edges,
+                "boolean_edge_selection".to_string(),
                 Some(self.graph.clone()),
             );
 

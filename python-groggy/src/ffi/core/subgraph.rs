@@ -905,4 +905,134 @@ impl PySubgraph {
         out.set_graph_reference(graph_ref.clone());
         Ok(out)
     }
+
+    /// Export subgraph to a new independent Graph object
+    pub fn to_graph(&self, py: Python) -> PyResult<PyObject> {
+        // Import the PyGraph class
+        let graph_module = py.import("groggy")?;
+        let graph_class = graph_module.getattr("Graph")?;
+        
+        // Create a new empty graph with the same directed property as parent
+        let is_directed = if let Some(graph_ref) = &self.graph {
+            let parent_graph = graph_ref.borrow(py);
+            parent_graph.is_directed()
+        } else {
+            false // Default to undirected if no parent reference
+        };
+        
+        let new_graph = graph_class.call1((is_directed,))?;
+        
+        if let Some(graph_ref) = &self.graph {
+            let parent_graph = graph_ref.borrow(py);
+            
+            // Add nodes with attributes
+            let mut node_id_mapping = std::collections::HashMap::new();
+            
+            for &old_node_id in &self.nodes {
+                // Get node attributes from parent graph
+                let node_attrs = parent_graph.inner.get_node_attributes(old_node_id)
+                    .unwrap_or_default();
+                
+                // Convert attributes to Python dict
+                let py_attrs = pyo3::types::PyDict::new(py);
+                for (key, value) in node_attrs {
+                    let py_value = crate::ffi::utils::attr_value_to_py_object(py, &value)?;
+                    py_attrs.set_item(key, py_value)?;
+                }
+                
+                // Add node to new graph
+                let new_node_id = new_graph.call_method1("add_node", (py_attrs,))?;
+                let new_id: u64 = new_node_id.extract()?;
+                node_id_mapping.insert(old_node_id, new_id);
+            }
+            
+            // Add edges with attributes
+            for &old_edge_id in &self.edges {
+                if let Ok((source, target)) = parent_graph.inner.edge_endpoints(old_edge_id) {
+                    if let (Some(&new_source), Some(&new_target)) = 
+                        (node_id_mapping.get(&source), node_id_mapping.get(&target)) {
+                        
+                        // Get edge attributes from parent graph
+                        let edge_attrs = parent_graph.inner.get_edge_attributes(old_edge_id)
+                            .unwrap_or_default();
+                        
+                        // Convert attributes to Python dict
+                        let py_attrs = pyo3::types::PyDict::new(py);
+                        for (key, value) in edge_attrs {
+                            let py_value = crate::ffi::utils::attr_value_to_py_object(py, &value)?;
+                            py_attrs.set_item(key, py_value)?;
+                        }
+                        
+                        // Add edge to new graph
+                        new_graph.call_method1("add_edge", (new_source, new_target, py_attrs))?;
+                    }
+                }
+            }
+        }
+        
+        Ok(new_graph)
+    }
+
+    /// Export subgraph to NetworkX graph object
+    pub fn to_networkx(&self, py: Python) -> PyResult<PyObject> {
+        // Import networkx
+        let nx = py.import("networkx")?;
+        
+        // Determine graph type
+        let is_directed = if let Some(graph_ref) = &self.graph {
+            let parent_graph = graph_ref.borrow(py);
+            parent_graph.is_directed()
+        } else {
+            false // Default to undirected if no parent reference
+        };
+        
+        // Create appropriate NetworkX graph
+        let nx_graph = if is_directed {
+            nx.call_method0("DiGraph")?
+        } else {
+            nx.call_method0("Graph")?
+        };
+        
+        if let Some(graph_ref) = &self.graph {
+            let parent_graph = graph_ref.borrow(py);
+            
+            // Add nodes with attributes
+            for &node_id in &self.nodes {
+                // Get node attributes from parent graph
+                let node_attrs = parent_graph.inner.get_node_attributes(node_id)
+                    .unwrap_or_default();
+                
+                // Convert attributes to Python dict
+                let py_attrs = pyo3::types::PyDict::new(py);
+                for (key, value) in node_attrs {
+                    let py_value = crate::ffi::utils::attr_value_to_py_object(py, &value)?;
+                    py_attrs.set_item(key, py_value)?;
+                }
+                
+                // Add node to NetworkX graph
+                nx_graph.call_method1("add_node", (node_id, py_attrs))?;
+            }
+            
+            // Add edges with attributes
+            for &edge_id in &self.edges {
+                if let Ok((source, target)) = parent_graph.inner.edge_endpoints(edge_id) {
+                    // Get edge attributes from parent graph
+                    let edge_attrs = parent_graph.inner.get_edge_attributes(edge_id)
+                        .unwrap_or_default();
+                    
+                    // Convert attributes to Python dict
+                    let py_attrs = pyo3::types::PyDict::new(py);
+                    for (key, value) in edge_attrs {
+                        let py_value = crate::ffi::utils::attr_value_to_py_object(py, &value)?;
+                        py_attrs.set_item(key, py_value)?;
+                    }
+                    
+                    // Add edge to NetworkX graph
+                    nx_graph.call_method1("add_edge", (source, target, py_attrs))?;
+                }
+            }
+        }
+        
+        Ok(nx_graph.to_object(py))
+    }
 }
