@@ -38,7 +38,7 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install maturin pytest networkx
+        pip install maturin pytest networkx pandas
     
     - name: Build and install
       run: |
