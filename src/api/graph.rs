@@ -1248,13 +1248,7 @@ impl Graph {
         max_length: usize,
     ) -> Result<Vec<crate::core::traversal::Path>, GraphError> {
         self.traversal_engine
-            .all_paths(
-                &self.pool.borrow(),
-                &mut self.space,
-                start,
-                end,
-                max_length,
-            )
+            .all_paths(&self.pool.borrow(), &mut self.space, start, end, max_length)
             .map_err(|e| e.into())
     }
 
@@ -1737,11 +1731,7 @@ impl Graph {
         &mut self,
         node_ids: &[NodeId],
     ) -> GraphResult<AdjacencyMatrix> {
-        AdjacencyMatrixBuilder::new().build_subgraph(
-            &self.pool.borrow(),
-            &mut self.space,
-            node_ids,
-        )
+        AdjacencyMatrixBuilder::new().build_subgraph(&self.pool.borrow(), &mut self.space, node_ids)
     }
 
     /// Generate custom adjacency matrix with full control

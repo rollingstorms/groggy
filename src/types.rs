@@ -404,10 +404,7 @@ impl CompressedData {
     /// Compress float vector data
     pub fn compress_float_vec(vec: &[f32]) -> Self {
         let bytes = unsafe {
-            std::slice::from_raw_parts(
-                vec.as_ptr() as *const u8,
-                std::mem::size_of_val(vec),
-            )
+            std::slice::from_raw_parts(vec.as_ptr() as *const u8, std::mem::size_of_val(vec))
         };
 
         // For small vectors, don't compress
