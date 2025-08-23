@@ -242,6 +242,29 @@ impl PyGraphAnalytics {
         }
     }
 
+    /// Check if a path exists between two nodes
+    pub fn has_path(
+        &self,
+        py: Python,
+        source: NodeId,
+        target: NodeId,
+    ) -> PyResult<bool> {
+        let mut graph = self.graph.borrow_mut(py);
+        
+        let options = PathFindingOptions {
+            weight_attribute: None,
+            max_path_length: None,
+            heuristic: None,
+        };
+
+        let result = graph
+            .inner
+            .shortest_path(source, target, options)
+            .map_err(graph_error_to_py_err)?;
+
+        Ok(result.is_some())
+    }
+
     /// Get node degree
     fn degree(&self, py: Python, node: NodeId) -> PyResult<usize> {
         let graph = self.graph.borrow(py);
