@@ -1341,7 +1341,7 @@ impl Graph {
     These create special views that delegate to history system.
     */
     /// Create a read-only view of the graph at a specific commit
-    pub fn view_at_commit(&self, commit_id: StateId) -> Result<HistoricalView, GraphError> {
+    pub fn view_at_commit(&self, commit_id: StateId) -> Result<HistoricalView<'_>, GraphError> {
         let _ = commit_id; // Silence unused parameter warning
         Err(GraphError::NotImplemented {
             feature: "historical views".to_string(),
