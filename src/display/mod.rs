@@ -2,22 +2,22 @@
 Pure Rust display formatting for GraphArray, GraphMatrix, and GraphTable.
 
 This module provides professional Unicode table formatting without Python dependencies,
-replacing the previous Python-based display system for better performance and 
+replacing the previous Python-based display system for better performance and
 architectural consistency.
 */
 
-pub mod table_formatter;
-pub mod matrix_formatter;
 pub mod array_formatter;
-pub mod unicode_chars;
+pub mod matrix_formatter;
+pub mod table_formatter;
 pub mod truncation;
+pub mod unicode_chars;
 
 use std::collections::HashMap;
 
+pub use array_formatter::format_array;
+pub use matrix_formatter::format_matrix;
 /// Re-export main formatting functions
 pub use table_formatter::format_table;
-pub use matrix_formatter::format_matrix;
-pub use array_formatter::format_array;
 
 /// Trait for types that can be displayed with rich formatting
 pub trait RichDisplay {
@@ -77,7 +77,7 @@ pub fn format_data_structure(
     config: &DisplayConfig,
 ) -> String {
     let detected_type = data_type.unwrap_or_else(|| detect_display_type(&data));
-    
+
     match detected_type {
         "table" => format_table(data, config),
         "matrix" => format_matrix(data, config),

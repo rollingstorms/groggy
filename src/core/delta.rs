@@ -1,8 +1,8 @@
 //! Delta Storage System - Efficient representation of changes between graph states.
 //!
 //! ARCHITECTURE ROLE:
-//! This module provides the core data structures for representing changes 
-//! (deltas) between different graph states. It's the foundation of the 
+//! This module provides the core data structures for representing changes
+//! (deltas) between different graph states. It's the foundation of the
 //! version control system, enabling efficient storage and application of changes.
 //!
 //! DESIGN PHILOSOPHY:
@@ -28,10 +28,10 @@ KEY INSIGHTS:
 - Immutable design: Safe for concurrent access and sharing
 */
 
+use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::hash::{Hash, Hasher};
-use crate::types::{AttrName, AttrValue, NodeId, EdgeId};
+use std::sync::Arc;
 
 /// Index-based columnar delta for efficient temporal versioning
 #[derive(Debug, Clone)]
@@ -53,12 +53,20 @@ impl ColumnIndexDelta {
             new_column_indices: Vec::new(),
         }
     }
-    
+
     /// Add an index change at the specified entity index
-    pub fn add_index_change(&mut self, entity_index: usize, old_idx: Option<usize>, new_idx: usize) {
+    pub fn add_index_change(
+        &mut self,
+        entity_index: usize,
+        old_idx: Option<usize>,
+        new_idx: usize,
+    ) {
         // Find insertion point to maintain sorted order by entity_index
-        let pos = self.entity_indices.binary_search(&entity_index).unwrap_or_else(|e| e);
-        
+        let pos = self
+            .entity_indices
+            .binary_search(&entity_index)
+            .unwrap_or_else(|e| e);
+
         if pos < self.entity_indices.len() && self.entity_indices[pos] == entity_index {
             // Update existing change - keep original old_idx, update to latest new_idx
             self.new_column_indices[pos] = new_idx;
@@ -69,24 +77,25 @@ impl ColumnIndexDelta {
             self.new_column_indices.insert(pos, new_idx);
         }
     }
-    
+
     /// Get the change at a specific entity index
     pub fn get_change(&self, entity_index: usize) -> Option<(Option<usize>, usize)> {
-        self.entity_indices.binary_search(&entity_index)
+        self.entity_indices
+            .binary_search(&entity_index)
             .ok()
             .map(|pos| (self.old_column_indices[pos], self.new_column_indices[pos]))
     }
-    
+
     /// Check if this delta has changes at the given entity index
     pub fn has_change(&self, entity_index: usize) -> bool {
         self.entity_indices.binary_search(&entity_index).is_ok()
     }
-    
+
     /// Get the number of changes in this delta
     pub fn len(&self) -> usize {
         self.entity_indices.len()
     }
-    
+
     /// Check if this delta is empty
     pub fn is_empty(&self) -> bool {
         self.entity_indices.is_empty()
@@ -131,7 +140,7 @@ impl ColumnDelta {
     pub fn add_change(&mut self, index: usize, value: AttrValue) {
         // Find insertion point to maintain sorted order
         let pos = self.indices.binary_search(&index).unwrap_or_else(|e| e);
-        
+
         if pos < self.indices.len() && self.indices[pos] == index {
             // Update existing value
             self.values[pos] = value;
@@ -144,7 +153,8 @@ impl ColumnDelta {
 
     /// Get the value at a specific index, if it exists
     pub fn get(&self, index: usize) -> Option<&AttrValue> {
-        self.indices.binary_search(&index)
+        self.indices
+            .binary_search(&index)
             .ok()
             .map(|pos| &self.values[pos])
     }
@@ -211,10 +221,10 @@ impl DeltaObject {
             edge_active_changes: Arc::new(edge_active_changes),
             content_hash: [0; 32], // Will be computed below
         };
-        
+
         // Compute content hash by converting HashMaps to sorted vectors
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        
+
         // Hash node attributes in sorted order
         let mut node_attrs_sorted: Vec<_> = delta.node_attrs.iter().collect();
         node_attrs_sorted.sort_by_key(|(k, _)| *k);
@@ -222,7 +232,7 @@ impl DeltaObject {
             key.hash(&mut hasher);
             value.hash(&mut hasher);
         }
-        
+
         // Hash edge attributes in sorted order
         let mut edge_attrs_sorted: Vec<_> = delta.edge_attrs.iter().collect();
         edge_attrs_sorted.sort_by_key(|(k, _)| *k);
@@ -230,21 +240,21 @@ impl DeltaObject {
             key.hash(&mut hasher);
             value.hash(&mut hasher);
         }
-        
+
         // Hash active changes
         delta.node_active_changes.hash(&mut hasher);
         delta.edge_active_changes.hash(&mut hasher);
-        
+
         let hash_value = hasher.finish();
         let mut hash = [0u8; 32];
         hash[..8].copy_from_slice(&hash_value.to_le_bytes());
-        
+
         Self {
             content_hash: hash,
             ..delta
         }
     }
-    
+
     /// Create a new index-based delta object (placeholder for future full implementation)
     /// Currently adapts to existing value-based structure
     pub fn new_with_indices(
@@ -258,7 +268,7 @@ impl DeltaObject {
         // NOTE: This is a temporary adapter implementation
         // In a full implementation, we'd have a separate IndexDeltaObject
         // or modify DeltaObject to natively support index-based deltas
-        
+
         // For now, create an empty value-based delta
         // The index information is preserved in the ChangeTracker
         Self::new(
@@ -281,7 +291,7 @@ impl DeltaObject {
 
     /// Check if this delta is empty (no changes)
     pub fn is_empty(&self) -> bool {
-        self.node_attrs.is_empty() 
+        self.node_attrs.is_empty()
             && self.edge_attrs.is_empty()
             && self.node_active_changes.is_empty()
             && self.edge_active_changes.is_empty()
@@ -291,8 +301,10 @@ impl DeltaObject {
     pub fn change_count(&self) -> usize {
         let node_attr_changes: usize = self.node_attrs.values().map(|d| d.len()).sum();
         let edge_attr_changes: usize = self.edge_attrs.values().map(|d| d.len()).sum();
-        node_attr_changes + edge_attr_changes + 
-            self.node_active_changes.len() + self.edge_active_changes.len()
+        node_attr_changes
+            + edge_attr_changes
+            + self.node_active_changes.len()
+            + self.edge_active_changes.len()
     }
 }
 
@@ -317,11 +329,11 @@ mod tests {
     #[test]
     fn test_column_delta_basic_operations() {
         let mut delta = ColumnDelta::new();
-        
+
         delta.add_change(5, AttrValue::Int(42));
         delta.add_change(2, AttrValue::Text("hello".to_string()));
         delta.add_change(8, AttrValue::Bool(true));
-        
+
         assert_eq!(delta.len(), 3);
         assert_eq!(delta.get(5), Some(&AttrValue::Int(42)));
         assert_eq!(delta.get(2), Some(&AttrValue::Text("hello".to_string())));
@@ -332,12 +344,12 @@ mod tests {
     #[test]
     fn test_column_delta_maintains_order() {
         let mut delta = ColumnDelta::new();
-        
+
         delta.add_change(5, AttrValue::Int(1));
         delta.add_change(2, AttrValue::Int(2));
         delta.add_change(8, AttrValue::Int(3));
         delta.add_change(1, AttrValue::Int(4));
-        
+
         assert_eq!(delta.indices, vec![1, 2, 5, 8]);
     }
 }

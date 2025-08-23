@@ -1,8 +1,8 @@
 //! Groggy - A Modular Graph Library with Git-like Version Control
 //!
 //! LIBRARY OVERVIEW:
-//! This library provides a comprehensive system for managing graphs with full 
-//! history tracking, branching, and versioning capabilities. Think "Git for graphs" 
+//! This library provides a comprehensive system for managing graphs with full
+//! history tracking, branching, and versioning capabilities. Think "Git for graphs"
 //! with high-performance columnar storage and advanced query capabilities.
 //!
 //! CORE ARCHITECTURE:
@@ -99,7 +99,7 @@
 //!
 //! // Bulk operations for performance
 //! let node_ids = graph.add_nodes(1000); // Add 1000 nodes efficiently
-//! graph.set_node_attrs_bulk("initialized", 
+//! graph.set_node_attrs_bulk("initialized",
 //!     node_ids.iter().map(|&id| (id, AttrValue::Bool(true))).collect()
 //! ).unwrap();
 //!
@@ -110,29 +110,29 @@
 //! ```
 
 // Core type definitions
-pub mod types;
 pub mod config;
 pub mod errors;
+pub mod types;
 pub mod util;
 
 // Core graph data structures and components
 pub mod core {
+    pub mod adjacency;
     pub mod array;
-    pub mod delta;
     pub mod change_tracker;
-    pub mod pool;
-    pub mod space;
-    pub mod query;
-    pub mod traversal;
+    pub mod delta;
     pub mod history;
-    pub mod state;
+    pub mod matrix;
+    pub mod neighborhood;
+    pub mod pool;
+    pub mod query;
     pub mod ref_manager;
+    pub mod space;
+    pub mod state;
     pub mod strategies;
     pub mod subgraph;
-    pub mod adjacency;
-    pub mod matrix;
     pub mod table;
-    pub mod neighborhood;
+    pub mod traversal;
 }
 
 // Display formatting
@@ -144,29 +144,32 @@ pub mod api {
 }
 
 // Re-export commonly used types and the main API
-pub use types::{NodeId, EdgeId, AttrName, AttrValue, AttrValueType, StateId, BranchName};
-pub use config::GraphConfig;
-pub use errors::{GraphError, GraphResult};
 pub use api::graph::Graph;
-pub use core::history::{HistoricalView, ViewSummary, HistoryForest};
+pub use config::GraphConfig;
+pub use core::history::{HistoricalView, HistoryForest, ViewSummary};
+pub use errors::{GraphError, GraphResult};
+pub use types::{AttrName, AttrValue, AttrValueType, BranchName, EdgeId, NodeId, StateId};
 // pub use core::query::{
 //     AttributeFilter, NumericComparison, StringComparison, MultiCriteria, Criterion,
 //     filter_nodes_by_attributes, filter_edges_by_attributes,
 //     filter_by_numeric_comparison, filter_by_string_comparison, filter_by_multi_criteria,
 // };
-pub use core::ref_manager::{RefManager, Branch, BranchInfo, TagInfo};
-pub use core::state::{StateObject, StateMetadata};
+pub use core::ref_manager::{Branch, BranchInfo, RefManager, TagInfo};
+pub use core::state::{StateMetadata, StateObject};
 
 // Re-export core types for advanced usage
-pub use core::delta::{ColumnDelta, DeltaObject};
+pub use core::adjacency::{
+    AdjacencyMatrix, AdjacencyMatrixResult, IndexMapping, MatrixFormat, MatrixType,
+    SparseAdjacencyMatrix,
+};
+pub use core::array::{GraphArray, StatsSummary};
 pub use core::change_tracker::ChangeTracker;
+pub use core::delta::{ColumnDelta, DeltaObject};
+pub use core::matrix::JoinType;
+pub use core::matrix::{Axis, GraphMatrix, MatrixProperties};
 pub use core::pool::GraphPool;
 pub use core::space::GraphSpace;
-pub use core::adjacency::{AdjacencyMatrix, SparseAdjacencyMatrix, AdjacencyMatrixResult, MatrixFormat, MatrixType, IndexMapping};
-pub use core::matrix::{GraphMatrix, MatrixProperties, Axis};
-pub use core::array::{GraphArray, StatsSummary};
-pub use core::table::{GraphTable, TableMetadata, AggregateOp, GroupBy, ConnectivityType};
-pub use core::matrix::JoinType;
+pub use core::table::{AggregateOp, ConnectivityType, GraphTable, GroupBy, TableMetadata};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -214,47 +217,66 @@ mod tests {
     fn test_basic_integration() {
         // Test that all the main components work together
         let mut graph = Graph::new();
-        
+
         // Basic graph operations
         let node1 = graph.add_node();
         let node2 = graph.add_node();
         let edge = graph.add_edge(node1, node2).unwrap();
-        
+
         // Attributes
-        graph.set_node_attribute(node1, "name".to_string(), AttrValue::Text("Alice".to_string())).unwrap();
-        graph.set_edge_attribute(edge, "weight".to_string(), AttrValue::Float(1.5)).unwrap();
-        
+        graph
+            .set_node_attribute(
+                node1,
+                "name".to_string(),
+                AttrValue::Text("Alice".to_string()),
+            )
+            .unwrap();
+        graph
+            .set_edge_attribute(edge, "weight".to_string(), AttrValue::Float(1.5))
+            .unwrap();
+
         // History
-        let state1 = graph.commit("Initial commit".to_string(), "test_user".to_string()).unwrap();
-        
+        let state1 = graph
+            .commit("Initial commit".to_string(), "test_user".to_string())
+            .unwrap();
+
         // Branching
-        graph.create_branch("test_branch".to_string(), Some("Test branch".to_string())).unwrap();
+        graph
+            .create_branch("test_branch".to_string(), Some("Test branch".to_string()))
+            .unwrap();
         graph.checkout_branch(&"test_branch".to_string()).unwrap();
-        
+
         // More changes
         let node3 = graph.add_node();
-        graph.set_node_attribute(node3, "value".to_string(), AttrValue::Int(42)).unwrap();
-        let state2 = graph.commit("Add node3".to_string(), "test_user".to_string()).unwrap();
-        
+        graph
+            .set_node_attribute(node3, "value".to_string(), AttrValue::Int(42))
+            .unwrap();
+        let state2 = graph
+            .commit("Add node3".to_string(), "test_user".to_string())
+            .unwrap();
+
         // Views
         let view = graph.view_at_state(state1).unwrap();
         assert_eq!(view.state_id(), state1);
-        
+
         // Stats
         let stats = graph.stats();
         assert_eq!(stats.node_count, 3);
         assert_eq!(stats.edge_count, 1);
         assert_eq!(stats.current_branch, "test_branch".to_string());
-        
+
         // Filtering
-        use std::collections::HashMap;
         use crate::core::query::AttributeFilter;
+        use std::collections::HashMap;
         let mut filters = HashMap::new();
-        filters.insert("name".to_string(), AttributeFilter::Equals(AttrValue::Text("Alice".to_string())));
+        filters.insert(
+            "name".to_string(),
+            AttributeFilter::Equals(AttrValue::Text("Alice".to_string())),
+        );
         let filtered = graph.filter_nodes(&filters).unwrap();
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0], node1);
-        
+
         // Tags
         graph.create_tag("v1.0".to_string(), Some(state2)).unwrap();
         let tags = graph.list_tags();
@@ -266,14 +288,14 @@ mod tests {
     #[test]
     fn test_error_handling() {
         let mut graph = Graph::new();
-        
+
         // Test invalid operations
         let result = graph.add_edge(999, 1000);
         assert!(result.is_err());
-        
+
         let result = graph.get_node_attribute(999, &"nonexistent".to_string());
         assert!(result.is_err());
-        
+
         let result = graph.checkout_branch(&"nonexistent_branch".to_string());
         assert!(result.is_err());
     }
@@ -282,7 +304,7 @@ mod tests {
     fn test_configuration() {
         let config = GraphConfig::default();
         let graph = Graph::with_config(config.clone());
-        
+
         assert_eq!(graph.config().max_states, config.max_states);
         assert_eq!(graph.config().enable_gc, config.enable_gc);
     }
