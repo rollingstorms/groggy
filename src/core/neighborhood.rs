@@ -11,11 +11,11 @@
 //! - Full composability: neighborhood().filter_nodes().bfs() etc.
 //! - Follows the same pattern as connected_components result structure
 
-use crate::types::NodeId;
-use crate::errors::GraphResult;
-use crate::core::subgraph::Subgraph;
-use crate::core::space::GraphSpace;
 use crate::core::pool::GraphPool;
+use crate::core::space::GraphSpace;
+use crate::core::subgraph::Subgraph;
+use crate::errors::GraphResult;
+use crate::types::NodeId;
 use std::collections::{HashMap, HashSet};
 
 /// Result of neighborhood sampling operations
@@ -72,22 +72,23 @@ impl NeighborhoodSampler {
 
         // Get neighbors using the same pattern as traversal engine
         let (_, _, _, neighbors_map) = space.snapshot(pool);
-        
+
         // Get direct neighbors of the node
         let mut nodes = HashSet::new();
         nodes.insert(node_id);
-        
+
         if let Some(node_neighbors) = neighbors_map.get(&node_id) {
             for &(neighbor_id, _edge_id) in node_neighbors {
                 nodes.insert(neighbor_id);
             }
         }
 
-        // Calculate induced edges 
+        // Calculate induced edges
         let edge_count = self.calculate_induced_edges_count(pool, space, &nodes)?;
 
         let duration = start.elapsed();
-        self.stats.record_neighborhood("single_neighborhood".to_string(), nodes.len(), duration);
+        self.stats
+            .record_neighborhood("single_neighborhood".to_string(), nodes.len(), duration);
 
         Ok(NeighborhoodSubgraph {
             edge_count,
@@ -107,7 +108,7 @@ impl NeighborhoodSampler {
     ) -> GraphResult<usize> {
         // Get topology vectors from space
         let (edge_ids, sources, targets, _) = space.snapshot(pool);
-        
+
         let mut count = 0;
         for i in 0..edge_ids.len() {
             let source = sources[i];
@@ -150,7 +151,8 @@ impl NeighborhoodSampler {
 
         let duration = start.elapsed();
         let total_nodes: usize = neighborhoods.iter().map(|n| n.size).sum();
-        self.stats.record_neighborhood("multi_neighborhood".to_string(), total_nodes, duration);
+        self.stats
+            .record_neighborhood("multi_neighborhood".to_string(), total_nodes, duration);
 
         Ok(NeighborhoodResult {
             total_neighborhoods: neighborhoods.len(),
@@ -174,7 +176,8 @@ impl NeighborhoodSampler {
         // For k=0, just return single node neighborhood
         if k == 0 {
             let duration = start.elapsed();
-            self.stats.record_neighborhood("k_hop_neighborhood".to_string(), 1, duration);
+            self.stats
+                .record_neighborhood("k_hop_neighborhood".to_string(), 1, duration);
             return Ok(NeighborhoodSubgraph {
                 edge_count: 0,
                 size: 1,
@@ -191,8 +194,9 @@ impl NeighborhoodSampler {
 
         // For k>1, implement BFS (stub for now)
         let duration = start.elapsed();
-        self.stats.record_neighborhood("k_hop_neighborhood".to_string(), 1, duration);
-        
+        self.stats
+            .record_neighborhood("k_hop_neighborhood".to_string(), 1, duration);
+
         Ok(NeighborhoodSubgraph {
             edge_count: 0,
             size: 1,
@@ -212,10 +216,14 @@ impl NeighborhoodSampler {
         k: usize,
     ) -> GraphResult<NeighborhoodSubgraph> {
         let start = std::time::Instant::now();
-        
+
         // Stub implementation for now
         let duration = start.elapsed();
-        self.stats.record_neighborhood("unified_neighborhood".to_string(), node_ids.len(), duration);
+        self.stats.record_neighborhood(
+            "unified_neighborhood".to_string(),
+            node_ids.len(),
+            duration,
+        );
 
         Ok(NeighborhoodSubgraph {
             edge_count: 0,
@@ -264,13 +272,21 @@ impl NeighborhoodStats {
         }
     }
 
-    fn record_neighborhood(&mut self, operation: String, nodes_sampled: usize, duration: std::time::Duration) {
+    fn record_neighborhood(
+        &mut self,
+        operation: String,
+        nodes_sampled: usize,
+        duration: std::time::Duration,
+    ) {
         self.total_neighborhoods += 1;
         self.total_nodes_sampled += nodes_sampled;
         self.total_time += duration;
 
         *self.operation_counts.entry(operation.clone()).or_insert(0) += 1;
-        *self.operation_times.entry(operation).or_insert(std::time::Duration::new(0, 0)) += duration;
+        *self
+            .operation_times
+            .entry(operation)
+            .or_insert(std::time::Duration::new(0, 0)) += duration;
     }
 
     fn clear(&mut self) {

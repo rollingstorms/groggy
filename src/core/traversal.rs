@@ -10,23 +10,23 @@
 //! - Modular: Each algorithm implements common traits for consistency
 //! - Configurable: Support filtering, early termination, and custom constraints
 
-use std::collections::{HashMap, HashSet, VecDeque, BinaryHeap};
-use std::cmp::Ordering;
-use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
 use crate::core::pool::GraphPool;
+use crate::core::query::{EdgeFilter, NodeFilter, QueryEngine};
 use crate::core::space::GraphSpace;
-use crate::core::query::{NodeFilter, EdgeFilter, QueryEngine};
 use crate::errors::GraphResult;
+use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 // use rayon::prelude::*; // TODO: Re-enable when parallel traversal is implemented
 
 /// High-performance graph traversal engine
-/// 
+///
 /// RESPONSIBILITIES:
 /// - Execute BFS, DFS, and shortest path algorithms
 /// - Find connected components and analyze connectivity
 /// - Support filtered traversals and early termination
 /// - Provide parallel implementations for large graphs
-/// 
+///
 /// NOT RESPONSIBLE FOR:
 /// - Graph modification (read-only operations)
 /// - Query result caching (that's QueryEngine's job)
@@ -35,14 +35,14 @@ use crate::errors::GraphResult;
 pub struct TraversalEngine {
     /// Reusable state to avoid allocations
     state_pool: TraversalStatePool,
-    
+
     /// Performance configuration
     #[allow(dead_code)] // TODO: Implement configuration system
     config: TraversalConfig,
-    
+
     /// Statistics tracking
     stats: TraversalStats,
-    
+
     /// Query engine for bulk filtering operations
     #[allow(dead_code)]
     query_engine: QueryEngine,
@@ -62,11 +62,11 @@ impl FilterCache {
             max_size,
         }
     }
-    
+
     pub fn get(&self, node_id: NodeId, filter_key: &str) -> Option<bool> {
         self.cache.get(&(node_id, filter_key.to_string())).copied()
     }
-    
+
     pub fn insert(&mut self, node_id: NodeId, filter_key: String, result: bool) {
         if self.cache.len() >= self.max_size {
             // Simple LRU: clear half the cache
@@ -75,10 +75,10 @@ impl FilterCache {
                 self.cache.remove(&key);
             }
         }
-        
+
         self.cache.insert((node_id, filter_key), result);
     }
-    
+
     pub fn clear(&mut self) {
         self.cache.clear();
     }
@@ -94,7 +94,7 @@ impl TraversalEngine {
             query_engine: QueryEngine::new(),
         }
     }
-    
+
     /// Create traversal engine with custom configuration
     pub fn with_config(config: TraversalConfig) -> Self {
         Self {
@@ -104,14 +104,14 @@ impl TraversalEngine {
             query_engine: QueryEngine::new(),
         }
     }
-    
+
     /*
     === BASIC TRAVERSAL ALGORITHMS ===
     Core BFS and DFS implementations with filtering support
     */
-    
+
     /// Breadth-First Search from a starting node
-    /// 
+    ///
     /// PERFORMANCE: O(V + E) with cached adjacency map - FAST!
     /// FEATURES: Early termination, filtering, minimal overhead
     pub fn bfs(
@@ -119,32 +119,32 @@ impl TraversalEngine {
         pool: &GraphPool,
         space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
         start: NodeId,
-        options: TraversalOptions
+        options: TraversalOptions,
     ) -> GraphResult<TraversalResult> {
         let start_time = std::time::Instant::now();
-        
+
         // Get fresh snapshot with guaranteed consistent adjacency data
         let (_, _, _, neighbors) = space.snapshot(pool);
-        
+
         // 🚀 PERFORMANCE: Use Arc reference directly - no O(E) clone needed!
         // The Arc allows zero-copy sharing of the adjacency map
-        
+
         // 🚀 PERFORMANCE: Skip bulk pre-filtering - filter nodes individually during traversal
         // This is much faster for sparse traversals that only visit a small subset of nodes
-        
+
         let mut visited = HashSet::new();
         let mut queue = VecDeque::new();
         let mut result_nodes = Vec::new();
         let mut result_edges = Vec::new();
         let mut levels = HashMap::new();
-        
+
         // Initialize BFS
         queue.push_back((start, 0)); // (node_id, level)
         visited.insert(start);
         levels.insert(start, 0);
-        
+
         let mut max_depth = 0;
-        
+
         while let Some((current_node, level)) = queue.pop_front() {
             // Check termination conditions - skip nodes beyond max depth
             if let Some(max_depth_limit) = options.max_depth {
@@ -152,16 +152,16 @@ impl TraversalEngine {
                     continue;
                 }
             }
-            
+
             if let Some(max_nodes) = options.max_nodes {
                 if result_nodes.len() >= max_nodes {
                     break;
                 }
             }
-            
+
             result_nodes.push(current_node);
             max_depth = max_depth.max(level);
-            
+
             // Find neighbors using fresh adjacency map - O(1) lookup, O(degree) iteration - FAST!
             if let Some(node_neighbors) = neighbors.get(&current_node) {
                 // Check if we can still explore deeper before processing neighbors
@@ -170,7 +170,7 @@ impl TraversalEngine {
                     Some(max_depth_limit) => next_level <= max_depth_limit,
                     None => true,
                 };
-                
+
                 if can_explore_deeper {
                     for &(neighbor, edge_id) in node_neighbors {
                         if !visited.contains(&neighbor) {
@@ -186,10 +186,11 @@ impl TraversalEngine {
                 }
             }
         }
-        
+
         let duration = start_time.elapsed();
-        self.stats.record_traversal("bfs".to_string(), result_nodes.len(), duration);
-        
+        self.stats
+            .record_traversal("bfs".to_string(), result_nodes.len(), duration);
+
         Ok(TraversalResult {
             algorithm: TraversalAlgorithm::BFS,
             nodes: result_nodes,
@@ -206,9 +207,9 @@ impl TraversalEngine {
             },
         })
     }
-    
+
     /// Depth-First Search from a starting node
-    /// 
+    ///
     /// PERFORMANCE: O(V + E) with cached adjacency map - FAST!
     /// FEATURES: Iterative implementation, minimal overhead
     pub fn dfs(
@@ -216,19 +217,19 @@ impl TraversalEngine {
         pool: &GraphPool,
         space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
         start: NodeId,
-        options: TraversalOptions
+        options: TraversalOptions,
     ) -> GraphResult<TraversalResult> {
         let start_time = std::time::Instant::now();
-        
+
         // Get fresh snapshot with guaranteed consistent adjacency data
         let (_, _, _, neighbors) = space.snapshot(pool);
-        
+
         // 🚀 PERFORMANCE: Use Arc reference directly - no O(E) clone needed!
         // The Arc allows zero-copy sharing of the adjacency map
-        
+
         // 🚀 PERFORMANCE: Skip bulk pre-filtering - filter nodes individually during traversal
         // This is much faster for sparse traversals that only visit a small subset of nodes
-        
+
         let mut visited = HashSet::new();
         let mut stack = Vec::new();
         let mut result_nodes = Vec::new();
@@ -236,10 +237,10 @@ impl TraversalEngine {
         let mut edge_set = HashSet::new(); // O(1) duplicate check instead of O(n)
         let mut discovery_order = HashMap::new();
         let mut discovery_count = 0;
-        
+
         // Initialize DFS with depth tracking
         stack.push((start, 0)); // (node, depth)
-        
+
         while let Some((current_node, depth)) = stack.pop() {
             if !visited.contains(&current_node) {
                 // Check depth limit before processing
@@ -248,21 +249,21 @@ impl TraversalEngine {
                         continue;
                     }
                 }
-                
+
                 // 🚀 FAST: Individual node filtering - only check nodes we actually encounter
                 if self.should_visit_node(pool, space, current_node, &options)? {
                     visited.insert(current_node);
                     result_nodes.push(current_node);
                     discovery_order.insert(current_node, discovery_count);
                     discovery_count += 1;
-                    
+
                     // Check termination conditions
                     if let Some(max_nodes) = options.max_nodes {
                         if result_nodes.len() >= max_nodes {
                             break;
                         }
                     }
-                    
+
                     // Get neighbors from fresh adjacency map - O(1) lookup - FAST!
                     if let Some(node_neighbors) = neighbors.get(&current_node) {
                         // Check if we can explore deeper
@@ -271,13 +272,14 @@ impl TraversalEngine {
                             Some(max_depth_limit) => next_depth <= max_depth_limit,
                             None => true,
                         };
-                        
+
                         if can_explore_deeper {
                             // Add in reverse order for consistent DFS traversal
                             for &(neighbor, edge_id) in node_neighbors.iter().rev() {
                                 if !visited.contains(&neighbor) {
                                     stack.push((neighbor, next_depth));
-                                    if edge_set.insert(edge_id) { // O(1) check + insert
+                                    if edge_set.insert(edge_id) {
+                                        // O(1) check + insert
                                         result_edges.push(edge_id);
                                     }
                                 }
@@ -287,10 +289,11 @@ impl TraversalEngine {
                 }
             }
         }
-        
+
         let duration = start_time.elapsed();
-        self.stats.record_traversal("dfs".to_string(), result_nodes.len(), duration);
-        
+        self.stats
+            .record_traversal("dfs".to_string(), result_nodes.len(), duration);
+
         Ok(TraversalResult {
             algorithm: TraversalAlgorithm::DFS,
             nodes: result_nodes,
@@ -307,14 +310,14 @@ impl TraversalEngine {
             },
         })
     }
-    
+
     /*
     === PATH FINDING ALGORITHMS ===
     Shortest path and path enumeration algorithms
     */
-    
+
     /// Find shortest path between two nodes using Dijkstra's algorithm
-    /// 
+    ///
     /// PERFORMANCE: O((V + E) log V) with binary heap optimization
     /// FEATURES: Supports edge weights, early termination at target
     pub fn shortest_path(
@@ -323,49 +326,60 @@ impl TraversalEngine {
         space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
         start: NodeId,
         end: NodeId,
-        options: PathFindingOptions
+        options: PathFindingOptions,
     ) -> GraphResult<Option<Path>> {
         let start_time = std::time::Instant::now();
-        
+
         let mut state = self.state_pool.get_state();
         state.distances.clear();
         state.predecessors.clear();
         state.visited.clear();
-        
+
         // Priority queue for Dijkstra's algorithm
         let mut heap = BinaryHeap::new();
-        
+
         // Initialize
         state.distances.insert(start, 0.0);
-        heap.push(DijkstraNode { id: start, distance: 0.0 });
-        
+        heap.push(DijkstraNode {
+            id: start,
+            distance: 0.0,
+        });
+
         // Get columnar topology with cache maintenance (make owned copies)
         let (edge_ids_ref, sources_ref, targets_ref, _) = space.snapshot(pool);
         let edge_ids: Vec<EdgeId> = edge_ids_ref.as_ref().clone();
         let sources: Vec<NodeId> = sources_ref.as_ref().clone();
         let targets: Vec<NodeId> = targets_ref.as_ref().clone();
-        
-        while let Some(DijkstraNode { id: current, distance }) = heap.pop() {
+
+        while let Some(DijkstraNode {
+            id: current,
+            distance,
+        }) = heap.pop()
+        {
             // Early termination if we reached the target
             if current == end {
                 let path = self.reconstruct_path(&state.predecessors, start, end, pool, space)?;
                 self.state_pool.return_state(state);
-                
+
                 let duration = start_time.elapsed();
-                self.stats.record_traversal("shortest_path".to_string(), path.nodes.len(), duration);
-                
+                self.stats.record_traversal(
+                    "shortest_path".to_string(),
+                    path.nodes.len(),
+                    duration,
+                );
+
                 return Ok(Some(path));
             }
-            
+
             // Skip if we've found a better path to this node
             if let Some(&current_distance) = state.distances.get(&current) {
                 if distance > current_distance {
                     continue;
                 }
             }
-            
+
             state.visited.insert(current);
-            
+
             // Explore neighbors directly from topology
             for i in 0..sources.len() {
                 let (neighbor, edge_id) = if sources[i] == current {
@@ -375,34 +389,41 @@ impl TraversalEngine {
                 } else {
                     continue;
                 };
-                
+
                 if state.visited.contains(&neighbor) {
                     continue;
                 }
-                
+
                 // Calculate edge weight
-                let edge_weight = self.get_edge_weight(pool, space, edge_id, &options.weight_attribute);
+                let edge_weight =
+                    self.get_edge_weight(pool, space, edge_id, &options.weight_attribute);
                 let new_distance = distance + edge_weight;
-                
+
                 // Update if we found a shorter path
-                if !state.distances.contains_key(&neighbor) || new_distance < state.distances[&neighbor] {
+                if !state.distances.contains_key(&neighbor)
+                    || new_distance < state.distances[&neighbor]
+                {
                     state.distances.insert(neighbor, new_distance);
                     state.predecessors.insert(neighbor, current);
-                    heap.push(DijkstraNode { id: neighbor, distance: new_distance });
+                    heap.push(DijkstraNode {
+                        id: neighbor,
+                        distance: new_distance,
+                    });
                 }
             }
         }
-        
+
         // No path found
         self.state_pool.return_state(state);
         let duration = start_time.elapsed();
-        self.stats.record_traversal("shortest_path".to_string(), 0, duration);
-        
+        self.stats
+            .record_traversal("shortest_path".to_string(), 0, duration);
+
         Ok(None)
     }
-    
+
     /// Find all simple paths between two nodes (up to maximum length)
-    /// 
+    ///
     /// WARNING: Can be expensive for large graphs or long paths
     pub fn all_paths(
         &mut self,
@@ -410,69 +431,76 @@ impl TraversalEngine {
         space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
         start: NodeId,
         end: NodeId,
-        max_length: usize
+        max_length: usize,
     ) -> GraphResult<Vec<Path>> {
         let start_time = std::time::Instant::now();
-        
+
         let mut all_paths = Vec::new();
         let mut current_path = Vec::new();
         let mut visited = HashSet::new();
-        
+
         self.find_all_paths_recursive(
-            pool, space, start, end, max_length,
-            &mut current_path, &mut visited, &mut all_paths
+            pool,
+            space,
+            start,
+            end,
+            max_length,
+            &mut current_path,
+            &mut visited,
+            &mut all_paths,
         )?;
-        
+
         let duration = start_time.elapsed();
-        self.stats.record_traversal("all_paths".to_string(), all_paths.len(), duration);
-        
+        self.stats
+            .record_traversal("all_paths".to_string(), all_paths.len(), duration);
+
         Ok(all_paths)
     }
-    
+
     /*
     === CONNECTIVITY ALGORITHMS ===
     Connected components and connectivity analysis
     */
-    
+
     /// Find all connected components in the graph
-    /// 
+    ///
     /// PERFORMANCE: O(V + E) using optimized BFS with adjacency map
     pub fn connected_components(
         &mut self,
         pool: &GraphPool,
         space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
-        options: TraversalOptions
+        options: TraversalOptions,
     ) -> GraphResult<ConnectedComponentsResult> {
         let start_time = std::time::Instant::now();
-        
+
         // 📊 TIMING: Step 1 - Get active nodes
         let step1_start = std::time::Instant::now();
         let active_nodes: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
         let _step1_duration = step1_start.elapsed();
-        
+
         // 📊 TIMING: Step 2 - Build adjacency snapshot
         let step2_start = std::time::Instant::now();
         let (_, _, _, neighbors) = space.snapshot(pool);
         let _step2_duration = step2_start.elapsed();
-        
+
         // 🚀 PERFORMANCE: Use Arc reference directly - no O(E) clone needed!
         // The Arc allows zero-copy sharing of the adjacency map
-        
+
         // 📊 TIMING: Step 3 - Initialize data structures
         let step3_start = std::time::Instant::now();
         let mut visited = HashSet::new();
         let mut components = Vec::new();
         let _step3_duration = step3_start.elapsed();
-        
+
         // 📊 TIMING: Step 4 - Main component finding loop
         let step4_start = std::time::Instant::now();
         let mut bfs_time = std::time::Duration::ZERO;
         let mut edge_computation_time = std::time::Duration::ZERO;
         let mut component_count = 0;
-        
+
         // 🚀 OPTIMIZATION: Pre-mark nodes with component IDs for O(1) edge validation
         let mut node_component_id: HashMap<NodeId, usize> = HashMap::new();
-        
+
         // BFS for each unvisited node - O(V + E) total
         for &start_node in &active_nodes {
             if !visited.contains(&start_node) {
@@ -480,19 +508,19 @@ impl TraversalEngine {
                 if !self.should_visit_node(pool, space, start_node, &options)? {
                     continue;
                 }
-                
+
                 // 📊 TIMING: BFS to find component
                 let bfs_start = std::time::Instant::now();
                 let mut component_nodes = Vec::new();
                 let mut queue = VecDeque::new();
-                
+
                 queue.push_back(start_node);
                 visited.insert(start_node);
                 node_component_id.insert(start_node, component_count); // Mark with component ID
-                
+
                 while let Some(current) = queue.pop_front() {
                     component_nodes.push(current);
-                    
+
                     // Use fresh adjacency for optimal performance - get (neighbor, edge_id) pairs
                     if let Some(current_neighbors) = neighbors.get(&current) {
                         for &(neighbor, _edge_id) in current_neighbors {
@@ -508,13 +536,13 @@ impl TraversalEngine {
                     }
                 }
                 bfs_time += bfs_start.elapsed();
-                
+
                 if !component_nodes.is_empty() {
                     // 📊 TIMING: Calculate induced edges for this component
                     let edges_start = std::time::Instant::now();
                     let mut component_edges = Vec::new();
                     let mut edge_set = HashSet::new(); // O(1) duplicate check instead of O(n)
-                    
+
                     // 🚀 OPTIMIZATION: Use O(1) component ID checks instead of O(log n) HashSet lookups
                     // For each node in the component, check its edges
                     for &node in &component_nodes {
@@ -525,7 +553,9 @@ impl TraversalEngine {
                                 if let Some(&neighbor_comp_id) = node_component_id.get(&neighbor) {
                                     if neighbor_comp_id == component_count // O(1) check instead of O(log n)
                                         && node < neighbor // Avoid adding same edge twice
-                                        && edge_set.insert(edge_id) { // O(1) check + insert
+                                        && edge_set.insert(edge_id)
+                                    {
+                                        // O(1) check + insert
                                         component_edges.push(edge_id);
                                     }
                                 }
@@ -534,7 +564,7 @@ impl TraversalEngine {
                     }
                     edge_computation_time += edges_start.elapsed();
                     component_count += 1;
-                    
+
                     components.push(ConnectedComponent {
                         nodes: component_nodes.clone(),
                         edges: component_edges,
@@ -544,20 +574,24 @@ impl TraversalEngine {
                 }
             }
         }
-        
+
         let _step4_duration = step4_start.elapsed();
-    
+
         // 📊 TIMING: Step 5 - Sort components by size
         let step5_start = std::time::Instant::now();
         components.sort_unstable_by(|a, b| b.size.cmp(&a.size));
         let _step5_duration = step5_start.elapsed();
-        
+
         let duration = start_time.elapsed();
-        self.stats.record_traversal("connected_components".to_string(), components.len(), duration);
-        
+        self.stats.record_traversal(
+            "connected_components".to_string(),
+            components.len(),
+            duration,
+        );
+
         let total_components = components.len();
         let largest_component_size = components.iter().map(|c| c.size).max().unwrap_or(0);
-        
+
         Ok(ConnectedComponentsResult {
             components,
             total_components,
@@ -565,7 +599,7 @@ impl TraversalEngine {
             execution_time: duration,
         })
     }
-    
+
     /*
     === HELPER METHODS ===
     Internal utility methods for traversal algorithms
@@ -578,7 +612,7 @@ impl TraversalEngine {
         pool: &GraphPool,
         space: &GraphSpace,
         node_id: NodeId,
-        options: &TraversalOptions
+        options: &TraversalOptions,
     ) -> GraphResult<bool> {
         if let Some(ref filter) = options.node_filter {
             self.should_visit_node_inline(pool, space, node_id, filter)
@@ -586,14 +620,14 @@ impl TraversalEngine {
             Ok(true)
         }
     }
-    
+
     /// Inline node filter matching for maximum performance
     fn should_visit_node_inline(
         &self,
         pool: &GraphPool,
         space: &GraphSpace,
         node_id: NodeId,
-        filter: &NodeFilter
+        filter: &NodeFilter,
     ) -> GraphResult<bool> {
         match filter {
             NodeFilter::HasAttribute { name } => {
@@ -637,7 +671,7 @@ impl TraversalEngine {
             _ => Ok(true), // Accept other filter types for now
         }
     }
-    
+
     /// Pre-filter nodes using bulk operations for O(n) performance instead of O(n²)
     /// NOTE: This is slower for sparse traversals - kept for compatibility
     #[allow(dead_code)]
@@ -646,23 +680,34 @@ impl TraversalEngine {
         pool: &GraphPool,
         space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
         candidate_nodes: &[NodeId],
-        options: &TraversalOptions
+        options: &TraversalOptions,
     ) -> GraphResult<HashSet<NodeId>> {
         if let Some(ref filter) = options.node_filter {
             // Use bulk filtering - O(n) instead of O(n²)
-            let filtered_nodes = self.query_engine.find_nodes_by_filter_with_space(pool, space, filter)?;
+            let filtered_nodes = self
+                .query_engine
+                .find_nodes_by_filter_with_space(pool, space, filter)?;
             // Return intersection with candidate nodes - convert filtered to HashSet for O(1) lookups
             let filtered_set: HashSet<NodeId> = filtered_nodes.into_iter().collect();
-            Ok(candidate_nodes.iter().copied().filter(|node| filtered_set.contains(node)).collect())
+            Ok(candidate_nodes
+                .iter()
+                .copied()
+                .filter(|node| filtered_set.contains(node))
+                .collect())
         } else {
             // No filter - all candidates are eligible, direct conversion is faster
             Ok(candidate_nodes.iter().copied().collect())
         }
     }
-  
-    
+
     /// Get edge weight for pathfinding algorithms
-    fn get_edge_weight(&self, pool: &GraphPool, space: &GraphSpace, edge_id: EdgeId, weight_attr: &Option<AttrName>) -> f64 {
+    fn get_edge_weight(
+        &self,
+        pool: &GraphPool,
+        space: &GraphSpace,
+        edge_id: EdgeId,
+        weight_attr: &Option<AttrName>,
+    ) -> f64 {
         if let Some(attr_name) = weight_attr {
             // Try to get edge attribute value (using space since pool doesn't have this method)
             if let Some(index) = space.get_edge_attr_index(edge_id, attr_name) {
@@ -682,7 +727,7 @@ impl TraversalEngine {
             1.0 // Default unit weight
         }
     }
-    
+
     /// Reconstruct path from predecessor information
     fn reconstruct_path(
         &self,
@@ -690,26 +735,26 @@ impl TraversalEngine {
         start: NodeId,
         end: NodeId,
         pool: &GraphPool,
-        space: &GraphSpace // Changed to &GraphSpace (no longer mutable)
+        space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
     ) -> GraphResult<Path> {
         let mut path_nodes = Vec::new();
         let mut path_edges = Vec::new();
         let mut current = end;
         let mut total_weight = 0.0;
-        
+
         // Build path backwards
         path_nodes.push(current);
-        
+
         while current != start {
             if let Some(&predecessor) = predecessors.get(&current) {
                 path_nodes.push(predecessor);
-                
+
                 // Find the edge between predecessor and current
                 if let Some(edge_id) = self.find_edge_between(pool, space, predecessor, current)? {
                     path_edges.push(edge_id);
                     total_weight += self.get_edge_weight(pool, space, edge_id, &None);
                 }
-                
+
                 current = predecessor;
             } else {
                 return Err(crate::errors::GraphError::InternalError {
@@ -719,13 +764,13 @@ impl TraversalEngine {
                 });
             }
         }
-        
+
         // Reverse to get correct order
         path_nodes.reverse();
         path_edges.reverse();
-        
+
         let path_length = path_nodes.len().saturating_sub(1);
-        
+
         Ok(Path {
             nodes: path_nodes,
             edges: path_edges,
@@ -737,21 +782,28 @@ impl TraversalEngine {
             },
         })
     }
-    
+
     /// Find edge between two nodes (helper for path reconstruction)
-    fn find_edge_between(&self, pool: &GraphPool, space: &GraphSpace, node1: NodeId, node2: NodeId) -> GraphResult<Option<EdgeId>> {
+    fn find_edge_between(
+        &self,
+        pool: &GraphPool,
+        space: &GraphSpace,
+        node1: NodeId,
+        node2: NodeId,
+    ) -> GraphResult<Option<EdgeId>> {
         let (edge_ids, sources, targets, _) = space.snapshot(pool);
-        
+
         for i in 0..sources.len() {
-            if (sources[i] == node1 && targets[i] == node2) || 
-               (sources[i] == node2 && targets[i] == node1) {
+            if (sources[i] == node1 && targets[i] == node2)
+                || (sources[i] == node2 && targets[i] == node1)
+            {
                 return Ok(Some(edge_ids[i]));
             }
         }
-        
+
         Ok(None)
     }
-    
+
     /// Recursive helper for finding all paths
     fn find_all_paths_recursive(
         &mut self,
@@ -762,28 +814,30 @@ impl TraversalEngine {
         max_length: usize,
         path: &mut Vec<NodeId>,
         visited: &mut HashSet<NodeId>,
-        all_paths: &mut Vec<Path>
+        all_paths: &mut Vec<Path>,
     ) -> GraphResult<()> {
         if path.len() >= max_length {
             return Ok(());
         }
-        
+
         path.push(current);
         visited.insert(current);
-        
+
         if current == target {
             // Found a path - convert to Path structure
             let path_nodes = path.clone();
             let mut path_edges = Vec::new();
             let mut total_weight = 0.0;
-            
+
             for i in 0..path_nodes.len() - 1 {
-                if let Some(edge_id) = self.find_edge_between(pool, space, path_nodes[i], path_nodes[i + 1])? {
+                if let Some(edge_id) =
+                    self.find_edge_between(pool, space, path_nodes[i], path_nodes[i + 1])?
+                {
                     path_edges.push(edge_id);
                     total_weight += self.get_edge_weight(pool, space, edge_id, &None);
                 }
             }
-            
+
             all_paths.push(Path {
                 nodes: path_nodes,
                 edges: path_edges,
@@ -797,7 +851,7 @@ impl TraversalEngine {
         } else {
             // Continue exploring - get topology data
             let (_edge_ids, sources, targets, _) = space.snapshot(pool);
-            
+
             // Collect neighbors first to avoid borrowing conflicts
             let mut neighbors = Vec::new();
             for i in 0..sources.len() {
@@ -807,24 +861,26 @@ impl TraversalEngine {
                     neighbors.push(sources[i]);
                 }
             }
-            
+
             for neighbor in neighbors {
                 if !visited.contains(&neighbor) {
-                    self.find_all_paths_recursive(pool, space, neighbor, target, max_length, path, visited, all_paths)?;
+                    self.find_all_paths_recursive(
+                        pool, space, neighbor, target, max_length, path, visited, all_paths,
+                    )?;
                 }
             }
         }
-        
+
         path.pop();
         visited.remove(&current);
         Ok(())
     }
-    
+
     /// Get traversal statistics
     pub fn statistics(&self) -> &TraversalStats {
         &self.stats
     }
-    
+
     /// Clear performance statistics
     pub fn clear_stats(&mut self) {
         self.stats.clear();
@@ -859,7 +915,10 @@ impl PartialOrd for DijkstraNode {
 impl Ord for DijkstraNode {
     fn cmp(&self, other: &Self) -> Ordering {
         // Reverse ordering for min-heap behavior
-        other.distance.partial_cmp(&self.distance).unwrap_or(Ordering::Equal)
+        other
+            .distance
+            .partial_cmp(&self.distance)
+            .unwrap_or(Ordering::Equal)
     }
 }
 
@@ -875,16 +934,18 @@ impl TraversalStatePool {
             available_states: Vec::new(),
         }
     }
-    
+
     fn get_state(&mut self) -> TraversalState {
-        self.available_states.pop().unwrap_or_else(|| TraversalState {
-            visited: HashSet::new(),
-            queue: VecDeque::new(),
-            distances: HashMap::new(),
-            predecessors: HashMap::new(),
-        })
+        self.available_states
+            .pop()
+            .unwrap_or_else(|| TraversalState {
+                visited: HashSet::new(),
+                queue: VecDeque::new(),
+                distances: HashMap::new(),
+                predecessors: HashMap::new(),
+            })
     }
-    
+
     fn return_state(&mut self, state: TraversalState) {
         self.available_states.push(state);
     }
@@ -1056,20 +1117,28 @@ impl TraversalStats {
             algorithm_times: HashMap::new(),
         }
     }
-    
-    fn record_traversal(&mut self, algorithm: String, nodes_visited: usize, duration: std::time::Duration) {
+
+    fn record_traversal(
+        &mut self,
+        algorithm: String,
+        nodes_visited: usize,
+        duration: std::time::Duration,
+    ) {
         self.total_traversals += 1;
         self.total_nodes_visited += nodes_visited;
         self.total_time += duration;
-        
+
         *self.algorithm_counts.entry(algorithm.clone()).or_insert(0) += 1;
-        *self.algorithm_times.entry(algorithm).or_insert(std::time::Duration::new(0, 0)) += duration;
+        *self
+            .algorithm_times
+            .entry(algorithm)
+            .or_insert(std::time::Duration::new(0, 0)) += duration;
     }
-    
+
     fn clear(&mut self) {
         *self = Self::new();
     }
-    
+
     pub fn average_time_per_traversal(&self) -> f64 {
         if self.total_traversals > 0 {
             self.total_time.as_secs_f64() / self.total_traversals as f64
@@ -1077,7 +1146,7 @@ impl TraversalStats {
             0.0
         }
     }
-    
+
     pub fn average_nodes_per_traversal(&self) -> f64 {
         if self.total_traversals > 0 {
             self.total_nodes_visited as f64 / self.total_traversals as f64

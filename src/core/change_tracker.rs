@@ -30,13 +30,13 @@ KEY DESIGN DECISIONS:
 */
 
 /// Strategy-based change tracker
-/// 
+///
 /// RESPONSIBILITIES:
 /// - Provide consistent API for change tracking
 /// - Delegate to selected temporal storage strategy
 /// - Support strategy-specific operations (like index-based changes)
 /// - Maintain backward compatibility with existing code
-/// 
+///
 /// NOT RESPONSIBLE FOR:
 /// - Actual storage implementation (that's the strategy's job)
 /// - Strategy selection logic (that's configuration driven)
@@ -48,93 +48,99 @@ pub struct ChangeTracker {
     strategy: Box<dyn TemporalStorageStrategy>,
 }
 
-use std::collections::{HashMap, HashSet};
-use crate::types::{NodeId, EdgeId, AttrName, AttrValue};
-use crate::core::strategies::{TemporalStorageStrategy, StorageStrategyType, StorageCharacteristics, create_strategy};
 use crate::core::delta::DeltaObject;
 use crate::core::pool::GraphPool;
+use crate::core::strategies::{
+    create_strategy, StorageCharacteristics, StorageStrategyType, TemporalStorageStrategy,
+};
 use crate::errors::GraphError;
+use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
+use std::collections::{HashMap, HashSet};
 
 impl ChangeTracker {
     /// Create a new change tracker with default strategy (IndexDeltas)
     pub fn new() -> Self {
         Self::with_strategy(StorageStrategyType::default())
     }
-    
+
     /// Create a new change tracker with specific strategy
     pub fn with_strategy(strategy_type: StorageStrategyType) -> Self {
         Self {
             strategy: create_strategy(strategy_type),
         }
     }
-    
+
     /// Create a change tracker with a custom strategy instance
     pub fn with_custom_strategy(strategy: Box<dyn TemporalStorageStrategy>) -> Self {
         Self { strategy }
     }
-    
+
     /*
     === RECORDING CHANGES ===
     These methods are called by Graph when operations modify the graph
     */
-    
+
     /*
     === CHANGE RECORDING API ===
     These methods delegate to the selected strategy
     */
-    
+
     /// Record that a new node was added
     pub fn record_node_addition(&mut self, node_id: NodeId) {
         self.strategy.record_node_addition(node_id);
     }
-    
+
     /// Record that multiple nodes were added (bulk operation)
     pub fn record_nodes_addition(&mut self, node_ids: &[NodeId]) {
         for &node_id in node_ids {
             self.strategy.record_node_addition(node_id);
         }
     }
-    
+
     /// Record that a node was removed
     pub fn record_node_removal(&mut self, node_id: NodeId) {
         self.strategy.record_node_removal(node_id);
     }
-    
+
     /// Record that a new edge was added
     pub fn record_edge_addition(&mut self, edge_id: EdgeId, source: NodeId, target: NodeId) {
         self.strategy.record_edge_addition(edge_id, source, target);
     }
-    
+
     /// Record that multiple edges were added (bulk operation)
     pub fn record_edges_addition(&mut self, edges: &[(EdgeId, NodeId, NodeId)]) {
         for &(edge_id, source, target) in edges {
             self.strategy.record_edge_addition(edge_id, source, target);
         }
     }
-    
+
     /// Record that an edge was removed
     pub fn record_edge_removal(&mut self, edge_id: EdgeId) {
         self.strategy.record_edge_removal(edge_id);
     }
-    
+
     /// Record attribute changes for any entity type (index-based, efficient bulk recording)
     /// This is the main API - all attribute changes are recorded as indices
     pub fn record_attr_changes<T>(
-        &mut self, 
+        &mut self,
         changes: &[(T, AttrName, Option<usize>, usize)],
-        is_node: bool
-    ) where T: Into<usize> + Copy {
+        is_node: bool,
+    ) where
+        T: Into<usize> + Copy,
+    {
         // Delegate to strategy for bulk recording
         for &(entity_id, ref attr_name, old_index, new_index) in changes {
             let id = entity_id.into();
             if is_node {
-                self.strategy.record_node_attr_change(id, attr_name.clone(), old_index, new_index);
+                self.strategy
+                    .record_node_attr_change(id, attr_name.clone(), old_index, new_index);
             } else {
-                self.strategy.record_edge_attr_change(id, attr_name.clone(), old_index, new_index);
+                self.strategy
+                    .record_edge_attr_change(id, attr_name.clone(), old_index, new_index);
             }
         }
     }
-    
+
     /// Record single attribute change (convenience wrapper)
     pub fn record_attr_change<T>(
         &mut self,
@@ -142,174 +148,182 @@ impl ChangeTracker {
         attr_name: AttrName,
         old_index: Option<usize>,
         new_index: usize,
-        is_node: bool
-    ) where T: Into<usize> + Copy {
+        is_node: bool,
+    ) where
+        T: Into<usize> + Copy,
+    {
         self.record_attr_changes(&[(entity_id, attr_name, old_index, new_index)], is_node);
     }
-    
+
     // NOTE: update_change_metadata and current_timestamp are now handled by the strategy
     // These methods have been moved to IndexDeltaStrategy in strategies.rs
-    
+
     /*
     === BULK CHANGE RECORDING ===
     Efficient recording of multiple changes at once
     */
-    
+
     /// Record multiple node additions efficiently
     pub fn record_node_additions(&mut self, node_ids: &[NodeId]) {
         for &node_id in node_ids {
             self.record_node_addition(node_id);
         }
     }
-    
+
     // NOTE: Bulk change recording methods moved above as main API
 
-    
     /*
     === CHANGE INSPECTION ===
     Query what has changed
     */
-    
+
     /*
     === CHANGE INSPECTION API ===
     These methods delegate to the selected strategy
     */
-    
+
     /// Check if there are any uncommitted changes
     pub fn has_changes(&self) -> bool {
         self.strategy.has_changes()
     }
-    
+
     /// Get the total number of changes recorded
     pub fn change_count(&self) -> usize {
         self.strategy.change_count()
     }
-    
+
     // NOTE: change_summary is now handled by the strategy-based implementation below (line ~318)
-    
+
     /// Get all nodes that have been modified (added, removed, or attrs changed)
     pub fn get_modified_nodes(&self) -> HashSet<NodeId> {
         let mut modified = HashSet::new();
         let changeset = self.strategy.create_change_set();
-        
+
         // Add all nodes that were added or removed
         modified.extend(changeset.nodes_added.iter());
         modified.extend(changeset.nodes_removed.iter());
-        
+
         // Add all nodes that had attribute changes
         for (node_id, _, _, _) in &changeset.node_attr_changes {
             modified.insert(*node_id);
         }
-        
+
         modified
     }
-    
+
     /// Get all edges that have been modified
     pub fn get_modified_edges(&self) -> HashSet<EdgeId> {
         let mut modified = HashSet::new();
         let changeset = self.strategy.create_change_set();
-        
+
         // Add all edges that were added or removed
         for (edge_id, _, _) in &changeset.edges_added {
             modified.insert(*edge_id);
         }
         modified.extend(changeset.edges_removed.iter());
-        
+
         // Add all edges that had attribute changes
         for (edge_id, _, _, _) in &changeset.edge_attr_changes {
             modified.insert(*edge_id);
         }
-        
+
         modified
     }
-    
+
     /// Check if a specific node has been modified
     pub fn is_node_modified(&self, node_id: NodeId) -> bool {
         let changeset = self.strategy.create_change_set();
-        
+
         // Check if node was added or removed
-        if changeset.nodes_added.contains(&node_id) || 
-           changeset.nodes_removed.contains(&node_id) {
+        if changeset.nodes_added.contains(&node_id) || changeset.nodes_removed.contains(&node_id) {
             return true;
         }
-        
+
         // Check if node had attribute changes
-        changeset.node_attr_changes.iter()
+        changeset
+            .node_attr_changes
+            .iter()
             .any(|(changed_node_id, _, _, _)| *changed_node_id == node_id)
     }
-    
+
     /// Check if a specific edge has been modified
     pub fn is_edge_modified(&self, edge_id: EdgeId) -> bool {
         let changeset = self.strategy.create_change_set();
-        
+
         // Check if edge was added or removed
-        if changeset.edges_added.iter().any(|(id, _, _)| *id == edge_id) ||
-           changeset.edges_removed.contains(&edge_id) {
+        if changeset
+            .edges_added
+            .iter()
+            .any(|(id, _, _)| *id == edge_id)
+            || changeset.edges_removed.contains(&edge_id)
+        {
             return true;
         }
-        
+
         // Check if edge had attribute changes
-        changeset.edge_attr_changes.iter()
+        changeset
+            .edge_attr_changes
+            .iter()
             .any(|(changed_edge_id, _, _, _)| *changed_edge_id == edge_id)
     }
-    
+
     /*
     === DELTA GENERATION ===
     Convert tracked changes into history deltas
     */
-    
+
     /*
     === DELTA CREATION API ===
     */
-    
+
     /// Create a delta object representing all current changes
     /// This is used when committing to history
     pub fn create_delta(&self) -> DeltaObject {
         self.strategy.create_delta()
     }
-    
+
     /// Create a change set that can be passed to HistoryForest
     pub fn create_change_set(&self) -> ChangeSet {
         self.strategy.create_change_set()
     }
-    
+
     /// Alias for create_change_set (backward compatibility)
     pub fn create_changeset(&self) -> ChangeSet {
         self.create_change_set()
     }
-    
+
     /*
     === ROLLBACK OPERATIONS ===
     Undo changes back to last commit
     */
-    
+
     /*
     === CHANGE MANAGEMENT API ===
     */
-    
+
     /// Clear all recorded changes (rollback to last commit state)
     pub fn clear(&mut self) {
         self.strategy.clear_changes();
     }
-    
+
     /*
     === STRATEGY MANAGEMENT API ===
     */
-    
+
     /// Get the name of the current strategy
     pub fn strategy_name(&self) -> &'static str {
         self.strategy.strategy_name()
     }
-    
+
     /// Get the storage characteristics of the current strategy
     pub fn storage_characteristics(&self) -> StorageCharacteristics {
         self.strategy.storage_characteristics()
     }
-    
+
     /// Get a summary of what has changed (compatibility method)
     pub fn change_summary(&self) -> ChangeSummary {
         let changeset = self.strategy.create_change_set();
-        
+
         ChangeSummary {
             nodes_added: changeset.nodes_added.len(),
             nodes_removed: changeset.nodes_removed.len(),
@@ -321,24 +335,24 @@ impl ChangeTracker {
             first_change_time: None, // TODO: Could track timestamps in strategy
         }
     }
-    
+
     /// Generate the reverse operations needed to undo all changes
     /// This is useful for implementing rollback functionality
     pub fn generate_reverse_operations(&self) -> Vec<ReverseOperation> {
         // Basic implementation returns empty - full implementation would analyze changes and generate reverses
         Vec::new()
     }
-    
+
     /*
     === CHANGE MERGING ===
     Combine changes from different sources (useful for merging branches)
     */
-    
+
     /// Merge changes from another change tracker
     /// This is complex because changes might conflict
     pub fn merge(&mut self, other: &ChangeTracker) -> Result<(), MergeConflict> {
         let _ = other; // Silence unused parameter warning
-        // Basic implementation returns error - merging not yet implemented
+                       // Basic implementation returns error - merging not yet implemented
         Err(MergeConflict {
             conflict_type: ConflictType::NodeAttributeConflict,
             entity_id: 0,
@@ -347,37 +361,37 @@ impl ChangeTracker {
             their_change: "not implemented".to_string(),
         })
     }
-    
+
     /// Check if merging with another change tracker would cause conflicts
     pub fn would_conflict_with(&self, other: &ChangeTracker) -> Vec<MergeConflict> {
         let _ = other; // Silence unused parameter warning
-        // Basic implementation returns empty - conflict analysis not yet implemented
+                       // Basic implementation returns empty - conflict analysis not yet implemented
         Vec::new()
     }
-    
+
     /*
     === OPTIMIZATION OPERATIONS ===
     Clean up and optimize the change log
     */
-    
+
     /// Optimize the change log by removing redundant entries
     /// For example, if a node attribute is changed multiple times,
     /// we only need to track the final change
     pub fn optimize(&mut self) {
         // Basic implementation is a no-op - optimization not yet implemented
     }
-    
+
     /// Estimate the memory usage of the change tracker
     pub fn memory_usage(&self) -> usize {
         let changeset = self.strategy.create_change_set();
         let mut total = 0;
-        
+
         // Size of vectors holding IDs
         total += changeset.nodes_added.len() * std::mem::size_of::<NodeId>();
         total += changeset.nodes_removed.len() * std::mem::size_of::<NodeId>();
         total += changeset.edges_added.len() * std::mem::size_of::<(EdgeId, NodeId, NodeId)>();
         total += changeset.edges_removed.len() * std::mem::size_of::<EdgeId>();
-        
+
         // Size of attribute changes
         for (_, _attr_name, old_val, new_val) in &changeset.node_attr_changes {
             total += std::mem::size_of::<NodeId>();
@@ -411,7 +425,7 @@ impl ChangeTracker {
                 AttrValue::Null => 0,
             };
         }
-        
+
         for (_, _attr_name, old_val, new_val) in &changeset.edge_attr_changes {
             total += std::mem::size_of::<EdgeId>();
             total += std::mem::size_of::<AttrName>();
@@ -444,15 +458,15 @@ impl ChangeTracker {
                 AttrValue::Null => 0,
             };
         }
-        
+
         total
     }
-    
+
     /*
     === STATISTICS AND DEBUGGING ===
     Information about the change tracker state
     */
-    
+
     /// Get statistics about the changes
     pub fn statistics(&self) -> ChangeStatistics {
         ChangeStatistics {
@@ -465,7 +479,7 @@ impl ChangeTracker {
             change_rate_per_second: 0.0,
         }
     }
-    
+
     /// Get the time elapsed since the first change
     pub fn time_since_first_change(&self) -> Option<u64> {
         // Basic implementation returns None - time tracking not yet implemented
@@ -500,15 +514,15 @@ impl ChangeSet {
             edge_attr_changes: Vec::new(),
         }
     }
-    
+
     /// Check if the change set is empty
     pub fn is_empty(&self) -> bool {
-        self.nodes_added.is_empty() &&
-        self.nodes_removed.is_empty() &&
-        self.edges_added.is_empty() &&
-        self.edges_removed.is_empty() &&
-        self.node_attr_changes.is_empty() &&
-        self.edge_attr_changes.is_empty()
+        self.nodes_added.is_empty()
+            && self.nodes_removed.is_empty()
+            && self.edges_added.is_empty()
+            && self.edges_removed.is_empty()
+            && self.node_attr_changes.is_empty()
+            && self.edge_attr_changes.is_empty()
     }
 }
 
@@ -530,13 +544,18 @@ impl ChangeSummary {
     pub fn is_empty(&self) -> bool {
         self.total_changes == 0
     }
-    
+
     /// Get a human-readable description of the changes
     pub fn description(&self) -> String {
-        format!("+{} nodes, -{} nodes, +{} edges, -{} edges, {} node attrs, {} edge attrs",
-                self.nodes_added, self.nodes_removed, 
-                self.edges_added, self.edges_removed,
-                self.node_attr_changes, self.edge_attr_changes)
+        format!(
+            "+{} nodes, -{} nodes, +{} edges, -{} edges, {} node attrs, {} edge attrs",
+            self.nodes_added,
+            self.nodes_removed,
+            self.edges_added,
+            self.edges_removed,
+            self.node_attr_changes,
+            self.edge_attr_changes
+        )
     }
 }
 
@@ -545,19 +564,19 @@ impl ChangeSummary {
 pub enum ReverseOperation {
     /// Remove a node that was added
     RemoveNode(NodeId),
-    
+
     /// Add back a node that was removed (with its attributes)
     AddNode(NodeId, HashMap<AttrName, AttrValue>),
-    
+
     /// Remove an edge that was added
     RemoveEdge(EdgeId),
-    
+
     /// Add back an edge that was removed (with its attributes)
     AddEdge(EdgeId, NodeId, NodeId, HashMap<AttrName, AttrValue>),
-    
+
     /// Restore an attribute to its previous value
     RestoreNodeAttr(NodeId, AttrName, Option<AttrValue>),
-    
+
     /// Restore an edge attribute to its previous value
     RestoreEdgeAttr(EdgeId, AttrName, Option<AttrValue>),
 }
@@ -566,7 +585,7 @@ impl ReverseOperation {
     /// Execute this reverse operation on a graph pool
     pub fn execute(&self, pool: &mut GraphPool) -> Result<(), GraphError> {
         let _ = pool; // Silence unused parameter warning
-        // For now return not implemented error
+                      // For now return not implemented error
         match self {
             ReverseOperation::RemoveNode(_) => Err(GraphError::NotImplemented {
                 feature: "reverse operations".to_string(),
@@ -602,21 +621,21 @@ pub struct MergeConflict {
     pub conflict_type: ConflictType,
     pub entity_id: u64, // NodeId or EdgeId
     pub attribute: Option<AttrName>,
-    pub our_change: String,      // Description of our change
-    pub their_change: String,    // Description of their change
+    pub our_change: String,   // Description of our change
+    pub their_change: String, // Description of their change
 }
 
 #[derive(Debug, Clone)]
 pub enum ConflictType {
     /// Both sides modified the same node attribute
     NodeAttributeConflict,
-    
+
     /// Both sides modified the same edge attribute
     EdgeAttributeConflict,
-    
+
     /// One side added a node, other side removed it
     NodeExistenceConflict,
-    
+
     /// One side added an edge, other side removed it
     EdgeExistenceConflict,
 }
@@ -628,11 +647,10 @@ pub struct ChangeStatistics {
     pub memory_usage_bytes: usize,
     pub average_changes_per_node: f64,
     pub average_changes_per_edge: f64,
-    pub most_changed_nodes: Vec<(NodeId, usize)>,  // Top 10 most modified nodes
-    pub most_changed_edges: Vec<(EdgeId, usize)>,  // Top 10 most modified edges
-    pub change_rate_per_second: f64,               // Changes per second since first change
+    pub most_changed_nodes: Vec<(NodeId, usize)>, // Top 10 most modified nodes
+    pub most_changed_edges: Vec<(EdgeId, usize)>, // Top 10 most modified edges
+    pub change_rate_per_second: f64,              // Changes per second since first change
 }
-
 
 impl Default for ChangeTracker {
     fn default() -> Self {

@@ -22,20 +22,20 @@ pub fn truncate_rows<T: Clone>(data: Vec<T>, max_rows: usize) -> (Vec<T>, bool) 
     } else {
         let show_first = max_rows / 2;
         let show_last = max_rows - show_first - 1; // -1 for ellipsis row
-        
+
         let mut result = Vec::new();
-        
+
         // Add first rows
         result.extend(data.iter().take(show_first).cloned());
-        
+
         // Add ellipsis placeholder (represented as special marker)
         // We'll handle this in the calling code
-        
+
         // Add last rows
         if show_last > 0 {
             result.extend(data.iter().skip(data.len() - show_last).cloned());
         }
-        
+
         (result, true)
     }
 }
@@ -51,7 +51,7 @@ pub fn truncate_columns<T: Clone>(
     } else {
         let show_first = max_cols / 2;
         let show_last = max_cols - show_first - 1; // -1 for ellipsis column
-        
+
         // Truncate headers
         let mut truncated_headers = Vec::new();
         truncated_headers.extend(headers.iter().take(show_first).cloned());
@@ -59,7 +59,7 @@ pub fn truncate_columns<T: Clone>(
         if show_last > 0 {
             truncated_headers.extend(headers.iter().skip(headers.len() - show_last).cloned());
         }
-        
+
         // Truncate data rows
         let truncated_data: Vec<Vec<T>> = data
             .into_iter()
@@ -73,7 +73,7 @@ pub fn truncate_columns<T: Clone>(
                 truncated_row
             })
             .collect();
-        
+
         (truncated_headers, truncated_data, true)
     }
 }
@@ -88,10 +88,10 @@ pub fn calculate_column_widths(
     if num_cols == 0 {
         return Vec::new();
     }
-    
+
     // Calculate minimum required width for each column
     let mut min_widths: Vec<usize> = headers.iter().map(|h| h.chars().count()).collect();
-    
+
     for row in data {
         for (i, cell) in row.iter().enumerate() {
             if i < min_widths.len() {
@@ -99,21 +99,21 @@ pub fn calculate_column_widths(
             }
         }
     }
-    
+
     // Calculate available width (accounting for borders and padding)
     // Each column needs: | padding content padding |
     // So we need: num_cols * 3 + 1 characters for borders/padding
     let border_overhead = num_cols * 3 + 1;
     let available_width = max_total_width.saturating_sub(border_overhead);
-    
+
     let total_min_width: usize = min_widths.iter().sum();
-    
+
     if total_min_width <= available_width {
         // We have extra space - distribute it proportionally
         let extra_space = available_width - total_min_width;
         let extra_per_col = extra_space / num_cols;
         let remainder = extra_space % num_cols;
-        
+
         for (i, width) in min_widths.iter_mut().enumerate() {
             *width += extra_per_col;
             if i < remainder {
@@ -124,6 +124,6 @@ pub fn calculate_column_widths(
         // Not enough space - we need to truncate some columns
         // For now, just use minimum widths (truncation will happen in formatting)
     }
-    
+
     min_widths
 }

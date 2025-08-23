@@ -12,18 +12,18 @@ impl BoxChars {
     pub const TOP_RIGHT: &'static str = "╮";
     pub const BOTTOM_LEFT: &'static str = "╰";
     pub const BOTTOM_RIGHT: &'static str = "╯";
-    
+
     // Lines
     pub const HORIZONTAL: &'static str = "─";
     pub const VERTICAL: &'static str = "│";
-    
+
     // Intersections
     pub const CROSS: &'static str = "┼";
     pub const T_TOP: &'static str = "┬";
     pub const T_BOTTOM: &'static str = "┴";
     pub const T_LEFT: &'static str = "├";
     pub const T_RIGHT: &'static str = "┤";
-    
+
     // Double lines for emphasis
     pub const HORIZONTAL_DOUBLE: &'static str = "═";
     pub const VERTICAL_DOUBLE: &'static str = "║";
@@ -33,11 +33,11 @@ impl BoxChars {
 pub struct Symbols;
 
 impl Symbols {
-    pub const ELLIPSIS: &'static str = "…";           // For truncated content
-    pub const DOT_SEPARATOR: &'static str = "•";      // For summary statistics  
-    pub const NULL_DISPLAY: &'static str = "NaN";     // For null/missing values
+    pub const ELLIPSIS: &'static str = "…"; // For truncated content
+    pub const DOT_SEPARATOR: &'static str = "•"; // For summary statistics
+    pub const NULL_DISPLAY: &'static str = "NaN"; // For null/missing values
     pub const TRUNCATION_INDICATOR: &'static str = "⋯"; // For matrix truncation
-    pub const HEADER_PREFIX: &'static str = "⊖⊖";     // For section headers
+    pub const HEADER_PREFIX: &'static str = "⊖⊖"; // For section headers
 }
 
 /// ANSI color codes for enhanced display
@@ -47,7 +47,7 @@ impl Colors {
     pub const RESET: &'static str = "\x1b[0m";
     pub const BOLD: &'static str = "\x1b[1m";
     pub const DIM: &'static str = "\x1b[2m";
-    
+
     // Text colors
     pub const RED: &'static str = "\x1b[31m";
     pub const GREEN: &'static str = "\x1b[32m";
@@ -64,9 +64,9 @@ pub fn colorize(text: &str, color: Option<&str>, bold: bool, dim: bool, use_colo
     if !use_color {
         return text.to_string();
     }
-    
+
     let mut result = String::new();
-    
+
     if bold {
         result.push_str(Colors::BOLD);
     }
@@ -76,13 +76,13 @@ pub fn colorize(text: &str, color: Option<&str>, bold: bool, dim: bool, use_colo
     if let Some(color_code) = color {
         result.push_str(color_code);
     }
-    
+
     result.push_str(text);
-    
+
     if bold || dim || color.is_some() {
         result.push_str(Colors::RESET);
     }
-    
+
     result
 }
 

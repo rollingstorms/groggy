@@ -35,12 +35,12 @@ WHAT DOESN'T BELONG HERE:
 - Analytics (that's QueryEngine's job)
 */
 
-use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, RwLock};
-use std::rc::Rc;
-use crate::types::{NodeId, EdgeId, AttrName, StateId};
-use crate::core::pool::GraphPool;
 use crate::core::delta::DeltaObject;
+use crate::core::pool::GraphPool;
+use crate::types::{AttrName, EdgeId, NodeId, StateId};
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 /// Snapshot of topology data that can be used without holding locks
 #[derive(Debug, Clone)]
@@ -68,7 +68,7 @@ impl CacheState {
             snapshot: None,
         }
     }
-    
+
     fn try_get_snapshot(&self, current_version: u64) -> Option<TopologySnapshot> {
         if self.built_version == current_version {
             self.snapshot.clone()
@@ -76,7 +76,7 @@ impl CacheState {
             None
         }
     }
-    
+
     fn set_snapshot(&mut self, snapshot: TopologySnapshot) {
         self.built_version = snapshot.version;
         self.snapshot = Some(snapshot);
@@ -84,16 +84,16 @@ impl CacheState {
 }
 
 /// Minimal active state tracker for the current graph
-/// 
+///
 /// DESIGN: GraphSpace is just the "active set" tracker. It knows which
 /// nodes and edges are currently active, and tracks changes for commits.
 /// The Graph coordinator handles actual operations.
-/// 
-/// KEY INSIGHT: 
+///
+/// KEY INSIGHT:
 /// - GraphSpace = Active Sets + Change Tracking (minimal)
 /// - Graph = Operations & Coordination
 /// - GraphPool = Pure Data Storage
-/// 
+///
 /// LIFECYCLE:
 /// 1. Created from a historical state (or empty)  
 /// 2. Graph calls methods to update active sets
@@ -104,55 +104,49 @@ pub struct GraphSpace {
     /*
     === ACTIVE SETS - Plain containers (no RefCell) ===
     */
-    
     /// All currently active (not deleted) nodes
     active_nodes: HashSet<NodeId>,
-    
+
     /// All currently active (not deleted) edges  
     active_edges: HashSet<EdgeId>,
-    
+
     /*
     === POOL REFERENCE ===
     */
-    
     /// Shared reference to the graph pool for topology rebuilding
     #[allow(dead_code)]
     pool: Rc<std::cell::RefCell<GraphPool>>,
-    
+
     /*
     === VERSION COUNTER - Plain u64 ===
     */
-    
     /// Version counter - increments on structural changes
     version: u64,
-    
+
     /*
     === CACHE - RwLock for read-heavy, occasional write ===
     */
-    
     /// Cache state with RwLock for lock-free reads
     cache: RwLock<CacheState>,
-    
+
     /*
     === ATTRIBUTE INDEX MAPPINGS - Plain HashMaps ===
     */
-    
     /// Maps attribute_name -> node -> column_index (OPTIMIZED: attribute-first for bulk filtering)
     node_attribute_indices: HashMap<AttrName, HashMap<NodeId, usize>>,
-    
+
     /// Maps attribute_name -> edge -> column_index (OPTIMIZED: attribute-first for bulk filtering)
     edge_attribute_indices: HashMap<AttrName, HashMap<EdgeId, usize>>,
-    
+
     /*
     === WORKSPACE METADATA ===
     */
-    
     /// Which historical state this workspace is based on
     base_state: StateId,
 }
 
 impl GraphSpace {
-    /// Create a new empty graph space 
+    /// Create a new empty graph space
     pub fn new(pool: Rc<std::cell::RefCell<GraphPool>>, base_state: StateId) -> Self {
         Self {
             active_nodes: HashSet::new(),
@@ -166,7 +160,6 @@ impl GraphSpace {
         }
     }
 
-
     /*
     === ACTIVE SET MANAGEMENT ===
     Legacy methods for external activation/deactivation
@@ -177,7 +170,6 @@ impl GraphSpace {
         self.active_nodes.insert(node_id);
     }
 
-    
     /// Bulk activate nodes (&mut self - PERFORMANCE: single extend call)
     pub fn activate_nodes<I: IntoIterator<Item = NodeId>>(&mut self, nodes: I) {
         self.active_nodes.extend(nodes);
@@ -219,13 +211,12 @@ impl GraphSpace {
         }
         self.version += 1;
     }
-    
+
     /// Bulk activate edges (&mut self)
     pub fn activate_edges<I: IntoIterator<Item = EdgeId>>(&mut self, edges: I) {
         self.active_edges.extend(edges);
         self.version += 1;
     }
-    
 
     /// Remove multiple edges from the active set (&mut self)
     pub fn deactivate_edges(&mut self, edges: &[EdgeId]) {
@@ -245,10 +236,17 @@ impl GraphSpace {
     Space ONLY manages which entities have which current attribute indices
     Graph coordinates between Space (current state) and ChangeTracker (deltas)
     */
-    
+
     /// Update the current attribute index for any entity (&mut self)
-    pub fn set_attr_index<T>(&mut self, entity_id: T, attr_name: AttrName, new_index: usize, is_node: bool) 
-    where T: Into<usize> + Copy {
+    pub fn set_attr_index<T>(
+        &mut self,
+        entity_id: T,
+        attr_name: AttrName,
+        new_index: usize,
+        is_node: bool,
+    ) where
+        T: Into<usize> + Copy,
+    {
         let id = entity_id.into();
         if is_node {
             self.node_attribute_indices
@@ -262,10 +260,17 @@ impl GraphSpace {
                 .insert(id as EdgeId, new_index);
         }
     }
-    
+
     /// Get current attribute index for any entity (&self - read-only)
-    pub fn get_attr_index<T>(&self, entity_id: T, attr_name: &AttrName, is_node: bool) -> Option<usize> 
-    where T: Into<usize> + Copy {
+    pub fn get_attr_index<T>(
+        &self,
+        entity_id: T,
+        attr_name: &AttrName,
+        is_node: bool,
+    ) -> Option<usize>
+    where
+        T: Into<usize> + Copy,
+    {
         let id = entity_id.into();
         if is_node {
             self.node_attribute_indices
@@ -279,7 +284,7 @@ impl GraphSpace {
                 .copied()
         }
     }
-    
+
     /// Get current attribute index for a node (&self - read-only)
     pub fn get_node_attr_index(&self, node_id: NodeId, attr_name: &AttrName) -> Option<usize> {
         self.node_attribute_indices
@@ -287,13 +292,17 @@ impl GraphSpace {
             .and_then(|nodes| nodes.get(&node_id))
             .copied()
     }
-    
+
     /// Get specific attribute indices for multiple nodes in one call (ULTRA-OPTIMIZED: attribute-first)
-    /// 
+    ///
     /// PERFORMANCE: Single attribute lookup + fast node iteration instead of N*2 HashMap lookups
     /// OLD: 50k * (node_lookup + attr_lookup) = 100k HashMap operations
     /// NEW: 1 * attr_lookup + 50k * (direct HashMap get) = 1 + 50k operations
-    pub fn get_node_attr_indices_for_attr(&self, node_ids: &[NodeId], attr_name: &AttrName) -> Vec<(NodeId, Option<usize>)> {
+    pub fn get_node_attr_indices_for_attr(
+        &self,
+        node_ids: &[NodeId],
+        attr_name: &AttrName,
+    ) -> Vec<(NodeId, Option<usize>)> {
         // Single attribute lookup to get all nodes with this attribute
         if let Some(attr_nodes) = self.node_attribute_indices.get(attr_name) {
             // Fast iteration through requested nodes with direct HashMap access
@@ -306,7 +315,7 @@ impl GraphSpace {
             node_ids.iter().map(|&node_id| (node_id, None)).collect()
         }
     }
-    
+
     /// Set current attribute index for a node (&mut self)
     pub fn set_node_attr_index(&mut self, node_id: NodeId, attr_name: AttrName, new_index: usize) {
         self.node_attribute_indices
@@ -314,7 +323,7 @@ impl GraphSpace {
             .or_default()
             .insert(node_id, new_index);
     }
-    
+
     /// Get current attribute index for an edge (&self - read-only)
     pub fn get_edge_attr_index(&self, edge_id: EdgeId, attr_name: &AttrName) -> Option<usize> {
         self.edge_attribute_indices
@@ -322,7 +331,7 @@ impl GraphSpace {
             .and_then(|edges| edges.get(&edge_id))
             .copied()
     }
-    
+
     /// Set current attribute index for an edge (&mut self)
     pub fn set_edge_attr_index(&mut self, edge_id: EdgeId, attr_name: AttrName, new_index: usize) {
         self.edge_attribute_indices
@@ -330,9 +339,13 @@ impl GraphSpace {
             .or_default()
             .insert(edge_id, new_index);
     }
-    
+
     /// Get specific attribute indices for multiple edges in one call (ULTRA-OPTIMIZED: attribute-first)
-    pub fn get_edge_attr_indices_for_attr(&self, edge_ids: &[EdgeId], attr_name: &AttrName) -> Vec<(EdgeId, Option<usize>)> {
+    pub fn get_edge_attr_indices_for_attr(
+        &self,
+        edge_ids: &[EdgeId],
+        attr_name: &AttrName,
+    ) -> Vec<(EdgeId, Option<usize>)> {
         // Single attribute lookup to get all edges with this attribute
         if let Some(attr_edges) = self.edge_attribute_indices.get(attr_name) {
             // Fast iteration through requested edges with direct HashMap access
@@ -345,7 +358,7 @@ impl GraphSpace {
             edge_ids.iter().map(|&edge_id| (edge_id, None)).collect()
         }
     }
-    
+
     /// Get all attribute names and indices for a node (&self - read-only)
     pub fn get_node_attr_indices(&self, node_id: NodeId) -> HashMap<AttrName, usize> {
         let mut result = HashMap::new();
@@ -356,7 +369,7 @@ impl GraphSpace {
         }
         result
     }
-    
+
     /// Get all attribute names and indices for an edge (&self - read-only)
     pub fn get_edge_attr_indices(&self, edge_id: EdgeId) -> HashMap<AttrName, usize> {
         let mut result = HashMap::new();
@@ -372,9 +385,12 @@ impl GraphSpace {
     === COLUMNAR FILTERING OPTIMIZATION ===
     Bulk attribute operations for vectorized filtering
     */
-    
+
     /// Get attribute indices for all active nodes (&self - ULTRA-OPTIMIZED: attribute-first)
-    pub fn get_attribute_indices_nodes(&self, attr_name: &AttrName) -> Vec<(NodeId, Option<usize>)> {
+    pub fn get_attribute_indices_nodes(
+        &self,
+        attr_name: &AttrName,
+    ) -> Vec<(NodeId, Option<usize>)> {
         if let Some(attr_nodes) = self.node_attribute_indices.get(attr_name) {
             self.active_nodes
                 .iter()
@@ -387,9 +403,12 @@ impl GraphSpace {
                 .collect()
         }
     }
-    
+
     /// Get attribute indices for all active edges (&self - ULTRA-OPTIMIZED: attribute-first)
-    pub fn get_attribute_indices_edges(&self, attr_name: &AttrName) -> Vec<(EdgeId, Option<usize>)> {
+    pub fn get_attribute_indices_edges(
+        &self,
+        attr_name: &AttrName,
+    ) -> Vec<(EdgeId, Option<usize>)> {
         if let Some(attr_edges) = self.edge_attribute_indices.get(attr_name) {
             self.active_edges
                 .iter()
@@ -402,27 +421,29 @@ impl GraphSpace {
                 .collect()
         }
     }
-    
+
     /// Get attribute values for all active nodes in columnar format (&self - OPTIMIZED)
-    pub fn get_attributes_nodes<'a>(&self, 
-        pool: &'a GraphPool, 
-        attr_name: &AttrName
+    pub fn get_attributes_nodes<'a>(
+        &self,
+        pool: &'a GraphPool,
+        attr_name: &AttrName,
     ) -> Vec<(NodeId, Option<&'a crate::types::AttrValue>)> {
         let entity_indices = self.get_attribute_indices_nodes(attr_name);
         pool.get_attribute_values(attr_name, &entity_indices, true)
     }
-    
+
     /// Get attribute values for all active edges in columnar format (&self - OPTIMIZED)
-    pub fn get_attributes_edges<'a>(&self, 
-        pool: &'a GraphPool, 
-        attr_name: &AttrName
+    pub fn get_attributes_edges<'a>(
+        &self,
+        pool: &'a GraphPool,
+        attr_name: &AttrName,
     ) -> Vec<(EdgeId, Option<&'a crate::types::AttrValue>)> {
         let entity_indices = self.get_attribute_indices_edges(attr_name);
         pool.get_attribute_values(attr_name, &entity_indices, false)
     }
 
     /// Get nodes that have a specific attribute (ULTRA-OPTIMIZED: direct attribute lookup)
-    /// 
+    ///
     /// PERFORMANCE: Direct O(1) lookup + iteration instead of checking N nodes
     /// OLD: Iterate all nodes, check if each has attribute
     /// NEW: Direct lookup of attribute -> get all nodes with it
@@ -435,7 +456,7 @@ impl GraphSpace {
     }
 
     /// Get attribute values for a specific subset of nodes in bulk (ULTRA-OPTIMIZED)
-    /// 
+    ///
     /// PERFORMANCE: Eliminates all HashMap lookups for large sparse attribute queries
     /// This is what the query system should actually use
     /// Get attribute values for specific nodes (ULTRA-OPTIMIZED: no RefCell churn)
@@ -443,22 +464,21 @@ impl GraphSpace {
         &self,
         pool: &'a GraphPool,
         attr_name: &AttrName,
-        node_ids: &[NodeId]
+        node_ids: &[NodeId],
     ) -> Vec<(NodeId, Option<&'a crate::types::AttrValue>)> {
-        
         let start_time = std::time::Instant::now();
-        
+
         // PERFORMANCE: Bulk index lookup in single call
         let entity_indices = self.get_node_attr_indices_for_attr(node_ids, attr_name);
-        
+
         let _index_time = start_time.elapsed();
         let start_time = std::time::Instant::now();
-        
+
         // Single pool call for bulk attribute retrieval
         let values = pool.get_attribute_values(attr_name, &entity_indices, true);
-        
+
         let _pool_time = start_time.elapsed();
-        
+
         values
     }
 
@@ -467,9 +487,8 @@ impl GraphSpace {
         &self,
         pool: &'a GraphPool,
         attr_name: &AttrName,
-        edge_ids: &[EdgeId]
+        edge_ids: &[EdgeId],
     ) -> Vec<(EdgeId, Option<&'a crate::types::AttrValue>)> {
-        
         // PERFORMANCE: Bulk index lookup in single call
         let entity_indices = self.get_edge_attr_indices_for_attr(edge_ids, attr_name);
 
@@ -506,7 +525,7 @@ impl GraphSpace {
     pub fn get_active_nodes(&self) -> HashSet<NodeId> {
         self.active_nodes.clone()
     }
-    
+
     /// Get all active edge IDs (compatibility with old RefCell API)
     pub fn get_active_edges(&self) -> HashSet<EdgeId> {
         self.active_edges.clone()
@@ -526,49 +545,67 @@ impl GraphSpace {
     pub fn edge_ids(&self) -> Vec<EdgeId> {
         self.active_edges.iter().copied().collect()
     }
-    
+
     /*
     === UNIFIED CACHE ACCESS ===
     Single method to get consistent topology and adjacency data with interior mutability
     */
-    
+
     /// Get consistent snapshot of topology and adjacency data (RwLock for read-heavy access)
-    pub fn snapshot(&self, pool: &GraphPool) -> (Arc<Vec<EdgeId>>, Arc<Vec<NodeId>>, Arc<Vec<NodeId>>, Arc<HashMap<NodeId, Vec<(NodeId, EdgeId)>>>) {
+    pub fn snapshot(
+        &self,
+        pool: &GraphPool,
+    ) -> (
+        Arc<Vec<EdgeId>>,
+        Arc<Vec<NodeId>>,
+        Arc<Vec<NodeId>>,
+        Arc<HashMap<NodeId, Vec<(NodeId, EdgeId)>>>,
+    ) {
         let current_version = self.version;
 
         // Fast path: read-lock and try to get cached snapshot
         {
             let cache = self.cache.read().unwrap();
             if let Some(snapshot) = cache.try_get_snapshot(current_version) {
-                return (snapshot.edge_ids, snapshot.sources, snapshot.targets, snapshot.neighbors);
+                return (
+                    snapshot.edge_ids,
+                    snapshot.sources,
+                    snapshot.targets,
+                    snapshot.neighbors,
+                );
             }
         }
 
         // Slow path: write-lock and rebuild if still stale
         let mut cache = self.cache.write().unwrap();
-        
+
         // Double-check after acquiring write lock (another thread might have rebuilt)
         if let Some(snapshot) = cache.try_get_snapshot(current_version) {
-            return (snapshot.edge_ids, snapshot.sources, snapshot.targets, snapshot.neighbors);
+            return (
+                snapshot.edge_ids,
+                snapshot.sources,
+                snapshot.targets,
+                snapshot.neighbors,
+            );
         }
 
         // Rebuild topology cache
         let (edge_ids, sources, targets) = self.rebuild_topology(pool);
-        
+
         // Build adjacency map from columnar topology (O(E))
         // DIRECTED: Only add source → target edges
         // UNDIRECTED: Add both source ↔ target edges for traversal
         let mut neighbors = HashMap::<NodeId, Vec<(NodeId, EdgeId)>>::new();
         let graph_type = pool.graph_type();
-        
+
         for (i, &edge_id) in edge_ids.iter().enumerate() {
             let u = sources[i];
             let v = targets[i];
-            
+
             // Always add the primary direction (source → target)
             neighbors.entry(u).or_default().push((v, edge_id));
-            
-            // For undirected graphs, also add the reverse direction (target → source)  
+
+            // For undirected graphs, also add the reverse direction (target → source)
             if graph_type == crate::types::GraphType::Undirected {
                 neighbors.entry(v).or_default().push((u, edge_id));
             }
@@ -585,14 +622,14 @@ impl GraphSpace {
             sources: sources_arc.clone(),
             targets: targets_arc.clone(),
             neighbors: neighbors_arc.clone(),
-            adjacency_matrix: None,  // Will be computed on-demand later
+            adjacency_matrix: None, // Will be computed on-demand later
             version: current_version,
         };
 
         cache.set_snapshot(snapshot);
         (edge_ids_arc, sources_arc, targets_arc, neighbors_arc)
     }
-    
+
     /// Rebuild columnar topology from active edges (PERFORMANCE: O(E))
     fn rebuild_topology(&self, pool: &GraphPool) -> (Vec<EdgeId>, Vec<NodeId>, Vec<NodeId>) {
         let edge_count = self.active_edges.len();
@@ -610,12 +647,12 @@ impl GraphSpace {
 
         (edge_ids, sources, targets)
     }
-    
+
     /// Get current version (for debugging/monitoring)
     pub fn get_version(&self) -> u64 {
         self.version
     }
-    
+
     /// NOTE: Topology queries (neighbors, degree, connectivity) now handled by
     /// Graph coordinator which queries Pool for topology and filters by Space's active sets
 
@@ -651,13 +688,17 @@ impl GraphSpace {
     pub fn create_change_delta(&self, _pool: &GraphPool) -> DeltaObject {
         DeltaObject::empty()
     }
-    
+
     /*
     === COMPATIBILITY METHODS FOR OLD REFCELL API ===
     */
-    
+
     /// Generic attribute index getter (compatibility with old API)
-    pub fn get_attribute_indices(&self, attr_name: &AttrName, is_node: bool) -> Vec<(NodeId, Option<usize>)> {
+    pub fn get_attribute_indices(
+        &self,
+        attr_name: &AttrName,
+        is_node: bool,
+    ) -> Vec<(NodeId, Option<usize>)> {
         if is_node {
             self.get_attribute_indices_nodes(attr_name)
         } else {
@@ -668,9 +709,14 @@ impl GraphSpace {
                 .collect()
         }
     }
-    
+
     /// Generic attribute values getter (compatibility with old API)
-    pub fn get_attributes<'a>(&self, pool: &'a GraphPool, attr_name: &AttrName, is_node: bool) -> Vec<(NodeId, Option<&'a crate::types::AttrValue>)> {
+    pub fn get_attributes<'a>(
+        &self,
+        pool: &'a GraphPool,
+        attr_name: &AttrName,
+        is_node: bool,
+    ) -> Vec<(NodeId, Option<&'a crate::types::AttrValue>)> {
         if is_node {
             self.get_attributes_nodes(pool, attr_name)
         } else {
@@ -681,7 +727,6 @@ impl GraphSpace {
                 .collect()
         }
     }
-
 }
 
 /*
@@ -700,7 +745,7 @@ GraphSpace is now properly minimal - it just manages:
 
 All actual graph operations happen in Graph, which coordinates between:
 - GraphSpace (active state)
-- GraphPool (data storage) 
+- GraphPool (data storage)
 - HistoryForest (version control)
 - QueryEngine (analytics)
 

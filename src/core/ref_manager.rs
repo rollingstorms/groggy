@@ -11,9 +11,9 @@
 //! - Metadata-rich references (creation time, author, description)
 //! - Concurrent-safe operations
 
-use std::collections::{HashMap, HashSet};
-use crate::types::{StateId, BranchName};
 use crate::errors::{GraphError, GraphResult};
+use crate::types::{BranchName, StateId};
+use std::collections::{HashMap, HashSet};
 
 /*
 === REFERENCE SYSTEM OVERVIEW ===
@@ -34,11 +34,11 @@ KEY DESIGN DECISIONS:
 */
 
 /// A branch pointer to a specific state in the graph history
-/// 
+///
 /// DESIGN: Branches are mutable references that can be updated to point
 /// to new states as development progresses. They carry metadata about
 /// their creation and purpose.
-/// 
+///
 /// LIFECYCLE:
 /// 1. Created pointing to an initial state
 /// 2. Updated as new commits are made on the branch
@@ -49,19 +49,19 @@ pub struct Branch {
     /// Human-readable branch name (must be unique)
     /// EXAMPLES: "main", "feature/user-auth", "hotfix/security-patch"
     pub name: BranchName,
-    
+
     /// Current head state (most recent commit on this branch)
     /// This is the state that new commits will build upon
     pub head: StateId,
-    
+
     /// Optional human-readable description
     /// USAGE: Explain the purpose of this branch
     pub description: Option<String>,
-    
+
     /// When this branch was created (Unix timestamp)
     /// USAGE: For sorting, cleanup, and auditing
     pub created_at: u64,
-    
+
     /// Who created this branch
     /// USAGE: For auditing and contact information
     pub created_by: String,
@@ -84,10 +84,10 @@ impl Branch {
 
     /// Create a branch with a description
     pub fn with_description(
-        name: BranchName, 
-        head: StateId, 
-        created_by: String, 
-        description: String
+        name: BranchName,
+        head: StateId,
+        created_by: String,
+        description: String,
     ) -> Self {
         Self {
             name,
@@ -102,7 +102,7 @@ impl Branch {
     }
 
     /// Update the head of this branch to a new state
-    /// 
+    ///
     /// USAGE: Called when new commits are made on this branch
     pub fn update_head(&mut self, new_head: StateId) {
         self.head = new_head;
@@ -125,14 +125,14 @@ impl Branch {
 }
 
 /// Manages all branches and tags in the graph system
-/// 
+///
 /// RESPONSIBILITIES:
 /// - Maintain the collection of all branches and tags
 /// - Track which branch is currently checked out
 /// - Provide operations for creating, deleting, and updating references
 /// - Handle branch switching and merging
 /// - Clean up stale references
-/// 
+///
 /// NOT RESPONSIBLE FOR:
 /// - Actually storing graph states (that's HistoryForest's job)
 /// - Performing merge operations (that's Graph's job)
@@ -142,23 +142,21 @@ pub struct RefManager {
     /*
     === BRANCH MANAGEMENT ===
     */
-    
     /// All branches indexed by name
     /// INVARIANT: Always contains at least the default branch
     branches: HashMap<BranchName, Branch>,
-    
+
     /// Currently checked out branch
     /// INVARIANT: Must always exist in the branches map
     current_branch: BranchName,
-    
+
     /// Default branch name (usually "main" or "master")
     /// INVARIANT: This branch cannot be deleted
     default_branch: BranchName,
-    
+
     /*
     === TAG MANAGEMENT ===
     */
-    
     /// Tags (immutable refs to specific states)
     /// DESIGN: Simple map from tag name to state ID
     /// IMMUTABILITY: Tags cannot be moved once created
@@ -170,15 +168,15 @@ impl RefManager {
     pub fn new() -> Self {
         let default_branch = "main".to_string();
         let mut branches = HashMap::new();
-        
+
         // Create the default branch pointing to state 0 (empty state)
         let default_branch_obj = Branch::new(
-            default_branch.clone(), 
+            default_branch.clone(),
             0, // StateId is just usize
-            "system".to_string()
+            "system".to_string(),
         );
         branches.insert(default_branch.clone(), default_branch_obj);
-        
+
         Self {
             branches,
             current_branch: default_branch.clone(),
@@ -186,19 +184,19 @@ impl RefManager {
             tags: HashMap::new(),
         }
     }
-    
+
     /// Create a new reference manager with a custom default branch name
     pub fn with_default_branch(default_name: BranchName) -> Self {
         let mut branches = HashMap::new();
-        
+
         // Create the default branch pointing to state 0 (empty state)
         let default_branch_obj = Branch::new(
-            default_name.clone(), 
+            default_name.clone(),
             0, // StateId is just usize
-            "system".to_string()
+            "system".to_string(),
         );
         branches.insert(default_name.clone(), default_branch_obj);
-        
+
         Self {
             branches,
             current_branch: default_name.clone(),
@@ -212,7 +210,7 @@ impl RefManager {
     */
 
     /// Create a new branch pointing to a specific state
-    /// 
+    ///
     /// ALGORITHM:
     /// 1. Check that branch name doesn't already exist
     /// 2. Validate that the target state exists (optional check)
@@ -226,24 +224,24 @@ impl RefManager {
         description: Option<String>,
     ) -> GraphResult<()> {
         if self.branches.contains_key(&name) {
-            return Err(GraphError::BranchAlreadyExists { 
-                branch_name: name.clone(), 
+            return Err(GraphError::BranchAlreadyExists {
+                branch_name: name.clone(),
                 existing_head: self.branches[&name].head,
             });
         }
-        
+
         let branch = if let Some(desc) = description {
             Branch::with_description(name.clone(), start_state, created_by, desc)
         } else {
             Branch::new(name.clone(), start_state, created_by)
         };
-        
+
         self.branches.insert(name, branch);
         Ok(())
     }
 
     /// Switch to a different branch (checkout)
-    /// 
+    ///
     /// ALGORITHM:
     /// 1. Verify the target branch exists
     /// 2. Update current_branch pointer
@@ -256,13 +254,13 @@ impl RefManager {
                 available_branches: self.branches.keys().cloned().collect(),
             });
         }
-        
+
         self.current_branch = name.clone();
         Ok(self.branches[name].head)
     }
 
     /// Delete a branch
-    /// 
+    ///
     /// RESTRICTIONS:
     /// - Cannot delete the default branch
     /// - Cannot delete the currently checked out branch
@@ -270,16 +268,17 @@ impl RefManager {
     pub fn delete_branch(&mut self, name: &BranchName) -> GraphResult<()> {
         if name == &self.default_branch {
             return Err(GraphError::InvalidInput(format!(
-                "Cannot delete default branch '{}': The default branch cannot be deleted", name
+                "Cannot delete default branch '{}': The default branch cannot be deleted",
+                name
             )));
         }
-        
+
         if name == &self.current_branch {
-            return Err(GraphError::CannotDeleteCurrentBranch { 
+            return Err(GraphError::CannotDeleteCurrentBranch {
                 branch_name: name.clone(),
             });
         }
-        
+
         if !self.branches.contains_key(name) {
             return Err(GraphError::BranchNotFound {
                 branch_name: name.clone(),
@@ -287,14 +286,15 @@ impl RefManager {
                 available_branches: self.branches.keys().cloned().collect(),
             });
         }
-        
+
         self.branches.remove(name);
         Ok(())
     }
 
     /// List all branches with their metadata
     pub fn list_branches(&self) -> Vec<BranchInfo> {
-        self.branches.values()
+        self.branches
+            .values()
             .map(|branch| BranchInfo {
                 name: branch.name.clone(),
                 head: branch.head,
@@ -309,7 +309,8 @@ impl RefManager {
 
     /// Get the currently checked out branch
     pub fn get_current_branch(&self) -> GraphResult<&Branch> {
-        self.branches.get(&self.current_branch)
+        self.branches
+            .get(&self.current_branch)
             .ok_or_else(|| GraphError::BranchNotFound {
                 branch_name: self.current_branch.clone(),
                 operation: "get current".to_string(),
@@ -319,7 +320,8 @@ impl RefManager {
 
     /// Get a specific branch by name
     pub fn get_branch(&self, name: &BranchName) -> GraphResult<&Branch> {
-        self.branches.get(name)
+        self.branches
+            .get(name)
             .ok_or_else(|| GraphError::BranchNotFound {
                 branch_name: name.clone(),
                 operation: "get branch".to_string(),
@@ -328,7 +330,7 @@ impl RefManager {
     }
 
     /// Update the head of the current branch
-    /// 
+    ///
     /// USAGE: Called after making a new commit
     pub fn update_current_branch_head(&mut self, new_head: StateId) -> GraphResult<()> {
         let current_name = self.current_branch.clone();
@@ -345,7 +347,11 @@ impl RefManager {
     }
 
     /// Update the head of a specific branch
-    pub fn update_branch_head(&mut self, branch_name: &BranchName, new_head: StateId) -> GraphResult<()> {
+    pub fn update_branch_head(
+        &mut self,
+        branch_name: &BranchName,
+        new_head: StateId,
+    ) -> GraphResult<()> {
         if let Some(branch) = self.branches.get_mut(branch_name) {
             branch.update_head(new_head);
             Ok(())
@@ -363,15 +369,16 @@ impl RefManager {
     */
 
     /// Create a new tag pointing to a specific state
-    /// 
+    ///
     /// IMMUTABILITY: Tags cannot be moved once created
     pub fn create_tag(&mut self, tag_name: String, state_id: StateId) -> GraphResult<()> {
         if self.tags.contains_key(&tag_name) {
             return Err(GraphError::InvalidInput(format!(
-                "Tag '{}' already exists pointing to state {}", tag_name, self.tags[&tag_name]
+                "Tag '{}' already exists pointing to state {}",
+                tag_name, self.tags[&tag_name]
             )));
         }
-        
+
         self.tags.insert(tag_name, state_id);
         Ok(())
     }
@@ -380,18 +387,20 @@ impl RefManager {
     pub fn delete_tag(&mut self, tag_name: &str) -> GraphResult<()> {
         if !self.tags.contains_key(tag_name) {
             return Err(GraphError::InvalidInput(format!(
-                "Tag '{}' not found. Available tags: {}", 
-                tag_name, self.tags.keys().cloned().collect::<Vec<_>>().join(", ")
+                "Tag '{}' not found. Available tags: {}",
+                tag_name,
+                self.tags.keys().cloned().collect::<Vec<_>>().join(", ")
             )));
         }
-        
+
         self.tags.remove(tag_name);
         Ok(())
     }
 
     /// List all tags
     pub fn list_tags(&self) -> Vec<TagInfo> {
-        self.tags.iter()
+        self.tags
+            .iter()
             .map(|(name, &state_id)| TagInfo {
                 name: name.clone(),
                 state_id,
@@ -409,21 +418,21 @@ impl RefManager {
     */
 
     /// Get all state IDs referenced by branches and tags
-    /// 
+    ///
     /// USAGE: For garbage collection - these states should not be deleted
     pub fn get_referenced_states(&self) -> Vec<StateId> {
         let mut states = Vec::new();
-        
+
         // Add branch heads
         for branch in self.branches.values() {
             states.push(branch.head);
         }
-        
+
         // Add tag states
         for &state_id in self.tags.values() {
             states.push(state_id);
         }
-        
+
         // Remove duplicates and sort
         states.sort();
         states.dedup();
@@ -431,13 +440,13 @@ impl RefManager {
     }
 
     /// Clean up branches that point to non-existent states
-    /// 
+    ///
     /// USAGE: After garbage collection in the history system
     /// RETURNS: Number of branches that were removed
     pub fn prune_invalid_branches(&mut self, valid_states: &[StateId]) -> usize {
         let valid_set: HashSet<_> = valid_states.iter().collect();
         let mut removed_count = 0;
-        
+
         let branch_names: Vec<_> = self.branches.keys().cloned().collect();
         for branch_name in branch_names {
             if let Some(branch) = self.branches.get(&branch_name) {
@@ -447,17 +456,17 @@ impl RefManager {
                 }
             }
         }
-        
+
         removed_count
     }
 
     /// Clean up tags that point to non-existent states
-    /// 
+    ///
     /// RETURNS: Number of tags that were removed
     pub fn prune_invalid_tags(&mut self, valid_states: &[StateId]) -> usize {
         let valid_set: HashSet<_> = valid_states.iter().collect();
         let mut removed_count = 0;
-        
+
         let tag_names: Vec<_> = self.tags.keys().cloned().collect();
         for tag_name in tag_names {
             if let Some(&state_id) = self.tags.get(&tag_name) {
@@ -467,7 +476,7 @@ impl RefManager {
                 }
             }
         }
-        
+
         removed_count
     }
 
@@ -586,7 +595,7 @@ mod tests {
         // TODO: Uncomment when RefManager is implemented
         /*
         let ref_manager = RefManager::new();
-        
+
         // Should have default branch
         assert_eq!(ref_manager.branch_count(), 1);
         assert_eq!(ref_manager.current_branch_name(), &"main".to_string());
@@ -600,7 +609,7 @@ mod tests {
         // TODO: Test branch lifecycle
         /*
         let mut ref_manager = RefManager::new();
-        
+
         // Create a new branch
         ref_manager.create_branch(
             "feature".to_string(),
@@ -611,7 +620,7 @@ mod tests {
 
         assert!(ref_manager.has_branch(&"feature".to_string()));
         assert_eq!(ref_manager.branch_count(), 2);
-        
+
         let branch = ref_manager.get_branch(&"feature".to_string()).unwrap();
         assert_eq!(branch.head, StateId(1));
         assert_eq!(branch.description, Some("Feature branch".to_string()));
@@ -628,14 +637,14 @@ mod tests {
         // TODO: Test branch switching
         /*
         let mut ref_manager = RefManager::new();
-        
+
         ref_manager.create_branch(
-            "dev".to_string(), 
-            StateId(2), 
-            "user".to_string(), 
+            "dev".to_string(),
+            StateId(2),
+            "user".to_string(),
             None
         ).unwrap();
-        
+
         let head = ref_manager.checkout_branch(&"dev".to_string()).unwrap();
         assert_eq!(head, StateId(2));
         assert_eq!(ref_manager.current_branch_name(), &"dev".to_string());
@@ -647,19 +656,19 @@ mod tests {
         // TODO: Test tag lifecycle
         /*
         let mut ref_manager = RefManager::new();
-        
+
         // Create tag
         ref_manager.create_tag("v1.0".to_string(), StateId(5)).unwrap();
-        
+
         assert!(ref_manager.has_tag("v1.0"));
         assert_eq!(ref_manager.get_tag("v1.0"), Some(StateId(5)));
-        
+
         // List tags
         let tags = ref_manager.list_tags();
         assert_eq!(tags.len(), 1);
         assert_eq!(tags[0].name, "v1.0");
         assert_eq!(tags[0].state_id, StateId(5));
-        
+
         // Delete tag
         ref_manager.delete_tag("v1.0").unwrap();
         assert!(!ref_manager.has_tag("v1.0"));
@@ -671,16 +680,16 @@ mod tests {
         // TODO: Test cleanup of invalid references
         /*
         let mut ref_manager = RefManager::new();
-        
+
         // Create branches and tags
         ref_manager.create_branch("temp".to_string(), StateId(999), "user".to_string(), None).unwrap();
         ref_manager.create_tag("old_tag".to_string(), StateId(888)).unwrap();
-        
+
         // Prune invalid references
         let valid_states = vec![StateId(0), StateId(1), StateId(2)];
         let removed_branches = ref_manager.prune_invalid_branches(&valid_states);
         let removed_tags = ref_manager.prune_invalid_tags(&valid_states);
-        
+
         assert_eq!(removed_branches, 1); // temp branch removed
         assert_eq!(removed_tags, 1); // old_tag removed
         */
@@ -691,24 +700,24 @@ mod tests {
         // TODO: Test error conditions
         /*
         let mut ref_manager = RefManager::new();
-        
+
         // Try to create duplicate branch
         let result = ref_manager.create_branch(
-            "main".to_string(), 
-            StateId(1), 
-            "user".to_string(), 
+            "main".to_string(),
+            StateId(1),
+            "user".to_string(),
             None
         );
         assert!(result.is_err());
-        
+
         // Try to checkout non-existent branch
         let result = ref_manager.checkout_branch(&"nonexistent".to_string());
         assert!(result.is_err());
-        
+
         // Try to delete default branch
         let result = ref_manager.delete_branch(&"main".to_string());
         assert!(result.is_err());
-        
+
         // Try to delete current branch
         ref_manager.create_branch("test".to_string(), StateId(1), "user".to_string(), None).unwrap();
         ref_manager.checkout_branch(&"test".to_string()).unwrap();
