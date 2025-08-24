@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use crate::ffi::api::graph::PyGraph;
 use crate::ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
 use crate::ffi::core::array::PyGraphArray;
-use crate::ffi::core::query::PyNodeFilter;
+use crate::ffi::core::query::{PyEdgeFilter, PyNodeFilter};
 use crate::ffi::core::table::PyGraphTable;
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::graph_error_to_py_err;
@@ -421,14 +421,68 @@ impl PySubgraph {
     }
 
     /// Filter edges within this subgraph (chainable)
-    fn filter_edges(&self, _py: Python, _filter: &PyAny) -> PyResult<PySubgraph> {
-        // Placeholder implementation
-        Ok(PySubgraph::new(
-            self.nodes.clone(),
-            self.edges.clone(),
-            format!("{}_edge_filtered", self.subgraph_type),
-            self.graph.clone(),
-        ))
+    fn filter_edges(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+        // Parse the edge filter - support both EdgeFilter objects and string queries
+        let edge_filter = if let Ok(filter_obj) = filter.extract::<PyEdgeFilter>() {
+            // Direct EdgeFilter object - fastest path
+            filter_obj.inner.clone()
+        } else if let Ok(query_str) = filter.extract::<String>() {
+            // String query - parse it using our query parser
+            let query_parser = py.import("groggy.query_parser")?;
+            let parse_func = query_parser.getattr("parse_edge_query")?;
+            let parsed_filter: PyEdgeFilter = parse_func.call1((query_str,))?.extract()?;
+            parsed_filter.inner.clone()
+        } else {
+            return Err(PyTypeError::new_err(
+                "Edge filter must be an EdgeFilter object or string query"
+            ));
+        };
+
+        // Get the parent graph reference
+        if let Some(parent_graph) = &self.graph {
+            let mut graph_ref = parent_graph.borrow_mut(py);
+            
+            // Apply filter using the graph's find_edges method, then intersect with our edges
+            let all_matching_edges = graph_ref.inner.find_edges(edge_filter)
+                .map_err(graph_error_to_py_err)?;
+            
+            // Keep only the edges that are in this subgraph
+            let subgraph_edge_set: HashSet<EdgeId> = self.edges.iter().copied().collect();
+            let filtered_edges: Vec<EdgeId> = all_matching_edges
+                .into_iter()
+                .filter(|edge_id| subgraph_edge_set.contains(edge_id))
+                .collect();
+            
+            // Find all nodes that are connected by the filtered edges
+            let mut connected_nodes = HashSet::new();
+            
+            for &edge_id in &filtered_edges {
+                if let Ok((source, target)) = graph_ref.inner.edge_endpoints(edge_id) {
+                    // Only include nodes that were originally in this subgraph
+                    if self.nodes.contains(&source) {
+                        connected_nodes.insert(source);
+                    }
+                    if self.nodes.contains(&target) {
+                        connected_nodes.insert(target);
+                    }
+                }
+            }
+            
+            // Convert to Vec for the new subgraph
+            let filtered_nodes: Vec<NodeId> = connected_nodes.into_iter().collect();
+            
+            Ok(PySubgraph::new(
+                filtered_nodes,
+                filtered_edges,
+                format!("{}_edge_filtered", self.subgraph_type),
+                self.graph.clone(),
+            ))
+        } else {
+            // Fallback for subgraphs without parent graph reference
+            Err(PyRuntimeError::new_err(
+                "Cannot filter edges: subgraph has no parent graph reference"
+            ))
+        }
     }
 
     /// Connected components within this subgraph

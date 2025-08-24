@@ -15,6 +15,7 @@ pub use ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
 pub use ffi::core::array::PyGraphArray;
 pub use ffi::core::history::{PyBranchInfo, PyCommit, PyHistoryStatistics};
 pub use ffi::core::matrix::PyGraphMatrix;
+pub use ffi::core::neighborhood::{PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph};
 pub use ffi::core::query::{PyAttributeFilter, PyEdgeFilter, PyNodeFilter};
 pub use ffi::core::subgraph::PySubgraph;
 pub use ffi::core::table::{PyGraphTable, PyGroupBy};
@@ -161,6 +162,38 @@ fn table(py: Python, data: PyObject, columns: Option<Vec<String>>) -> PyResult<P
     }
 }
 
+/// Merge multiple graphs into a single new graph
+///
+/// Examples:
+///   gr.merge([g1, g2, g3])  # Merge multiple graphs
+///   gr.merge([g1, g2])      # Merge two graphs
+#[pyfunction]
+fn merge(py: Python, graphs: Vec<Py<PyGraph>>) -> PyResult<PyObject> {
+    if graphs.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "Cannot merge empty list of graphs"
+        ));
+    }
+    
+    // Create a new empty graph with the same directionality as the first graph
+    let first_graph = graphs[0].borrow(py);
+    let directed = first_graph.inner.graph_type() == groggy::types::GraphType::Directed;
+    drop(first_graph); // Release borrow
+    
+    // Use the constructor through Python class instantiation
+    let result_py = py.get_type::<PyGraph>().call1((directed,))?;
+    let mut result: PyRefMut<PyGraph> = result_py.extract::<PyRefMut<PyGraph>>()?;
+    
+    // Add each graph to the result
+    for graph_py in graphs {
+        let graph = graph_py.borrow(py);
+        result.add_graph(py, &graph)?;
+    }
+    
+    // Return the PyObject
+    Ok(result_py.to_object(py))
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
@@ -196,6 +229,11 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHistoryStatistics>()?;
     m.add_class::<PyHistoricalView>()?;
 
+    // Register neighborhood sampling system
+    m.add_class::<PyNeighborhoodSubgraph>()?;
+    m.add_class::<PyNeighborhoodResult>()?;
+    m.add_class::<PyNeighborhoodStats>()?;
+
     // Register traversal and aggregation results
     m.add_class::<PyTraversalResult>()?;
     m.add_class::<PyAggregationResult>()?;
@@ -210,6 +248,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(array, m)?)?;
     m.add_function(wrap_pyfunction!(matrix, m)?)?;
     m.add_function(wrap_pyfunction!(table, m)?)?;
+    m.add_function(wrap_pyfunction!(merge, m)?)?;
 
     // Use the module registration function
     module::register_classes(py, m)?;
