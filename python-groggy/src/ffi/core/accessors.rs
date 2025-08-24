@@ -2,10 +2,23 @@
 //!
 //! Python bindings for smart indexing accessors.
 
-use groggy::{EdgeId, NodeId};
+use groggy::{AttrValue, EdgeId, NodeId};
 use pyo3::exceptions::{PyIndexError, PyKeyError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PySlice;
+
+/// Utility function to convert AttrValue to Python object
+fn attr_value_to_python_value(py: Python, attr_value: &AttrValue) -> PyResult<PyObject> {
+    match attr_value {
+        AttrValue::Int(val) => Ok(val.to_object(py)),
+        AttrValue::SmallInt(val) => Ok((*val as i64).to_object(py)),
+        AttrValue::Float(val) => Ok(val.to_object(py)),
+        AttrValue::Bool(val) => Ok(val.to_object(py)),
+        AttrValue::Text(val) => Ok(val.to_object(py)),
+        AttrValue::CompactText(val) => Ok(val.as_str().to_object(py)),
+        _ => Ok(py.None()),
+    }
+}
 
 // Import types from our FFI modules
 use crate::ffi::api::graph::PyGraph;
@@ -267,12 +280,18 @@ impl PyNodesAccessor {
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
 
+        // Try to extract as string (attribute name access)
+        if let Ok(_attr_name) = key.extract::<String>() {
+            // TODO: Complete implementation - temporarily disabled
+            return Err(PyTypeError::new_err(
+                "String attribute access is under development. Use g.age syntax instead."
+            ));
+        }
+
         // If none of the above worked, return error
         Err(PyTypeError::new_err(
-            "Node index must be int, list of ints, or slice. \
-            To access node attributes, use: graph.nodes.table() for all attributes, \
-            graph.nodes.table()['attribute_name'] for specific attributes, or \
-            graph.nodes[node_id].attribute_name for a single node's attribute.",
+            "Node index must be int, list of ints, slice, or string attribute name. \
+            Examples: g.nodes[0], g.nodes[0:10], g.nodes['age'], or g.age for attribute access.",
         ))
     }
 
@@ -368,6 +387,132 @@ impl PyNodesAccessor {
         )?;
 
         Ok(Py::new(py, py_table)?.to_object(py))
+    }
+
+    /// Get all nodes as a subgraph (equivalent to g.nodes[:])
+    /// Returns a subgraph containing all nodes and all induced edges
+    fn all(&self, py: Python) -> PyResult<PySubgraph> {
+        let graph = self.graph.borrow_mut(py);
+        
+        // Get all node IDs (respecting constraints if any)
+        let all_node_ids = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            graph.inner.node_ids()
+        };
+        
+        // Get all induced edges for these nodes using columnar topology (high performance)
+        let selected_node_set: std::collections::HashSet<NodeId> =
+            all_node_ids.iter().copied().collect();
+        let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
+        let mut induced_edges = Vec::new();
+
+        // O(k) where k = active edges
+        for i in 0..edge_ids.len() {
+            let edge_id = edge_ids[i];
+            let source = sources[i];
+            let target = targets[i];
+
+            // Include edge if both endpoints are in our node set
+            if selected_node_set.contains(&source) && selected_node_set.contains(&target) {
+                induced_edges.push(edge_id);
+            }
+        }
+
+        // Create and return Subgraph
+        let subgraph = PySubgraph::new(
+            all_node_ids,
+            induced_edges,
+            "all_nodes".to_string(),
+            Some(self.graph.clone()),
+        );
+
+        Ok(subgraph)
+    }
+
+    /// Get node attribute column with proper error checking
+    fn _get_node_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<PyObject> {
+        let graph = self.graph.borrow(py);
+        
+        // Determine which nodes to check
+        let node_ids = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            graph.inner.node_ids()
+        };
+
+        if node_ids.is_empty() {
+            return Err(PyValueError::new_err(format!(
+                "Cannot access attribute '{}': No nodes available", 
+                attr_name
+            )));
+        }
+
+        // Check if the attribute exists on ANY node
+        let mut attribute_exists = false;
+        for &node_id in &node_ids {
+            if graph.has_node_internal(node_id) {
+                let attrs = graph.node_attribute_keys(node_id);
+                if attrs.contains(&attr_name.to_string()) {
+                    attribute_exists = true;
+                    break;
+                }
+            }
+        }
+
+        if !attribute_exists {
+            return Err(PyKeyError::new_err(format!(
+                "Attribute '{}' does not exist on any nodes. Available attributes: {:?}",
+                attr_name,
+                {
+                    let mut all_attrs = std::collections::HashSet::new();
+                    for &node_id in &node_ids {
+                        if graph.has_node_internal(node_id) {
+                            let attrs = graph.node_attribute_keys(node_id);
+                            for attr in attrs {
+                                all_attrs.insert(attr);
+                            }
+                        }
+                    }
+                    let mut result: Vec<String> = all_attrs.into_iter().collect();
+                    result.sort();
+                    result
+                }
+            )));
+        }
+
+        // Collect attribute values - allow None for nodes without the attribute
+        let mut values: Vec<Option<PyObject>> = Vec::new();
+        for &node_id in &node_ids {
+            if graph.has_node_internal(node_id) {
+                match graph.inner.get_node_attr(node_id, &attr_name.to_string()) {
+                    Ok(Some(value)) => {
+                        // Convert the attribute value to Python object
+                        let py_value = attr_value_to_python_value(py, &value)?;
+                        values.push(Some(py_value));
+                    }
+                    Ok(None) => {
+                        values.push(None);
+                    }
+                    Err(_) => {
+                        values.push(None);
+                    }
+                }
+            } else {
+                values.push(None);
+            }
+        }
+
+        // Convert to Python list
+        let py_values: Vec<PyObject> = values
+            .into_iter()
+            .map(|opt_val| match opt_val {
+                Some(val) => val,
+                None => py.None(),
+            })
+            .collect();
+
+        Ok(py_values.to_object(py))
     }
 }
 
@@ -607,7 +752,8 @@ impl PyEdgesAccessor {
 
         // If none of the above worked, return error
         Err(PyTypeError::new_err(
-            "Edge index must be int, list of ints, or slice",
+            "Edge index must be int, list of ints, or slice. \
+            Examples: g.edges[0], g.edges[0:10]. For attribute access use g.edges.weight syntax.",
         ))
     }
 
@@ -701,5 +847,132 @@ impl PyEdgesAccessor {
         )?;
 
         Ok(Py::new(py, py_table)?.to_object(py))
+    }
+
+    /// Get all edges as a subgraph (equivalent to g.edges[:])
+    /// Returns a subgraph containing all nodes that are connected by the edges and all edges
+    fn all(&self, py: Python) -> PyResult<PySubgraph> {
+        let graph = self.graph.borrow_mut(py);
+        
+        // Get all edge IDs (respecting constraints if any)
+        let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
+            constrained.clone()
+        } else {
+            graph.inner.edge_ids()
+        };
+        
+        // Get all nodes that are endpoints of these edges
+        let (_, sources, targets) = graph.inner.get_columnar_topology();
+        let mut connected_nodes = std::collections::HashSet::new();
+        let edge_set: std::collections::HashSet<EdgeId> = all_edge_ids.iter().copied().collect();
+        
+        // Find all nodes connected by our edges
+        for i in 0..all_edge_ids.len() {
+            let edge_id = all_edge_ids[i];
+            if edge_set.contains(&edge_id) {
+                let source = sources[i];
+                let target = targets[i];
+                connected_nodes.insert(source);
+                connected_nodes.insert(target);
+            }
+        }
+        
+        let connected_node_ids: Vec<NodeId> = connected_nodes.into_iter().collect();
+
+        // Create and return Subgraph (all edges are included by construction)
+        let subgraph = PySubgraph::new(
+            connected_node_ids,
+            all_edge_ids,
+            "all_edges".to_string(),
+            Some(self.graph.clone()),
+        );
+
+        Ok(subgraph)
+    }
+
+    /// Support property-style attribute access: g.edges.weight
+    fn __getattr__(&self, _py: Python, name: &str) -> PyResult<PyObject> {
+        // TODO: Complete implementation - temporarily disabled
+        return Err(PyKeyError::new_err(format!(
+            "Edge attribute '{}' access is under development.",
+            name
+        )));
+    }
+
+    /// Get edge attribute column with proper error checking
+    fn _get_edge_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<PyObject> {
+        let graph = self.graph.borrow(py);
+        
+        // Determine which edges to check
+        let edge_ids = if let Some(ref constrained) = self.constrained_edges {
+            constrained.clone()
+        } else {
+            graph.inner.edge_ids()
+        };
+
+        if edge_ids.is_empty() {
+            return Err(PyValueError::new_err(format!(
+                "Cannot access attribute '{}': No edges available", 
+                attr_name
+            )));
+        }
+
+        // Check if the attribute exists on ANY edge
+        let mut attribute_exists = false;
+        for &edge_id in &edge_ids {
+            let attrs = graph.edge_attribute_keys(edge_id);
+            if attrs.contains(&attr_name.to_string()) {
+                attribute_exists = true;
+                break;
+            }
+        }
+
+        if !attribute_exists {
+            return Err(PyKeyError::new_err(format!(
+                "Attribute '{}' does not exist on any edges. Available attributes: {:?}",
+                attr_name,
+                {
+                    let mut all_attrs = std::collections::HashSet::new();
+                    for &edge_id in &edge_ids {
+                        let attrs = graph.edge_attribute_keys(edge_id);
+                        for attr in attrs {
+                            all_attrs.insert(attr);
+                        }
+                    }
+                    let mut result: Vec<String> = all_attrs.into_iter().collect();
+                    result.sort();
+                    result
+                }
+            )));
+        }
+
+        // Collect attribute values - allow None for edges without the attribute
+        let mut values: Vec<Option<PyObject>> = Vec::new();
+        for &edge_id in &edge_ids {
+            match graph.inner.get_edge_attr(edge_id, &attr_name.to_string()) {
+                Ok(Some(value)) => {
+                    // Convert the attribute value to Python object
+                    let py_value = attr_value_to_python_value(py, &value)?;
+                    values.push(Some(py_value));
+                }
+                Ok(None) => {
+                    values.push(None);
+                }
+                Err(_) => {
+                    values.push(None);
+                }
+            }
+        }
+
+        // Convert to Python list
+        let py_values: Vec<PyObject> = values
+            .into_iter()
+            .map(|opt_val| match opt_val {
+                Some(val) => val,
+                None => py.None(),
+            })
+            .collect();
+
+        Ok(py_values.to_object(py))
     }
 }

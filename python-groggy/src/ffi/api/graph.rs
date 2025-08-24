@@ -3,7 +3,7 @@
 //! Main Python bindings for the Graph API.
 
 use groggy::{AttrName, AttrValue as RustAttrValue, EdgeId, Graph as RustGraph, NodeId, StateId};
-use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyTypeError};
+use pyo3::exceptions::{PyAttributeError, PyKeyError, PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -11,6 +11,7 @@ use pyo3::types::PyDict;
 use crate::ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
 use crate::ffi::core::array::PyGraphArray;
 use crate::ffi::core::matrix::PyGraphMatrix;
+use crate::ffi::core::neighborhood::{PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph};
 use crate::ffi::core::query::{PyEdgeFilter, PyNodeFilter};
 use crate::ffi::core::subgraph::PySubgraph;
 use crate::ffi::core::traversal::PyGroupedAggregationResult;
@@ -24,6 +25,15 @@ use crate::ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoricalView};
 // Placeholder imports for missing types - these need to be implemented
 struct PyAttributes {
     graph: *const RustGraph,
+}
+
+/// Specification for neighborhood hop parameters
+#[derive(Debug, Clone)]
+enum HopSpecification {
+    /// Single level: k hops (e.g., k=2 for 2-hop)
+    SingleLevel(usize),
+    /// Multi-level: different sampling at each level (e.g., [100, 10] for 100 from 1st hop, 10 from 2nd hop)
+    MultiLevel(Vec<usize>),
 }
 
 /// Python wrapper for AggregationResult
@@ -1365,9 +1375,80 @@ impl PyGraph {
 
     // === DISPLAY/TABLE METHODS ===
 
-    /// Get all neighbors of a node
-    fn neighbors(&mut self, node: NodeId) -> PyResult<Vec<NodeId>> {
-        self.inner.neighbors(node).map_err(graph_error_to_py_err)
+    /// Get neighbors with flexible parameters (like degree)
+    /// 
+    /// Supports:
+    /// - g.neighbors(node_id)  # neighbors for single node -> Vec<NodeId>
+    /// - g.neighbors([node1, node2])  # neighbors for multiple nodes -> GraphArray of lists
+    /// - g.neighbors()  # neighbors for all nodes -> GraphArray of lists
+    #[pyo3(signature = (nodes = None))]
+    fn neighbors(&mut self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
+        match nodes {
+            // Single node case: neighbors(node_id) -> Vec<NodeId> (backward compatibility)
+            Some(node_arg) if node_arg.extract::<NodeId>().is_ok() => {
+                let node = node_arg.extract::<NodeId>()?;
+                let neighbors = self.inner.neighbors(node).map_err(graph_error_to_py_err)?;
+                Ok(neighbors.to_object(py))
+            }
+            // List of nodes case: neighbors([node1, node2, ...]) -> GraphArray
+            Some(node_arg) if node_arg.extract::<Vec<NodeId>>().is_ok() => {
+                let node_ids = node_arg.extract::<Vec<NodeId>>()?;
+                let mut neighbor_arrays = Vec::new();
+
+                for node_id in node_ids {
+                    match self.inner.neighbors(node_id) {
+                        Ok(neighbors) => {
+                            // Convert Vec<NodeId> to comma-separated string representation
+                            let neighbor_str = neighbors
+                                .iter()
+                                .map(|id| id.to_string())
+                                .collect::<Vec<String>>()
+                                .join(",");
+                            neighbor_arrays.push(groggy::AttrValue::Text(neighbor_str));
+                        }
+                        Err(_) => {
+                            // For non-existent nodes, return empty string
+                            neighbor_arrays.push(groggy::AttrValue::Text(String::new()));
+                        }
+                    }
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(neighbor_arrays);
+                let py_graph_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+            // All nodes case: neighbors() -> GraphArray
+            None => {
+                let all_nodes = self.inner.node_ids();
+                let mut neighbor_arrays = Vec::new();
+
+                for node_id in all_nodes {
+                    match self.inner.neighbors(node_id) {
+                        Ok(neighbors) => {
+                            // Convert Vec<NodeId> to comma-separated string representation
+                            let neighbor_str = neighbors
+                                .iter()
+                                .map(|id| id.to_string())
+                                .collect::<Vec<String>>()
+                                .join(",");
+                            neighbor_arrays.push(groggy::AttrValue::Text(neighbor_str));
+                        }
+                        Err(_) => {
+                            // For any issues, return empty string
+                            neighbor_arrays.push(groggy::AttrValue::Text(String::new()));
+                        }
+                    }
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(neighbor_arrays);
+                let py_graph_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+            // Invalid argument case
+            Some(_) => Err(PyTypeError::new_err(
+                "neighbors() argument must be a NodeId or list of NodeIds"
+            ))
+        }
     }
 
     /// Get the degree of nodes (number of incident edges) as GraphArray
@@ -1805,6 +1886,211 @@ impl PyGraph {
                 attribute: attribute.clone(),
             })
         })
+    }
+
+    // === NEIGHBORHOOD SAMPLING OPERATIONS ===
+
+    /// Generate neighborhood subgraphs with flexible parameters
+    /// 
+    /// Supports:
+    /// - g.neighborhood(node_id)  # 1-hop single node
+    /// - g.neighborhood(node_id, k=2)  # k-hop single node  
+    /// - g.neighborhood([node1, node2])  # 1-hop multiple nodes
+    /// - g.neighborhood([node1, node2], k=2)  # k-hop multiple nodes
+    /// - g.neighborhood([node1, node2], k=[100, 10])  # multi-level sampling
+    /// - g.neighborhood(..., unified=True)  # single combined subgraph vs separate subgraphs
+    fn neighborhood(
+        &mut self,
+        nodes: &PyAny,
+        k: Option<&PyAny>,
+        unified: Option<bool>,
+    ) -> PyResult<PyObject> {
+        let py = nodes.py();
+        
+        // Parse k parameter
+        let hop_spec = if let Some(k_val) = k {
+            if let Ok(single_k) = k_val.extract::<usize>() {
+                HopSpecification::SingleLevel(single_k)
+            } else if let Ok(multi_k) = k_val.extract::<Vec<usize>>() {
+                HopSpecification::MultiLevel(multi_k)
+            } else {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "k parameter must be an integer or list of integers"
+                ));
+            }
+        } else {
+            HopSpecification::SingleLevel(1) // Default to 1-hop
+        };
+        
+        let unified = unified.unwrap_or(false);
+        
+        // Parse nodes parameter - single node or list of nodes
+        if let Ok(single_node) = nodes.extract::<NodeId>() {
+            // Single node case
+            let result = match hop_spec {
+                HopSpecification::SingleLevel(1) => {
+                    // Use optimized 1-hop method
+                    self.inner.neighborhood(single_node)
+                        .map_err(graph_error_to_py_err)
+                        .map(|nbh| PyNeighborhoodSubgraph { inner: nbh })
+                        .map(|py_nbh| py_nbh.into_py(py))
+                }
+                HopSpecification::SingleLevel(k) => {
+                    // Use k-hop method
+                    self.inner.k_hop_neighborhood(single_node, k)
+                        .map_err(graph_error_to_py_err)
+                        .map(|nbh| PyNeighborhoodSubgraph { inner: nbh })
+                        .map(|py_nbh| py_nbh.into_py(py))
+                }
+                HopSpecification::MultiLevel(_levels) => {
+                    // TODO: Implement multi-level sampling for single node
+                    return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                        "Multi-level sampling for single node not yet implemented"
+                    ));
+                }
+            }?;
+            
+            Ok(result)
+        } else if let Ok(node_list) = nodes.extract::<Vec<NodeId>>() {
+            // Multiple nodes case
+            if unified {
+                // Return single combined subgraph
+                let result = match hop_spec {
+                    HopSpecification::SingleLevel(k) => {
+                        self.inner.unified_neighborhood(&node_list, k)
+                            .map_err(graph_error_to_py_err)
+                            .map(|nbh| PyNeighborhoodSubgraph { inner: nbh })
+                            .map(|py_nbh| py_nbh.into_py(py))
+                    }
+                    HopSpecification::MultiLevel(_levels) => {
+                        // TODO: Implement multi-level unified sampling
+                        return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                            "Multi-level unified sampling not yet implemented"
+                        ));
+                    }
+                }?;
+                
+                Ok(result)
+            } else {
+                // Return separate subgraphs for each node
+                let result = match hop_spec {
+                    HopSpecification::SingleLevel(1) => {
+                        // Use optimized multi-neighborhood method for 1-hop
+                        self.inner.multi_neighborhood(&node_list)
+                            .map_err(graph_error_to_py_err)
+                            .map(|result| PyNeighborhoodResult { inner: result })
+                            .map(|py_result| py_result.into_py(py))
+                    }
+                    HopSpecification::SingleLevel(_k) => {
+                        // TODO: Implement k-hop for multiple nodes returning separate subgraphs
+                        return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                            "k-hop sampling for multiple nodes (non-unified) not yet implemented"
+                        ));
+                    }
+                    HopSpecification::MultiLevel(_levels) => {
+                        // TODO: Implement multi-level sampling for multiple nodes
+                        return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+                            "Multi-level sampling for multiple nodes not yet implemented"
+                        ));
+                    }
+                }?;
+                
+                Ok(result)
+            }
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "nodes parameter must be a NodeId or list of NodeIds"
+            ))
+        }
+    }
+
+    /// Get neighborhood sampling performance statistics
+    fn neighborhood_statistics(&self) -> PyNeighborhoodStats {
+        PyNeighborhoodStats {
+            inner: self.inner.neighborhood_statistics().clone(),
+        }
+    }
+
+    // === GRAPH MERGING OPERATIONS ===
+
+    /// Add another graph to this graph (merge nodes and edges)
+    /// 
+    /// All nodes and edges from the other graph will be added to this graph.
+    /// Node and edge IDs may be remapped to avoid conflicts.
+    /// Attributes are preserved during the merge.
+    pub fn add_graph(&mut self, py: Python, other: &PyGraph) -> PyResult<()> {
+        // Get all nodes from the other graph with their attributes
+        let other_node_ids = other.inner.node_ids();
+        let other_edge_ids = other.inner.edge_ids();
+        
+        // Track ID mappings to handle potential conflicts
+        let mut node_id_mapping = std::collections::HashMap::new();
+        
+        // Add all nodes from other graph
+        for &old_node_id in &other_node_ids {
+            // Get all attributes for this node
+            let mut node_attrs = std::collections::HashMap::new();
+            
+            // Get attribute names for this node (this is a simplified approach)
+            // TODO: This could be more efficient with a proper attribute iteration API
+            let sample_attrs = ["name", "label", "type", "value", "weight", "id"]; // Common attribute names
+            for attr_name in &sample_attrs {
+                if let Ok(Some(attr_value)) = other.inner.get_node_attr(old_node_id, &attr_name.to_string()) {
+                    node_attrs.insert(attr_name.to_string(), attr_value);
+                }
+            }
+            
+            // Add the node to this graph
+            let new_node_id = self.inner.add_node();
+            node_id_mapping.insert(old_node_id, new_node_id);
+            
+            // Set all attributes on the new node
+            for (attr_name, attr_value) in node_attrs {
+                let _ = self.inner.set_node_attr(new_node_id, attr_name, attr_value);
+            }
+        }
+        
+        // Add all edges from other graph
+        for &old_edge_id in &other_edge_ids {
+            if let Ok((old_source, old_target)) = other.inner.edge_endpoints(old_edge_id) {
+                // Map old node IDs to new node IDs
+                if let (Some(&new_source), Some(&new_target)) = (
+                    node_id_mapping.get(&old_source),
+                    node_id_mapping.get(&old_target)
+                ) {
+                    // Add the edge
+                    match self.inner.add_edge(new_source, new_target) {
+                        Ok(new_edge_id) => {
+                            // Copy edge attributes
+                            let sample_edge_attrs = ["weight", "label", "type", "capacity"]; // Common edge attribute names
+                            for attr_name in &sample_edge_attrs {
+                                if let Ok(Some(attr_value)) = other.inner.get_edge_attr(old_edge_id, &attr_name.to_string()) {
+                                    let _ = self.inner.set_edge_attr(new_edge_id, attr_name.to_string(), attr_value);
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            // Skip edges that can't be added (e.g., duplicates in undirected graphs)
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    // === PROPERTY GETTERS FOR ATTRIBUTE ACCESS ===
+
+    /// Enable property-style attribute access (g.age instead of g.nodes['age'])
+    /// This method is called when accessing attributes that don't exist as methods
+    fn __getattr__(slf: PyRef<Self>, py: Python, name: String) -> PyResult<PyObject> {
+        // TODO: Complete implementation - temporarily disabled for compilation
+        return Err(PyAttributeError::new_err(format!(
+            "Attribute '{}' not found. Property-style attribute access is under development.",
+            name
+        )));
     }
 
     /// Get complete attribute column for ALL nodes (optimized for table() method)

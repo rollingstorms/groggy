@@ -8,6 +8,7 @@ pub mod array;
 pub mod attributes;
 pub mod history;
 pub mod matrix;
+pub mod neighborhood;
 pub mod query;
 pub mod subgraph;
 pub mod table;

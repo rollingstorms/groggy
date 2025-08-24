@@ -1176,8 +1176,18 @@ impl Graph {
 
     /// Get the commit history
     pub fn commit_history(&self) -> Vec<CommitInfo> {
-        // Basic implementation returns empty - full implementation would query history system
-        Vec::new()
+        self.history
+            .get_commit_history()
+            .into_iter()
+            .map(|commit| CommitInfo {
+                id: commit.id,
+                message: commit.message.clone(),
+                author: commit.author.clone(),
+                timestamp: commit.timestamp,
+                parent: commit.parents.first().copied(),
+                changes_summary: commit.delta.summary(),
+            })
+            .collect()
     }
 
     /*
@@ -1342,11 +1352,7 @@ impl Graph {
     */
     /// Create a read-only view of the graph at a specific commit
     pub fn view_at_commit(&self, commit_id: StateId) -> Result<HistoricalView<'_>, GraphError> {
-        let _ = commit_id; // Silence unused parameter warning
-        Err(GraphError::NotImplemented {
-            feature: "historical views".to_string(),
-            tracking_issue: None,
-        })
+        HistoricalView::new(&self.history, commit_id)
     }
 
     /// Compare two commits and show differences
