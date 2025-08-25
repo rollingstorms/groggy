@@ -268,68 +268,26 @@ impl Subgraph {
 
     /// Find connected components within this subgraph
     pub fn connected_components(&self) -> GraphResult<Vec<Subgraph>> {
-        use std::collections::{HashMap, VecDeque};
-        
         if self.nodes.is_empty() {
             return Ok(vec![]);
         }
         
-        // Get the graph reference
-        let graph = self.graph.borrow();
+        // Use optimized TraversalEngine via Graph
+        let mut graph = self.graph.borrow_mut();
+        let options = TraversalOptions {
+            node_filter: None, // Will be set by the Graph method
+            ..TraversalOptions::default()
+        };
         
-        // Build adjacency map for nodes in this subgraph
-        let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
+        let result = graph.run_connected_components_for_subgraph(&self.nodes, options)?;
         
-        // Initialize adjacency list with all nodes
-        for &node_id in &self.nodes {
-            adjacency.insert(node_id, Vec::new());
-        }
-        
-        // Add edges that connect nodes within this subgraph
-        for &edge_id in &self.edges {
-            if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
-                // Only include edges where both endpoints are in our subgraph
-                if self.nodes.contains(&source) && self.nodes.contains(&target) {
-                    if let Some(neighbors) = adjacency.get_mut(&source) {
-                        neighbors.push(target);
-                    }
-                    if let Some(neighbors) = adjacency.get_mut(&target) {
-                        neighbors.push(source);
-                    }
-                }
-            }
-        }
-        
-        let mut visited = HashSet::new();
+        // Convert ConnectedComponentsResult to Vec<Subgraph>
         let mut components = Vec::new();
-        
-        // Find connected components using BFS
-        for &start_node in &self.nodes {
-            if visited.contains(&start_node) {
-                continue;
-            }
+        for (component_id, component_result) in result.components.into_iter().enumerate() {
+            // Get nodes in this component
+            let component_nodes: HashSet<NodeId> = component_result.nodes.into_iter().collect();
             
-            // BFS to find all nodes in this component
-            let mut component_nodes = HashSet::new();
-            let mut queue = VecDeque::new();
-            
-            queue.push_back(start_node);
-            visited.insert(start_node);
-            component_nodes.insert(start_node);
-            
-            while let Some(current_node) = queue.pop_front() {
-                if let Some(neighbors) = adjacency.get(&current_node) {
-                    for &neighbor in neighbors {
-                        if !visited.contains(&neighbor) && self.nodes.contains(&neighbor) {
-                            visited.insert(neighbor);
-                            component_nodes.insert(neighbor);
-                            queue.push_back(neighbor);
-                        }
-                    }
-                }
-            }
-            
-            // Find all edges within this component
+            // Find edges that are within this component
             let mut component_edges = HashSet::new();
             for &edge_id in &self.edges {
                 if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
@@ -339,15 +297,13 @@ impl Subgraph {
                 }
             }
             
-            // Create a subgraph for this component
-            let component = Subgraph::new(
+            // Create subgraph for this component
+            components.push(Subgraph::new(
                 self.graph.clone(),
                 component_nodes,
                 component_edges,
-                format!("{}_component_{}", self.subgraph_type, components.len()),
-            );
-            
-            components.push(component);
+                format!("{}_component_{}", self.subgraph_type, component_id),
+            ));
         }
         
         Ok(components)

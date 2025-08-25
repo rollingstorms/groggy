@@ -261,6 +261,16 @@ impl QueryEngine {
                     .collect();
                 Ok(non_matching)
             }
+
+            NodeFilter::NodeSet(node_set) => {
+                // Optimized intersection of nodes with node_set
+                let matching_nodes: Vec<NodeId> = nodes
+                    .iter()
+                    .copied()
+                    .filter(|node_id| node_set.contains(node_id))
+                    .collect();
+                Ok(matching_nodes)
+            }
         }
     }
 
@@ -325,6 +335,9 @@ impl QueryEngine {
             }),
             NodeFilter::Not(filter) => {
                 !self.node_matches_filter_with_topology(node_id, pool, space, filter, topology_data)
+            }
+            NodeFilter::NodeSet(node_set) => {
+                node_set.contains(&node_id)
             }
         }
     }
@@ -534,6 +547,8 @@ pub enum NodeFilter {
     And(Vec<NodeFilter>),
     Or(Vec<NodeFilter>),
     Not(Box<NodeFilter>),
+    /// Filter to nodes in a specific set (for subgraph node restriction)
+    NodeSet(HashSet<NodeId>),
 }
 
 /// Edge filter for graph queries

@@ -1268,13 +1268,35 @@ impl Graph {
         options: crate::core::traversal::TraversalOptions,
     ) -> Result<crate::core::traversal::ConnectedComponentsResult, GraphError> {
         self.traversal_engine
-            .connected_components(&self.pool.borrow(), &mut self.space, options)
+            .connected_components(&self.pool.borrow(), &self.space, options)
             .map_err(|e| e.into())
     }
 
     /// Get traversal performance statistics
     pub fn traversal_statistics(&self) -> &crate::core::traversal::TraversalStats {
         self.traversal_engine.statistics()
+    }
+
+    /// Allow subgraphs to use the optimized TraversalEngine
+    /// This enables all connected components analysis to use the same optimized algorithm
+    pub(crate) fn run_connected_components_for_subgraph(
+        &mut self,
+        subgraph_nodes: &std::collections::HashSet<NodeId>,
+        options: crate::core::traversal::TraversalOptions,
+    ) -> Result<crate::core::traversal::ConnectedComponentsResult, GraphError> {
+        // Clone the options and add subgraph node filtering
+        let mut filtered_options = options;
+        
+        // Create a node filter that only includes our subgraph nodes
+        use crate::core::query::NodeFilter;
+        let node_filter = NodeFilter::NodeSet(subgraph_nodes.clone());
+        
+        filtered_options.node_filter = Some(node_filter);
+        
+        // Delegate to TraversalEngine with subgraph filtering
+        self.traversal_engine
+            .connected_components(&self.pool.borrow(), &self.space, filtered_options)
+            .map_err(|e| e.into())
     }
 
     // ===== NEIGHBORHOOD SUBGRAPH SAMPLING =====

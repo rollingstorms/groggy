@@ -878,7 +878,6 @@ impl PyEdgesAccessor {
         }
         
         let connected_node_ids: Vec<NodeId> = connected_nodes.into_iter().collect();
-
         // Create and return Subgraph (all edges are included by construction)
         let subgraph = PySubgraph::new(
             connected_node_ids,
