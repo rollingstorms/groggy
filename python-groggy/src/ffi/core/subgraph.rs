@@ -509,14 +509,106 @@ impl PySubgraph {
             }
             Ok(result)
         } else {
-            // Fallback - return single component for now
-            Ok(vec![PySubgraph::new(
-                self.nodes.clone(),
-                self.edges.clone(),
-                "component".to_string(),
-                self.graph.clone(),
-            )])
+            // Fallback: Implement BFS connected components using PyGraph access
+            let py = Python::acquire_gil().python();
+            if let Some(ref graph_py) = self.graph {
+                let graph = graph_py.borrow(py);
+                self.connected_components_fallback(&graph)
+            } else {
+                // If no graph reference, return single component
+                Ok(vec![PySubgraph::new(
+                    self.nodes.clone(),
+                    self.edges.clone(),
+                    "component".to_string(),
+                    self.graph.clone(),
+                )])
+            }
         }
+    }
+
+    /// Fallback connected components implementation using PyGraph access pattern
+    /// Same algorithm as RustSubgraph, different data access pattern
+    fn connected_components_fallback(&self, graph: &crate::ffi::api::graph::PyGraph) -> PyResult<Vec<PySubgraph>> {
+        use std::collections::{HashMap, HashSet, VecDeque};
+        
+        if self.nodes.is_empty() {
+            return Ok(vec![]);
+        }
+        
+        // Build adjacency map for nodes in this subgraph
+        let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
+        
+        // Initialize adjacency list with all nodes
+        for &node_id in &self.nodes {
+            adjacency.insert(node_id, Vec::new());
+        }
+        
+        // Add edges that connect nodes within this subgraph
+        for &edge_id in &self.edges {
+            if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                // Only include edges where both endpoints are in our subgraph
+                if self.nodes.contains(&source) && self.nodes.contains(&target) {
+                    if let Some(neighbors) = adjacency.get_mut(&source) {
+                        neighbors.push(target);
+                    }
+                    if let Some(neighbors) = adjacency.get_mut(&target) {
+                        neighbors.push(source);
+                    }
+                }
+            }
+        }
+        
+        let mut visited = HashSet::new();
+        let mut components = Vec::new();
+        
+        // Find connected components using BFS
+        for &start_node in &self.nodes {
+            if visited.contains(&start_node) {
+                continue;
+            }
+            
+            // BFS to find all nodes in this component
+            let mut component_nodes = HashSet::new();
+            let mut queue = VecDeque::new();
+            
+            queue.push_back(start_node);
+            visited.insert(start_node);
+            component_nodes.insert(start_node);
+            
+            while let Some(current_node) = queue.pop_front() {
+                if let Some(neighbors) = adjacency.get(&current_node) {
+                    for &neighbor in neighbors {
+                        if !visited.contains(&neighbor) && self.nodes.contains(&neighbor) {
+                            visited.insert(neighbor);
+                            component_nodes.insert(neighbor);
+                            queue.push_back(neighbor);
+                        }
+                    }
+                }
+            }
+            
+            // Find all edges within this component
+            let mut component_edges = HashSet::new();
+            for &edge_id in &self.edges {
+                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                    if component_nodes.contains(&source) && component_nodes.contains(&target) {
+                        component_edges.insert(edge_id);
+                    }
+                }
+            }
+            
+            // Create a subgraph for this component
+            let component = PySubgraph::new(
+                component_nodes.into_iter().collect(),
+                component_edges.into_iter().collect(),
+                format!("{}_component_{}", self.subgraph_type, components.len()),
+                self.graph.clone(),
+            );
+            
+            components.push(component);
+        }
+        
+        Ok(components)
     }
 
     /// Check if the subgraph is connected (has exactly one connected component)
@@ -527,8 +619,9 @@ impl PySubgraph {
                 PyErr::new::<PyRuntimeError, _>(format!("Failed to check connectivity: {}", e))
             })
         } else {
-            // Fallback - for now assume connected if we have nodes
-            Ok(!self.nodes.is_empty())
+            // Use proper fallback algorithm
+            let components = self.connected_components()?;
+            Ok(components.len() == 1 && !self.nodes.is_empty())
         }
     }
 

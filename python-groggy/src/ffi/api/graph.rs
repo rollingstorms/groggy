@@ -6,6 +6,8 @@ use groggy::{AttrName, AttrValue as RustAttrValue, EdgeId, Graph as RustGraph, N
 use pyo3::exceptions::{PyAttributeError, PyKeyError, PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // Import all graph modules
 use crate::ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
