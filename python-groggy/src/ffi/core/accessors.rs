@@ -101,7 +101,7 @@ impl PyNodesAccessor {
             let all_node_ids = if let Some(ref constrained) = self.constrained_nodes {
                 constrained.clone()
             } else {
-                graph.inner.node_ids()
+                { let node_ids = graph.inner.borrow().node_ids(); node_ids }
             };
 
             // Check if boolean mask length matches node count
@@ -137,7 +137,10 @@ impl PyNodesAccessor {
             // Get induced edges for selected nodes
             let node_set: std::collections::HashSet<NodeId> =
                 selected_nodes.iter().copied().collect();
-            let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
+            let (edge_ids, sources, targets) = { 
+            let topology = graph.inner.borrow().get_columnar_topology();
+            topology
+        };
             let mut induced_edges = Vec::new();
 
             for i in 0..edge_ids.len() {
@@ -164,8 +167,7 @@ impl PyNodesAccessor {
         // Try to extract as list of integers (batch access) - CHECK AFTER boolean arrays
         if let Ok(indices_or_ids) = key.extract::<Vec<NodeId>>() {
             // Batch node access - return Subgraph
-            let graph = self.graph.borrow_mut(py);
-
+            
             // Convert indices to actual node IDs if constrained
             let actual_node_ids: Result<Vec<NodeId>, PyErr> =
                 if let Some(ref constrained) = self.constrained_nodes {
@@ -193,7 +195,11 @@ impl PyNodesAccessor {
 
             // Validate all nodes exist
             for &node_id in &node_ids {
-                if !graph.has_node_internal(node_id) {
+                let exists = {
+                    let graph = self.graph.borrow(py);
+                    graph.has_node_internal(node_id)
+                };
+                if !exists {
                     return Err(PyKeyError::new_err(format!(
                         "Node {} does not exist",
                         node_id
@@ -203,7 +209,11 @@ impl PyNodesAccessor {
 
             // Get induced edges for selected nodes
             let node_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
-            let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
+            let (edge_ids, sources, targets) = { 
+                let graph = self.graph.borrow(py);
+                let topology = graph.inner.borrow().get_columnar_topology();
+                topology
+            };
             let mut induced_edges = Vec::new();
 
             for i in 0..edge_ids.len() {
@@ -229,8 +239,10 @@ impl PyNodesAccessor {
 
         // Try to extract as slice (slice access)
         if let Ok(slice) = key.downcast::<PySlice>() {
-            let graph = self.graph.borrow_mut(py);
-            let all_node_ids = graph.inner.node_ids();
+            let all_node_ids = {
+                let graph = self.graph.borrow(py);  // Only need read access
+                { let node_ids = graph.inner.borrow().node_ids(); node_ids }
+            };
 
             // Convert slice to indices
             let slice_info = slice.indices(
@@ -254,7 +266,11 @@ impl PyNodesAccessor {
             // 🚀 PERFORMANCE FIX: Use core columnar topology instead of O(E) FFI algorithm
             let selected_node_set: std::collections::HashSet<NodeId> =
                 selected_nodes.iter().copied().collect();
-            let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
+            let (edge_ids, sources, targets) = { 
+                let graph = self.graph.borrow(py);
+                let topology = graph.inner.borrow().get_columnar_topology();
+                topology
+            };
             let mut induced_edges = Vec::new();
 
             // O(k) where k = active edges, much better than O(E)
@@ -301,7 +317,8 @@ impl PyNodesAccessor {
             constrained.clone()
         } else {
             let graph = self.graph.borrow(py);
-            graph.inner.node_ids()
+            let node_ids = graph.inner.borrow().node_ids();
+            node_ids
         };
 
         Ok(NodesIterator {
@@ -369,12 +386,14 @@ impl PyNodesAccessor {
         } else {
             // Full graph case: get all node IDs from the graph
             let graph = self.graph.borrow(py);
-            graph
+            let node_ids = graph
                 .inner
+                .borrow()
                 .node_ids()
                 .into_iter()
                 .map(|id| id as u64)
-                .collect()
+                .collect();
+            node_ids
         };
 
         // Use PyGraphTable::from_graph_nodes to create the table
@@ -392,19 +411,22 @@ impl PyNodesAccessor {
     /// Get all nodes as a subgraph (equivalent to g.nodes[:])
     /// Returns a subgraph containing all nodes and all induced edges
     fn all(&self, py: Python) -> PyResult<PySubgraph> {
-        let graph = self.graph.borrow_mut(py);
+        let graph = self.graph.borrow(py);
         
         // Get all node IDs (respecting constraints if any)
         let all_node_ids = if let Some(ref constrained) = self.constrained_nodes {
             constrained.clone()
         } else {
-            graph.inner.node_ids()
+            { let node_ids = graph.inner.borrow().node_ids(); node_ids }
         };
         
         // Get all induced edges for these nodes using columnar topology (high performance)
         let selected_node_set: std::collections::HashSet<NodeId> =
             all_node_ids.iter().copied().collect();
-        let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
+        let (edge_ids, sources, targets) = { 
+            let topology = graph.inner.borrow().get_columnar_topology();
+            topology
+        };
         let mut induced_edges = Vec::new();
 
         // O(k) where k = active edges
@@ -438,7 +460,7 @@ impl PyNodesAccessor {
         let node_ids = if let Some(ref constrained) = self.constrained_nodes {
             constrained.clone()
         } else {
-            graph.inner.node_ids()
+            { let node_ids = graph.inner.borrow().node_ids(); node_ids }
         };
 
         if node_ids.is_empty() {
@@ -485,7 +507,7 @@ impl PyNodesAccessor {
         let mut values: Vec<Option<PyObject>> = Vec::new();
         for &node_id in &node_ids {
             if graph.has_node_internal(node_id) {
-                match graph.inner.get_node_attr(node_id, &attr_name.to_string()) {
+                match graph.inner.borrow().get_node_attr(node_id, &attr_name.to_string()) {
                     Ok(Some(value)) => {
                         // Convert the attribute value to Python object
                         let py_value = attr_value_to_python_value(py, &value)?;
@@ -593,7 +615,7 @@ impl PyEdgesAccessor {
             let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
                 constrained.clone()
             } else {
-                graph.inner.edge_ids()
+                { let edge_ids = graph.inner.borrow().edge_ids(); edge_ids }
             };
 
             // Check if boolean mask length matches edge count
@@ -629,7 +651,12 @@ impl PyEdgesAccessor {
             // Get all endpoint nodes from selected edges
             let mut endpoint_nodes = std::collections::HashSet::new();
             for &edge_id in &selected_edges {
-                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                let endpoints = {
+                    let graph = self.graph.borrow(py);
+                    let result = graph.inner.borrow().edge_endpoints(edge_id);
+                    result
+                };
+                if let Ok((source, target)) = endpoints {
                     endpoint_nodes.insert(source);
                     endpoint_nodes.insert(target);
                 }
@@ -689,7 +716,7 @@ impl PyEdgesAccessor {
             // Get all endpoint nodes from these edges
             let mut endpoint_nodes = std::collections::HashSet::new();
             for &edge_id in &edge_ids {
-                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                if let Ok((source, target)) = graph.inner.borrow().edge_endpoints(edge_id) {
                     endpoint_nodes.insert(source);
                     endpoint_nodes.insert(target);
                 }
@@ -708,8 +735,10 @@ impl PyEdgesAccessor {
 
         // Try to extract as slice (slice access)
         if let Ok(slice) = key.downcast::<PySlice>() {
-            let graph = self.graph.borrow(py);
-            let all_edge_ids = graph.inner.edge_ids();
+            let all_edge_ids = {
+                let graph = self.graph.borrow(py);
+                { let edge_ids = graph.inner.borrow().edge_ids(); edge_ids }
+            };
 
             // Convert slice to indices
             let slice_info = slice.indices(
@@ -733,7 +762,12 @@ impl PyEdgesAccessor {
             // Get all endpoint nodes from selected edges
             let mut endpoint_nodes = std::collections::HashSet::new();
             for &edge_id in &selected_edges {
-                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                let endpoints = {
+                    let graph = self.graph.borrow(py);
+                    let result = graph.inner.borrow().edge_endpoints(edge_id);
+                    result
+                };
+                if let Ok((source, target)) = endpoints {
                     endpoint_nodes.insert(source);
                     endpoint_nodes.insert(target);
                 }
@@ -763,7 +797,8 @@ impl PyEdgesAccessor {
             constrained.clone()
         } else {
             let graph = self.graph.borrow(py);
-            graph.inner.edge_ids()
+            let edge_ids = graph.inner.borrow().edge_ids();
+            edge_ids
         };
 
         Ok(EdgesIterator {
@@ -801,7 +836,7 @@ impl PyEdgesAccessor {
             constrained.clone()
         } else {
             // Get all edge IDs from the graph
-            graph.inner.edge_ids()
+            { let edge_ids = graph.inner.borrow().edge_ids(); edge_ids }
         };
 
         // Collect attributes from all edges
@@ -829,12 +864,14 @@ impl PyEdgesAccessor {
         } else {
             // Full graph case: get all edge IDs from the graph
             let graph = self.graph.borrow(py);
-            graph
+            let edge_ids = graph
                 .inner
+                .borrow()
                 .edge_ids()
                 .into_iter()
                 .map(|id| id as u64)
-                .collect()
+                .collect();
+            edge_ids
         };
 
         // Use PyGraphTable::from_graph_edges to create the table
@@ -858,11 +895,11 @@ impl PyEdgesAccessor {
         let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
             constrained.clone()
         } else {
-            graph.inner.edge_ids()
+            { let edge_ids = graph.inner.borrow().edge_ids(); edge_ids }
         };
         
         // Get all nodes that are endpoints of these edges
-        let (_, sources, targets) = graph.inner.get_columnar_topology();
+        let (_, sources, targets) = graph.inner.borrow().get_columnar_topology();
         let mut connected_nodes = std::collections::HashSet::new();
         let edge_set: std::collections::HashSet<EdgeId> = all_edge_ids.iter().copied().collect();
         
@@ -906,7 +943,7 @@ impl PyEdgesAccessor {
         let edge_ids = if let Some(ref constrained) = self.constrained_edges {
             constrained.clone()
         } else {
-            graph.inner.edge_ids()
+            { let edge_ids = graph.inner.borrow().edge_ids(); edge_ids }
         };
 
         if edge_ids.is_empty() {
@@ -948,7 +985,7 @@ impl PyEdgesAccessor {
         // Collect attribute values - allow None for edges without the attribute
         let mut values: Vec<Option<PyObject>> = Vec::new();
         for &edge_id in &edge_ids {
-            match graph.inner.get_edge_attr(edge_id, &attr_name.to_string()) {
+            match graph.inner.borrow().get_edge_attr(edge_id, &attr_name.to_string()) {
                 Ok(Some(value)) => {
                     // Convert the attribute value to Python object
                     let py_value = attr_value_to_python_value(py, &value)?;

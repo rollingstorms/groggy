@@ -27,14 +27,18 @@ impl PyGraphAnalytics {
         attr_name: Option<String>,
     ) -> PyResult<Vec<PySubgraph>> {
         let inplace = inplace.unwrap_or(false);
-        let mut graph = self.graph.borrow_mut(py);
-
+        
         // Delegate to core algorithm - THIN WRAPPER
         let options = TraversalOptions::default();
-        let result = graph
-            .inner
-            .connected_components(options)
-            .map_err(graph_error_to_py_err)?;
+        let result = {
+            let graph = self.graph.borrow(py);
+            let components_result = graph
+                .inner
+                .borrow_mut()
+                .connected_components(options)
+                .map_err(graph_error_to_py_err)?;
+            components_result
+        };
 
         let mut subgraphs = Vec::new();
 
@@ -55,8 +59,11 @@ impl PyGraphAnalytics {
                     .collect();
                 attrs_values.insert(attr_name.clone(), node_value_pairs);
 
+                // Set attributes in a separate borrow scope
+                let graph = self.graph.borrow(py);
                 graph
                     .inner
+                    .borrow_mut()
                     .set_node_attrs(attrs_values)
                     .map_err(graph_error_to_py_err)?;
             }
@@ -88,19 +95,23 @@ impl PyGraphAnalytics {
         attr_name: Option<String>,
     ) -> PyResult<PySubgraph> {
         let inplace = inplace.unwrap_or(false);
-        let mut graph = self.graph.borrow_mut(py);
-
+        
         // Create traversal options
         let mut options = TraversalOptions::default();
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
         }
 
-        // Perform BFS traversal
-        let result = graph
-            .inner
-            .bfs(start_node, options)
-            .map_err(graph_error_to_py_err)?;
+        // Perform BFS traversal - get inner graph reference directly
+        let result = {
+            let graph = self.graph.borrow(py);
+            let bfs_result = graph
+                .inner
+                .borrow_mut()
+                .bfs(start_node, options)
+                .map_err(graph_error_to_py_err)?;
+            bfs_result
+        };
 
         // If inplace=True, set distance/order attributes on nodes
         if inplace {
@@ -116,8 +127,11 @@ impl PyGraphAnalytics {
                 .collect();
             attrs_values.insert(attr_name, node_value_pairs);
 
+            // Set attributes in a separate borrow scope
+            let graph = self.graph.borrow(py);
             graph
                 .inner
+                .borrow_mut()
                 .set_node_attrs(attrs_values)
                 .map_err(graph_error_to_py_err)?;
         }
@@ -141,19 +155,23 @@ impl PyGraphAnalytics {
         attr_name: Option<String>,
     ) -> PyResult<PySubgraph> {
         let inplace = inplace.unwrap_or(false);
-        let mut graph = self.graph.borrow_mut(py);
-
+        
         // Create traversal options
         let mut options = TraversalOptions::default();
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
         }
 
-        // Perform DFS traversal
-        let result = graph
-            .inner
-            .dfs(start_node, options)
-            .map_err(graph_error_to_py_err)?;
+        // Perform DFS traversal - get inner graph reference directly
+        let result = {
+            let graph = self.graph.borrow(py);
+            let dfs_result = graph
+                .inner
+                .borrow_mut()
+                .dfs(start_node, options)
+                .map_err(graph_error_to_py_err)?;
+            dfs_result
+        };
 
         // If inplace=True, set distance/order attributes on nodes
         if inplace {
@@ -169,8 +187,11 @@ impl PyGraphAnalytics {
                 .collect();
             attrs_values.insert(attr_name, node_value_pairs);
 
+            // Set attributes in a separate borrow scope
+            let graph = self.graph.borrow(py);
             graph
                 .inner
+                .borrow_mut()
                 .set_node_attrs(attrs_values)
                 .map_err(graph_error_to_py_err)?;
         }
@@ -195,18 +216,22 @@ impl PyGraphAnalytics {
         attr_name: Option<String>,
     ) -> PyResult<Option<PySubgraph>> {
         let inplace = inplace.unwrap_or(false);
-        let mut graph = self.graph.borrow_mut(py);
-
+        
         let options = PathFindingOptions {
             weight_attribute,
             max_path_length: None,
             heuristic: None,
         };
 
-        let result = graph
-            .inner
-            .shortest_path(source, target, options)
-            .map_err(graph_error_to_py_err)?;
+        let result = {
+            let graph = self.graph.borrow(py);
+            let path_result = graph
+                .inner
+                .borrow_mut()
+                .shortest_path(source, target, options)
+                .map_err(graph_error_to_py_err)?;
+            path_result
+        };
 
         match result {
             Some(path) => {
@@ -224,8 +249,11 @@ impl PyGraphAnalytics {
                             .collect();
                         attrs_values.insert(attr_name, node_value_pairs);
 
+                        // Set attributes in a separate borrow scope
+                        let graph = self.graph.borrow(py);
                         graph
                             .inner
+                            .borrow_mut()
                             .set_node_attrs(attrs_values)
                             .map_err(graph_error_to_py_err)?;
                     }
@@ -244,18 +272,21 @@ impl PyGraphAnalytics {
 
     /// Check if a path exists between two nodes
     pub fn has_path(&self, py: Python, source: NodeId, target: NodeId) -> PyResult<bool> {
-        let mut graph = self.graph.borrow_mut(py);
-
         let options = PathFindingOptions {
             weight_attribute: None,
             max_path_length: None,
             heuristic: None,
         };
 
-        let result = graph
-            .inner
-            .shortest_path(source, target, options)
-            .map_err(graph_error_to_py_err)?;
+        let result = {
+            let graph = self.graph.borrow(py);
+            let path_result = graph
+                .inner
+                .borrow_mut()
+                .shortest_path(source, target, options)
+                .map_err(graph_error_to_py_err)?;
+            path_result
+        };
 
         Ok(result.is_some())
     }
@@ -263,13 +294,14 @@ impl PyGraphAnalytics {
     /// Get node degree
     fn degree(&self, py: Python, node: NodeId) -> PyResult<usize> {
         let graph = self.graph.borrow(py);
-        graph.inner.degree(node).map_err(graph_error_to_py_err)
+        let degree = graph.inner.borrow().degree(node).map_err(graph_error_to_py_err);
+        degree
     }
 
     /// Get memory statistics
     fn memory_statistics(&self, py: Python) -> PyResult<PyObject> {
         let graph = self.graph.borrow(py);
-        let stats = graph.inner.memory_statistics();
+        let stats = graph.inner.borrow().memory_statistics();
 
         // Convert MemoryStatistics to Python dict
         let dict = PyDict::new(py);
