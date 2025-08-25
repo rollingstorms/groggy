@@ -1277,6 +1277,17 @@ impl Graph {
         self.traversal_engine.statistics()
     }
 
+    /// Allow subgraphs to access TraversalEngine for connected components
+    pub(crate) fn connected_components_for_subgraph(
+        &mut self,
+        nodes: Vec<NodeId>,
+    ) -> Result<crate::core::traversal::ConnectedComponentsResult, GraphError> {
+        let options = crate::core::traversal::TraversalOptions::default();
+        self.traversal_engine
+            .connected_components_for_nodes(&self.pool.borrow(), &self.space, nodes, options)
+            .map_err(|e| e.into())
+    }
+
     /// Allow subgraphs to use the optimized TraversalEngine
     /// This enables all connected components analysis to use the same optimized algorithm
     pub(crate) fn run_connected_components_for_subgraph(

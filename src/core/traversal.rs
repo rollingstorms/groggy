@@ -468,14 +468,36 @@ impl TraversalEngine {
     pub fn connected_components(
         &mut self,
         pool: &GraphPool,
-        space: &GraphSpace, // Changed to &GraphSpace (no longer mutable)
+        space: &GraphSpace,
+        options: TraversalOptions,
+    ) -> GraphResult<ConnectedComponentsResult> {
+        // Use all active nodes if no specific nodes provided
+        let nodes = match &options.node_filter {
+            Some(NodeFilter::NodeSet(node_set)) => node_set.iter().copied().collect(),
+            None => space.get_active_nodes().iter().copied().collect(),
+            _ => {
+                // Apply other filters to active nodes
+                let active_nodes: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
+                self.query_engine.filter_nodes_columnar(&active_nodes, pool, space, options.node_filter.as_ref().unwrap())?
+            }
+        };
+        
+        self.connected_components_for_nodes(pool, space, nodes, options)
+    }
+
+    /// Core connected components implementation that works on any node set
+    pub fn connected_components_for_nodes(
+        &mut self,
+        pool: &GraphPool,
+        space: &GraphSpace,
+        nodes: Vec<NodeId>,
         options: TraversalOptions,
     ) -> GraphResult<ConnectedComponentsResult> {
         let start_time = std::time::Instant::now();
 
-        // 📊 TIMING: Step 1 - Get active nodes
+        // 📊 TIMING: Step 1 - Use provided nodes
         let step1_start = std::time::Instant::now();
-        let active_nodes: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
+        // nodes parameter already provided
         let _step1_duration = step1_start.elapsed();
 
         // 📊 TIMING: Step 2 - Build adjacency snapshot
@@ -502,7 +524,7 @@ impl TraversalEngine {
         let mut node_component_id: HashMap<NodeId, usize> = HashMap::new();
 
         // BFS for each unvisited node - O(V + E) total
-        for &start_node in &active_nodes {
+        for &start_node in &nodes {
             if !visited.contains(&start_node) {
                 // 🚀 FAST: Individual node filtering - only check nodes we actually encounter
                 if !self.should_visit_node(pool, space, start_node, &options)? {
@@ -524,7 +546,8 @@ impl TraversalEngine {
                     // Use fresh adjacency for optimal performance - get (neighbor, edge_id) pairs
                     if let Some(current_neighbors) = neighbors.get(&current) {
                         for &(neighbor, _edge_id) in current_neighbors {
-                            if !visited.contains(&neighbor) {
+                            // Only consider neighbors that are in our node set
+                            if nodes.contains(&neighbor) && !visited.contains(&neighbor) {
                                 // 🚀 FAST: Individual node filtering - only check nodes we actually encounter
                                 if self.should_visit_node(pool, space, neighbor, &options)? {
                                     visited.insert(neighbor);

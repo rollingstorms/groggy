@@ -22,7 +22,7 @@ pub struct PyGraphQuery {
 impl PyGraphQuery {
     /// Filter nodes by criteria
     pub fn filter_nodes(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
-        let mut graph = self.graph.borrow_mut(py);
+        let graph = self.graph.borrow(py);
 
         // Fast path optimization: Check for NodeFilter object first (most common case)
         let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
@@ -42,6 +42,7 @@ impl PyGraphQuery {
 
         let filtered_nodes = graph
             .inner
+            .borrow_mut()
             .find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
 
@@ -49,7 +50,7 @@ impl PyGraphQuery {
         let node_set: HashSet<NodeId> = filtered_nodes.iter().copied().collect();
 
         // Get columnar topology vectors (edge_ids, sources, targets) - O(1) if cached
-        let (edge_ids, sources, targets) = graph.inner.get_columnar_topology();
+        let (edge_ids, sources, targets) = graph.inner.borrow().get_columnar_topology();
         let mut induced_edges = Vec::new();
 
         // Iterate through parallel vectors - O(k) where k = active edges
@@ -74,7 +75,7 @@ impl PyGraphQuery {
 
     /// Filter edges by criteria
     pub fn filter_edges(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
-        let mut graph = self.graph.borrow_mut(py);
+        let graph = self.graph.borrow(py);
 
         // Similar pattern to filter_nodes but for edges
         let edge_filter = if let Ok(filter_obj) = filter.extract::<PyEdgeFilter>() {
@@ -92,13 +93,14 @@ impl PyGraphQuery {
 
         let filtered_edges = graph
             .inner
+            .borrow_mut()
             .find_edges(edge_filter)
             .map_err(graph_error_to_py_err)?;
 
         // Calculate nodes that are connected by the filtered edges
         let mut nodes = HashSet::new();
         for &edge_id in &filtered_edges {
-            if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+            if let Ok((source, target)) = graph.inner.borrow().edge_endpoints(edge_id) {
                 nodes.insert(source);
                 nodes.insert(target);
             }
@@ -121,7 +123,7 @@ impl PyGraphQuery {
         subgraph: &PySubgraph,
         filter: &PyAny,
     ) -> PyResult<PySubgraph> {
-        let mut graph = self.graph.borrow_mut(py);
+        let graph = self.graph.borrow(py);
 
         // Parse filter same way as filter_nodes
         let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
@@ -141,6 +143,7 @@ impl PyGraphQuery {
         let subgraph_node_set: HashSet<NodeId> = subgraph.get_nodes().iter().copied().collect();
         let all_filtered_nodes = graph
             .inner
+            .borrow_mut()
             .find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
 
@@ -156,7 +159,7 @@ impl PyGraphQuery {
             .get_edges()
             .iter()
             .filter(|&&edge_id| {
-                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                if let Ok((source, target)) = graph.inner.borrow().edge_endpoints(edge_id) {
                     filtered_node_set.contains(&source) && filtered_node_set.contains(&target)
                 } else {
                     false
@@ -195,6 +198,7 @@ impl PyGraphQuery {
                     // All nodes aggregation
                     let result = graph
                         .inner
+                        .borrow()
                         .aggregate_node_attribute(&attribute, &operation)
                         .map_err(graph_error_to_py_err)?;
 
@@ -210,6 +214,7 @@ impl PyGraphQuery {
                 // Edge aggregation
                 let result = graph
                     .inner
+                    .borrow()
                     .aggregate_edge_attribute(&attribute, &operation)
                     .map_err(graph_error_to_py_err)?;
 
@@ -282,6 +287,7 @@ impl PyGraphQuery {
         // Use bulk attribute retrieval for much better performance
         let bulk_attributes = graph
             .inner
+            .borrow()
             ._get_node_attributes_for_nodes(&node_ids, &attribute)
             .map_err(graph_error_to_py_err)?;
         let mut values = Vec::new();

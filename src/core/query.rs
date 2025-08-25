@@ -41,7 +41,7 @@ impl QueryEngine {
     }
 
     /// Columnar filtering on any subset of nodes - THE CORE METHOD (ULTRA-OPTIMIZED)
-    fn filter_nodes_columnar(
+    pub(crate) fn filter_nodes_columnar(
         &self,
         nodes: &[NodeId],
         pool: &GraphPool,
