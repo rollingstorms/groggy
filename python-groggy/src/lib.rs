@@ -177,7 +177,7 @@ fn merge(py: Python, graphs: Vec<Py<PyGraph>>) -> PyResult<PyObject> {
     
     // Create a new empty graph with the same directionality as the first graph
     let first_graph = graphs[0].borrow(py);
-    let directed = first_graph.inner.graph_type() == groggy::types::GraphType::Directed;
+    let directed = first_graph.inner.borrow().graph_type() == groggy::types::GraphType::Directed;
     drop(first_graph); // Release borrow
     
     // Use the constructor through Python class instantiation

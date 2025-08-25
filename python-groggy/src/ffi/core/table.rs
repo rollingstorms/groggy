@@ -113,7 +113,7 @@ impl PyGraphTable {
             // Discover all available node attributes
             let mut all_attrs = std::collections::HashSet::new();
             for &node_id in &nodes {
-                if let Ok(attrs) = graph_ref.inner.get_node_attrs(node_id as usize) {
+                if let Ok(attrs) = graph_ref.inner.borrow().get_node_attrs(node_id as usize) {
                     for attr_name in attrs.keys() {
                         all_attrs.insert(attr_name.clone());
                     }
@@ -139,7 +139,7 @@ impl PyGraphTable {
                 // Regular node attributes
                 for &node_id in &nodes {
                     if let Ok(Some(attr_value)) =
-                        graph_ref.inner.get_node_attr(node_id as usize, attr_name)
+                        graph_ref.inner.borrow().get_node_attr(node_id as usize, attr_name)
                     {
                         attr_values.push(attr_value);
                     } else {
@@ -177,7 +177,7 @@ impl PyGraphTable {
             // Discover all available edge attributes
             let mut all_attrs = std::collections::HashSet::new();
             for &edge_id in &edges {
-                if let Ok(attrs) = graph_ref.inner.get_edge_attrs(edge_id as usize) {
+                if let Ok(attrs) = graph_ref.inner.borrow().get_edge_attrs(edge_id as usize) {
                     for attr_name in attrs.keys() {
                         all_attrs.insert(attr_name.clone());
                     }
@@ -206,7 +206,7 @@ impl PyGraphTable {
             } else if attr_name == "source" || attr_name == "target" {
                 // Special case: edge endpoints
                 for &edge_id in &edges {
-                    if let Ok((source, target)) = graph_ref.inner.edge_endpoints(edge_id as usize) {
+                    if let Ok((source, target)) = graph_ref.inner.borrow().edge_endpoints(edge_id as usize) {
                         let endpoint_id = if attr_name == "source" {
                             source
                         } else {
@@ -222,7 +222,7 @@ impl PyGraphTable {
                 // Regular edge attributes
                 for &edge_id in &edges {
                     if let Ok(Some(attr_value)) =
-                        graph_ref.inner.get_edge_attr(edge_id as usize, attr_name)
+                        graph_ref.inner.borrow().get_edge_attr(edge_id as usize, attr_name)
                     {
                         attr_values.push(attr_value);
                     } else {
@@ -742,7 +742,7 @@ impl PyGraphTable {
 
         let filtered_table = self
             .inner
-            .filter_by_degree(&graph_ref.inner, &node_id_column, min_degree, max_degree)
+            .filter_by_degree(&*graph_ref.inner.borrow(), &node_id_column, min_degree, max_degree)
             .map_err(graph_error_to_py_err)?;
 
         let py_table = PyGraphTable::from_graph_table(filtered_table);
@@ -779,7 +779,7 @@ impl PyGraphTable {
         let filtered_table = self
             .inner
             .filter_by_connectivity(
-                &graph_ref.inner,
+                &*graph_ref.inner.borrow(),
                 &node_id_column,
                 &target_usize,
                 connectivity,
@@ -807,7 +807,7 @@ impl PyGraphTable {
         let filtered_table = self
             .inner
             .filter_by_distance(
-                &graph_ref.inner,
+                &*graph_ref.inner.borrow(),
                 &node_id_column,
                 &target_usize,
                 max_distance,

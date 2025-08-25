@@ -272,18 +272,15 @@ impl Subgraph {
             return Ok(vec![]);
         }
         
-        // Use optimized TraversalEngine via Graph
+        // Use TraversalEngine via Graph method
         let mut graph = self.graph.borrow_mut();
-        let options = TraversalOptions {
-            node_filter: None, // Will be set by the Graph method
-            ..TraversalOptions::default()
-        };
+        let nodes: Vec<NodeId> = self.nodes.iter().copied().collect();
         
-        let result = graph.run_connected_components_for_subgraph(&self.nodes, options)?;
+        let result = graph.connected_components_for_subgraph(nodes)?;
         
         // Convert ConnectedComponentsResult to Vec<Subgraph>
         let mut components = Vec::new();
-        for (component_id, component_result) in result.components.into_iter().enumerate() {
+        for component_result in result.components {
             // Get nodes in this component
             let component_nodes: HashSet<NodeId> = component_result.nodes.into_iter().collect();
             
@@ -302,7 +299,7 @@ impl Subgraph {
                 self.graph.clone(),
                 component_nodes,
                 component_edges,
-                format!("{}_component_{}", self.subgraph_type, component_id),
+                format!("{}_component_{}", self.subgraph_type, components.len()),
             ));
         }
         

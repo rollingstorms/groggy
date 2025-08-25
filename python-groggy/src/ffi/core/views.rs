@@ -61,7 +61,7 @@ impl PyNodeView {
     fn values(&self, py: Python) -> PyResult<Vec<PyAttrValue>> {
         let graph = self.graph.borrow(py);
         // 🚀 PERFORMANCE FIX: Use batch attribute access instead of manual loops
-        let node_attrs = graph.inner.get_node_attrs(self.node_id).map_err(|e| {
+        let node_attrs = graph.inner.borrow().get_node_attrs(self.node_id).map_err(|e| {
             PyRuntimeError::new_err(format!("Failed to get node attributes: {}", e))
         })?;
 
@@ -75,16 +75,17 @@ impl PyNodeView {
     /// Get neighbors of this node
     fn neighbors(&self, py: Python) -> PyResult<Vec<NodeId>> {
         let graph = self.graph.borrow(py);
-        graph.inner.neighbors(self.node_id).map_err(|e| {
+        let neighbors = graph.inner.borrow().neighbors(self.node_id).map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get neighbors: {}", e))
-        })
+        });
+        neighbors
     }
 
     /// Get all attribute items as (key, value) pairs
     fn items(&self, py: Python) -> PyResult<Vec<(String, PyAttrValue)>> {
         let graph = self.graph.borrow(py);
         // 🚀 PERFORMANCE FIX: Use batch attribute access instead of manual loops
-        let node_attrs = graph.inner.get_node_attrs(self.node_id).map_err(|e| {
+        let node_attrs = graph.inner.borrow().get_node_attrs(self.node_id).map_err(|e| {
             PyRuntimeError::new_err(format!("Failed to get node attributes: {}", e))
         })?;
 
@@ -265,6 +266,7 @@ impl PyEdgeView {
         let graph = self.graph.borrow(py);
         let (source, _) = graph
             .inner
+            .borrow()
             .edge_endpoints(self.edge_id)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get edge endpoints: {}", e)))?;
         Ok(source)
@@ -276,6 +278,7 @@ impl PyEdgeView {
         let graph = self.graph.borrow(py);
         let (_, target) = graph
             .inner
+            .borrow()
             .edge_endpoints(self.edge_id)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get edge endpoints: {}", e)))?;
         Ok(target)
@@ -286,6 +289,7 @@ impl PyEdgeView {
         let graph = self.graph.borrow(py);
         let endpoints = graph
             .inner
+            .borrow()
             .edge_endpoints(self.edge_id)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get edge endpoints: {}", e)))?;
         Ok(endpoints)
@@ -307,7 +311,7 @@ impl PyEdgeView {
     fn values(&self, py: Python) -> PyResult<Vec<PyAttrValue>> {
         let graph = self.graph.borrow(py);
         // 🚀 PERFORMANCE FIX: Use batch attribute access instead of manual loops
-        let edge_attrs = graph.inner.get_edge_attrs(self.edge_id).map_err(|e| {
+        let edge_attrs = graph.inner.borrow().get_edge_attrs(self.edge_id).map_err(|e| {
             PyRuntimeError::new_err(format!("Failed to get edge attributes: {}", e))
         })?;
 
@@ -322,7 +326,7 @@ impl PyEdgeView {
     fn items(&self, py: Python) -> PyResult<Vec<(String, PyAttrValue)>> {
         let graph = self.graph.borrow(py);
         // 🚀 PERFORMANCE FIX: Use batch attribute access instead of manual loops
-        let edge_attrs = graph.inner.get_edge_attrs(self.edge_id).map_err(|e| {
+        let edge_attrs = graph.inner.borrow().get_edge_attrs(self.edge_id).map_err(|e| {
             PyRuntimeError::new_err(format!("Failed to get edge attributes: {}", e))
         })?;
 
@@ -357,7 +361,7 @@ impl PyEdgeView {
         let keys = graph.edge_attribute_keys(self.edge_id);
 
         // Get endpoints for display
-        let (source, target) = match graph.inner.edge_endpoints(self.edge_id) {
+        let (source, target) = match graph.inner.borrow().edge_endpoints(self.edge_id) {
             Ok(endpoints) => endpoints,
             Err(_) => return Ok(format!("EdgeView({}) [invalid]", self.edge_id)),
         };
