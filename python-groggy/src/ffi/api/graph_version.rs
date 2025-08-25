@@ -157,40 +157,48 @@ impl PyHistoricalView {
 impl PyGraphVersion {
     /// Commit current changes to version control
     fn commit(&self, py: Python, message: String, author: String) -> PyResult<StateId> {
-        let mut graph = self.graph.borrow_mut(py);
-        graph
+        let graph = self.graph.borrow_mut(py);
+        let commit_result = graph
             .inner
+            .borrow_mut()
             .commit(message, author)
-            .map_err(graph_error_to_py_err)
+            .map_err(graph_error_to_py_err);
+        commit_result
     }
 
     /// Create a new branch
     fn create_branch(&self, py: Python, branch_name: String) -> PyResult<()> {
-        let mut graph = self.graph.borrow_mut(py);
-        graph
+        let graph = self.graph.borrow_mut(py);
+        let create_result = graph
             .inner
+            .borrow_mut()
             .create_branch(branch_name)
-            .map_err(graph_error_to_py_err)
+            .map_err(graph_error_to_py_err);
+        create_result
     }
 
     /// Switch to a different branch
     fn checkout_branch(&self, py: Python, branch_name: String) -> PyResult<()> {
-        let mut graph = self.graph.borrow_mut(py);
-        graph
+        let graph = self.graph.borrow_mut(py);
+        let checkout_result = graph
             .inner
+            .borrow_mut()
             .checkout_branch(branch_name)
-            .map_err(graph_error_to_py_err)
+            .map_err(graph_error_to_py_err);
+        checkout_result
     }
 
     /// List all branches
     fn branches(&self, py: Python) -> Vec<PyBranchInfo> {
         let graph = self.graph.borrow(py);
-        graph
+        let branches = graph
             .inner
+            .borrow()
             .list_branches()
             .into_iter()
             .map(|branch_info| PyBranchInfo { inner: branch_info })
-            .collect()
+            .collect();
+        branches
     }
 
     /// Get commit history
@@ -204,7 +212,9 @@ impl PyGraphVersion {
     /// Get historical view at a specific commit
     fn historical_view(&self, py: Python, commit_id: StateId) -> PyResult<PyHistoricalView> {
         let graph = self.graph.borrow(py);
-        match graph.inner.view_at_commit(commit_id) {
+        let inner = graph.inner.borrow();
+        let view_result = inner.view_at_commit(commit_id);
+        match view_result {
             Ok(_view) => Ok(PyHistoricalView {
                 state_id: commit_id,
             }),
@@ -215,7 +225,8 @@ impl PyGraphVersion {
     /// Check if there are uncommitted changes
     fn has_uncommitted_changes(&self, py: Python) -> bool {
         let graph = self.graph.borrow(py);
-        graph.inner.has_uncommitted_changes()
+        let has_changes = graph.inner.borrow().has_uncommitted_changes();
+        has_changes
     }
 
     /// Create a snapshot of the current graph state
@@ -275,7 +286,7 @@ impl PyGraphVersion {
         dict.set_item("total_commits", 0)?; // Would be implemented with actual history
         dict.set_item(
             "has_uncommitted_changes",
-            graph.inner.has_uncommitted_changes(),
+            graph.inner.borrow().has_uncommitted_changes(),
         )?;
 
         // Get current state info
@@ -291,13 +302,24 @@ impl PyGraphVersion {
 
     /// Get node mapping for a specific attribute
     fn get_node_mapping(&self, py: Python, uid_key: String) -> PyResult<PyObject> {
-        let graph = self.graph.borrow(py);
         let dict = PyDict::new(py);
-        let node_ids = graph.inner.node_ids();
+        
+        // Get node IDs in isolated borrow scope
+        let node_ids = {
+            let graph = self.graph.borrow(py);
+            let result = graph.inner.borrow().node_ids();
+            result
+        };
 
-        // Scan all nodes for the specified uid_key attribute
+        // Scan all nodes for the specified uid_key attribute using isolated borrows
         for node_id in node_ids {
-            if let Ok(Some(attr_value)) = graph.inner.get_node_attr(node_id, &uid_key) {
+            let attr_value = {
+                let graph = self.graph.borrow(py);
+                let result = graph.inner.borrow().get_node_attr(node_id, &uid_key);
+                result
+            };
+            
+            if let Ok(Some(attr_value)) = attr_value {
                 // Convert attribute value to appropriate Python type
                 let key_value = match attr_value {
                     RustAttrValue::Text(s) => s.to_object(py),
@@ -321,7 +343,7 @@ impl PyGraphVersion {
         let graph = self.graph.borrow(py);
         let node_count = graph.get_node_count();
         let edge_count = graph.get_edge_count();
-        let has_changes = graph.inner.has_uncommitted_changes();
+        let has_changes = graph.inner.borrow().has_uncommitted_changes();
 
         Ok(format!(
             "Version Control: {} nodes, {} edges, uncommitted changes: {}",

@@ -77,15 +77,34 @@ impl PySubgraph {
         }
     }
 
-    /// Standard PySubgraph constructor
+    /// Standard PySubgraph constructor - now creates proper RustSubgraph
     pub fn new(
         nodes: Vec<NodeId>,
         edges: Vec<EdgeId>,
         subgraph_type: String,
         graph: Option<Py<PyGraph>>,
     ) -> Self {
+        // Always create proper RustSubgraph when we have graph reference
+        let inner = if let Some(ref graph_py) = graph {
+            pyo3::Python::with_gil(|py| {
+                let graph = graph_py.borrow(py);
+                let graph_ref = graph.get_graph_ref();
+                
+                let rust_subgraph = RustSubgraph::new(
+                    graph_ref,
+                    nodes.iter().copied().collect(),
+                    edges.iter().copied().collect(),
+                    subgraph_type.clone(),
+                );
+                
+                Some(rust_subgraph)
+            })
+        } else {
+            None
+        };
+        
         PySubgraph {
-            inner: None,
+            inner,
             nodes,
             edges,
             subgraph_type,
@@ -300,9 +319,10 @@ impl PySubgraph {
                 let deg = if full_graph {
                     // Get degree from full graph
                     let graph = graph_ref.borrow(py);
-                    graph.inner.degree(node_id).map_err(|e| {
+                    let degree = graph.inner.borrow().degree(node_id).map_err(|e| {
                         PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}", e))
-                    })?
+                    })?;
+                    degree
                 } else {
                     // Calculate local degree within subgraph
                     self.edges
@@ -310,11 +330,12 @@ impl PySubgraph {
                         .filter(|&&edge_id| {
                             if let Some(graph_ref) = &self.graph {
                                 let graph = graph_ref.borrow(py);
-                                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                                let is_connected = if let Ok((source, target)) = graph.inner.borrow().edge_endpoints(edge_id) {
                                     source == node_id || target == node_id
                                 } else {
                                     false
-                                }
+                                };
+                                is_connected
                             } else {
                                 false
                             }
@@ -330,6 +351,20 @@ impl PySubgraph {
                 let node_ids = node_arg.extract::<Vec<NodeId>>()?;
                 let mut degrees = Vec::new();
 
+                // Pre-collect edge endpoints to avoid repeated borrows in filter
+                let edge_endpoints: std::collections::HashMap<groggy::EdgeId, (groggy::NodeId, groggy::NodeId)> = if !full_graph {
+                    if let Some(graph_ref) = &self.graph {
+                        let graph = graph_ref.borrow(py);
+                        self.edges.iter().filter_map(|&edge_id| {
+                            graph.inner.borrow().edge_endpoints(edge_id).ok().map(|(s, t)| (edge_id, (s, t)))
+                        }).collect()
+                    } else {
+                        std::collections::HashMap::new()
+                    }
+                } else {
+                    std::collections::HashMap::new()
+                };
+
                 for node_id in node_ids {
                     // Verify node is in subgraph
                     if !self.nodes.contains(&node_id) {
@@ -337,31 +372,21 @@ impl PySubgraph {
                     }
 
                     let deg = if full_graph {
-                        // Get degree from main graph
-                        let graph = graph_ref.borrow(py);
-                        match graph.inner.degree(node_id) {
+                        // Get degree from main graph using isolated borrow
+                        let degree_result = {
+                            let graph = graph_ref.borrow(py);
+                            let result = graph.inner.borrow().degree(node_id);
+                            result
+                        };
+                        match degree_result {
                             Ok(d) => d,
                             Err(_) => continue, // Skip invalid nodes
                         }
                     } else {
-                        // Calculate local degree within subgraph
-                        self.edges
-                            .iter()
-                            .filter(|&&edge_id| {
-                                if let Some(graph_ref) = &self.graph {
-                                    let graph = graph_ref.borrow(py);
-                                    if let Ok((source, target)) =
-                                        graph.inner.edge_endpoints(edge_id)
-                                    {
-                                        source == node_id || target == node_id
-                                    } else {
-                                        false
-                                    }
-                                } else {
-                                    false
-                                }
-                            })
-                            .count()
+                        // Calculate local degree using pre-collected endpoints
+                        edge_endpoints.values().filter(|(source, target)| {
+                            *source == node_id || *target == node_id
+                        }).count()
                     };
 
                     degrees.push(groggy::AttrValue::Int(deg as i64));
@@ -376,33 +401,37 @@ impl PySubgraph {
             None => {
                 let mut degrees = Vec::new();
 
+                // Pre-collect edge endpoints to avoid repeated borrows in filter
+                let edge_endpoints: std::collections::HashMap<groggy::EdgeId, (groggy::NodeId, groggy::NodeId)> = if !full_graph {
+                    if let Some(graph_ref) = &self.graph {
+                        let graph = graph_ref.borrow(py);
+                        self.edges.iter().filter_map(|&edge_id| {
+                            graph.inner.borrow().edge_endpoints(edge_id).ok().map(|(s, t)| (edge_id, (s, t)))
+                        }).collect()
+                    } else {
+                        std::collections::HashMap::new()
+                    }
+                } else {
+                    std::collections::HashMap::new()
+                };
+
                 for &node_id in &self.nodes {
                     let deg = if full_graph {
-                        // Get degree from main graph
-                        let graph = graph_ref.borrow(py);
-                        match graph.inner.degree(node_id) {
+                        // Get degree from main graph using isolated borrow
+                        let degree_result = {
+                            let graph = graph_ref.borrow(py);
+                            let result = graph.inner.borrow().degree(node_id);
+                            result
+                        };
+                        match degree_result {
                             Ok(d) => d,
                             Err(_) => continue, // Skip invalid nodes
                         }
                     } else {
-                        // Calculate local degree within subgraph
-                        self.edges
-                            .iter()
-                            .filter(|&&edge_id| {
-                                if let Some(graph_ref) = &self.graph {
-                                    let graph = graph_ref.borrow(py);
-                                    if let Ok((source, target)) =
-                                        graph.inner.edge_endpoints(edge_id)
-                                    {
-                                        source == node_id || target == node_id
-                                    } else {
-                                        false
-                                    }
-                                } else {
-                                    false
-                                }
-                            })
-                            .count()
+                        // Calculate local degree using pre-collected endpoints
+                        edge_endpoints.values().filter(|(source, target)| {
+                            *source == node_id || *target == node_id
+                        }).count()
                     };
 
                     degrees.push(groggy::AttrValue::Int(deg as i64));
@@ -440,11 +469,13 @@ impl PySubgraph {
 
         // Get the parent graph reference
         if let Some(parent_graph) = &self.graph {
-            let mut graph_ref = parent_graph.borrow_mut(py);
-            
-            // Apply filter using the graph's find_edges method, then intersect with our edges
-            let all_matching_edges = graph_ref.inner.find_edges(edge_filter)
-                .map_err(graph_error_to_py_err)?;
+            // Apply filter using isolated borrow scope
+            let all_matching_edges = {
+                let graph_ref = parent_graph.borrow(py);
+                let result = graph_ref.inner.borrow_mut().find_edges(edge_filter)
+                    .map_err(graph_error_to_py_err)?;
+                result
+            };
             
             // Keep only the edges that are in this subgraph
             let subgraph_edge_set: HashSet<EdgeId> = self.edges.iter().copied().collect();
@@ -453,18 +484,26 @@ impl PySubgraph {
                 .filter(|edge_id| subgraph_edge_set.contains(edge_id))
                 .collect();
             
+            // Pre-collect all edge endpoints in one borrow operation
+            let edge_endpoints: std::collections::HashMap<EdgeId, (NodeId, NodeId)> = {
+                let graph_ref = parent_graph.borrow(py);
+                filtered_edges.iter().filter_map(|&edge_id| {
+                    graph_ref.inner.borrow().edge_endpoints(edge_id)
+                        .ok()
+                        .map(|(s, t)| (edge_id, (s, t)))
+                }).collect()
+            };
+            
             // Find all nodes that are connected by the filtered edges
             let mut connected_nodes = HashSet::new();
             
-            for &edge_id in &filtered_edges {
-                if let Ok((source, target)) = graph_ref.inner.edge_endpoints(edge_id) {
-                    // Only include nodes that were originally in this subgraph
-                    if self.nodes.contains(&source) {
-                        connected_nodes.insert(source);
-                    }
-                    if self.nodes.contains(&target) {
-                        connected_nodes.insert(target);
-                    }
+            for (source, target) in edge_endpoints.values() {
+                // Only include nodes that were originally in this subgraph
+                if self.nodes.contains(source) {
+                    connected_nodes.insert(*source);
+                }
+                if self.nodes.contains(target) {
+                    connected_nodes.insert(*target);
                 }
             }
             
@@ -487,7 +526,7 @@ impl PySubgraph {
 
     /// Connected components within this subgraph
     fn connected_components(&self) -> PyResult<Vec<PySubgraph>> {
-        // Use inner subgraph if available
+        // All subgraphs must have proper inner RustSubgraph
         if let Some(ref inner_subgraph) = self.inner {
             let components = inner_subgraph.connected_components().map_err(|e| {
                 PyErr::new::<PyRuntimeError, _>(format!(
@@ -497,131 +536,30 @@ impl PySubgraph {
             })?;
 
             let mut result = Vec::new();
-            for (i, component) in components.iter().enumerate() {
-                // STANDARDIZED: Use PySubgraph::new() like all other subgraph creation methods
-                // This ensures consistent graph reference handling for .nodes/.edges accessors
-                result.push(PySubgraph::new(
-                    component.node_ids(),
-                    component.edge_ids(),
-                    format!("connected_component_{}", i),
-                    self.graph.clone(), // Pass the graph reference consistently
-                ));
+            for component in components.iter() {
+                // Create proper PySubgraph from RustSubgraph
+                result.push(PySubgraph::from_core_subgraph(component.clone()));
             }
             Ok(result)
         } else {
-            // Fallback: Implement BFS connected components using PyGraph access
-            let py = Python::acquire_gil().python();
-            if let Some(ref graph_py) = self.graph {
-                let graph = graph_py.borrow(py);
-                self.connected_components_fallback(&graph)
-            } else {
-                // If no graph reference, return single component
-                Ok(vec![PySubgraph::new(
-                    self.nodes.clone(),
-                    self.edges.clone(),
-                    "component".to_string(),
-                    self.graph.clone(),
-                )])
-            }
+            Err(PyErr::new::<PyRuntimeError, _>(
+                "PySubgraph missing inner RustSubgraph - ensure proper subgraph creation"
+            ))
         }
     }
 
-    /// Fallback connected components implementation using PyGraph access pattern
-    /// Same algorithm as RustSubgraph, different data access pattern
-    fn connected_components_fallback(&self, graph: &crate::ffi::api::graph::PyGraph) -> PyResult<Vec<PySubgraph>> {
-        use std::collections::{HashMap, HashSet, VecDeque};
-        
-        if self.nodes.is_empty() {
-            return Ok(vec![]);
-        }
-        
-        // Build adjacency map for nodes in this subgraph
-        let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
-        
-        // Initialize adjacency list with all nodes
-        for &node_id in &self.nodes {
-            adjacency.insert(node_id, Vec::new());
-        }
-        
-        // Add edges that connect nodes within this subgraph
-        for &edge_id in &self.edges {
-            if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
-                // Only include edges where both endpoints are in our subgraph
-                if self.nodes.contains(&source) && self.nodes.contains(&target) {
-                    if let Some(neighbors) = adjacency.get_mut(&source) {
-                        neighbors.push(target);
-                    }
-                    if let Some(neighbors) = adjacency.get_mut(&target) {
-                        neighbors.push(source);
-                    }
-                }
-            }
-        }
-        
-        let mut visited = HashSet::new();
-        let mut components = Vec::new();
-        
-        // Find connected components using BFS
-        for &start_node in &self.nodes {
-            if visited.contains(&start_node) {
-                continue;
-            }
-            
-            // BFS to find all nodes in this component
-            let mut component_nodes = HashSet::new();
-            let mut queue = VecDeque::new();
-            
-            queue.push_back(start_node);
-            visited.insert(start_node);
-            component_nodes.insert(start_node);
-            
-            while let Some(current_node) = queue.pop_front() {
-                if let Some(neighbors) = adjacency.get(&current_node) {
-                    for &neighbor in neighbors {
-                        if !visited.contains(&neighbor) && self.nodes.contains(&neighbor) {
-                            visited.insert(neighbor);
-                            component_nodes.insert(neighbor);
-                            queue.push_back(neighbor);
-                        }
-                    }
-                }
-            }
-            
-            // Find all edges within this component
-            let mut component_edges = HashSet::new();
-            for &edge_id in &self.edges {
-                if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
-                    if component_nodes.contains(&source) && component_nodes.contains(&target) {
-                        component_edges.insert(edge_id);
-                    }
-                }
-            }
-            
-            // Create a subgraph for this component
-            let component = PySubgraph::new(
-                component_nodes.into_iter().collect(),
-                component_edges.into_iter().collect(),
-                format!("{}_component_{}", self.subgraph_type, components.len()),
-                self.graph.clone(),
-            );
-            
-            components.push(component);
-        }
-        
-        Ok(components)
-    }
 
     /// Check if the subgraph is connected (has exactly one connected component)
     pub fn is_connected(&self) -> PyResult<bool> {
-        // Use inner subgraph if available (preferred path)
+        // All subgraphs must have proper inner RustSubgraph
         if let Some(ref inner_subgraph) = self.inner {
             inner_subgraph.is_connected().map_err(|e| {
                 PyErr::new::<PyRuntimeError, _>(format!("Failed to check connectivity: {}", e))
             })
         } else {
-            // Use proper fallback algorithm
-            let components = self.connected_components()?;
-            Ok(components.len() == 1 && !self.nodes.is_empty())
+            Err(PyErr::new::<PyRuntimeError, _>(
+                "PySubgraph missing inner RustSubgraph - ensure proper subgraph creation"
+            ))
         }
     }
 
@@ -750,14 +688,17 @@ impl PySubgraph {
         }
         // Fallback to legacy implementation
         else if let Some(graph_ref) = &self.graph {
-            let graph = graph_ref.borrow(py);
             let mut attr_values = Vec::new();
 
             for &node_id in &self.nodes {
-                if let Ok(Some(attr_value)) =
-                    graph.inner.get_node_attr(node_id, &attr_name.to_string())
-                {
-                    attr_values.push(attr_value);
+                let attr_value = {
+                    let graph = graph_ref.borrow(py);
+                    let result = graph.inner.borrow().get_node_attr(node_id, &attr_name.to_string());
+                    result
+                };
+                
+                if let Ok(Some(value)) = attr_value {
+                    attr_values.push(value);
                 } else {
                     // Handle missing attributes with default value
                     attr_values.push(groggy::AttrValue::Int(0));
@@ -780,15 +721,18 @@ impl PySubgraph {
     /// Column access: get all values for an edge attribute within this subgraph
     fn get_edge_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<Vec<PyObject>> {
         if let Some(graph_ref) = &self.graph {
-            let graph = graph_ref.borrow(py);
             let mut values = Vec::new();
 
             for &edge_id in &self.edges {
-                if let Ok(Some(attr_value)) =
-                    graph.inner.get_edge_attr(edge_id, &attr_name.to_string())
-                {
+                let attr_value = {
+                    let graph = graph_ref.borrow(py);
+                    let result = graph.inner.borrow().get_edge_attr(edge_id, &attr_name.to_string());
+                    result
+                };
+                
+                if let Ok(Some(value)) = attr_value {
                     // Convert AttrValue to Python object
-                    let py_value = attr_value_to_python_value(py, &attr_value)?;
+                    let py_value = attr_value_to_python_value(py, &value)?;
                     values.push(py_value);
                 } else {
                     // Handle missing attributes - use None
@@ -958,7 +902,7 @@ impl PySubgraph {
         // Get all available node attributes
         let mut all_attrs = std::collections::HashSet::new();
         for &node_id in &self.nodes {
-            if let Ok(attrs) = graph.inner.get_node_attrs(node_id) {
+            if let Ok(attrs) = graph.inner.borrow().get_node_attrs(node_id) {
                 for attr_name in attrs.keys() {
                     all_attrs.insert(attr_name.clone());
                 }
@@ -983,7 +927,7 @@ impl PySubgraph {
             } else {
                 // Attribute column
                 for &node_id in &self.nodes {
-                    if let Ok(Some(attr_value)) = graph.inner.get_node_attr(node_id, column_name) {
+                    if let Ok(Some(attr_value)) = graph.inner.borrow().get_node_attr(node_id, column_name) {
                         attr_values.push(attr_value);
                     } else {
                         // Default to null/empty for missing attributes
@@ -1013,7 +957,7 @@ impl PySubgraph {
         // Get all available edge attributes
         let mut all_attrs = std::collections::HashSet::new();
         for &edge_id in &self.edges {
-            if let Ok(attrs) = graph.inner.get_edge_attrs(edge_id) {
+            if let Ok(attrs) = graph.inner.borrow().get_edge_attrs(edge_id) {
                 for attr_name in attrs.keys() {
                     all_attrs.insert(attr_name.clone());
                 }
@@ -1042,7 +986,7 @@ impl PySubgraph {
             } else if column_name == "source" || column_name == "target" {
                 // Source/Target columns
                 for &edge_id in &self.edges {
-                    if let Ok((source, target)) = graph.inner.edge_endpoints(edge_id) {
+                    if let Ok((source, target)) = graph.inner.borrow().edge_endpoints(edge_id) {
                         let endpoint_id = if column_name == "source" {
                             source
                         } else {
@@ -1056,7 +1000,7 @@ impl PySubgraph {
             } else {
                 // Attribute column
                 for &edge_id in &self.edges {
-                    if let Ok(Some(attr_value)) = graph.inner.get_edge_attr(edge_id, column_name) {
+                    if let Ok(Some(attr_value)) = graph.inner.borrow().get_edge_attr(edge_id, column_name) {
                         attr_values.push(attr_value);
                     } else {
                         // Default to null/empty for missing attributes
@@ -1172,11 +1116,12 @@ impl PySubgraph {
         };
 
         // 2) Evaluate filter on the *current subgraph nodes* using the core API
-        let mut g = graph_ref.borrow_mut(py);
+        let g = graph_ref.borrow_mut(py);
 
         // Get all nodes that match the filter from the entire graph
         let all_filtered_nodes: Vec<groggy::NodeId> = g
             .inner
+            .borrow_mut()
             .find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
 
@@ -1192,7 +1137,7 @@ impl PySubgraph {
         let node_set: HashSet<groggy::NodeId> = filtered_nodes.iter().copied().collect();
         let mut induced_edges = Vec::with_capacity(self.edges.len() / 2);
         for &eid in &self.edges {
-            if let Ok((s, t)) = g.inner.edge_endpoints(eid) {
+            if let Ok((s, t)) = g.inner.borrow().edge_endpoints(eid) {
                 if node_set.contains(&s) && node_set.contains(&t) {
                     induced_edges.push(eid);
                 }
@@ -1219,7 +1164,8 @@ impl PySubgraph {
         // Create a new empty graph with the same directed property as parent
         let is_directed = if let Some(graph_ref) = &self.graph {
             let parent_graph = graph_ref.borrow(py);
-            parent_graph.inner.is_directed()
+            let directed = parent_graph.inner.borrow().is_directed();
+            directed
         } else {
             false // Default to undirected if no parent reference
         };
@@ -1265,7 +1211,7 @@ impl PySubgraph {
 
             // Add edges with attributes
             for &old_edge_id in &self.edges {
-                if let Ok((source, target)) = parent_graph.inner.edge_endpoints(old_edge_id) {
+                if let Ok((source, target)) = parent_graph.inner.borrow().edge_endpoints(old_edge_id) {
                     if let (Some(&new_source), Some(&new_target)) =
                         (node_id_mapping.get(&source), node_id_mapping.get(&target))
                     {
@@ -1315,7 +1261,8 @@ impl PySubgraph {
         // Determine graph type
         let is_directed = if let Some(graph_ref) = &self.graph {
             let parent_graph = graph_ref.borrow(py);
-            parent_graph.inner.is_directed()
+            let directed = parent_graph.inner.borrow().is_directed();
+            directed
         } else {
             false // Default to undirected if no parent reference
         };
@@ -1328,21 +1275,25 @@ impl PySubgraph {
         };
 
         if let Some(graph_ref) = &self.graph {
-            let parent_graph = graph_ref.borrow(py);
-
             // Add nodes with attributes
             for &node_id in &self.nodes {
-                // Get node attribute keys
-                let attr_keys = parent_graph.node_attribute_keys(node_id);
+                // Get node attribute keys and attributes in isolated scopes
+                let attr_keys = {
+                    let parent_graph = graph_ref.borrow(py);
+                    parent_graph.node_attribute_keys(node_id)
+                };
 
                 // Create Python dict for node attributes
                 let py_attrs = pyo3::types::PyDict::new(py);
 
-                // Get each attribute using the FFI method
+                // Get each attribute using isolated FFI method calls
                 for attr_key in attr_keys {
-                    if let Ok(Some(py_attr_value)) =
+                    let py_attr_value = {
+                        let parent_graph = graph_ref.borrow(py);
                         parent_graph.get_node_attribute(node_id, attr_key.clone())
-                    {
+                    };
+                    
+                    if let Ok(Some(py_attr_value)) = py_attr_value {
                         // Convert PyAttrValue to Python object
                         let py_value = crate::ffi::utils::attr_value_to_python_value(
                             py,
@@ -1358,18 +1309,30 @@ impl PySubgraph {
 
             // Add edges with attributes
             for &edge_id in &self.edges {
-                if let Ok((source, target)) = parent_graph.inner.edge_endpoints(edge_id) {
-                    // Get edge attribute keys
-                    let attr_keys = parent_graph.edge_attribute_keys(edge_id);
+                let endpoints = {
+                    let parent_graph = graph_ref.borrow(py);
+                    let result = parent_graph.inner.borrow().edge_endpoints(edge_id);
+                    result
+                };
+                
+                if let Ok((source, target)) = endpoints {
+                    // Get edge attribute keys in isolated scope
+                    let attr_keys = {
+                        let parent_graph = graph_ref.borrow(py);
+                        parent_graph.edge_attribute_keys(edge_id)
+                    };
 
                     // Create Python dict for edge attributes
                     let py_attrs = pyo3::types::PyDict::new(py);
 
-                    // Get each attribute using the FFI method
+                    // Get each attribute using isolated FFI method calls
                     for attr_key in attr_keys {
-                        if let Ok(Some(py_attr_value)) =
+                        let py_attr_value = {
+                            let parent_graph = graph_ref.borrow(py);
                             parent_graph.get_edge_attribute(edge_id, attr_key.clone())
-                        {
+                        };
+                        
+                        if let Ok(Some(py_attr_value)) = py_attr_value {
                             // Convert PyAttrValue to Python object
                             let py_value = crate::ffi::utils::attr_value_to_python_value(
                                 py,
