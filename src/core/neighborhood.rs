@@ -34,8 +34,10 @@ pub struct NeighborhoodResult {
 /// A single neighborhood subgraph containing a central node and its neighbors
 #[derive(Debug, Clone)]
 pub struct NeighborhoodSubgraph {
-    /// The subgraph containing central node(s) and neighbors
-    pub subgraph: Subgraph,
+    /// Node IDs in this neighborhood
+    pub nodes: Vec<NodeId>,
+    /// Edge IDs in this neighborhood (induced edges)
+    pub edges: Vec<usize>, // EdgeId
     /// Central node(s) that define this neighborhood
     pub central_nodes: Vec<NodeId>,
     /// Distance/hop count for this neighborhood
@@ -83,17 +85,21 @@ impl NeighborhoodSampler {
             }
         }
 
-        // Calculate induced edges
-        let edge_count = self.calculate_induced_edges_count(pool, space, &nodes)?;
+        // Calculate induced edges using the same pattern as connected components
+        let nodes_vec: Vec<NodeId> = nodes.into_iter().collect();
+        let size = nodes_vec.len();
+        let induced_edges = self.calculate_induced_edges(pool, space, &nodes_vec)?;
+        let edge_count = induced_edges.len();
 
         let duration = start.elapsed();
         self.stats
-            .record_neighborhood("single_neighborhood".to_string(), nodes.len(), duration);
+            .record_neighborhood("single_neighborhood".to_string(), size, duration);
 
         Ok(NeighborhoodSubgraph {
+            nodes: nodes_vec,
+            edges: induced_edges,
             edge_count,
-            size: nodes.len(),
-            subgraph: self.create_dummy_subgraph()?, // Placeholder for now
+            size,
             central_nodes: vec![node_id],
             hops: 1,
         })
@@ -120,15 +126,30 @@ impl NeighborhoodSampler {
         Ok(count)
     }
 
-    /// Create a dummy subgraph placeholder
-    /// TODO: This needs to be properly implemented with actual subgraph creation
-    fn create_dummy_subgraph(&self) -> GraphResult<Subgraph> {
-        // For now, this is a placeholder until we solve the Graph ownership issue
-        use crate::errors::GraphError;
-        Err(GraphError::NotImplemented {
-            feature: "Subgraph creation in neighborhood sampler".to_string(),
-            tracking_issue: None,
-        })
+    /// Calculate induced edges for a set of nodes
+    /// Uses the same pattern as connected_components for proper edge calculation
+    fn calculate_induced_edges(
+        &self,
+        pool: &GraphPool,
+        space: &GraphSpace,
+        nodes: &[NodeId],
+    ) -> GraphResult<Vec<usize>> {
+        // Calculate induced edges using the same pattern as connected components
+        let (edge_ids, sources, targets, _) = space.snapshot(pool);
+        let node_set: HashSet<NodeId> = nodes.iter().copied().collect();
+        
+        let mut induced_edges = Vec::new();
+        for i in 0..edge_ids.len() {
+            let edge_id = edge_ids[i];
+            let source = sources[i];
+            let target = targets[i];
+            
+            if node_set.contains(&source) && node_set.contains(&target) {
+                induced_edges.push(edge_id);
+            }
+        }
+        
+        Ok(induced_edges)
     }
 
     /// Generate 1-hop neighborhoods for multiple nodes
@@ -179,9 +200,10 @@ impl NeighborhoodSampler {
             self.stats
                 .record_neighborhood("k_hop_neighborhood".to_string(), 1, duration);
             return Ok(NeighborhoodSubgraph {
+                nodes: vec![node_id],
+                edges: vec![], // No edges for single node
                 edge_count: 0,
                 size: 1,
-                subgraph: self.create_dummy_subgraph()?,
                 central_nodes: vec![node_id],
                 hops: k,
             });
@@ -192,15 +214,47 @@ impl NeighborhoodSampler {
             return self.single_neighborhood(pool, space, node_id);
         }
 
-        // For k>1, implement BFS (stub for now)
+        // For k>1, implement BFS using the same pattern as traversal engine
+        let (_, _, _, neighbors_map) = space.snapshot(pool);
+        let mut visited = HashSet::new();
+        let mut current_level = HashSet::new();
+        current_level.insert(node_id);
+        visited.insert(node_id);
+        
+        // BFS for k hops
+        for _hop in 0..k {
+            let mut next_level = HashSet::new();
+            for &current_node in &current_level {
+                if let Some(node_neighbors) = neighbors_map.get(&current_node) {
+                    for &(neighbor_id, _edge_id) in node_neighbors {
+                        if !visited.contains(&neighbor_id) {
+                            visited.insert(neighbor_id);
+                            next_level.insert(neighbor_id);
+                        }
+                    }
+                }
+            }
+            current_level = next_level;
+            if current_level.is_empty() {
+                break; // No more nodes to explore
+            }
+        }
+        
+        // Calculate induced edges for all visited nodes
+        let nodes_vec: Vec<NodeId> = visited.into_iter().collect();
+        let size = nodes_vec.len();
+        let induced_edges = self.calculate_induced_edges(pool, space, &nodes_vec)?;
+        let edge_count = induced_edges.len();
+
         let duration = start.elapsed();
         self.stats
-            .record_neighborhood("k_hop_neighborhood".to_string(), 1, duration);
+            .record_neighborhood("k_hop_neighborhood".to_string(), size, duration);
 
         Ok(NeighborhoodSubgraph {
-            edge_count: 0,
-            size: 1,
-            subgraph: self.create_dummy_subgraph()?,
+            nodes: nodes_vec,
+            edges: induced_edges,
+            edge_count,
+            size,
             central_nodes: vec![node_id],
             hops: k,
         })
@@ -210,25 +264,61 @@ impl NeighborhoodSampler {
     /// Returns a single subgraph containing all nodes and their combined neighborhoods
     pub fn unified_neighborhood(
         &mut self,
-        _pool: &GraphPool,
-        _space: &GraphSpace,
+        pool: &GraphPool,
+        space: &GraphSpace,
         node_ids: &[NodeId],
         k: usize,
     ) -> GraphResult<NeighborhoodSubgraph> {
         let start = std::time::Instant::now();
 
-        // Stub implementation for now
+        // Use combined BFS from all starting nodes
+        let (_, _, _, neighbors_map) = space.snapshot(pool);
+        let mut visited = HashSet::new();
+        let mut current_level = HashSet::new();
+        
+        // Start from all provided nodes
+        for &node_id in node_ids {
+            current_level.insert(node_id);
+            visited.insert(node_id);
+        }
+        
+        // BFS for k hops
+        for _hop in 0..k {
+            let mut next_level = HashSet::new();
+            for &current_node in &current_level {
+                if let Some(node_neighbors) = neighbors_map.get(&current_node) {
+                    for &(neighbor_id, _edge_id) in node_neighbors {
+                        if !visited.contains(&neighbor_id) {
+                            visited.insert(neighbor_id);
+                            next_level.insert(neighbor_id);
+                        }
+                    }
+                }
+            }
+            current_level = next_level;
+            if current_level.is_empty() {
+                break; // No more nodes to explore
+            }
+        }
+        
+        // Calculate induced edges for all visited nodes
+        let nodes_vec: Vec<NodeId> = visited.into_iter().collect();
+        let size = nodes_vec.len();
+        let induced_edges = self.calculate_induced_edges(pool, space, &nodes_vec)?;
+        let edge_count = induced_edges.len();
+
         let duration = start.elapsed();
         self.stats.record_neighborhood(
             "unified_neighborhood".to_string(),
-            node_ids.len(),
+            size,
             duration,
         );
 
         Ok(NeighborhoodSubgraph {
-            edge_count: 0,
-            size: node_ids.len(),
-            subgraph: self.create_dummy_subgraph()?,
+            nodes: nodes_vec,
+            edges: induced_edges,
+            edge_count,
+            size,
             central_nodes: node_ids.to_vec(),
             hops: k,
         })

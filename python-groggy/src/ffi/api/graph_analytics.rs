@@ -72,8 +72,9 @@ impl PyGraphAnalytics {
         // Convert core results to FFI wrappers - ZERO-COPY: just use pre-computed edges!
         for (i, component) in result.components.into_iter().enumerate() {
             // 🚀 PERFORMANCE: Use edges already computed by Rust core - no recomputation needed!
-            // 🔧 SAFE: Use basic constructor that never acquires GIL
-            let subgraph = PySubgraph::new(
+            // 🔧 SAFE: Create subgraph with inner RustSubgraph since we have Python context
+            let subgraph = PySubgraph::new_with_inner(
+                py,
                 component.nodes,
                 component.edges, // Use pre-computed induced edges from Rust core
                 format!("connected_component_{}", i),
@@ -137,7 +138,8 @@ impl PyGraphAnalytics {
                 .map_err(graph_error_to_py_err)?;
         }
 
-        Ok(PySubgraph::new(
+        Ok(PySubgraph::new_with_inner(
+            py,
             result.nodes,
             result.edges,
             "bfs_traversal".to_string(),
@@ -197,7 +199,8 @@ impl PyGraphAnalytics {
                 .map_err(graph_error_to_py_err)?;
         }
 
-        Ok(PySubgraph::new(
+        Ok(PySubgraph::new_with_inner(
+            py,
             result.nodes,
             result.edges,
             "dfs_traversal".to_string(),
@@ -260,7 +263,8 @@ impl PyGraphAnalytics {
                     }
                 }
 
-                Ok(Some(PySubgraph::new(
+                Ok(Some(PySubgraph::new_with_inner(
+                    py,
                     path.nodes,
                     path.edges,
                     "shortest_path".to_string(),
