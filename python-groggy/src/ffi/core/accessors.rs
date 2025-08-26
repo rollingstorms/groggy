@@ -153,8 +153,9 @@ impl PyNodesAccessor {
                 }
             }
 
-            // Create and return Subgraph
-            let subgraph = PySubgraph::new(
+            // Create and return Subgraph with inner RustSubgraph  
+            let subgraph = PySubgraph::new_with_inner(
+                py,
                 selected_nodes,
                 induced_edges,
                 "boolean_selection".to_string(),
@@ -226,8 +227,9 @@ impl PyNodesAccessor {
                 }
             }
 
-            // Create and return Subgraph
-            let subgraph = PySubgraph::new(
+            // Create and return Subgraph with inner RustSubgraph
+            let subgraph = PySubgraph::new_with_inner(
+                py,
                 node_ids,
                 induced_edges,
                 "node_batch_selection".to_string(),
@@ -285,8 +287,9 @@ impl PyNodesAccessor {
                 }
             }
 
-            // Create and return Subgraph
-            let subgraph = PySubgraph::new(
+            // Create and return Subgraph with inner RustSubgraph
+            let subgraph = PySubgraph::new_with_inner(
+                py,
                 selected_nodes,
                 induced_edges,
                 "node_slice_selection".to_string(),
@@ -441,8 +444,9 @@ impl PyNodesAccessor {
             }
         }
 
-        // Create and return Subgraph
-        let subgraph = PySubgraph::new(
+        // Create and return Subgraph with inner RustSubgraph
+        let subgraph = PySubgraph::new_with_inner(
+            py,
             all_node_ids,
             induced_edges,
             "all_nodes".to_string(),
@@ -662,8 +666,9 @@ impl PyEdgesAccessor {
                 }
             }
 
-            // Create and return Subgraph
-            let subgraph = PySubgraph::new(
+            // Create and return Subgraph with inner RustSubgraph
+            let subgraph = PySubgraph::new_with_inner(
+                py,
                 endpoint_nodes.into_iter().collect(),
                 selected_edges,
                 "boolean_edge_selection".to_string(),
@@ -722,8 +727,9 @@ impl PyEdgesAccessor {
                 }
             }
 
-            // Create and return Subgraph
-            let subgraph = PySubgraph::new(
+            // Create and return Subgraph with inner RustSubgraph
+            let subgraph = PySubgraph::new_with_inner(
+                py,
                 endpoint_nodes.into_iter().collect(),
                 edge_ids,
                 "edge_batch_selection".to_string(),
@@ -773,8 +779,9 @@ impl PyEdgesAccessor {
                 }
             }
 
-            // Create and return Subgraph
-            let subgraph = PySubgraph::new(
+            // Create and return Subgraph with inner RustSubgraph
+            let subgraph = PySubgraph::new_with_inner(
+                py,
                 endpoint_nodes.into_iter().collect(),
                 selected_edges,
                 "edge_slice_selection".to_string(),
@@ -915,8 +922,9 @@ impl PyEdgesAccessor {
         }
         
         let connected_node_ids: Vec<NodeId> = connected_nodes.into_iter().collect();
-        // Create and return Subgraph (all edges are included by construction)
-        let subgraph = PySubgraph::new(
+        // Create and return Subgraph with inner RustSubgraph (all edges are included by construction)
+        let subgraph = PySubgraph::new_with_inner(
+            py,
             connected_node_ids,
             all_edge_ids,
             "all_edges".to_string(),

@@ -578,8 +578,11 @@ impl PySubgraph {
 
             let mut result = Vec::new();
             for component in components.iter() {
-                // Create proper PySubgraph from RustSubgraph
-                result.push(PySubgraph::from_core_subgraph(component.clone()));
+                // Create proper PySubgraph from RustSubgraph with parent graph reference
+                let mut py_subgraph = PySubgraph::from_core_subgraph(component.clone());
+                // Set the parent graph reference so downstream operations work
+                py_subgraph.graph = self.graph.clone();
+                result.push(py_subgraph);
             }
             Ok(result)
         } else {

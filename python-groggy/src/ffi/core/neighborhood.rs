@@ -36,17 +36,17 @@ impl PyNeighborhoodSubgraph {
         self.inner.edge_count
     }
 
-    /// Get the subgraph object (when implemented)
-    fn subgraph(&self) -> PyResult<PySubgraph> {
-        // For now, return a placeholder until subgraph creation is fully implemented
-        match &self.inner.subgraph {
-            _ => {
-                // Return a placeholder error for now
-                Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-                    "Subgraph access not yet implemented in neighborhood sampler",
-                ))
-            }
-        }
+    /// Get the subgraph object using the same pattern as connected components
+    fn subgraph(&self, py: Python) -> PyResult<PySubgraph> {
+        // Create PySubgraph using the same pattern as connected components
+        let subgraph = PySubgraph::new_with_inner(
+            py,
+            self.inner.nodes.clone(),
+            self.inner.edges.clone(),
+            format!("neighborhood_hops_{}", self.inner.hops),
+            None, // No parent graph reference needed for neighborhood subgraphs
+        );
+        Ok(subgraph)
     }
 
     fn __repr__(&self) -> String {
