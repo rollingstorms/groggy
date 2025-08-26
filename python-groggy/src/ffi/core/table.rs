@@ -48,7 +48,7 @@ impl TableIterator {
             let column_names = self.table.columns();
 
             // Access each column by name
-            for (col_idx, col_name) in column_names.iter().enumerate() {
+            for (_col_idx, col_name) in column_names.iter().enumerate() {
                 // Get the column data by name
                 if let Some(array) = self.table.get_column_by_name(col_name) {
                     if self.index < array.len() {
@@ -1017,7 +1017,7 @@ impl PyGraphTable {
     /// Check if table contains any null values
     fn has_null(&self) -> bool {
         let (rows, _) = self.inner.shape();
-        let columns = self.inner.columns();
+        let _columns = self.inner.columns();
         for row_idx in 0..rows {
             if let Some(row_data) = self.inner.iloc(row_idx) {
                 for value in row_data.values() {
