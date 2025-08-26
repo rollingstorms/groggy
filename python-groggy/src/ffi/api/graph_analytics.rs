@@ -72,6 +72,7 @@ impl PyGraphAnalytics {
         // Convert core results to FFI wrappers - ZERO-COPY: just use pre-computed edges!
         for (i, component) in result.components.into_iter().enumerate() {
             // 🚀 PERFORMANCE: Use edges already computed by Rust core - no recomputation needed!
+            // 🔧 SAFE: Use basic constructor that never acquires GIL
             let subgraph = PySubgraph::new(
                 component.nodes,
                 component.edges, // Use pre-computed induced edges from Rust core

@@ -495,35 +495,28 @@ impl TraversalEngine {
     ) -> GraphResult<ConnectedComponentsResult> {
         let start_time = std::time::Instant::now();
 
-        // 📊 TIMING: Step 1 - Use provided nodes
-        let step1_start = std::time::Instant::now();
-        // nodes parameter already provided
-        let _step1_duration = step1_start.elapsed();
-
-        // 📊 TIMING: Step 2 - Build adjacency snapshot
-        let step2_start = std::time::Instant::now();
-        let (_, _, _, neighbors) = space.snapshot(pool);
-        let _step2_duration = step2_start.elapsed();
+        // Use provided nodes
+        
+        // Build adjacency snapshot  
+        let (_, _, _, _neighbors) = space.snapshot(pool);
 
         // 🚀 PERFORMANCE: Use Arc reference directly - no O(E) clone needed!
         // The Arc allows zero-copy sharing of the adjacency map
 
-        // 📊 TIMING: Step 3 - Initialize data structures
-        let step3_start = std::time::Instant::now();
+        // Initialize data structures
         let mut visited = HashSet::new();
         let mut components = Vec::new();
-        let _step3_duration = step3_start.elapsed();
 
-        // 📊 TIMING: Step 4 - Main component finding loop
-        let step4_start = std::time::Instant::now();
-        let mut bfs_time = std::time::Duration::ZERO;
-        let mut edge_computation_time = std::time::Duration::ZERO;
+        // Main component finding loop
         let mut component_count = 0;
 
         // 🚀 OPTIMIZATION: Pre-mark nodes with component IDs for O(1) edge validation
         let mut node_component_id: HashMap<NodeId, usize> = HashMap::new();
 
-        // BFS for each unvisited node - O(V + E) total
+        // 🚀 PERFORMANCE: Convert nodes to HashSet for O(1) lookups instead of O(n) contains()
+        let nodes_set: HashSet<NodeId> = nodes.iter().copied().collect();
+
+        // BFS for each unvisited node - O(V + E) total using single optimized loop
         for &start_node in &nodes {
             if !visited.contains(&start_node) {
                 // 🚀 FAST: Individual node filtering - only check nodes we actually encounter
@@ -531,79 +524,61 @@ impl TraversalEngine {
                     continue;
                 }
 
-                // 📊 TIMING: BFS to find component
-                let bfs_start = std::time::Instant::now();
+                // BFS to find component using single optimized loop
                 let mut component_nodes = Vec::new();
+                let mut component_edges = Vec::new();
                 let mut queue = VecDeque::new();
+                let mut edge_set = HashSet::new(); // O(1) duplicate check
 
                 queue.push_back(start_node);
                 visited.insert(start_node);
-                node_component_id.insert(start_node, component_count); // Mark with component ID
+                node_component_id.insert(start_node, component_count);
 
                 while let Some(current) = queue.pop_front() {
                     component_nodes.push(current);
 
-                    // Use fresh adjacency for optimal performance - get (neighbor, edge_id) pairs
-                    if let Some(current_neighbors) = neighbors.get(&current) {
-                        for &(neighbor, _edge_id) in current_neighbors {
-                            // Only consider neighbors that are in our node set
-                            if nodes.contains(&neighbor) && !visited.contains(&neighbor) {
+                    // Get neighbors and process edges in single pass
+                    if let Some(current_neighbors) = _neighbors.get(&current) {
+                        for &(neighbor, edge_id) in current_neighbors {
+                            // 🚀 PERFORMANCE FIX: Use O(1) HashSet lookup instead of O(n) Vec contains
+                            if nodes_set.contains(&neighbor) && !visited.contains(&neighbor) {
                                 // 🚀 FAST: Individual node filtering - only check nodes we actually encounter
                                 if self.should_visit_node(pool, space, neighbor, &options)? {
                                     visited.insert(neighbor);
-                                    node_component_id.insert(neighbor, component_count); // Mark with component ID
+                                    node_component_id.insert(neighbor, component_count);
                                     queue.push_back(neighbor);
+                                }
+                            }
+                            
+                            // Add edge if both endpoints are in this component and not already added
+                            if let Some(&neighbor_comp_id) = node_component_id.get(&neighbor) {
+                                if neighbor_comp_id == component_count 
+                                    && current < neighbor // Avoid duplicates
+                                    && edge_set.insert(edge_id) 
+                                {
+                                    component_edges.push(edge_id);
                                 }
                             }
                         }
                     }
                 }
-                bfs_time += bfs_start.elapsed();
 
                 if !component_nodes.is_empty() {
-                    // 📊 TIMING: Calculate induced edges for this component
-                    let edges_start = std::time::Instant::now();
-                    let mut component_edges = Vec::new();
-                    let mut edge_set = HashSet::new(); // O(1) duplicate check instead of O(n)
-
-                    // 🚀 OPTIMIZATION: Use O(1) component ID checks instead of O(log n) HashSet lookups
-                    // For each node in the component, check its edges
-                    for &node in &component_nodes {
-                        if let Some(node_neighbors) = neighbors.get(&node) {
-                            for &(neighbor, edge_id) in node_neighbors {
-                                // Only include edge if both endpoints are in the SAME component
-                                // and we haven't already added this edge (avoid duplicates)
-                                if let Some(&neighbor_comp_id) = node_component_id.get(&neighbor) {
-                                    if neighbor_comp_id == component_count // O(1) check instead of O(log n)
-                                        && node < neighbor // Avoid adding same edge twice
-                                        && edge_set.insert(edge_id)
-                                    {
-                                        // O(1) check + insert
-                                        component_edges.push(edge_id);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    edge_computation_time += edges_start.elapsed();
+                    let component_size = component_nodes.len();
                     component_count += 1;
-
                     components.push(ConnectedComponent {
-                        nodes: component_nodes.clone(),
+                        nodes: component_nodes,
                         edges: component_edges,
-                        size: component_nodes.len(),
+                        size: component_size,
                         root: start_node,
                     });
                 }
             }
         }
 
-        let _step4_duration = step4_start.elapsed();
 
-        // 📊 TIMING: Step 5 - Sort components by size
-        let step5_start = std::time::Instant::now();
+        // Sort components by size
         components.sort_unstable_by(|a, b| b.size.cmp(&a.size));
-        let _step5_duration = step5_start.elapsed();
 
         let duration = start_time.elapsed();
         self.stats.record_traversal(
@@ -611,6 +586,7 @@ impl TraversalEngine {
             components.len(),
             duration,
         );
+
 
         let total_components = components.len();
         let largest_component_size = components.iter().map(|c| c.size).max().unwrap_or(0);

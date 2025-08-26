@@ -816,7 +816,7 @@ impl PyGraph {
     }
 
     /// Filter nodes using NodeFilter object or string query
-    fn filter_nodes(mut slf: PyRefMut<Self>, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+    fn filter_nodes(slf: PyRefMut<Self>, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for NodeFilter object first (most common case)
         let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
             // Direct NodeFilter object - fastest path
@@ -847,7 +847,7 @@ impl PyGraph {
             .find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
 
-        let elapsed = start.elapsed();
+        let _elapsed = start.elapsed();
 
         let start = std::time::Instant::now();
         // O(k) Calculate induced edges using optimized core subgraph method
@@ -870,7 +870,7 @@ impl PyGraph {
             }
         }
 
-        let elapsed = start.elapsed();
+        let _elapsed = start.elapsed();
 
         Ok(PySubgraph::new(
             filtered_nodes,
@@ -881,7 +881,7 @@ impl PyGraph {
     }
 
     /// Filter edges using EdgeFilter object or string query
-    fn filter_edges(mut slf: PyRefMut<Self>, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+    fn filter_edges(slf: PyRefMut<Self>, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for EdgeFilter object first (most common case)
         let edge_filter = if let Ok(filter_obj) = filter.extract::<PyEdgeFilter>() {
             // Direct EdgeFilter object - fastest path

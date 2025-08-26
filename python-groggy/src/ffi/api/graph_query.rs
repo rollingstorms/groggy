@@ -241,7 +241,7 @@ impl PyGraphQuery {
         kwargs: Option<&pyo3::types::PyDict>,
     ) -> PyResult<PyObject> {
         // Parse and execute complex graph queries
-        let graph = self.graph.borrow(py);
+        let _graph = self.graph.borrow(py);
 
         // For now, support basic query patterns
         if query.starts_with("nodes where ") {
