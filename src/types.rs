@@ -28,6 +28,60 @@ pub type StateId = u64;
 /// Branch name for git-like workflow
 pub type BranchName = String;
 
+/// Subgraph identifier for entity system
+pub type SubgraphId = usize;
+
+/// Universal entity identifier for the GraphEntity trait system
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EntityId {
+    /// Node entity
+    Node(NodeId),
+    /// Edge entity
+    Edge(EdgeId),
+    /// Subgraph entity (base subgraph)
+    Subgraph(SubgraphId),
+    /// Neighborhood subgraph entity
+    Neighborhood(SubgraphId),
+    /// Component subgraph entity
+    Component(SubgraphId),
+    /// Path subgraph entity
+    Path(SubgraphId),
+    /// Filter subgraph entity
+    Filter(SubgraphId),
+    /// Meta-node entity (node containing a subgraph)
+    MetaNode(NodeId),
+}
+
+impl EntityId {
+    /// Check if this EntityId represents a valid identifier
+    pub fn is_valid(&self) -> bool {
+        match self {
+            EntityId::Node(id) | EntityId::MetaNode(id) => *id != usize::MAX,
+            EntityId::Edge(id) => *id != usize::MAX,
+            EntityId::Subgraph(id) | EntityId::Neighborhood(id) | 
+            EntityId::Component(id) | EntityId::Path(id) | 
+            EntityId::Filter(id) => *id != usize::MAX,
+        }
+    }
+    
+    /// Get the underlying numeric ID regardless of entity type
+    pub fn numeric_id(&self) -> usize {
+        match self {
+            EntityId::Node(id) | EntityId::MetaNode(id) => *id,
+            EntityId::Edge(id) => *id,
+            EntityId::Subgraph(id) | EntityId::Neighborhood(id) |
+            EntityId::Component(id) | EntityId::Path(id) |
+            EntityId::Filter(id) => *id,
+        }
+    }
+}
+
+impl Default for EntityId {
+    fn default() -> Self {
+        EntityId::Node(0)
+    }
+}
+
 /*
 === GRAPH STRUCTURE TYPES ===
 Fundamental graph properties that affect behavior across the entire system.
@@ -89,6 +143,12 @@ pub enum AttrValue {
     CompressedFloatVec(CompressedData),
     /// Null/missing value - preserves the fact that an attribute is missing
     Null,
+    /// Reference to a subgraph stored in GraphPool (for hierarchical meta-nodes)
+    SubgraphRef(SubgraphId),
+    /// Array of node IDs (for storing node collections as attributes)
+    NodeArray(Vec<NodeId>),
+    /// Array of edge IDs (for storing edge collections as attributes)
+    EdgeArray(Vec<EdgeId>),
 }
 
 /// Custom PartialEq implementation that compares logical content across storage variants
@@ -276,6 +336,18 @@ impl Hash for AttrValue {
             AttrValue::Null => {
                 10u8.hash(state); // Discriminant for Null variant
                                   // No additional data to hash for Null
+            }
+            AttrValue::SubgraphRef(id) => {
+                11u8.hash(state); // Discriminant for SubgraphRef variant
+                id.hash(state);
+            }
+            AttrValue::NodeArray(nodes) => {
+                12u8.hash(state); // Discriminant for NodeArray variant
+                nodes.hash(state);
+            }
+            AttrValue::EdgeArray(edges) => {
+                13u8.hash(state); // Discriminant for EdgeArray variant
+                edges.hash(state);
             }
         }
     }

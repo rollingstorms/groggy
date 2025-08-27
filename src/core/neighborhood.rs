@@ -11,12 +11,16 @@
 //! - Full composability: neighborhood().filter_nodes().bfs() etc.
 //! - Follows the same pattern as connected_components result structure
 
+use crate::api::graph::Graph;
 use crate::core::pool::GraphPool;
 use crate::core::space::GraphSpace;
 use crate::core::subgraph::Subgraph;
+use crate::core::traits::{GraphEntity, SubgraphOperations};
 use crate::errors::GraphResult;
-use crate::types::NodeId;
+use crate::types::{EdgeId, EntityId, NodeId, SubgraphId};
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 /// Result of neighborhood sampling operations
 #[derive(Debug, Clone)]
@@ -32,20 +36,378 @@ pub struct NeighborhoodResult {
 }
 
 /// A single neighborhood subgraph containing a central node and its neighbors
+/// 
+/// Uses our existing efficient HashSet<NodeId> + HashSet<EdgeId> storage
+/// with specialized metadata for neighborhood analysis.
 #[derive(Debug, Clone)]
 pub struct NeighborhoodSubgraph {
-    /// Node IDs in this neighborhood
-    pub nodes: Vec<NodeId>,
-    /// Edge IDs in this neighborhood (induced edges)
-    pub edges: Vec<usize>, // EdgeId
+    /// Reference to shared graph storage infrastructure
+    graph_ref: Rc<RefCell<Graph>>,
+    /// Efficient node storage (HashSet for O(1) contains operations)
+    nodes: HashSet<NodeId>,
+    /// Efficient edge storage (HashSet for O(1) contains operations)
+    edges: HashSet<EdgeId>,
     /// Central node(s) that define this neighborhood
-    pub central_nodes: Vec<NodeId>,
+    central_nodes: Vec<NodeId>,
     /// Distance/hop count for this neighborhood
-    pub hops: usize,
-    /// Number of nodes in this neighborhood
-    pub size: usize,
-    /// Number of edges in this neighborhood (induced edges)
-    pub edge_count: usize,
+    hops: usize,
+    /// Subgraph ID for GraphEntity trait
+    subgraph_id: SubgraphId,
+}
+
+impl NeighborhoodSubgraph {
+    /// Create a new NeighborhoodSubgraph from expansion results
+    pub fn from_expansion(
+        graph_ref: Rc<RefCell<Graph>>,
+        central_nodes: Vec<NodeId>,
+        hops: usize,
+        result: crate::core::neighborhood::NeighborhoodResult,
+    ) -> Self {
+        // TODO: Extract nodes and edges from result properly
+        // For now, create from first neighborhood in result
+        if let Some(first_neighborhood) = result.neighborhoods.first() {
+            let nodes: HashSet<NodeId> = first_neighborhood.nodes.iter().cloned().collect();
+            let edges: HashSet<EdgeId> = first_neighborhood.edges.iter().cloned().collect();
+            
+            Self::new(graph_ref, central_nodes, hops, nodes, edges)
+        } else {
+            // Empty neighborhood
+            Self::new(graph_ref, central_nodes, hops, HashSet::new(), HashSet::new())
+        }
+    }
+    
+    /// Create a new NeighborhoodSubgraph from stored data
+    pub fn from_stored(
+        graph_ref: Rc<RefCell<Graph>>,
+        nodes: HashSet<NodeId>,
+        edges: HashSet<EdgeId>,
+        central_nodes: Vec<NodeId>,
+        hops: usize,
+    ) -> Self {
+        Self::new(graph_ref, central_nodes, hops, nodes, edges)
+    }
+    
+    /// Create a new NeighborhoodSubgraph
+    pub fn new(
+        graph_ref: Rc<RefCell<Graph>>,
+        central_nodes: Vec<NodeId>,
+        hops: usize,
+        nodes: HashSet<NodeId>,
+        edges: HashSet<EdgeId>,
+    ) -> Self {
+        // Generate subgraph ID from central nodes and hops
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        for &central in &central_nodes {
+            central.hash(&mut hasher);
+        }
+        hops.hash(&mut hasher);
+        nodes.len().hash(&mut hasher);
+        let subgraph_id = hasher.finish() as SubgraphId;
+        
+        Self {
+            graph_ref,
+            nodes,
+            edges,
+            central_nodes,
+            hops,
+            subgraph_id,
+        }
+    }
+    
+    /// Get the central nodes for this neighborhood
+    pub fn central_nodes(&self) -> &[NodeId] {
+        &self.central_nodes
+    }
+    
+    /// Get the number of hops for this neighborhood
+    pub fn hops(&self) -> usize {
+        self.hops
+    }
+    
+    /// Expand this neighborhood by additional hops
+    pub fn expand_by(&self, additional_hops: usize) -> GraphResult<NeighborhoodSubgraph> {
+        let new_hops = self.hops + additional_hops;
+        let mut graph = self.graph_ref.borrow_mut();
+        
+        let result = graph.neighborhood_sampler.unified_neighborhood(
+            &graph.pool.borrow(),
+            &graph.space,
+            &self.central_nodes,
+            new_hops
+        )?;
+        
+        Ok(NeighborhoodSubgraph::from_expansion(
+            self.graph_ref.clone(),
+            self.central_nodes.clone(),
+            new_hops,
+            result
+        ))
+    }
+}
+
+/// GraphEntity trait implementation for NeighborhoodSubgraph
+impl GraphEntity for NeighborhoodSubgraph {
+    fn entity_id(&self) -> EntityId {
+        EntityId::Neighborhood(self.subgraph_id)
+    }
+
+    fn entity_type(&self) -> &'static str {
+        "neighborhood"
+    }
+
+    fn graph_ref(&self) -> Rc<RefCell<Graph>> {
+        self.graph_ref.clone()
+    }
+
+    fn related_entities(&self) -> GraphResult<Vec<Box<dyn GraphEntity>>> {
+        // Return central nodes as EntityNode wrappers
+        let entities: Vec<Box<dyn GraphEntity>> = self.central_nodes
+            .iter()
+            .map(|&central_id| {
+                Box::new(crate::core::node::EntityNode::new(central_id, self.graph_ref.clone()))
+                    as Box<dyn GraphEntity>
+            })
+            .collect();
+        Ok(entities)
+    }
+
+    fn summary(&self) -> String {
+        format!(
+            "NeighborhoodSubgraph(central={:?}, hops={}, nodes={}, edges={})",
+            self.central_nodes,
+            self.hops,
+            self.nodes.len(),
+            self.edges.len()
+        )
+    }
+}
+
+/// SubgraphOperations trait implementation for NeighborhoodSubgraph
+impl SubgraphOperations for NeighborhoodSubgraph {
+    fn node_set(&self) -> &HashSet<NodeId> {
+        &self.nodes
+    }
+
+    fn edge_set(&self) -> &HashSet<EdgeId> {
+        &self.edges
+    }
+
+    fn induced_subgraph(&self, nodes: &[NodeId]) -> GraphResult<Box<dyn SubgraphOperations>> {
+        // Filter to nodes that exist in this neighborhood
+        let filtered_nodes: HashSet<NodeId> = nodes.iter()
+            .filter(|&&node_id| self.nodes.contains(&node_id))
+            .cloned()
+            .collect();
+
+        // Calculate induced edges using existing method
+        let induced_edges = crate::core::subgraph::Subgraph::calculate_induced_edges(&self.graph_ref, &filtered_nodes)?;
+
+        let induced_neighborhood = NeighborhoodSubgraph::new(
+            self.graph_ref.clone(),
+            self.central_nodes.clone(), // Keep same central nodes
+            self.hops,
+            filtered_nodes,
+            induced_edges
+        );
+
+        Ok(Box::new(induced_neighborhood))
+    }
+
+    fn subgraph_from_edges(&self, edges: &[EdgeId]) -> GraphResult<Box<dyn SubgraphOperations>> {
+        // Filter to edges that exist in this neighborhood
+        let filtered_edges: HashSet<EdgeId> = edges.iter()
+            .filter(|&&edge_id| self.edges.contains(&edge_id))
+            .cloned()
+            .collect();
+
+        // Calculate nodes from edge endpoints
+        let mut endpoint_nodes = HashSet::new();
+        let graph_borrow = self.graph_ref.borrow();
+        for &edge_id in &filtered_edges {
+            if let Ok((source, target)) = graph_borrow.edge_endpoints(edge_id) {
+                if self.nodes.contains(&source) {
+                    endpoint_nodes.insert(source);
+                }
+                if self.nodes.contains(&target) {
+                    endpoint_nodes.insert(target);
+                }
+            }
+        }
+
+        let edge_neighborhood = NeighborhoodSubgraph::new(
+            self.graph_ref.clone(),
+            self.central_nodes.clone(),
+            self.hops,
+            endpoint_nodes,
+            filtered_edges
+        );
+
+        Ok(Box::new(edge_neighborhood))
+    }
+
+    fn connected_components(&self) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
+        // Use existing efficient TraversalEngine for connected components within this neighborhood
+        let mut graph = self.graph_ref.borrow_mut();
+        let nodes_vec: Vec<NodeId> = self.nodes.iter().cloned().collect();
+        let options = crate::core::traversal::TraversalOptions::default();
+        
+        let result = graph.traversal_engine.connected_components_for_nodes(
+            &graph.pool.borrow(),
+            &graph.space,
+            nodes_vec,
+            options
+        )?;
+
+        let mut component_subgraphs = Vec::new();
+        for (i, component) in result.components.into_iter().enumerate() {
+            let component_nodes: std::collections::HashSet<NodeId> = component.nodes.into_iter().collect();
+            let component_edges: std::collections::HashSet<EdgeId> = component.edges.into_iter().collect();
+            
+            let component_neighborhood = NeighborhoodSubgraph::new(
+                self.graph_ref.clone(),
+                self.central_nodes.clone(), // Keep same central nodes
+                self.hops,
+                component_nodes,
+                component_edges
+            );
+            component_subgraphs.push(Box::new(component_neighborhood) as Box<dyn SubgraphOperations>);
+        }
+
+        Ok(component_subgraphs)
+    }
+
+    fn bfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+        if !self.nodes.contains(&start) {
+            return Err(crate::errors::GraphError::NodeNotFound { 
+                node_id: start,
+                operation: "bfs_subgraph".to_string(),
+                suggestion: "Ensure start node is within this neighborhood".to_string(),
+            });
+        }
+
+        // Use existing efficient TraversalEngine for BFS within this neighborhood
+        let mut graph = self.graph_ref.borrow_mut();
+        let mut options = crate::core::traversal::TraversalOptions::default();
+        if let Some(depth) = max_depth {
+            options.max_depth = Some(depth);
+        }
+        
+        let result = graph.traversal_engine.bfs(
+            &graph.pool.borrow(),
+            &mut graph.space,
+            start,
+            options
+        )?;
+
+        // Filter result to nodes that exist in this neighborhood
+        let filtered_nodes: std::collections::HashSet<NodeId> = result.nodes
+            .into_iter()
+            .filter(|node| self.nodes.contains(node))
+            .collect();
+        let filtered_edges: std::collections::HashSet<EdgeId> = result.edges
+            .into_iter()
+            .filter(|edge| self.edges.contains(edge))
+            .collect();
+
+        let bfs_neighborhood = NeighborhoodSubgraph::new(
+            self.graph_ref.clone(),
+            self.central_nodes.clone(),
+            self.hops,
+            filtered_nodes,
+            filtered_edges
+        );
+
+        Ok(Box::new(bfs_neighborhood))
+    }
+
+    fn dfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+        if !self.nodes.contains(&start) {
+            return Err(crate::errors::GraphError::NodeNotFound { 
+                node_id: start,
+                operation: "dfs_subgraph".to_string(),
+                suggestion: "Ensure start node is within this neighborhood".to_string(),
+            });
+        }
+
+        // Use existing efficient TraversalEngine for DFS within this neighborhood
+        let mut graph = self.graph_ref.borrow_mut();
+        let mut options = crate::core::traversal::TraversalOptions::default();
+        if let Some(depth) = max_depth {
+            options.max_depth = Some(depth);
+        }
+        
+        let result = graph.traversal_engine.dfs(
+            &graph.pool.borrow(),
+            &mut graph.space,
+            start,
+            options
+        )?;
+
+        // Filter result to nodes that exist in this neighborhood
+        let filtered_nodes: std::collections::HashSet<NodeId> = result.nodes
+            .into_iter()
+            .filter(|node| self.nodes.contains(node))
+            .collect();
+        let filtered_edges: std::collections::HashSet<EdgeId> = result.edges
+            .into_iter()
+            .filter(|edge| self.edges.contains(edge))
+            .collect();
+
+        let dfs_neighborhood = NeighborhoodSubgraph::new(
+            self.graph_ref.clone(),
+            self.central_nodes.clone(),
+            self.hops,
+            filtered_nodes,
+            filtered_edges
+        );
+
+        Ok(Box::new(dfs_neighborhood))
+    }
+
+    fn shortest_path_subgraph(&self, source: NodeId, target: NodeId) -> GraphResult<Option<Box<dyn SubgraphOperations>>> {
+        if !self.nodes.contains(&source) || !self.nodes.contains(&target) {
+            return Ok(None);
+        }
+
+        // Use existing efficient TraversalEngine for shortest path within this neighborhood
+        let mut graph = self.graph_ref.borrow_mut();
+        let options = crate::core::traversal::PathFindingOptions::default();
+        
+        if let Some(path_result) = graph.traversal_engine.shortest_path(
+            &graph.pool.borrow(),
+            &mut graph.space,
+            source,
+            target,
+            options
+        )? {
+            // Filter path to nodes/edges that exist in this neighborhood
+            let filtered_nodes: std::collections::HashSet<NodeId> = path_result.nodes
+                .into_iter()
+                .filter(|node| self.nodes.contains(node))
+                .collect();
+            let filtered_edges: std::collections::HashSet<EdgeId> = path_result.edges
+                .into_iter()
+                .filter(|edge| self.edges.contains(edge))
+                .collect();
+
+            if !filtered_nodes.is_empty() {
+                let path_neighborhood = NeighborhoodSubgraph::new(
+                    self.graph_ref.clone(),
+                    self.central_nodes.clone(),
+                    self.hops,
+                    filtered_nodes,
+                    filtered_edges
+                );
+                Ok(Some(Box::new(path_neighborhood)))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 /// Engine for generating neighborhood subgraphs

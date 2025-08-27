@@ -1,0 +1,328 @@
+//! SubgraphOperations - Shared interface for all subgraph-like entities
+//!
+//! This trait provides common operations for all subgraph types while leveraging
+//! our existing efficient storage (HashSet<NodeId>, HashSet<EdgeId>) and algorithms.
+//! All subgraph types use the same optimized foundation with specialized behaviors.
+
+use crate::core::traits::GraphEntity;
+use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
+use crate::errors::GraphResult;
+use std::collections::{HashMap, HashSet};
+
+/// Common operations that all subgraph-like entities support
+/// 
+/// This trait provides a unified interface over our existing efficient subgraph storage.
+/// All implementations use the same HashSet<NodeId> and HashSet<EdgeId> foundation
+/// with our existing optimized algorithms accessed through the Graph reference.
+/// 
+/// # Design Principles
+/// - **Same Storage**: All subgraphs use HashSet<NodeId> + HashSet<EdgeId> + Rc<RefCell<Graph>>
+/// - **Algorithm Reuse**: All operations delegate to existing optimized algorithms
+/// - **Zero Copying**: Methods return references to existing data structures
+/// - **Trait Objects**: Methods return Box<dyn SubgraphOperations> for composability
+pub trait SubgraphOperations: GraphEntity {
+    /// Reference to our efficient node set (no copying)
+    /// 
+    /// # Returns
+    /// Reference to the HashSet<NodeId> containing this subgraph's nodes
+    /// 
+    /// # Performance
+    /// O(1) - Direct reference to existing efficient storage
+    fn node_set(&self) -> &HashSet<NodeId>;
+    
+    /// Reference to our efficient edge set (no copying)
+    /// 
+    /// # Returns
+    /// Reference to the HashSet<EdgeId> containing this subgraph's edges
+    /// 
+    /// # Performance
+    /// O(1) - Direct reference to existing efficient storage
+    fn edge_set(&self) -> &HashSet<EdgeId>;
+    
+    /// Node count using our existing efficient structure
+    /// 
+    /// # Returns
+    /// Number of nodes in this subgraph
+    /// 
+    /// # Performance
+    /// O(1) - Direct .len() call on HashSet
+    fn node_count(&self) -> usize {
+        self.node_set().len()
+    }
+    
+    /// Edge count using our existing efficient structure
+    /// 
+    /// # Returns
+    /// Number of edges in this subgraph
+    /// 
+    /// # Performance
+    /// O(1) - Direct .len() call on HashSet
+    fn edge_count(&self) -> usize {
+        self.edge_set().len()
+    }
+    
+    /// Containment check using our existing HashSet lookups
+    /// 
+    /// # Arguments
+    /// * `node_id` - Node to check for membership
+    /// 
+    /// # Returns
+    /// true if node is in this subgraph
+    /// 
+    /// # Performance
+    /// O(1) - Direct HashSet.contains() call
+    fn contains_node(&self, node_id: NodeId) -> bool {
+        self.node_set().contains(&node_id)
+    }
+    
+    /// Edge containment check using our existing HashSet lookups
+    /// 
+    /// # Arguments
+    /// * `edge_id` - Edge to check for membership
+    /// 
+    /// # Returns
+    /// true if edge is in this subgraph
+    /// 
+    /// # Performance
+    /// O(1) - Direct HashSet.contains() call
+    fn contains_edge(&self, edge_id: EdgeId) -> bool {
+        self.edge_set().contains(&edge_id)
+    }
+    
+    /// Node attribute access using GraphPool (no copying)
+    /// 
+    /// # Arguments
+    /// * `node_id` - Node whose attribute to retrieve
+    /// * `name` - Attribute name
+    /// 
+    /// # Returns
+    /// Optional reference to attribute value in GraphPool
+    /// 
+    /// # Performance
+    /// O(1) - Direct lookup in optimized columnar storage
+    fn get_node_attribute(&self, node_id: NodeId, name: &AttrName) -> GraphResult<Option<&AttrValue>> {
+        self.graph_ref().borrow().pool().get_node_attribute(node_id, name)
+    }
+    
+    /// Edge attribute access using GraphPool (no copying)
+    /// 
+    /// # Arguments
+    /// * `edge_id` - Edge whose attribute to retrieve
+    /// * `name` - Attribute name
+    /// 
+    /// # Returns
+    /// Optional reference to attribute value in GraphPool
+    /// 
+    /// # Performance
+    /// O(1) - Direct lookup in optimized columnar storage
+    fn get_edge_attribute(&self, edge_id: EdgeId, name: &AttrName) -> GraphResult<Option<&AttrValue>> {
+        self.graph_ref().borrow().pool().get_edge_attribute(edge_id, name)
+    }
+    
+    /// Topology queries using our existing efficient algorithms
+    /// 
+    /// # Arguments
+    /// * `node_id` - Node whose neighbors to find
+    /// 
+    /// # Returns
+    /// Vector of neighbor node IDs within this subgraph
+    /// 
+    /// # Performance
+    /// Uses existing optimized neighbor algorithm with subgraph filtering
+    fn neighbors(&self, node_id: NodeId) -> GraphResult<Vec<NodeId>> {
+        let graph = self.graph_ref().borrow();
+        graph.neighbors_filtered(node_id, self.node_set())
+    }
+    
+    /// Node degree within this subgraph
+    /// 
+    /// # Arguments
+    /// * `node_id` - Node whose degree to calculate
+    /// 
+    /// # Returns
+    /// Number of edges connected to this node within the subgraph
+    /// 
+    /// # Performance
+    /// Uses existing optimized degree algorithm with subgraph filtering
+    fn degree(&self, node_id: NodeId) -> GraphResult<usize> {
+        let graph = self.graph_ref().borrow();
+        graph.degree_filtered(node_id, self.node_set())
+    }
+    
+    /// Edge endpoints within this subgraph
+    /// 
+    /// # Arguments
+    /// * `edge_id` - Edge whose endpoints to retrieve
+    /// 
+    /// # Returns
+    /// Tuple of (source, target) node IDs
+    /// 
+    /// # Performance
+    /// Uses existing efficient edge endpoint lookup
+    fn edge_endpoints(&self, edge_id: EdgeId) -> GraphResult<(NodeId, NodeId)> {
+        let graph_ref = self.graph_ref();
+        let graph = graph_ref.borrow();
+        graph.edge_endpoints(edge_id)
+    }
+    
+    /// Check for edge between nodes in this subgraph
+    /// 
+    /// # Arguments
+    /// * `source` - Source node ID
+    /// * `target` - Target node ID
+    /// 
+    /// # Returns
+    /// true if edge exists between nodes within this subgraph
+    /// 
+    /// # Performance
+    /// Uses existing efficient edge existence check
+    fn has_edge_between(&self, source: NodeId, target: NodeId) -> GraphResult<bool> {
+        let graph = self.graph_ref().borrow();
+        graph.has_edge_between_filtered(source, target, self.edge_set())
+    }
+    
+    // === SUBGRAPH CREATION (Returns trait objects for composability) ===
+    
+    /// Create induced subgraph from node subset
+    /// 
+    /// # Arguments
+    /// * `nodes` - Slice of node IDs to include in new subgraph
+    /// 
+    /// # Returns
+    /// New subgraph containing only specified nodes and edges between them
+    /// 
+    /// # Performance
+    /// Uses existing efficient induced subgraph algorithm
+    fn induced_subgraph(&self, nodes: &[NodeId]) -> GraphResult<Box<dyn SubgraphOperations>>;
+    
+    /// Create subgraph from edge subset
+    /// 
+    /// # Arguments
+    /// * `edges` - Slice of edge IDs to include in new subgraph
+    /// 
+    /// # Returns
+    /// New subgraph containing specified edges and their endpoint nodes
+    /// 
+    /// # Performance
+    /// Uses existing efficient edge-based subgraph creation
+    fn subgraph_from_edges(&self, edges: &[EdgeId]) -> GraphResult<Box<dyn SubgraphOperations>>;
+    
+    // === ALGORITHMS (Delegate to existing implementations, return trait objects) ===
+    
+    /// Find connected components within this subgraph
+    /// 
+    /// # Returns
+    /// Vector of subgraphs, each representing a connected component
+    /// 
+    /// # Performance
+    /// Uses existing optimized connected components algorithm on subgraph data
+    fn connected_components(&self) -> GraphResult<Vec<Box<dyn SubgraphOperations>>>;
+    
+    /// Breadth-first search from starting node within this subgraph
+    /// 
+    /// # Arguments
+    /// * `start` - Starting node for BFS
+    /// * `max_depth` - Optional maximum depth to traverse
+    /// 
+    /// # Returns
+    /// Subgraph containing nodes reachable via BFS
+    /// 
+    /// # Performance
+    /// Uses existing efficient BFS algorithm with subgraph constraints
+    fn bfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>>;
+    
+    /// Depth-first search from starting node within this subgraph
+    /// 
+    /// # Arguments
+    /// * `start` - Starting node for DFS
+    /// * `max_depth` - Optional maximum depth to traverse
+    /// 
+    /// # Returns
+    /// Subgraph containing nodes reachable via DFS
+    /// 
+    /// # Performance
+    /// Uses existing efficient DFS algorithm with subgraph constraints
+    fn dfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>>;
+    
+    /// Find shortest path between nodes within this subgraph
+    /// 
+    /// # Arguments
+    /// * `source` - Starting node
+    /// * `target` - Destination node
+    /// 
+    /// # Returns
+    /// Optional subgraph representing the shortest path (None if no path exists)
+    /// 
+    /// # Performance
+    /// Uses existing efficient shortest path algorithm with subgraph constraints
+    fn shortest_path_subgraph(&self, source: NodeId, target: NodeId) -> GraphResult<Option<Box<dyn SubgraphOperations>>>;
+    
+    // === HIERARCHICAL OPERATIONS (Integration with GraphPool storage) ===
+    
+    /// Collapse this subgraph into a meta-node stored in GraphPool
+    /// 
+    /// # Arguments
+    /// * `agg_functions` - Attribute aggregation functions (e.g., "mean", "sum", "count")
+    /// 
+    /// # Returns
+    /// NodeId of the created meta-node in GraphPool
+    /// 
+    /// # Storage Integration
+    /// - Creates new node in GraphPool
+    /// - Stores subgraph reference using SubgraphRef attribute
+    /// - Applies aggregation functions using existing bulk operations
+    /// - All attributes stored in our efficient columnar storage
+    fn collapse_to_node(&self, agg_functions: HashMap<AttrName, String>) -> GraphResult<NodeId> {
+        let mut graph = self.graph_ref().borrow_mut();
+        
+        // Create new meta-node in GraphPool using existing efficient node creation
+        let meta_node_id = graph.pool_mut().create_node()?;
+        
+        // Store subgraph reference in GraphPool using new subgraph storage capability
+        let subgraph_id = graph.pool_mut().store_subgraph(
+            self.node_set().clone(),
+            self.edge_set().clone(),
+            self.entity_type()
+        )?;
+        
+        // Link meta-node to subgraph using our efficient attribute storage
+        graph.pool_mut().set_node_attribute(
+            meta_node_id,
+            "contained_subgraph".into(),
+            AttrValue::SubgraphRef(subgraph_id)
+        )?;
+        
+        // Apply aggregation functions using existing bulk operations on GraphPool
+        for (attr_name, agg_func) in agg_functions {
+            let aggregated_value = graph.aggregate_attribute_over_nodes(
+                self.node_set(),
+                &attr_name,
+                &agg_func
+            )?;
+            graph.pool_mut().set_node_attribute(meta_node_id, attr_name, aggregated_value)?;
+        }
+        
+        Ok(meta_node_id)
+    }
+    
+    /// Get parent subgraph (if this is a sub-subgraph)
+    /// 
+    /// # Returns
+    /// Optional parent subgraph that contains this one
+    fn parent_subgraph(&self) -> Option<Box<dyn SubgraphOperations>> {
+        // TODO: Implement parent tracking for hierarchical subgraphs
+        None
+    }
+    
+    /// Get child subgraphs (if this contains other subgraphs)
+    /// 
+    /// # Returns
+    /// Vector of child subgraphs contained within this one
+    fn child_subgraphs(&self) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
+        // TODO: Implement child tracking for hierarchical subgraphs
+        Ok(Vec::new())
+    }
+}
+
+// Note: No default implementations provided to avoid conflicts.
+// Each concrete subgraph type implements SubgraphOperations directly.

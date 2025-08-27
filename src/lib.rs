@@ -147,9 +147,11 @@ pub mod core {
     pub mod array;
     pub mod change_tracker;
     pub mod delta;
+    pub mod edge;
     pub mod history;
     pub mod matrix;
     pub mod neighborhood;
+    pub mod node;
     pub mod pool;
     pub mod query;
     pub mod ref_manager;
@@ -158,6 +160,7 @@ pub mod core {
     pub mod strategies;
     pub mod subgraph;
     pub mod table;
+    pub mod traits;
     pub mod traversal;
 }
 

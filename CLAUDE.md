@@ -111,6 +111,13 @@ See `documentation/planning/personas/` for detailed role definitions.
 - **Three-tier separation**: Clear boundaries between Core/FFI/API layers
 - **Attribute-first optimization**: Data structures optimized for bulk attribute operations
 
+### Implementation Standards
+- **NO PLACEHOLDER CODE**: Never add stub implementations or TODO placeholders that don't compile
+- **Complete One Step at a Time**: When tasks become complex, break them into smaller, complete functional steps
+- **Regroup When Needed**: If implementation becomes too complex, pause and discuss options with the team
+- **Working Code Only**: Every commit must leave the codebase in a compilable, functional state
+- **Progressive Implementation**: Build complex features through successive working iterations, not empty shells
+
 ### Performance Standards
 - Core operations must meet O(1) amortized complexity targets
 - Memory usage must scale linearly with data size
