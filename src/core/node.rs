@@ -6,6 +6,8 @@
 
 use crate::api::graph::Graph;
 use crate::core::traits::{GraphEntity, NodeOperations, SubgraphOperations};
+use crate::core::traversal::TraversalEngine;
+use crate::core::neighborhood::NeighborhoodSampler;
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId};
 use std::cell::RefCell;
@@ -104,10 +106,11 @@ impl NodeOperations for EntityNode {
 
     fn node_attributes(&self) -> GraphResult<HashMap<AttrName, AttrValue>> {
         let graph = self.graph_ref.borrow();
-        graph.pool().get_all_node_attributes(self.node_id)
+        let x = graph.pool().get_all_node_attributes(self.node_id);
+        x
     }
 
-    fn get_node_attribute(&self, name: &AttrName) -> GraphResult<Option<&AttrValue>> {
+    fn get_node_attribute(&self, name: &AttrName) -> GraphResult<Option<AttrValue>> {
         self.get_attribute(name) // Delegates to GraphEntity default implementation
     }
 
@@ -116,32 +119,46 @@ impl NodeOperations for EntityNode {
     }
 
     fn expand_to_subgraph(&self) -> GraphResult<Option<Box<dyn SubgraphOperations>>> {
-        let graph = self.graph_ref.borrow();
+        // First check if this node has a subgraph reference
+        let subgraph_id_opt = {
+            let graph = self.graph_ref.borrow();
+            let x = graph.pool().get_node_attribute(self.node_id, &"contained_subgraph".into())?;
+            x
+        };
         
-        // Check if this node has a subgraph reference in GraphPool
-        if let Some(AttrValue::SubgraphRef(subgraph_id)) =
-            graph.pool().get_node_attribute(self.node_id, &"contained_subgraph".into())? {
+        if let Some(AttrValue::SubgraphRef(subgraph_id)) = subgraph_id_opt {
+            // Get all needed data in separate scopes to avoid long-lived borrows
+            let (nodes, edges, subgraph_type) = {
+                let graph = self.graph_ref.borrow();
+                let x = graph.pool().get_subgraph(subgraph_id)?;
+                x
+            };
             
-            // Retrieve subgraph data from GraphPool storage
-            let (nodes, edges, subgraph_type) = graph.pool().get_subgraph(*subgraph_id)?;
+            let central_nodes = {
+                let graph = self.graph_ref.borrow();
+                let x = if let Some(AttrValue::NodeArray(central)) = 
+                    graph.pool().get_node_attribute(self.node_id, &"central_nodes".into())? {
+                    central
+                } else {
+                    vec![self.node_id] // Default to this node as central
+                };
+                x
+            };
+            
+            let hops = {
+                let graph = self.graph_ref.borrow();
+                let x = if let Some(AttrValue::SmallInt(h)) = 
+                    graph.pool().get_node_attribute(self.node_id, &"expansion_hops".into())? {
+                    h as usize
+                } else {
+                    1 // Default hops
+                };
+                x
+            };
             
             // Create appropriate subgraph type based on stored metadata
             let subgraph: Box<dyn SubgraphOperations> = match subgraph_type.as_str() {
                 "neighborhood" => {
-                    // Reconstruct NeighborhoodSubgraph with metadata from node attributes
-                    let central_nodes = if let Some(AttrValue::NodeArray(central)) =
-                        graph.pool().get_node_attribute(self.node_id, &"central_nodes".into())? {
-                        central.clone()
-                    } else {
-                        vec![self.node_id] // Default to this node as central
-                    };
-                    let hops = if let Some(AttrValue::SmallInt(h)) =
-                        graph.pool().get_node_attribute(self.node_id, &"expansion_hops".into())? {
-                        *h as usize
-                    } else {
-                        1 // Default hops
-                    };
-                    
                     Box::new(crate::core::neighborhood::NeighborhoodSubgraph::from_stored(
                         self.graph_ref(),
                         nodes,
@@ -185,20 +202,17 @@ impl NodeOperations for EntityNode {
     fn neighborhood(&self, hops: usize) -> GraphResult<Box<dyn SubgraphOperations>> {
         // Use existing NeighborhoodSampler for efficient neighborhood expansion
         let mut graph = self.graph_ref.borrow_mut();
-        let result = graph.neighborhood_sampler.unified_neighborhood(
-            &graph.pool.borrow(),
-            &graph.space,
+        // Use NeighborhoodSampler directly
+        let mut neighborhood_sampler = NeighborhoodSampler::new();
+        let result = neighborhood_sampler.unified_neighborhood(
+            &graph.pool(),
+            graph.space(),
             &vec![self.node_id],
             hops
         )?;
         
-        // Create proper NeighborhoodSubgraph with trait support
-        let neighborhood_subgraph = crate::core::neighborhood::NeighborhoodSubgraph::from_expansion(
-            self.graph_ref(),
-            vec![self.node_id],
-            hops,
-            result
-        );
+        // unified_neighborhood already returns a NeighborhoodSubgraph
+        let neighborhood_subgraph = result;
         
         Ok(Box::new(neighborhood_subgraph))
     }
@@ -209,9 +223,11 @@ impl NodeOperations for EntityNode {
         let options = crate::core::traversal::PathFindingOptions::default();
         
         for &target in targets {
-            if let Some(path_result) = graph.traversal_engine.shortest_path(
-                &graph.pool.borrow(),
-                &mut graph.space,
+            // Use TraversalEngine directly
+            let mut traversal_engine = TraversalEngine::new();
+            if let Some(path_result) = traversal_engine.shortest_path(
+                &graph.pool(),
+                &mut graph.space(),
                 self.node_id,
                 target,
                 options.clone()

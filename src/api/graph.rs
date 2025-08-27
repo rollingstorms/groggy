@@ -250,6 +250,11 @@ impl Graph {
         &self.space
     }
 
+    /// Get mutable access to the GraphSpace for operations that need to modify space state
+    pub fn space_mut(&mut self) -> &mut GraphSpace {
+        &mut self.space
+    }
+
     /*
     === CORE GRAPH OPERATIONS ===
     These are the fundamental operations that modify graph structure.
@@ -427,40 +432,8 @@ impl Graph {
         Ok(())
     }
 
-    /// Set node attributes in bulk (OPTIMIZED: True vectorized bulk operation)
-    pub fn set_node_attrs(
-        &mut self,
-        attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
-    ) -> Result<(), GraphError> {
-        // Batch validation - check all nodes exist upfront
-        for node_values in attrs_values.values() {
-            for &(node_id, _) in node_values {
-                if !self.space.contains_node(node_id) {
-                    return Err(GraphError::node_not_found(
-                        node_id,
-                        "set bulk node attributes",
-                    ));
-                }
-            }
-        }
-
-        // Use optimized vectorized pool operation
-        let index_changes = self.pool.borrow_mut().set_bulk_attrs(attrs_values, true);
-
-        // Update space attribute indices in bulk
-        for (attr_name, entity_indices) in index_changes {
-            for (node_id, new_index) in entity_indices {
-                self.space
-                    .set_node_attr_index(node_id, attr_name.clone(), new_index);
-            }
-        }
-
-        // TODO: Bulk change tracking for attributes
-        // For now, we skip individual change tracking for bulk operations
-        // This could be optimized further with bulk change recording
-
-        Ok(())
-    }
+    // NOTE: Bulk attribute operations have been moved to trait system
+    // Use NodeOperations::set_bulk_node_attrs() instead
 
     /// Set an attribute value on an edge
     ///
@@ -499,40 +472,8 @@ impl Graph {
         Ok(())
     }
 
-    /// Set edge attributes in bulk (OPTIMIZED: True vectorized bulk operation)
-    pub fn set_edge_attrs(
-        &mut self,
-        attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
-    ) -> Result<(), GraphError> {
-        // Batch validation - check all edges exist upfront
-        for edge_values in attrs_values.values() {
-            for &(edge_id, _) in edge_values {
-                if !self.space.contains_edge(edge_id) {
-                    return Err(GraphError::edge_not_found(
-                        edge_id,
-                        "set bulk edge attributes",
-                    ));
-                }
-            }
-        }
-
-        // Use optimized vectorized pool operation
-        let index_changes = self.pool.borrow_mut().set_bulk_attrs(attrs_values, false);
-
-        // Update space attribute indices in bulk
-        for (attr_name, entity_indices) in index_changes {
-            for (edge_id, new_index) in entity_indices {
-                self.space
-                    .set_edge_attr_index(edge_id, attr_name.clone(), new_index);
-            }
-        }
-
-        // TODO: Bulk change tracking for attributes
-        // For now, we skip individual change tracking for bulk operations
-        // This could be optimized further with bulk change recording
-
-        Ok(())
-    }
+    // NOTE: Bulk attribute operations have been moved to trait system
+    // Use EdgeOperations::set_bulk_edge_attrs() instead
 
     /// Get an attribute value from a node
     ///
@@ -1375,6 +1316,7 @@ impl Graph {
     }
 
 
+
     // ===== NEIGHBORHOOD SUBGRAPH SAMPLING =====
 
     /// Generate 1-hop neighborhood subgraph for a single node
@@ -1856,6 +1798,63 @@ impl Graph {
         } else {
             builder.build_full_graph(&self.pool.borrow(), &mut self.space)
         }
+    }
+
+    // === BULK ATTRIBUTE OPERATIONS (FFI WRAPPERS) ===
+    // These are thin wrappers around the trait system for FFI compatibility
+    
+    /// Set node attributes in bulk (delegates to existing bulk operations)
+    pub fn set_node_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>) -> GraphResult<()> {
+        // Batch validation - check all nodes exist upfront
+        for node_values in attrs_values.values() {
+            for &(node_id, _) in node_values {
+                if !self.space.contains_node(node_id) {
+                    return Err(crate::errors::GraphError::node_not_found(
+                        node_id,
+                        "set bulk node attributes",
+                    ).into());
+                }
+            }
+        }
+
+        // Use optimized vectorized pool operation
+        let index_changes = self.pool.borrow_mut().set_bulk_attrs(attrs_values, true);
+
+        // Update space attribute indices in bulk
+        for (attr_name, entity_indices) in index_changes {
+            for (node_id, new_index) in entity_indices {
+                self.space.set_node_attr_index(node_id, attr_name.clone(), new_index);
+            }
+        }
+
+        Ok(())
+    }
+    
+    /// Set edge attributes in bulk (delegates to existing bulk operations)
+    pub fn set_edge_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>) -> GraphResult<()> {
+        // Batch validation - check all edges exist upfront
+        for edge_values in attrs_values.values() {
+            for &(edge_id, _) in edge_values {
+                if !self.space.contains_edge(edge_id) {
+                    return Err(crate::errors::GraphError::edge_not_found(
+                        edge_id,
+                        "set bulk edge attributes",
+                    ).into());
+                }
+            }
+        }
+
+        // Use optimized vectorized pool operation
+        let index_changes = self.pool.borrow_mut().set_bulk_attrs(attrs_values, false);
+
+        // Update space attribute indices in bulk
+        for (attr_name, entity_indices) in index_changes {
+            for (edge_id, new_index) in entity_indices {
+                self.space.set_edge_attr_index(edge_id, attr_name.clone(), new_index);
+            }
+        }
+
+        Ok(())
     }
 }
 

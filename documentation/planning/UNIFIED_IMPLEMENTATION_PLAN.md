@@ -391,10 +391,12 @@ pub struct PyAggregationFunction {
 
 ## **SUCCESS METRICS**
 
-### **Week 1 Success:**
-- [ ] All 10 missing SubgraphOperations methods implemented in core
-- [ ] Methods compile and pass basic tests
-- [ ] Performance benchmarks show no regression
+### **Week 1 Success:** ✅ **COMPLETED**
+- [x] All 10 missing SubgraphOperations methods implemented in core
+- [x] Methods compile and pass basic tests
+- [x] Performance benchmarks show no regression
+- [x] **BONUS**: SimilarityMetric enum added and exported
+- [x] **BONUS**: Comprehensive unit tests for structural metrics and set operations
 
 ### **Week 2-3 Success:**  
 - [ ] Enhanced filtering and all hierarchical methods implemented

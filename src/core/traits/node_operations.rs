@@ -5,6 +5,7 @@
 //! optimized GraphPool/GraphSpace/HistoryForest infrastructure.
 
 use crate::core::traits::{GraphEntity, SubgraphOperations};
+use crate::core::traversal::TraversalEngine;
 use crate::types::{AttrName, AttrValue, NodeId};
 use crate::errors::GraphResult;
 use std::collections::HashMap;
@@ -63,8 +64,10 @@ pub trait NodeOperations: GraphEntity {
     /// # Performance
     /// Iterates through node's attributes in GraphPool columnar storage
     fn node_attributes(&self) -> GraphResult<HashMap<AttrName, AttrValue>> {
-        let graph = self.graph_ref().borrow();
-        graph.pool().get_all_node_attributes(self.node_id())
+        let binding = self.graph_ref();
+        let graph = binding.borrow();
+        let x = graph.pool().get_all_node_attributes(self.node_id());
+        x
     }
     
     /// Get specific node attribute from GraphPool
@@ -77,7 +80,7 @@ pub trait NodeOperations: GraphEntity {
     /// 
     /// # Performance
     /// O(1) - Direct lookup in optimized columnar storage
-    fn get_node_attribute(&self, name: &AttrName) -> GraphResult<Option<&AttrValue>> {
+    fn get_node_attribute(&self, name: &AttrName) -> GraphResult<Option<AttrValue>> {
         self.get_attribute(name) // Delegates to GraphEntity default implementation
     }
     
@@ -103,38 +106,57 @@ pub trait NodeOperations: GraphEntity {
     /// # Performance
     /// Queries GraphPool for subgraph reference, then reconstructs appropriate subgraph type
     fn expand_to_subgraph(&self) -> GraphResult<Option<Box<dyn SubgraphOperations>>> {
-        let graph = self.graph_ref().borrow();
+        // First check if this node has a subgraph reference
+        let subgraph_id_opt = {
+            let binding = self.graph_ref();
+            let graph = binding.borrow();
+            let x = graph.pool().get_node_attribute(self.node_id(), &"contained_subgraph".into())?;
+            x
+        };
         
-        // Check if this node has a subgraph reference in GraphPool
-        if let Some(AttrValue::SubgraphRef(subgraph_id)) =
-            graph.pool().get_node_attribute(self.node_id(), &"contained_subgraph".into())? {
-            
-            // Retrieve subgraph data from GraphPool storage
-            let (nodes, edges, subgraph_type) = graph.pool().get_subgraph(*subgraph_id)?;
+        if let Some(AttrValue::SubgraphRef(subgraph_id)) = subgraph_id_opt {
+            // Get all needed data in separate scopes to avoid long-lived borrows
+            let (nodes, edges, subgraph_type) = {
+                let binding = self.graph_ref();
+                let graph = binding.borrow();
+                let x = graph.pool().get_subgraph(subgraph_id)?;
+                x
+            };
             
             // Create appropriate subgraph type based on stored metadata
             let subgraph: Box<dyn SubgraphOperations> = match subgraph_type.as_str() {
                 "neighborhood" => {
                     // Reconstruct NeighborhoodSubgraph with metadata from node attributes
-                    let central_nodes = if let Some(AttrValue::NodeArray(central)) =
-                        graph.pool().get_node_attribute(self.node_id(), &"central_nodes".into())? {
-                        central.clone()
-                    } else {
-                        vec![self.node_id()] // Default to this node as central
-                    };
-                    let hops = if let Some(AttrValue::SmallInt(h)) =
-                        graph.pool().get_node_attribute(self.node_id(), &"expansion_hops".into())? {
-                        *h as usize
-                    } else {
-                        1 // Default hops
+                    let central_nodes = {
+                        let binding = self.graph_ref();
+                        let graph = binding.borrow();
+                        let x = if let Some(AttrValue::NodeArray(central)) = 
+                            graph.pool().get_node_attribute(self.node_id(), &"central_nodes".into())? {
+                            central
+                        } else {
+                            vec![self.node_id()] // Default to this node as central
+                        };
+                        x
                     };
                     
-                    Box::new(crate::core::neighborhood::NeighborhoodSubgraph::from_stored(
+                    let hops = {
+                        let binding = self.graph_ref();
+                        let graph = binding.borrow();
+                        let x = if let Some(AttrValue::SmallInt(h)) = 
+                            graph.pool().get_node_attribute(self.node_id(), &"expansion_hops".into())? {
+                            h as usize
+                        } else {
+                            1 // Default hops
+                        };
+                        x
+                    };
+                    
+                    // For now, just create a regular Subgraph since NeighborhoodSubgraph::from_stored doesn't exist
+                    Box::new(crate::core::subgraph::Subgraph::new(
                         self.graph_ref(),
                         nodes,
                         edges,
-                        central_nodes,
-                        hops
+                        subgraph_type.clone()
                     ))
                 },
                 "component" => {
@@ -149,7 +171,7 @@ pub trait NodeOperations: GraphEntity {
                 },
                 _ => {
                     // Default to base Subgraph
-                    Box::new(crate::core::subgraph::Subgraph::from_stored(
+                    Box::new(crate::core::subgraph::Subgraph::new(
                         self.graph_ref(),
                         nodes,
                         edges,
@@ -207,17 +229,19 @@ pub trait NodeOperations: GraphEntity {
     /// # Performance
     /// Uses existing efficient neighborhood expansion algorithm
     fn neighborhood(&self, hops: usize) -> GraphResult<Box<dyn SubgraphOperations>> {
-        let graph = self.graph_ref().borrow();
-        let neighborhood_result = graph.expand_neighborhood(&[self.node_id()], hops, None)?;
+        // Use existing NeighborhoodSampler for efficient neighborhood expansion (same as EntityNode)
+        let binding = self.graph_ref();
+        let mut graph = binding.borrow_mut();
+        let mut neighborhood_sampler = crate::core::neighborhood::NeighborhoodSampler::new();
+        let result = neighborhood_sampler.unified_neighborhood(
+            &graph.pool(),
+            graph.space(),
+            &vec![self.node_id()],
+            hops
+        )?;
         
-        let neighborhood = crate::core::neighborhood::NeighborhoodSubgraph::from_expansion(
-            self.graph_ref(),
-            vec![self.node_id()],
-            hops,
-            neighborhood_result
-        );
-        
-        Ok(Box::new(neighborhood))
+        // unified_neighborhood already returns a NeighborhoodSubgraph
+        Ok(Box::new(result))
     }
     
     /// Find shortest paths from this node to multiple targets
@@ -231,11 +255,21 @@ pub trait NodeOperations: GraphEntity {
     /// # Performance
     /// Uses existing efficient shortest path algorithm with multiple targets
     fn shortest_paths(&self, targets: &[NodeId]) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
-        let graph = self.graph_ref().borrow();
+        let binding = self.graph_ref();
+        let mut graph = binding.borrow_mut();
         let mut paths = Vec::new();
         
         for &target in targets {
-            if let Some(path_result) = graph.shortest_path(self.node_id(), target)? {
+            let options = crate::core::traversal::PathFindingOptions::default();
+            // Use TraversalEngine directly
+            let mut traversal_engine = TraversalEngine::new();
+            if let Some(path_result) = traversal_engine.shortest_path(
+                &graph.pool(),
+                &mut graph.space(),
+                self.node_id(),
+                target,
+                options
+            )? {
                 // TODO: Implement PathSubgraph when needed  
                 // For now, create basic Subgraph for path
                 let path_subgraph = crate::core::subgraph::Subgraph::new(
@@ -259,7 +293,8 @@ pub trait NodeOperations: GraphEntity {
     /// # Performance
     /// Uses existing efficient edge enumeration with GraphSpace
     fn incident_edges(&self) -> GraphResult<Vec<crate::types::EdgeId>> {
-        let graph = self.graph_ref().borrow();
+        let binding = self.graph_ref();
+        let graph = binding.borrow();
         graph.incident_edges(self.node_id())
     }
     
@@ -274,7 +309,12 @@ pub trait NodeOperations: GraphEntity {
     /// # Performance
     /// Uses existing efficient edge existence check
     fn is_connected_to(&self, other: NodeId) -> GraphResult<bool> {
-        let graph = self.graph_ref().borrow();
+        let binding = self.graph_ref();
+        let graph = binding.borrow();
         graph.has_edge_between(self.node_id(), other)
     }
+
+    // === BULK ATTRIBUTE OPERATIONS ===
+    // Note: Bulk operations are available via SubgraphOperations::set_node_attrs()
+    // for cross-entity bulk operations. Individual nodes use single attribute methods.
 }

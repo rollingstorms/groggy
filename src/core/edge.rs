@@ -131,10 +131,11 @@ impl EdgeOperations for EntityEdge {
 
     fn edge_attributes(&self) -> GraphResult<HashMap<AttrName, AttrValue>> {
         let graph = self.graph_ref.borrow();
-        graph.pool().get_all_edge_attributes(self.edge_id)
+        let x = graph.pool().get_all_edge_attributes(self.edge_id);
+        x
     }
 
-    fn get_edge_attribute(&self, name: &AttrName) -> GraphResult<Option<&AttrValue>> {
+    fn get_edge_attribute(&self, name: &AttrName) -> GraphResult<Option<AttrValue>> {
         self.get_attribute(name) // Delegates to GraphEntity default implementation
     }
 
@@ -149,22 +150,22 @@ impl EdgeOperations for EntityEdge {
 
     fn weight(&self) -> GraphResult<Option<f64>> {
         match self.get_edge_attribute(&"weight".into())? {
-            Some(AttrValue::Float(w)) => Ok(Some(*w)),
-            Some(AttrValue::Int(w)) => Ok(Some(*w as f64)),
-            Some(AttrValue::SmallInt(w)) => Ok(Some(*w as f64)),
+            Some(AttrValue::Float(w)) => Ok(Some(w as f64)),
+            Some(AttrValue::Int(w)) => Ok(Some(w as f64)),
+            Some(AttrValue::SmallInt(w)) => Ok(Some(w as f64)),
             _ => Ok(None)
         }
     }
 
     fn set_weight(&self, weight: f64) -> GraphResult<()> {
-        self.set_edge_attribute("weight".into(), AttrValue::Float(weight))
+        self.set_edge_attribute("weight".into(), AttrValue::Float(weight as f32))
     }
 
     fn capacity(&self) -> GraphResult<Option<f64>> {
         match self.get_edge_attribute(&"capacity".into())? {
-            Some(AttrValue::Float(c)) => Ok(Some(*c)),
-            Some(AttrValue::Int(c)) => Ok(Some(*c as f64)),
-            Some(AttrValue::SmallInt(c)) => Ok(Some(*c as f64)),
+            Some(AttrValue::Float(c)) => Ok(Some(c as f64)),
+            Some(AttrValue::Int(c)) => Ok(Some(c as f64)),
+            Some(AttrValue::SmallInt(c)) => Ok(Some(c as f64)),
             _ => Ok(None)
         }
     }

@@ -50,8 +50,9 @@ pub trait GraphEntity: std::fmt::Debug {
     /// 
     /// # Performance
     /// O(1) - Direct lookup in our optimized columnar storage
-    fn get_attribute(&self, name: &AttrName) -> GraphResult<Option<&AttrValue>> {
-        let graph = self.graph_ref().borrow();
+    fn get_attribute(&self, name: &AttrName) -> GraphResult<Option<AttrValue>> {
+        let binding = self.graph_ref();
+        let graph = binding.borrow();
         match self.entity_id() {
             EntityId::Node(id) | EntityId::MetaNode(id) => {
                 graph.pool().get_node_attribute(id, name)
@@ -76,7 +77,8 @@ pub trait GraphEntity: std::fmt::Debug {
     /// # Performance
     /// Uses our existing optimized AttributeColumn storage with memory pooling
     fn set_attribute(&self, name: AttrName, value: AttrValue) -> GraphResult<()> {
-        let mut graph = self.graph_ref().borrow_mut();
+        let binding = self.graph_ref();
+        let mut graph = binding.borrow_mut();
         match self.entity_id() {
             EntityId::Node(id) | EntityId::MetaNode(id) => {
                 graph.pool_mut().set_node_attribute(id, name, value)
@@ -100,7 +102,8 @@ pub trait GraphEntity: std::fmt::Debug {
     /// # Performance  
     /// O(1) - Direct HashSet lookup in GraphSpace
     fn is_active(&self) -> bool {
-        let graph = self.graph_ref().borrow();
+        let binding = self.graph_ref();
+        let graph = binding.borrow();
         match self.entity_id() {
             EntityId::Node(id) | EntityId::MetaNode(id) => {
                 graph.space().is_node_active(id)
@@ -177,14 +180,14 @@ pub trait SafeGraphEntity: GraphEntity {
     fn validate(&self) -> GraphResult<()> {
         // Check entity ID validity
         if !self.entity_id().is_valid() {
-            return Err(crate::errors::GraphError::InvalidEntity(
+            return Err(crate::errors::GraphError::InvalidInput(
                 "Entity ID is invalid".to_string()
             ));
         }
         
         // Check relation count limits
         if self.relation_count() > MAX_RELATIONS {
-            return Err(crate::errors::GraphError::InvalidEntity(
+            return Err(crate::errors::GraphError::InvalidInput(
                 format!("Entity has too many relations: {}", self.relation_count())
             ));
         }

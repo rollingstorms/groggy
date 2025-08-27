@@ -112,8 +112,10 @@ pub trait EdgeOperations: GraphEntity {
     /// # Performance
     /// Iterates through edge's attributes in GraphPool columnar storage
     fn edge_attributes(&self) -> GraphResult<HashMap<AttrName, AttrValue>> {
-        let graph = self.graph_ref().borrow();
-        graph.pool().get_all_edge_attributes(self.edge_id())
+        let binding = self.graph_ref();
+        let graph = binding.borrow();
+        let x = graph.pool().get_all_edge_attributes(self.edge_id()); 
+        x
     }
     
     /// Get specific edge attribute from GraphPool
@@ -126,7 +128,7 @@ pub trait EdgeOperations: GraphEntity {
     /// 
     /// # Performance
     /// O(1) - Direct lookup in optimized columnar storage
-    fn get_edge_attribute(&self, name: &AttrName) -> GraphResult<Option<&AttrValue>> {
+    fn get_edge_attribute(&self, name: &AttrName) -> GraphResult<Option<AttrValue>> {
         self.get_attribute(name) // Delegates to GraphEntity default implementation
     }
     
@@ -150,7 +152,8 @@ pub trait EdgeOperations: GraphEntity {
     /// # Performance
     /// O(1) - Graph type lookup
     fn is_directed(&self) -> bool {
-        let graph = self.graph_ref().borrow();
+        let binding = self.graph_ref();
+        let graph = binding.borrow();
         graph.is_directed()
     }
     
@@ -163,9 +166,9 @@ pub trait EdgeOperations: GraphEntity {
     /// O(1) - Single attribute lookup
     fn weight(&self) -> GraphResult<Option<f64>> {
         match self.get_edge_attribute(&"weight".into())? {
-            Some(AttrValue::Float(w)) => Ok(Some(*w)),
-            Some(AttrValue::Int(w)) => Ok(Some(*w as f64)),
-            Some(AttrValue::SmallInt(w)) => Ok(Some(*w as f64)),
+            Some(AttrValue::Float(w)) => Ok(Some(w as f64)),
+            Some(AttrValue::Int(w)) => Ok(Some(w as f64)),
+            Some(AttrValue::SmallInt(w)) => Ok(Some(w as f64)),
             _ => Ok(None)
         }
     }
@@ -178,7 +181,7 @@ pub trait EdgeOperations: GraphEntity {
     /// # Performance
     /// Uses existing efficient attribute storage
     fn set_weight(&self, weight: f64) -> GraphResult<()> {
-        self.set_edge_attribute("weight".into(), AttrValue::Float(weight))
+        self.set_edge_attribute("weight".into(), AttrValue::Float(weight as f32))
     }
     
     /// Get edge capacity if stored as attribute (for flow networks)
@@ -190,9 +193,9 @@ pub trait EdgeOperations: GraphEntity {
     /// O(1) - Single attribute lookup
     fn capacity(&self) -> GraphResult<Option<f64>> {
         match self.get_edge_attribute(&"capacity".into())? {
-            Some(AttrValue::Float(c)) => Ok(Some(*c)),
-            Some(AttrValue::Int(c)) => Ok(Some(*c as f64)),
-            Some(AttrValue::SmallInt(c)) => Ok(Some(*c as f64)),
+            Some(AttrValue::Float(c)) => Ok(Some(c as f64)),
+            Some(AttrValue::Int(c)) => Ok(Some(c as f64)),
+            Some(AttrValue::SmallInt(c)) => Ok(Some(c as f64)),
             _ => Ok(None)
         }
     }
@@ -228,7 +231,8 @@ pub trait EdgeOperations: GraphEntity {
     /// Uses existing efficient edge enumeration algorithms
     fn parallel_edges(&self) -> GraphResult<Vec<EdgeId>> {
         let (source, target) = self.endpoints()?;
-        let graph = self.graph_ref().borrow();
+        let binding = self.graph_ref();
+        let graph = binding.borrow();
         
         // Get all edges between these nodes
         let mut parallel = Vec::new();
@@ -247,4 +251,8 @@ pub trait EdgeOperations: GraphEntity {
         
         Ok(parallel)
     }
+
+    // === BULK ATTRIBUTE OPERATIONS ===
+    // Note: Bulk operations are available via SubgraphOperations::set_edge_attrs()
+    // for cross-entity bulk operations. Individual edges use single attribute methods.
 }

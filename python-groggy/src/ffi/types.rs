@@ -81,6 +81,9 @@ impl PyAttrValue {
                 Ok(data) => data.to_object(py),
                 Err(_) => py.None(),
             },
+            RustAttrValue::SubgraphRef(subgraph_id) => subgraph_id.to_object(py),
+            RustAttrValue::NodeArray(node_ids) => node_ids.to_object(py),
+            RustAttrValue::EdgeArray(edge_ids) => edge_ids.to_object(py),
             RustAttrValue::Null => py.None(),
         }
     }
@@ -98,6 +101,9 @@ impl PyAttrValue {
             RustAttrValue::SmallInt(_) => "int",
             RustAttrValue::CompressedText(_) => "text",
             RustAttrValue::CompressedFloatVec(_) => "float_vec",
+            RustAttrValue::SubgraphRef(_) => "subgraph_ref",
+            RustAttrValue::NodeArray(_) => "node_array",
+            RustAttrValue::EdgeArray(_) => "edge_array",
             RustAttrValue::Null => "null",
         }
     }
@@ -126,6 +132,9 @@ impl PyAttrValue {
                         Err(_) => "compressed(error)".to_string(),
                     }
                 }
+                RustAttrValue::SubgraphRef(subgraph_id) => format!("SubgraphRef({})", subgraph_id),
+                RustAttrValue::NodeArray(node_ids) => format!("{:?}", node_ids),
+                RustAttrValue::EdgeArray(edge_ids) => format!("{:?}", edge_ids),
                 RustAttrValue::Null => "None".to_string(),
             }
         )
@@ -149,6 +158,9 @@ impl PyAttrValue {
                 Ok(data) => format!("{:?}", data),
                 Err(_) => "compressed(error)".to_string(),
             },
+            RustAttrValue::SubgraphRef(subgraph_id) => format!("SubgraphRef({})", subgraph_id),
+            RustAttrValue::NodeArray(node_ids) => format!("{:?}", node_ids),
+            RustAttrValue::EdgeArray(edge_ids) => format!("{:?}", edge_ids),
             RustAttrValue::Null => "None".to_string(),
         })
     }
@@ -212,8 +224,20 @@ impl PyAttrValue {
                     }
                 }
             }
-            RustAttrValue::Null => {
+            RustAttrValue::SubgraphRef(subgraph_id) => {
                 10u8.hash(&mut hasher);
+                subgraph_id.hash(&mut hasher);
+            }
+            RustAttrValue::NodeArray(node_ids) => {
+                11u8.hash(&mut hasher);
+                node_ids.hash(&mut hasher);
+            }
+            RustAttrValue::EdgeArray(edge_ids) => {
+                12u8.hash(&mut hasher);
+                edge_ids.hash(&mut hasher);
+            }
+            RustAttrValue::Null => {
+                13u8.hash(&mut hasher);
                 // No additional data to hash for Null
             }
         }
@@ -241,6 +265,9 @@ impl pyo3::ToPyObject for PyAttrValue {
                 Ok(data) => data.to_object(py),
                 Err(_) => py.None(),
             },
+            RustAttrValue::SubgraphRef(subgraph_id) => subgraph_id.to_object(py),
+            RustAttrValue::NodeArray(node_ids) => node_ids.to_object(py),
+            RustAttrValue::EdgeArray(edge_ids) => edge_ids.to_object(py),
             RustAttrValue::Null => py.None(),
         }
     }

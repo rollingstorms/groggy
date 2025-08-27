@@ -155,6 +155,9 @@ pub fn attr_value_to_python_value(py: Python, attr_value: &RustAttrValue) -> PyR
         RustAttrValue::SmallInt(i) => i.to_object(py),
         RustAttrValue::CompressedText(_) => "compressed_text".to_object(py), // Placeholder
         RustAttrValue::CompressedFloatVec(_) => vec!["compressed_floats"].to_object(py), // Placeholder
+        RustAttrValue::SubgraphRef(subgraph_id) => subgraph_id.to_object(py),
+        RustAttrValue::NodeArray(node_ids) => node_ids.to_object(py),
+        RustAttrValue::EdgeArray(edge_ids) => edge_ids.to_object(py),
         RustAttrValue::Null => py.None(),
     };
     Ok(py_value)

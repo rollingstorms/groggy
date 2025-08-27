@@ -414,6 +414,9 @@ impl AttrValue {
             AttrValue::Text(_) | AttrValue::CompactText(_) | AttrValue::CompressedText(_) => 4,
             AttrValue::FloatVec(_) | AttrValue::CompressedFloatVec(_) => 5,
             AttrValue::Bytes(_) => 6,
+            AttrValue::SubgraphRef(_) => 7,
+            AttrValue::NodeArray(_) => 8,
+            AttrValue::EdgeArray(_) => 9,
         }
     }
 }
@@ -624,6 +627,9 @@ pub enum AttrValueType {
     CompressedText,
     CompressedFloatVec,
     Null,
+    SubgraphRef,
+    NodeArray,
+    EdgeArray,
 }
 
 impl AttrValueType {
@@ -656,6 +662,9 @@ impl std::fmt::Display for AttrValue {
                 Err(_) => write!(f, "[compressed float vec]"),
             },
             AttrValue::Null => write!(f, "NaN"),
+            AttrValue::SubgraphRef(id) => write!(f, "SubgraphRef({})", id),
+            AttrValue::NodeArray(nodes) => write!(f, "NodeArray({:?})", nodes),
+            AttrValue::EdgeArray(edges) => write!(f, "EdgeArray({:?})", edges),
         }
     }
 }
@@ -675,6 +684,9 @@ impl AttrValue {
             AttrValue::CompressedText(_) => "CompressedText",
             AttrValue::CompressedFloatVec(_) => "CompressedFloatVec",
             AttrValue::Null => "Null",
+            AttrValue::SubgraphRef(_) => "SubgraphRef",
+            AttrValue::NodeArray(_) => "NodeArray",
+            AttrValue::EdgeArray(_) => "EdgeArray",
         }
     }
 
@@ -692,6 +704,9 @@ impl AttrValue {
             AttrValue::CompressedText(_) => AttrValueType::CompressedText,
             AttrValue::CompressedFloatVec(_) => AttrValueType::CompressedFloatVec,
             AttrValue::Null => AttrValueType::Null,
+            AttrValue::SubgraphRef(_) => AttrValueType::SubgraphRef,
+            AttrValue::NodeArray(_) => AttrValueType::NodeArray,
+            AttrValue::EdgeArray(_) => AttrValueType::EdgeArray,
         }
     }
 
@@ -711,6 +726,9 @@ impl AttrValue {
             AttrValue::CompressedText(cd) => cd.memory_size(),
             AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
             AttrValue::Null => 0, // Null values take no memory
+            AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
+            AttrValue::NodeArray(nodes) => std::mem::size_of::<Vec<crate::types::NodeId>>() + nodes.capacity() * std::mem::size_of::<crate::types::NodeId>(),
+            AttrValue::EdgeArray(edges) => std::mem::size_of::<Vec<crate::types::EdgeId>>() + edges.capacity() * std::mem::size_of::<crate::types::EdgeId>(),
         }
     }
 
