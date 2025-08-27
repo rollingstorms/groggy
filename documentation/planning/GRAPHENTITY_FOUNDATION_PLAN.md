@@ -1,5 +1,44 @@
 # GraphEntity Foundation Plan: Dr. V's Strategic Implementation Roadmap
 
+## 🚨 CRITICAL ARCHITECTURE VIOLATIONS TO ADDRESS FIRST
+
+### Issue 1: FFI Layer Contains Algorithms (Architecture Violation)
+**Problem**: FFI implements business logic instead of pure translation
+- `python-groggy/src/ffi/api/graph.rs:1426-1442` - neighbor array processing in FFI
+- `python-groggy/src/ffi/core/accessors.rs` - data transformation in FFI layer
+- Multiple FFI methods doing algorithmic work that belongs in core
+
+**Solution**: Move ALL algorithm logic to Rust core, FFI becomes pure translation:
+```rust
+// WRONG (current): FFI processes neighbor arrays
+for node_id in node_ids { /* algorithm logic here */ }
+
+// RIGHT: Core provides bulk operation, FFI just translates  
+self.inner.borrow().bulk_neighbors(node_ids).map_err(to_py_err)
+```
+
+### Issue 2: Missing Graph API Accessors  
+**Problem**: Traits expect `graph.pool()`, `graph.space()`, `graph.pool_mut()` methods
+- GraphEntity calls non-existent `graph.pool().get_node_attribute()`
+- SubgraphOperations needs `graph.space().is_node_active()`
+
+**Solution**: Add reference accessors to Graph:
+```rust
+impl Graph {
+    pub fn pool(&self) -> std::cell::Ref<GraphPool> { self.pool.borrow() }
+    pub fn pool_mut(&self) -> std::cell::RefMut<GraphPool> { self.pool.borrow_mut() }  
+    pub fn space(&self) -> &GraphSpace { &self.space }
+}
+```
+
+### Issue 3: Missing Edge Operations in NodeOperations
+**Problem**: NodeOperations lacks edge methods for complete node interface
+- No `incident_edges()` for getting connected edges
+- No `edge_to(other)` for finding specific edges
+- No edge creation methods
+
+**Solution**: Add edge operations to NodeOperations trait
+
 ## Executive Summary by Dr. V
 
 This is our foundational architecture for the next decade of graph computing. We're building **shared trait interfaces** that work seamlessly with our **existing optimized storage infrastructure** (GraphPool, GraphSpace, HistoryForest). Every entity becomes composable and queryable while leveraging our columnar storage, memory pooling, and ultra-efficient attribute systems.
@@ -998,14 +1037,14 @@ mod tests {
 
 ### Existing Methods to Keep + Add Trait Interface:
 
-#### ✅ **Basic Subgraph Operations** (Keep existing efficient methods + add trait interface):
-- [ ] Keep `node_ids()` method + `SubgraphOperations::node_set()` returns `&HashSet<NodeId>`
-- [ ] Keep `edge_ids()` method + `SubgraphOperations::edge_set()` returns `&HashSet<EdgeId>`
-- [ ] Keep `node_count()` method + trait delegates to existing efficient `.len()`  
-- [ ] Keep `edge_count()` method + trait delegates to existing efficient `.len()`
-- [ ] Keep `has_node()` method + `SubgraphOperations::contains_node()` delegates to existing `.contains()`
-- [ ] Keep `has_edge()` method + `SubgraphOperations::contains_edge()` delegates to existing `.contains()`
-- [ ] `subgraph_type()` → `GraphEntity::entity_type()` (interface change only)
+#### ✅ **COMPLETED - Basic Subgraph Operations** (Keep existing efficient methods + add trait interface):
+- [x] Keep `node_ids()` method + `SubgraphOperations::node_set()` returns `&HashSet<NodeId>` ✅
+- [x] Keep `edge_ids()` method + `SubgraphOperations::edge_set()` returns `&HashSet<EdgeId>` ✅
+- [x] Keep `node_count()` method + trait delegates to existing efficient `.len()` ✅
+- [x] Keep `edge_count()` method + trait delegates to existing efficient `.len()` ✅ 
+- [x] Keep `has_node()` method + `SubgraphOperations::contains_node()` delegates to existing `.contains()` ✅
+- [x] Keep `has_edge()` method + `SubgraphOperations::contains_edge()` delegates to existing `.contains()` ✅
+- [x] `subgraph_type()` → `GraphEntity::entity_type()` (interface change only) ✅
 
 #### ✅ **Graph Operations** (Keep existing algorithms + add trait interface):
 - [ ] Keep `filter_nodes_by_attributes()` + add trait method that delegates to existing

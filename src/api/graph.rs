@@ -220,6 +220,37 @@ impl Graph {
     }
 
     /*
+    === COMPONENT ACCESS METHODS ===
+    These provide access to the internal storage and state components
+    for trait implementations and advanced operations.
+    */
+
+    /// Get read-only access to the GraphPool storage component
+    /// 
+    /// This provides access to the columnar attribute storage and
+    /// is used by traits and advanced operations that need direct
+    /// access to the storage layer.
+    pub fn pool(&self) -> std::cell::Ref<GraphPool> {
+        self.pool.borrow()
+    }
+
+    /// Get mutable access to the GraphPool storage component
+    /// 
+    /// This provides mutable access to the columnar attribute storage
+    /// for operations that need to modify the storage directly.
+    pub fn pool_mut(&self) -> std::cell::RefMut<GraphPool> {
+        self.pool.borrow_mut()
+    }
+
+    /// Get read-only access to the GraphSpace active state component
+    /// 
+    /// This provides access to the active node/edge sets and change tracking
+    /// for operations that need to query the current graph state.
+    pub fn space(&self) -> &GraphSpace {
+        &self.space
+    }
+
+    /*
     === CORE GRAPH OPERATIONS ===
     These are the fundamental operations that modify graph structure.
     The Graph coordinates between pool, history, and change tracking.
@@ -897,6 +928,61 @@ impl Graph {
             })
     }
 
+    /// Check if there's an edge between two nodes
+    pub fn has_edge_between(&self, source: NodeId, target: NodeId) -> GraphResult<bool> {
+        let pool = self.pool.borrow();
+        Ok(pool.has_edge_between(source, target))
+    }
+
+    /// Get all edges connected to a node
+    pub fn incident_edges(&self, node: NodeId) -> GraphResult<Vec<EdgeId>> {
+        let pool = self.pool.borrow();
+        pool.get_incident_edges(node)
+    }
+
+    /// Check if a node exists
+    pub fn has_node(&self, node: NodeId) -> bool {
+        self.space.has_node(node)
+    }
+
+    /// Check if an edge exists
+    pub fn has_edge(&self, edge: EdgeId) -> bool {
+        self.space.has_edge(edge)
+    }
+
+    /// Get neighbors filtered to a specific node set
+    pub fn neighbors_filtered(&self, node: NodeId, filter_nodes: &std::collections::HashSet<NodeId>) -> GraphResult<Vec<NodeId>> {
+        let all_neighbors = self.neighbors(node)?;
+        Ok(all_neighbors.into_iter()
+            .filter(|&n| filter_nodes.contains(&n))
+            .collect())
+    }
+
+    /// Get degree filtered to a specific node set
+    pub fn degree_filtered(&self, node: NodeId, filter_nodes: &std::collections::HashSet<NodeId>) -> GraphResult<usize> {
+        let filtered_neighbors = self.neighbors_filtered(node, filter_nodes)?;
+        Ok(filtered_neighbors.len())
+    }
+
+    /// Check if there's an edge between two nodes, filtered to a specific edge set
+    pub fn has_edge_between_filtered(&self, source: NodeId, target: NodeId, filter_edges: &std::collections::HashSet<EdgeId>) -> GraphResult<bool> {
+        let incident = self.incident_edges(source)?;
+        for edge_id in incident {
+            if filter_edges.contains(&edge_id) {
+                if let Ok((edge_source, edge_target)) = self.edge_endpoints(edge_id) {
+                    if (edge_source == source && edge_target == target) ||
+                       (edge_source == target && edge_target == source) {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
+
+
+
+
     /// Get basic statistics about the current graph
     pub fn statistics(&self) -> GraphStatistics {
         let _pool_stats = self.pool.borrow().statistics();
@@ -1288,27 +1374,6 @@ impl Graph {
             .map_err(|e| e.into())
     }
 
-    /// Allow subgraphs to use the optimized TraversalEngine
-    /// This enables all connected components analysis to use the same optimized algorithm
-    pub(crate) fn run_connected_components_for_subgraph(
-        &mut self,
-        subgraph_nodes: &std::collections::HashSet<NodeId>,
-        options: crate::core::traversal::TraversalOptions,
-    ) -> Result<crate::core::traversal::ConnectedComponentsResult, GraphError> {
-        // Clone the options and add subgraph node filtering
-        let mut filtered_options = options;
-        
-        // Create a node filter that only includes our subgraph nodes
-        use crate::core::query::NodeFilter;
-        let node_filter = NodeFilter::NodeSet(subgraph_nodes.clone());
-        
-        filtered_options.node_filter = Some(node_filter);
-        
-        // Delegate to TraversalEngine with subgraph filtering
-        self.traversal_engine
-            .connected_components(&self.pool.borrow(), &self.space, filtered_options)
-            .map_err(|e| e.into())
-    }
 
     // ===== NEIGHBORHOOD SUBGRAPH SAMPLING =====
 

@@ -517,6 +517,9 @@ impl GraphSnapshot {
                     AttrValue::CompressedText(cd) => cd.memory_size(),
                     AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
                     AttrValue::Null => 0,
+                    AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
+                    AttrValue::NodeArray(v) => v.len() * std::mem::size_of::<crate::types::NodeId>(),
+                    AttrValue::EdgeArray(v) => v.len() * std::mem::size_of::<crate::types::EdgeId>(),
                 };
             }
         }
@@ -538,6 +541,9 @@ impl GraphSnapshot {
                     AttrValue::CompressedText(cd) => cd.memory_size(),
                     AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
                     AttrValue::Null => 0,
+                    AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
+                    AttrValue::NodeArray(v) => v.len() * std::mem::size_of::<crate::types::NodeId>(),
+                    AttrValue::EdgeArray(v) => v.len() * std::mem::size_of::<crate::types::EdgeId>(),
                 };
             }
         }

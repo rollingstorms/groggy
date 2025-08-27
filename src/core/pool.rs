@@ -35,6 +35,7 @@ This separation allows:
 - Easier testing and reasoning
 */
 
+use crate::errors::GraphResult;
 use crate::types::{AttrName, AttrValue, EdgeId, GraphType, NodeId};
 use std::collections::HashMap;
 
@@ -636,6 +637,108 @@ impl GraphPool {
         let node_attrs = self.node_attributes.keys().cloned().collect();
         let edge_attrs = self.edge_attributes.keys().cloned().collect();
         (node_attrs, edge_attrs)
+    }
+
+    /// Get all attributes for a node
+    pub fn get_all_node_attributes(&self, node_id: NodeId) -> GraphResult<std::collections::HashMap<AttrName, AttrValue>> {
+        let mut attributes = std::collections::HashMap::new();
+        
+        // Iterate through all attribute columns to find this node's attributes
+        for (attr_name, column) in &self.node_attributes {
+            if let Some(value) = column.get(node_id) {
+                attributes.insert(attr_name.clone(), value.clone());
+            }
+        }
+        
+        Ok(attributes)
+    }
+
+    /// Get all attributes for an edge
+    pub fn get_all_edge_attributes(&self, edge_id: EdgeId) -> GraphResult<std::collections::HashMap<AttrName, AttrValue>> {
+        let mut attributes = std::collections::HashMap::new();
+        
+        // Iterate through all attribute columns to find this edge's attributes
+        for (attr_name, column) in &self.edge_attributes {
+            if let Some(value) = column.get(edge_id) {
+                attributes.insert(attr_name.clone(), value.clone());
+            }
+        }
+        
+        Ok(attributes)
+    }
+
+    /// Check if there's an edge between two nodes
+    pub fn has_edge_between(&self, source: NodeId, target: NodeId) -> bool {
+        // Check if any edge connects these two nodes
+        for i in 0..self.edge_sources.len() {
+            let edge_source = self.edge_sources[i];
+            let edge_target = self.edge_targets[i];
+            
+            if (edge_source == source && edge_target == target) ||
+               (edge_source == target && edge_target == source) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Get all edges connected to a node
+    pub fn get_incident_edges(&self, node_id: NodeId) -> GraphResult<Vec<EdgeId>> {
+        let mut incident_edges = Vec::new();
+        
+        // Check all edges to find ones connected to this node
+        for i in 0..self.edge_sources.len() {
+            if self.edge_sources[i] == node_id || self.edge_targets[i] == node_id {
+                incident_edges.push(self.edge_ids[i]);
+            }
+        }
+        
+        Ok(incident_edges)
+    }
+
+    /// Store subgraph data in GraphPool (placeholder for now)
+    pub fn store_subgraph(
+        &mut self,
+        nodes: std::collections::HashSet<NodeId>,
+        edges: std::collections::HashSet<EdgeId>,
+        subgraph_type: String,
+    ) -> GraphResult<crate::types::SubgraphId> {
+        // TODO: Implement proper subgraph storage in GraphPool
+        // For now, just return a hash-based ID
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        nodes.len().hash(&mut hasher);
+        edges.len().hash(&mut hasher);
+        subgraph_type.hash(&mut hasher);
+        let subgraph_id = hasher.finish() as crate::types::SubgraphId;
+        Ok(subgraph_id)
+    }
+
+    /// Get stored subgraph data (placeholder for now)
+    pub fn get_subgraph(&self, subgraph_id: crate::types::SubgraphId) -> GraphResult<(std::collections::HashSet<NodeId>, std::collections::HashSet<EdgeId>, String)> {
+        // TODO: Implement proper subgraph retrieval from GraphPool
+        // For now, return empty data
+        let _ = subgraph_id; // Silence unused parameter warning
+        Ok((
+            std::collections::HashSet::new(),
+            std::collections::HashSet::new(),
+            "placeholder".to_string()
+        ))
+    }
+
+    /// Get subgraph attribute (placeholder for now)
+    pub fn get_subgraph_attribute(&self, subgraph_id: crate::types::SubgraphId, name: &AttrName) -> GraphResult<Option<&AttrValue>> {
+        // TODO: Implement subgraph attribute storage
+        let _ = (subgraph_id, name); // Silence unused parameter warnings
+        Ok(None)
+    }
+
+    /// Set subgraph attribute (placeholder for now)  
+    pub fn set_subgraph_attribute(&mut self, subgraph_id: crate::types::SubgraphId, name: AttrName, value: AttrValue) -> GraphResult<()> {
+        // TODO: Implement subgraph attribute storage
+        let _ = (subgraph_id, name, value); // Silence unused parameter warnings
+        Ok(())
     }
 }
 
