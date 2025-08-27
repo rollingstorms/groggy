@@ -516,8 +516,34 @@ impl GraphSpace {
         self.active_nodes.contains(&node_id)
     }
 
+    /// Check if a node is active (same as contains_node)
+    pub fn is_node_active(&self, node_id: NodeId) -> bool {
+        self.active_nodes.contains(&node_id)
+    }
+
     /// Check if an edge is currently active (&self - read-only)
     pub fn contains_edge(&self, edge_id: EdgeId) -> bool {
+        self.active_edges.contains(&edge_id)
+    }
+
+    /// Check if an edge is active (same as contains_edge)
+    pub fn is_edge_active(&self, edge_id: EdgeId) -> bool {
+        self.active_edges.contains(&edge_id)
+    }
+
+    /// Check if a subgraph is active (placeholder for now)
+    pub fn is_subgraph_active(&self, _subgraph_id: crate::types::SubgraphId) -> bool {
+        // TODO: Implement subgraph tracking in GraphSpace
+        true // For now, assume all subgraphs are active
+    }
+
+    /// Check if a node exists (compatibility method)
+    pub fn has_node(&self, node_id: NodeId) -> bool {
+        self.active_nodes.contains(&node_id)
+    }
+
+    /// Check if an edge exists (compatibility method)
+    pub fn has_edge(&self, edge_id: EdgeId) -> bool {
         self.active_edges.contains(&edge_id)
     }
 

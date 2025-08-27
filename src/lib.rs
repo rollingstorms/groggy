@@ -198,6 +198,7 @@ pub use core::matrix::JoinType;
 pub use core::matrix::{Axis, GraphMatrix, MatrixProperties};
 pub use core::pool::GraphPool;
 pub use core::space::GraphSpace;
+pub use core::subgraph::SimilarityMetric;
 pub use core::table::{AggregateOp, ConnectivityType, GraphTable, GroupBy, TableMetadata};
 
 /// Library version

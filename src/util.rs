@@ -133,6 +133,22 @@ pub fn attr_value_hash(value: &AttrValue) -> u64 {
             // Consistent hash for null values
             u64::MAX // Use max value to distinguish from other values
         }
+        AttrValue::SubgraphRef(id) => {
+            // Hash subgraph ID
+            *id as u64
+        }
+        AttrValue::NodeArray(nodes) => {
+            // Hash node array
+            let mut hasher = DefaultHasher::new();
+            nodes.hash(&mut hasher);
+            hasher.finish()
+        }
+        AttrValue::EdgeArray(edges) => {
+            // Hash edge array
+            let mut hasher = DefaultHasher::new();
+            edges.hash(&mut hasher);
+            hasher.finish()
+        }
     }
 }
 

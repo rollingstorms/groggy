@@ -4,6 +4,7 @@
 
 use crate::ffi::core::subgraph::PySubgraph;
 use groggy::core::neighborhood::{NeighborhoodResult, NeighborhoodStats, NeighborhoodSubgraph};
+use groggy::core::traits::SubgraphOperations;
 use groggy::NodeId;
 use pyo3::prelude::*;
 
@@ -18,22 +19,22 @@ pub struct PyNeighborhoodSubgraph {
 impl PyNeighborhoodSubgraph {
     #[getter]
     fn central_nodes(&self) -> Vec<NodeId> {
-        self.inner.central_nodes.clone()
+        self.inner.central_nodes().to_vec()
     }
 
     #[getter]
     fn hops(&self) -> usize {
-        self.inner.hops
+        self.inner.hops()
     }
 
     #[getter]
     fn size(&self) -> usize {
-        self.inner.size
+        self.inner.node_count()
     }
 
     #[getter]
     fn edge_count(&self) -> usize {
-        self.inner.edge_count
+        self.inner.edge_count()
     }
 
     /// Get the subgraph object using the same pattern as connected components
@@ -41,9 +42,9 @@ impl PyNeighborhoodSubgraph {
         // Create PySubgraph using the same pattern as connected components
         let subgraph = PySubgraph::new_with_inner(
             py,
-            self.inner.nodes.clone(),
-            self.inner.edges.clone(),
-            format!("neighborhood_hops_{}", self.inner.hops),
+            self.inner.node_set().iter().copied().collect(),
+            self.inner.edge_set().iter().copied().collect(),
+            format!("neighborhood_hops_{}", self.inner.hops()),
             None, // No parent graph reference needed for neighborhood subgraphs
         );
         Ok(subgraph)
@@ -52,20 +53,20 @@ impl PyNeighborhoodSubgraph {
     fn __repr__(&self) -> String {
         format!(
             "NeighborhoodSubgraph(central_nodes={:?}, hops={}, size={}, edges={})",
-            self.inner.central_nodes, self.inner.hops, self.inner.size, self.inner.edge_count
+            self.inner.central_nodes(), self.inner.hops(), self.inner.node_count(), self.inner.edge_count()
         )
     }
 
     fn __str__(&self) -> String {
-        if self.inner.central_nodes.len() == 1 {
+        if self.inner.central_nodes().len() == 1 {
             format!(
                 "Neighborhood of node {} ({}-hop, {} nodes, {} edges)",
-                self.inner.central_nodes[0], self.inner.hops, self.inner.size, self.inner.edge_count
+                self.inner.central_nodes()[0], self.inner.hops(), self.inner.node_count(), self.inner.edge_count()
             )
         } else {
             format!(
                 "Neighborhood of {} nodes ({}-hop, {} nodes, {} edges)",
-                self.inner.central_nodes.len(), self.inner.hops, self.inner.size, self.inner.edge_count
+                self.inner.central_nodes().len(), self.inner.hops(), self.inner.node_count(), self.inner.edge_count()
             )
         }
     }

@@ -639,6 +639,21 @@ impl GraphPool {
         (node_attrs, edge_attrs)
     }
 
+    /// Get a specific attribute for a node
+    pub fn get_node_attribute(&self, node_id: NodeId, attr_name: &AttrName) -> GraphResult<Option<AttrValue>> {
+        if let Some(column) = self.node_attributes.get(attr_name) {
+            Ok(column.get(node_id).cloned())
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Set a specific attribute for a node
+    pub fn set_node_attribute(&mut self, node_id: NodeId, attr_name: AttrName, value: AttrValue) -> GraphResult<()> {
+        self.set_attr(attr_name, value, true);
+        Ok(())
+    }
+
     /// Get all attributes for a node
     pub fn get_all_node_attributes(&self, node_id: NodeId) -> GraphResult<std::collections::HashMap<AttrName, AttrValue>> {
         let mut attributes = std::collections::HashMap::new();
@@ -651,6 +666,21 @@ impl GraphPool {
         }
         
         Ok(attributes)
+    }
+
+    /// Get a specific attribute for an edge
+    pub fn get_edge_attribute(&self, edge_id: EdgeId, attr_name: &AttrName) -> GraphResult<Option<AttrValue>> {
+        if let Some(column) = self.edge_attributes.get(attr_name) {
+            Ok(column.get(edge_id).cloned())
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Set a specific attribute for an edge
+    pub fn set_edge_attribute(&mut self, edge_id: EdgeId, attr_name: AttrName, value: AttrValue) -> GraphResult<()> {
+        self.set_attr(attr_name, value, false);
+        Ok(())
     }
 
     /// Get all attributes for an edge
@@ -670,12 +700,9 @@ impl GraphPool {
     /// Check if there's an edge between two nodes
     pub fn has_edge_between(&self, source: NodeId, target: NodeId) -> bool {
         // Check if any edge connects these two nodes
-        for i in 0..self.edge_sources.len() {
-            let edge_source = self.edge_sources[i];
-            let edge_target = self.edge_targets[i];
-            
-            if (edge_source == source && edge_target == target) ||
-               (edge_source == target && edge_target == source) {
+        for (_edge_id, (edge_source, edge_target)) in &self.topology {
+            if (*edge_source == source && *edge_target == target) ||
+               (*edge_source == target && *edge_target == source) {
                 return true;
             }
         }
@@ -687,9 +714,9 @@ impl GraphPool {
         let mut incident_edges = Vec::new();
         
         // Check all edges to find ones connected to this node
-        for i in 0..self.edge_sources.len() {
-            if self.edge_sources[i] == node_id || self.edge_targets[i] == node_id {
-                incident_edges.push(self.edge_ids[i]);
+        for (edge_id, (edge_source, edge_target)) in &self.topology {
+            if *edge_source == node_id || *edge_target == node_id {
+                incident_edges.push(*edge_id);
             }
         }
         
@@ -728,7 +755,7 @@ impl GraphPool {
     }
 
     /// Get subgraph attribute (placeholder for now)
-    pub fn get_subgraph_attribute(&self, subgraph_id: crate::types::SubgraphId, name: &AttrName) -> GraphResult<Option<&AttrValue>> {
+    pub fn get_subgraph_attribute(&self, subgraph_id: crate::types::SubgraphId, name: &AttrName) -> GraphResult<Option<AttrValue>> {
         // TODO: Implement subgraph attribute storage
         let _ = (subgraph_id, name); // Silence unused parameter warnings
         Ok(None)

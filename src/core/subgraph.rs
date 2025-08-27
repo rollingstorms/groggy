@@ -19,12 +19,25 @@
 
 use crate::api::graph::Graph;
 use crate::core::traits::{GraphEntity, SubgraphOperations};
-use crate::core::traversal::TraversalOptions;
+use crate::core::traversal::{TraversalEngine, TraversalOptions};
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId, SubgraphId};
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
+
+/// Similarity metrics for comparing subgraphs
+#[derive(Debug, Clone, PartialEq)]
+pub enum SimilarityMetric {
+    /// Jaccard similarity: |A ∩ B| / |A ∪ B|
+    Jaccard,
+    /// Dice coefficient: 2 * |A ∩ B| / (|A| + |B|) 
+    Dice,
+    /// Cosine similarity: A·B / (||A|| * ||B||)
+    Cosine,
+    /// Overlap coefficient: |A ∩ B| / min(|A|, |B|)
+    Overlap,
+}
 
 /// A Subgraph represents a subset of nodes and edges from a parent Graph
 /// with full Graph API capabilities through delegation.
@@ -111,7 +124,7 @@ impl Subgraph {
     ///
     /// Uses columnar topology vectors for O(k) performance where k = number of active edges,
     /// which is much better than O(E) over all edges in the graph.
-    fn calculate_induced_edges(
+    pub fn calculate_induced_edges(
         graph: &Rc<RefCell<Graph>>,
         nodes: &HashSet<NodeId>,
     ) -> GraphResult<HashSet<EdgeId>> {
@@ -427,8 +440,9 @@ impl Subgraph {
 
         attrs_values.insert(attr_name.clone(), node_value_pairs);
 
-        // Single bulk operation instead of O(n) individual calls
-        graph_borrow.set_node_attrs(attrs_values)?;
+        // Single bulk operation instead of O(n) individual calls - now using trait system
+        drop(graph_borrow); // Release the borrow before calling trait method
+        self.set_node_attrs(attrs_values)?;
 
         Ok(())
     }
@@ -460,7 +474,8 @@ impl Subgraph {
             .collect();
 
         attrs_values.insert(attr_name.clone(), node_value_pairs);
-        graph_borrow.set_node_attrs(attrs_values)?;
+        drop(graph_borrow); // Release the borrow before calling trait method
+        self.set_node_attrs(attrs_values)?;
 
         Ok(())
     }
@@ -486,8 +501,9 @@ impl Subgraph {
             attrs_values.insert(attr_name, node_value_pairs);
         }
 
-        // Single bulk operation instead of O(n*m) individual calls
-        graph_borrow.set_node_attrs(attrs_values)?;
+        // Single bulk operation instead of O(n*m) individual calls - now using trait system
+        drop(graph_borrow); // Release the borrow before calling trait method
+        self.set_node_attrs(attrs_values)?;
 
         Ok(())
     }
@@ -505,6 +521,264 @@ impl Subgraph {
         }
 
         Ok(())
+    }
+
+    // === STRUCTURAL METRICS ===
+    // Remember: All operations are on this subgraph (active nodes/edges)
+    
+    /// Calculate clustering coefficient for a node or average for all nodes
+    /// Formula: 2 * triangles / (degree * (degree - 1)) for directed graphs
+    pub fn clustering_coefficient(&self, node_id: Option<NodeId>) -> GraphResult<f64> {
+        match node_id {
+            Some(nid) => {
+                if !self.has_node(nid) {
+                    return Err(GraphError::InvalidInput(
+                        format!("Node {} not in this subgraph", nid)
+                    ));
+                }
+                self.calculate_node_clustering_coefficient(nid)
+            }
+            None => {
+                // Average clustering coefficient for all nodes in subgraph
+                let mut total = 0.0;
+                let mut count = 0;
+                
+                for &node_id in &self.nodes {
+                    let coefficient = self.calculate_node_clustering_coefficient(node_id)?;
+                    total += coefficient;
+                    count += 1;
+                }
+                
+                if count == 0 {
+                    Ok(0.0)
+                } else {
+                    Ok(total / count as f64)
+                }
+            }
+        }
+    }
+
+    /// Helper method to calculate clustering coefficient for a single node
+    fn calculate_node_clustering_coefficient(&self, node_id: NodeId) -> GraphResult<f64> {
+        let graph = self.graph.borrow();
+        
+        // Get neighbors of this node that are also in the subgraph
+        let neighbors = graph.neighbors_filtered(node_id, &self.nodes)?;
+        let degree = neighbors.len();
+        
+        if degree < 2 {
+            return Ok(0.0); // Clustering coefficient is 0 for nodes with degree < 2
+        }
+        
+        // Count triangles: edges between neighbors
+        let mut triangles = 0;
+        for i in 0..neighbors.len() {
+            for j in (i + 1)..neighbors.len() {
+                if graph.has_edge_between_filtered(neighbors[i], neighbors[j], &self.edges)? {
+                    triangles += 1;
+                }
+            }
+        }
+        
+        // Calculate clustering coefficient
+        let possible_edges = degree * (degree - 1) / 2; // For undirected graphs
+        Ok(triangles as f64 / possible_edges as f64)
+    }
+
+    /// Calculate global clustering coefficient (transitivity)
+    /// Formula: 3 * triangles / triads
+    pub fn transitivity(&self) -> GraphResult<f64> {
+        let mut total_triangles = 0;
+        let mut total_triads = 0;
+        
+        let graph = self.graph.borrow();
+        
+        // Count each triangle only once by using node ordering
+        let mut nodes_vec: Vec<_> = self.nodes.iter().copied().collect();
+        nodes_vec.sort();
+        
+        for (i, &node_a) in nodes_vec.iter().enumerate() {
+            let neighbors_a = graph.neighbors_filtered(node_a, &self.nodes)?;
+            
+            for (j, &node_b) in nodes_vec.iter().enumerate().skip(i + 1) {
+                if !neighbors_a.contains(&node_b) {
+                    continue; // No edge between a and b
+                }
+                
+                for &node_c in nodes_vec.iter().skip(j + 1) {
+                    if neighbors_a.contains(&node_c) {
+                        let neighbors_b = graph.neighbors_filtered(node_b, &self.nodes)?;
+                        if neighbors_b.contains(&node_c) {
+                            // Triangle found: a-b-c
+                            total_triangles += 1;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Count triads (connected triples)
+        for &node_id in &self.nodes {
+            let neighbors = graph.neighbors_filtered(node_id, &self.nodes)?;
+            let degree = neighbors.len();
+            
+            if degree >= 2 {
+                total_triads += degree * (degree - 1) / 2;
+            }
+        }
+        
+        if total_triads == 0 {
+            Ok(0.0)
+        } else {
+            Ok(3.0 * total_triangles as f64 / total_triads as f64)
+        }
+    }
+
+    /// Calculate subgraph density
+    /// Formula: 2 * edges / (nodes * (nodes - 1)) for undirected graphs
+    pub fn density(&self) -> f64 {
+        let node_count = self.nodes.len();
+        
+        if node_count < 2 {
+            return 0.0;
+        }
+        
+        let edge_count = self.edges.len();
+        let max_possible_edges = node_count * (node_count - 1) / 2; // Undirected graph
+        
+        edge_count as f64 / max_possible_edges as f64
+    }
+
+    // === SUBGRAPH SET OPERATIONS ===
+    
+    /// Merge with another subgraph (union operation)
+    /// Returns new subgraph containing all nodes and edges from both subgraphs
+    pub fn merge_with(&self, other: &Subgraph) -> GraphResult<Subgraph> {
+        // Union of nodes and edges
+        let mut merged_nodes = self.nodes.clone();
+        merged_nodes.extend(&other.nodes);
+        
+        let mut merged_edges = self.edges.clone();
+        merged_edges.extend(&other.edges);
+        
+        // Create merged subgraph with union of nodes and edges
+        Ok(Subgraph::new(
+            self.graph.clone(),
+            merged_nodes,
+            merged_edges,
+            format!("merge_{}_{}", self.subgraph_type, other.subgraph_type)
+        ))
+    }
+    
+    /// Intersect with another subgraph 
+    /// Returns new subgraph containing only nodes and edges present in both subgraphs
+    pub fn intersect_with(&self, other: &Subgraph) -> GraphResult<Subgraph> {
+        // Intersection of nodes
+        let intersected_nodes: HashSet<NodeId> = self.nodes
+            .intersection(&other.nodes)
+            .copied()
+            .collect();
+        
+        // Intersection of edges 
+        let intersected_edges: HashSet<EdgeId> = self.edges
+            .intersection(&other.edges)
+            .copied()
+            .collect();
+        
+        Ok(Subgraph::new(
+            self.graph.clone(),
+            intersected_nodes,
+            intersected_edges,
+            format!("intersection_{}_{}", self.subgraph_type, other.subgraph_type)
+        ))
+    }
+    
+    /// Subtract another subgraph from this one (difference operation)
+    /// Returns new subgraph with other's nodes and edges removed
+    pub fn subtract_from(&self, other: &Subgraph) -> GraphResult<Subgraph> {
+        // Remove other's nodes from this subgraph
+        let remaining_nodes: HashSet<NodeId> = self.nodes
+            .difference(&other.nodes)
+            .copied()
+            .collect();
+        
+        // Remove other's edges from this subgraph
+        let remaining_edges: HashSet<EdgeId> = self.edges
+            .difference(&other.edges)
+            .copied()
+            .collect();
+        
+        Ok(Subgraph::new(
+            self.graph.clone(),
+            remaining_nodes,
+            remaining_edges,
+            format!("difference_{}_{}", self.subgraph_type, other.subgraph_type)
+        ))
+    }
+    
+    /// Calculate similarity with another subgraph using specified metric
+    pub fn calculate_similarity(&self, other: &Subgraph, metric: SimilarityMetric) -> GraphResult<f64> {
+        match metric {
+            SimilarityMetric::Jaccard => {
+                // |A ∩ B| / |A ∪ B| for nodes
+                let intersection_size = self.nodes.intersection(&other.nodes).count();
+                let union_size = self.nodes.union(&other.nodes).count();
+                
+                if union_size == 0 {
+                    Ok(0.0)
+                } else {
+                    Ok(intersection_size as f64 / union_size as f64)
+                }
+            }
+            SimilarityMetric::Dice => {
+                // 2 * |A ∩ B| / (|A| + |B|) for nodes
+                let intersection_size = self.nodes.intersection(&other.nodes).count();
+                let total_size = self.nodes.len() + other.nodes.len();
+                
+                if total_size == 0 {
+                    Ok(0.0)
+                } else {
+                    Ok(2.0 * intersection_size as f64 / total_size as f64)
+                }
+            }
+            SimilarityMetric::Overlap => {
+                // |A ∩ B| / min(|A|, |B|) for nodes
+                let intersection_size = self.nodes.intersection(&other.nodes).count();
+                let min_size = self.nodes.len().min(other.nodes.len());
+                
+                if min_size == 0 {
+                    Ok(0.0)
+                } else {
+                    Ok(intersection_size as f64 / min_size as f64)
+                }
+            }
+            SimilarityMetric::Cosine => {
+                // Simplified cosine similarity based on node presence (binary vectors)
+                let intersection_size = self.nodes.intersection(&other.nodes).count();
+                let magnitude_product = (self.nodes.len() as f64).sqrt() * (other.nodes.len() as f64).sqrt();
+                
+                if magnitude_product == 0.0 {
+                    Ok(0.0)
+                } else {
+                    Ok(intersection_size as f64 / magnitude_product)
+                }
+            }
+        }
+    }
+    
+    /// Find overlapping regions with multiple other subgraphs
+    /// Returns vector of intersection subgraphs with each input subgraph
+    pub fn find_overlaps(&self, others: Vec<&Subgraph>) -> GraphResult<Vec<Subgraph>> {
+        let mut overlaps = Vec::new();
+        
+        for other in others {
+            let overlap = self.intersect_with(other)?;
+            if !overlap.nodes.is_empty() || !overlap.edges.is_empty() {
+                overlaps.push(overlap);
+            }
+        }
+        
+        Ok(overlaps)
     }
 }
 
@@ -616,16 +890,13 @@ impl SubgraphOperations for Subgraph {
 
     fn connected_components(&self) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
         // Use existing efficient TraversalEngine for connected components
-        let mut graph = self.graph.borrow_mut();
+        let graph = self.graph.borrow();
         let nodes_vec: Vec<NodeId> = self.nodes.iter().cloned().collect();
         let options = crate::core::traversal::TraversalOptions::default();
         
-        let result = graph.traversal_engine.connected_components_for_nodes(
-            &graph.pool.borrow(),
-            &graph.space,
-            nodes_vec,
-            options
-        )?;
+        // Use TraversalEngine directly - no Graph API indirection needed
+        let mut traversal_engine = TraversalEngine::new();
+        let result = traversal_engine.connected_components_for_nodes(&graph.pool(), graph.space(), nodes_vec, options)?;
 
         let mut component_subgraphs = Vec::new();
         for (i, component) in result.components.into_iter().enumerate() {
@@ -660,12 +931,9 @@ impl SubgraphOperations for Subgraph {
             options.max_depth = Some(depth);
         }
         
-        let result = graph.traversal_engine.bfs(
-            &graph.pool.borrow(),
-            &mut graph.space,
-            start,
-            options
-        )?;
+        // Use TraversalEngine directly
+        let mut traversal_engine = TraversalEngine::new();
+        let result = traversal_engine.bfs(&graph.pool(), &mut graph.space(), start, options)?;
 
         // Filter result to nodes that exist in this subgraph
         let filtered_nodes: std::collections::HashSet<NodeId> = result.nodes
@@ -703,12 +971,9 @@ impl SubgraphOperations for Subgraph {
             options.max_depth = Some(depth);
         }
         
-        let result = graph.traversal_engine.dfs(
-            &graph.pool.borrow(),
-            &mut graph.space,
-            start,
-            options
-        )?;
+        // Use TraversalEngine directly
+        let mut traversal_engine = TraversalEngine::new();
+        let result = traversal_engine.dfs(&graph.pool(), &mut graph.space(), start, options)?;
 
         // Filter result to nodes that exist in this subgraph
         let filtered_nodes: std::collections::HashSet<NodeId> = result.nodes
@@ -739,9 +1004,11 @@ impl SubgraphOperations for Subgraph {
         let mut graph = self.graph.borrow_mut();
         let options = crate::core::traversal::PathFindingOptions::default();
         
-        if let Some(path_result) = graph.traversal_engine.shortest_path(
-            &graph.pool.borrow(),
-            &mut graph.space,
+        // Use TraversalEngine directly
+        let mut traversal_engine = TraversalEngine::new();
+        let x = if let Some(path_result) = traversal_engine.shortest_path(
+            &graph.pool(), 
+            &mut graph.space(),
             source,
             target,
             options
@@ -763,13 +1030,14 @@ impl SubgraphOperations for Subgraph {
                     filtered_edges,
                     format!("{}_path_{}_{}", self.subgraph_type, source, target)
                 );
-                Ok(Some(Box::new(path_subgraph)))
+                Ok(Some(Box::new(path_subgraph) as Box<dyn SubgraphOperations>))
             } else {
                 Ok(None)
             }
         } else {
             Ok(None)
-        }
+        };
+        x
     }
 }
 
@@ -819,5 +1087,88 @@ mod tests {
             .get_node_attribute_column(&"name".to_string())
             .unwrap();
         assert_eq!(names.len(), 2);
+    }
+
+    #[test]
+    fn test_structural_metrics() {
+        // Create a triangle graph for testing clustering coefficient
+        let mut graph = Graph::new();
+        let node1 = graph.add_node();
+        let node2 = graph.add_node();
+        let node3 = graph.add_node();
+
+        // Create edges to form a triangle
+        graph.add_edge(node1, node2).unwrap();
+        graph.add_edge(node2, node3).unwrap();
+        graph.add_edge(node3, node1).unwrap();
+
+        // Create subgraph with all nodes
+        let graph_rc = Rc::new(RefCell::new(graph));
+        let all_nodes = HashSet::from([node1, node2, node3]);
+        let subgraph = Subgraph::from_nodes(graph_rc, all_nodes, "triangle".to_string()).unwrap();
+
+        // Test density - triangle graph should have density = 1.0
+        let density = subgraph.density();
+        assert!((density - 1.0).abs() < f64::EPSILON);
+
+        // Test connectivity
+        assert!(subgraph.is_connected().unwrap());
+        
+        // Test clustering coefficient - each node should have coefficient = 1.0 (complete triangle)
+        let avg_clustering = subgraph.clustering_coefficient(None).unwrap();
+        assert!((avg_clustering - 1.0).abs() < f64::EPSILON);
+        
+        // Test transitivity
+        let transitivity = subgraph.transitivity().unwrap();
+        assert!((transitivity - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_subgraph_set_operations() {
+        let mut graph = Graph::new();
+        let node1 = graph.add_node();
+        let node2 = graph.add_node();
+        let node3 = graph.add_node();
+        let node4 = graph.add_node();
+
+        graph.add_edge(node1, node2).unwrap();
+        graph.add_edge(node2, node3).unwrap();
+        graph.add_edge(node3, node4).unwrap();
+
+        let graph_rc = Rc::new(RefCell::new(graph));
+
+        // Create two overlapping subgraphs
+        let subgraph1_nodes = HashSet::from([node1, node2, node3]);
+        let subgraph1 = Subgraph::from_nodes(graph_rc.clone(), subgraph1_nodes, "sub1".to_string()).unwrap();
+
+        let subgraph2_nodes = HashSet::from([node2, node3, node4]);
+        let subgraph2 = Subgraph::from_nodes(graph_rc.clone(), subgraph2_nodes, "sub2".to_string()).unwrap();
+
+        // Test merge (union)
+        let merged = subgraph1.merge_with(&subgraph2).unwrap();
+        assert_eq!(merged.node_count(), 4); // All 4 nodes
+        assert!(merged.has_node(node1));
+        assert!(merged.has_node(node4));
+
+        // Test intersection
+        let intersection = subgraph1.intersect_with(&subgraph2).unwrap();
+        assert_eq!(intersection.node_count(), 2); // node2, node3
+        assert!(intersection.has_node(node2));
+        assert!(intersection.has_node(node3));
+        assert!(!intersection.has_node(node1));
+        assert!(!intersection.has_node(node4));
+
+        // Test subtraction
+        let difference = subgraph1.subtract_from(&subgraph2).unwrap();
+        assert_eq!(difference.node_count(), 1); // only node1
+        assert!(difference.has_node(node1));
+        assert!(!difference.has_node(node2));
+
+        // Test similarity metrics
+        let jaccard = subgraph1.calculate_similarity(&subgraph2, SimilarityMetric::Jaccard).unwrap();
+        assert!((jaccard - 0.5).abs() < f64::EPSILON); // |intersection| / |union| = 2/4 = 0.5
+
+        let dice = subgraph1.calculate_similarity(&subgraph2, SimilarityMetric::Dice).unwrap();
+        assert!((dice - 2.0/3.0).abs() < f64::EPSILON); // 2 * 2 / (3 + 3) = 4/6 = 2/3
     }
 }

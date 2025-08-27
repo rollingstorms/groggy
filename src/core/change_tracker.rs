@@ -409,6 +409,9 @@ impl ChangeTracker {
                     AttrValue::CompressedText(cd) => cd.memory_size(),
                     AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
                     AttrValue::Null => 0,
+                    AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
+                    AttrValue::NodeArray(nodes) => nodes.len() * std::mem::size_of::<crate::types::NodeId>(),
+                    AttrValue::EdgeArray(edges) => edges.len() * std::mem::size_of::<crate::types::EdgeId>(),
                 };
             }
             total += match new_val {
@@ -445,6 +448,9 @@ impl ChangeTracker {
                     AttrValue::CompressedText(cd) => cd.memory_size(),
                     AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
                     AttrValue::Null => 0,
+                    AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
+                    AttrValue::NodeArray(nodes) => nodes.len() * std::mem::size_of::<crate::types::NodeId>(),
+                    AttrValue::EdgeArray(edges) => edges.len() * std::mem::size_of::<crate::types::EdgeId>(),
                 };
             }
             total += match new_val {
