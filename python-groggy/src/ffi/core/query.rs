@@ -275,30 +275,6 @@ impl PyEdgeFilter {
     }
 }
 
-/// Python wrapper for TraversalResult
-#[pyclass(name = "TraversalResult")]
-pub struct PyTraversalResult {
-    pub nodes: Vec<NodeId>,
-    pub edges: Vec<EdgeId>,
-}
-
-#[pymethods]
-impl PyTraversalResult {
-    #[getter]
-    fn nodes(&self) -> Vec<NodeId> {
-        self.nodes.clone()
-    }
-
-    #[getter]
-    fn edges(&self) -> Vec<EdgeId> {
-        self.edges.clone()
-    }
-
-    #[getter]
-    fn algorithm(&self) -> String {
-        "NotImplemented".to_string()
-    }
-}
 
 /// Python wrapper for AggregationResult
 #[pyclass(name = "AggregationResult")]

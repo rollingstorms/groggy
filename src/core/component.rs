@@ -168,7 +168,7 @@ impl SubgraphOperations for ComponentSubgraph {
         Ok(vec![Box::new(self.clone()) as Box<dyn SubgraphOperations>])
     }
     
-    fn bfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+    fn bfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
         // Use existing BFS implementation from base Subgraph pattern
         if !self.nodes.contains(&start) {
             return Err(crate::errors::GraphError::NodeNotFound { 
@@ -211,7 +211,7 @@ impl SubgraphOperations for ComponentSubgraph {
         Ok(Box::new(bfs_component))
     }
     
-    fn dfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+    fn dfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
         // Use existing DFS implementation pattern
         if !self.nodes.contains(&start) {
             return Err(crate::errors::GraphError::NodeNotFound { 

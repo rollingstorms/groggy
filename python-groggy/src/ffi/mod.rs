@@ -20,4 +20,8 @@ pub mod api;
 // Display FFI bindings (mirror main project display/)
 pub mod display;
 
+// TODO: FFI Traits - Pure delegation to core trait implementations  
+// pub mod traits;  // Temporarily disabled until trait object conversions are complete
+
 // Re-export commonly used FFI types
+pub use core::query_parser::{PyQueryParser, parse_node_query, parse_edge_query, validate_node_query, validate_edge_query, get_node_query_error, get_edge_query_error};

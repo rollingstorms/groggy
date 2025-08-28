@@ -236,6 +236,12 @@ pub enum GraphError {
         partial_results: Option<usize>,
     },
 
+    /// Query parsing failed
+    QueryParseError {
+        query: String,
+        message: String,
+    },
+
     /*
     === CONFIGURATION ERRORS ===
     Problems with settings and configuration

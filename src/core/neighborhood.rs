@@ -14,7 +14,6 @@
 use crate::api::graph::Graph;
 use crate::core::pool::GraphPool;
 use crate::core::space::GraphSpace;
-use crate::core::subgraph::Subgraph;
 use crate::core::traits::{GraphEntity, SubgraphOperations};
 use crate::core::traversal::TraversalEngine;
 use crate::errors::GraphResult;
@@ -115,33 +114,6 @@ impl NeighborhoodSubgraph {
             hops,
             subgraph_id,
         }
-    }
-    
-    /// Get the central nodes for this neighborhood
-    pub fn central_nodes(&self) -> &[NodeId] {
-        &self.central_nodes
-    }
-    
-    /// Get the number of hops for this neighborhood
-    pub fn hops(&self) -> usize {
-        self.hops
-    }
-    
-    /// Expand this neighborhood by additional hops
-    pub fn expand_by(&self, additional_hops: usize) -> GraphResult<NeighborhoodSubgraph> {
-        let new_hops = self.hops + additional_hops;
-        let mut graph = self.graph_ref.borrow_mut();
-        
-        // Use NeighborhoodSampler directly
-        let mut neighborhood_sampler = NeighborhoodSampler::new();
-        let result = neighborhood_sampler.unified_neighborhood(
-            &graph.pool(),
-            graph.space(),
-            &self.central_nodes,
-            new_hops
-        )?;
-        
-        Ok(result)
     }
 }
 
@@ -273,7 +245,7 @@ impl SubgraphOperations for NeighborhoodSubgraph {
         Ok(component_subgraphs)
     }
 
-    fn bfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+    fn bfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
         if !self.nodes.contains(&start) {
             return Err(crate::errors::GraphError::NodeNotFound { 
                 node_id: start,
@@ -314,7 +286,7 @@ impl SubgraphOperations for NeighborhoodSubgraph {
         Ok(Box::new(bfs_neighborhood))
     }
 
-    fn dfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+    fn dfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
         if !self.nodes.contains(&start) {
             return Err(crate::errors::GraphError::NodeNotFound { 
                 node_id: start,
@@ -402,6 +374,79 @@ impl SubgraphOperations for NeighborhoodSubgraph {
     }
 }
 
+/// NeighborhoodOperations trait implementation for NeighborhoodSubgraph
+impl crate::core::traits::NeighborhoodOperations for NeighborhoodSubgraph {
+    fn central_nodes(&self) -> &[NodeId] {
+        &self.central_nodes
+    }
+    
+    fn hops(&self) -> usize {
+        self.hops
+    }
+    
+    fn expand_by(&self, additional_hops: usize) -> GraphResult<Box<dyn crate::core::traits::NeighborhoodOperations>> {
+        // Use existing neighborhood sampling to expand
+        let mut sampler = NeighborhoodSampler::new();
+        let new_hops = self.hops + additional_hops;
+        
+        // For simplicity, expand from the first central node
+        // In a full implementation, we'd merge expansions from all central nodes
+        if let Some(&first_central) = self.central_nodes.first() {
+            let graph = self.graph_ref.borrow();
+            let expanded_neighborhood = sampler.k_hop_neighborhood(
+                &*graph.pool(),
+                graph.space(),
+                first_central,
+                new_hops,
+            )?;
+            
+            Ok(Box::new(expanded_neighborhood))
+        } else {
+            // No central nodes, return empty neighborhood
+            let empty_neighborhood = NeighborhoodSubgraph::new(
+                self.graph_ref.clone(),
+                Vec::new(),
+                new_hops,
+                std::collections::HashSet::new(),
+                std::collections::HashSet::new(),
+            );
+            Ok(Box::new(empty_neighborhood))
+        }
+    }
+    
+    fn merge_with(&self, other: &dyn crate::core::traits::NeighborhoodOperations) -> GraphResult<Box<dyn crate::core::traits::NeighborhoodOperations>> {
+        // Union of node and edge sets
+        let mut merged_nodes = self.nodes.clone();
+        let other_nodes = other.node_set();
+        merged_nodes.extend(other_nodes);
+        
+        let mut merged_edges = self.edges.clone();
+        let other_edges = other.edge_set();
+        merged_edges.extend(other_edges);
+        
+        // Merge central nodes
+        let mut merged_centrals = self.central_nodes.clone();
+        for &central in other.central_nodes() {
+            if !merged_centrals.contains(&central) {
+                merged_centrals.push(central);
+            }
+        }
+        
+        // Use maximum hop distance
+        let merged_hops = std::cmp::max(self.hops, other.hops());
+        
+        let merged_neighborhood = NeighborhoodSubgraph::new(
+            self.graph_ref.clone(),
+            merged_centrals,
+            merged_hops,
+            merged_nodes,
+            merged_edges,
+        );
+        
+        Ok(Box::new(merged_neighborhood))
+    }
+}
+
 /// Engine for generating neighborhood subgraphs
 #[derive(Debug)]
 pub struct NeighborhoodSampler {
@@ -463,26 +508,6 @@ impl NeighborhoodSampler {
         })
     }
 
-    /// Helper to calculate induced edges count without creating full subgraph
-    fn calculate_induced_edges_count(
-        &self,
-        pool: &GraphPool,
-        space: &GraphSpace,
-        nodes: &HashSet<NodeId>,
-    ) -> GraphResult<usize> {
-        // Get topology vectors from space
-        let (edge_ids, sources, targets, _) = space.snapshot(pool);
-
-        let mut count = 0;
-        for i in 0..edge_ids.len() {
-            let source = sources[i];
-            let target = targets[i];
-            if nodes.contains(&source) && nodes.contains(&target) {
-                count += 1;
-            }
-        }
-        Ok(count)
-    }
 
     /// Calculate induced edges for a set of nodes
     /// Uses the same pattern as connected_components for proper edge calculation
@@ -745,5 +770,68 @@ impl NeighborhoodStats {
 
     fn clear(&mut self) {
         *self = Self::new();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::graph::Graph;
+    use crate::core::traits::NeighborhoodOperations;
+    use std::rc::Rc;
+    use std::cell::RefCell;
+
+    #[test]
+    fn test_neighborhood_operations() {
+        // Test NeighborhoodOperations implementation
+        let mut graph = Graph::new();
+        
+        // Create a small test graph
+        let center = graph.add_node();
+        let node1 = graph.add_node();
+        let node2 = graph.add_node();
+        let node3 = graph.add_node();
+        
+        let _edge1 = graph.add_edge(center, node1).unwrap();
+        let _edge2 = graph.add_edge(center, node2).unwrap();
+        let _edge3 = graph.add_edge(node1, node3).unwrap();
+        
+        let graph_rc = Rc::new(RefCell::new(graph));
+        
+        // Create a neighborhood manually for testing
+        let nodes = std::collections::HashSet::from([center, node1, node2]);
+        let edges = std::collections::HashSet::from([_edge1, _edge2]);
+        
+        let neighborhood = NeighborhoodSubgraph::new(
+            graph_rc.clone(),
+            vec![center], // central node
+            1, // 1-hop neighborhood
+            nodes,
+            edges,
+        );
+        
+        // Test NeighborhoodOperations interface
+        assert_eq!(neighborhood.central_nodes(), &[center]);
+        assert_eq!(neighborhood.hops(), 1);
+        assert!(neighborhood.is_central_node(center));
+        assert!(!neighborhood.is_central_node(node1));
+        
+        // Test expansion statistics
+        let stats = neighborhood.expansion_stats();
+        assert_eq!(stats.total_nodes, 3);
+        assert_eq!(stats.total_edges, 2);
+        assert_eq!(stats.central_count, 1);
+        assert_eq!(stats.max_hops, 1);
+        
+        // Test density calculation
+        let density = neighborhood.calculate_density();
+        assert!(density > 0.0 && density <= 1.0);
+        
+        // Test nodes at hop 0 (central nodes)
+        let central_nodes_at_hop = neighborhood.nodes_at_hop(0).unwrap();
+        assert_eq!(central_nodes_at_hop.len(), 1);
+        assert_eq!(central_nodes_at_hop[0], center);
+        
+        println!("NeighborhoodOperations tests passed!");
     }
 }

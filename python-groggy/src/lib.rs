@@ -18,10 +18,11 @@ pub use ffi::core::matrix::PyGraphMatrix;
 pub use ffi::core::component::PyComponentSubgraph;
 pub use ffi::core::neighborhood::{PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph};
 pub use ffi::core::query::{PyAttributeFilter, PyEdgeFilter, PyNodeFilter};
+pub use ffi::core::query_parser::{PyQueryParser, parse_node_query, parse_edge_query, validate_node_query, validate_edge_query, get_node_query_error, get_edge_query_error};
 pub use ffi::core::subgraph::PySubgraph;
 pub use ffi::core::table::{PyGraphTable, PyGroupBy};
 pub use ffi::core::traversal::{
-    PyAggregationResult, PyGroupedAggregationResult, PyTraversalResult,
+    PyAggregationResult, PyGroupedAggregationResult,
 };
 pub use ffi::core::views::{PyEdgeView, PyNodeView};
 pub use ffi::types::{PyAttrValue, PyAttributeCollection, PyResultHandle};
@@ -223,6 +224,15 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyAttributeFilter>()?;
     m.add_class::<PyNodeFilter>()?;
     m.add_class::<PyEdgeFilter>()?;
+    
+    // Register query parser (NEW - eliminates circular dependency)
+    m.add_class::<PyQueryParser>()?;
+    m.add_function(wrap_pyfunction!(parse_node_query, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_edge_query, m)?)?;
+    m.add_function(wrap_pyfunction!(validate_node_query, m)?)?;
+    m.add_function(wrap_pyfunction!(validate_edge_query, m)?)?;
+    m.add_function(wrap_pyfunction!(get_node_query_error, m)?)?;
+    m.add_function(wrap_pyfunction!(get_edge_query_error, m)?)?;
 
     // Register version control system
     m.add_class::<PyCommit>()?;
@@ -239,7 +249,6 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyNeighborhoodStats>()?;
 
     // Register traversal and aggregation results
-    m.add_class::<PyTraversalResult>()?;
     m.add_class::<PyAggregationResult>()?;
     m.add_class::<PyGroupedAggregationResult>()?;
 

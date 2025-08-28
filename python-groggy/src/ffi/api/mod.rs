@@ -4,7 +4,6 @@
 
 // Graph API FFI bindings
 pub mod graph;
-pub mod graph_analytics;
 pub mod graph_query;
 pub mod graph_version;
 

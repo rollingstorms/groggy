@@ -5,62 +5,6 @@
 use groggy::{EdgeId, NodeId};
 use pyo3::prelude::*;
 
-/// Result of a graph traversal operation
-#[pyclass(name = "TraversalResult")]
-pub struct PyTraversalResult {
-    pub nodes: Vec<NodeId>,
-    pub edges: Vec<EdgeId>,
-    pub distances: Option<Vec<usize>>,
-    pub traversal_type: String,
-}
-
-#[pymethods]
-impl PyTraversalResult {
-    #[getter]
-    fn nodes(&self) -> Vec<NodeId> {
-        self.nodes.clone()
-    }
-
-    #[getter]
-    fn edges(&self) -> Vec<EdgeId> {
-        self.edges.clone()
-    }
-
-    #[getter]
-    fn distances(&self) -> Option<Vec<usize>> {
-        self.distances.clone()
-    }
-
-    #[getter]
-    fn traversal_type(&self) -> String {
-        self.traversal_type.clone()
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "TraversalResult(nodes={}, edges={}, type='{}')",
-            self.nodes.len(),
-            self.edges.len(),
-            self.traversal_type
-        )
-    }
-}
-
-impl PyTraversalResult {
-    pub fn new(
-        nodes: Vec<NodeId>,
-        edges: Vec<EdgeId>,
-        distances: Option<Vec<usize>>,
-        traversal_type: String,
-    ) -> Self {
-        Self {
-            nodes,
-            edges,
-            distances,
-            traversal_type,
-        }
-    }
-}
 
 /// Result of an aggregation operation
 #[pyclass(name = "AggregationResult")]

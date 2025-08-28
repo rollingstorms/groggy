@@ -8,7 +8,7 @@ use crate::api::graph::Graph;
 use crate::core::traits::{GraphEntity, NodeOperations, SubgraphOperations};
 use crate::core::traversal::TraversalEngine;
 use crate::core::neighborhood::NeighborhoodSampler;
-use crate::errors::{GraphError, GraphResult};
+use crate::errors::GraphResult;
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -253,5 +253,70 @@ impl NodeOperations for EntityNode {
     fn is_connected_to(&self, other: NodeId) -> GraphResult<bool> {
         let graph = self.graph_ref.borrow();
         graph.has_edge_between(self.node_id, other)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::graph::Graph;
+    use crate::types::AttrValue;
+    use std::rc::Rc;
+    use std::cell::RefCell;
+
+    #[test]
+    fn test_entity_node_operations() {
+        // Test EntityNode and NodeOperations functionality
+        let mut graph = Graph::new();
+
+        // Create test nodes and edges
+        let node1 = graph.add_node();
+        let node2 = graph.add_node();
+        let node3 = graph.add_node();
+        
+        let _edge1 = graph.add_edge(node1, node2).unwrap();
+        let _edge2 = graph.add_edge(node2, node3).unwrap();
+        
+        // Set some attributes
+        graph.set_node_attr(node1, "name".to_string(), AttrValue::Text("Alice".to_string())).unwrap();
+        graph.set_node_attr(node1, "age".to_string(), AttrValue::Int(25)).unwrap();
+        
+        // Create EntityNode
+        let graph_rc = Rc::new(RefCell::new(graph));
+        let entity_node = EntityNode::new(node1, graph_rc.clone());
+        
+        // Test GraphEntity interface
+        assert_eq!(entity_node.entity_type(), "node");
+        assert!(entity_node.exists());
+        
+        // Test NodeOperations interface  
+        assert_eq!(entity_node.node_id(), node1);
+        
+        // Test degree calculation
+        let degree = entity_node.degree().unwrap();
+        assert_eq!(degree, 1); // node1 has one edge to node2
+        
+        // Test neighbors
+        let neighbors = entity_node.neighbors().unwrap();
+        assert_eq!(neighbors.len(), 1);
+        assert_eq!(neighbors[0], node2);
+        
+        // Test attribute access
+        let name = entity_node.get_node_attribute(&"name".to_string()).unwrap();
+        assert!(matches!(name, Some(AttrValue::Text(_)) | Some(AttrValue::CompactText(_))));
+        
+        // Test related entities (should return neighbors as EntityNodes)
+        let related = entity_node.related_entities().unwrap();
+        assert_eq!(related.len(), 1);
+        assert_eq!(related[0].entity_type(), "node");
+        
+        // Test connectivity
+        let is_connected = entity_node.is_connected_to(node2).unwrap();
+        assert!(is_connected);
+        
+        let is_not_connected = entity_node.is_connected_to(node3).unwrap();
+        assert!(!is_not_connected);
+        
+        println!("EntityNode tests passed!");
     }
 }
