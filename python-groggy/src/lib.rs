@@ -15,6 +15,7 @@ pub use ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
 pub use ffi::core::array::PyGraphArray;
 pub use ffi::core::history::{PyBranchInfo, PyCommit, PyHistoryStatistics};
 pub use ffi::core::matrix::PyGraphMatrix;
+pub use ffi::core::component::PyComponentSubgraph;
 pub use ffi::core::neighborhood::{PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph};
 pub use ffi::core::query::{PyAttributeFilter, PyEdgeFilter, PyNodeFilter};
 pub use ffi::core::subgraph::PySubgraph;
@@ -229,7 +230,10 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHistoryStatistics>()?;
     m.add_class::<PyHistoricalView>()?;
 
-    // Register neighborhood sampling system
+    // Register specialized entity types
+    m.add_class::<PyComponentSubgraph>()?;
+    
+    // Register neighborhood sampling system  
     m.add_class::<PyNeighborhoodSubgraph>()?;
     m.add_class::<PyNeighborhoodResult>()?;
     m.add_class::<PyNeighborhoodStats>()?;

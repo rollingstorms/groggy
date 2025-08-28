@@ -8,9 +8,15 @@ pub mod graph_entity;
 pub mod subgraph_operations;
 pub mod node_operations;
 pub mod edge_operations;
+pub mod component_operations;
+pub mod neighborhood_operations;
+pub mod filter_operations;
 
 // Re-export core traits for easy importing
 pub use graph_entity::GraphEntity;
 pub use subgraph_operations::SubgraphOperations;
 pub use node_operations::NodeOperations;
 pub use edge_operations::EdgeOperations;
+pub use component_operations::ComponentOperations;
+pub use neighborhood_operations::{NeighborhoodOperations, NeighborhoodStats};
+pub use filter_operations::{FilterOperations, FilterCriteria, FilterStats};
