@@ -19,7 +19,7 @@
 
 use crate::api::graph::Graph;
 use crate::core::traits::{GraphEntity, SubgraphOperations};
-use crate::core::traversal::{TraversalEngine, TraversalOptions};
+use crate::core::traversal::TraversalEngine;
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId, SubgraphId};
 use std::cell::RefCell;
@@ -272,84 +272,12 @@ impl Subgraph {
         )
     }
 
-    /// Run BFS traversal starting from a node within this subgraph
-    /// The traversal is constrained to nodes in this subgraph
-    pub fn bfs(&self, start: NodeId, _options: TraversalOptions) -> GraphResult<Subgraph> {
-        // Ensure start node is in this subgraph
-        if !self.has_node(start) {
-            return Err(GraphError::node_not_found(start, "subgraph BFS"));
-        }
-
-        // TODO: Implement constrained BFS within subgraph
-        // For now, return a placeholder
-        Ok(Subgraph::new(
-            self.graph.clone(),
-            HashSet::from([start]),
-            HashSet::new(),
-            format!("{}_bfs", self.subgraph_type),
-        ))
-    }
-
-    /// Run DFS traversal starting from a node within this subgraph
-    pub fn dfs(&self, start: NodeId, _options: TraversalOptions) -> GraphResult<Subgraph> {
-        // Ensure start node is in this subgraph
-        if !self.has_node(start) {
-            return Err(GraphError::node_not_found(start, "subgraph DFS"));
-        }
-
-        // TODO: Implement constrained DFS within subgraph
-        // For now, return a placeholder
-        Ok(Subgraph::new(
-            self.graph.clone(),
-            HashSet::from([start]),
-            HashSet::new(),
-            format!("{}_dfs", self.subgraph_type),
-        ))
-    }
-
-    /// Find connected components within this subgraph
-    pub fn connected_components(&self) -> GraphResult<Vec<Subgraph>> {
-        if self.nodes.is_empty() {
-            return Ok(vec![]);
-        }
-        
-        // Use TraversalEngine via Graph method
-        let mut graph = self.graph.borrow_mut();
-        let nodes: Vec<NodeId> = self.nodes.iter().copied().collect();
-        
-        let result = graph.connected_components_for_subgraph(nodes)?;
-        
-        // Convert ConnectedComponentsResult to Vec<Subgraph>
-        let mut components = Vec::new();
-        for component_result in result.components {
-            // Get nodes in this component
-            let component_nodes: HashSet<NodeId> = component_result.nodes.into_iter().collect();
-            
-            // Find edges that are within this component
-            let mut component_edges = HashSet::new();
-            for &edge_id in &self.edges {
-                if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
-                    if component_nodes.contains(&source) && component_nodes.contains(&target) {
-                        component_edges.insert(edge_id);
-                    }
-                }
-            }
-            
-            // Create subgraph for this component
-            components.push(Subgraph::new(
-                self.graph.clone(),
-                component_nodes,
-                component_edges,
-                format!("{}_component_{}", self.subgraph_type, components.len()),
-            ));
-        }
-        
-        Ok(components)
-    }
 
     /// Check if the subgraph is connected (has exactly one connected component)
     pub fn is_connected(&self) -> GraphResult<bool> {
-        let components = self.connected_components()?;
+        // Use the trait method instead of the old method
+        use crate::core::traits::SubgraphOperations;
+        let components = SubgraphOperations::connected_components(self)?;
         Ok(components.len() == 1 && !self.nodes.is_empty())
     }
 }
@@ -915,7 +843,7 @@ impl SubgraphOperations for Subgraph {
         Ok(component_subgraphs)
     }
 
-    fn bfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+    fn bfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
         if !self.nodes.contains(&start) {
             return Err(GraphError::NodeNotFound { 
                 node_id: start,
@@ -955,7 +883,7 @@ impl SubgraphOperations for Subgraph {
         Ok(Box::new(bfs_subgraph))
     }
 
-    fn dfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+    fn dfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
         if !self.nodes.contains(&start) {
             return Err(GraphError::NodeNotFound { 
                 node_id: start,
@@ -1087,6 +1015,61 @@ mod tests {
             .get_node_attribute_column(&"name".to_string())
             .unwrap();
         assert_eq!(names.len(), 2);
+    }
+
+    #[test]
+    fn test_subgraph_algorithms() {
+        // Test the core SubgraphOperations algorithms
+        let mut graph = Graph::new();
+
+        // Create a small connected graph for testing
+        let node1 = graph.add_node();
+        let node2 = graph.add_node();
+        let node3 = graph.add_node();
+        let node4 = graph.add_node(); // Isolated node to test components
+        
+        let edge1 = graph.add_edge(node1, node2).unwrap();
+        let edge2 = graph.add_edge(node2, node3).unwrap();
+        let edge3 = graph.add_edge(node3, node1).unwrap(); // Triangle
+        
+        let graph_rc = Rc::new(RefCell::new(graph));
+        let node_subset = HashSet::from([node1, node2, node3, node4]);
+        let subgraph = Subgraph::from_nodes(graph_rc, node_subset, "test".to_string()).unwrap();
+
+        // Test BFS subgraph
+        let bfs_result = subgraph.bfs_subgraph(node1, Some(2)).unwrap();
+        assert!(bfs_result.contains_node(node1));
+        println!("BFS test: contains {} nodes", bfs_result.node_count());
+
+        // Test DFS subgraph  
+        let dfs_result = subgraph.dfs_subgraph(node1, Some(2)).unwrap();
+        assert!(dfs_result.contains_node(node1));
+        println!("DFS test: contains {} nodes", dfs_result.node_count());
+
+        // Test connected components
+        use crate::core::traits::SubgraphOperations;
+        let components = SubgraphOperations::connected_components(&subgraph).unwrap();
+        println!("Found {} connected components", components.len());
+        assert!(components.len() >= 1); // At least the triangle should form one component
+        
+        // Test induced subgraph
+        let induced = subgraph.induced_subgraph(&[node1, node2]).unwrap();
+        assert_eq!(induced.node_count(), 2);
+        assert!(induced.contains_node(node1));
+        assert!(induced.contains_node(node2));
+        
+        // Test subgraph from edges
+        let edge_subset = [edge1, edge2];
+        let edge_subgraph = subgraph.subgraph_from_edges(&edge_subset).unwrap();
+        assert!(edge_subgraph.contains_edge(edge1));
+        assert!(edge_subgraph.contains_edge(edge2));
+        
+        // Test shortest path (if path exists)
+        if let Some(path) = subgraph.shortest_path_subgraph(node1, node3).unwrap() {
+            assert!(path.contains_node(node1));
+            assert!(path.contains_node(node3));
+            println!("Shortest path found with {} nodes", path.node_count());
+        }
     }
 
     #[test]

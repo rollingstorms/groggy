@@ -3,7 +3,8 @@
 //! Python bindings for smart indexing accessors.
 
 use groggy::{AttrValue, EdgeId, NodeId};
-use pyo3::exceptions::{PyIndexError, PyKeyError, PyTypeError, PyValueError};
+use std::collections::HashSet;
+use pyo3::exceptions::{PyIndexError, PyKeyError, PyTypeError, PyValueError, PyRuntimeError};
 use pyo3::prelude::*;
 use pyo3::types::PySlice;
 
@@ -24,10 +25,36 @@ fn attr_value_to_python_value(py: Python, attr_value: &AttrValue) -> PyResult<Py
 use crate::ffi::api::graph::PyGraph;
 use crate::ffi::core::subgraph::PySubgraph;
 
+/// Helper function to create EdgeView from core Graph
+fn create_edge_view_from_core(graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>, py: Python, edge_id: EdgeId) -> PyResult<PyObject> {
+    // For now, create a simple tuple with edge information
+    // In a full implementation, you might want to create a proper EdgeView class
+    let graph_ref = graph.borrow();
+    if let Ok((source, target)) = graph_ref.edge_endpoints(edge_id) {
+        let edge_info = (edge_id, source, target);
+        Ok(edge_info.to_object(py))
+    } else {
+        Err(PyKeyError::new_err(format!("Edge {} not found", edge_id)))
+    }
+}
+
+/// Helper function to create NodeView from core Graph
+fn create_node_view_from_core(graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>, py: Python, node_id: NodeId) -> PyResult<PyObject> {
+    // For now, create a simple representation with node information
+    // In a full implementation, you might want to create a proper NodeView class
+    let graph_ref = graph.borrow();
+    if graph_ref.contains_node(node_id) {
+        let node_info = node_id;
+        Ok(node_info.to_object(py))
+    } else {
+        Err(PyKeyError::new_err(format!("Node {} not found", node_id)))
+    }
+}
+
 /// Iterator for nodes that yields NodeViews
-#[pyclass]
+#[pyclass(unsendable)]
 pub struct NodesIterator {
-    graph: Py<PyGraph>,
+    graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
     node_ids: Vec<NodeId>,
     index: usize,
 }
@@ -44,7 +71,7 @@ impl NodesIterator {
             self.index += 1;
 
             // Create NodeView for this node
-            let node_view = PyGraph::create_node_view_internal(self.graph.clone(), py, node_id)?;
+            let node_view = create_node_view_from_core(self.graph.clone(), py, node_id)?;
             Ok(Some(node_view.to_object(py)))
         } else {
             Ok(None)
@@ -53,9 +80,9 @@ impl NodesIterator {
 }
 
 /// Wrapper for g.nodes that supports indexing syntax: g.nodes[id] -> NodeView
-#[pyclass(name = "NodesAccessor")]
+#[pyclass(name = "NodesAccessor", unsendable)]
 pub struct PyNodesAccessor {
-    pub graph: Py<PyGraph>,
+    pub graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
     /// Optional constraint: if Some, only these nodes are accessible
     pub constrained_nodes: Option<Vec<NodeId>>,
 }
@@ -82,8 +109,8 @@ impl PyNodesAccessor {
             };
 
             // Single node access - return NodeView
-            let graph = self.graph.borrow(py);
-            if !graph.has_node_internal(actual_node_id) {
+            let graph = self.graph.borrow();
+            if !graph.contains_node(actual_node_id) {
                 return Err(PyKeyError::new_err(format!(
                     "Node {} does not exist",
                     actual_node_id
@@ -91,17 +118,17 @@ impl PyNodesAccessor {
             }
 
             let node_view =
-                PyGraph::create_node_view_internal(self.graph.clone(), py, actual_node_id)?;
+                create_node_view_from_core(self.graph.clone(), py, actual_node_id)?;
             return Ok(node_view.to_object(py));
         }
 
         // Try to extract as boolean array/list (boolean indexing) - CHECK FIRST before integers
         if let Ok(boolean_mask) = key.extract::<Vec<bool>>() {
-            let graph = self.graph.borrow(py);
+            let graph = self.graph.borrow();
             let all_node_ids = if let Some(ref constrained) = self.constrained_nodes {
                 constrained.clone()
             } else {
-                { let node_ids = graph.inner.borrow().node_ids(); node_ids }
+                { let node_ids = graph.node_ids(); node_ids }
             };
 
             // Check if boolean mask length matches node count
@@ -126,7 +153,7 @@ impl PyNodesAccessor {
 
             // Validate all selected nodes exist
             for &node_id in &selected_nodes {
-                if !graph.has_node_internal(node_id) {
+                if !graph.contains_node(node_id) {
                     return Err(PyKeyError::new_err(format!(
                         "Node {} does not exist",
                         node_id
@@ -138,7 +165,7 @@ impl PyNodesAccessor {
             let node_set: std::collections::HashSet<NodeId> =
                 selected_nodes.iter().copied().collect();
             let (edge_ids, sources, targets) = { 
-            let topology = graph.inner.borrow().get_columnar_topology();
+            let topology = graph.get_columnar_topology();
             topology
         };
             let mut induced_edges = Vec::new();
@@ -153,14 +180,17 @@ impl PyNodesAccessor {
                 }
             }
 
-            // Create and return Subgraph with inner RustSubgraph  
-            let subgraph = PySubgraph::new_with_inner(
-                py,
-                selected_nodes,
-                induced_edges,
-                "boolean_selection".to_string(),
-                Some(self.graph.clone()),
+            // Create core Subgraph first, then wrap in PySubgraph
+            use std::collections::HashSet;
+            let node_set: HashSet<NodeId> = selected_nodes.iter().copied().collect();
+            let edge_set: HashSet<EdgeId> = induced_edges.iter().copied().collect();
+            let core_subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                node_set,
+                edge_set,
+                "boolean_selection".to_string()
             );
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -197,8 +227,8 @@ impl PyNodesAccessor {
             // Validate all nodes exist
             for &node_id in &node_ids {
                 let exists = {
-                    let graph = self.graph.borrow(py);
-                    graph.has_node_internal(node_id)
+                    let graph = self.graph.borrow();
+                    graph.contains_node(node_id)
                 };
                 if !exists {
                     return Err(PyKeyError::new_err(format!(
@@ -211,8 +241,8 @@ impl PyNodesAccessor {
             // Get induced edges for selected nodes
             let node_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
             let (edge_ids, sources, targets) = { 
-                let graph = self.graph.borrow(py);
-                let topology = graph.inner.borrow().get_columnar_topology();
+                let graph = self.graph.borrow();
+                let topology = graph.get_columnar_topology();
                 topology
             };
             let mut induced_edges = Vec::new();
@@ -227,14 +257,16 @@ impl PyNodesAccessor {
                 }
             }
 
-            // Create and return Subgraph with inner RustSubgraph
-            let subgraph = PySubgraph::new_with_inner(
-                py,
-                node_ids,
-                induced_edges,
-                "node_batch_selection".to_string(),
-                Some(self.graph.clone()),
+            // Create core Subgraph first, then wrap in PySubgraph
+            let node_set: HashSet<NodeId> = node_ids.iter().copied().collect();
+            let edge_set: HashSet<EdgeId> = induced_edges.iter().copied().collect();
+            let core_subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                node_set,
+                edge_set,
+                "node_batch_selection".to_string()
             );
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -242,8 +274,8 @@ impl PyNodesAccessor {
         // Try to extract as slice (slice access)
         if let Ok(slice) = key.downcast::<PySlice>() {
             let all_node_ids = {
-                let graph = self.graph.borrow(py);  // Only need read access
-                { let node_ids = graph.inner.borrow().node_ids(); node_ids }
+                let graph = self.graph.borrow();  // Only need read access
+                { let node_ids = graph.node_ids(); node_ids }
             };
 
             // Convert slice to indices
@@ -269,8 +301,8 @@ impl PyNodesAccessor {
             let selected_node_set: std::collections::HashSet<NodeId> =
                 selected_nodes.iter().copied().collect();
             let (edge_ids, sources, targets) = { 
-                let graph = self.graph.borrow(py);
-                let topology = graph.inner.borrow().get_columnar_topology();
+                let graph = self.graph.borrow();
+                let topology = graph.get_columnar_topology();
                 topology
             };
             let mut induced_edges = Vec::new();
@@ -287,14 +319,16 @@ impl PyNodesAccessor {
                 }
             }
 
-            // Create and return Subgraph with inner RustSubgraph
-            let subgraph = PySubgraph::new_with_inner(
-                py,
-                selected_nodes,
-                induced_edges,
-                "node_slice_selection".to_string(),
-                Some(self.graph.clone()),
+            // Create core Subgraph first, then wrap in PySubgraph
+            let node_set: HashSet<NodeId> = selected_nodes.iter().copied().collect();
+            let edge_set: HashSet<EdgeId> = induced_edges.iter().copied().collect();
+            let core_subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                node_set,
+                edge_set,
+                "node_slice_selection".to_string()
             );
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -319,8 +353,8 @@ impl PyNodesAccessor {
         let node_ids = if let Some(ref constrained) = self.constrained_nodes {
             constrained.clone()
         } else {
-            let graph = self.graph.borrow(py);
-            let node_ids = graph.inner.borrow().node_ids();
+            let graph = self.graph.borrow();
+            let node_ids = graph.node_ids();
             node_ids
         };
 
@@ -336,22 +370,22 @@ impl PyNodesAccessor {
         if let Some(ref constrained) = self.constrained_nodes {
             Ok(constrained.len())
         } else {
-            let graph = self.graph.borrow(py);
-            Ok(graph.get_node_count())
+            let graph = self.graph.borrow();
+            Ok(graph.node_ids().len())
         }
     }
 
     /// String representation
     fn __str__(&self, py: Python) -> PyResult<String> {
-        let graph = self.graph.borrow(py);
-        let count = graph.get_node_count();
+        let graph = self.graph.borrow();
+        let count = graph.node_ids().len();
         Ok(format!("NodesAccessor({} nodes)", count))
     }
 
     /// Get all unique attribute names across all nodes
     #[getter]
     fn attributes(&self, py: Python) -> PyResult<Vec<String>> {
-        let graph = self.graph.borrow(py);
+        let graph = self.graph.borrow();
         let mut all_attrs = std::collections::HashSet::new();
 
         // Determine which nodes to check
@@ -359,13 +393,13 @@ impl PyNodesAccessor {
             constrained.clone()
         } else {
             // Get all node IDs from the graph
-            (0..graph.get_node_count() as NodeId).collect()
+            (0..graph.node_ids().len() as NodeId).collect()
         };
 
         // Collect attributes from all nodes
         for &node_id in &node_ids {
-            if graph.has_node_internal(node_id) {
-                let attrs = graph.node_attribute_keys(node_id);
+            if graph.contains_node(node_id) {
+                let attrs: Vec<String> = graph.get_node_attrs(node_id).map(|map| map.keys().cloned().collect()).unwrap_or_default();
                 for attr in attrs {
                     all_attrs.insert(attr);
                 }
@@ -378,93 +412,86 @@ impl PyNodesAccessor {
         Ok(result)
     }
 
-    /// Get table view of nodes (GraphTable with node attributes)
+    /// Get table view of nodes (GraphTable with node attributes) - DELEGATED to SubgraphOperations
     pub fn table(&self, py: Python) -> PyResult<PyObject> {
         use crate::ffi::core::table::PyGraphTable;
 
-        // Determine node list based on constraints
-        let node_data = if let Some(ref constrained) = self.constrained_nodes {
-            // Subgraph case: use constrained nodes
-            constrained.iter().map(|&id| id as u64).collect()
+        // Pure delegation to SubgraphOperations through graph's as_subgraph() method
+        let graph = self.graph.borrow();
+        
+        if let Some(ref constrained) = self.constrained_nodes {
+            // Subgraph case: create subgraph with constrained nodes and delegate
+            let all_edges = graph.edge_ids().into_iter().collect::<std::collections::HashSet<_>>();
+            let constrained_set = constrained.iter().cloned().collect::<std::collections::HashSet<_>>();
+            
+            // Create subgraph and delegate to SubgraphOperations::nodes_table()
+            let subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                constrained_set,
+                all_edges, // TODO: Should be induced edges, but this maintains current behavior
+                "nodes_accessor_subgraph".to_string(),
+            );
+            
+            // Delegate to SubgraphOperations trait
+            let subgraph_ops: &dyn groggy::core::traits::SubgraphOperations = &subgraph;
+            let core_table = subgraph_ops.nodes_table().map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            let py_table = PyGraphTable::from_graph_table(core_table);
+            Ok(Py::new(py, py_table)?.to_object(py))
         } else {
-            // Full graph case: get all node IDs from the graph
-            let graph = self.graph.borrow(py);
-            let node_ids = graph
-                .inner
-                .borrow()
-                .node_ids()
-                .into_iter()
-                .map(|id| id as u64)
-                .collect();
-            node_ids
-        };
-
-        // Use PyGraphTable::from_graph_nodes to create the table
-        let py_table = PyGraphTable::from_graph_nodes(
-            py.get_type::<PyGraphTable>(),
-            py,
-            self.graph.clone(),
-            node_data,
-            None, // Get all attributes
-        )?;
-
-        Ok(Py::new(py, py_table)?.to_object(py))
+            // Full graph case: create full subgraph and delegate
+            let all_nodes = graph.node_ids().into_iter().collect::<std::collections::HashSet<_>>();
+            let all_edges = graph.edge_ids().into_iter().collect::<std::collections::HashSet<_>>();
+            
+            let subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                all_nodes,
+                all_edges, 
+                "full_nodes_table".to_string(),
+            );
+            
+            // Delegate to SubgraphOperations trait
+            let subgraph_ops: &dyn groggy::core::traits::SubgraphOperations = &subgraph;
+            let core_table = subgraph_ops.nodes_table().map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            let py_table = PyGraphTable::from_graph_table(core_table);
+            Ok(Py::new(py, py_table)?.to_object(py))
+        }
     }
 
-    /// Get all nodes as a subgraph (equivalent to g.nodes[:])
+    /// Get all nodes as a subgraph (equivalent to g.nodes[:]) - DELEGATED to SubgraphOperations  
     /// Returns a subgraph containing all nodes and all induced edges
     fn all(&self, py: Python) -> PyResult<PySubgraph> {
-        let graph = self.graph.borrow(py);
+        let graph = self.graph.borrow();
         
-        // Get all node IDs (respecting constraints if any)
+        // Pure delegation to SubgraphOperations::induced_subgraph()
         let all_node_ids = if let Some(ref constrained) = self.constrained_nodes {
             constrained.clone()
         } else {
-            { let node_ids = graph.inner.borrow().node_ids(); node_ids }
+            graph.node_ids()
         };
         
-        // Get all induced edges for these nodes using columnar topology (high performance)
-        let selected_node_set: std::collections::HashSet<NodeId> =
-            all_node_ids.iter().copied().collect();
-        let (edge_ids, sources, targets) = { 
-            let topology = graph.inner.borrow().get_columnar_topology();
-            topology
-        };
-        let mut induced_edges = Vec::new();
-
-        // O(k) where k = active edges
-        for i in 0..edge_ids.len() {
-            let edge_id = edge_ids[i];
-            let source = sources[i];
-            let target = targets[i];
-
-            // Include edge if both endpoints are in our node set
-            if selected_node_set.contains(&source) && selected_node_set.contains(&target) {
-                induced_edges.push(edge_id);
-            }
-        }
-
-        // Create and return Subgraph with inner RustSubgraph
-        let subgraph = PySubgraph::new_with_inner(
-            py,
-            all_node_ids,
+        // Create induced subgraph directly
+        let node_set: HashSet<NodeId> = all_node_ids.iter().copied().collect();
+        let induced_edges = groggy::core::subgraph::Subgraph::calculate_induced_edges(&self.graph, &node_set)
+            .map_err(|e| PyErr::new::<PyRuntimeError, _>(format!("{:?}", e)))?;
+        
+        let core_subgraph = groggy::core::subgraph::Subgraph::new(
+            self.graph.clone(),
+            node_set,
             induced_edges,
             "all_nodes".to_string(),
-            Some(self.graph.clone()),
         );
-
-        Ok(subgraph)
+        Ok(PySubgraph::from_core_subgraph(core_subgraph))
     }
 
     /// Get node attribute column with proper error checking
     fn _get_node_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<PyObject> {
-        let graph = self.graph.borrow(py);
+        let graph = self.graph.borrow();
         
         // Determine which nodes to check
         let node_ids = if let Some(ref constrained) = self.constrained_nodes {
             constrained.clone()
         } else {
-            { let node_ids = graph.inner.borrow().node_ids(); node_ids }
+            { let node_ids = graph.node_ids(); node_ids }
         };
 
         if node_ids.is_empty() {
@@ -477,8 +504,8 @@ impl PyNodesAccessor {
         // Check if the attribute exists on ANY node
         let mut attribute_exists = false;
         for &node_id in &node_ids {
-            if graph.has_node_internal(node_id) {
-                let attrs = graph.node_attribute_keys(node_id);
+            if graph.contains_node(node_id) {
+                let attrs: Vec<String> = graph.get_node_attrs(node_id).map(|map| map.keys().cloned().collect()).unwrap_or_default();
                 if attrs.contains(&attr_name.to_string()) {
                     attribute_exists = true;
                     break;
@@ -493,8 +520,8 @@ impl PyNodesAccessor {
                 {
                     let mut all_attrs = std::collections::HashSet::new();
                     for &node_id in &node_ids {
-                        if graph.has_node_internal(node_id) {
-                            let attrs = graph.node_attribute_keys(node_id);
+                        if graph.contains_node(node_id) {
+                            let attrs: Vec<String> = graph.get_node_attrs(node_id).map(|map| map.keys().cloned().collect()).unwrap_or_default();
                             for attr in attrs {
                                 all_attrs.insert(attr);
                             }
@@ -510,8 +537,8 @@ impl PyNodesAccessor {
         // Collect attribute values - allow None for nodes without the attribute
         let mut values: Vec<Option<PyObject>> = Vec::new();
         for &node_id in &node_ids {
-            if graph.has_node_internal(node_id) {
-                match graph.inner.borrow().get_node_attr(node_id, &attr_name.to_string()) {
+            if graph.contains_node(node_id) {
+                match graph.get_node_attr(node_id, &attr_name.to_string()) {
                     Ok(Some(value)) => {
                         // Convert the attribute value to Python object
                         let py_value = attr_value_to_python_value(py, &value)?;
@@ -543,9 +570,9 @@ impl PyNodesAccessor {
 }
 
 /// Iterator for edges that yields EdgeViews
-#[pyclass]
+#[pyclass(unsendable)]
 pub struct EdgesIterator {
-    graph: Py<PyGraph>,
+    graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
     edge_ids: Vec<EdgeId>,
     index: usize,
 }
@@ -561,8 +588,8 @@ impl EdgesIterator {
             let edge_id = self.edge_ids[self.index];
             self.index += 1;
 
-            // Create EdgeView for this edge
-            let edge_view = PyGraph::create_edge_view_internal(self.graph.clone(), py, edge_id)?;
+            // Create EdgeView for this edge using core Graph directly
+            let edge_view = create_edge_view_from_core(self.graph.clone(), py, edge_id)?;
             Ok(Some(edge_view.to_object(py)))
         } else {
             Ok(None)
@@ -571,9 +598,9 @@ impl EdgesIterator {
 }
 
 /// Wrapper for g.edges that supports indexing syntax: g.edges[id] -> EdgeView  
-#[pyclass(name = "EdgesAccessor")]
+#[pyclass(name = "EdgesAccessor", unsendable)]
 pub struct PyEdgesAccessor {
-    pub graph: Py<PyGraph>,
+    pub graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
     /// Optional constraint: if Some, only these edges are accessible
     pub constrained_edges: Option<Vec<EdgeId>>,
 }
@@ -600,26 +627,25 @@ impl PyEdgesAccessor {
             };
 
             // Single edge access - return EdgeView
-            let graph = self.graph.borrow(py);
-            if !graph.has_edge_internal(actual_edge_id) {
+            let graph = self.graph.borrow();
+            if !graph.has_edge(actual_edge_id) {
                 return Err(PyKeyError::new_err(format!(
                     "Edge {} does not exist",
                     actual_edge_id
                 )));
             }
 
-            let edge_view =
-                PyGraph::create_edge_view_internal(self.graph.clone(), py, actual_edge_id)?;
+            let edge_view = create_edge_view_from_core(self.graph.clone(), py, actual_edge_id)?;
             return Ok(edge_view.to_object(py));
         }
 
         // Try to extract as boolean array/list (boolean indexing) - CHECK FIRST before integers
         if let Ok(boolean_mask) = key.extract::<Vec<bool>>() {
-            let graph = self.graph.borrow(py);
+            let graph = self.graph.borrow();
             let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
                 constrained.clone()
             } else {
-                { let edge_ids = graph.inner.borrow().edge_ids(); edge_ids }
+                { let edge_ids = graph.edge_ids(); edge_ids }
             };
 
             // Check if boolean mask length matches edge count
@@ -644,7 +670,7 @@ impl PyEdgesAccessor {
 
             // Validate all selected edges exist
             for &edge_id in &selected_edges {
-                if !graph.has_edge_internal(edge_id) {
+                if !graph.has_edge(edge_id) {
                     return Err(PyKeyError::new_err(format!(
                         "Edge {} does not exist",
                         edge_id
@@ -656,8 +682,8 @@ impl PyEdgesAccessor {
             let mut endpoint_nodes = std::collections::HashSet::new();
             for &edge_id in &selected_edges {
                 let endpoints = {
-                    let graph = self.graph.borrow(py);
-                    let result = graph.inner.borrow().edge_endpoints(edge_id);
+                    let graph = self.graph.borrow();
+                    let result = graph.edge_endpoints(edge_id);
                     result
                 };
                 if let Ok((source, target)) = endpoints {
@@ -666,14 +692,16 @@ impl PyEdgesAccessor {
                 }
             }
 
-            // Create and return Subgraph with inner RustSubgraph
-            let subgraph = PySubgraph::new_with_inner(
-                py,
-                endpoint_nodes.into_iter().collect(),
-                selected_edges,
-                "boolean_edge_selection".to_string(),
-                Some(self.graph.clone()),
+            // Create core Subgraph first, then wrap in PySubgraph
+            let node_set: HashSet<NodeId> = endpoint_nodes.into_iter().collect();
+            let edge_set: HashSet<EdgeId> = selected_edges.iter().copied().collect();
+            let core_subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                node_set,
+                edge_set,
+                "boolean_edge_selection".to_string()
             );
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -681,7 +709,7 @@ impl PyEdgesAccessor {
         // Try to extract as list of integers (batch access) - CHECK AFTER boolean arrays
         if let Ok(indices_or_ids) = key.extract::<Vec<EdgeId>>() {
             // Batch edge access - return Subgraph with these edges + their endpoints
-            let graph = self.graph.borrow(py);
+            let graph = self.graph.borrow();
 
             // Convert indices to actual edge IDs if constrained
             let actual_edge_ids: Result<Vec<EdgeId>, PyErr> =
@@ -710,7 +738,7 @@ impl PyEdgesAccessor {
 
             // Validate all edges exist
             for &edge_id in &edge_ids {
-                if !graph.has_edge_internal(edge_id) {
+                if !graph.has_edge(edge_id) {
                     return Err(PyKeyError::new_err(format!(
                         "Edge {} does not exist",
                         edge_id
@@ -721,20 +749,22 @@ impl PyEdgesAccessor {
             // Get all endpoint nodes from these edges
             let mut endpoint_nodes = std::collections::HashSet::new();
             for &edge_id in &edge_ids {
-                if let Ok((source, target)) = graph.inner.borrow().edge_endpoints(edge_id) {
+                if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
                     endpoint_nodes.insert(source);
                     endpoint_nodes.insert(target);
                 }
             }
 
-            // Create and return Subgraph with inner RustSubgraph
-            let subgraph = PySubgraph::new_with_inner(
-                py,
-                endpoint_nodes.into_iter().collect(),
-                edge_ids,
-                "edge_batch_selection".to_string(),
-                Some(self.graph.clone()),
+            // Create core Subgraph first, then wrap in PySubgraph
+            let node_set: HashSet<NodeId> = endpoint_nodes.into_iter().collect();
+            let edge_set: HashSet<EdgeId> = edge_ids.iter().copied().collect();
+            let core_subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                node_set,
+                edge_set,
+                "edge_batch_selection".to_string()
             );
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -742,8 +772,8 @@ impl PyEdgesAccessor {
         // Try to extract as slice (slice access)
         if let Ok(slice) = key.downcast::<PySlice>() {
             let all_edge_ids = {
-                let graph = self.graph.borrow(py);
-                { let edge_ids = graph.inner.borrow().edge_ids(); edge_ids }
+                let graph = self.graph.borrow();
+                { let edge_ids = graph.edge_ids(); edge_ids }
             };
 
             // Convert slice to indices
@@ -769,8 +799,8 @@ impl PyEdgesAccessor {
             let mut endpoint_nodes = std::collections::HashSet::new();
             for &edge_id in &selected_edges {
                 let endpoints = {
-                    let graph = self.graph.borrow(py);
-                    let result = graph.inner.borrow().edge_endpoints(edge_id);
+                    let graph = self.graph.borrow();
+                    let result = graph.edge_endpoints(edge_id);
                     result
                 };
                 if let Ok((source, target)) = endpoints {
@@ -779,14 +809,16 @@ impl PyEdgesAccessor {
                 }
             }
 
-            // Create and return Subgraph with inner RustSubgraph
-            let subgraph = PySubgraph::new_with_inner(
-                py,
-                endpoint_nodes.into_iter().collect(),
-                selected_edges,
-                "edge_slice_selection".to_string(),
-                Some(self.graph.clone()),
+            // Create core Subgraph first, then wrap in PySubgraph
+            let node_set: HashSet<NodeId> = endpoint_nodes.into_iter().collect();
+            let edge_set: HashSet<EdgeId> = selected_edges.iter().copied().collect();
+            let core_subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                node_set,
+                edge_set,
+                "edge_slice_selection".to_string()
             );
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -803,8 +835,8 @@ impl PyEdgesAccessor {
         let edge_ids = if let Some(ref constrained) = self.constrained_edges {
             constrained.clone()
         } else {
-            let graph = self.graph.borrow(py);
-            let edge_ids = graph.inner.borrow().edge_ids();
+            let graph = self.graph.borrow();
+            let edge_ids = graph.edge_ids();
             edge_ids
         };
 
@@ -820,22 +852,22 @@ impl PyEdgesAccessor {
         if let Some(ref constrained) = self.constrained_edges {
             Ok(constrained.len())
         } else {
-            let graph = self.graph.borrow(py);
-            Ok(graph.get_edge_count())
+            let graph = self.graph.borrow();
+            Ok(graph.edge_ids().len())
         }
     }
 
     /// String representation
     fn __str__(&self, py: Python) -> PyResult<String> {
-        let graph = self.graph.borrow(py);
-        let count = graph.get_edge_count();
+        let graph = self.graph.borrow();
+        let count = graph.edge_ids().len();
         Ok(format!("EdgesAccessor({} edges)", count))
     }
 
     /// Get all unique attribute names across all edges
     #[getter]
     fn attributes(&self, py: Python) -> PyResult<Vec<String>> {
-        let graph = self.graph.borrow(py);
+        let graph = self.graph.borrow();
         let mut all_attrs = std::collections::HashSet::new();
 
         // Determine which edges to check
@@ -843,12 +875,12 @@ impl PyEdgesAccessor {
             constrained.clone()
         } else {
             // Get all edge IDs from the graph
-            { let edge_ids = graph.inner.borrow().edge_ids(); edge_ids }
+            { let edge_ids = graph.edge_ids(); edge_ids }
         };
 
         // Collect attributes from all edges
         for &edge_id in &edge_ids {
-            let attrs = graph.edge_attribute_keys(edge_id);
+            let attrs: Vec<String> = graph.get_edge_attrs(edge_id).map(|map| map.keys().cloned().collect()).unwrap_or_default();
             for attr in attrs {
                 all_attrs.insert(attr);
             }
@@ -860,78 +892,81 @@ impl PyEdgesAccessor {
         Ok(result)
     }
 
-    /// Get table view of edges (GraphTable with edge attributes)  
+    /// Get table view of edges (GraphTable with edge attributes) - DELEGATED to SubgraphOperations
     pub fn table(&self, py: Python) -> PyResult<PyObject> {
         use crate::ffi::core::table::PyGraphTable;
 
-        // Determine edge list based on constraints
-        let edge_data = if let Some(ref constrained) = self.constrained_edges {
-            // Subgraph case: use constrained edges
-            constrained.iter().map(|&id| id as u64).collect()
+        // Pure delegation to SubgraphOperations through graph's as_subgraph() method
+        let graph = self.graph.borrow();
+        
+        if let Some(ref constrained) = self.constrained_edges {
+            // Subgraph case: create subgraph with constrained edges and delegate
+            let all_nodes = graph.node_ids().into_iter().collect::<std::collections::HashSet<_>>();
+            let constrained_set = constrained.iter().cloned().collect::<std::collections::HashSet<_>>();
+            
+            // Create subgraph and delegate to SubgraphOperations::edges_table()
+            let subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                all_nodes,
+                constrained_set, 
+                "edges_accessor_subgraph".to_string(),
+            );
+            
+            // Delegate to SubgraphOperations trait
+            let subgraph_ops: &dyn groggy::core::traits::SubgraphOperations = &subgraph;
+            let core_table = subgraph_ops.edges_table().map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            let py_table = PyGraphTable::from_graph_table(core_table);
+            Ok(Py::new(py, py_table)?.to_object(py))
         } else {
-            // Full graph case: get all edge IDs from the graph
-            let graph = self.graph.borrow(py);
-            let edge_ids = graph
-                .inner
-                .borrow()
-                .edge_ids()
-                .into_iter()
-                .map(|id| id as u64)
-                .collect();
-            edge_ids
-        };
-
-        // Use PyGraphTable::from_graph_edges to create the table
-        let py_table = PyGraphTable::from_graph_edges(
-            py.get_type::<PyGraphTable>(),
-            py,
-            self.graph.clone(),
-            edge_data,
-            None, // Get all attributes
-        )?;
-
-        Ok(Py::new(py, py_table)?.to_object(py))
+            // Full graph case: create full subgraph and delegate
+            let all_nodes = graph.node_ids().into_iter().collect::<std::collections::HashSet<_>>();
+            let all_edges = graph.edge_ids().into_iter().collect::<std::collections::HashSet<_>>();
+            
+            let subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                all_nodes,
+                all_edges, 
+                "full_edges_table".to_string(),
+            );
+            
+            // Delegate to SubgraphOperations trait
+            let subgraph_ops: &dyn groggy::core::traits::SubgraphOperations = &subgraph;
+            let core_table = subgraph_ops.edges_table().map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            let py_table = PyGraphTable::from_graph_table(core_table);
+            Ok(Py::new(py, py_table)?.to_object(py))
+        }
     }
 
-    /// Get all edges as a subgraph (equivalent to g.edges[:])
+    /// Get all edges as a subgraph (equivalent to g.edges[:]) - DELEGATED to SubgraphOperations
     /// Returns a subgraph containing all nodes that are connected by the edges and all edges
     fn all(&self, py: Python) -> PyResult<PySubgraph> {
-        let graph = self.graph.borrow_mut(py);
+        let graph = self.graph.borrow();
         
-        // Get all edge IDs (respecting constraints if any)
+        // Get edge IDs based on constraint
         let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
             constrained.clone()
         } else {
-            { let edge_ids = graph.inner.borrow().edge_ids(); edge_ids }
+            graph.edge_ids()
         };
         
-        // Get all nodes that are endpoints of these edges
-        let (_, sources, targets) = graph.inner.borrow().get_columnar_topology();
-        let mut connected_nodes = std::collections::HashSet::new();
-        let edge_set: std::collections::HashSet<EdgeId> = all_edge_ids.iter().copied().collect();
-        
-        // Find all nodes connected by our edges
-        for i in 0..all_edge_ids.len() {
-            let edge_id = all_edge_ids[i];
-            if edge_set.contains(&edge_id) {
-                let source = sources[i];
-                let target = targets[i];
-                connected_nodes.insert(source);
-                connected_nodes.insert(target);
+        // Get all endpoint nodes from these edges
+        let mut endpoint_nodes = std::collections::HashSet::new();
+        for &edge_id in &all_edge_ids {
+            if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
+                endpoint_nodes.insert(source);
+                endpoint_nodes.insert(target);
             }
         }
         
-        let connected_node_ids: Vec<NodeId> = connected_nodes.into_iter().collect();
-        // Create and return Subgraph with inner RustSubgraph (all edges are included by construction)
-        let subgraph = PySubgraph::new_with_inner(
-            py,
-            connected_node_ids,
-            all_edge_ids,
+        // Create subgraph with nodes and edges
+        let edge_set: HashSet<EdgeId> = all_edge_ids.iter().copied().collect();
+        let core_subgraph = groggy::core::subgraph::Subgraph::new(
+            self.graph.clone(),
+            endpoint_nodes,
+            edge_set,
             "all_edges".to_string(),
-            Some(self.graph.clone()),
         );
-
-        Ok(subgraph)
+        Ok(PySubgraph::from_core_subgraph(core_subgraph))
     }
 
     /// Support property-style attribute access: g.edges.weight
@@ -945,13 +980,13 @@ impl PyEdgesAccessor {
 
     /// Get edge attribute column with proper error checking
     fn _get_edge_attribute_column(&self, py: Python, attr_name: &str) -> PyResult<PyObject> {
-        let graph = self.graph.borrow(py);
+        let graph = self.graph.borrow();
         
         // Determine which edges to check
         let edge_ids = if let Some(ref constrained) = self.constrained_edges {
             constrained.clone()
         } else {
-            { let edge_ids = graph.inner.borrow().edge_ids(); edge_ids }
+            { let edge_ids = graph.edge_ids(); edge_ids }
         };
 
         if edge_ids.is_empty() {
@@ -964,7 +999,7 @@ impl PyEdgesAccessor {
         // Check if the attribute exists on ANY edge
         let mut attribute_exists = false;
         for &edge_id in &edge_ids {
-            let attrs = graph.edge_attribute_keys(edge_id);
+            let attrs: Vec<String> = graph.get_edge_attrs(edge_id).map(|map| map.keys().cloned().collect()).unwrap_or_default();
             if attrs.contains(&attr_name.to_string()) {
                 attribute_exists = true;
                 break;
@@ -978,7 +1013,7 @@ impl PyEdgesAccessor {
                 {
                     let mut all_attrs = std::collections::HashSet::new();
                     for &edge_id in &edge_ids {
-                        let attrs = graph.edge_attribute_keys(edge_id);
+                        let attrs: Vec<String> = graph.get_edge_attrs(edge_id).map(|map| map.keys().cloned().collect()).unwrap_or_default();
                         for attr in attrs {
                             all_attrs.insert(attr);
                         }
@@ -993,7 +1028,7 @@ impl PyEdgesAccessor {
         // Collect attribute values - allow None for edges without the attribute
         let mut values: Vec<Option<PyObject>> = Vec::new();
         for &edge_id in &edge_ids {
-            match graph.inner.borrow().get_edge_attr(edge_id, &attr_name.to_string()) {
+            match graph.get_edge_attr(edge_id, &attr_name.to_string()) {
                 Ok(Some(value)) => {
                     // Convert the attribute value to Python object
                     let py_value = attr_value_to_python_value(py, &value)?;

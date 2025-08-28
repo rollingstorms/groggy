@@ -738,7 +738,7 @@ impl GraphPool {
         nodes.len().hash(&mut hasher);
         edges.len().hash(&mut hasher);
         subgraph_type.hash(&mut hasher);
-        let subgraph_id = hasher.finish() as crate::types::SubgraphId;
+        let subgraph_id = (hasher.finish() as usize) as crate::types::SubgraphId;
         Ok(subgraph_id)
     }
 

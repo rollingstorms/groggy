@@ -6,7 +6,7 @@
 
 use crate::api::graph::Graph;
 use crate::core::traits::{GraphEntity, EdgeOperations, SubgraphOperations};
-use crate::errors::{GraphError, GraphResult};
+use crate::errors::GraphResult;
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId};
 use std::cell::RefCell;
 use std::collections::HashMap;

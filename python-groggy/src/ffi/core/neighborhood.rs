@@ -4,8 +4,8 @@
 
 use crate::ffi::core::subgraph::PySubgraph;
 use groggy::core::neighborhood::{NeighborhoodResult, NeighborhoodStats, NeighborhoodSubgraph};
-use groggy::core::traits::SubgraphOperations;
-use groggy::NodeId;
+use groggy::core::traits::{SubgraphOperations, NeighborhoodOperations, GraphEntity};
+use groggy::{NodeId, EdgeId};
 use pyo3::prelude::*;
 
 /// Python wrapper for NeighborhoodSubgraph
@@ -17,6 +17,8 @@ pub struct PyNeighborhoodSubgraph {
 
 #[pymethods]
 impl PyNeighborhoodSubgraph {
+    // === NeighborhoodOperations - Specialized methods ===
+    
     #[getter]
     fn central_nodes(&self) -> Vec<NodeId> {
         self.inner.central_nodes().to_vec()
@@ -26,9 +28,16 @@ impl PyNeighborhoodSubgraph {
     fn hops(&self) -> usize {
         self.inner.hops()
     }
+    
+    /// Check if a node is a central node
+    fn is_central_node(&self, node_id: NodeId) -> bool {
+        self.inner.is_central_node(node_id)
+    }
+
+    // === SubgraphOperations - Inherited methods ===
 
     #[getter]
-    fn size(&self) -> usize {
+    fn node_count(&self) -> usize {
         self.inner.node_count()
     }
 
@@ -36,23 +45,45 @@ impl PyNeighborhoodSubgraph {
     fn edge_count(&self) -> usize {
         self.inner.edge_count()
     }
+    
+    /// Check if a node exists in this neighborhood
+    fn contains_node(&self, node_id: NodeId) -> bool {
+        self.inner.contains_node(node_id)
+    }
+
+    /// Check if an edge exists in this neighborhood
+    fn contains_edge(&self, edge_id: EdgeId) -> bool {
+        self.inner.contains_edge(edge_id)
+    }
+
+    /// Get all node IDs in this neighborhood
+    fn node_ids(&self) -> Vec<NodeId> {
+        self.inner.node_set().iter().copied().collect()
+    }
+
+    /// Get all edge IDs in this neighborhood
+    fn edge_ids(&self) -> Vec<EdgeId> {
+        self.inner.edge_set().iter().copied().collect()
+    }
 
     /// Get the subgraph object using the same pattern as connected components
+    /// I would rather that the NeighborhoodSubgraph object be the subgraph object itself
     fn subgraph(&self, py: Python) -> PyResult<PySubgraph> {
         // Create PySubgraph using the same pattern as connected components
-        let subgraph = PySubgraph::new_with_inner(
-            py,
-            self.inner.node_set().iter().copied().collect(),
-            self.inner.edge_set().iter().copied().collect(),
-            format!("neighborhood_hops_{}", self.inner.hops()),
-            None, // No parent graph reference needed for neighborhood subgraphs
+        // Create core Subgraph first, then wrap in PySubgraph
+        let core_subgraph = groggy::core::subgraph::Subgraph::new(
+            self.inner.graph_ref().clone(),
+            self.inner.node_set().clone(),
+            self.inner.edge_set().clone(),
+            format!("neighborhood_hops_{}", self.inner.hops())
         );
+        let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
         Ok(subgraph)
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "NeighborhoodSubgraph(central_nodes={:?}, hops={}, size={}, edges={})",
+            "NeighborhoodSubgraph(central_nodes={:?}, hops={}, nodes={}, edges={})",
             self.inner.central_nodes(), self.inner.hops(), self.inner.node_count(), self.inner.edge_count()
         )
     }

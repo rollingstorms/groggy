@@ -89,6 +89,43 @@ pub trait SubgraphOperations: GraphEntity {
         self.edge_set().contains(&edge_id)
     }
     
+    /// Calculate subgraph density (ratio of actual edges to possible edges)
+    /// 
+    /// # Returns
+    /// Density value between 0.0 and 1.0, where 1.0 means fully connected
+    /// 
+    /// # Performance
+    /// O(1) - Uses existing efficient node_count() and edge_count() methods
+    fn density(&self) -> f64 {
+        let node_count = self.node_count();
+        let edge_count = self.edge_count();
+        
+        if node_count <= 1 {
+            return 0.0;
+        }
+        
+        // Determine if parent graph is directed
+        let is_directed = {
+            let graph = self.graph_ref();
+            let graph_borrowed = graph.borrow();
+            graph_borrowed.is_directed()
+        };
+        
+        let max_possible_edges = if is_directed {
+            // For directed graphs: n(n-1) 
+            node_count * (node_count - 1)
+        } else {
+            // For undirected graphs: n(n-1)/2
+            (node_count * (node_count - 1)) / 2
+        };
+        
+        if max_possible_edges > 0 {
+            edge_count as f64 / max_possible_edges as f64
+        } else {
+            0.0
+        }
+    }
+    
     /// Node attribute access using GraphPool (no copying)
     /// 
     /// # Arguments
@@ -238,7 +275,7 @@ pub trait SubgraphOperations: GraphEntity {
     /// 
     /// # Performance
     /// Uses existing efficient BFS algorithm with subgraph constraints
-    fn bfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>>;
+    fn bfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>>;
     
     /// Depth-first search from starting node within this subgraph
     /// 
@@ -251,7 +288,7 @@ pub trait SubgraphOperations: GraphEntity {
     /// 
     /// # Performance
     /// Uses existing efficient DFS algorithm with subgraph constraints
-    fn dfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>>;
+    fn dfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>>;
     
     /// Find shortest path between nodes within this subgraph
     /// 

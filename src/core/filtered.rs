@@ -229,7 +229,7 @@ impl SubgraphOperations for FilteredSubgraph {
         Ok(components)
     }
     
-    fn bfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+    fn bfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
         if !self.nodes.contains(&start) {
             return Err(crate::errors::GraphError::NodeNotFound { 
                 node_id: start,
@@ -270,7 +270,7 @@ impl SubgraphOperations for FilteredSubgraph {
         Ok(Box::new(bfs_subgraph))
     }
     
-    fn dfs_subgraph(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+    fn dfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
         if !self.nodes.contains(&start) {
             return Err(crate::errors::GraphError::NodeNotFound { 
                 node_id: start,

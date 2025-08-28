@@ -497,11 +497,10 @@ impl PySubgraph {
             // Direct EdgeFilter object - fastest path
             filter_obj.inner.clone()
         } else if let Ok(query_str) = filter.extract::<String>() {
-            // String query - parse it using our query parser
-            let query_parser = py.import("groggy.query_parser")?;
-            let parse_func = query_parser.getattr("parse_edge_query")?;
-            let parsed_filter: PyEdgeFilter = parse_func.call1((query_str,))?.extract()?;
-            parsed_filter.inner.clone()
+            // String query - parse it using Rust core query parser (FIXED: no circular dependency)
+            let mut parser = groggy::core::query_parser::QueryParser::new();
+            parser.parse_edge_query(&query_str)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e)))?
         } else {
             return Err(PyTypeError::new_err(
                 "Edge filter must be an EdgeFilter object or string query"
@@ -1134,10 +1133,10 @@ impl PySubgraph {
         let node_filter = if let Ok(py_nf) = filter.extract::<PyNodeFilter>() {
             py_nf.inner.clone()
         } else if let Ok(query_str) = filter.extract::<String>() {
-            let qp = py.import("groggy.query_parser")?;
-            let parse = qp.getattr("parse_node_query")?;
-            let parsed: PyNodeFilter = parse.call1((query_str,))?.extract()?;
-            parsed.inner.clone()
+            // String query - parse it using Rust core query parser (FIXED: no circular dependency)
+            let mut parser = groggy::core::query_parser::QueryParser::new();
+            parser.parse_node_query(&query_str)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e)))?
         } else if let Ok(dict) = filter.downcast::<pyo3::types::PyDict>() {
             // Optional: allow dict form {"age": AttributeFilter.greater_than(21), ...}
             use groggy::core::query::NodeFilter as NF;

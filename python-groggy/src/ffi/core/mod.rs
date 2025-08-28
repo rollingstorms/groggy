@@ -11,6 +11,7 @@ pub mod history;
 pub mod matrix;
 pub mod neighborhood;
 pub mod query;
+pub mod query_parser;
 pub mod subgraph;
 pub mod table;
 pub mod traversal;
