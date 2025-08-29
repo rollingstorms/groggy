@@ -1,19 +1,28 @@
-//! Graph Analysis Operations - Pure FFI Delegation Layer
+//! Graph Analysis Operations - Internal Helper Class
 //!
-//! Graph algorithm operations that delegate to core implementations.
+//! PyGraphAnalysis helper class that handles all graph analysis operations.
 
 use crate::ffi::core::neighborhood::PyNeighborhoodResult;
 use crate::ffi::utils::graph_error_to_py_err;
-use groggy::{AttrName, EdgeId, NodeId};
+use groggy::{AttrName, EdgeId, NodeId, GraphError};
+use groggy::core::traits::SubgraphOperations;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 use super::graph::PyGraph;
 
-#[pymethods]
-impl PyGraph {
+/// Internal helper for graph analysis operations (not exposed to Python)
+pub struct PyGraphAnalysis {
+    pub graph: Py<PyGraph>,
+}
+
+impl PyGraphAnalysis {
+    /// Create new PyGraphAnalysis instance
+    pub fn new(graph: Py<PyGraph>) -> PyResult<PyGraphAnalysis> {
+        Ok(PyGraphAnalysis { graph })
+    }
     /// Get neighbors of nodes - PURE DELEGATION to core
-    fn neighbors(&mut self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
+    pub fn neighbors(&mut self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
         if let Some(nodes_input) = nodes {
             // Handle multiple nodes
             if let Ok(node_list) = nodes_input.extract::<Vec<NodeId>>() {
@@ -21,12 +30,15 @@ impl PyGraph {
                 
                 for node in node_list {
                     // DELEGATION: Use core neighbors implementation (graph.rs:866)
-                    let neighbors = py.allow_threads(|| {
-                        self.inner
+                    let neighbors = {
+                        let graph_ref = self.graph.borrow(py);
+                        let result = graph_ref.inner
                             .borrow()
                             .neighbors(node)
-                            .map_err(graph_error_to_py_err)
-                    })?;
+                            .map_err(graph_error_to_py_err);
+                        drop(graph_ref);
+                        result
+                    }?;
                     
                     let py_neighbors = PyList::new(py, neighbors);
                     result_dict.set_item(node, py_neighbors)?;
@@ -35,12 +47,15 @@ impl PyGraph {
                 Ok(result_dict.to_object(py))
             } else if let Ok(single_node) = nodes_input.extract::<NodeId>() {
                 // Handle single node
-                let neighbors = py.allow_threads(|| {
-                    self.inner
+                let neighbors = {
+                    let graph_ref = self.graph.borrow(py);
+                    let result = graph_ref.inner
                         .borrow()
                         .neighbors(single_node)
-                        .map_err(graph_error_to_py_err)
-                })?;
+                        .map_err(graph_error_to_py_err);
+                    drop(graph_ref);
+                    result
+                }?;
                 
                 Ok(PyList::new(py, neighbors).to_object(py))
             } else {
@@ -56,7 +71,7 @@ impl PyGraph {
     }
 
     /// Get degree of nodes - PURE DELEGATION to core
-    fn degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
+    pub fn degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
         if let Some(nodes_input) = nodes {
             // Handle multiple nodes
             if let Ok(node_list) = nodes_input.extract::<Vec<NodeId>>() {
@@ -64,12 +79,15 @@ impl PyGraph {
                 
                 for node in node_list {
                     // DELEGATION: Use core degree implementation (graph.rs:845)
-                    let degree = py.allow_threads(|| {
-                        self.inner
+                    let degree = {
+                        let graph_ref = self.graph.borrow(py);
+                        let result = graph_ref.inner
                             .borrow()
                             .degree(node)
-                            .map_err(graph_error_to_py_err)
-                    })?;
+                            .map_err(graph_error_to_py_err);
+                        drop(graph_ref);
+                        result
+                    }?;
                     
                     result_dict.set_item(node, degree)?;
                 }
@@ -77,12 +95,15 @@ impl PyGraph {
                 Ok(result_dict.to_object(py))
             } else if let Ok(single_node) = nodes_input.extract::<NodeId>() {
                 // Handle single node
-                let degree = py.allow_threads(|| {
-                    self.inner
+                let degree = {
+                    let graph_ref = self.graph.borrow(py);
+                    let result = graph_ref.inner
                         .borrow()
                         .degree(single_node)
-                        .map_err(graph_error_to_py_err)
-                })?;
+                        .map_err(graph_error_to_py_err);
+                    drop(graph_ref);
+                    result
+                }?;
                 
                 Ok(degree.to_object(py))
             } else {
@@ -92,16 +113,24 @@ impl PyGraph {
             }
         } else {
             // Return degree for all nodes
-            let all_nodes = self.inner.borrow().node_ids();
+            let all_nodes = {
+                let graph_ref = self.graph.borrow(py);
+                let nodes = graph_ref.inner.borrow().node_ids();
+                drop(graph_ref);
+                nodes
+            };
             let result_dict = PyDict::new(py);
             
             for node in all_nodes {
-                let degree = py.allow_threads(|| {
-                    self.inner
+                let degree = {
+                    let graph_ref = self.graph.borrow(py);
+                    let result = graph_ref.inner
                         .borrow()
                         .degree(node)
-                        .map_err(graph_error_to_py_err)
-                })?;
+                        .map_err(graph_error_to_py_err);
+                    drop(graph_ref);
+                    result
+                }?;
                 
                 result_dict.set_item(node, degree)?;
             }
@@ -111,7 +140,7 @@ impl PyGraph {
     }
 
     /// Get in-degree of nodes - PURE DELEGATION to core
-    fn in_degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
+    pub fn in_degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
         if let Some(nodes_input) = nodes {
             // Handle multiple nodes
             if let Ok(node_list) = nodes_input.extract::<Vec<NodeId>>() {
@@ -119,12 +148,15 @@ impl PyGraph {
                 
                 for node in node_list {
                     // DELEGATION: Use core in_degree implementation
-                    let in_degree = py.allow_threads(|| {
-                        self.inner
+                    let in_degree = {
+                        let graph_ref = self.graph.borrow(py);
+                        let result = graph_ref.inner
                             .borrow()
                             .in_degree(node)
-                            .map_err(graph_error_to_py_err)
-                    })?;
+                            .map_err(graph_error_to_py_err);
+                        drop(graph_ref);
+                        result
+                    }?;
                     
                     result_dict.set_item(node, in_degree)?;
                 }
@@ -132,12 +164,15 @@ impl PyGraph {
                 Ok(result_dict.to_object(py))
             } else if let Ok(single_node) = nodes_input.extract::<NodeId>() {
                 // Handle single node
-                let in_degree = py.allow_threads(|| {
-                    self.inner
+                let in_degree = {
+                    let graph_ref = self.graph.borrow(py);
+                    let result = graph_ref.inner
                         .borrow()
                         .in_degree(single_node)
-                        .map_err(graph_error_to_py_err)
-                })?;
+                        .map_err(graph_error_to_py_err);
+                    drop(graph_ref);
+                    result
+                }?;
                 
                 Ok(in_degree.to_object(py))
             } else {
@@ -147,16 +182,24 @@ impl PyGraph {
             }
         } else {
             // Return in-degree for all nodes
-            let all_nodes = self.inner.borrow().node_ids();
+            let all_nodes = {
+                let graph_ref = self.graph.borrow(py);
+                let nodes = graph_ref.inner.borrow().node_ids();
+                drop(graph_ref);
+                nodes
+            };
             let result_dict = PyDict::new(py);
             
             for node in all_nodes {
-                let in_degree = py.allow_threads(|| {
-                    self.inner
+                let in_degree = {
+                    let graph_ref = self.graph.borrow(py);
+                    let result = graph_ref.inner
                         .borrow()
                         .in_degree(node)
-                        .map_err(graph_error_to_py_err)
-                })?;
+                        .map_err(graph_error_to_py_err);
+                    drop(graph_ref);
+                    result
+                }?;
                 
                 result_dict.set_item(node, in_degree)?;
             }
@@ -166,7 +209,7 @@ impl PyGraph {
     }
 
     /// Get out-degree of nodes - PURE DELEGATION to core
-    fn out_degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
+    pub fn out_degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
         if let Some(nodes_input) = nodes {
             // Handle multiple nodes
             if let Ok(node_list) = nodes_input.extract::<Vec<NodeId>>() {
@@ -174,12 +217,15 @@ impl PyGraph {
                 
                 for node in node_list {
                     // DELEGATION: Use core out_degree implementation
-                    let out_degree = py.allow_threads(|| {
-                        self.inner
+                    let out_degree = {
+                        let graph_ref = self.graph.borrow(py);
+                        let result = graph_ref.inner
                             .borrow()
                             .out_degree(node)
-                            .map_err(graph_error_to_py_err)
-                    })?;
+                            .map_err(graph_error_to_py_err);
+                        drop(graph_ref);
+                        result
+                    }?;
                     
                     result_dict.set_item(node, out_degree)?;
                 }
@@ -187,12 +233,15 @@ impl PyGraph {
                 Ok(result_dict.to_object(py))
             } else if let Ok(single_node) = nodes_input.extract::<NodeId>() {
                 // Handle single node
-                let out_degree = py.allow_threads(|| {
-                    self.inner
+                let out_degree = {
+                    let graph_ref = self.graph.borrow(py);
+                    let result = graph_ref.inner
                         .borrow()
                         .out_degree(single_node)
-                        .map_err(graph_error_to_py_err)
-                })?;
+                        .map_err(graph_error_to_py_err);
+                    drop(graph_ref);
+                    result
+                }?;
                 
                 Ok(out_degree.to_object(py))
             } else {
@@ -202,16 +251,24 @@ impl PyGraph {
             }
         } else {
             // Return out-degree for all nodes
-            let all_nodes = self.inner.borrow().node_ids();
+            let all_nodes = {
+                let graph_ref = self.graph.borrow(py);
+                let nodes = graph_ref.inner.borrow().node_ids();
+                drop(graph_ref);
+                nodes
+            };
             let result_dict = PyDict::new(py);
             
             for node in all_nodes {
-                let out_degree = py.allow_threads(|| {
-                    self.inner
+                let out_degree = {
+                    let graph_ref = self.graph.borrow(py);
+                    let result = graph_ref.inner
                         .borrow()
                         .out_degree(node)
-                        .map_err(graph_error_to_py_err)
-                })?;
+                        .map_err(graph_error_to_py_err);
+                    drop(graph_ref);
+                    result
+                }?;
                 
                 result_dict.set_item(node, out_degree)?;
             }
@@ -221,7 +278,7 @@ impl PyGraph {
     }
 
     /// Get neighborhood sampling - PURE DELEGATION to core
-    fn neighborhood(
+    pub fn neighborhood(
         &mut self,
         py: Python,
         center_nodes: Vec<NodeId>,
@@ -231,19 +288,79 @@ impl PyGraph {
         let radius = radius.unwrap_or(1);
         let max_nodes = max_nodes.unwrap_or(100);
 
-        // DELEGATION: Use core neighborhood implementation (graph.rs:1366)
-        let result = py.allow_threads(|| {
-            self.inner
-                .borrow_mut()
-                .neighborhood(&center_nodes, radius, max_nodes)
-                .map_err(graph_error_to_py_err)
-        })?;
+        // DELEGATION: Choose appropriate core method based on input parameters
+        let result = {
+            match center_nodes.len() {
+                0 => Err(GraphError::EmptyGraph {
+                    operation: "neighborhood: No center nodes provided".to_string(),
+                }),
+                1 => {
+                    let node_id = center_nodes[0];
+                    if radius == 1 {
+                        // Single node, 1-hop: use single_neighborhood
+                        let graph_ref = self.graph.borrow_mut(py);
+                        let result = graph_ref.inner.borrow_mut().neighborhood(node_id)
+                            .map(|subgraph| {
+                                let size = subgraph.node_set().len();
+                                groggy::core::neighborhood::NeighborhoodResult {
+                                    neighborhoods: vec![subgraph],
+                                    total_neighborhoods: 1,
+                                    largest_neighborhood_size: size,
+                                    execution_time: std::time::Duration::from_millis(0),
+                                }
+                            });
+                        drop(graph_ref);
+                        result
+                    } else {
+                        // Single node, k-hop: use k_hop_neighborhood  
+                        let graph_ref = self.graph.borrow_mut(py);
+                        let result = graph_ref.inner.borrow_mut().k_hop_neighborhood(node_id, radius)
+                            .map(|subgraph| {
+                                let size = subgraph.node_set().len();
+                                groggy::core::neighborhood::NeighborhoodResult {
+                                    neighborhoods: vec![subgraph],
+                                    total_neighborhoods: 1,
+                                    largest_neighborhood_size: size,
+                                    execution_time: std::time::Duration::from_millis(0),
+                                }
+                            });
+                        drop(graph_ref);
+                        result
+                    }
+                },
+                _ => {
+                    if radius == 1 {
+                        // Multiple nodes, 1-hop: use multi_neighborhood
+                        let graph_ref = self.graph.borrow_mut(py);
+                        let result = graph_ref.inner.borrow_mut().multi_neighborhood(&center_nodes);
+                        drop(graph_ref);
+                        result
+                    } else {
+                        // Multiple nodes, k-hop: use unified_neighborhood
+                        let graph_ref = self.graph.borrow_mut(py);
+                        let result = graph_ref.inner.borrow_mut().unified_neighborhood(&center_nodes, radius)
+                            .map(|subgraph| {
+                                let size = subgraph.node_set().len();
+                                groggy::core::neighborhood::NeighborhoodResult {
+                                    neighborhoods: vec![subgraph],
+                                    total_neighborhoods: 1,
+                                    largest_neighborhood_size: size,
+                                    execution_time: std::time::Duration::from_millis(0),
+                                }
+                            });
+                        drop(graph_ref);
+                        result
+                    }
+                }
+            }
+            .map_err(graph_error_to_py_err)
+        }?;
 
-        Ok(PyNeighborhoodResult::from_core_result(result))
+        Ok(PyNeighborhoodResult { inner: result })
     }
 
     /// Get shortest path - PURE DELEGATION to core
-    fn shortest_path(
+    pub fn shortest_path(
         &self,
         py: Python,
         source: NodeId,
@@ -252,25 +369,25 @@ impl PyGraph {
         inplace: Option<bool>,
         attr_name: Option<String>,
     ) -> PyResult<PyObject> {
-        // DELEGATION: Use core shortest_path implementation (graph.rs:1311 + traversal.rs:323)
-        let path = py.allow_threads(|| {
-            if let Some(weight_attr) = weight_attribute {
-                // Weighted shortest path
-                self.inner
-                    .borrow()
-                    .shortest_path_weighted(source, target, &weight_attr)
-                    .map_err(graph_error_to_py_err)
-            } else {
-                // Unweighted shortest path
-                self.inner
-                    .borrow()
-                    .shortest_path(source, target)
-                    .map_err(graph_error_to_py_err)
-            }
-        })?;
+        // DELEGATION: Use core shortest_path implementation with proper options
+        let path = {
+            let options = groggy::core::traversal::PathFindingOptions {
+                weight_attribute: weight_attribute,
+                max_path_length: None,
+                heuristic: None,
+            };
+            
+            let graph_ref = self.graph.borrow_mut(py);
+            let result = graph_ref.inner
+                .borrow_mut()
+                .shortest_path(source, target, options)
+                .map_err(graph_error_to_py_err);
+            drop(graph_ref);
+            result
+        }?;
 
         match path {
-            Some(path_nodes) => Ok(PyList::new(py, path_nodes).to_object(py)),
+            Some(path) => Ok(PyList::new(py, path.nodes).to_object(py)),
             None => Ok(py.None()),
         }
     }

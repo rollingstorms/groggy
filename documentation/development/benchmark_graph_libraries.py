@@ -253,7 +253,7 @@ class GroggyPhase3Benchmark:
         
         # Set ALL node attributes in a single optimized bulk operation
         if bulk_attrs_dict:
-            self.graph.set_node_attributes(bulk_attrs_dict)
+            self.graph.set_node_attrs(bulk_attrs_dict)
         
         # Use bulk edge creation for better performance
         # 🔧 DEDUPLICATE EDGES: NetworkX automatically deduplicates, so we should too
@@ -307,7 +307,7 @@ class GroggyPhase3Benchmark:
         
         # Set ALL edge attributes in a single optimized bulk operation
         if bulk_edge_attrs_dict:
-            self.graph.set_edge_attributes(bulk_edge_attrs_dict)
+            self.graph.set_edge_attrs(bulk_edge_attrs_dict)
         
         self.creation_time = time.time() - start
         end_memory = get_memory_usage()
@@ -370,14 +370,14 @@ class GroggyPhase3Benchmark:
         """Test BFS traversal"""
         start = time.time()
         start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
-        result = self.graph.analytics.bfs(start_node=start_node, max_depth=3)
+        result = self.graph.bfs(start_node=start_node, max_depth=3)
         return time.time() - start, len(result.nodes)
     
     def traversal_dfs(self):
         """Test DFS traversal"""
         start = time.time()
         start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
-        result = self.graph.analytics.dfs(start_node=start_node, max_depth=3)
+        result = self.graph.dfs(start_node=start_node, max_depth=3)
         return time.time() - start, len(result.nodes)
     
     def traversal_bfs_filtered(self):
@@ -386,13 +386,13 @@ class GroggyPhase3Benchmark:
         start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
         # Note: filtered traversal is not yet supported in analytics module
         # Fall back to basic BFS for now
-        result = self.graph.analytics.bfs(start_node=start_node, max_depth=2)
+        result = self.graph.bfs(start_node=start_node, max_depth=2)
         return time.time() - start, len(result.nodes)
     
     def connected_components(self):
         """Test connected components analysis"""
         start = time.time()
-        result = self.graph.analytics.connected_components()
+        result = self.graph.connected_components()
         return time.time() - start, len(result)
     
     # Phase 3.4: Aggregation & Analytics Tests

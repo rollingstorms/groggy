@@ -1,6 +1,6 @@
-//! Graph Attribute Operations - Pure FFI Delegation Layer
+//! Graph Attribute Operations - Specialized Wrapper Class
 //!
-//! This module contains attribute-related operations that delegate to core implementations.
+//! This module contains PyGraphAttr class that handles all attribute operations.
 
 use crate::ffi::types::{PyAttrValue, PyResultHandle};
 use crate::ffi::utils::{python_value_to_attr_value, graph_error_to_py_err};
@@ -12,77 +12,109 @@ use std::collections::HashMap;
 
 use super::graph::PyGraph;
 
-#[pymethods]
-impl PyGraph {
+/// Internal helper for graph attribute operations (not exposed to Python)
+pub struct PyGraphAttr {
+    pub graph: Py<PyGraph>,
+}
+
+impl PyGraphAttr {
+    /// Create new PyGraphAttr instance
+    pub fn new(graph: Py<PyGraph>) -> PyResult<PyGraphAttr> {
+        Ok(PyGraphAttr { graph })
+    }
+
     /// Set single node attribute - delegates to core
-    pub fn set_node_attr(&mut self, node: NodeId, attr: AttrName, value: &PyAny) -> PyResult<()> {
+    pub fn set_node_attr(&mut self, py: Python, node: NodeId, attr: String, value: &PyAny) -> PyResult<()> {
         let attr_value = python_value_to_attr_value(value)?;
-        self.inner
+        self.graph.borrow_mut(py).inner
             .borrow_mut()
             .set_node_attr(node, attr, attr_value)
             .map_err(graph_error_to_py_err)
     }
 
+    /// Get single node attribute - delegates to core
+    pub fn get_node_attr(&self, py: Python, node: NodeId, attr: String, default: Option<&PyAny>) -> PyResult<PyObject> {
+        use crate::ffi::types::PyAttrValue;
+        match self.graph.borrow(py).inner.borrow().get_node_attr(node, &attr) {
+            Ok(Some(attr_value)) => {
+                let py_attr_value = PyAttrValue::new(attr_value);
+                Ok(py_attr_value.to_object(py))
+            }
+            Ok(None) => {
+                if let Some(default_val) = default {
+                    Ok(default_val.to_object(py))
+                } else {
+                    Ok(py.None())
+                }
+            }
+            Err(e) => Err(graph_error_to_py_err(e)),
+        }
+    }
+
     /// Set single edge attribute - delegates to core
-    pub fn set_edge_attr(&mut self, edge: EdgeId, attr: AttrName, value: &PyAny) -> PyResult<()> {
+    pub fn set_edge_attr(&mut self, py: Python, edge: EdgeId, attr: String, value: &PyAny) -> PyResult<()> {
         let attr_value = python_value_to_attr_value(value)?;
-        self.inner
+        self.graph.borrow_mut(py).inner
             .borrow_mut()
             .set_edge_attr(edge, attr, attr_value)
             .map_err(graph_error_to_py_err)
     }
 
-    /// Get single node attribute - delegates to core
-    pub fn get_node_attr(
-        &self,
-        node: NodeId,
-        attr: AttrName,
-        default: Option<&PyAny>,
-        py: Python,
-    ) -> PyResult<PyObject> {
-        match self.inner.borrow().get_node_attr(node, &attr) {
-            Ok(Some(attr_value)) => {
-                let py_attr_value = PyAttrValue::new(attr_value);
-                Ok(py_attr_value.to_object(py))
-            }
-            Ok(None) => match default {
-                Some(default_value) => Ok(default_value.to_object(py)),
-                None => Err(PyKeyError::new_err(format!(
-                    "Attribute '{}' not found for node {}",
-                    attr, node
-                ))),
-            },
-            Err(e) => Err(graph_error_to_py_err(e)),
-        }
-    }
-
     /// Get single edge attribute - delegates to core
-    pub fn get_edge_attr(
-        &self,
-        edge: EdgeId,
-        attr: AttrName,
-        default: Option<&PyAny>,
-        py: Python,
-    ) -> PyResult<PyObject> {
-        match self.inner.borrow().get_edge_attr(edge, &attr) {
+    pub fn get_edge_attr(&self, py: Python, edge: EdgeId, attr: String, default: Option<&PyAny>) -> PyResult<PyObject> {
+        use crate::ffi::types::PyAttrValue;
+        match self.graph.borrow(py).inner.borrow().get_edge_attr(edge, &attr) {
             Ok(Some(attr_value)) => {
                 let py_attr_value = PyAttrValue::new(attr_value);
                 Ok(py_attr_value.to_object(py))
             }
-            Ok(None) => match default {
-                Some(default_value) => Ok(default_value.to_object(py)),
-                None => Err(PyKeyError::new_err(format!(
-                    "Attribute '{}' not found for edge {}",
-                    attr, edge
-                ))),
-            },
+            Ok(None) => {
+                if let Some(default_val) = default {
+                    Ok(default_val.to_object(py))
+                } else {
+                    Ok(py.None())
+                }
+            }
             Err(e) => Err(graph_error_to_py_err(e)),
         }
     }
 
+    /// Check if node has specific attribute - delegates to core
+    pub fn has_node_attribute(&self, py: Python, node_id: NodeId, attr_name: &str) -> bool {
+        self.graph.borrow(py).inner.borrow().get_node_attr(node_id, &attr_name.to_string())
+            .map(|opt| opt.is_some())
+            .unwrap_or(false)
+    }
+
+    /// Check if edge has specific attribute - delegates to core
+    pub fn has_edge_attribute(&self, py: Python, edge_id: EdgeId, attr_name: &str) -> bool {
+        self.graph.borrow(py).inner.borrow().get_edge_attr(edge_id, &attr_name.to_string())
+            .map(|opt| opt.is_some())
+            .unwrap_or(false)
+    }
+
+    /// Get all attribute keys for a node - delegates to core
+    pub fn node_attribute_keys(&self, py: Python, node_id: NodeId) -> Vec<String> {
+        self.graph.borrow(py).inner.borrow()
+            .get_node_attrs(node_id)
+            .map(|attrs| attrs.keys().cloned().collect())
+            .unwrap_or_else(|_| vec![])
+    }
+
+    /// Get all attribute keys for an edge - delegates to core
+    pub fn edge_attribute_keys(&self, py: Python, edge_id: EdgeId) -> Vec<String> {
+        self.graph.borrow(py).inner.borrow()
+            .get_edge_attrs(edge_id)
+            .map(|attrs| attrs.keys().cloned().collect())
+            .unwrap_or_else(|_| vec![])
+    }
+}
+
+// Helper methods for internal use (not exposed to Python)
+impl PyGraphAttr {
     /// Get all attributes for a single edge - delegates to core
-    fn get_edge_attrs(&self, edge: EdgeId, py: Python) -> PyResult<PyObject> {
-        let result = self.inner
+    pub fn get_edge_attrs_internal(&self, py: Python, edge: EdgeId) -> PyResult<PyObject> {
+        let result = self.graph.borrow(py).inner
             .borrow()
             .get_edge_attrs(edge)
             .map_err(graph_error_to_py_err)?;
@@ -96,8 +128,9 @@ impl PyGraph {
         Ok(py_dict.to_object(py))
     }
 
+
     /// Set bulk node attributes - HYPER-OPTIMIZED core delegation
-    fn set_node_attrs(&mut self, _py: Python, attrs_dict: &PyDict) -> PyResult<()> {
+    pub fn set_node_attrs_internal(&mut self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         use groggy::AttrValue as RustAttrValue;
         use pyo3::exceptions::{PyKeyError, PyValueError};
 
@@ -136,18 +169,18 @@ impl PyGraph {
         }
 
         // DELEGATION: Use core bulk operation
-        self.inner
+        self.graph.borrow_mut(py).inner
             .borrow_mut()
             .set_node_attrs(rust_attrs)
             .map_err(graph_error_to_py_err)
     }
 
     /// Get bulk node attributes - HYPER-OPTIMIZED core delegation  
-    fn get_node_attrs(&self, py: Python, nodes: Vec<NodeId>, attrs: Vec<AttrName>) -> PyResult<PyObject> {
+    pub fn get_node_attrs_internal(&self, py: Python, nodes: Vec<NodeId>, attrs: Vec<AttrName>) -> PyResult<PyObject> {
         use groggy::AttrValue as RustAttrValue;
         
         // HYPER-OPTIMIZED bulk attribute retrieval - leverages columnar storage
-        let result = self.inner
+        let result = self.graph.borrow(py).inner
             .borrow()
             .get_node_attrs_bulk(nodes, attrs)
             .map_err(graph_error_to_py_err)?;
@@ -183,7 +216,7 @@ impl PyGraph {
     }
 
     /// Set bulk edge attributes - HYPER-OPTIMIZED core delegation
-    fn set_edge_attrs(&mut self, _py: Python, attrs_dict: &PyDict) -> PyResult<()> {
+    pub fn set_edge_attrs_internal(&mut self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         use groggy::AttrValue as RustAttrValue;
         use pyo3::exceptions::{PyKeyError, PyValueError};
 
@@ -222,39 +255,53 @@ impl PyGraph {
         }
 
         // DELEGATION: Use core bulk operation
-        self.inner
+        self.graph.borrow_mut(py).inner
             .borrow_mut()
             .set_edge_attrs(rust_attrs)
             .map_err(graph_error_to_py_err)
     }
 
-    /// Check if node has specific attribute - delegates to core
-    pub fn has_node_attribute(&self, node_id: NodeId, attr_name: &str) -> bool {
-        self.inner.borrow().get_node_attr(node_id, attr_name)
-            .map(|opt| opt.is_some())
-            .unwrap_or(false)
+
+
+
+    /// Get bulk edge attributes - HYPER-OPTIMIZED core delegation
+    pub fn get_edge_attrs_bulk_internal(&self, py: Python, edges: Vec<EdgeId>, attrs: Vec<String>) -> PyResult<PyObject> {
+        use groggy::AttrValue as RustAttrValue;
+
+        // HYPER-OPTIMIZED bulk attribute retrieval - leverages columnar storage
+        let result = self.graph.borrow(py).inner
+            .borrow()
+            .get_edge_attrs_bulk(edges, attrs)
+            .map_err(graph_error_to_py_err)?;
+        
+        // Convert Rust result to Python dictionary
+        // Format: {edge_id: {attr_name: AttrValue}}
+        let py_dict = PyDict::new(py);
+        for (edge_id, edge_attrs) in result {
+            let edge_dict = PyDict::new(py);
+            for (attr_name, attr_value) in edge_attrs {
+                let py_attr_value = match attr_value {
+                    RustAttrValue::Text(s) => Py::new(py, PyAttrValue { inner: RustAttrValue::Text(s) })?,
+                    RustAttrValue::Int(i) => Py::new(py, PyAttrValue { inner: RustAttrValue::Int(i) })?,
+                    RustAttrValue::Float(f) => Py::new(py, PyAttrValue { inner: RustAttrValue::Float(f) })?,
+                    RustAttrValue::Bool(b) => Py::new(py, PyAttrValue { inner: RustAttrValue::Bool(b) })?,
+                    RustAttrValue::FloatVec(arr) => Py::new(py, PyAttrValue { inner: RustAttrValue::FloatVec(arr) })?,
+                    RustAttrValue::CompactText(ct) => Py::new(py, PyAttrValue { inner: RustAttrValue::CompactText(ct) })?,
+                    RustAttrValue::SmallInt(si) => Py::new(py, PyAttrValue { inner: RustAttrValue::SmallInt(si) })?,
+                    RustAttrValue::CompressedText(ct) => Py::new(py, PyAttrValue { inner: RustAttrValue::CompressedText(ct) })?,
+                    RustAttrValue::CompressedFloatVec(cfv) => Py::new(py, PyAttrValue { inner: RustAttrValue::CompressedFloatVec(cfv) })?,
+                    RustAttrValue::Null => Py::new(py, PyAttrValue { inner: RustAttrValue::Null })?,
+                    RustAttrValue::SubgraphRef(sr) => Py::new(py, PyAttrValue { inner: RustAttrValue::SubgraphRef(sr) })?,
+                    RustAttrValue::NodeArray(na) => Py::new(py, PyAttrValue { inner: RustAttrValue::NodeArray(na) })?,
+                    RustAttrValue::EdgeArray(ea) => Py::new(py, PyAttrValue { inner: RustAttrValue::EdgeArray(ea) })?,
+                    RustAttrValue::Bytes(bytes) => Py::new(py, PyAttrValue { inner: RustAttrValue::Bytes(bytes) })?,
+                };
+                edge_dict.set_item(attr_name, py_attr_value)?;
+            }
+            py_dict.set_item(edge_id, edge_dict)?;
+        }
+        
+        Ok(py_dict.to_object(py))
     }
 
-    /// Check if edge has specific attribute - delegates to core  
-    pub fn has_edge_attribute(&self, edge_id: EdgeId, attr_name: &str) -> bool {
-        self.inner.borrow().get_edge_attr(edge_id, attr_name)
-            .map(|opt| opt.is_some())
-            .unwrap_or(false)
-    }
-
-    /// Get all attribute keys for a node - delegates to core
-    pub fn node_attribute_keys(&self, node_id: NodeId) -> Vec<String> {
-        self.inner.borrow()
-            .get_node_attrs(node_id)
-            .map(|attrs| attrs.keys().cloned().collect())
-            .unwrap_or_else(|_| vec![])
-    }
-
-    /// Get all attribute keys for an edge - delegates to core
-    pub fn edge_attribute_keys(&self, edge_id: EdgeId) -> Vec<String> {
-        self.inner.borrow()
-            .get_edge_attrs(edge_id)
-            .map(|attrs| attrs.keys().cloned().collect())
-            .unwrap_or_else(|_| vec![])
-    }
 }

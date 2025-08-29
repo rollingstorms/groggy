@@ -149,6 +149,14 @@ impl AttributeColumn {
         }
     }
 
+    /// Create a new attribute column with pre-allocated capacity
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            values: Vec::with_capacity(capacity),
+            memory_pool: AttributeMemoryPool::new(),
+        }
+    }
+
     /// Append a new value and return its index
     ///
     /// PERFORMANCE: O(1) amortized append with memory optimization
@@ -216,6 +224,22 @@ impl AttributeColumn {
         let pool_overhead = std::mem::size_of::<AttributeMemoryPool>();
 
         base_size + values_size + pool_overhead
+    }
+
+    /// Ensure the column can address up to the given index (sparse indexing support)
+    pub fn ensure_len(&mut self, min_len: usize) {
+        if self.values.len() < min_len {
+            self.values.resize(min_len, AttrValue::Null);
+        }
+    }
+
+    /// Set value at a specific index (for node/edge ID indexing)
+    pub fn set(&mut self, index: usize, value: AttrValue) {
+        if index >= self.values.len() {
+            self.ensure_len(index + 1);
+        }
+        let optimized_value = value.optimize();
+        self.values[index] = optimized_value;
     }
 }
 
@@ -650,7 +674,12 @@ impl GraphPool {
 
     /// Set a specific attribute for a node
     pub fn set_node_attribute(&mut self, node_id: NodeId, attr_name: AttrName, value: AttrValue) -> GraphResult<()> {
-        self.set_attr(attr_name, value, true);
+        // Ensure the column exists and can address node_id
+        let column = self.node_attributes
+            .entry(attr_name.clone())
+            .or_insert_with(|| AttributeColumn::with_capacity(self.next_node_id));
+        column.ensure_len(self.next_node_id);  // Grow to current size
+        column.set(node_id, value);            // Write per-node value
         Ok(())
     }
 
@@ -679,7 +708,12 @@ impl GraphPool {
 
     /// Set a specific attribute for an edge
     pub fn set_edge_attribute(&mut self, edge_id: EdgeId, attr_name: AttrName, value: AttrValue) -> GraphResult<()> {
-        self.set_attr(attr_name, value, false);
+        // Ensure the column exists and can address edge_id
+        let column = self.edge_attributes
+            .entry(attr_name.clone())
+            .or_insert_with(|| AttributeColumn::with_capacity(self.next_edge_id));
+        column.ensure_len(self.next_edge_id);  // Grow to current size
+        column.set(edge_id, value);            // Write per-edge value
         Ok(())
     }
 

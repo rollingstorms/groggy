@@ -311,20 +311,34 @@ class Graph:
     
     def set_node_attributes(self, attrs: Dict[AttrName, List[Tuple[NodeId, AttrValue]]]) -> None:
         """
-        Set multiple attributes on multiple nodes efficiently.
+        DEPRECATED: Use set_node_attrs() instead for 3-5x better performance.
+        
+        This method will be removed in v0.4.0. The new set_node_attrs() method
+        provides significantly better performance through columnar bulk operations.
         
         Args:
             attrs: Dictionary mapping attribute names to lists of (node_id, value) pairs
             
-        Example:
-            graph.set_node_attributes({
+        Migration Example:
+            OLD: graph.set_node_attributes({
                 "name": [(1, AttrValue("Alice")), (2, AttrValue("Bob"))],
                 "age": [(1, AttrValue(25)), (2, AttrValue(30))]
+            })
+            NEW: graph.set_node_attrs({
+                "name": {"nodes": [1, 2], "values": ["Alice", "Bob"], "value_type": "text"},
+                "age": {"nodes": [1, 2], "values": [25, 30], "value_type": "int"}
             })
             
         Raises:
             NodeNotFoundError: If any node doesn't exist
         """
+        import warnings
+        warnings.warn(
+            "set_node_attributes() is deprecated and will be removed in v0.4.0. "
+            "Use set_node_attrs() for 3-5x better performance with columnar operations.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         # Convert Python AttrValue objects to Rust AttrValue objects
         rust_attrs = {}
         for attr_name, pairs in attrs.items():
@@ -344,20 +358,34 @@ class Graph:
     
     def set_edge_attributes(self, attrs: Dict[AttrName, List[Tuple[EdgeId, AttrValue]]]) -> None:
         """
-        Set multiple attributes on multiple edges efficiently.
+        DEPRECATED: Use set_edge_attrs() instead for 3-5x better performance.
+        
+        This method will be removed in v0.4.0. The new set_edge_attrs() method
+        provides significantly better performance through columnar bulk operations.
         
         Args:
             attrs: Dictionary mapping attribute names to lists of (edge_id, value) pairs
             
-        Example:
-            graph.set_edge_attributes({
+        Migration Example:
+            OLD: graph.set_edge_attributes({
                 "weight": [(1, AttrValue(0.9)), (2, AttrValue(0.8))],
                 "type": [(1, AttrValue("friend")), (2, AttrValue("colleague"))]
+            })
+            NEW: graph.set_edge_attrs({
+                "weight": {"edges": [1, 2], "values": [0.9, 0.8], "value_type": "float"},
+                "type": {"edges": [1, 2], "values": ["friend", "colleague"], "value_type": "text"}
             })
             
         Raises:
             EdgeNotFoundError: If any edge doesn't exist
         """
+        import warnings
+        warnings.warn(
+            "set_edge_attributes() is deprecated and will be removed in v0.4.0. "
+            "Use set_edge_attrs() for 3-5x better performance with columnar operations.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         # Convert Python AttrValue objects to Rust AttrValue objects
         rust_attrs = {}
         for attr_name, pairs in attrs.items():

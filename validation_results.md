@@ -1,6 +1,6 @@
 # Groggy Documentation Validation Report
 
-Generated: 2025-08-22 20:21:04
+Generated: 2025-08-28 20:53:08
 
 ## Summary
 

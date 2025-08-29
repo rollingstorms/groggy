@@ -125,39 +125,8 @@ pub fn parse_edge_query(query: &str) -> PyResult<PyEdgeFilter> {
     Ok(PyEdgeFilter { inner: filter })
 }
 
-/// Validate a node query string (stateless)
-#[pyfunction]
-pub fn validate_node_query(query: &str) -> bool {
-    let mut parser = QueryParser::new();
-    parser.parse_node_query(query).is_ok()
-}
-
-/// Validate an edge query string (stateless)
-#[pyfunction]
-pub fn validate_edge_query(query: &str) -> bool {
-    let mut parser = QueryParser::new();
-    parser.parse_edge_query(query).is_ok()
-}
-
-/// Get error details for a node query (stateless)
-#[pyfunction]
-pub fn get_node_query_error(query: &str) -> Option<String> {
-    let mut parser = QueryParser::new();
-    match parser.parse_node_query(query) {
-        Ok(_) => None,
-        Err(e) => Some(e.to_string()),
-    }
-}
-
-/// Get error details for an edge query (stateless)
-#[pyfunction]  
-pub fn get_edge_query_error(query: &str) -> Option<String> {
-    let mut parser = QueryParser::new();
-    match parser.parse_edge_query(query) {
-        Ok(_) => None,
-        Err(e) => Some(e.to_string()),
-    }
-}
+// Note: Removed duplicate validation and error functions as they were unused
+// The PyQueryParser class methods provide the same functionality if needed
 
 #[cfg(test)]
 mod tests {
@@ -185,20 +154,22 @@ mod tests {
     }
 
     #[test]
-    fn test_validation_functions() {
-        assert!(validate_node_query("salary > 100000"));
-        assert!(validate_node_query("name == 'test'"));
-        assert!(!validate_node_query("invalid >>"));
-        assert!(!validate_node_query(""));
+    fn test_validation_methods() {
+        let mut parser = PyQueryParser::new();
+        assert!(parser.validate_node_query("salary > 100000"));
+        assert!(parser.validate_node_query("name == 'test'"));
+        assert!(!parser.validate_node_query("invalid >>"));
+        assert!(!parser.validate_node_query(""));
     }
 
     #[test] 
-    fn test_error_reporting() {
-        let error = get_node_query_error("salary >");
+    fn test_error_reporting_methods() {
+        let mut parser = PyQueryParser::new();
+        let error = parser.get_node_query_error("salary >");
         assert!(error.is_some());
         assert!(error.unwrap().contains("Expected"));
         
-        let error = get_node_query_error("salary > 100000");
+        let error = parser.get_node_query_error("salary > 100000");
         assert!(error.is_none());
     }
 
