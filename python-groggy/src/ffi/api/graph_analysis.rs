@@ -110,18 +110,114 @@ impl PyGraph {
         }
     }
 
-    /// Get in-degree of nodes - MISSING FROM CORE (needs implementation)
+    /// Get in-degree of nodes - PURE DELEGATION to core
     fn in_degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "in_degree needs to be implemented in core first"
-        ))
+        if let Some(nodes_input) = nodes {
+            // Handle multiple nodes
+            if let Ok(node_list) = nodes_input.extract::<Vec<NodeId>>() {
+                let result_dict = PyDict::new(py);
+                
+                for node in node_list {
+                    // DELEGATION: Use core in_degree implementation
+                    let in_degree = py.allow_threads(|| {
+                        self.inner
+                            .borrow()
+                            .in_degree(node)
+                            .map_err(graph_error_to_py_err)
+                    })?;
+                    
+                    result_dict.set_item(node, in_degree)?;
+                }
+                
+                Ok(result_dict.to_object(py))
+            } else if let Ok(single_node) = nodes_input.extract::<NodeId>() {
+                // Handle single node
+                let in_degree = py.allow_threads(|| {
+                    self.inner
+                        .borrow()
+                        .in_degree(single_node)
+                        .map_err(graph_error_to_py_err)
+                })?;
+                
+                Ok(in_degree.to_object(py))
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "nodes must be a NodeId or list of NodeIds"
+                ))
+            }
+        } else {
+            // Return in-degree for all nodes
+            let all_nodes = self.inner.borrow().node_ids();
+            let result_dict = PyDict::new(py);
+            
+            for node in all_nodes {
+                let in_degree = py.allow_threads(|| {
+                    self.inner
+                        .borrow()
+                        .in_degree(node)
+                        .map_err(graph_error_to_py_err)
+                })?;
+                
+                result_dict.set_item(node, in_degree)?;
+            }
+            
+            Ok(result_dict.to_object(py))
+        }
     }
 
-    /// Get out-degree of nodes - MISSING FROM CORE (needs implementation)
+    /// Get out-degree of nodes - PURE DELEGATION to core
     fn out_degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "out_degree needs to be implemented in core first"
-        ))
+        if let Some(nodes_input) = nodes {
+            // Handle multiple nodes
+            if let Ok(node_list) = nodes_input.extract::<Vec<NodeId>>() {
+                let result_dict = PyDict::new(py);
+                
+                for node in node_list {
+                    // DELEGATION: Use core out_degree implementation
+                    let out_degree = py.allow_threads(|| {
+                        self.inner
+                            .borrow()
+                            .out_degree(node)
+                            .map_err(graph_error_to_py_err)
+                    })?;
+                    
+                    result_dict.set_item(node, out_degree)?;
+                }
+                
+                Ok(result_dict.to_object(py))
+            } else if let Ok(single_node) = nodes_input.extract::<NodeId>() {
+                // Handle single node
+                let out_degree = py.allow_threads(|| {
+                    self.inner
+                        .borrow()
+                        .out_degree(single_node)
+                        .map_err(graph_error_to_py_err)
+                })?;
+                
+                Ok(out_degree.to_object(py))
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "nodes must be a NodeId or list of NodeIds"
+                ))
+            }
+        } else {
+            // Return out-degree for all nodes
+            let all_nodes = self.inner.borrow().node_ids();
+            let result_dict = PyDict::new(py);
+            
+            for node in all_nodes {
+                let out_degree = py.allow_threads(|| {
+                    self.inner
+                        .borrow()
+                        .out_degree(node)
+                        .map_err(graph_error_to_py_err)
+                })?;
+                
+                result_dict.set_item(node, out_degree)?;
+            }
+            
+            Ok(result_dict.to_object(py))
+        }
     }
 
     /// Get neighborhood sampling - PURE DELEGATION to core

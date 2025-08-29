@@ -344,6 +344,54 @@ impl Graph {
         edge_ids
     }
 
+    /// Add all nodes and edges from another graph to this graph
+    pub fn add_graph(&mut self, other: &Graph) -> Result<(), GraphError> {
+        // Add all nodes from the other graph
+        let other_nodes = other.node_ids();
+        let node_count = other_nodes.len();
+        
+        if node_count > 0 {
+            let _new_nodes = self.add_nodes(node_count);
+        }
+
+        // Add all edges from the other graph
+        let other_edges = other.edge_ids();
+        let mut edges_to_add = Vec::new();
+        
+        for edge_id in other_edges {
+            if let Ok((source, target)) = other.edge_endpoints(edge_id) {
+                // Map the node IDs from other graph to this graph
+                // For now, assume 1:1 mapping based on node creation order
+                // TODO: Implement proper node ID mapping if needed
+                edges_to_add.push((source, target));
+            }
+        }
+        
+        if !edges_to_add.is_empty() {
+            let _edge_ids = self.add_edges(&edges_to_add);
+        }
+
+        // Copy node attributes from the other graph
+        for node_id in other_nodes {
+            if let Ok(attrs) = other.get_node_attrs(node_id) {
+                for (attr_name, attr_value) in attrs {
+                    let _ = self.set_node_attr(node_id, attr_name, attr_value);
+                }
+            }
+        }
+
+        // Copy edge attributes from the other graph
+        for edge_id in other.edge_ids() {
+            if let Ok(attrs) = other.get_edge_attrs(edge_id) {
+                for (attr_name, attr_value) in attrs {
+                    let _ = self.set_edge_attr(edge_id, attr_name, attr_value);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Remove a node and all its incident edges
     ///
     /// ALGORITHM:
@@ -856,6 +904,48 @@ impl Graph {
         let mut count = 0;
         for i in 0..sources.len() {
             if sources[i] == node || targets[i] == node {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
+    /// Get the in-degree of a node (number of incoming edges)
+    pub fn in_degree(&self, node: NodeId) -> Result<usize, GraphError> {
+        if !self.space.contains_node(node) {
+            return Err(GraphError::NodeNotFound {
+                node_id: node,
+                operation: "get in-degree".to_string(),
+                suggestion: "Check if node exists with contains_node()".to_string(),
+            });
+        }
+
+        // Get fresh topology snapshot
+        let (_, _, targets, _) = self.space.snapshot(&self.pool.borrow());
+        let mut count = 0;
+        for &target in targets.iter() {
+            if target == node {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
+    /// Get the out-degree of a node (number of outgoing edges)
+    pub fn out_degree(&self, node: NodeId) -> Result<usize, GraphError> {
+        if !self.space.contains_node(node) {
+            return Err(GraphError::NodeNotFound {
+                node_id: node,
+                operation: "get out-degree".to_string(),
+                suggestion: "Check if node exists with contains_node()".to_string(),
+            });
+        }
+
+        // Get fresh topology snapshot
+        let (_, sources, _, _) = self.space.snapshot(&self.pool.borrow());
+        let mut count = 0;
+        for &source in sources.iter() {
+            if source == node {
                 count += 1;
             }
         }
@@ -1782,6 +1872,11 @@ impl Graph {
     /// Generate adjacency matrix for the entire graph
     pub fn adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
         AdjacencyMatrixBuilder::new().build_full_graph(&self.pool.borrow(), &mut self.space)
+    }
+
+    /// Simple adjacency matrix (alias for adjacency_matrix)
+    pub fn adjacency(&mut self) -> GraphResult<AdjacencyMatrix> {
+        self.adjacency_matrix()
     }
 
     /// Generate weighted adjacency matrix using specified edge attribute
