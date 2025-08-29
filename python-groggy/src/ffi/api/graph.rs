@@ -70,15 +70,37 @@ fn adjacency_matrix_to_py_graph_matrix(
     ))
 }
 
-// Helper function to extract matrix from AdjacencyMatrix and wrap appropriately
-fn adjacency_matrix_to_py_object(
-    _py: Python,
-    _matrix: groggy::AdjacencyMatrixResult,
-) -> PyResult<PyObject> {
-    // TODO: Implement adjacency matrix to Python object conversion in Phase 2
-    Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-        "Adjacency matrix functionality temporarily disabled during Phase 2 unification",
-    ))
+/// Convert AdjacencyMatrix to Python object - DELEGATION helper
+impl PyGraph {
+    fn adjacency_matrix_to_py_object(
+        &self,
+        py: Python,
+        matrix: groggy::AdjacencyMatrix,
+    ) -> PyResult<PyObject> {
+        use crate::ffi::core::matrix::PyGraphMatrix;
+        use pyo3::types::PyDict;
+        
+        // Create metadata dict
+        let result_dict = PyDict::new(py);
+        result_dict.set_item("size", matrix.size)?;
+        result_dict.set_item("is_sparse", matrix.data.is_sparse())?;
+        result_dict.set_item("type", "adjacency_matrix")?;
+        
+        // Convert to GraphMatrix for structured access
+        match self.adjacency_matrix_to_graph_matrix(matrix) {
+            Ok(graph_matrix) => {
+                let py_matrix = PyGraphMatrix { inner: graph_matrix };
+                result_dict.set_item("matrix", Py::new(py, py_matrix)?)?;
+            }
+            Err(_) => {
+                // Fallback to basic matrix representation
+                result_dict.set_item("matrix", py.None())?;
+                result_dict.set_item("error", "Matrix conversion failed")?;
+            }
+        }
+        
+        Ok(result_dict.to_object(py))
+    }
 }
 
 /// Python wrapper for the main Graph
@@ -1337,11 +1359,18 @@ impl PyGraph {
 
     /// Generate adjacency matrix for the entire graph (FFI wrapper around core matrix operations)
     /// Returns: GraphMatrix (dense) or GraphSparseMatrix (sparse)
-    fn adjacency_matrix(&mut self, _py: Python) -> PyResult<PyObject> {
-        // TODO: Implement adjacency matrix in Phase 2
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "Adjacency matrix temporarily disabled during Phase 2 unification",
-        ))
+    /// Get adjacency matrix - PURE DELEGATION to core
+    fn adjacency_matrix(&mut self, py: Python) -> PyResult<PyObject> {
+        // DELEGATION: Use core adjacency_matrix implementation (graph.rs:1783)
+        let matrix = py.allow_threads(|| {
+            self.inner
+                .borrow_mut()
+                .adjacency_matrix()
+                .map_err(graph_error_to_py_err)
+        })?;
+        
+        // Convert AdjacencyMatrix to Python object
+        self.adjacency_matrix_to_py_object(py, matrix)
     }
 
     /// Generate adjacency matrix for the entire graph (cleaner API)
@@ -1392,19 +1421,35 @@ impl PyGraph {
     }
 
     /// Generate dense adjacency matrix (FFI wrapper around core matrix operations)
-    fn dense_adjacency_matrix(&mut self, _py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        // TODO: Implement dense adjacency matrix in Phase 2
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "Dense adjacency matrix temporarily disabled during Phase 2 unification",
-        ))
+    /// Get dense adjacency matrix - PURE DELEGATION to core
+    fn dense_adjacency_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        use crate::ffi::core::matrix::PyGraphMatrix;
+        
+        // DELEGATION: Use core dense_adjacency_matrix implementation (graph.rs:1797)
+        let matrix = py.allow_threads(|| {
+            self.inner
+                .borrow_mut()
+                .dense_adjacency_matrix()
+                .map_err(graph_error_to_py_err)
+        })?;
+        
+        // Convert AdjacencyMatrix to GraphMatrix
+        let graph_matrix = self.adjacency_matrix_to_graph_matrix(matrix)?;
+        Ok(Py::new(py, PyGraphMatrix { inner: graph_matrix })?)
     }
 
-    /// Generate sparse adjacency matrix (FFI wrapper around core matrix operations)
-    fn sparse_adjacency_matrix(&mut self, _py: Python) -> PyResult<PyObject> {
-        // TODO: Implement sparse adjacency matrix in Phase 2 (will return PyGraphSparseMatrix)
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "Sparse adjacency matrix temporarily disabled during Phase 2 unification",
-        ))
+    /// Get sparse adjacency matrix - PURE DELEGATION to core
+    fn sparse_adjacency_matrix(&mut self, py: Python) -> PyResult<PyObject> {
+        // DELEGATION: Use core sparse_adjacency_matrix implementation (graph.rs:1804)
+        let matrix = py.allow_threads(|| {
+            self.inner
+                .borrow_mut()
+                .sparse_adjacency_matrix()
+                .map_err(graph_error_to_py_err)
+        })?;
+        
+        // Convert AdjacencyMatrix to Python object (sparse format)
+        self.adjacency_matrix_to_py_object(py, matrix)
     }
 
     /// Generate Laplacian matrix (FFI wrapper around core matrix operations)
@@ -2395,29 +2440,32 @@ impl PyGraph {
     
     /// Get connected components using SubgraphOperations trait  
     /// This replaces the graph_analytics.py connected_components() method
-    fn connected_components(&self, py: Python) -> PyResult<Vec<PySubgraph>> {
-        {
-            let subgraph = self.as_subgraph()?;
-            let components = subgraph.connected_components().map_err(graph_error_to_py_err)?;
+    /// Get connected components - PURE DELEGATION to core
+    fn connected_components(&self, _py: Python) -> PyResult<Vec<PySubgraph>> {
+        // DELEGATION: Use core connected_components implementation (graph.rs:1335)
+        let components = self.inner
+            .borrow()
+            .connected_components()
+            .map_err(graph_error_to_py_err)?;
             
-            let py_components = components
-                .into_iter()
-                .map(|component| {
-                    // Convert trait object back to concrete Subgraph
-                    // For now, create from node/edge sets since downcasting is complex
-                    let nodes = component.node_set().iter().copied().collect();
-                    let edges = component.edge_set().iter().copied().collect();  
-                    let subgraph = groggy::core::subgraph::Subgraph::new(
-                        self.inner.clone(),
-                        nodes,
-                        edges,
-                        "connected_component".to_string(),
-                    );
-                    PySubgraph::from_core_subgraph(subgraph)
-                })
-                .collect();
-            Ok(py_components)
-        }
+        // Convert core ComponentSubgraphs to PySubgraphs
+        let py_components = components
+            .into_iter()
+            .map(|component| {
+                // Convert ComponentSubgraph to PySubgraph
+                let nodes = component.nodes.into_iter().collect();
+                let edges = component.edges.into_iter().collect();
+                let subgraph = groggy::core::subgraph::Subgraph::new(
+                    self.inner.clone(),
+                    nodes,
+                    edges,
+                    format!("component_{}", component.id),
+                );
+                PySubgraph::from_core_subgraph(subgraph)
+            })
+            .collect();
+            
+        Ok(py_components)
     }
 
     /// Get memory statistics - moved from graph_analytics
