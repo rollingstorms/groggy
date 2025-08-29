@@ -121,10 +121,11 @@ impl PyGraph {
 #[pymethods]
 impl PyGraph {
     #[new]
-    #[pyo3(signature = (directed = false, _config = None))]
-    fn new(directed: bool, _config: Option<&PyDict>) -> PyResult<Self> {
-        // Create graph with specified directionality
-        let rust_graph = if directed {
+    #[pyo3(signature = (directed = None, _config = None))]
+    fn new(directed: Option<bool>, _config: Option<&PyDict>) -> PyResult<Self> {
+        // Create graph with specified directionality (defaults to false/undirected)
+        let is_directed = directed.unwrap_or(false);
+        let rust_graph = if is_directed {
             RustGraph::new_directed()
         } else {
             RustGraph::new_undirected()
@@ -560,6 +561,46 @@ impl PyGraph {
 .borrow_mut()
             .set_node_attrs(attrs_values)
             .map_err(graph_error_to_py_err)
+    }
+
+    /// Get bulk node attributes - high-performance columnar retrieval
+    fn get_node_attrs(&self, py: Python, nodes: Vec<NodeId>, attrs: Vec<AttrName>) -> PyResult<PyObject> {
+        use groggy::AttrValue as RustAttrValue;
+        
+        // HYPER-OPTIMIZED bulk attribute retrieval - leverages columnar storage
+        let result = self.inner
+            .borrow()
+            .get_node_attrs_bulk(nodes, attrs)
+            .map_err(graph_error_to_py_err)?;
+        
+        // Convert Rust result to Python dictionary
+        // Format: {node_id: {attr_name: AttrValue}}
+        let py_dict = PyDict::new(py);
+        for (node_id, node_attrs) in result {
+            let node_dict = PyDict::new(py);
+            for (attr_name, attr_value) in node_attrs {
+                let py_attr_value = match attr_value {
+                    RustAttrValue::Text(s) => Py::new(py, PyAttrValue { inner: RustAttrValue::Text(s) })?,
+                    RustAttrValue::Int(i) => Py::new(py, PyAttrValue { inner: RustAttrValue::Int(i) })?,
+                    RustAttrValue::Float(f) => Py::new(py, PyAttrValue { inner: RustAttrValue::Float(f) })?,
+                    RustAttrValue::Bool(b) => Py::new(py, PyAttrValue { inner: RustAttrValue::Bool(b) })?,
+                    RustAttrValue::FloatVec(arr) => Py::new(py, PyAttrValue { inner: RustAttrValue::FloatVec(arr) })?,
+                    RustAttrValue::CompactText(ct) => Py::new(py, PyAttrValue { inner: RustAttrValue::CompactText(ct) })?,
+                    RustAttrValue::SmallInt(si) => Py::new(py, PyAttrValue { inner: RustAttrValue::SmallInt(si) })?,
+                    RustAttrValue::CompressedText(ct) => Py::new(py, PyAttrValue { inner: RustAttrValue::CompressedText(ct) })?,
+                    RustAttrValue::CompressedFloatVec(cfv) => Py::new(py, PyAttrValue { inner: RustAttrValue::CompressedFloatVec(cfv) })?,
+                    RustAttrValue::Null => Py::new(py, PyAttrValue { inner: RustAttrValue::Null })?,
+                    RustAttrValue::SubgraphRef(sr) => Py::new(py, PyAttrValue { inner: RustAttrValue::SubgraphRef(sr) })?,
+                    RustAttrValue::NodeArray(na) => Py::new(py, PyAttrValue { inner: RustAttrValue::NodeArray(na) })?,
+                    RustAttrValue::EdgeArray(ea) => Py::new(py, PyAttrValue { inner: RustAttrValue::EdgeArray(ea) })?,
+                    RustAttrValue::Bytes(bytes) => Py::new(py, PyAttrValue { inner: RustAttrValue::Bytes(bytes) })?,
+                };
+                node_dict.set_item(attr_name, py_attr_value)?;
+            }
+            py_dict.set_item(node_id, node_dict)?;
+        }
+        
+        Ok(py_dict.to_object(py))
     }
 
     /// Set bulk edge attributes using the format expected by benchmark

@@ -568,6 +568,48 @@ impl Graph {
         Ok(attributes)
     }
 
+    /// Get attributes for multiple nodes at once - bulk operation for performance
+    pub fn get_node_attrs_bulk(&self, nodes: Vec<NodeId>, attrs: Vec<AttrName>) -> Result<HashMap<NodeId, HashMap<AttrName, AttrValue>>, GraphError> {
+        let mut result = HashMap::new();
+        
+        // OPTIMIZATION: Pre-validate all nodes exist to fail fast
+        for &node in &nodes {
+            if !self.space.contains_node(node) {
+                return Err(GraphError::NodeNotFound {
+                    node_id: node,
+                    operation: "bulk get attributes".to_string(),
+                    suggestion: "Check if all nodes exist with contains_node()".to_string(),
+                });
+            }
+        }
+        
+        // OPTIMIZATION: Bulk retrieve requested attributes for each node
+        for node in nodes {
+            let mut node_attrs = HashMap::new();
+            
+            // Get all attribute indices for this node
+            let attr_indices = self.space.get_node_attr_indices(node);
+            
+            // Only retrieve requested attributes (intersection)
+            for attr_name in &attrs {
+                if let Some(&index) = attr_indices.get(attr_name) {
+                    if let Some(value) = self
+                        .pool
+                        .borrow()
+                        .get_attr_by_index(attr_name, index, true)
+                    {
+                        node_attrs.insert(attr_name.clone(), value.clone());
+                    }
+                }
+                // Note: Missing attributes are simply omitted from result
+            }
+            
+            result.insert(node, node_attrs);
+        }
+        
+        Ok(result)
+    }
+
     /// Get all attributes for an edge efficiently
     ///
     /// ALGORITHM:
