@@ -212,19 +212,22 @@ impl PartialEq for AttrValue {
 
             // Cross-type float vector comparisons
             (FloatVec(a), CompressedFloatVec(b)) => {
-                // TODO: Implement compressed float vector decompression when needed
-                let _ = (a, b);
-                false
+                match b.decompress_float_vec() {
+                    Ok(decompressed_b) => a == &decompressed_b,
+                    Err(_) => false,
+                }
             }
             (CompressedFloatVec(a), FloatVec(b)) => {
-                // TODO: Implement compressed float vector decompression when needed
-                let _ = (a, b);
-                false
+                match a.decompress_float_vec() {
+                    Ok(decompressed_a) => &decompressed_a == b,
+                    Err(_) => false,
+                }
             }
             (CompressedFloatVec(a), CompressedFloatVec(b)) => {
-                // TODO: Implement compressed float vector comparison when needed
-                let _ = (a, b);
-                false
+                match (a.decompress_float_vec(), b.decompress_float_vec()) {
+                    (Ok(decompressed_a), Ok(decompressed_b)) => decompressed_a == decompressed_b,
+                    _ => false,
+                }
             }
 
             // Null comparisons - Null only equals Null
@@ -645,7 +648,13 @@ impl AttrValueType {
 impl std::fmt::Display for AttrValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AttrValue::Float(val) => write!(f, "{}", val),
+            AttrValue::Float(val) => {
+                if val.is_nan() {
+                    write!(f, "nan")
+                } else {
+                    write!(f, "{}", val)
+                }
+            },
             AttrValue::Int(val) => write!(f, "{}", val),
             AttrValue::Text(val) => write!(f, "{}", val),
             AttrValue::Bool(val) => write!(f, "{}", val),
@@ -661,7 +670,7 @@ impl std::fmt::Display for AttrValue {
                 Ok(vec) => write!(f, "{:?}", vec),
                 Err(_) => write!(f, "[compressed float vec]"),
             },
-            AttrValue::Null => write!(f, "NaN"),
+            AttrValue::Null => write!(f, "nan"),
             AttrValue::SubgraphRef(id) => write!(f, "SubgraphRef({})", id),
             AttrValue::NodeArray(nodes) => write!(f, "NodeArray({:?})", nodes),
             AttrValue::EdgeArray(edges) => write!(f, "EdgeArray({:?})", edges),

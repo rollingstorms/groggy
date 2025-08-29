@@ -1,0 +1,6 @@
+Ignoring pytest: markers 'extra == "dev"' don't match your environment
+Ignoring pytest-benchmark: markers 'extra == "dev"' don't match your environment
+Ignoring numpy: markers 'extra == "dev"' don't match your environment
+Ignoring networkx: markers 'extra == "dev"' don't match your environment
+Requirement already satisfied: networkx>=2.8 in /Users/michaelroth/Documents/Code/venv/lib/python3.9/site-packages (3.2.1)
+✏️ Setting installed package as editable

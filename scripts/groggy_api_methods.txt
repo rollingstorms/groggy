@@ -1,0 +1,91 @@
+# Groggy API Method Extraction
+
+
+## AggregationResult
+
+## str
+
+## AttrValue
+
+## AttributeFilter
+
+## BranchInfo
+
+## Commit
+
+## DisplayConfig
+
+## EdgeFilter
+
+## int
+
+## EdgeNotFoundError
+
+## Graph
+- to_networkx(self, directed: bool = False, include_attributes: bool = True)
+
+## GraphArray
+
+## GraphMatrix
+
+## GraphTable
+
+## GroggyError
+
+## GroupedAggregationResult
+
+## HistoricalView
+
+## HistoryStatistics
+
+## InvalidInputError
+
+## NodeFilter
+
+## NodeNotFoundError
+
+## NotImplementedError
+
+## PyAttributeCollection
+
+## PyResultHandle
+
+## ArrayDisplayFormatter
+- format(self, array_data: Dict[str, Any]) -> str
+
+## MatrixDisplayFormatter
+- format(self, matrix_data: Dict[str, Any]) -> str
+
+## TableDisplayFormatter
+- format(self, table_data: Dict[str, Any]) -> str
+
+## BoxChars
+
+## Colors
+
+## Symbols
+
+## EnhancedQueryEngine
+- filter_edges(self, query: str)
+- filter_nodes(self, query: str)
+
+## EnhancedSubgraph
+
+## QueryParser
+- parse_edge_filter(self, query: str) -> EdgeFilter
+- parse_node_filter(self, query: str) -> NodeFilter
+
+## EdgesTableAccessor
+- table(self)
+
+## AttrValue
+- [property] type_name
+- [property] value
+
+## AttributeFilter
+
+## EdgeFilter
+
+## Enum
+
+## NodeFilter

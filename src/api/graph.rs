@@ -689,6 +689,48 @@ impl Graph {
         Ok(attributes)
     }
 
+    /// Get attributes for multiple edges at once - bulk operation for performance
+    pub fn get_edge_attrs_bulk(&self, edges: Vec<EdgeId>, attrs: Vec<AttrName>) -> Result<HashMap<EdgeId, HashMap<AttrName, AttrValue>>, GraphError> {
+        let mut result = HashMap::new();
+        
+        // OPTIMIZATION: Pre-validate all edges exist to fail fast
+        for &edge in &edges {
+            if !self.space.contains_edge(edge) {
+                return Err(GraphError::EdgeNotFound {
+                    edge_id: edge,
+                    operation: "bulk get attributes".to_string(),
+                    suggestion: "Check if all edges exist with contains_edge()".to_string(),
+                });
+            }
+        }
+        
+        // OPTIMIZATION: Bulk retrieve requested attributes for each edge
+        for edge in edges {
+            let mut edge_attrs = HashMap::new();
+            
+            // Get all attribute indices for this edge
+            let attr_indices = self.space.get_edge_attr_indices(edge);
+            
+            // Only retrieve requested attributes (intersection)
+            for attr_name in &attrs {
+                if let Some(&index) = attr_indices.get(attr_name) {
+                    if let Some(value) = self
+                        .pool
+                        .borrow()
+                        .get_attr_by_index(attr_name, index, false)
+                    {
+                        edge_attrs.insert(attr_name.clone(), value.clone());
+                    }
+                }
+                // Note: Missing attributes are simply omitted from result
+            }
+            
+            result.insert(edge, edge_attrs);
+        }
+        
+        Ok(result)
+    }
+
     /*
     === EFFICIENT BULK OPERATIONS ===
     Graph provides secure external API while using efficient internal operations.

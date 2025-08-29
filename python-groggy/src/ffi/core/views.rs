@@ -9,6 +9,7 @@ use pyo3::types::PyDict;
 
 // Import types from our FFI modules
 use crate::ffi::api::graph::PyGraph;
+use crate::ffi::api::graph_attributes::PyGraphAttr;
 use crate::ffi::types::PyAttrValue;
 
 /// A view of a specific node with access to its attributes
@@ -22,22 +23,18 @@ pub struct PyNodeView {
 impl PyNodeView {
     /// Get node attribute value
     fn __getitem__(&self, py: Python, key: &str) -> PyResult<PyAttrValue> {
-        let graph = self.graph.borrow(py);
-        match graph.get_node_attr(self.node_id, key.to_string())? {
-            Some(value) => Ok(value),
-            None => Err(PyKeyError::new_err(format!(
-                "Attribute '{}' not found on node {}",
-                key, self.node_id
-            ))),
-        }
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        let py_obj = attr_handler.get_node_attr(py, self.node_id, key.to_string(), None)?;
+        // Extract PyAttrValue from PyObject
+        let attr_value: PyAttrValue = py_obj.extract(py)?;
+        Ok(attr_value)
     }
 
     /// Set node attribute value (chainable)
     fn __setitem__(&mut self, py: Python, key: &str, value: PyAttrValue) -> PyResult<()> {
-        let mut graph = self.graph.borrow_mut(py);
-        // Convert PyAttrValue back to PyAny for the method call
+        let mut attr_handler = PyGraphAttr::new(self.graph.clone())?;
         let py_value = value.to_object(py);
-        graph.set_node_attr(self.node_id, key.to_string(), py_value.as_ref(py))?;
+        attr_handler.set_node_attr(py, self.node_id, key.to_string(), py_value.as_ref(py))?;
         Ok(())
     }
 
@@ -49,14 +46,14 @@ impl PyNodeView {
 
     /// Check if attribute exists
     fn __contains__(&self, py: Python, key: &str) -> PyResult<bool> {
-        let graph = self.graph.borrow(py);
-        Ok(graph.has_node_attribute(self.node_id, key))
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        Ok(attr_handler.has_node_attribute(py, self.node_id, key))
     }
 
     /// Get all attribute keys
     fn keys(&self, py: Python) -> PyResult<Vec<String>> {
-        let graph = self.graph.borrow(py);
-        Ok(graph.node_attribute_keys(self.node_id))
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        Ok(attr_handler.node_attribute_keys(py, self.node_id))
     }
 
     /// Get all attribute values
@@ -107,7 +104,9 @@ impl PyNodeView {
             let attr_value = PyAttrValue::extract(value)?.to_attr_value();
             // Convert to PyAny for the method call
             let py_attr = PyAttrValue::from_attr_value(attr_value).to_object(py);
-            graph.set_node_attr(
+            let mut attr_handler = PyGraphAttr::new(self.graph.clone())?;
+            attr_handler.set_node_attr(
+                py,
                 self.node_id,
                 key_str,
                 py_attr.as_ref(py),
@@ -120,8 +119,8 @@ impl PyNodeView {
 
     /// String representation
     fn __str__(&self, py: Python) -> PyResult<String> {
-        let graph = self.graph.borrow(py);
-        let keys = graph.node_attribute_keys(self.node_id);
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        let keys = attr_handler.node_attribute_keys(py, self.node_id);
 
         if keys.is_empty() {
             Ok(format!("NodeView({})", self.node_id))
@@ -129,8 +128,10 @@ impl PyNodeView {
             let mut attr_parts = Vec::new();
             for key in keys.iter().take(3) {
                 // Show first 3 attributes
-                if let Ok(Some(value)) = graph.get_node_attr(self.node_id, key.clone()) {
-                    attr_parts.push(format!("{}={}", key, value.__str__()?));
+                if let Ok(py_obj) = attr_handler.get_node_attr(py, self.node_id, key.clone(), None) {
+                    if let Ok(value) = py_obj.extract::<PyAttrValue>(py) {
+                        attr_parts.push(format!("{}={}", key, value.__str__()?));
+                    }
                 }
             }
 
@@ -147,16 +148,12 @@ impl PyNodeView {
     /// Get as dictionary
     fn to_dict(&self, py: Python) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
-        let graph = self.graph.borrow(py);
-        let keys = graph.node_attribute_keys(self.node_id);
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        let keys = attr_handler.node_attribute_keys(py, self.node_id);
 
         for key in keys {
-            if let Some(value) = graph
-                .get_node_attr(self.node_id, key.clone())
-                .ok()
-                .flatten()
-            {
-                dict.set_item(key, value)?;
+            if let Ok(py_obj) = attr_handler.get_node_attr(py, self.node_id, key.clone(), None) {
+                dict.set_item(key, py_obj)?;
             }
         }
 
@@ -170,17 +167,15 @@ impl PyNodeView {
 
     /// Iterator support - iterates over (key, value) pairs
     fn __iter__(&self, py: Python) -> PyResult<NodeViewIterator> {
-        let graph = self.graph.borrow(py);
-        let keys = graph.node_attribute_keys(self.node_id);
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        let keys = attr_handler.node_attribute_keys(py, self.node_id);
 
         let mut items = Vec::new();
         for key in keys {
-            if let Some(value) = graph
-                .get_node_attr(self.node_id, key.clone())
-                .ok()
-                .flatten()
-            {
-                items.push((key, value));
+            if let Ok(py_obj) = attr_handler.get_node_attr(py, self.node_id, key.clone(), None) {
+                if let Ok(value) = py_obj.extract::<PyAttrValue>(py) {
+                    items.push((key, value));
+                }
             }
         }
 
@@ -235,22 +230,18 @@ pub struct PyEdgeView {
 impl PyEdgeView {
     /// Get edge attribute value
     fn __getitem__(&self, py: Python, key: &str) -> PyResult<PyAttrValue> {
-        let graph = self.graph.borrow(py);
-        match graph.get_edge_attr(self.edge_id, key.to_string())? {
-            Some(value) => Ok(value),
-            None => Err(PyKeyError::new_err(format!(
-                "Attribute '{}' not found on edge {}",
-                key, self.edge_id
-            ))),
-        }
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        let py_obj = attr_handler.get_edge_attr(py, self.edge_id, key.to_string(), None)?;
+        // Extract PyAttrValue from PyObject
+        let attr_value: PyAttrValue = py_obj.extract(py)?;
+        Ok(attr_value)
     }
 
     /// Set edge attribute value (chainable)
     fn __setitem__(&mut self, py: Python, key: &str, value: PyAttrValue) -> PyResult<()> {
-        let mut graph = self.graph.borrow_mut(py);
-        // Convert PyAttrValue back to PyAny for the method call
+        let mut attr_handler = PyGraphAttr::new(self.graph.clone())?;
         let py_value = value.to_object(py);
-        graph.set_edge_attr(self.edge_id, key.to_string(), py_value.as_ref(py))?;
+        attr_handler.set_edge_attr(py, self.edge_id, key.to_string(), py_value.as_ref(py))?;
         Ok(())
     }
 
@@ -303,14 +294,14 @@ impl PyEdgeView {
 
     /// Check if attribute exists
     fn __contains__(&self, py: Python, key: &str) -> PyResult<bool> {
-        let graph = self.graph.borrow(py);
-        Ok(graph.has_edge_attribute(self.edge_id, key))
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        Ok(attr_handler.has_edge_attribute(py, self.edge_id, key))
     }
 
     /// Get all attribute keys
     fn keys(&self, py: Python) -> PyResult<Vec<String>> {
-        let graph = self.graph.borrow(py);
-        Ok(graph.edge_attribute_keys(self.edge_id))
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        Ok(attr_handler.edge_attribute_keys(py, self.edge_id))
     }
 
     /// Get all attribute values
@@ -363,10 +354,11 @@ impl PyEdgeView {
 
     /// String representation
     fn __str__(&self, py: Python) -> PyResult<String> {
-        let graph = self.graph.borrow(py);
-        let keys = graph.edge_attribute_keys(self.edge_id);
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        let keys = attr_handler.edge_attribute_keys(py, self.edge_id);
 
         // Get endpoints for display
+        let graph = self.graph.borrow(py);
         let (source, target) = match graph.inner.borrow().edge_endpoints(self.edge_id) {
             Ok(endpoints) => endpoints,
             Err(_) => return Ok(format!("EdgeView({}) [invalid]", self.edge_id)),
@@ -381,8 +373,10 @@ impl PyEdgeView {
             let mut attr_parts = Vec::new();
             for key in keys.iter().take(3) {
                 // Show first 3 attributes
-                if let Ok(Some(value)) = graph.get_edge_attr(self.edge_id, key.clone()) {
-                    attr_parts.push(format!("{}={}", key, value.__str__()?));
+                if let Ok(py_obj) = attr_handler.get_edge_attr(py, self.edge_id, key.clone(), None) {
+                    if let Ok(value) = py_obj.extract::<PyAttrValue>(py) {
+                        attr_parts.push(format!("{}={}", key, value.__str__()?));
+                    }
                 }
             }
 
@@ -402,16 +396,12 @@ impl PyEdgeView {
     /// Get as dictionary
     fn to_dict(&self, py: Python) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
-        let graph = self.graph.borrow(py);
-        let keys = graph.edge_attribute_keys(self.edge_id);
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        let keys = attr_handler.edge_attribute_keys(py, self.edge_id);
 
         for key in keys {
-            if let Some(value) = graph
-                .get_edge_attr(self.edge_id, key.clone())
-                .ok()
-                .flatten()
-            {
-                dict.set_item(key, value)?;
+            if let Ok(py_obj) = attr_handler.get_edge_attr(py, self.edge_id, key.clone(), None) {
+                dict.set_item(key, py_obj)?;
             }
         }
 
@@ -425,17 +415,15 @@ impl PyEdgeView {
 
     /// Iterator support - iterates over (key, value) pairs
     fn __iter__(&self, py: Python) -> PyResult<EdgeViewIterator> {
-        let graph = self.graph.borrow(py);
-        let keys = graph.edge_attribute_keys(self.edge_id);
+        let attr_handler = PyGraphAttr::new(self.graph.clone())?;
+        let keys = attr_handler.edge_attribute_keys(py, self.edge_id);
 
         let mut items = Vec::new();
         for key in keys {
-            if let Some(value) = graph
-                .get_edge_attr(self.edge_id, key.clone())
-                .ok()
-                .flatten()
-            {
-                items.push((key, value));
+            if let Ok(py_obj) = attr_handler.get_edge_attr(py, self.edge_id, key.clone(), None) {
+                if let Ok(value) = py_obj.extract::<PyAttrValue>(py) {
+                    items.push((key, value));
+                }
             }
         }
 

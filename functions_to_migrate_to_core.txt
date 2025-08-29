@@ -1,0 +1,60 @@
+api/graph.rs
+    add_node
+    add_nodes
+    resolve_string_id_to_node
+    node_ids
+    edge_ids
+    set_node_attrs
+    get_node_attrs
+    set_edge_attrs
+    add_edges
+    filter_nodes # also in graph_query??? -> should call rust core
+    filter_edges # also in graph_query??? - should call rust core
+    group_nodes_by_attribute # probably not needed
+    group_by
+    add_edge
+    shortest_path
+    aggregate
+    adjacency_matrix
+    adjacency
+    weighted_adjacency_matrix
+    dense_adjacency_matrix
+    sparse_adjacency_matrix
+    laplacian_matrix
+    transition_matrix
+    neighbors
+    degree
+    in_degree
+    out_degree
+    neighborhood
+    add_graph
+    adjacency_matrix_to_graph_matrix
+    # and all methods in the pygraph seem sketch 
+    # There is a duplicate connected_components
+
+api/graph_query.rs
+    filter_nodes 
+    filter_edges
+    filter_subgraph_nodes #not needed - remove
+    aggregate
+    execute
+    aggregate_custom_nodes
+
+api/graph_version.rs
+    restore_snapshot # needs implmentation in core
+    get_history
+
+core/accessors.rs
+    attributes
+    table
+    all
+    # those are all subgraph operations btw
+    _get_node_attribute_column
+    attributes
+    table
+    _get_edge_attribute_column
+
+core/table.rs
+    from_graph_nodes
+    from_graph_edges
+    

@@ -9,7 +9,7 @@ relying on the Rust core for logical combinations.
 import re
 from typing import Union, List, Set
 from . import Graph
-from .query_parser import parse_node_query, parse_edge_query
+from ._groggy import parse_node_query, parse_edge_query
 from ._groggy import NodeFilter, EdgeFilter
 
 class EnhancedQueryEngine:

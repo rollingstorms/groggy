@@ -88,7 +88,6 @@ python-groggy/src/ffi/api/
 ├── graph_query.rs (query/filter operations) - NEEDS CREATION
 ├── graph_analysis.rs (algorithms) - NEEDS CREATION  
 ├── graph_io.rs (serialization/import/export) - NEEDS CREATION
-└── graph_subgraph.rs (subgraph operations) - NEEDS CREATION
 ```
 
 **Priority**: Extract attribute methods from main `graph.rs` to `graph_attributes.rs` module.

@@ -45,7 +45,7 @@ from .errors import (
     InvalidInputError, 
     NotImplementedError
 )
-from .query_parser import parse_node_query, parse_edge_query
+from ._groggy import parse_node_query, parse_edge_query
 from . import generators
 from .generators import (
     complete_graph,
