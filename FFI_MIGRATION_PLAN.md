@@ -135,13 +135,15 @@ fn some_method(&self, py: Python, args: Type) -> PyResult<ReturnType> {
 1. **✅ shortest_path** - Core: graph.rs:1311 + traversal.rs:323
 2. **✅ group_by** - Core: table.rs:623
 
-### ⚠️ **MEDIUM PRIORITY** - Need Core Implementation First
-1. **❌ in_degree** - Missing from core, implement first
-2. **❌ out_degree** - Missing from core, implement first  
-3. **❌ adjacency** (simple) - Missing from core, implement first - just an alias for adjacency_matrix
-4. **❌ transition_matrix** - Missing from core, implement first 
-5. **❌ add_graph** - Missing from core, implement first
-6. **❌ resolve_string_id_to_node** - Missing from core, implement first
+### ✅ **MEDIUM PRIORITY** - Recently Implemented in Core!
+1. **✅ in_degree** - **JUST IMPLEMENTED** in core (graph.rs:866)
+2. **✅ out_degree** - **JUST IMPLEMENTED** in core (graph.rs:887)  
+3. **✅ adjacency** - **JUST IMPLEMENTED** in core (graph.rs:1878) - alias for adjacency_matrix
+4. **✅ add_graph** - **JUST IMPLEMENTED** in core (graph.rs:348)
+
+### ❌ **LOW PRIORITY** - Still Missing from Core  
+1. **❌ transition_matrix** - Missing from core, implement first 
+2. **❌ resolve_string_id_to_node** - Missing from core, implement first
 
 ### 🔻 **LOW PRIORITY** - Version Control & Helpers
 1. **❌ restore_snapshot** - Missing core implementation
@@ -149,11 +151,19 @@ fn some_method(&self, py: Python, args: Type) -> PyResult<ReturnType> {
 3. **✅ Table operations** - Already working (from_graph_nodes/edges)
 4. **Remove unnecessary** - `group_nodes_by_attribute`, `adjacency_matrix_to_graph_matrix`
 
-## **REVISED IMPACT ESTIMATE**
-- **✅ Ready for FFI wrapping**: **15 methods** (core exists)
-- **❌ Need core implementation**: **8 methods** (missing from core)
+## **UPDATED IMPACT ESTIMATE** (After Recent Core Implementations)
+- **✅ Ready for FFI wrapping**: **19 methods** (core exists) ⬆️ +4 methods!
+- **❌ Need core implementation**: **4 methods** (missing from core) ⬇️ -4 methods!
 - **🗑️ Remove/consolidate**: **6 methods** (duplicates + unnecessary)  
-- **Effort split**: 65% wrapping, 35% core implementation
+- **Effort split**: **83% wrapping**, **17% core implementation** ⬆️ Much better ratio!
+
+### **🎉 MAJOR PROGRESS**: 
+We just implemented 4 critical missing methods in core:
+- `in_degree`, `out_degree` - Essential degree operations
+- `adjacency` - Simple matrix alias  
+- `add_graph` - Graph merging functionality
+
+**Only 4 methods still missing from core** vs 8 before!
 
 ## File Breakdown Target
 
