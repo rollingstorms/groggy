@@ -8,6 +8,7 @@ use groggy::{AttrName, EdgeId, NodeId, GraphError};
 use groggy::core::traits::SubgraphOperations;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use pyo3::exceptions::PyRuntimeError;
 
 use super::graph::PyGraph;
 
@@ -70,59 +71,13 @@ impl PyGraphAnalysis {
         }
     }
 
-    /// Get degree of nodes - PURE DELEGATION to core
+    /// Get degree of nodes - Returns GraphArray for filtering support
     pub fn degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
-        if let Some(nodes_input) = nodes {
-            // Handle multiple nodes
-            if let Ok(node_list) = nodes_input.extract::<Vec<NodeId>>() {
-                let result_dict = PyDict::new(py);
-                
-                for node in node_list {
-                    // DELEGATION: Use core degree implementation (graph.rs:845)
-                    let degree = {
-                        let graph_ref = self.graph.borrow(py);
-                        let result = graph_ref.inner
-                            .borrow()
-                            .degree(node)
-                            .map_err(graph_error_to_py_err);
-                        drop(graph_ref);
-                        result
-                    }?;
-                    
-                    result_dict.set_item(node, degree)?;
-                }
-                
-                Ok(result_dict.to_object(py))
-            } else if let Ok(single_node) = nodes_input.extract::<NodeId>() {
-                // Handle single node
-                let degree = {
-                    let graph_ref = self.graph.borrow(py);
-                    let result = graph_ref.inner
-                        .borrow()
-                        .degree(single_node)
-                        .map_err(graph_error_to_py_err);
-                    drop(graph_ref);
-                    result
-                }?;
-                
-                Ok(degree.to_object(py))
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "nodes must be a NodeId or list of NodeIds"
-                ))
-            }
-        } else {
-            // Return degree for all nodes
-            let all_nodes = {
-                let graph_ref = self.graph.borrow(py);
-                let nodes = graph_ref.inner.borrow().node_ids();
-                drop(graph_ref);
-                nodes
-            };
-            let result_dict = PyDict::new(py);
-            
-            for node in all_nodes {
-                let degree = {
+        match nodes {
+            // Single node case: degree(node_id) -> int (keep as int for backward compatibility)
+            Some(node_arg) if node_arg.extract::<NodeId>().is_ok() => {
+                let node = node_arg.extract::<NodeId>()?;
+                let deg = {
                     let graph_ref = self.graph.borrow(py);
                     let result = graph_ref.inner
                         .borrow()
@@ -131,11 +86,67 @@ impl PyGraphAnalysis {
                     drop(graph_ref);
                     result
                 }?;
-                
-                result_dict.set_item(node, degree)?;
+                Ok(deg.to_object(py))
             }
-            
-            Ok(result_dict.to_object(py))
+            // List of nodes case: degree([node1, node2, ...]) -> GraphArray
+            Some(node_arg) if node_arg.extract::<Vec<NodeId>>().is_ok() => {
+                let node_ids = node_arg.extract::<Vec<NodeId>>()?;
+                let mut degrees = Vec::new();
+
+                for node_id in node_ids {
+                    let degree_result = {
+                        let graph_ref = self.graph.borrow(py);
+                        let result = graph_ref.inner.borrow().degree(node_id);
+                        drop(graph_ref);
+                        result
+                    };
+                    
+                    match degree_result {
+                        Ok(deg) => {
+                            degrees.push(groggy::AttrValue::Int(deg as i64));
+                        }
+                        Err(_) => {
+                            // Skip nodes that don't exist rather than failing
+                            continue;
+                        }
+                    }
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(degrees);
+                let py_graph_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+            // All nodes case: degree() -> GraphArray
+            None => {
+                let all_nodes = {
+                    let graph_ref = self.graph.borrow(py);
+                    let nodes = graph_ref.inner.borrow().node_ids();
+                    drop(graph_ref);
+                    nodes
+                };
+                let mut degrees = Vec::new();
+
+                for node_id in all_nodes {
+                    let degree_result = {
+                        let graph_ref = self.graph.borrow(py);
+                        let result = graph_ref.inner.borrow().degree(node_id);
+                        drop(graph_ref);
+                        result
+                    };
+                    
+                    if let Ok(deg) = degree_result {
+                        degrees.push(groggy::AttrValue::Int(deg as i64));
+                    }
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(degrees);
+                let py_graph_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+            // Invalid argument type
+            Some(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "degree() argument must be a NodeId, list of NodeIds, or None",
+            )),
         }
     }
 
@@ -387,7 +398,31 @@ impl PyGraphAnalysis {
         }?;
 
         match path {
-            Some(path) => Ok(PyList::new(py, path.nodes).to_object(py)),
+            Some(path) => {
+                // Create a subgraph from the path nodes and edges
+                use crate::ffi::core::subgraph::PySubgraph;
+                use groggy::core::subgraph::Subgraph;
+                
+                let graph_ref = self.graph.borrow(py);
+                let core_graph = graph_ref.inner.clone();
+                drop(graph_ref);
+                
+                // Create subgraph with path nodes and edges
+                let mut node_set = std::collections::HashSet::new();
+                for &node_id in &path.nodes {
+                    node_set.insert(node_id);
+                }
+                
+                let mut edge_set = std::collections::HashSet::new();
+                for &edge_id in &path.edges {
+                    edge_set.insert(edge_id);
+                }
+                
+                let subgraph = Subgraph::new(core_graph, node_set, edge_set, "shortest_path".to_string());
+                
+                let py_subgraph = PySubgraph { inner: subgraph };
+                Ok(Py::new(py, py_subgraph)?.to_object(py))
+            },
             None => Ok(py.None()),
         }
     }

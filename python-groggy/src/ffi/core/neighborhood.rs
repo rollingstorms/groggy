@@ -36,36 +36,6 @@ impl PyNeighborhoodSubgraph {
 
     // === SubgraphOperations - Inherited methods ===
 
-    #[getter]
-    fn node_count(&self) -> usize {
-        self.inner.node_count()
-    }
-
-    #[getter]
-    fn edge_count(&self) -> usize {
-        self.inner.edge_count()
-    }
-    
-    /// Check if a node exists in this neighborhood
-    fn contains_node(&self, node_id: NodeId) -> bool {
-        self.inner.contains_node(node_id)
-    }
-
-    /// Check if an edge exists in this neighborhood
-    fn contains_edge(&self, edge_id: EdgeId) -> bool {
-        self.inner.contains_edge(edge_id)
-    }
-
-    /// Get all node IDs in this neighborhood
-    fn node_ids(&self) -> Vec<NodeId> {
-        self.inner.node_set().iter().copied().collect()
-    }
-
-    /// Get all edge IDs in this neighborhood
-    fn edge_ids(&self) -> Vec<EdgeId> {
-        self.inner.edge_set().iter().copied().collect()
-    }
-
     /// Get the subgraph object using the same pattern as connected components
     /// I would rather that the NeighborhoodSubgraph object be the subgraph object itself
     fn subgraph(&self, py: Python) -> PyResult<PySubgraph> {
@@ -100,6 +70,13 @@ impl PyNeighborhoodSubgraph {
                 self.inner.central_nodes().len(), self.inner.hops(), self.inner.node_count(), self.inner.edge_count()
             )
         }
+    }
+
+    /// Delegate unknown attribute access to the subgraph, so methods like .table() work directly.
+    fn __getattr__(&self, name: &str, py: Python) -> PyResult<PyObject> {
+        let subgraph = self.subgraph(py)?;
+        let subgraph_obj = Py::new(py, subgraph)?;
+        subgraph_obj.getattr(py, name)
     }
 }
 
