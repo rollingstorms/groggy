@@ -5,10 +5,12 @@
 
 use groggy::core::subgraph::Subgraph;
 use groggy::core::traits::SubgraphOperations;
-use groggy::{NodeId, EdgeId, AttrValue};
+use groggy::{NodeId, EdgeId, AttrValue, SimilarityMetric};
+use crate::ffi::core::neighborhood::PyNeighborhoodResult;
+use groggy::core::neighborhood::NeighborhoodResult;
 use std::collections::HashSet;
 use pyo3::prelude::*;
-use pyo3::exceptions::{PyRuntimeError, PyKeyError};
+use pyo3::exceptions::{PyRuntimeError, PyKeyError, PyTypeError};
 use pyo3::types::PyDict;
 
 // Import FFI types we need to preserve compatibility
@@ -194,14 +196,19 @@ impl PySubgraph {
     
     // === Filtering Methods - delegate to SubgraphOperations ===
     
-    /// Filter nodes and return new subgraph
+    /// Filter nodes and return new subgraph  
     fn filter_nodes(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
-        // Extract the filter from Python object
+        // Extract the filter from Python object - support both NodeFilter objects and string queries
         let node_filter = if let Ok(filter_obj) = filter.extract::<crate::ffi::core::query::PyNodeFilter>() {
             filter_obj.inner.clone()
+        } else if let Ok(query_str) = filter.extract::<String>() {
+            // String query - parse it using Rust core query parser
+            let mut parser = groggy::core::query_parser::QueryParser::new();
+            parser.parse_node_query(&query_str)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e)))?
         } else {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "filter must be a NodeFilter object"
+                "filter must be a NodeFilter object or a string query (e.g., 'salary > 120000')"
             ));
         };
         
@@ -228,12 +235,17 @@ impl PySubgraph {
     
     /// Filter edges and return new subgraph
     fn filter_edges(&self, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
-        // Extract the filter from Python object
+        // Extract the filter from Python object - support both EdgeFilter objects and string queries
         let edge_filter = if let Ok(filter_obj) = filter.extract::<crate::ffi::core::query::PyEdgeFilter>() {
             filter_obj.inner.clone()
+        } else if let Ok(query_str) = filter.extract::<String>() {
+            // String query - parse it using Rust core query parser
+            let mut parser = groggy::core::query_parser::QueryParser::new();
+            parser.parse_edge_query(&query_str)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e)))?
         } else {
             return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "filter must be an EdgeFilter object"
+                "filter must be an EdgeFilter object or a string query (e.g., 'weight > 0.5')"
             ));
         };
         
@@ -287,6 +299,207 @@ impl PySubgraph {
         // For now, return None as placeholder
         Ok(py.None())
     }
+
+    /// Get degree of nodes in subgraph as GraphArray
+    ///
+    /// Usage:
+    /// - degree(node_id, full_graph=False) -> int: degree of single node (local or full graph)
+    /// - degree(node_ids, full_graph=False) -> GraphArray: degrees for list of nodes
+    /// - degree(full_graph=False) -> GraphArray: degrees for all nodes in subgraph
+    ///
+    /// Parameters:
+    /// - nodes: Optional node ID, list of node IDs, or None for all nodes
+    /// - full_graph: If False (default), compute degrees within subgraph only.
+    ///               If True, compute degrees from the original full graph.
+    #[pyo3(signature = (nodes = None, *, full_graph = false))]
+    fn degree(&self, py: Python, nodes: Option<&PyAny>, full_graph: bool) -> PyResult<PyObject> {
+        let graph_ref = self.inner.graph();
+
+        match nodes {
+            // Single node case
+            Some(node_arg) if node_arg.extract::<NodeId>().is_ok() => {
+                let node_id = node_arg.extract::<NodeId>()?;
+                
+                // Verify node is in subgraph
+                if !self.inner.node_set().contains(&node_id) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Node {} is not in this subgraph",
+                        node_id
+                    )));
+                }
+
+                let deg = if full_graph {
+                    // Get degree from full graph
+                    let graph = graph_ref.borrow();
+                    graph.degree(node_id).map_err(|e| {
+                        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}", e))
+                    })?
+                } else {
+                    // Calculate local degree within subgraph
+                    self.inner.edge_set()
+                        .iter()
+                        .filter(|&&edge_id| {
+                            let graph = graph_ref.borrow();
+                            if let Ok((src, tgt)) = graph.edge_endpoints(edge_id) {
+                                src == node_id || tgt == node_id
+                            } else {
+                                false
+                            }
+                        })
+                        .count()
+                };
+
+                Ok(deg.to_object(py))
+            }
+
+            // List of nodes case
+            Some(node_arg) if node_arg.extract::<Vec<NodeId>>().is_ok() => {
+                let node_ids = node_arg.extract::<Vec<NodeId>>()?;
+                let mut degrees = Vec::new();
+
+                for node_id in node_ids {
+                    // Verify node is in subgraph
+                    if !self.inner.node_set().contains(&node_id) {
+                        continue; // Skip nodes not in subgraph
+                    }
+
+                    let deg = if full_graph {
+                        // Get degree from main graph
+                        let graph = graph_ref.borrow();
+                        match graph.degree(node_id) {
+                            Ok(d) => d,
+                            Err(_) => continue, // Skip invalid nodes
+                        }
+                    } else {
+                        // Calculate local degree within subgraph
+                        self.inner.edge_set()
+                            .iter()
+                            .filter(|&&edge_id| {
+                                let graph = graph_ref.borrow();
+                                if let Ok((src, tgt)) = graph.edge_endpoints(edge_id) {
+                                    src == node_id || tgt == node_id
+                                } else {
+                                    false
+                                }
+                            })
+                            .count()
+                    };
+
+                    degrees.push(groggy::AttrValue::Int(deg as i64));
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(degrees);
+                let py_graph_array = PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+
+            // All nodes case (or None)
+            None => {
+                let mut degrees = Vec::new();
+
+                for &node_id in self.inner.node_set() {
+                    let deg = if full_graph {
+                        // Get degree from main graph
+                        let graph = graph_ref.borrow();
+                        match graph.degree(node_id) {
+                            Ok(d) => d,
+                            Err(_) => continue, // Skip invalid nodes
+                        }
+                    } else {
+                        // Calculate local degree within subgraph
+                        self.inner.edge_set()
+                            .iter()
+                            .filter(|&&edge_id| {
+                                let graph = graph_ref.borrow();
+                                if let Ok((src, tgt)) = graph.edge_endpoints(edge_id) {
+                                    src == node_id || tgt == node_id
+                                } else {
+                                    false
+                                }
+                            })
+                            .count()
+                    };
+
+                    degrees.push(groggy::AttrValue::Int(deg as i64));
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(degrees);
+                let py_graph_array = PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+
+            // Invalid argument type
+            Some(_) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "degree() nodes argument must be a NodeId, list of NodeIds, or None",
+            )),
+        }
+    }
+
+    /// Calculate similarity between subgraphs using various metrics
+    #[pyo3(signature = (other, metric = "jaccard"))]
+    fn calculate_similarity(&self, other: &PySubgraph, metric: &str, _py: Python) -> PyResult<f64> {
+        let similarity_metric = match metric {
+            "jaccard" => SimilarityMetric::Jaccard,
+            "dice" => SimilarityMetric::Dice,
+            "cosine" => SimilarityMetric::Cosine,
+            "overlap" => SimilarityMetric::Overlap,
+            _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                format!("Unknown similarity metric: '{}'. Valid options: 'jaccard', 'dice', 'cosine', 'overlap'", metric)
+            ))
+        };
+        
+        self.inner.calculate_similarity(&other.inner, similarity_metric)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Similarity calculation error: {}", e)))
+    }
+
+    /// Support attribute access via indexing: subgraph['attr_name'] -> GraphArray
+    fn __getitem__(&self, key: &PyAny, py: Python) -> PyResult<PyObject> {
+        // Only support string keys (attribute names) for now
+        if let Ok(attr_name) = key.extract::<String>() {
+            // Return GraphArray of attribute values for all nodes in the subgraph
+            let graph_ref = self.inner.graph();
+            let mut attr_values = Vec::new();
+            
+            for &node_id in self.inner.node_set() {
+                let graph = graph_ref.borrow();
+                match graph.get_node_attr(node_id, &attr_name) {
+                    Ok(Some(attr_value)) => {
+                        attr_values.push(attr_value);
+                    }
+                    Ok(None) | Err(_) => {
+                        // Use null for missing attributes
+                        attr_values.push(AttrValue::Null);
+                    }
+                }
+            }
+
+            let graph_array = groggy::GraphArray::from_vec(attr_values);
+            let py_graph_array = PyGraphArray { inner: graph_array };
+            return Ok(Py::new(py, py_graph_array)?.to_object(py));
+        }
+
+        // For now, only support string attribute access
+        Err(PyTypeError::new_err(
+            "Subgraph indexing only supports string attribute names. \
+             Example: subgraph['community']",
+        ))
+    }
+
+    /// Compute neighborhoods from this subgraph, returning a PyNeighborhoodResult
+    fn neighborhood(&self, py: Python, central_nodes: Vec<NodeId>, hops: usize) -> PyResult<PyNeighborhoodResult> {
+        // Just wrap the graph_analysis version - create a temporary PyGraph from our core graph
+        use crate::ffi::api::graph::PyGraph;
+        use crate::ffi::api::graph_analysis::PyGraphAnalysis;
+        
+        // Create a temporary PyGraph wrapper
+        let py_graph = PyGraph {
+            inner: self.inner.graph(),
+        };
+        
+        // Create PyGraphAnalysis and delegate to it
+        let mut analysis_handler = PyGraphAnalysis::new(Py::new(py, py_graph)?)?;
+        analysis_handler.neighborhood(py, central_nodes, Some(hops), None)
+    }
     
     // === String representations ===
     
@@ -305,4 +518,5 @@ impl PySubgraph {
             self.inner.edge_count()
         )
     }
+
 }

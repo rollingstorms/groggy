@@ -24,6 +24,16 @@ fn attr_value_to_python_value(py: Python, attr_value: &AttrValue) -> PyResult<Py
 // Import types from our FFI modules
 use crate::ffi::api::graph::PyGraph;
 use crate::ffi::core::subgraph::PySubgraph;
+use crate::ffi::core::views::PyNodeView;
+
+/// Helper function to create NodeView from core Graph
+fn create_node_view_from_core(graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>, py: Python, node_id: NodeId) -> PyResult<PyObject> {
+    let node_view = PyNodeView {
+        graph: graph.clone(),
+        node_id,
+    };
+    Ok(Py::new(py, node_view)?.to_object(py))
+}
 
 /// Helper function to create EdgeView from core Graph
 fn create_edge_view_from_core(graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>, py: Python, edge_id: EdgeId) -> PyResult<PyObject> {
@@ -38,18 +48,6 @@ fn create_edge_view_from_core(graph: std::rc::Rc<std::cell::RefCell<groggy::Grap
     }
 }
 
-/// Helper function to create NodeView from core Graph
-fn create_node_view_from_core(graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>, py: Python, node_id: NodeId) -> PyResult<PyObject> {
-    // For now, create a simple representation with node information
-    // In a full implementation, you might want to create a proper NodeView class
-    let graph_ref = graph.borrow();
-    if graph_ref.contains_node(node_id) {
-        let node_info = node_id;
-        Ok(node_info.to_object(py))
-    } else {
-        Err(PyKeyError::new_err(format!("Node {} not found", node_id)))
-    }
-}
 
 /// Iterator for nodes that yields NodeViews
 #[pyclass(unsendable)]
@@ -70,9 +68,12 @@ impl NodesIterator {
             let node_id = self.node_ids[self.index];
             self.index += 1;
 
-            // Create NodeView for this node
-            let node_view = create_node_view_from_core(self.graph.clone(), py, node_id)?;
-            Ok(Some(node_view.to_object(py)))
+            // Create PyNodeView that supports 'attr' in node and node['attr'] syntax
+            let node_view = PyNodeView {
+                graph: self.graph.clone(),
+                node_id,
+            };
+            Ok(Some(Py::new(py, node_view)?.to_object(py)))
         } else {
             Ok(None)
         }
@@ -334,11 +335,31 @@ impl PyNodesAccessor {
         }
 
         // Try to extract as string (attribute name access)
-        if let Ok(_attr_name) = key.extract::<String>() {
-            // TODO: Complete implementation - temporarily disabled
-            return Err(PyTypeError::new_err(
-                "String attribute access is under development. Use g.age syntax instead."
-            ));
+        if let Ok(attr_name) = key.extract::<String>() {
+            // Return GraphArray of attribute values for all nodes
+            let graph = self.graph.borrow();
+            let node_ids = if let Some(ref constrained) = self.constrained_nodes {
+                constrained.clone()
+            } else {
+                graph.node_ids()
+            };
+
+            let mut attr_values = Vec::new();
+            for node_id in node_ids {
+                match graph.get_node_attr(node_id, &attr_name) {
+                    Ok(Some(attr_value)) => {
+                        attr_values.push(attr_value);
+                    }
+                    Ok(None) | Err(_) => {
+                        // Use null for missing attributes
+                        attr_values.push(AttrValue::Null);
+                    }
+                }
+            }
+
+            let graph_array = groggy::GraphArray::from_vec(attr_values);
+            let py_graph_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
+            return Ok(Py::new(py, py_graph_array)?.to_object(py));
         }
 
         // If none of the above worked, return error
