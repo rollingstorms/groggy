@@ -442,6 +442,252 @@ impl PySubgraph {
         }
     }
 
+    /// Get in-degree of nodes within subgraph
+    #[pyo3(signature = (nodes = None, full_graph = false))]
+    fn in_degree(&self, py: Python, nodes: Option<&PyAny>, full_graph: bool) -> PyResult<PyObject> {
+        let graph_ref = self.inner.graph();
+
+        match nodes {
+            // Single node case
+            Some(node_arg) if node_arg.extract::<NodeId>().is_ok() => {
+                let node_id = node_arg.extract::<NodeId>()?;
+                
+                // Verify node is in subgraph
+                if !self.inner.node_set().contains(&node_id) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Node {} is not in this subgraph",
+                        node_id
+                    )));
+                }
+
+                let in_deg = if full_graph {
+                    // Get in-degree from full graph
+                    let graph = graph_ref.borrow();
+                    graph.in_degree(node_id).map_err(|e| {
+                        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}", e))
+                    })?
+                } else {
+                    // Calculate local in-degree within subgraph
+                    self.inner.edge_set()
+                        .iter()
+                        .filter(|&&edge_id| {
+                            let graph = graph_ref.borrow();
+                            if let Ok((_, tgt)) = graph.edge_endpoints(edge_id) {
+                                tgt == node_id
+                            } else {
+                                false
+                            }
+                        })
+                        .count()
+                };
+
+                Ok(in_deg.to_object(py))
+            }
+
+            // Multiple nodes case
+            Some(nodes_arg) => {
+                let node_ids: Vec<NodeId> = nodes_arg.extract()?;
+                let mut in_degrees = Vec::new();
+
+                for node_id in node_ids {
+                    // Verify node is in subgraph
+                    if !self.inner.node_set().contains(&node_id) {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                            "Node {} is not in this subgraph",
+                            node_id
+                        )));
+                    }
+
+                    let in_deg = if full_graph {
+                        // Get in-degree from full graph
+                        let graph = graph_ref.borrow();
+                        match graph.in_degree(node_id) {
+                            Ok(d) => d,
+                            Err(_) => continue, // Skip invalid nodes
+                        }
+                    } else {
+                        // Calculate local in-degree within subgraph
+                        self.inner.edge_set()
+                            .iter()
+                            .filter(|&&edge_id| {
+                                let graph = graph_ref.borrow();
+                                if let Ok((_, tgt)) = graph.edge_endpoints(edge_id) {
+                                    tgt == node_id
+                                } else {
+                                    false
+                                }
+                            })
+                            .count()
+                    };
+
+                    in_degrees.push(groggy::AttrValue::Int(in_deg as i64));
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(in_degrees);
+                let py_graph_array = PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+
+            // All nodes case (or None)
+            None => {
+                let mut in_degrees = Vec::new();
+
+                for &node_id in self.inner.node_set() {
+                    let in_deg = if full_graph {
+                        // Get in-degree from main graph
+                        let graph = graph_ref.borrow();
+                        match graph.in_degree(node_id) {
+                            Ok(d) => d,
+                            Err(_) => continue, // Skip invalid nodes
+                        }
+                    } else {
+                        // Calculate local in-degree within subgraph
+                        self.inner.edge_set()
+                            .iter()
+                            .filter(|&&edge_id| {
+                                let graph = graph_ref.borrow();
+                                if let Ok((_, tgt)) = graph.edge_endpoints(edge_id) {
+                                    tgt == node_id
+                                } else {
+                                    false
+                                }
+                            })
+                            .count()
+                    };
+
+                    in_degrees.push(groggy::AttrValue::Int(in_deg as i64));
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(in_degrees);
+                let py_graph_array = PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+        }
+    }
+
+    /// Get out-degree of nodes within subgraph
+    #[pyo3(signature = (nodes = None, full_graph = false))]
+    fn out_degree(&self, py: Python, nodes: Option<&PyAny>, full_graph: bool) -> PyResult<PyObject> {
+        let graph_ref = self.inner.graph();
+
+        match nodes {
+            // Single node case
+            Some(node_arg) if node_arg.extract::<NodeId>().is_ok() => {
+                let node_id = node_arg.extract::<NodeId>()?;
+                
+                // Verify node is in subgraph
+                if !self.inner.node_set().contains(&node_id) {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Node {} is not in this subgraph",
+                        node_id
+                    )));
+                }
+
+                let out_deg = if full_graph {
+                    // Get out-degree from full graph
+                    let graph = graph_ref.borrow();
+                    graph.out_degree(node_id).map_err(|e| {
+                        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}", e))
+                    })?
+                } else {
+                    // Calculate local out-degree within subgraph
+                    self.inner.edge_set()
+                        .iter()
+                        .filter(|&&edge_id| {
+                            let graph = graph_ref.borrow();
+                            if let Ok((src, _)) = graph.edge_endpoints(edge_id) {
+                                src == node_id
+                            } else {
+                                false
+                            }
+                        })
+                        .count()
+                };
+
+                Ok(out_deg.to_object(py))
+            }
+
+            // Multiple nodes case
+            Some(nodes_arg) => {
+                let node_ids: Vec<NodeId> = nodes_arg.extract()?;
+                let mut out_degrees = Vec::new();
+
+                for node_id in node_ids {
+                    // Verify node is in subgraph
+                    if !self.inner.node_set().contains(&node_id) {
+                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                            "Node {} is not in this subgraph",
+                            node_id
+                        )));
+                    }
+
+                    let out_deg = if full_graph {
+                        // Get out-degree from full graph
+                        let graph = graph_ref.borrow();
+                        match graph.out_degree(node_id) {
+                            Ok(d) => d,
+                            Err(_) => continue, // Skip invalid nodes
+                        }
+                    } else {
+                        // Calculate local out-degree within subgraph
+                        self.inner.edge_set()
+                            .iter()
+                            .filter(|&&edge_id| {
+                                let graph = graph_ref.borrow();
+                                if let Ok((src, _)) = graph.edge_endpoints(edge_id) {
+                                    src == node_id
+                                } else {
+                                    false
+                                }
+                            })
+                            .count()
+                    };
+
+                    out_degrees.push(groggy::AttrValue::Int(out_deg as i64));
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(out_degrees);
+                let py_graph_array = PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+
+            // All nodes case (or None)
+            None => {
+                let mut out_degrees = Vec::new();
+
+                for &node_id in self.inner.node_set() {
+                    let out_deg = if full_graph {
+                        // Get out-degree from main graph
+                        let graph = graph_ref.borrow();
+                        match graph.out_degree(node_id) {
+                            Ok(d) => d,
+                            Err(_) => continue, // Skip invalid nodes
+                        }
+                    } else {
+                        // Calculate local out-degree within subgraph
+                        self.inner.edge_set()
+                            .iter()
+                            .filter(|&&edge_id| {
+                                let graph = graph_ref.borrow();
+                                if let Ok((src, _)) = graph.edge_endpoints(edge_id) {
+                                    src == node_id
+                                } else {
+                                    false
+                                }
+                            })
+                            .count()
+                    };
+
+                    out_degrees.push(groggy::AttrValue::Int(out_deg as i64));
+                }
+
+                let graph_array = groggy::GraphArray::from_vec(out_degrees);
+                let py_graph_array = PyGraphArray { inner: graph_array };
+                Ok(Py::new(py, py_graph_array)?.to_object(py))
+            }
+        }
+    }
+
     /// Calculate similarity between subgraphs using various metrics
     #[pyo3(signature = (other, metric = "jaccard"))]
     fn calculate_similarity(&self, other: &PySubgraph, metric: &str, _py: Python) -> PyResult<f64> {

@@ -964,23 +964,6 @@ impl PyGraph {
         analysis_handler.neighbors(py, nodes)
     }
 
-    /// Get degree of nodes - delegates to PyGraphAnalysis helper
-    fn degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
-        let analysis_handler = PyGraphAnalysis::new(Py::new(py, self.clone())?)?;
-        analysis_handler.degree(py, nodes)
-    }
-
-    /// Get in-degree of nodes - delegates to PyGraphAnalysis helper  
-    fn in_degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
-        let analysis_handler = PyGraphAnalysis::new(Py::new(py, self.clone())?)?;
-        analysis_handler.in_degree(py, nodes)
-    }
-
-    /// Get out-degree of nodes - delegates to PyGraphAnalysis helper
-    fn out_degree(&self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
-        let analysis_handler = PyGraphAnalysis::new(Py::new(py, self.clone())?)?;
-        analysis_handler.out_degree(py, nodes)
-    }
 
     /// Get neighborhood sampling - delegates to PyGraphAnalysis helper
     fn neighborhood(
@@ -1651,6 +1634,29 @@ impl PyGraph {
             }
             
             return Ok(result_dict.to_object(py));
+        }
+        
+        // Try delegating to subgraph methods (like degree, in_degree, out_degree)
+        match slf.as_subgraph() {
+            Ok(full_subgraph_trait) => {
+                match PySubgraph::from_trait_object(full_subgraph_trait) {
+                    Ok(full_subgraph) => {
+                        let subgraph_obj = Py::new(py, full_subgraph)?;
+                        match subgraph_obj.getattr(py, name.as_str()) {
+                            Ok(result) => return Ok(result),
+                            Err(_) => {
+                                // Subgraph doesn't have this method either, fall through to error
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        // Failed to create subgraph, fall through to error
+                    }
+                }
+            }
+            Err(_) => {
+                // Failed to create subgraph trait, fall through to error
+            }
         }
         
         // Attribute not found
