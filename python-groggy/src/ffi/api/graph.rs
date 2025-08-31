@@ -6,11 +6,10 @@ use crate::ffi::api::graph_attributes::{PyGraphAttr, PyGraphAttrMut};
 use groggy::{AttrName, AttrValue as RustAttrValue, EdgeId, Graph as RustGraph, NodeId, StateId};
 use groggy::core::subgraph::Subgraph;
 use groggy::core::traits::SubgraphOperations;
-use pyo3::exceptions::{PyAttributeError, PyKeyError, PyRuntimeError, PyTypeError};
+use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 // Import all graph modules
@@ -57,16 +56,6 @@ impl PyAggregationResult {
     }
 }
 
-/// Helper function to convert AdjacencyMatrix to PyGraphMatrix
-fn adjacency_matrix_to_py_graph_matrix(
-    _py: Python,
-    _matrix: groggy::AdjacencyMatrix,
-) -> PyResult<Py<PyGraphMatrix>> {
-    // TODO: Implement adjacency matrix to GraphMatrix conversion in Phase 2
-    Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-        "AdjacencyMatrix to GraphMatrix conversion temporarily disabled during Phase 2 unification",
-    ))
-}
 
 /// Convert AdjacencyMatrix to Python object - DELEGATION helper
 impl PyGraph {
@@ -1354,9 +1343,6 @@ impl PyGraph {
 // Internal methods for FFI integration (not exposed to Python)
 impl PyGraph {
     /// Get shared reference to the graph for creating RustSubgraphs
-    pub(crate) fn get_graph_ref(&self) -> Rc<RefCell<RustGraph>> {
-        self.inner.clone()
-    }
 
     /// Convert core AdjacencyMatrix to GraphMatrix for Python FFI
     pub(crate) fn adjacency_matrix_to_graph_matrix(
@@ -1795,70 +1781,8 @@ impl PyGraph {
 
     // === DELEGATED METHODS - Pure SubgraphOperations delegation ===
     
-    /// Get connected components using SubgraphOperations trait  
-    /// This replaces the graph_analytics.py connected_components() method
-    /// Get connected components - PURE DELEGATION to SubgraphOperations
-    fn connected_components(&self, _py: Python) -> PyResult<Vec<PySubgraph>> {
-        // DELEGATION: Use SubgraphOperations connected_components
-        match self.as_subgraph() {
-            Ok(subgraph) => {
-                let components = subgraph.connected_components().map_err(graph_error_to_py_err)?;
-                let py_components: Result<Vec<PySubgraph>, PyErr> = components
-                    .into_iter()
-                    .map(|component| {
-                        // Convert trait object to concrete PySubgraph
-                        let nodes = component.node_set().iter().copied().collect();
-                        let edges = component.edge_set().iter().copied().collect();
-                        let concrete_subgraph = groggy::core::subgraph::Subgraph::new(
-                            self.inner.clone(),
-                            nodes,
-                            edges,
-                            format!("component"),
-                        );
-                        PySubgraph::from_core_subgraph(concrete_subgraph)
-                    })
-                    .collect();
-                py_components
-            },
-            Err(e) => Err(e),
-        }
-    }
+  
 
-    /// Get memory statistics - moved from graph_analytics
-    fn memory_statistics(&self, py: Python) -> PyResult<PyObject> {
-        let stats = self.inner.borrow().memory_statistics();
 
-        // Convert MemoryStatistics to Python dict
-        let dict = PyDict::new(py);
-        dict.set_item("pool_memory_bytes", stats.pool_memory_bytes);
-        dict.set_item("space_memory_bytes", stats.space_memory_bytes);
-        dict.set_item("history_memory_bytes", stats.history_memory_bytes);
-        dict.set_item("change_tracker_memory_bytes", stats.change_tracker_memory_bytes);
-        dict.set_item("total_memory_bytes", stats.total_memory_bytes);
-        dict.set_item("total_memory_mb", stats.total_memory_mb);
-
-        // Add memory efficiency stats
-        let efficiency_dict = PyDict::new(py);
-        efficiency_dict.set_item("bytes_per_node", stats.memory_efficiency.bytes_per_node);
-        efficiency_dict.set_item("bytes_per_edge", stats.memory_efficiency.bytes_per_edge);
-        efficiency_dict.set_item("bytes_per_entity", stats.memory_efficiency.bytes_per_entity);
-        efficiency_dict.set_item("overhead_ratio", stats.memory_efficiency.overhead_ratio);
-        efficiency_dict.set_item("cache_efficiency", stats.memory_efficiency.cache_efficiency);
-        dict.set_item("memory_efficiency", efficiency_dict);
-
-        Ok(dict.to_object(py))
-    }
-
-    /// Get analytics summary - moved from graph_analytics  
-    fn get_summary(&self, py: Python) -> PyResult<String> {
-        {
-            let subgraph = self.as_subgraph()?;
-            Ok(format!(
-                "Graph Summary: {} nodes, {} edges",
-                subgraph.node_count(),
-                subgraph.edge_count()
-            ))
-        }
-    }
 
 }

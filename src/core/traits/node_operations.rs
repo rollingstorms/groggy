@@ -127,7 +127,7 @@ pub trait NodeOperations: GraphEntity {
             let subgraph: Box<dyn SubgraphOperations> = match subgraph_type.as_str() {
                 "neighborhood" => {
                     // Reconstruct NeighborhoodSubgraph with metadata from node attributes
-                    let central_nodes = {
+                    let _central_nodes = {
                         let binding = self.graph_ref();
                         let graph = binding.borrow();
                         let x = if let Some(AttrValue::NodeArray(central)) = 
@@ -139,7 +139,7 @@ pub trait NodeOperations: GraphEntity {
                         x
                     };
                     
-                    let hops = {
+                    let _hops = {
                         let binding = self.graph_ref();
                         let graph = binding.borrow();
                         let x = if let Some(AttrValue::SmallInt(h)) = 
@@ -231,7 +231,7 @@ pub trait NodeOperations: GraphEntity {
     fn neighborhood(&self, hops: usize) -> GraphResult<Box<dyn SubgraphOperations>> {
         // Use existing NeighborhoodSampler for efficient neighborhood expansion (same as EntityNode)
         let binding = self.graph_ref();
-        let mut graph = binding.borrow_mut();
+        let graph = binding.borrow_mut();
         let mut neighborhood_sampler = crate::core::neighborhood::NeighborhoodSampler::new();
         let result = neighborhood_sampler.unified_neighborhood(
             &graph.pool(),
@@ -256,7 +256,7 @@ pub trait NodeOperations: GraphEntity {
     /// Uses existing efficient shortest path algorithm with multiple targets
     fn shortest_paths(&self, targets: &[NodeId]) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
         let binding = self.graph_ref();
-        let mut graph = binding.borrow_mut();
+        let graph = binding.borrow_mut();
         let mut paths = Vec::new();
         
         for &target in targets {

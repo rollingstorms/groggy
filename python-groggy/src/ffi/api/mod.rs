@@ -14,5 +14,3 @@ pub mod graph_query;
 pub mod graph_version;
 
 // Re-export API FFI types
-pub use graph::PyGraph;
-pub use graph_attributes::PyGraphAttr;

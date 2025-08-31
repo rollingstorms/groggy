@@ -7,10 +7,9 @@ use groggy::core::subgraph::Subgraph;
 use groggy::core::traits::SubgraphOperations;
 use groggy::{NodeId, EdgeId, AttrValue, SimilarityMetric};
 use crate::ffi::core::neighborhood::PyNeighborhoodResult;
-use groggy::core::neighborhood::NeighborhoodResult;
 use std::collections::HashSet;
 use pyo3::prelude::*;
-use pyo3::exceptions::{PyRuntimeError, PyKeyError, PyTypeError};
+use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::types::PyDict;
 
 // Import FFI types we need to preserve compatibility

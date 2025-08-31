@@ -422,6 +422,94 @@ impl PyRowIterator {
 }
 ```
 
+## Recent Architecture Changes (v0.3.0)
+
+### Shadow API Elimination
+
+**Problem Resolved**: PySubgraphOperations trait contained ~33 useful methods that were completely inaccessible to Python users, creating a "shadow API" where functionality existed but was trapped.
+
+**Solution Implemented**:
+1. **Deleted PySubgraphOperations trait** (400+ lines of unused code)
+2. **Moved all methods to PySubgraph #[pymethods]** for direct Python access
+3. **Added 13 previously hidden methods** including `is_empty()`, `summary()`, `degree()`, etc.
+
+```rust
+// BEFORE: Shadow API (inaccessible)
+trait PySubgraphOperations {
+    fn degree(&self, node: NodeId) -> PyResult<usize>; // Hidden from Python!
+    fn is_empty(&self) -> bool; // Hidden from Python!
+    // ... 31 more hidden methods
+}
+
+// AFTER: Direct access via #[pymethods]
+#[pymethods]
+impl PySubgraph {
+    fn degree(&self, py: Python, node: NodeId) -> PyResult<usize> {
+        // Now accessible to Python users!
+    }
+    
+    fn is_empty(&self, py: Python) -> PyResult<bool> {
+        // Now accessible to Python users!
+    }
+}
+```
+
+### Accessor-Based Attribute Setting
+
+**New Pattern**: Constrained attribute setting through accessor objects instead of direct subgraph methods.
+
+```rust
+// NEW: Accessor-based pattern
+impl PyNodesAccessor {
+    #[pymethods]
+    fn set_attrs(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
+        self.set_attrs_internal(py, attrs_dict)
+    }
+    
+    // Internal method for cross-language calls
+    pub fn set_attrs_internal(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
+        // Validation and delegation to core
+    }
+}
+```
+
+**Usage Pattern**:
+```python
+# Constrained attribute setting
+subgraph.nodes.set_attrs(department="Engineering") 
+subgraph.edges.set_attrs(weight=1.5)
+subgraph.nodes[:5].set_attrs(priority="high")  # Sliced setting
+```
+
+### Method Delegation Pattern
+
+**New Pattern**: `__getattr__` delegation eliminates duplicate implementations between PyGraph and PySubgraph.
+
+```rust
+#[pymethods]
+impl PyGraph {
+    fn __getattr__(slf: PyRef<Self>, py: Python, name: String) -> PyResult<PyObject> {
+        // Automatic delegation to subgraph methods
+        match slf.as_subgraph() {
+            Ok(full_subgraph_trait) => {
+                match PySubgraph::from_trait_object(full_subgraph_trait) {
+                    Ok(full_subgraph) => {
+                        let subgraph_obj = Py::new(py, full_subgraph)?;
+                        match subgraph_obj.getattr(py, name.as_str()) {
+                            Ok(result) => return Ok(result),
+                            Err(_) => { /* fall through */ }
+                        }
+                    }
+                }
+            }
+        }
+        // Standard attribute lookup if delegation fails
+    }
+}
+```
+
+**Result**: No more duplicate degree/analysis methods - automatic forwarding from Graph to Subgraph.
+
 ## Development Patterns
 
 ### Adding a New FFI Method

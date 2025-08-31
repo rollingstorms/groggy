@@ -22,7 +22,6 @@ fn attr_value_to_python_value(py: Python, attr_value: &AttrValue) -> PyResult<Py
 }
 
 // Import types from our FFI modules
-use crate::ffi::api::graph::PyGraph;
 use crate::ffi::core::subgraph::PySubgraph;
 use crate::ffi::core::views::PyNodeView;
 

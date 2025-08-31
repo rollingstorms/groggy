@@ -193,7 +193,7 @@ impl SubgraphOperations for FilteredSubgraph {
     fn connected_components(&self) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
         // Use existing connected components algorithm with filtered data
         use crate::core::traversal::TraversalEngine;
-        let mut graph = self.graph.borrow_mut();
+        let graph = self.graph.borrow_mut();
         let options = crate::core::traversal::TraversalOptions::default();
         
         let mut traversal_engine = TraversalEngine::new();
@@ -239,7 +239,7 @@ impl SubgraphOperations for FilteredSubgraph {
         }
 
         use crate::core::traversal::TraversalEngine;
-        let mut graph = self.graph.borrow_mut();
+        let graph = self.graph.borrow_mut();
         let mut options = crate::core::traversal::TraversalOptions::default();
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
@@ -280,7 +280,7 @@ impl SubgraphOperations for FilteredSubgraph {
         }
 
         use crate::core::traversal::TraversalEngine;
-        let mut graph = self.graph.borrow_mut();
+        let graph = self.graph.borrow_mut();
         let mut options = crate::core::traversal::TraversalOptions::default();
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
@@ -317,7 +317,7 @@ impl SubgraphOperations for FilteredSubgraph {
         }
 
         use crate::core::traversal::{TraversalEngine, PathFindingOptions};
-        let mut graph = self.graph.borrow_mut();
+        let graph = self.graph.borrow_mut();
         let options = PathFindingOptions::default();
         
         let mut traversal_engine = TraversalEngine::new();

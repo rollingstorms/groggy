@@ -5,7 +5,7 @@
 use crate::ffi::core::subgraph::PySubgraph;
 use groggy::core::neighborhood::{NeighborhoodResult, NeighborhoodStats, NeighborhoodSubgraph};
 use groggy::core::traits::{SubgraphOperations, NeighborhoodOperations, GraphEntity};
-use groggy::{NodeId, EdgeId};
+use groggy::NodeId;
 use pyo3::prelude::*;
 
 /// Python wrapper for NeighborhoodSubgraph
