@@ -6,7 +6,7 @@ use groggy::{AttrValue, EdgeId, NodeId};
 use std::collections::HashSet;
 use pyo3::exceptions::{PyIndexError, PyKeyError, PyTypeError, PyValueError, PyRuntimeError};
 use pyo3::prelude::*;
-use pyo3::types::PySlice;
+use pyo3::types::{PySlice, PyDict};
 
 /// Utility function to convert AttrValue to Python object
 fn attr_value_to_python_value(py: Python, attr_value: &AttrValue) -> PyResult<PyObject> {
@@ -94,6 +94,12 @@ pub struct PyNodesAccessor {
 
 #[pymethods]
 impl PyNodesAccessor {
+
+    /// Set attributes for multiple nodes (bulk operation)
+    /// Supports the same formats as the main graph: node-centric, column-centric, etc.
+    fn set_attrs(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
+        self.set_attrs_internal(py, attrs_dict)
+    }
     /// Support node access: g.nodes[0] -> NodeView, g.nodes[[0,1,2]] -> Subgraph, g.nodes[0:5] -> Subgraph
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
         // Try to extract as single integer
@@ -594,6 +600,42 @@ impl PyNodesAccessor {
     }
 }
 
+impl PyNodesAccessor {
+    /// Set attributes for multiple nodes (bulk operation) - internal method callable from Rust
+    /// Supports the same formats as the main graph: node-centric, column-centric, etc.
+    pub fn set_attrs_internal(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
+        use crate::ffi::api::graph_attributes::PyGraphAttrMut;
+        
+        // Create a mutable graph attributes handler
+        let mut attr_handler = PyGraphAttrMut::new(self.graph.clone());
+        
+        // If this accessor is constrained to specific nodes, we need to validate
+        if let Some(ref constrained_nodes) = self.constrained_nodes {
+            // Validate that all node IDs in attrs_dict are in our constrained set
+            let constrained_set: std::collections::HashSet<NodeId> = constrained_nodes.iter().copied().collect();
+            
+            for (attr_name_py, node_values_py) in attrs_dict.iter() {
+                let attr_name: String = attr_name_py.extract()?;
+                
+                // Handle different formats - for now assume node-centric format
+                if let Ok(node_dict) = node_values_py.extract::<&pyo3::types::PyDict>() {
+                    for (node_py, _value_py) in node_dict.iter() {
+                        let node_id: NodeId = node_py.extract()?;
+                        if !constrained_set.contains(&node_id) {
+                            return Err(pyo3::exceptions::PyPermissionError::new_err(
+                                format!("Cannot set attribute for node {} - not in this subgraph/view", node_id)
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Delegate to the graph attributes handler (it has the smart format detection)
+        attr_handler.set_node_attrs(py, attrs_dict)
+    }
+}
+
 /// Iterator for edges that yields EdgeViews
 #[pyclass(unsendable)]
 pub struct EdgesIterator {
@@ -632,6 +674,11 @@ pub struct PyEdgesAccessor {
 
 #[pymethods]
 impl PyEdgesAccessor {
+    /// Set attributes for multiple edges (bulk operation)
+    /// Supports the same formats as the main graph: edge-centric, column-centric, etc.
+    fn set_attrs(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
+        self.set_attrs_internal(py, attrs_dict)
+    }
     /// Support edge access: g.edges[0] -> EdgeView, g.edges[[0,1,2]] -> Subgraph, g.edges[0:5] -> Subgraph
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
         // Try to extract as single integer
@@ -1078,5 +1125,37 @@ impl PyEdgesAccessor {
             .collect();
 
         Ok(py_values.to_object(py))
+    }
+}
+
+impl PyEdgesAccessor {
+    /// Set attributes for multiple edges (bulk operation) - internal method callable from Rust
+    pub fn set_attrs_internal(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
+        use crate::ffi::api::graph_attributes::PyGraphAttrMut;
+        
+        // Create a mutable graph attributes handler
+        let mut attr_handler = PyGraphAttrMut::new(self.graph.clone());
+        
+        // If this accessor is constrained to specific edges, validate
+        if let Some(ref constrained_edges) = self.constrained_edges {
+            let constrained_set: std::collections::HashSet<EdgeId> = constrained_edges.iter().copied().collect();
+            
+            for (attr_name_py, edge_values_py) in attrs_dict.iter() {
+                let attr_name: String = attr_name_py.extract()?;
+                
+                if let Ok(edge_dict) = edge_values_py.extract::<&pyo3::types::PyDict>() {
+                    for (edge_py, _value_py) in edge_dict.iter() {
+                        let edge_id: EdgeId = edge_py.extract()?;
+                        if !constrained_set.contains(&edge_id) {
+                            return Err(pyo3::exceptions::PyPermissionError::new_err(
+                                format!("Cannot set attribute for edge {} - not in this subgraph/view", edge_id)
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        
+        attr_handler.set_edge_attrs(py, attrs_dict)
     }
 }

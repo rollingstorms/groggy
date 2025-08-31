@@ -4,7 +4,5 @@
 //! to our efficient core trait implementations. All algorithm logic remains
 //! in the core - this is pure translation layer.
 
-pub mod subgraph_operations;
-
-// Re-export trait types for easier access
-pub use subgraph_operations::*;
+// Subgraph operations moved to direct implementation in ffi/core/subgraph.rs
+// No trait-based patterns needed - direct delegation is cleaner

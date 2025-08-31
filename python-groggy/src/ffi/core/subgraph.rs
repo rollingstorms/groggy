@@ -6,7 +6,6 @@
 use groggy::core::subgraph::Subgraph;
 use groggy::core::traits::SubgraphOperations;
 use groggy::{NodeId, EdgeId, AttrValue, SimilarityMetric};
-use crate::ffi::traits::subgraph_operations::PySubgraphOperations;
 use crate::ffi::core::neighborhood::PyNeighborhoodResult;
 use groggy::core::neighborhood::NeighborhoodResult;
 use std::collections::HashSet;
@@ -519,6 +518,237 @@ impl PySubgraph {
         )
     }
     
+    // === MISSING BASIC OPERATIONS ===
+    
+    /// Check if subgraph is empty
+    fn is_empty(&self) -> bool {
+        self.inner.node_count() == 0
+    }
+    
+    /// Get text summary of subgraph
+    fn summary(&self) -> String {
+        format!(
+            "Subgraph: {} nodes, {} edges, density: {:.3}",
+            self.inner.node_count(),
+            self.inner.edge_count(),
+            self.inner.density()
+        )
+    }
+    
+    /// Check if subgraph contains a specific node (alias for has_node)
+    fn contains_node(&self, node_id: NodeId) -> bool {
+        self.inner.contains_node(node_id)
+    }
+    
+    /// Check if subgraph contains a specific edge (alias for has_edge)  
+    fn contains_edge(&self, edge_id: EdgeId) -> bool {
+        self.inner.contains_edge(edge_id)
+    }
+    
+    /// Get neighbors of a node within the subgraph
+    fn neighbors(&self, py: Python, node_id: NodeId) -> PyResult<Py<PyGraphArray>> {
+        match self.inner.neighbors(node_id) {
+            Ok(neighbor_ids) => {
+                let attr_values: Vec<AttrValue> = neighbor_ids
+                    .into_iter()
+                    .map(|id| AttrValue::Int(id as i64))
+                    .collect();
+                let py_array = PyGraphArray {
+                    inner: groggy::core::array::GraphArray::from_vec(attr_values),
+                };
+                Py::new(py, py_array)
+            }
+            Err(e) => Err(PyRuntimeError::new_err(format!("Neighbors error: {}", e)))
+        }
+    }
+    
+    /// Get edge endpoints (source, target)
+    fn edge_endpoints(&self, _py: Python, edge_id: EdgeId) -> PyResult<(NodeId, NodeId)> {
+        match self.inner.edge_endpoints(edge_id) {
+            Ok(endpoints) => Ok(endpoints),
+            Err(e) => Err(PyRuntimeError::new_err(format!("Edge endpoints error: {}", e)))
+        }
+    }
+    
+    /// Check if edge exists between two nodes
+    fn has_edge_between(&self, _py: Python, source: NodeId, target: NodeId) -> PyResult<bool> {
+        match self.inner.has_edge_between(source, target) {
+            Ok(exists) => Ok(exists),
+            Err(e) => Err(PyRuntimeError::new_err(format!("Edge check error: {}", e)))
+        }
+    }
+    
+    // === MISSING ATTRIBUTE ACCESS METHODS ===
+    
+    /// Get a single node attribute value
+    fn get_node_attribute(&self, py: Python, node_id: NodeId, attr_name: String) -> PyResult<Option<PyObject>> {
+        use crate::ffi::utils::attr_value_to_python_value;
+        match self.inner.get_node_attribute(node_id, &attr_name) {
+            Ok(Some(attr_value)) => {
+                let py_value = attr_value_to_python_value(py, &attr_value)?;
+                Ok(Some(py_value))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(PyRuntimeError::new_err(format!("Get node attribute error: {}", e)))
+        }
+    }
+    
+    /// Get a single edge attribute value
+    fn get_edge_attribute(&self, py: Python, edge_id: EdgeId, attr_name: String) -> PyResult<Option<PyObject>> {
+        use crate::ffi::utils::attr_value_to_python_value;
+        match self.inner.get_edge_attribute(edge_id, &attr_name) {
+            Ok(Some(attr_value)) => {
+                let py_value = attr_value_to_python_value(py, &attr_value)?;
+                Ok(Some(py_value))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(PyRuntimeError::new_err(format!("Get edge attribute error: {}", e)))
+        }
+    }
+    
+    /// Set multiple node attributes (bulk operation) - delegates to accessor
+    fn set_node_attrs(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
+        // Get the nodes accessor and delegate to its internal method
+        let nodes_accessor = self.nodes(py)?;
+        let nodes_accessor_ref: PyRef<PyNodesAccessor> = nodes_accessor.extract(py)?;
+        nodes_accessor_ref.set_attrs_internal(py, attrs_dict)
+    }
+    
+    /// Set multiple edge attributes (bulk operation) - delegates to accessor  
+    fn set_edge_attrs(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
+        // Get the edges accessor and delegate to its internal method
+        let edges_accessor = self.edges(py)?;
+        let edges_accessor_ref: PyRef<PyEdgesAccessor> = edges_accessor.extract(py)?;
+        edges_accessor_ref.set_attrs_internal(py, attrs_dict)
+    }
+    
+    // === MISSING GRAPH METRICS ===
+    
+    /// Calculate clustering coefficient for a node or entire subgraph
+    fn clustering_coefficient(&self, _py: Python, node_id: Option<NodeId>) -> PyResult<f64> {
+        // Note: Clustering coefficient not yet implemented in core
+        // This is a placeholder for future implementation
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "Clustering coefficient not yet implemented in core - coming in future version"
+        ))
+    }
+    
+    /// Calculate transitivity of the subgraph
+    fn transitivity(&self, _py: Python) -> PyResult<f64> {
+        // Note: Transitivity not yet implemented in core  
+        // This is a placeholder for future implementation
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "Transitivity not yet implemented in core - coming in future version"
+        ))
+    }
+    
+    // === ENTITY TYPE METHOD ===
+    
+    /// Return the entity type string
+    fn entity_type(&self) -> PyResult<String> {
+        Ok("Subgraph".to_string())
+    }
+    
+    // === MISSING SUBGRAPH OPERATIONS ===
+    
+    /// Create subgraph from BFS traversal
+    fn bfs(&self, py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PySubgraph> {
+        match self.inner.bfs(start, max_depth) {
+            Ok(subgraph_trait) => {
+                // Convert trait object back to concrete Subgraph - this is complex
+                // For now, return not implemented error
+                Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                    "BFS subgraph creation not yet implemented - complex trait object conversion needed"
+                ))
+            }
+            Err(e) => Err(PyRuntimeError::new_err(format!("BFS error: {}", e)))
+        }
+    }
+    
+    /// Create subgraph from DFS traversal  
+    fn dfs(&self, py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PySubgraph> {
+        match self.inner.dfs(start, max_depth) {
+            Ok(subgraph_trait) => {
+                // Convert trait object back to concrete Subgraph - this is complex
+                // For now, return not implemented error
+                Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                    "DFS subgraph creation not yet implemented - complex trait object conversion needed"
+                ))
+            }
+            Err(e) => Err(PyRuntimeError::new_err(format!("DFS error: {}", e)))
+        }
+    }
+    
+    /// Create subgraph representing shortest path between two nodes
+    fn shortest_path_subgraph(&self, py: Python, source: NodeId, target: NodeId) -> PyResult<Option<PySubgraph>> {
+        match self.inner.shortest_path_subgraph(source, target) {
+            Ok(Some(subgraph_trait)) => {
+                // Convert trait object back to concrete Subgraph - this is complex
+                // For now, return not implemented error
+                Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                    "Shortest path subgraph not yet implemented - complex trait object conversion needed"
+                ))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(PyRuntimeError::new_err(format!("Shortest path error: {}", e)))
+        }
+    }
+    
+    /// Create induced subgraph from list of nodes
+    fn induced_subgraph(&self, py: Python, nodes: Vec<NodeId>) -> PyResult<PySubgraph> {
+        match self.inner.induced_subgraph(&nodes) {
+            Ok(subgraph_trait) => {
+                // Convert trait object back to concrete Subgraph - this is complex
+                // For now, return not implemented error
+                Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                    "Induced subgraph not yet implemented - complex trait object conversion needed"
+                ))
+            }
+            Err(e) => Err(PyRuntimeError::new_err(format!("Induced subgraph error: {}", e)))
+        }
+    }
+    
+    /// Create subgraph from list of edges
+    fn subgraph_from_edges(&self, py: Python, edges: Vec<EdgeId>) -> PyResult<PySubgraph> {
+        match self.inner.subgraph_from_edges(&edges) {
+            Ok(subgraph_trait) => {
+                // Convert trait object back to concrete Subgraph - this is complex
+                // For now, return not implemented error
+                Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                    "Subgraph from edges not yet implemented - complex trait object conversion needed"
+                ))
+            }
+            Err(e) => Err(PyRuntimeError::new_err(format!("Subgraph from edges error: {}", e)))
+        }
+    }
+    
+    /// Set operations - merge, intersect, subtract (placeholders)
+    fn merge_with(&self, py: Python, other: &PySubgraph) -> PyResult<PySubgraph> {
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "Subgraph set operations not yet implemented - requires subgraph algebra in core"
+        ))
+    }
+    
+    fn intersect_with(&self, py: Python, other: &PySubgraph) -> PyResult<PySubgraph> {
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "Subgraph set operations not yet implemented - requires subgraph algebra in core"
+        ))
+    }
+    
+    fn subtract_from(&self, py: Python, other: &PySubgraph) -> PyResult<PySubgraph> {
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "Subgraph set operations not yet implemented - requires subgraph algebra in core"
+        ))
+    }
+    
+    /// Collapse subgraph to a single node with aggregated attributes
+    fn collapse_to_node(&self, py: Python, agg_functions: &PyDict) -> PyResult<NodeId> {
+        // This is complex and needs proper aggregation logic
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "Subgraph collapse not yet implemented - requires aggregation logic in core"
+        ))
+    }
+    
     fn __str__(&self) -> String {
         format!(
             "Subgraph with {} nodes and {} edges",
@@ -533,14 +763,4 @@ impl PySubgraph {
 // TRAIT IMPLEMENTATION - Core delegation pattern
 // ============================================================================
 
-impl PySubgraphOperations for PySubgraph {
-    /// Provide access to core trait object for delegation
-    fn core_subgraph(&self) -> PyResult<&dyn groggy::core::traits::SubgraphOperations> {
-        Ok(&self.inner)
-    }
-    
-    /// Override trait method for concrete Subgraph downcast when needed
-    fn try_downcast_to_subgraph(&self) -> Option<&groggy::core::subgraph::Subgraph> {
-        Some(&self.inner)
-    }
-}
+// Shadow trait implementation removed - PySubgraph now uses direct delegation only
