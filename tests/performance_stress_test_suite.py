@@ -76,7 +76,7 @@ class PerformanceStressTester:
         print("-" * 80)
         
         # Test different graph sizes
-        sizes = [1000, 10000, 50000]
+        sizes = [100000, 1000000, 5000000]
         
         for size in sizes:
             print(f"\n📊 Testing with {size:,} nodes:")
@@ -146,7 +146,7 @@ class PerformanceStressTester:
         print("-" * 80)
         
         # Test with different graph densities
-        node_counts = [1000, 5000]
+        node_counts = [1000000, 5000000]
         edge_densities = [0.1, 0.5, 1.0]  # Percentage of possible edges
         
         for node_count in node_counts:
@@ -211,7 +211,7 @@ class PerformanceStressTester:
         
         # Create a large graph with diverse attributes
         graph = g.Graph()
-        node_count = 10000
+        node_count = 1000000
         
         print(f"\n📊 Setting up {node_count:,} node test graph...")
         
@@ -289,7 +289,7 @@ class PerformanceStressTester:
         print(f"{'Test':<40} | {'Time':>8} | {'Memory':>8} | {'Total':>6}")
         print("-" * 80)
         
-        sizes = [100, 500, 1000]  # Start smaller for matrix ops
+        sizes = [1000, 5000, 10000]  # Start smaller for matrix ops
         
         for size in sizes:
             print(f"\n📊 Testing {size}x{size} matrices:")

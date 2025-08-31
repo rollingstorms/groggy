@@ -5,9 +5,7 @@
 // Core component FFI bindings
 pub mod accessors;
 pub mod array;
-pub mod attributes;
 pub mod component;
-pub mod history;
 pub mod matrix;
 pub mod neighborhood;
 pub mod query;
