@@ -219,37 +219,25 @@ class GroggyPhase3Benchmark:
         # Only set attributes that are actually used in the benchmark queries
         essential_attributes = ['department', 'salary', 'active', 'performance']  # Reduced from 7 to 4
         
-        # Use new optimized bulk API format
+        # Use correct API format: {attr_name: {node_id: value}}
         bulk_attrs_dict = {}
         
         for attr_name in essential_attributes:
-            values_list = []
+            node_values_dict = {}
             
             for i, node in enumerate(nodes_data):
+                node_id = self.bulk_node_ids[i]
+                
                 if attr_name == 'department':
-                    values_list.append(node['department'])
+                    node_values_dict[node_id] = node['department']
                 elif attr_name == 'salary':
-                    values_list.append(node['salary'])
+                    node_values_dict[node_id] = node['salary']
                 elif attr_name == 'active':
-                    values_list.append(node['active'])
+                    node_values_dict[node_id] = node['active']
                 elif attr_name == 'performance':
-                    values_list.append(node['performance'])
+                    node_values_dict[node_id] = node['performance']
             
-            # Determine value type for bulk API
-            if attr_name in ['department']:
-                value_type = 'text'
-            elif attr_name in ['salary']:
-                value_type = 'int'
-            elif attr_name in ['active']:
-                value_type = 'bool'
-            elif attr_name in ['performance']:
-                value_type = 'float'
-            
-            bulk_attrs_dict[attr_name] = {
-                'nodes': self.bulk_node_ids,
-                'values': values_list,
-                'value_type': value_type
-            }
+            bulk_attrs_dict[attr_name] = node_values_dict
         
         # Set ALL node attributes in a single optimized bulk operation
         if bulk_attrs_dict:
@@ -281,29 +269,21 @@ class GroggyPhase3Benchmark:
         # Use optimized bulk edge attribute setting - focus on benchmark-relevant attributes only
         essential_edge_attributes = ['relationship', 'weight']  # Reduced from 3 to 2
         
-        # Use new optimized bulk API format for edges
+        # Use correct API format for edges: {attr_name: {edge_id: value}}
         bulk_edge_attrs_dict = {}
         
         for attr_name in essential_edge_attributes:
-            values_list = []
+            edge_values_dict = {}
             
-            for i, edge in enumerate(edges_data):
+            for i, edge in enumerate(edge_data_deduplicated):
+                edge_id = self.bulk_edge_ids[i]
+                
                 if attr_name == 'relationship':
-                    values_list.append(edge['relationship'])
+                    edge_values_dict[edge_id] = edge['relationship']
                 elif attr_name == 'weight':
-                    values_list.append(edge['weight'])
+                    edge_values_dict[edge_id] = edge['weight']
             
-            # Determine value type for bulk API
-            if attr_name == 'relationship':
-                value_type = 'text'
-            elif attr_name == 'weight':
-                value_type = 'float'
-            
-            bulk_edge_attrs_dict[attr_name] = {
-                'edges': self.bulk_edge_ids,
-                'values': values_list,
-                'value_type': value_type
-            }
+            bulk_edge_attrs_dict[attr_name] = edge_values_dict
         
         # Set ALL edge attributes in a single optimized bulk operation
         if bulk_edge_attrs_dict:
@@ -370,14 +350,14 @@ class GroggyPhase3Benchmark:
         """Test BFS traversal"""
         start = time.time()
         start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
-        result = self.graph.bfs(start_node=start_node, max_depth=3)
+        result = self.graph.view().bfs(start_node=start_node, max_depth=3)
         return time.time() - start, len(result.nodes)
     
     def traversal_dfs(self):
         """Test DFS traversal"""
         start = time.time()
         start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
-        result = self.graph.dfs(start_node=start_node, max_depth=3)
+        result = self.graph.view().dfs(start_node=start_node, max_depth=3)
         return time.time() - start, len(result.nodes)
     
     def traversal_bfs_filtered(self):
@@ -386,13 +366,13 @@ class GroggyPhase3Benchmark:
         start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
         # Note: filtered traversal is not yet supported in analytics module
         # Fall back to basic BFS for now
-        result = self.graph.bfs(start_node=start_node, max_depth=2)
+        result = self.graph.view().bfs(start_node=start_node, max_depth=2)
         return time.time() - start, len(result.nodes)
     
     def connected_components(self):
         """Test connected components analysis"""
         start = time.time()
-        result = self.graph.connected_components()
+        result = self.graph.view().connected_components()
         return time.time() - start, len(result)
     
     # Phase 3.4: Aggregation & Analytics Tests
@@ -401,7 +381,7 @@ class GroggyPhase3Benchmark:
         start = time.time()
         
         # Use optimized GraphArray single-pass approach - much faster than multiple aggregate() calls
-        salaries = self.graph.nodes[:]['salary']  # Single bulk column access
+        salaries = self.graph.nodes['salary']  # Single bulk column access
         
         # Compute all stats from the GraphArray in one efficient pass
         result = {
@@ -418,8 +398,8 @@ class GroggyPhase3Benchmark:
         start = time.time()
         
         # Use optimized GraphArray single-pass approach
-        salaries = self.graph.nodes[:]['salary']  # Single bulk column access
-        departments = self.graph.nodes[:]['department']  # Single bulk column access
+        salaries = self.graph.nodes['salary']  # Single bulk column access
+        departments = self.graph.nodes['department']  # Single bulk column access
         
         # Compute all stats from the GraphArrays efficiently
         result = {
@@ -892,10 +872,10 @@ def analyze_comprehensive_scaling_behavior(all_results_by_scale):
     large_scale = scales[1]  # Should be "Large"
     
     # Get dataset sizes for per-item calculations
-    small_nodes = 50000   # Medium scale
-    large_nodes = 250000  # Large scale  
-    small_edges = 50000   # Medium scale
-    large_edges = 250000  # Large scale
+    small_nodes = 500000   # Medium scale
+    large_nodes = 5000000  # Large scale  
+    small_edges = 500000   # Medium scale
+    large_edges = 5000000  # Large scale
     
     print(f"\nScaling Analysis: {small_scale} ({small_nodes:,} nodes) → {large_scale} ({large_nodes:,} nodes)")
     print("Operation Category       | Library        | Small→Large Time | Per-Item Change | Scaling Quality")
