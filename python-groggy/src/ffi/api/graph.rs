@@ -639,7 +639,7 @@ impl PyGraph {
             edge_set,
             "filtered_nodes".to_string()
         );
-        Ok(PySubgraph::from_core_subgraph(subgraph))
+        PySubgraph::from_core_subgraph(subgraph)
     }
 
     /// Filter edges using EdgeFilter object or string query
@@ -690,7 +690,7 @@ impl PyGraph {
             edge_set,
             "filtered_edges".to_string()
         );
-        Ok(PySubgraph::from_core_subgraph(subgraph))
+        PySubgraph::from_core_subgraph(subgraph)
     }
 
     /// Get analytics module for this graph
@@ -1325,7 +1325,7 @@ impl PyGraph {
             "full_view".to_string()
         );
         
-        let py_subgraph = PySubgraph::from_core_subgraph(subgraph);
+        let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;
         Py::new(py, py_subgraph)
     }
 
@@ -1809,7 +1809,7 @@ impl PyGraph {
                             edges,
                             format!("component"),
                         );
-                        Ok(PySubgraph::from_core_subgraph(concrete_subgraph))
+                        PySubgraph::from_core_subgraph(concrete_subgraph)
                     })
                     .collect();
                 py_components

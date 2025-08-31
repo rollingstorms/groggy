@@ -2,6 +2,8 @@
 //!
 //! Python bindings for version control and history operations.
 
+// Deprecated ? maybe now graph_version?
+
 use groggy::core::history::{Commit, HistoryStatistics};
 use groggy::core::ref_manager::BranchInfo;
 use groggy::{EdgeId, NodeId, StateId};

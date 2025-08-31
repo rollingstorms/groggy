@@ -2,6 +2,8 @@
 //!
 //! Python bindings for attribute access operations.
 
+//Deprecated ???
+
 use crate::ffi::core::array::PyGraphArray;
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::{

@@ -48,7 +48,7 @@ impl PyGraphQuery {
             "filtered_nodes".to_string()
         );
         
-        Ok(PySubgraph::from_core_subgraph(subgraph))
+        PySubgraph::from_core_subgraph(subgraph)
     }
 
     /// Filter edges by criteria - DELEGATED to core Graph.find_edges()
@@ -84,7 +84,7 @@ impl PyGraphQuery {
             "filtered_edges".to_string()
         );
 
-        Ok(PySubgraph::from_core_subgraph(subgraph))
+        PySubgraph::from_core_subgraph(subgraph)
     }
 
     /// Filter nodes within a subgraph
@@ -150,7 +150,7 @@ impl PyGraphQuery {
             "filtered_subgraph".to_string()
         );
         
-        Ok(PySubgraph::from_core_subgraph(subgraph))
+        PySubgraph::from_core_subgraph(subgraph)
     }
 
     /// Aggregate attribute values

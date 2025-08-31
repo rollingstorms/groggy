@@ -1,6 +1,6 @@
 # Groggy Comprehensive Test Suite Report
 
-Generated: 2025-08-29 19:46:15
+Generated: 2025-08-30 19:58:07
 
 ## Executive Summary
 
@@ -14,7 +14,7 @@ performance characteristics, persona-based scenarios, and complex composability 
 - **Success Rate**: 97.9%
 
 ### Performance Metrics
-- **Average Execution Time**: 0.0001s
+- **Average Execution Time**: 0.0000s
 - **Slowest Test**: 0.0015s
 - **Tests > 100ms**: 0
 
@@ -26,17 +26,17 @@ performance characteristics, persona-based scenarios, and complex composability 
 
 ### ✅ Edge Cases - Graph Creation
 - **Success Rate**: 6/6 (100.0%)
-- **Total Time**: 0.0016s
+- **Total Time**: 0.0000s
 
 ### ⚠️ Boundary Conditions - Nodes
 - **Success Rate**: 35/36 (97.2%)
-- **Total Time**: 0.0009s
+- **Total Time**: 0.0001s
 - **Failed Tests**:
   - `Node with nested dict`: Unsupported attribute value type: dict. Supported types: int, float, str, bool, bytes, [int], [float], [str]
 
 ### ✅ Bulk Operations - Core Architecture
 - **Success Rate**: 8/8 (100.0%)
-- **Total Time**: 0.0001s
+- **Total Time**: 0.0000s
 
 ### ⚠️ Attribute System - Edge Cases
 - **Success Rate**: 21/22 (95.5%)
@@ -46,13 +46,13 @@ performance characteristics, persona-based scenarios, and complex composability 
 
 ### ⚠️ Query System - Comprehensive
 - **Success Rate**: 44/45 (97.8%)
-- **Total Time**: 0.0009s
+- **Total Time**: 0.0003s
 - **Failed Tests**:
   - `Query Apply: Non-existent attribute`: "Attribute 'nonexistent' does not exist on any nodes in the graph. Use graph.nodes.table().columns to see available attributes."
 
 ### ✅ Performance Characteristics
 - **Success Rate**: 15/15 (100.0%)
-- **Total Time**: 0.0043s
+- **Total Time**: 0.0037s
 
 ## Failed Tests Analysis
 

@@ -477,9 +477,13 @@ pub trait SubgraphOperations: GraphEntity {
         let binding = self.graph_ref();
         let graph = binding.borrow();
         
+        // Sort node IDs for consistent table ordering
+        let mut sorted_node_ids: Vec<_> = self.node_set().iter().copied().collect();
+        sorted_node_ids.sort();
+        
         // Collect all unique attribute names across all nodes
         let mut all_attrs = std::collections::HashSet::new();
-        for &node_id in self.node_set() {
+        for &node_id in &sorted_node_ids {
             if let Ok(attrs) = graph.get_node_attrs(node_id) {
                 for attr_name in attrs.keys() {
                     all_attrs.insert(attr_name.clone());
@@ -498,17 +502,17 @@ pub trait SubgraphOperations: GraphEntity {
             
             if column_name == "node_id" {
                 // Node ID column
-                for &node_id in self.node_set() {
+                for &node_id in &sorted_node_ids {
                     attr_values.push(crate::types::AttrValue::Int(node_id as i64));
                 }
             } else {
                 // Attribute column  
-                for &node_id in self.node_set() {
+                for &node_id in &sorted_node_ids {
                     if let Ok(Some(attr_value)) = graph.get_node_attr(node_id, column_name) {
                         attr_values.push(attr_value);
                     } else {
                         // Use null placeholder for missing attributes
-                        attr_values.push(crate::types::AttrValue::Int(0)); 
+                        attr_values.push(crate::types::AttrValue::Null); 
                     }
                 }
             }
@@ -532,9 +536,13 @@ pub trait SubgraphOperations: GraphEntity {
         let binding = self.graph_ref();
         let graph = binding.borrow();
         
+        // Sort edge IDs for consistent table ordering
+        let mut sorted_edge_ids: Vec<_> = self.edge_set().iter().copied().collect();
+        sorted_edge_ids.sort();
+        
         // Collect all unique attribute names across all edges
         let mut all_attrs = std::collections::HashSet::new();
-        for &edge_id in self.edge_set() {
+        for &edge_id in &sorted_edge_ids {
             if let Ok(attrs) = graph.get_edge_attrs(edge_id) {
                 for attr_name in attrs.keys() {
                     all_attrs.insert(attr_name.clone());
@@ -542,8 +550,8 @@ pub trait SubgraphOperations: GraphEntity {
             }
         }
         
-        // Build columns: edge_id first, then attributes  
-        let mut column_names = vec!["edge_id".to_string()];
+        // Build columns: edge_id, source, target, then attributes  
+        let mut column_names = vec!["edge_id".to_string(), "source".to_string(), "target".to_string()];
         column_names.extend(all_attrs.into_iter());
         
         let mut columns = Vec::new();
@@ -553,17 +561,37 @@ pub trait SubgraphOperations: GraphEntity {
             
             if column_name == "edge_id" {
                 // Edge ID column
-                for &edge_id in self.edge_set() {
+                for &edge_id in &sorted_edge_ids {
                     attr_values.push(crate::types::AttrValue::Int(edge_id as i64));
+                }
+            } else if column_name == "source" {
+                // Source node column
+                for &edge_id in &sorted_edge_ids {
+                    if let Ok((source, _target)) = graph.edge_endpoints(edge_id) {
+                        attr_values.push(crate::types::AttrValue::Int(source as i64));
+                    } else {
+                        // Use null placeholder for missing endpoints
+                        attr_values.push(crate::types::AttrValue::Null);
+                    }
+                }
+            } else if column_name == "target" {
+                // Target node column
+                for &edge_id in &sorted_edge_ids {
+                    if let Ok((_source, target)) = graph.edge_endpoints(edge_id) {
+                        attr_values.push(crate::types::AttrValue::Int(target as i64));
+                    } else {
+                        // Use null placeholder for missing endpoints
+                        attr_values.push(crate::types::AttrValue::Null);
+                    }
                 }
             } else {
                 // Attribute column
-                for &edge_id in self.edge_set() {
+                for &edge_id in &sorted_edge_ids {
                     if let Ok(Some(attr_value)) = graph.get_edge_attr(edge_id, column_name) {
                         attr_values.push(attr_value);
                     } else {
                         // Use null placeholder for missing attributes
-                        attr_values.push(crate::types::AttrValue::Int(0));
+                        attr_values.push(crate::types::AttrValue::Null);
                     }
                 }
             }
