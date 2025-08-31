@@ -37,12 +37,16 @@ fn create_node_view_from_core(graph: std::rc::Rc<std::cell::RefCell<groggy::Grap
 
 /// Helper function to create EdgeView from core Graph
 fn create_edge_view_from_core(graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>, py: Python, edge_id: EdgeId) -> PyResult<PyObject> {
-    // For now, create a simple tuple with edge information
-    // In a full implementation, you might want to create a proper EdgeView class
+    // Create proper EdgeView object
+    use crate::ffi::core::views::PyEdgeView;
+    
     let graph_ref = graph.borrow();
-    if let Ok((source, target)) = graph_ref.edge_endpoints(edge_id) {
-        let edge_info = (edge_id, source, target);
-        Ok(edge_info.to_object(py))
+    if graph_ref.has_edge(edge_id) {
+        let edge_view = PyEdgeView {
+            graph: graph.clone(),
+            edge_id,
+        };
+        Ok(Py::new(py, edge_view)?.to_object(py))
     } else {
         Err(PyKeyError::new_err(format!("Edge {} not found", edge_id)))
     }
@@ -191,7 +195,7 @@ impl PyNodesAccessor {
                 edge_set,
                 "boolean_selection".to_string()
             );
-            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph)?;
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -267,7 +271,7 @@ impl PyNodesAccessor {
                 edge_set,
                 "node_batch_selection".to_string()
             );
-            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph)?;
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -329,7 +333,7 @@ impl PyNodesAccessor {
                 edge_set,
                 "node_slice_selection".to_string()
             );
-            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph)?;
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -501,7 +505,7 @@ impl PyNodesAccessor {
             induced_edges,
             "all_nodes".to_string(),
         );
-        Ok(PySubgraph::from_core_subgraph(core_subgraph))
+        PySubgraph::from_core_subgraph(core_subgraph)
     }
 
     /// Get node attribute column with proper error checking
@@ -722,7 +726,7 @@ impl PyEdgesAccessor {
                 edge_set,
                 "boolean_edge_selection".to_string()
             );
-            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph)?;
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -785,7 +789,7 @@ impl PyEdgesAccessor {
                 edge_set,
                 "edge_batch_selection".to_string()
             );
-            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph)?;
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -839,7 +843,7 @@ impl PyEdgesAccessor {
                 edge_set,
                 "edge_slice_selection".to_string()
             );
-            let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
+            let subgraph = PySubgraph::from_core_subgraph(core_subgraph)?;
 
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
@@ -987,7 +991,7 @@ impl PyEdgesAccessor {
             edge_set,
             "all_edges".to_string(),
         );
-        Ok(PySubgraph::from_core_subgraph(core_subgraph))
+        PySubgraph::from_core_subgraph(core_subgraph)
     }
 
     /// Support property-style attribute access: g.edges.weight

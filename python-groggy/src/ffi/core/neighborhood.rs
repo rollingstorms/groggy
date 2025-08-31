@@ -47,8 +47,7 @@ impl PyNeighborhoodSubgraph {
             self.inner.edge_set().clone(),
             format!("neighborhood_hops_{}", self.inner.hops())
         );
-        let subgraph = PySubgraph::from_core_subgraph(core_subgraph);
-        Ok(subgraph)
+        PySubgraph::from_core_subgraph(core_subgraph)
     }
 
     fn __repr__(&self) -> String {

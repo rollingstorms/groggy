@@ -6,6 +6,7 @@
 use groggy::core::subgraph::Subgraph;
 use groggy::core::traits::SubgraphOperations;
 use groggy::{NodeId, EdgeId, AttrValue, SimilarityMetric};
+use crate::ffi::traits::subgraph_operations::PySubgraphOperations;
 use crate::ffi::core::neighborhood::PyNeighborhoodResult;
 use groggy::core::neighborhood::NeighborhoodResult;
 use std::collections::HashSet;
@@ -31,8 +32,15 @@ pub struct PySubgraph {
 
 impl PySubgraph {
     /// Create from Rust Subgraph
-    pub fn from_core_subgraph(subgraph: Subgraph) -> Self {
-        Self { inner: subgraph }
+    pub fn from_core_subgraph(subgraph: Subgraph) -> PyResult<Self> {
+        Ok(Self { inner: subgraph })
+    }
+    
+    /// Create from trait object (used by trait delegation)
+    pub fn from_trait_object(subgraph: Box<dyn groggy::core::traits::SubgraphOperations>) -> PyResult<Self> {
+        // For now, we'll use a simpler approach - assume we can only handle concrete Subgraph types
+        // In the future, we might need better trait object handling with proper Any downcasting
+        Err(PyRuntimeError::new_err("from_trait_object not yet implemented - use concrete Subgraph types"))
     }
 }
 
@@ -143,7 +151,7 @@ impl PySubgraph {
             .map_err(|e| PyRuntimeError::new_err(format!("Connected components error: {}", e)))?;
             
         // Convert trait objects back to PySubgraph
-        let py_components = components.into_iter()
+        let py_components: PyResult<Vec<PySubgraph>> = components.into_iter()
             .map(|comp| {
                 // Create new PySubgraph from the component's data
                 // This is tricky because we get Box<dyn SubgraphOperations> back
@@ -162,7 +170,7 @@ impl PySubgraph {
                 PySubgraph::from_core_subgraph(component_subgraph)
             })
             .collect();
-        Ok(py_components)
+        py_components
     }
     
     /// Check if this subgraph is connected
@@ -230,7 +238,7 @@ impl PySubgraph {
             format!("{}_filtered_nodes", self.inner.subgraph_type())
         );
         
-        Ok(PySubgraph::from_core_subgraph(new_subgraph))
+        PySubgraph::from_core_subgraph(new_subgraph)
     }
     
     /// Filter edges and return new subgraph
@@ -274,7 +282,7 @@ impl PySubgraph {
             format!("{}_filtered_edges", self.inner.subgraph_type())
         );
         
-        Ok(PySubgraph::from_core_subgraph(new_subgraph))
+        PySubgraph::from_core_subgraph(new_subgraph)
     }
     
     // === Graph Conversion Methods ===
@@ -519,4 +527,20 @@ impl PySubgraph {
         )
     }
 
+}
+
+// ============================================================================
+// TRAIT IMPLEMENTATION - Core delegation pattern
+// ============================================================================
+
+impl PySubgraphOperations for PySubgraph {
+    /// Provide access to core trait object for delegation
+    fn core_subgraph(&self) -> PyResult<&dyn groggy::core::traits::SubgraphOperations> {
+        Ok(&self.inner)
+    }
+    
+    /// Override trait method for concrete Subgraph downcast when needed
+    fn try_downcast_to_subgraph(&self) -> Option<&groggy::core::subgraph::Subgraph> {
+        Some(&self.inner)
+    }
 }
