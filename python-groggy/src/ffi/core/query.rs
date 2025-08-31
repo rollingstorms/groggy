@@ -3,7 +3,7 @@
 //! Python bindings for query and filter operations.
 
 use groggy::core::query::{AttributeFilter, EdgeFilter, NodeFilter};
-use groggy::{AttrName, EdgeId, NodeId};
+use groggy::{AttrName, NodeId};
 use pyo3::prelude::*;
 
 // Import types from our FFI modules

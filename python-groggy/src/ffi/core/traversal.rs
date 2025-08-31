@@ -2,7 +2,6 @@
 //!
 //! Python bindings for traversal result structures.
 
-use groggy::{EdgeId, NodeId};
 use pyo3::prelude::*;
 
 

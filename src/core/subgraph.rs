@@ -356,7 +356,7 @@ impl Subgraph {
         attr_name: &AttrName,
         attr_value: AttrValue,
     ) -> GraphResult<()> {
-        let mut graph_borrow = self.graph.borrow_mut();
+        let graph_borrow = self.graph.borrow_mut();
 
         // Use the optimized bulk API instead of individual calls
         let mut attrs_values = std::collections::HashMap::new();
@@ -394,7 +394,7 @@ impl Subgraph {
         }
 
         // Use optimized bulk API
-        let mut graph_borrow = self.graph.borrow_mut();
+        let graph_borrow = self.graph.borrow_mut();
         let mut attrs_values = std::collections::HashMap::new();
         let node_value_pairs: Vec<(NodeId, AttrValue)> = node_ids
             .iter()
@@ -415,7 +415,7 @@ impl Subgraph {
         &self,
         attributes: std::collections::HashMap<AttrName, AttrValue>,
     ) -> GraphResult<()> {
-        let mut graph_borrow = self.graph.borrow_mut();
+        let graph_borrow = self.graph.borrow_mut();
 
         // Transform to bulk API format: HashMap<AttrName, Vec<(NodeId, AttrValue)>>
         let mut attrs_values = std::collections::HashMap::new();
@@ -853,7 +853,7 @@ impl SubgraphOperations for Subgraph {
         }
 
         // Use existing efficient TraversalEngine for BFS
-        let mut graph = self.graph.borrow_mut();
+        let graph = self.graph.borrow_mut();
         let mut options = crate::core::traversal::TraversalOptions::default();
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
@@ -893,7 +893,7 @@ impl SubgraphOperations for Subgraph {
         }
 
         // Use existing efficient TraversalEngine for DFS
-        let mut graph = self.graph.borrow_mut();
+        let graph = self.graph.borrow_mut();
         let mut options = crate::core::traversal::TraversalOptions::default();
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
@@ -929,7 +929,7 @@ impl SubgraphOperations for Subgraph {
         }
 
         // Use existing efficient TraversalEngine for shortest path
-        let mut graph = self.graph.borrow_mut();
+        let graph = self.graph.borrow_mut();
         let options = crate::core::traversal::PathFindingOptions::default();
         
         // Use TraversalEngine directly
@@ -1030,19 +1030,19 @@ mod tests {
         
         let edge1 = graph.add_edge(node1, node2).unwrap();
         let edge2 = graph.add_edge(node2, node3).unwrap();
-        let edge3 = graph.add_edge(node3, node1).unwrap(); // Triangle
+        let _edge3 = graph.add_edge(node3, node1).unwrap(); // Triangle
         
         let graph_rc = Rc::new(RefCell::new(graph));
         let node_subset = HashSet::from([node1, node2, node3, node4]);
         let subgraph = Subgraph::from_nodes(graph_rc, node_subset, "test".to_string()).unwrap();
 
         // Test BFS subgraph
-        let bfs_result = subgraph.bfs_subgraph(node1, Some(2)).unwrap();
+        let bfs_result = subgraph.bfs(node1, Some(2)).unwrap();
         assert!(bfs_result.contains_node(node1));
         println!("BFS test: contains {} nodes", bfs_result.node_count());
 
         // Test DFS subgraph  
-        let dfs_result = subgraph.dfs_subgraph(node1, Some(2)).unwrap();
+        let dfs_result = subgraph.dfs(node1, Some(2)).unwrap();
         assert!(dfs_result.contains_node(node1));
         println!("DFS test: contains {} nodes", dfs_result.node_count());
 

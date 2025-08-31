@@ -201,7 +201,7 @@ impl NodeOperations for EntityNode {
 
     fn neighborhood(&self, hops: usize) -> GraphResult<Box<dyn SubgraphOperations>> {
         // Use existing NeighborhoodSampler for efficient neighborhood expansion
-        let mut graph = self.graph_ref.borrow_mut();
+        let graph = self.graph_ref.borrow_mut();
         // Use NeighborhoodSampler directly
         let mut neighborhood_sampler = NeighborhoodSampler::new();
         let result = neighborhood_sampler.unified_neighborhood(
@@ -218,7 +218,7 @@ impl NodeOperations for EntityNode {
     }
 
     fn shortest_paths(&self, targets: &[NodeId]) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
-        let mut graph = self.graph_ref.borrow_mut();
+        let graph = self.graph_ref.borrow_mut();
         let mut paths = Vec::new();
         let options = crate::core::traversal::PathFindingOptions::default();
         

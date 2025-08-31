@@ -3,8 +3,7 @@
 //! Python bindings for the core Rust query parser. This eliminates the
 //! circular dependency by providing direct access to Rust parsing functionality.
 
-use groggy::core::query_parser::{QueryParser, QueryError, QueryResult};
-use groggy::core::query::{NodeFilter, EdgeFilter};
+use groggy::core::query_parser::QueryParser;
 use pyo3::prelude::*;
 use crate::ffi::core::query::{PyNodeFilter, PyEdgeFilter};
 
@@ -131,7 +130,7 @@ pub fn parse_edge_query(query: &str) -> PyResult<PyEdgeFilter> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use groggy::types::AttrValue;
+    
 
     #[test]
     fn test_python_query_parser() {

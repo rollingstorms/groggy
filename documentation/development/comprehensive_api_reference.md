@@ -315,6 +315,74 @@ less_equal = gr.AttributeFilter.less_than_or_equal(50)
 
 ---
 
+## Subgraph Operations
+
+### Creating Subgraphs
+
+```python
+# Neighborhood-based subgraphs
+neighborhood = g.neighborhood(center_node, hops=2)
+multi_neighborhood = g.multi_neighborhood([node1, node2], hops=1)
+
+# BFS/DFS subgraphs  
+bfs_subgraph = g.bfs(start_node, max_depth=3)
+dfs_subgraph = g.dfs(start_node, max_depth=2)
+
+# Induced subgraphs
+induced = g.induced_subgraph([node1, node2, node3])
+edge_induced = g.edge_subgraph([edge1, edge2])
+```
+
+### Subgraph Analysis (New in v0.3.0)
+
+```python
+# Basic properties
+is_empty = subgraph.is_empty()           # Check if contains nodes
+summary = subgraph.summary()             # Structural summary
+node_count = subgraph.node_count()       # Number of nodes
+edge_count = subgraph.edge_count()       # Number of edges
+
+# Node analysis within subgraph
+degree = subgraph.degree(node)           # Node degree in subgraph
+in_deg = subgraph.in_degree(node)        # In-degree in subgraph  
+out_deg = subgraph.out_degree(node)      # Out-degree in subgraph
+clustering = subgraph.clustering_coefficient(node)  # Local clustering
+
+# Attribute access within subgraph
+node_attr = subgraph.get_node_attribute(node, "name")
+edge_attr = subgraph.get_edge_attribute(edge, "weight")
+```
+
+### Subgraph Attribute Management
+
+```python
+# Accessor-based attribute setting (New Pattern)
+subgraph.nodes.set_attrs(department="Engineering", active=True)
+subgraph.edges.set_attrs(weight=1.5, type="collaboration")
+
+# Slice-based attribute setting
+subgraph.nodes[:5].set_attrs(priority="high")      # First 5 nodes
+subgraph.edges[2:8].set_attrs(validated=True)      # Edges 2-7
+
+# Individual attribute setting
+subgraph.nodes[node_id].set_attrs(role="manager")
+subgraph.edges[edge_id].set_attrs(strength=0.9)
+```
+
+### Nested Subgraph Operations
+
+```python
+# Create subgraphs from subgraphs
+sub_induced = subgraph.induced_subgraph(subset_nodes)
+sub_edge = subgraph.edge_subgraph(subset_edges)
+
+# Filtering within subgraphs  
+filtered_nodes = subgraph.filter_nodes(lambda n: n.age > 25)
+filtered_edges = subgraph.filter_edges(lambda e: e.weight > 0.5)
+```
+
+---
+
 ## Analytics and Algorithms
 
 ### Traversal Algorithms

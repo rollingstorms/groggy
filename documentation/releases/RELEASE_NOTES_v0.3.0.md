@@ -1,7 +1,7 @@
-# Groggy v0.3.0 Release Notes
+# Groggy v0.3.1 Release Notes
 
 **Release Date:** August 2025  
-**Major Feature:** Storage View Unification Complete
+**Major Feature:** Architecture Cleanup + Enhanced Subgraph Operations
 
 ## 🎉 Overview
 
@@ -136,6 +136,39 @@ Statistical operations      <1ms       Cached     Smart caching
 
 ## 🔧 **API Enhancements**
 
+### New Subgraph Methods (Previously Hidden)
+
+**Complete Subgraph Operations:**
+```python
+# Previously trapped in unused PySubgraphOperations trait, now accessible:
+sg.is_empty()                    # Check if subgraph contains any nodes
+sg.summary()                     # Get structural summary of subgraph 
+sg.get_node_attribute(node, attr)  # Get node attribute within subgraph
+sg.get_edge_attribute(edge, attr)  # Get edge attribute within subgraph
+sg.degree(node)                  # Node degree within subgraph
+sg.in_degree(node)               # In-degree within subgraph  
+sg.out_degree(node)              # Out-degree within subgraph
+sg.clustering_coefficient(node)   # Local clustering coefficient
+sg.induced_subgraph(nodes)       # Create induced subgraph
+sg.edge_subgraph(edges)          # Create edge-induced subgraph
+
+# Accessor-based attribute setting (new pattern)
+sg.nodes.set_attrs(name="value")       # Set node attributes
+sg.edges.set_attrs(weight=1.0)         # Set edge attributes
+sg.nodes[:5].set_attrs(group="A")       # Set attributes on node slice
+```
+
+### Graph Method Delegation
+
+**Automatic Method Forwarding:**
+```python
+# Methods automatically delegate from Graph to full subgraph:
+g.degree(node)        # → g.full_subgraph.degree(node)  
+g.in_degree(node)     # → g.full_subgraph.in_degree(node)
+g.out_degree(node)    # → g.full_subgraph.out_degree(node)
+# No duplicate implementations needed!
+```
+
 ### New Storage View Methods
 
 **GraphArray (Statistical Arrays):**
@@ -187,7 +220,14 @@ nearby = table.filter_by_distance(g, 'node_id', centers, max_distance=2)
 
 ## 🐛 **Bug Fixes and Improvements**
 
-### Core Fixes
+### Major Architecture Fixes
+- **✅ BREAKING**: Eliminated PySubgraphOperations shadow API - removed 400+ lines of unused trait code
+- **✅ NEW**: Exposed 13 previously trapped subgraph methods directly in PySubgraph
+- **✅ NEW**: Added accessor-based attribute setting (`sg.nodes.set_attrs()`, `sg.edges.set_attrs()`)  
+- **✅ NEW**: Implemented `__getattr__` delegation pattern for automatic method forwarding
+- **✅ FIXED**: Complete method visibility - all subgraph functionality now accessible to Python users
+
+### Core Fixes  
 - **✅ Fixed**: Removed problematic Index trait implementation in subgraph.rs
 - **✅ Fixed**: Resolved all `unimplemented!` errors across codebase  
 - **✅ Fixed**: Compilation warnings and build system improvements

@@ -4,9 +4,7 @@
 
 use crate::ffi::core::matrix::PyGraphMatrix;
 use crate::ffi::utils::graph_error_to_py_err;
-use groggy::AttrName;
 use pyo3::prelude::*;
-use pyo3::exceptions::PyRuntimeError;
 
 use super::graph::PyGraph;
 

@@ -8,7 +8,6 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 // Import types from our FFI modules
-use crate::ffi::api::graph::PyGraph;
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::api::graph_attributes::PyGraphAttr;
 

@@ -179,7 +179,7 @@ impl SubgraphOperations for ComponentSubgraph {
         }
 
         use crate::core::traversal::TraversalEngine;
-        let mut graph = self.graph.borrow_mut();
+        let graph = self.graph.borrow_mut();
         let mut options = crate::core::traversal::TraversalOptions::default();
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
@@ -222,7 +222,7 @@ impl SubgraphOperations for ComponentSubgraph {
         }
 
         use crate::core::traversal::TraversalEngine;
-        let mut graph = self.graph.borrow_mut();
+        let graph = self.graph.borrow_mut();
         let mut options = crate::core::traversal::TraversalOptions::default();
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
@@ -260,7 +260,7 @@ impl SubgraphOperations for ComponentSubgraph {
         }
 
         use crate::core::traversal::{TraversalEngine, PathFindingOptions};
-        let mut graph = self.graph.borrow_mut();
+        let graph = self.graph.borrow_mut();
         let options = PathFindingOptions::default();
         
         let mut traversal_engine = TraversalEngine::new();
@@ -530,12 +530,12 @@ mod tests {
         );
         
         // Test BFS from node1
-        let bfs_result = component.bfs_subgraph(node1, Some(2)).unwrap();
+        let bfs_result = component.bfs(node1, Some(2)).unwrap();
         assert!(bfs_result.contains_node(node1));
         println!("BFS result has {} nodes", bfs_result.node_count());
         
         // Test DFS from node1  
-        let dfs_result = component.dfs_subgraph(node1, Some(2)).unwrap();
+        let dfs_result = component.dfs(node1, Some(2)).unwrap();
         assert!(dfs_result.contains_node(node1));
         println!("DFS result has {} nodes", dfs_result.node_count());
         

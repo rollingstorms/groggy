@@ -9,7 +9,7 @@ Groggy Documentation
 
 Groggy is a next-generation graph processing library that combines high-performance Rust core with an intuitive Python API. It provides seamless integration between graph topology and advanced tabular analytics through unified storage views (Arrays, Matrices, Tables) that support both relational operations and graph-aware analysis.
 
-🚀 **Latest Release: v0.3.0** - Storage View Unification Complete
+🚀 **Latest Release: v0.3.1** - Architecture Cleanup + Enhanced Subgraph Operations
 
 Quick Start
 -----------
@@ -48,6 +48,12 @@ Key Features
    - **GROUP BY & Aggregation**: Complete statistical functions (sum, count, mean, min, max, std, var, first, last, unique)
    - **Graph-Aware Operations**: Neighborhood analysis, k-hop traversal, connectivity filtering
    - **Statistical Computing**: Comprehensive descriptive statistics with caching
+
+🎯 **Enhanced Subgraph Operations** (New in v0.3.1)
+   - **Complete API Access**: All 13 previously hidden methods now exposed to Python
+   - **Accessor-Based Setting**: ``sg.nodes.set_attrs()`` and ``sg.edges.set_attrs()`` patterns
+   - **Method Delegation**: Automatic forwarding from Graph to Subgraph via ``__getattr__``
+   - **Nested Operations**: Create subgraphs from subgraphs, filter within subgraphs
 
 ⚡ **High Performance**
    - **Rust Core**: Memory-efficient columnar storage with attribute pools

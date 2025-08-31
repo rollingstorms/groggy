@@ -78,7 +78,7 @@ pub trait GraphEntity: std::fmt::Debug {
     /// Uses our existing optimized AttributeColumn storage with memory pooling
     fn set_attribute(&self, name: AttrName, value: AttrValue) -> GraphResult<()> {
         let binding = self.graph_ref();
-        let mut graph = binding.borrow_mut();
+        let graph = binding.borrow_mut();
         match self.entity_id() {
             EntityId::Node(id) | EntityId::MetaNode(id) => {
                 graph.pool_mut().set_node_attribute(id, name, value)

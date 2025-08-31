@@ -219,7 +219,7 @@ impl SubgraphOperations for NeighborhoodSubgraph {
 
     fn connected_components(&self) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
         // Use existing efficient TraversalEngine for connected components within this neighborhood
-        let mut graph = self.graph_ref.borrow_mut();
+        let graph = self.graph_ref.borrow_mut();
         let nodes_vec: Vec<NodeId> = self.nodes.iter().cloned().collect();
         let options = crate::core::traversal::TraversalOptions::default();
         
@@ -228,7 +228,7 @@ impl SubgraphOperations for NeighborhoodSubgraph {
         let result = traversal_engine.connected_components_for_nodes(&graph.pool(), graph.space(), nodes_vec, options)?;
 
         let mut component_subgraphs = Vec::new();
-        for (i, component) in result.components.into_iter().enumerate() {
+        for (_i, component) in result.components.into_iter().enumerate() {
             let component_nodes: std::collections::HashSet<NodeId> = component.nodes.into_iter().collect();
             let component_edges: std::collections::HashSet<EdgeId> = component.edges.into_iter().collect();
             
@@ -255,7 +255,7 @@ impl SubgraphOperations for NeighborhoodSubgraph {
         }
 
         // Use existing efficient TraversalEngine for BFS within this neighborhood
-        let mut graph = self.graph_ref.borrow_mut();
+        let graph = self.graph_ref.borrow_mut();
         let mut options = crate::core::traversal::TraversalOptions::default();
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
@@ -296,7 +296,7 @@ impl SubgraphOperations for NeighborhoodSubgraph {
         }
 
         // Use existing efficient TraversalEngine for DFS within this neighborhood
-        let mut graph = self.graph_ref.borrow_mut();
+        let graph = self.graph_ref.borrow_mut();
         let mut options = crate::core::traversal::TraversalOptions::default();
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
@@ -333,7 +333,7 @@ impl SubgraphOperations for NeighborhoodSubgraph {
         }
 
         // Use existing efficient TraversalEngine for shortest path within this neighborhood
-        let mut graph = self.graph_ref.borrow_mut();
+        let graph = self.graph_ref.borrow_mut();
         let options = crate::core::traversal::PathFindingOptions::default();
         
         // Use TraversalEngine directly
@@ -488,7 +488,7 @@ impl NeighborhoodSampler {
         let nodes_vec: Vec<NodeId> = nodes.into_iter().collect();
         let size = nodes_vec.len();
         let induced_edges = self.calculate_induced_edges(pool, space, &nodes_vec)?;
-        let edge_count = induced_edges.len();
+        let _edge_count = induced_edges.len();
 
         let duration = start.elapsed();
         self.stats
@@ -629,7 +629,7 @@ impl NeighborhoodSampler {
         let nodes_vec: Vec<NodeId> = visited.into_iter().collect();
         let size = nodes_vec.len();
         let induced_edges = self.calculate_induced_edges(pool, space, &nodes_vec)?;
-        let edge_count = induced_edges.len();
+        let _edge_count = induced_edges.len();
 
         let duration = start.elapsed();
         self.stats
@@ -692,7 +692,7 @@ impl NeighborhoodSampler {
         let nodes_vec: Vec<NodeId> = visited.into_iter().collect();
         let size = nodes_vec.len();
         let induced_edges = self.calculate_induced_edges(pool, space, &nodes_vec)?;
-        let edge_count = induced_edges.len();
+        let _edge_count = induced_edges.len();
 
         let duration = start.elapsed();
         self.stats.record_neighborhood(
