@@ -15,7 +15,6 @@ use std::rc::Rc;
 // Import all graph modules
 use crate::ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
 use crate::ffi::core::array::PyGraphArray;
-use crate::ffi::core::matrix::PyGraphMatrix;
 use crate::ffi::core::neighborhood::PyNeighborhoodStats;
 use crate::ffi::core::query::{PyEdgeFilter, PyNodeFilter};
 use crate::ffi::core::subgraph::PySubgraph;
