@@ -379,7 +379,7 @@ impl PyNodesAccessor {
     }
 
     /// Support iteration: for node_view in g.nodes
-    fn __iter__(&self, py: Python) -> PyResult<NodesIterator> {
+    fn __iter__(&self, _py: Python) -> PyResult<NodesIterator> {
         let node_ids = if let Some(ref constrained) = self.constrained_nodes {
             constrained.clone()
         } else {
@@ -396,7 +396,7 @@ impl PyNodesAccessor {
     }
 
     /// Support len(g.nodes)
-    fn __len__(&self, py: Python) -> PyResult<usize> {
+    fn __len__(&self, _py: Python) -> PyResult<usize> {
         if let Some(ref constrained) = self.constrained_nodes {
             Ok(constrained.len())
         } else {
@@ -406,7 +406,7 @@ impl PyNodesAccessor {
     }
 
     /// String representation
-    fn __str__(&self, py: Python) -> PyResult<String> {
+    fn __str__(&self, _py: Python) -> PyResult<String> {
         let graph = self.graph.borrow();
         let count = graph.node_ids().len();
         Ok(format!("NodesAccessor({} nodes)", count))
@@ -414,7 +414,7 @@ impl PyNodesAccessor {
 
     /// Get all unique attribute names across all nodes
     #[getter]
-    fn attributes(&self, py: Python) -> PyResult<Vec<String>> {
+    fn attributes(&self, _py: Python) -> PyResult<Vec<String>> {
         let graph = self.graph.borrow();
         let mut all_attrs = std::collections::HashSet::new();
 
@@ -489,7 +489,7 @@ impl PyNodesAccessor {
 
     /// Get all nodes as a subgraph (equivalent to g.nodes[:]) - DELEGATED to SubgraphOperations  
     /// Returns a subgraph containing all nodes and all induced edges
-    fn all(&self, py: Python) -> PyResult<PySubgraph> {
+    fn all(&self, _py: Python) -> PyResult<PySubgraph> {
         let graph = self.graph.borrow();
         
         // Pure delegation to SubgraphOperations::induced_subgraph()
@@ -614,7 +614,7 @@ impl PyNodesAccessor {
             let constrained_set: std::collections::HashSet<NodeId> = constrained_nodes.iter().copied().collect();
             
             for (attr_name_py, node_values_py) in attrs_dict.iter() {
-                let attr_name: String = attr_name_py.extract()?;
+                let _attr_name: String = attr_name_py.extract()?;
                 
                 // Handle different formats - for now assume node-centric format
                 if let Ok(node_dict) = node_values_py.extract::<&pyo3::types::PyDict>() {
@@ -902,7 +902,7 @@ impl PyEdgesAccessor {
     }
 
     /// Support iteration: for edge_view in g.edges
-    fn __iter__(&self, py: Python) -> PyResult<EdgesIterator> {
+    fn __iter__(&self, _py: Python) -> PyResult<EdgesIterator> {
         let edge_ids = if let Some(ref constrained) = self.constrained_edges {
             constrained.clone()
         } else {
@@ -919,7 +919,7 @@ impl PyEdgesAccessor {
     }
 
     /// Support len(g.edges)
-    fn __len__(&self, py: Python) -> PyResult<usize> {
+    fn __len__(&self, _py: Python) -> PyResult<usize> {
         if let Some(ref constrained) = self.constrained_edges {
             Ok(constrained.len())
         } else {
@@ -929,7 +929,7 @@ impl PyEdgesAccessor {
     }
 
     /// String representation
-    fn __str__(&self, py: Python) -> PyResult<String> {
+    fn __str__(&self, _py: Python) -> PyResult<String> {
         let graph = self.graph.borrow();
         let count = graph.edge_ids().len();
         Ok(format!("EdgesAccessor({} edges)", count))
@@ -937,7 +937,7 @@ impl PyEdgesAccessor {
 
     /// Get all unique attribute names across all edges
     #[getter]
-    fn attributes(&self, py: Python) -> PyResult<Vec<String>> {
+    fn attributes(&self, _py: Python) -> PyResult<Vec<String>> {
         let graph = self.graph.borrow();
         let mut all_attrs = std::collections::HashSet::new();
 
@@ -1010,7 +1010,7 @@ impl PyEdgesAccessor {
 
     /// Get all edges as a subgraph (equivalent to g.edges[:]) - DELEGATED to SubgraphOperations
     /// Returns a subgraph containing all nodes that are connected by the edges and all edges
-    fn all(&self, py: Python) -> PyResult<PySubgraph> {
+    fn all(&self, _py: Python) -> PyResult<PySubgraph> {
         let graph = self.graph.borrow();
         
         // Get edge IDs based on constraint
@@ -1140,7 +1140,7 @@ impl PyEdgesAccessor {
             let constrained_set: std::collections::HashSet<EdgeId> = constrained_edges.iter().copied().collect();
             
             for (attr_name_py, edge_values_py) in attrs_dict.iter() {
-                let attr_name: String = attr_name_py.extract()?;
+                let _attr_name: String = attr_name_py.extract()?;
                 
                 if let Ok(edge_dict) = edge_values_py.extract::<&pyo3::types::PyDict>() {
                     for (edge_py, _value_py) in edge_dict.iter() {

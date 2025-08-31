@@ -21,7 +21,7 @@ pub struct PyNodeView {
 #[pymethods]
 impl PyNodeView {
     /// Get node attribute value
-    fn __getitem__(&self, py: Python, key: &str) -> PyResult<PyAttrValue> {
+    fn __getitem__(&self, _py: Python, key: &str) -> PyResult<PyAttrValue> {
         let graph = self.graph.borrow();
         match graph.get_node_attr(self.node_id, &key.to_string()) {
             Ok(Some(attr_value)) => Ok(PyAttrValue::from_attr_value(attr_value)),
@@ -31,7 +31,7 @@ impl PyNodeView {
     }
 
     /// Set node attribute value (chainable)
-    fn __setitem__(&mut self, py: Python, key: &str, value: PyAttrValue) -> PyResult<()> {
+    fn __setitem__(&mut self, _py: Python, key: &str, value: PyAttrValue) -> PyResult<()> {
         let mut graph = self.graph.borrow_mut();
         let attr_value = value.to_attr_value();
         graph.set_node_attr(self.node_id, key.to_string(), attr_value)
@@ -46,7 +46,7 @@ impl PyNodeView {
     }
 
     /// Check if attribute exists
-    fn __contains__(&self, py: Python, key: &str) -> PyResult<bool> {
+    fn __contains__(&self, _py: Python, key: &str) -> PyResult<bool> {
         let graph = self.graph.borrow();
         match graph.get_node_attr(self.node_id, &key.to_string()) {
             Ok(Some(_)) => Ok(true),
@@ -78,7 +78,7 @@ impl PyNodeView {
     }
 
     /// Get neighbors of this node
-    fn neighbors(&self, py: Python) -> PyResult<Vec<NodeId>> {
+    fn neighbors(&self, _py: Python) -> PyResult<Vec<NodeId>> {
         let graph = self.graph.borrow();
         graph.neighbors(self.node_id).map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get neighbors: {}", e))
@@ -114,7 +114,7 @@ impl PyNodeView {
     }
 
     /// String representation
-    fn __str__(&self, py: Python) -> PyResult<String> {
+    fn __str__(&self, _py: Python) -> PyResult<String> {
         let graph = self.graph.borrow();
         let keys = match graph.get_node_attrs(self.node_id) {
             Ok(attrs) => attrs.keys().cloned().collect::<Vec<_>>(),
@@ -167,7 +167,7 @@ impl PyNodeView {
     }
 
     /// Iterator support - iterates over (key, value) pairs
-    fn __iter__(&self, py: Python) -> PyResult<NodeViewIterator> {
+    fn __iter__(&self, _py: Python) -> PyResult<NodeViewIterator> {
         let graph = self.graph.borrow();
         
         let mut items = Vec::new();
@@ -231,7 +231,7 @@ pub struct PyEdgeView {
 #[pymethods]
 impl PyEdgeView {
     /// Get edge attribute value
-    fn __getitem__(&self, py: Python, key: &str) -> PyResult<PyAttrValue> {
+    fn __getitem__(&self, _py: Python, key: &str) -> PyResult<PyAttrValue> {
         let graph = self.graph.borrow();
         match graph.get_edge_attr(self.edge_id, &key.to_string()) {
             Ok(Some(attr_value)) => Ok(PyAttrValue::from_attr_value(attr_value)),
@@ -241,7 +241,7 @@ impl PyEdgeView {
     }
 
     /// Set edge attribute value (chainable)  
-    fn __setitem__(&mut self, py: Python, key: &str, value: PyAttrValue) -> PyResult<()> {
+    fn __setitem__(&mut self, _py: Python, key: &str, value: PyAttrValue) -> PyResult<()> {
         let mut graph = self.graph.borrow_mut();
         let attr_value = value.to_attr_value();
         graph.set_edge_attr(self.edge_id, key.to_string(), attr_value)
@@ -263,7 +263,7 @@ impl PyEdgeView {
 
     /// Get source node ID
     #[getter]
-    fn source(&self, py: Python) -> PyResult<NodeId> {
+    fn source(&self, _py: Python) -> PyResult<NodeId> {
         let graph = self.graph.borrow();
         let (source, _) = graph.edge_endpoints(self.edge_id)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get edge endpoints: {}", e)))?;
@@ -272,7 +272,7 @@ impl PyEdgeView {
 
     /// Get target node ID  
     #[getter]
-    fn target(&self, py: Python) -> PyResult<NodeId> {
+    fn target(&self, _py: Python) -> PyResult<NodeId> {
         let graph = self.graph.borrow();
         let (_, target) = graph.edge_endpoints(self.edge_id)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get edge endpoints: {}", e)))?;
@@ -280,7 +280,7 @@ impl PyEdgeView {
     }
 
     /// Get both endpoints as (source, target) tuple
-    fn endpoints(&self, py: Python) -> PyResult<(NodeId, NodeId)> {
+    fn endpoints(&self, _py: Python) -> PyResult<(NodeId, NodeId)> {
         let graph = self.graph.borrow();
         let endpoints = graph.edge_endpoints(self.edge_id)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get edge endpoints: {}", e)))?;
@@ -288,7 +288,7 @@ impl PyEdgeView {
     }
 
     /// Check if attribute exists
-    fn __contains__(&self, py: Python, key: &str) -> PyResult<bool> {
+    fn __contains__(&self, _py: Python, key: &str) -> PyResult<bool> {
         let graph = self.graph.borrow();
         match graph.get_edge_attr(self.edge_id, &key.to_string()) {
             Ok(Some(_)) => Ok(true),

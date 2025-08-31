@@ -38,7 +38,7 @@ impl PyNeighborhoodSubgraph {
 
     /// Get the subgraph object using the same pattern as connected components
     /// I would rather that the NeighborhoodSubgraph object be the subgraph object itself
-    fn subgraph(&self, py: Python) -> PyResult<PySubgraph> {
+    fn subgraph(&self, _py: Python) -> PyResult<PySubgraph> {
         // Create PySubgraph using the same pattern as connected components
         // Create core Subgraph first, then wrap in PySubgraph
         let core_subgraph = groggy::core::subgraph::Subgraph::new(

@@ -29,10 +29,6 @@ use crate::ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoricalView};
 use crate::ffi::api::graph_analysis::PyGraphAnalysis;
 use crate::ffi::api::graph_matrix::PyGraphMatrixHelper;
 
-// Placeholder imports for missing types - these need to be implemented
-struct PyAttributes {
-    graph: *const RustGraph,
-}
 
 /// Specification for neighborhood hop parameters
 #[derive(Debug, Clone)]
@@ -425,7 +421,7 @@ impl PyGraph {
         &mut self,
         edges: &PyAny,
         node_mapping: Option<std::collections::HashMap<String, NodeId>>,
-        uid_key: Option<String>,
+        _uid_key: Option<String>,
     ) -> PyResult<Vec<EdgeId>> {
         // Format 1: List of (source, target) tuples - most common case for benchmarks
         if let Ok(edge_pairs) = edges.extract::<Vec<(NodeId, NodeId)>>() {
@@ -563,7 +559,7 @@ impl PyGraph {
     }
 
     /// Filter nodes using NodeFilter object or string query
-    fn filter_nodes(slf: PyRefMut<Self>, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+    fn filter_nodes(slf: PyRefMut<Self>, _py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for NodeFilter object first (most common case)
         let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
             // Direct NodeFilter object - fastest path
