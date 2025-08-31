@@ -13,7 +13,7 @@ pub use ffi::api::graph::PyGraph;
 pub use ffi::api::graph_version::PyHistoricalView;
 pub use ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
 pub use ffi::core::array::PyGraphArray;
-pub use ffi::core::history::{PyBranchInfo, PyCommit, PyHistoryStatistics};
+pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
 pub use ffi::core::matrix::PyGraphMatrix;
 pub use ffi::core::component::PyComponentSubgraph;
 pub use ffi::core::neighborhood::{PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph};
@@ -230,6 +230,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_edge_query, m)?)?;
 
     // Register version control system
+    // Register version control classes
     m.add_class::<PyCommit>()?;
     m.add_class::<PyBranchInfo>()?;
     m.add_class::<PyHistoryStatistics>()?;

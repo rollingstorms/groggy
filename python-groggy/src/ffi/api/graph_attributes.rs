@@ -4,12 +4,12 @@
 
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::{python_value_to_attr_value, graph_error_to_py_err};
+use crate::ffi::core::array::PyGraphArray;
+use crate::ffi::core::table::PyGraphTable;
 use groggy::{AttrName, AttrValue, EdgeId, NodeId};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
-
-use super::graph::PyGraph;
 
 /// Clean attribute operations - 12 essential methods only
 
@@ -140,20 +140,10 @@ impl PyGraphAttrMut {
     }
 
     pub fn set_node_attrs(&mut self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
-        let mut rust_attrs: HashMap<String, Vec<(NodeId, AttrValue)>> = HashMap::new();
-        for (attr_name_py, node_values_py) in attrs_dict.iter() {
-            let attr_name: String = attr_name_py.extract()?;
-            let node_dict: &PyDict = node_values_py.extract()?;
-            let mut attr_values = Vec::new();
-            for (node_py, value_py) in node_dict.iter() {
-                let node_id: NodeId = node_py.extract()?;
-                let attr_value = python_value_to_attr_value(value_py)?;
-                attr_values.push((node_id, attr_value));
-            }
-            rust_attrs.insert(attr_name, attr_values);
-        }
+        // Convert any format to standardized internal format
+        let standardized_attrs = self.normalize_attrs_format(py, attrs_dict, true)?;
         self.graph.borrow_mut()
-            .set_node_attrs(rust_attrs)
+            .set_node_attrs(standardized_attrs)
             .map_err(graph_error_to_py_err)
     }
 
@@ -165,20 +155,163 @@ impl PyGraphAttrMut {
     }
 
     pub fn set_edge_attrs(&mut self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
-        let mut rust_attrs: HashMap<String, Vec<(EdgeId, AttrValue)>> = HashMap::new();
-        for (attr_name_py, edge_values_py) in attrs_dict.iter() {
-            let attr_name: String = attr_name_py.extract()?;
-            let edge_dict: &PyDict = edge_values_py.extract()?;
-            let mut attr_values = Vec::new();
-            for (edge_py, value_py) in edge_dict.iter() {
-                let edge_id: EdgeId = edge_py.extract()?;
-                let attr_value = python_value_to_attr_value(value_py)?;
-                attr_values.push((edge_id, attr_value));
-            }
-            rust_attrs.insert(attr_name, attr_values);
-        }
+        // Convert any format to standardized internal format
+        let standardized_attrs = self.normalize_attrs_format(py, attrs_dict, false)?;
         self.graph.borrow_mut()
-            .set_edge_attrs(rust_attrs)
+            .set_edge_attrs(standardized_attrs)
             .map_err(graph_error_to_py_err)
+    }
+
+    // === FORMAT DETECTION AND NORMALIZATION ===
+
+    /// Intelligently detect and normalize various bulk attribute formats
+    /// 
+    /// Supports multiple input formats:
+    /// 1. Node-centric: {"attr": {node_id: value, node_id: value}}
+    /// 2. Column-centric: {"attr": {"nodes": [node_ids], "values": [values]}}
+    /// 3. GraphArray: {"attr": GraphArray([values])} (with matching node order)
+    /// 4. GraphTable: GraphTable with node_id column + attribute columns
+    fn normalize_attrs_format<T>(
+        &self, 
+        py: Python, 
+        attrs_dict: &PyDict, 
+        is_nodes: bool
+    ) -> PyResult<HashMap<String, Vec<(T, AttrValue)>>>
+    where 
+        T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
+    {
+        let mut normalized_attrs: HashMap<String, Vec<(T, AttrValue)>> = HashMap::new();
+        
+        for (attr_name_py, attr_data_py) in attrs_dict.iter() {
+            let attr_name: String = attr_name_py.extract()?;
+            let attr_values = self.parse_attribute_format::<T>(py, attr_data_py, is_nodes)?;
+            normalized_attrs.insert(attr_name, attr_values);
+        }
+        
+        Ok(normalized_attrs)
+    }
+
+    /// Parse a single attribute's data from any supported format
+    fn parse_attribute_format<T>(
+        &self,
+        py: Python,
+        attr_data: &PyAny,
+        is_nodes: bool,
+    ) -> PyResult<Vec<(T, AttrValue)>>
+    where
+        T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
+    {
+        // Format 1: Node-centric dict {node_id: value, node_id: value}
+        if let Ok(node_dict) = attr_data.extract::<&PyDict>() {
+            // Check if it looks like column-centric format {"nodes": [...], "values": [...]}
+            if node_dict.contains("nodes")? && node_dict.contains("values")? {
+                return self.parse_column_centric_format::<T>(py, node_dict);
+            }
+            // Otherwise treat as node-centric format
+            return self.parse_node_centric_format::<T>(py, node_dict);
+        }
+        
+        // Format 3: GraphArray
+        if let Ok(graph_array) = attr_data.extract::<PyRef<PyGraphArray>>() {
+            return self.parse_graph_array_format::<T>(py, &graph_array, is_nodes);
+        }
+        
+        // Format 4: GraphTable
+        if let Ok(graph_table) = attr_data.extract::<PyRef<PyGraphTable>>() {
+            return self.parse_graph_table_format::<T>(py, &graph_table, is_nodes);
+        }
+        
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            format!(
+                "Unsupported attribute format. Expected: dict {{id: value}}, dict {{\"nodes\": [...], \"values\": [...]}}, GraphArray, or GraphTable. Got: {}",
+                attr_data.get_type().name()?
+            )
+        ))
+    }
+
+    /// Parse node-centric format: {node_id: value, node_id: value}
+    fn parse_node_centric_format<T>(
+        &self,
+        _py: Python,
+        node_dict: &PyDict,
+    ) -> PyResult<Vec<(T, AttrValue)>>
+    where
+        T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
+    {
+        let mut attr_values = Vec::new();
+        for (id_py, value_py) in node_dict.iter() {
+            let id: T = id_py.extract()?;
+            let attr_value = python_value_to_attr_value(value_py)?;
+            attr_values.push((id, attr_value));
+        }
+        Ok(attr_values)
+    }
+
+    /// Parse column-centric format: {"nodes": [node_ids], "values": [values]}
+    fn parse_column_centric_format<T>(
+        &self,
+        py: Python,
+        data_dict: &PyDict,
+    ) -> PyResult<Vec<(T, AttrValue)>>
+    where
+        T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
+    {
+        let ids_list = data_dict.get_item("nodes")?
+            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("Missing 'nodes' key in column-centric format"))?;
+        let values_list = data_dict.get_item("values")?
+            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("Missing 'values' key in column-centric format"))?;
+        
+        let ids: Vec<T> = ids_list.extract()?;
+        let values: &PyList = values_list.extract()?;
+        
+        if ids.len() != values.len() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                format!("Length mismatch: {} nodes vs {} values", ids.len(), values.len())
+            ));
+        }
+        
+        let mut attr_values = Vec::new();
+        for (id, value_py) in ids.into_iter().zip(values.iter()) {
+            let attr_value = python_value_to_attr_value(value_py)?;
+            attr_values.push((id, attr_value));
+        }
+        
+        Ok(attr_values)
+    }
+
+    /// Parse GraphArray format: values correspond to graph order
+    /// Note: Complex type conversion deferred to next phase
+    fn parse_graph_array_format<T>(
+        &self,
+        py: Python,
+        _graph_array: &PyRef<PyGraphArray>,
+        is_nodes: bool,
+    ) -> PyResult<Vec<(T, AttrValue)>>
+    where
+        T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
+    {
+        // GraphArray support requires complex type conversion between NodeId/EdgeId and T
+        // This will be implemented in the next phase once we have proper type mappings
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            format!("GraphArray format for {} not yet implemented - complex type conversion needed", 
+                if is_nodes { "nodes" } else { "edges" }
+            )
+        ))
+    }
+
+    /// Parse GraphTable format: table with id column + attribute columns
+    fn parse_graph_table_format<T>(
+        &self,
+        py: Python,
+        _graph_table: &PyRef<PyGraphTable>,
+        _is_nodes: bool,
+    ) -> PyResult<Vec<(T, AttrValue)>>
+    where
+        T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
+    {
+        // GraphTable support will be implemented in the next phase
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "GraphTable format support coming in next phase"
+        ))
     }
 }
