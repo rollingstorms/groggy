@@ -87,7 +87,7 @@ except ImportError:
         shape = data.get('shape', (0, 0))
         return f"GraphTable(shape={shape})"
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __all__ = [
     "Graph",
     "AttrValue", 
