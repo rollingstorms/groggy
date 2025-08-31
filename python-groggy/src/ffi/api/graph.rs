@@ -867,7 +867,7 @@ impl PyGraph {
 
     /// Set bulk node attributes - delegates to PyGraphAttrMut
     #[pyo3(signature = (attrs_dict))]
-    fn set_node_attrs(&mut self, attrs_dict: &PyDict, py: Python) -> PyResult<()> {
+    fn set_node_attrs(&mut self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         let mut attr_handler = PyGraphAttrMut::new(self.inner.clone());
         attr_handler.set_node_attrs(py, attrs_dict)
     }
@@ -881,7 +881,7 @@ impl PyGraph {
 
     /// Set bulk edge attributes - delegates to PyGraphAttrMut
     #[pyo3(signature = (attrs_dict))]
-    fn set_edge_attrs(&mut self, attrs_dict: &PyDict, py: Python) -> PyResult<()> {
+    fn set_edge_attrs(&mut self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         let mut attr_handler = PyGraphAttrMut::new(self.inner.clone());
         attr_handler.set_edge_attrs(py, attrs_dict)
     }
