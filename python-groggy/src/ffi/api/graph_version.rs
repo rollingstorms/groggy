@@ -351,3 +351,83 @@ impl PyGraphVersion {
         ))
     }
 }
+
+/// History statistics for the graph
+#[pyclass(name = "HistoryStatistics")]
+#[derive(Clone)]
+pub struct PyHistoryStatistics {
+    pub total_commits: usize,
+    pub total_branches: usize,
+    pub uncommitted_changes: bool,
+    pub current_state_nodes: usize,
+    pub current_state_edges: usize,
+}
+
+impl PyHistoryStatistics {
+    /// Create new history statistics
+    pub fn new(
+        total_commits: usize,
+        total_branches: usize,
+        uncommitted_changes: bool,
+        current_state_nodes: usize,
+        current_state_edges: usize,
+    ) -> Self {
+        Self {
+            total_commits,
+            total_branches,
+            uncommitted_changes,
+            current_state_nodes,
+            current_state_edges,
+        }
+    }
+}
+
+#[pymethods]
+impl PyHistoryStatistics {
+    /// Get total number of commits
+    #[getter]
+    fn total_commits(&self) -> usize {
+        self.total_commits
+    }
+
+    /// Get total number of branches
+    #[getter]
+    fn total_branches(&self) -> usize {
+        self.total_branches
+    }
+
+    /// Check if there are uncommitted changes
+    #[getter]
+    fn uncommitted_changes(&self) -> bool {
+        self.uncommitted_changes
+    }
+
+    /// Get current state node count
+    #[getter]
+    fn current_state_nodes(&self) -> usize {
+        self.current_state_nodes
+    }
+
+    /// Get current state edge count
+    #[getter]
+    fn current_state_edges(&self) -> usize {
+        self.current_state_edges
+    }
+
+    /// String representation
+    fn __str__(&self) -> String {
+        format!(
+            "HistoryStatistics(commits={}, branches={}, uncommitted={}, nodes={}, edges={})",
+            self.total_commits,
+            self.total_branches,
+            self.uncommitted_changes,
+            self.current_state_nodes,
+            self.current_state_edges
+        )
+    }
+
+    /// Debug representation
+    fn __repr__(&self) -> String {
+        self.__str__()
+    }
+}
