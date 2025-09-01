@@ -510,7 +510,7 @@ impl QueryParser {
 
     fn match_token(&mut self, expected: &Token) -> bool {
         if let Some(token) = self.current_token() {
-            if std::mem::discriminant(token) == std::mem::discriminant(expected) {
+            if token == expected {
                 self.advance();
                 return true;
             }
@@ -566,11 +566,14 @@ mod tests {
             NodeFilter::AttributeFilter { name, filter } => {
                 assert_eq!(name, "salary");
                 match filter {
-                    AttributeFilter::GreaterThan(AttrValue::Int(120000)) => (),
-                    _ => panic!("Expected GreaterThan with Int(120000)"),
+                    AttributeFilter::GreaterThan(AttrValue::SmallInt(120000)) => (),
+                    _ => panic!(
+                        "Expected GreaterThan with SmallInt(120000), got {:?}",
+                        filter
+                    ),
                 }
             }
-            _ => panic!("Expected AttributeFilter"),
+            _ => panic!("Expected AttributeFilter, got {:?}", filter),
         }
     }
 
@@ -599,7 +602,7 @@ mod tests {
 
         match filter {
             NodeFilter::Or(_) => (), // Structure is correct
-            _ => panic!("Expected Or filter"),
+            _ => panic!("Expected Or filter, got {:?}", filter),
         }
     }
 
