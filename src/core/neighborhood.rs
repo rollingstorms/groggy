@@ -289,7 +289,7 @@ impl SubgraphOperations for NeighborhoodSubgraph {
 
         // Use TraversalEngine directly
         let mut traversal_engine = TraversalEngine::new();
-        let result = traversal_engine.bfs(&graph.pool(), &mut graph.space(), start, options)?;
+        let result = traversal_engine.bfs(&graph.pool(), graph.space(), start, options)?;
 
         // Filter result to nodes that exist in this neighborhood
         let filtered_nodes: std::collections::HashSet<NodeId> = result
@@ -336,7 +336,7 @@ impl SubgraphOperations for NeighborhoodSubgraph {
 
         // Use TraversalEngine directly
         let mut traversal_engine = TraversalEngine::new();
-        let result = traversal_engine.dfs(&graph.pool(), &mut graph.space(), start, options)?;
+        let result = traversal_engine.dfs(&graph.pool(), graph.space(), start, options)?;
 
         // Filter result to nodes that exist in this neighborhood
         let filtered_nodes: std::collections::HashSet<NodeId> = result
@@ -378,7 +378,7 @@ impl SubgraphOperations for NeighborhoodSubgraph {
         let mut traversal_engine = TraversalEngine::new();
         let x = if let Some(path_result) = traversal_engine.shortest_path(
             &graph.pool(),
-            &mut graph.space(),
+            graph.space(),
             source,
             target,
             options,
@@ -439,7 +439,7 @@ impl crate::core::traits::NeighborhoodOperations for NeighborhoodSubgraph {
         if let Some(&first_central) = self.central_nodes.first() {
             let graph = self.graph_ref.borrow();
             let expanded_neighborhood = sampler.k_hop_neighborhood(
-                &*graph.pool(),
+                &graph.pool(),
                 graph.space(),
                 first_central,
                 new_hops,

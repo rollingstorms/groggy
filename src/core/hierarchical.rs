@@ -16,6 +16,7 @@ use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, EntityId, NodeId};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt;
 use std::rc::Rc;
 
 /// Attribute aggregation functions for collapsing subgraphs into meta-nodes
@@ -60,21 +61,24 @@ impl AggregationFunction {
             ))),
         }
     }
+}
 
-    /// Convert aggregation function to string
-    pub fn to_string(&self) -> String {
+impl fmt::Display for AggregationFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AggregationFunction::Sum => "sum".to_string(),
-            AggregationFunction::Mean => "mean".to_string(),
-            AggregationFunction::Max => "max".to_string(),
-            AggregationFunction::Min => "min".to_string(),
-            AggregationFunction::Count => "count".to_string(),
-            AggregationFunction::First => "first".to_string(),
-            AggregationFunction::Last => "last".to_string(),
-            AggregationFunction::Concat(sep) => format!("concat:{}", sep),
+            AggregationFunction::Sum => write!(f, "sum"),
+            AggregationFunction::Mean => write!(f, "mean"),
+            AggregationFunction::Max => write!(f, "max"),
+            AggregationFunction::Min => write!(f, "min"),
+            AggregationFunction::Count => write!(f, "count"),
+            AggregationFunction::First => write!(f, "first"),
+            AggregationFunction::Last => write!(f, "last"),
+            AggregationFunction::Concat(sep) => write!(f, "concat:{}", sep),
         }
     }
+}
 
+impl AggregationFunction {
     /// Apply aggregation function to a list of attribute values
     pub fn aggregate(&self, values: &[AttrValue]) -> GraphResult<AttrValue> {
         if values.is_empty() {
