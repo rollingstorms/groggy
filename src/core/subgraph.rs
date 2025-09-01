@@ -295,9 +295,15 @@ impl Subgraph {
     /// * `Err(GraphError)` if there's an error during traversal
     ///
     /// # Examples
-    /// ```rust
+    /// ```rust,no_run
+    /// # use groggy::core::subgraph::Subgraph;
+    /// # use groggy::errors::GraphResult;
+    /// # fn example() -> GraphResult<()> {
+    /// # let subgraph: Subgraph = todo!(); // Placeholder for actual subgraph
     /// // Check if there's a path between node 1 and node 5 in the subgraph
     /// let path_exists = subgraph.has_path(1, 5)?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn has_path(&self, node1_id: NodeId, node2_id: NodeId) -> GraphResult<bool> {
         // Quick checks first
