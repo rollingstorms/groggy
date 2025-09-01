@@ -1,9 +1,60 @@
 # Groggy v0.3.1 Release Notes
 
-**Release Date:** August 2025  
-**Major Feature:** Architecture Cleanup + Enhanced Subgraph Operations
+**Release Date:** September 2025  
+**Major Feature:** BFS/DFS Implementation Fix + Enhanced Subgraph Operations
 
-## 🎉 Overview
+## 🚨 v0.3.1 Critical Bug Fixes
+
+### ✅ **Fixed BFS/DFS Subgraph Operations**
+
+**BREAKING FIX**: Resolved critical issue where BFS and DFS subgraph operations were throwing `NotImplementedError` due to trait object conversion problems in the FFI layer.
+
+**What was broken:**
+```python
+# These operations were failing with NotImplementedError
+bfs_result = subgraph.bfs(start_node)  
+dfs_result = subgraph.dfs(start_node)
+shortest_path = subgraph.shortest_path_subgraph(source, target)
+induced_sg = subgraph.induced_subgraph(node_list)
+edge_sg = subgraph.subgraph_from_edges(edge_list)
+```
+
+**What's fixed:**
+- **BFS Traversal**: `subgraph.bfs(start_node, max_depth)` now works correctly
+- **DFS Traversal**: `subgraph.dfs(start_node, max_depth)` now works correctly  
+- **Shortest Path**: `subgraph.shortest_path_subgraph(source, target)` now returns proper subgraphs
+- **Induced Subgraphs**: `subgraph.induced_subgraph(nodes)` now works correctly
+- **Edge Subgraphs**: `subgraph.subgraph_from_edges(edges)` now works correctly
+
+**Technical Details:**
+- Fixed trait object conversion in FFI layer by extracting node/edge data from `Box<dyn SubgraphOperations>` 
+- Maintained trait-based architecture for compatibility with multiple subgraph types
+- All algorithms remain in `SubgraphOperations` trait for use by `NeighborhoodSubgraph`, `ComponentSubgraph`, etc.
+
+### ✅ **New has_path Method**
+
+**NEW**: Added efficient connectivity checking between nodes within subgraphs.
+
+```python
+# Check if there's a path between two nodes in a subgraph
+path_exists = subgraph.has_path(node1, node2)  # Returns bool
+
+# More efficient than constructing full shortest path when you just need connectivity
+if subgraph.has_path(alice, bob):
+    print("Alice and Bob are connected in this subgraph")
+```
+
+**Performance:** Uses BFS for O(V + E) connectivity checking without path construction overhead.
+
+### ✅ **Code Quality Improvements**
+
+- **Fixed**: All clippy warnings resolved
+- **Fixed**: Rust formatting issues corrected  
+- **Fixed**: Missing test files added
+- **Fixed**: Query parser test compilation issues
+- **Improved**: Documentation examples now compile correctly
+
+## 🎉 v0.3.0 Overview (Base Release)
 
 Groggy v0.3.0 represents a major milestone with the completion of the **Storage View Unification** project. This release transforms Groggy into a unified graph analytics platform that seamlessly bridges graph topology and advanced tabular operations through three core storage views: Arrays, Matrices, and Tables.
 
@@ -332,7 +383,7 @@ maturin develop --release
 import groggy as gr
 g = gr.Graph()
 g.add_node("test", value=42)
-print(f"Groggy v0.3.0 - Node count: {g.node_count()}")
+print(f"Groggy v0.3.1 - Node count: {g.node_count()}")
 ```
 
 ## 🙏 **Acknowledgments**
@@ -347,6 +398,6 @@ Key architectural achievements:
 
 ---
 
-**Full Changelog**: https://github.com/rollingstorms/groggy/compare/v0.2.0...v0.3.0
+**Full Changelog**: https://github.com/rollingstorms/groggy/compare/v0.3.0...v0.3.1
 **Documentation**: https://groggy.readthedocs.io
 **Issues**: https://github.com/rollingstorms/groggy/issues
