@@ -189,6 +189,30 @@ impl PySubgraph {
         Ok(components.len() <= 1)
     }
 
+    /// Check if there is a path between two nodes within this subgraph
+    ///
+    /// This is more efficient than `shortest_path_subgraph` when you only need
+    /// to know if a path exists, not the actual path.
+    ///
+    /// # Arguments
+    /// * `node1_id` - The starting node ID
+    /// * `node2_id` - The destination node ID
+    ///
+    /// # Returns
+    /// * `True` if a path exists between the nodes within this subgraph
+    /// * `False` if no path exists or either node is not in this subgraph
+    ///
+    /// # Example
+    /// ```python
+    /// # Check if there's a path between node 1 and node 5 in the subgraph
+    /// path_exists = subgraph.has_path(1, 5)
+    /// ```
+    fn has_path(&self, node1_id: NodeId, node2_id: NodeId) -> PyResult<bool> {
+        self.inner
+            .has_path(node1_id, node2_id)
+            .map_err(|e| PyRuntimeError::new_err(format!("Error checking path: {}", e)))
+    }
+
     // === Data Export Methods ===
 
     /// Convert subgraph nodes to a table - pure delegation to core GraphTable

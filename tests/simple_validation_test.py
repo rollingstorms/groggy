@@ -112,11 +112,11 @@ def test_core_features():
     
     # 13. Analytics
     print("13. Graph Analytics")
-    components = g.analytics.connected_components()
-    path = g.analytics.shortest_path(alice, bob)
-    has_path = g.analytics.has_path(alice, bob)
-    bfs_result = g.analytics.bfs(alice)
-    dfs_result = g.analytics.dfs(alice)
+    components = g.connected_components()
+    path = g.shortest_path(alice, bob)
+    has_path = g.has_path(alice, bob)
+    bfs_result = g.bfs(alice)
+    dfs_result = g.dfs(alice)
     print(f"   ✅ Connected components: {len(components)}")
     print(f"   ✅ Shortest path: {path}")
     print(f"   ✅ BFS/DFS work")

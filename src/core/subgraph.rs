@@ -279,6 +279,66 @@ impl Subgraph {
         let components = SubgraphOperations::connected_components(self)?;
         Ok(components.len() == 1 && !self.nodes.is_empty())
     }
+
+    /// Check if there is a path between two nodes within this subgraph
+    ///
+    /// This is more efficient than `shortest_path_subgraph` when you only need
+    /// to know if a path exists, not the actual path.
+    ///
+    /// # Arguments
+    /// * `node1_id` - The starting node ID
+    /// * `node2_id` - The destination node ID
+    ///
+    /// # Returns
+    /// * `Ok(true)` if a path exists between the nodes within this subgraph
+    /// * `Ok(false)` if no path exists or either node is not in this subgraph
+    /// * `Err(GraphError)` if there's an error during traversal
+    ///
+    /// # Examples
+    /// ```rust
+    /// // Check if there's a path between node 1 and node 5 in the subgraph
+    /// let path_exists = subgraph.has_path(1, 5)?;
+    /// ```
+    pub fn has_path(&self, node1_id: NodeId, node2_id: NodeId) -> GraphResult<bool> {
+        // Quick checks first
+        if node1_id == node2_id {
+            return Ok(self.nodes.contains(&node1_id));
+        }
+
+        if !self.nodes.contains(&node1_id) || !self.nodes.contains(&node2_id) {
+            return Ok(false);
+        }
+
+        // Use BFS to check for reachability - more efficient than Dijkstra for just connectivity
+        use std::collections::{HashSet, VecDeque};
+
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        queue.push_back(node1_id);
+        visited.insert(node1_id);
+
+        let graph = self.graph.borrow();
+
+        while let Some(current_node) = queue.pop_front() {
+            if current_node == node2_id {
+                return Ok(true);
+            }
+
+            // Get neighbors of current node
+            if let Ok(neighbors) = graph.neighbors(current_node) {
+                for neighbor in neighbors {
+                    // Only consider neighbors that are in this subgraph and not yet visited
+                    if self.nodes.contains(&neighbor) && !visited.contains(&neighbor) {
+                        visited.insert(neighbor);
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+        }
+
+        Ok(false)
+    }
 }
 
 /// Column access operations for bulk attribute extraction
