@@ -376,13 +376,9 @@ impl SubgraphOperations for NeighborhoodSubgraph {
 
         // Use TraversalEngine directly
         let mut traversal_engine = TraversalEngine::new();
-        let x = if let Some(path_result) = traversal_engine.shortest_path(
-            &graph.pool(),
-            graph.space(),
-            source,
-            target,
-            options,
-        )? {
+        let x = if let Some(path_result) =
+            traversal_engine.shortest_path(&graph.pool(), graph.space(), source, target, options)?
+        {
             // Filter path to nodes/edges that exist in this neighborhood
             let filtered_nodes: std::collections::HashSet<NodeId> = path_result
                 .nodes
