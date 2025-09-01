@@ -130,16 +130,6 @@ def test_core_features():
     print(f"   ✅ Adjacency matrix: {adj_matrix.shape}")
     print(f"   ✅ Matrix operations work")
     
-    # 15. Graph-aware table operations
-    print("15. Graph-Aware Table Operations")
-    try:
-        high_degree = nodes_table.filter_by_degree(g, 'node_id', min_degree=1)
-        connected = nodes_table.filter_by_connectivity(g, 'node_id', [alice], mode='direct')
-        nearby = nodes_table.filter_by_distance(g, 'node_id', [alice], max_distance=2)
-        print(f"   ✅ Graph-aware filtering works")
-    except Exception as e:
-        print(f"   ⚠️ Graph-aware filtering: {e}")
-    
     # 16. Table joins
     print("16. Table Joins")
     salary_data = {

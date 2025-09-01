@@ -990,12 +990,19 @@ impl PySubgraph {
     /// Create subgraph from BFS traversal
     fn bfs(&self, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PySubgraph> {
         match self.inner.bfs(start, max_depth) {
-            Ok(_subgraph_trait) => {
-                // Convert trait object back to concrete Subgraph - this is complex
-                // For now, return not implemented error
-                Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                    "BFS subgraph creation not yet implemented - complex trait object conversion needed"
-                ))
+            Ok(boxed_subgraph) => {
+                // Create a concrete Subgraph from the trait object data
+                use groggy::core::subgraph::Subgraph;
+                use groggy::core::traits::GraphEntity;
+                let concrete_subgraph = Subgraph::new(
+                    self.inner.graph_ref(),
+                    boxed_subgraph.node_set().clone(),
+                    boxed_subgraph.edge_set().clone(),
+                    format!("bfs_from_{}", start),
+                );
+                Ok(PySubgraph {
+                    inner: concrete_subgraph,
+                })
             }
             Err(e) => Err(PyRuntimeError::new_err(format!("BFS error: {}", e))),
         }
@@ -1004,12 +1011,19 @@ impl PySubgraph {
     /// Create subgraph from DFS traversal  
     fn dfs(&self, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PySubgraph> {
         match self.inner.dfs(start, max_depth) {
-            Ok(_subgraph_trait) => {
-                // Convert trait object back to concrete Subgraph - this is complex
-                // For now, return not implemented error
-                Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                    "DFS subgraph creation not yet implemented - complex trait object conversion needed"
-                ))
+            Ok(boxed_subgraph) => {
+                // Create a concrete Subgraph from the trait object data
+                use groggy::core::subgraph::Subgraph;
+                use groggy::core::traits::GraphEntity;
+                let concrete_subgraph = Subgraph::new(
+                    self.inner.graph_ref(),
+                    boxed_subgraph.node_set().clone(),
+                    boxed_subgraph.edge_set().clone(),
+                    format!("dfs_from_{}", start),
+                );
+                Ok(PySubgraph {
+                    inner: concrete_subgraph,
+                })
             }
             Err(e) => Err(PyRuntimeError::new_err(format!("DFS error: {}", e))),
         }
@@ -1023,12 +1037,19 @@ impl PySubgraph {
         target: NodeId,
     ) -> PyResult<Option<PySubgraph>> {
         match self.inner.shortest_path_subgraph(source, target) {
-            Ok(Some(_subgraph_trait)) => {
-                // Convert trait object back to concrete Subgraph - this is complex
-                // For now, return not implemented error
-                Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                    "Shortest path subgraph not yet implemented - complex trait object conversion needed"
-                ))
+            Ok(Some(boxed_subgraph)) => {
+                // Create a concrete Subgraph from the trait object data
+                use groggy::core::subgraph::Subgraph;
+                use groggy::core::traits::GraphEntity;
+                let concrete_subgraph = Subgraph::new(
+                    self.inner.graph_ref(),
+                    boxed_subgraph.node_set().clone(),
+                    boxed_subgraph.edge_set().clone(),
+                    format!("shortest_path_{}_{}", source, target),
+                );
+                Ok(Some(PySubgraph {
+                    inner: concrete_subgraph,
+                }))
             }
             Ok(None) => Ok(None),
             Err(e) => Err(PyRuntimeError::new_err(format!(
@@ -1041,12 +1062,19 @@ impl PySubgraph {
     /// Create induced subgraph from list of nodes
     fn induced_subgraph(&self, _py: Python, nodes: Vec<NodeId>) -> PyResult<PySubgraph> {
         match self.inner.induced_subgraph(&nodes) {
-            Ok(_subgraph_trait) => {
-                // Convert trait object back to concrete Subgraph - this is complex
-                // For now, return not implemented error
-                Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                    "Induced subgraph not yet implemented - complex trait object conversion needed",
-                ))
+            Ok(boxed_subgraph) => {
+                // Create a concrete Subgraph from the trait object data
+                use groggy::core::subgraph::Subgraph;
+                use groggy::core::traits::GraphEntity;
+                let concrete_subgraph = Subgraph::new(
+                    self.inner.graph_ref(),
+                    boxed_subgraph.node_set().clone(),
+                    boxed_subgraph.edge_set().clone(),
+                    "induced_subgraph".to_string(),
+                );
+                Ok(PySubgraph {
+                    inner: concrete_subgraph,
+                })
             }
             Err(e) => Err(PyRuntimeError::new_err(format!(
                 "Induced subgraph error: {}",
@@ -1058,12 +1086,19 @@ impl PySubgraph {
     /// Create subgraph from list of edges
     fn subgraph_from_edges(&self, _py: Python, edges: Vec<EdgeId>) -> PyResult<PySubgraph> {
         match self.inner.subgraph_from_edges(&edges) {
-            Ok(_subgraph_trait) => {
-                // Convert trait object back to concrete Subgraph - this is complex
-                // For now, return not implemented error
-                Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                    "Subgraph from edges not yet implemented - complex trait object conversion needed"
-                ))
+            Ok(boxed_subgraph) => {
+                // Create a concrete Subgraph from the trait object data
+                use groggy::core::subgraph::Subgraph;
+                use groggy::core::traits::GraphEntity;
+                let concrete_subgraph = Subgraph::new(
+                    self.inner.graph_ref(),
+                    boxed_subgraph.node_set().clone(),
+                    boxed_subgraph.edge_set().clone(),
+                    "subgraph_from_edges".to_string(),
+                );
+                Ok(PySubgraph {
+                    inner: concrete_subgraph,
+                })
             }
             Err(e) => Err(PyRuntimeError::new_err(format!(
                 "Subgraph from edges error: {}",
