@@ -12,11 +12,15 @@
 
 Groggy is a modern graph analytics library that combines **graph topology** with **tabular data operations**. Built with a high-performance Rust core and intuitive Python API, Groggy lets you seamlessly work with graph data using familiar table-like operations.
 
+> 🚀 **NEW in v0.4.0**: Complete architecture overhaul with GraphEntity foundation! All previously broken subgraph operations (BFS, DFS, shortest_path) now work correctly. See [Release Notes](documentation/releases/RELEASE_NOTES_v0.4.0.md) for details.
+
 ### **Key Features:**
 - 🔥 **High-performance Rust core** with Python bindings
 - 📊 **Unified data structures**: GraphArray, GraphTable, GraphMatrix
-- 🎯 **Graph-aware analytics** with table operations 
-- 🔮 **More features to come...**
+- 🎯 **Graph-aware analytics** with table operations
+- 🆕 **Fixed subgraph operations**: BFS, DFS, shortest_path now work correctly
+- 🆕 **GraphEntity system**: Universal trait-based architecture
+- 🆕 **Enhanced connectivity**: Efficient `has_path()` method
 ---
 
 ## 📥 **Installation**
@@ -89,17 +93,34 @@ young_nodes = nodes_table[nodes_table['age'] < 30]  # Boolean filtering
 
 ### **Graph Analytics**
 ```python
+# Add edge to connect nodes first
+g.add_edge(alice, bob, weight=0.8)
+
 # Connected components
-components = g.analytics.connected_components()
+components = g.connected_components()
 print(f"Components: {len(components)}")
 
 # Shortest paths  
-path = g.analytics.shortest_path(alice, bob)
+path = g.shortest_path(alice, bob)
 print(f"Shortest path: {path}")
 
-# Graph traversal
-bfs_result = g.analytics.bfs(alice)
-dfs_result = g.analytics.dfs(alice)
+# Graph properties
+print(f"Graph density: {g.density()}")
+print(f"Is connected: {g.is_connected()}")
+
+# Neighborhood analysis
+neighbors = g.neighbors(alice)
+print(f"Alice's neighbors: {neighbors}")
+
+# NEW in v0.4.0 - Fixed subgraph operations!
+# Get a component (subgraph) and perform traversals
+component = components[0]  # Get first connected component
+bfs_result = component.bfs(alice)  # BFS traversal (now works!)
+dfs_result = component.dfs(alice)  # DFS traversal (now works!)
+
+# NEW - Efficient connectivity checking
+has_path = component.has_path(alice, bob)
+print(f"Path from Alice to Bob: {has_path}")
 ```
 
 ### **Advanced Features**
