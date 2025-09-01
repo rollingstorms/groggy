@@ -478,10 +478,15 @@ impl TraversalEngine {
             _ => {
                 // Apply other filters to active nodes
                 let active_nodes: Vec<NodeId> = space.get_active_nodes().iter().copied().collect();
-                self.query_engine.filter_nodes_columnar(&active_nodes, pool, space, options.node_filter.as_ref().unwrap())?
+                self.query_engine.filter_nodes_columnar(
+                    &active_nodes,
+                    pool,
+                    space,
+                    options.node_filter.as_ref().unwrap(),
+                )?
             }
         };
-        
+
         self.connected_components_for_nodes(pool, space, nodes, options)
     }
 
@@ -496,8 +501,8 @@ impl TraversalEngine {
         let start_time = std::time::Instant::now();
 
         // Use provided nodes
-        
-        // Build adjacency snapshot  
+
+        // Build adjacency snapshot
         let (_, _, _, _neighbors) = space.snapshot(pool);
 
         // 🚀 PERFORMANCE: Use Arc reference directly - no O(E) clone needed!
@@ -549,12 +554,12 @@ impl TraversalEngine {
                                     queue.push_back(neighbor);
                                 }
                             }
-                            
+
                             // Add edge if both endpoints are in this component and not already added
                             if let Some(&neighbor_comp_id) = node_component_id.get(&neighbor) {
-                                if neighbor_comp_id == component_count 
+                                if neighbor_comp_id == component_count
                                     && current < neighbor // Avoid duplicates
-                                    && edge_set.insert(edge_id) 
+                                    && edge_set.insert(edge_id)
                                 {
                                     component_edges.push(edge_id);
                                 }
@@ -576,7 +581,6 @@ impl TraversalEngine {
             }
         }
 
-
         // Sort components by size
         components.sort_unstable_by(|a, b| b.size.cmp(&a.size));
 
@@ -586,7 +590,6 @@ impl TraversalEngine {
             components.len(),
             duration,
         );
-
 
         let total_components = components.len();
         let largest_component_size = components.iter().map(|c| c.size).max().unwrap_or(0);

@@ -303,7 +303,7 @@ impl PyGraphVersion {
     /// Get node mapping for a specific attribute
     fn get_node_mapping(&self, py: Python, uid_key: String) -> PyResult<PyObject> {
         let dict = PyDict::new(py);
-        
+
         // Get node IDs in isolated borrow scope
         let node_ids = {
             let graph = self.graph.borrow(py);
@@ -318,7 +318,7 @@ impl PyGraphVersion {
                 let result = graph.inner.borrow().get_node_attr(node_id, &uid_key);
                 result
             };
-            
+
             if let Ok(Some(attr_value)) = attr_value {
                 // Convert attribute value to appropriate Python type
                 let key_value = match attr_value {

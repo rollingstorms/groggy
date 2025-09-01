@@ -5,9 +5,9 @@
 //! to nodes through the trait system.
 
 use crate::api::graph::Graph;
+use crate::core::neighborhood::NeighborhoodSampler;
 use crate::core::traits::{GraphEntity, NodeOperations, SubgraphOperations};
 use crate::core::traversal::TraversalEngine;
-use crate::core::neighborhood::NeighborhoodSampler;
 use crate::errors::GraphResult;
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId};
 use std::cell::RefCell;
@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 /// A wrapper around a NodeId that implements GraphEntity and NodeOperations
-/// 
+///
 /// EntityNode provides a unified interface to individual nodes, enabling
 /// them to participate in the trait system while leveraging all existing
 /// efficient storage and algorithms.
@@ -30,10 +30,7 @@ pub struct EntityNode {
 impl EntityNode {
     /// Create a new EntityNode wrapper for the given node
     pub fn new(node_id: NodeId, graph_ref: Rc<RefCell<Graph>>) -> Self {
-        Self {
-            node_id,
-            graph_ref,
-        }
+        Self { node_id, graph_ref }
     }
 
     /// Get the wrapped node ID
@@ -64,26 +61,22 @@ impl GraphEntity for EntityNode {
         // Return neighboring nodes as EntityNode wrappers
         let graph = self.graph_ref.borrow();
         let neighbor_ids = graph.neighbors(self.node_id)?;
-        
+
         let entities: Vec<Box<dyn GraphEntity>> = neighbor_ids
             .into_iter()
             .map(|neighbor_id| {
-                Box::new(EntityNode::new(neighbor_id, self.graph_ref.clone())) 
+                Box::new(EntityNode::new(neighbor_id, self.graph_ref.clone()))
                     as Box<dyn GraphEntity>
             })
             .collect();
-        
+
         Ok(entities)
     }
 
     fn summary(&self) -> String {
         let graph = self.graph_ref.borrow();
         let degree = graph.degree(self.node_id).unwrap_or(0);
-        format!(
-            "EntityNode(id={}, degree={})",
-            self.node_id,
-            degree
-        )
+        format!("EntityNode(id={}, degree={})", self.node_id, degree)
     }
 }
 
@@ -122,10 +115,12 @@ impl NodeOperations for EntityNode {
         // First check if this node has a subgraph reference
         let subgraph_id_opt = {
             let graph = self.graph_ref.borrow();
-            let x = graph.pool().get_node_attribute(self.node_id, &"contained_subgraph".into())?;
+            let x = graph
+                .pool()
+                .get_node_attribute(self.node_id, &"contained_subgraph".into())?;
             x
         };
-        
+
         if let Some(AttrValue::SubgraphRef(subgraph_id)) = subgraph_id_opt {
             // Get all needed data in separate scopes to avoid long-lived borrows
             let (nodes, edges, subgraph_type) = {
@@ -133,51 +128,55 @@ impl NodeOperations for EntityNode {
                 let x = graph.pool().get_subgraph(subgraph_id)?;
                 x
             };
-            
+
             let central_nodes = {
                 let graph = self.graph_ref.borrow();
-                let x = if let Some(AttrValue::NodeArray(central)) = 
-                    graph.pool().get_node_attribute(self.node_id, &"central_nodes".into())? {
+                let x = if let Some(AttrValue::NodeArray(central)) = graph
+                    .pool()
+                    .get_node_attribute(self.node_id, &"central_nodes".into())?
+                {
                     central
                 } else {
                     vec![self.node_id] // Default to this node as central
                 };
                 x
             };
-            
+
             let hops = {
                 let graph = self.graph_ref.borrow();
-                let x = if let Some(AttrValue::SmallInt(h)) = 
-                    graph.pool().get_node_attribute(self.node_id, &"expansion_hops".into())? {
+                let x = if let Some(AttrValue::SmallInt(h)) = graph
+                    .pool()
+                    .get_node_attribute(self.node_id, &"expansion_hops".into())?
+                {
                     h as usize
                 } else {
                     1 // Default hops
                 };
                 x
             };
-            
+
             // Create appropriate subgraph type based on stored metadata
             let subgraph: Box<dyn SubgraphOperations> = match subgraph_type.as_str() {
-                "neighborhood" => {
-                    Box::new(crate::core::neighborhood::NeighborhoodSubgraph::from_stored(
+                "neighborhood" => Box::new(
+                    crate::core::neighborhood::NeighborhoodSubgraph::from_stored(
                         self.graph_ref(),
                         nodes,
                         edges,
                         central_nodes,
-                        hops
-                    ))
-                },
+                        hops,
+                    ),
+                ),
                 _ => {
                     // Default to base Subgraph
                     Box::new(crate::core::subgraph::Subgraph::new(
                         self.graph_ref(),
                         nodes,
                         edges,
-                        subgraph_type.clone()
+                        subgraph_type.clone(),
                     ))
                 }
             };
-            
+
             Ok(Some(subgraph))
         } else {
             Ok(None)
@@ -185,7 +184,9 @@ impl NodeOperations for EntityNode {
     }
 
     fn is_meta_node(&self) -> bool {
-        self.graph_ref.borrow().pool()
+        self.graph_ref
+            .borrow()
+            .pool()
             .get_node_attribute(self.node_id, &"contained_subgraph".into())
             .map(|attr_opt| attr_opt.is_some())
             .unwrap_or(false)
@@ -208,12 +209,12 @@ impl NodeOperations for EntityNode {
             &graph.pool(),
             graph.space(),
             &vec![self.node_id],
-            hops
+            hops,
         )?;
-        
+
         // unified_neighborhood already returns a NeighborhoodSubgraph
         let neighborhood_subgraph = result;
-        
+
         Ok(Box::new(neighborhood_subgraph))
     }
 
@@ -221,7 +222,7 @@ impl NodeOperations for EntityNode {
         let graph = self.graph_ref.borrow_mut();
         let mut paths = Vec::new();
         let options = crate::core::traversal::PathFindingOptions::default();
-        
+
         for &target in targets {
             // Use TraversalEngine directly
             let mut traversal_engine = TraversalEngine::new();
@@ -230,18 +231,18 @@ impl NodeOperations for EntityNode {
                 &mut graph.space(),
                 self.node_id,
                 target,
-                options.clone()
+                options.clone(),
             )? {
                 let path_subgraph = crate::core::subgraph::Subgraph::new(
                     self.graph_ref(),
                     path_result.nodes.into_iter().collect(),
                     path_result.edges.into_iter().collect(),
-                    format!("path_{}_{}", self.node_id, target)
+                    format!("path_{}_{}", self.node_id, target),
                 );
                 paths.push(Box::new(path_subgraph) as Box<dyn SubgraphOperations>);
             }
         }
-        
+
         Ok(paths)
     }
 
@@ -261,8 +262,8 @@ mod tests {
     use super::*;
     use crate::api::graph::Graph;
     use crate::types::AttrValue;
-    use std::rc::Rc;
     use std::cell::RefCell;
+    use std::rc::Rc;
 
     #[test]
     fn test_entity_node_operations() {
@@ -273,50 +274,61 @@ mod tests {
         let node1 = graph.add_node();
         let node2 = graph.add_node();
         let node3 = graph.add_node();
-        
+
         let _edge1 = graph.add_edge(node1, node2).unwrap();
         let _edge2 = graph.add_edge(node2, node3).unwrap();
-        
+
         // Set some attributes
-        graph.set_node_attr(node1, "name".to_string(), AttrValue::Text("Alice".to_string())).unwrap();
-        graph.set_node_attr(node1, "age".to_string(), AttrValue::Int(25)).unwrap();
-        
+        graph
+            .set_node_attr(
+                node1,
+                "name".to_string(),
+                AttrValue::Text("Alice".to_string()),
+            )
+            .unwrap();
+        graph
+            .set_node_attr(node1, "age".to_string(), AttrValue::Int(25))
+            .unwrap();
+
         // Create EntityNode
         let graph_rc = Rc::new(RefCell::new(graph));
         let entity_node = EntityNode::new(node1, graph_rc.clone());
-        
+
         // Test GraphEntity interface
         assert_eq!(entity_node.entity_type(), "node");
         assert!(entity_node.exists());
-        
-        // Test NodeOperations interface  
+
+        // Test NodeOperations interface
         assert_eq!(entity_node.node_id(), node1);
-        
+
         // Test degree calculation
         let degree = entity_node.degree().unwrap();
         assert_eq!(degree, 1); // node1 has one edge to node2
-        
+
         // Test neighbors
         let neighbors = entity_node.neighbors().unwrap();
         assert_eq!(neighbors.len(), 1);
         assert_eq!(neighbors[0], node2);
-        
+
         // Test attribute access
         let name = entity_node.get_node_attribute(&"name".to_string()).unwrap();
-        assert!(matches!(name, Some(AttrValue::Text(_)) | Some(AttrValue::CompactText(_))));
-        
+        assert!(matches!(
+            name,
+            Some(AttrValue::Text(_)) | Some(AttrValue::CompactText(_))
+        ));
+
         // Test related entities (should return neighbors as EntityNodes)
         let related = entity_node.related_entities().unwrap();
         assert_eq!(related.len(), 1);
         assert_eq!(related[0].entity_type(), "node");
-        
+
         // Test connectivity
         let is_connected = entity_node.is_connected_to(node2).unwrap();
         assert!(is_connected);
-        
+
         let is_not_connected = entity_node.is_connected_to(node3).unwrap();
         assert!(!is_not_connected);
-        
+
         println!("EntityNode tests passed!");
     }
 }

@@ -274,13 +274,13 @@ impl PyGraphArray {
     /// Return iterator over array items (compatibility with pandas/numpy)
     /// Returns iterator of (index, value) tuples
     fn items(&self, py: Python) -> PyResult<PyObject> {
-        let items: PyResult<Vec<(usize, PyObject)>> = self.inner.iter()
+        let items: PyResult<Vec<(usize, PyObject)>> = self
+            .inner
+            .iter()
             .enumerate()
-            .map(|(i, attr_value)| {
-                Ok((i, attr_value_to_python_value(py, attr_value)?))
-            })
+            .map(|(i, attr_value)| Ok((i, attr_value_to_python_value(py, attr_value)?)))
             .collect();
-        
+
         Ok(items?.to_object(py))
     }
 

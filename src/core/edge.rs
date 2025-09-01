@@ -5,7 +5,7 @@
 //! to edges through the trait system.
 
 use crate::api::graph::Graph;
-use crate::core::traits::{GraphEntity, EdgeOperations, SubgraphOperations};
+use crate::core::traits::{EdgeOperations, GraphEntity, SubgraphOperations};
 use crate::errors::GraphResult;
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId};
 use std::cell::RefCell;
@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 /// A wrapper around an EdgeId that implements GraphEntity and EdgeOperations
-/// 
+///
 /// EntityEdge provides a unified interface to individual edges, enabling
 /// them to participate in the trait system while leveraging all existing
 /// efficient storage and algorithms.
@@ -28,10 +28,7 @@ pub struct EntityEdge {
 impl EntityEdge {
     /// Create a new EntityEdge wrapper for the given edge
     pub fn new(edge_id: EdgeId, graph_ref: Rc<RefCell<Graph>>) -> Self {
-        Self {
-            edge_id,
-            graph_ref,
-        }
+        Self { edge_id, graph_ref }
     }
 
     /// Get the wrapped edge ID
@@ -62,19 +59,28 @@ impl GraphEntity for EntityEdge {
         // Return the endpoint nodes as EntityNode wrappers
         let graph = self.graph_ref.borrow();
         let (source, target) = graph.edge_endpoints(self.edge_id)?;
-        
+
         let entities: Vec<Box<dyn GraphEntity>> = vec![
-            Box::new(crate::core::node::EntityNode::new(source, self.graph_ref.clone())),
-            Box::new(crate::core::node::EntityNode::new(target, self.graph_ref.clone())),
+            Box::new(crate::core::node::EntityNode::new(
+                source,
+                self.graph_ref.clone(),
+            )),
+            Box::new(crate::core::node::EntityNode::new(
+                target,
+                self.graph_ref.clone(),
+            )),
         ];
-        
+
         Ok(entities)
     }
 
     fn summary(&self) -> String {
         let graph = self.graph_ref.borrow();
         if let Ok((source, target)) = graph.edge_endpoints(self.edge_id) {
-            let weight = self.weight().ok().flatten()
+            let weight = self
+                .weight()
+                .ok()
+                .flatten()
                 .map(|w| format!(", weight={:.2}", w))
                 .unwrap_or_default();
             format!(
@@ -125,8 +131,7 @@ impl EdgeOperations for EntityEdge {
 
     fn connects(&self, node1: NodeId, node2: NodeId) -> GraphResult<bool> {
         let (source, target) = self.endpoints()?;
-        Ok((source == node1 && target == node2) || 
-           (source == node2 && target == node1))
+        Ok((source == node1 && target == node2) || (source == node2 && target == node1))
     }
 
     fn edge_attributes(&self) -> GraphResult<HashMap<AttrName, AttrValue>> {
@@ -153,7 +158,7 @@ impl EdgeOperations for EntityEdge {
             Some(AttrValue::Float(w)) => Ok(Some(w as f64)),
             Some(AttrValue::Int(w)) => Ok(Some(w as f64)),
             Some(AttrValue::SmallInt(w)) => Ok(Some(w as f64)),
-            _ => Ok(None)
+            _ => Ok(None),
         }
     }
 
@@ -166,7 +171,7 @@ impl EdgeOperations for EntityEdge {
             Some(AttrValue::Float(c)) => Ok(Some(c as f64)),
             Some(AttrValue::Int(c)) => Ok(Some(c as f64)),
             Some(AttrValue::SmallInt(c)) => Ok(Some(c as f64)),
-            _ => Ok(None)
+            _ => Ok(None),
         }
     }
 
@@ -174,36 +179,37 @@ impl EdgeOperations for EntityEdge {
         let (source, target) = self.endpoints()?;
         let nodes = [source, target].into_iter().collect();
         let edges = [self.edge_id].into_iter().collect();
-        
+
         let edge_subgraph = crate::core::subgraph::Subgraph::new(
             self.graph_ref(),
             nodes,
             edges,
-            format!("edge_{}", self.edge_id)
+            format!("edge_{}", self.edge_id),
         );
-        
+
         Ok(Box::new(edge_subgraph))
     }
 
     fn parallel_edges(&self) -> GraphResult<Vec<EdgeId>> {
         let (source, target) = self.endpoints()?;
         let graph = self.graph_ref.borrow();
-        
+
         // Get all edges between these nodes
         let mut parallel = Vec::new();
         let source_edges = graph.incident_edges(source)?;
-        
+
         for edge_id in source_edges {
             if edge_id != self.edge_id {
                 if let Ok((edge_source, edge_target)) = graph.edge_endpoints(edge_id) {
-                    if (edge_source == source && edge_target == target) ||
-                       (edge_source == target && edge_target == source) {
+                    if (edge_source == source && edge_target == target)
+                        || (edge_source == target && edge_target == source)
+                    {
                         parallel.push(edge_id);
                     }
                 }
             }
         }
-        
+
         Ok(parallel)
     }
 }

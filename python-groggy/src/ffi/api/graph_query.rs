@@ -5,8 +5,8 @@
 use crate::ffi::core::query::{PyEdgeFilter, PyNodeFilter};
 use crate::ffi::core::subgraph::PySubgraph;
 use crate::ffi::utils::graph_error_to_py_err;
-use groggy::{AttrName, EdgeId, NodeId};
 use groggy::core::subgraph::Subgraph;
+use groggy::{AttrName, EdgeId, NodeId};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -27,27 +27,31 @@ impl PyGraphQuery {
         let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
             filter_obj.inner.clone()
         } else {
-            return Err(PyErr::new::<PyTypeError, _>("filter must be a NodeFilter object"));
+            return Err(PyErr::new::<PyTypeError, _>(
+                "filter must be a NodeFilter object",
+            ));
         };
-        
+
         // Pure delegation to core Graph methods
         let graph = self.graph.borrow(py);
-        let filtered_nodes = graph.inner.borrow_mut()
+        let filtered_nodes = graph
+            .inner
+            .borrow_mut()
             .find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
-        
+
         // Create subgraph using core Subgraph constructor
         let node_set: HashSet<NodeId> = filtered_nodes.iter().copied().collect();
         let induced_edges = Subgraph::calculate_induced_edges(&graph.inner, &node_set)
             .map_err(graph_error_to_py_err)?;
-            
+
         let subgraph = Subgraph::new(
             graph.inner.clone(),
             node_set,
             induced_edges,
-            "filtered_nodes".to_string()
+            "filtered_nodes".to_string(),
         );
-        
+
         PySubgraph::from_core_subgraph(subgraph)
     }
 
@@ -57,12 +61,16 @@ impl PyGraphQuery {
         let edge_filter = if let Ok(filter_obj) = filter.extract::<PyEdgeFilter>() {
             filter_obj.inner.clone()
         } else {
-            return Err(PyErr::new::<PyTypeError, _>("filter must be an EdgeFilter object"));
+            return Err(PyErr::new::<PyTypeError, _>(
+                "filter must be an EdgeFilter object",
+            ));
         };
 
         // Pure delegation to core Graph methods
         let graph = self.graph.borrow(py);
-        let filtered_edges = graph.inner.borrow_mut()
+        let filtered_edges = graph
+            .inner
+            .borrow_mut()
             .find_edges(edge_filter)
             .map_err(graph_error_to_py_err)?;
 
@@ -81,7 +89,7 @@ impl PyGraphQuery {
             graph.inner.clone(),
             incident_nodes,
             edge_set,
-            "filtered_edges".to_string()
+            "filtered_edges".to_string(),
         );
 
         PySubgraph::from_core_subgraph(subgraph)
@@ -102,8 +110,9 @@ impl PyGraphQuery {
         } else if let Ok(query_str) = filter.extract::<String>() {
             // String query - parse it using Rust core query parser (FIXED: no circular dependency)
             let mut parser = groggy::core::query_parser::QueryParser::new();
-            parser.parse_node_query(&query_str)
-                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e)))?
+            parser.parse_node_query(&query_str).map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
+            })?
         } else {
             return Err(PyErr::new::<PyTypeError, _>(
                 "filter must be a NodeFilter object or a string query",
@@ -127,7 +136,8 @@ impl PyGraphQuery {
         // Calculate induced edges within the filtered nodes
         let filtered_node_set: HashSet<NodeId> = filtered_nodes.iter().copied().collect();
         let filtered_edges: Vec<EdgeId> = subgraph
-            .inner.edges()
+            .inner
+            .edges()
             .iter()
             .filter(|&&edge_id| {
                 if let Ok((source, target)) = graph.inner.borrow().edge_endpoints(edge_id) {
@@ -142,14 +152,14 @@ impl PyGraphQuery {
         // Create subgraph using core Subgraph constructor
         let filtered_node_set: HashSet<NodeId> = filtered_nodes.iter().copied().collect();
         let filtered_edge_set: HashSet<EdgeId> = filtered_edges.iter().copied().collect();
-        
+
         let subgraph = Subgraph::new(
             graph.inner.clone(),
             filtered_node_set,
             filtered_edge_set,
-            "filtered_subgraph".to_string()
+            "filtered_subgraph".to_string(),
         );
-        
+
         PySubgraph::from_core_subgraph(subgraph)
     }
 

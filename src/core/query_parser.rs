@@ -17,7 +17,11 @@ pub enum QueryError {
     /// Invalid syntax in query string
     InvalidSyntax { message: String, position: usize },
     /// Unexpected token during parsing
-    UnexpectedToken { expected: String, found: String, position: usize },
+    UnexpectedToken {
+        expected: String,
+        found: String,
+        position: usize,
+    },
     /// Missing closing parenthesis
     MissingClosingParen { position: usize },
     /// Invalid attribute value
@@ -32,14 +36,26 @@ impl std::fmt::Display for QueryError {
             QueryError::InvalidSyntax { message, position } => {
                 write!(f, "Invalid syntax at position {}: {}", position, message)
             }
-            QueryError::UnexpectedToken { expected, found, position } => {
-                write!(f, "Expected '{}' but found '{}' at position {}", expected, found, position)
+            QueryError::UnexpectedToken {
+                expected,
+                found,
+                position,
+            } => {
+                write!(
+                    f,
+                    "Expected '{}' but found '{}' at position {}",
+                    expected, found, position
+                )
             }
             QueryError::MissingClosingParen { position } => {
                 write!(f, "Missing closing parenthesis at position {}", position)
             }
             QueryError::InvalidValue { value, position } => {
-                write!(f, "Invalid attribute value '{}' at position {}", value, position)
+                write!(
+                    f,
+                    "Invalid attribute value '{}' at position {}",
+                    value, position
+                )
             }
             QueryError::EmptyQuery => {
                 write!(f, "Query string cannot be empty")
@@ -132,7 +148,7 @@ impl QueryParser {
     fn tokenize(&mut self, query: &str) -> QueryResult<()> {
         self.tokens.clear();
         let mut chars = query.char_indices().peekable();
-        
+
         while let Some((pos, ch)) = chars.next() {
             match ch {
                 ' ' | '\t' | '\n' => continue, // Skip whitespace
@@ -181,7 +197,7 @@ impl QueryParser {
                     let quote_char = ch;
                     let mut value = String::new();
                     let mut escaped = false;
-                    
+
                     while let Some((_, ch)) = chars.next() {
                         if escaped {
                             value.push(ch);
@@ -194,7 +210,7 @@ impl QueryParser {
                             value.push(ch);
                         }
                     }
-                    
+
                     self.tokens.push(Token::Value(AttrValue::Text(value)));
                 }
                 _ if ch.is_ascii_digit() || ch == '-' => {
@@ -202,7 +218,7 @@ impl QueryParser {
                     let start_pos = pos;
                     let mut number_str = String::new();
                     number_str.push(ch);
-                    
+
                     while let Some(&(_, next_ch)) = chars.peek() {
                         if next_ch.is_ascii_digit() || next_ch == '.' {
                             number_str.push(next_ch);
@@ -211,14 +227,16 @@ impl QueryParser {
                             break;
                         }
                     }
-                    
+
                     let value = if number_str.contains('.') {
                         match number_str.parse::<f32>() {
                             Ok(f) => AttrValue::Float(f),
-                            Err(_) => return Err(QueryError::InvalidValue {
-                                value: number_str,
-                                position: start_pos,
-                            }),
+                            Err(_) => {
+                                return Err(QueryError::InvalidValue {
+                                    value: number_str,
+                                    position: start_pos,
+                                })
+                            }
                         }
                     } else {
                         match number_str.parse::<i64>() {
@@ -229,20 +247,22 @@ impl QueryParser {
                                     AttrValue::Int(i)
                                 }
                             }
-                            Err(_) => return Err(QueryError::InvalidValue {
-                                value: number_str,
-                                position: start_pos,
-                            }),
+                            Err(_) => {
+                                return Err(QueryError::InvalidValue {
+                                    value: number_str,
+                                    position: start_pos,
+                                })
+                            }
                         }
                     };
-                    
+
                     self.tokens.push(Token::Value(value));
                 }
                 _ if ch.is_ascii_alphabetic() || ch == '_' => {
                     // Parse identifier or keyword
                     let mut ident = String::new();
                     ident.push(ch);
-                    
+
                     while let Some(&(_, next_ch)) = chars.peek() {
                         if next_ch.is_ascii_alphanumeric() || next_ch == '_' {
                             ident.push(next_ch);
@@ -251,7 +271,7 @@ impl QueryParser {
                             break;
                         }
                     }
-                    
+
                     match ident.to_uppercase().as_str() {
                         "AND" => self.tokens.push(Token::LogicalOp(LogicalOp::And)),
                         "OR" => self.tokens.push(Token::LogicalOp(LogicalOp::Or)),
@@ -269,7 +289,7 @@ impl QueryParser {
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -281,24 +301,24 @@ impl QueryParser {
     /// Parse OR expression for nodes
     fn parse_node_or(&mut self) -> QueryResult<NodeFilter> {
         let mut left = self.parse_node_and()?;
-        
+
         while self.match_token(&Token::LogicalOp(LogicalOp::Or)) {
             let right = self.parse_node_and()?;
             left = NodeFilter::Or(vec![left, right]);
         }
-        
+
         Ok(left)
     }
 
     /// Parse AND expression for nodes
     fn parse_node_and(&mut self) -> QueryResult<NodeFilter> {
         let mut left = self.parse_node_not()?;
-        
+
         while self.match_token(&Token::LogicalOp(LogicalOp::And)) {
             let right = self.parse_node_not()?;
             left = NodeFilter::And(vec![left, right]);
         }
-        
+
         Ok(left)
     }
 
@@ -330,13 +350,13 @@ impl QueryParser {
     /// Parse a comparison expression for nodes
     fn parse_node_comparison(&mut self) -> QueryResult<NodeFilter> {
         let attr_name = self.expect_identifier()?;
-        
+
         if let Some(token) = self.current_token().cloned() {
             match token {
                 Token::Operator(op) => {
                     self.advance();
                     let value = self.expect_value()?;
-                    
+
                     match op {
                         CompOp::Equals => Ok(NodeFilter::AttributeEquals {
                             name: attr_name,
@@ -383,24 +403,24 @@ impl QueryParser {
     /// Parse OR expression for edges
     fn parse_edge_or(&mut self) -> QueryResult<EdgeFilter> {
         let mut left = self.parse_edge_and()?;
-        
+
         while self.match_token(&Token::LogicalOp(LogicalOp::Or)) {
             let right = self.parse_edge_and()?;
             left = EdgeFilter::Or(vec![left, right]);
         }
-        
+
         Ok(left)
     }
 
     /// Parse AND expression for edges
     fn parse_edge_and(&mut self) -> QueryResult<EdgeFilter> {
         let mut left = self.parse_edge_not()?;
-        
+
         while self.match_token(&Token::LogicalOp(LogicalOp::And)) {
             let right = self.parse_edge_not()?;
             left = EdgeFilter::And(vec![left, right]);
         }
-        
+
         Ok(left)
     }
 
@@ -432,13 +452,13 @@ impl QueryParser {
     /// Parse a comparison expression for edges
     fn parse_edge_comparison(&mut self) -> QueryResult<EdgeFilter> {
         let attr_name = self.expect_identifier()?;
-        
+
         if let Some(token) = self.current_token().cloned() {
             match token {
                 Token::Operator(op) => {
                     self.advance();
                     let value = self.expect_value()?;
-                    
+
                     match op {
                         CompOp::Equals => Ok(EdgeFilter::AttributeEquals {
                             name: attr_name,
@@ -541,7 +561,7 @@ mod tests {
     fn test_simple_comparison() {
         let mut parser = QueryParser::new();
         let filter = parser.parse_node_query("salary > 120000").unwrap();
-        
+
         match filter {
             NodeFilter::AttributeFilter { name, filter } => {
                 assert_eq!(name, "salary");
@@ -557,8 +577,10 @@ mod tests {
     #[test]
     fn test_string_equals() {
         let mut parser = QueryParser::new();
-        let filter = parser.parse_node_query("department == 'Engineering'").unwrap();
-        
+        let filter = parser
+            .parse_node_query("department == 'Engineering'")
+            .unwrap();
+
         match filter {
             NodeFilter::AttributeEquals { name, value } => {
                 assert_eq!(name, "department");
@@ -571,10 +593,10 @@ mod tests {
     #[test]
     fn test_complex_logical() {
         let mut parser = QueryParser::new();
-        let filter = parser.parse_node_query(
-            "(salary > 120000 AND department == 'Engineering') OR age < 25"
-        ).unwrap();
-        
+        let filter = parser
+            .parse_node_query("(salary > 120000 AND department == 'Engineering') OR age < 25")
+            .unwrap();
+
         match filter {
             NodeFilter::Or(_) => (), // Structure is correct
             _ => panic!("Expected Or filter"),
@@ -585,7 +607,7 @@ mod tests {
     fn test_has_attribute() {
         let mut parser = QueryParser::new();
         let filter = parser.parse_node_query("email").unwrap();
-        
+
         match filter {
             NodeFilter::HasAttribute { name } => {
                 assert_eq!(name, "email");
@@ -598,17 +620,15 @@ mod tests {
     fn test_not_filter() {
         let mut parser = QueryParser::new();
         let filter = parser.parse_node_query("NOT department == 'HR'").unwrap();
-        
+
         match filter {
-            NodeFilter::Not(inner) => {
-                match inner.as_ref() {
-                    NodeFilter::AttributeEquals { name, value } => {
-                        assert_eq!(name, "department");
-                        assert_eq!(value, &AttrValue::Text("HR".to_string()));
-                    }
-                    _ => panic!("Expected AttributeEquals inside Not"),
+            NodeFilter::Not(inner) => match inner.as_ref() {
+                NodeFilter::AttributeEquals { name, value } => {
+                    assert_eq!(name, "department");
+                    assert_eq!(value, &AttrValue::Text("HR".to_string()));
                 }
-            }
+                _ => panic!("Expected AttributeEquals inside Not"),
+            },
             _ => panic!("Expected Not filter"),
         }
     }
@@ -616,16 +636,16 @@ mod tests {
     #[test]
     fn test_error_cases() {
         let mut parser = QueryParser::new();
-        
+
         // Empty query
         assert!(parser.parse_node_query("").is_err());
-        
+
         // Missing value
         assert!(parser.parse_node_query("salary >").is_err());
-        
+
         // Invalid syntax
         assert!(parser.parse_node_query("salary > > 100").is_err());
-        
+
         // Missing closing paren
         assert!(parser.parse_node_query("(salary > 100").is_err());
     }
@@ -634,7 +654,7 @@ mod tests {
     fn test_edge_queries() {
         let mut parser = QueryParser::new();
         let filter = parser.parse_edge_query("weight > 0.5").unwrap();
-        
+
         match filter {
             EdgeFilter::AttributeFilter { name, filter } => {
                 assert_eq!(name, "weight");

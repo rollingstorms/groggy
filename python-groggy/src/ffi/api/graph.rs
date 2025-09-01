@@ -3,9 +3,9 @@ use crate::ffi::api::graph_attributes::{PyGraphAttr, PyGraphAttrMut};
 //
 // Main Python bindings for the Graph API.
 
-use groggy::{AttrName, AttrValue as RustAttrValue, EdgeId, Graph as RustGraph, NodeId, StateId};
 use groggy::core::subgraph::Subgraph;
 use groggy::core::traits::SubgraphOperations;
+use groggy::{AttrName, AttrValue as RustAttrValue, EdgeId, Graph as RustGraph, NodeId, StateId};
 use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -29,7 +29,6 @@ use crate::ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoricalView};
 use crate::ffi::api::graph_analysis::PyGraphAnalysis;
 use crate::ffi::api::graph_matrix::PyGraphMatrixHelper;
 
-
 /// Specification for neighborhood hop parameters
 #[derive(Debug, Clone)]
 
@@ -51,7 +50,6 @@ impl PyAggregationResult {
     }
 }
 
-
 /// Convert AdjacencyMatrix to Python object - DELEGATION helper
 impl PyGraph {
     pub(crate) fn adjacency_matrix_to_py_object(
@@ -61,17 +59,19 @@ impl PyGraph {
     ) -> PyResult<PyObject> {
         use crate::ffi::core::matrix::PyGraphMatrix;
         use pyo3::types::PyDict;
-        
+
         // Create metadata dict
         let result_dict = PyDict::new(py);
         result_dict.set_item("size", matrix.size)?;
         result_dict.set_item("is_sparse", matrix.data.is_sparse())?;
         result_dict.set_item("type", "adjacency_matrix")?;
-        
+
         // Convert to GraphMatrix for structured access
         match self.adjacency_matrix_to_graph_matrix(matrix) {
             Ok(graph_matrix) => {
-                let py_matrix = PyGraphMatrix { inner: graph_matrix };
+                let py_matrix = PyGraphMatrix {
+                    inner: graph_matrix,
+                };
                 result_dict.set_item("matrix", Py::new(py, py_matrix)?)?;
             }
             Err(_) => {
@@ -80,7 +80,7 @@ impl PyGraph {
                 result_dict.set_item("error", "Matrix conversion failed")?;
             }
         }
-        
+
         Ok(result_dict.to_object(py))
     }
 }
@@ -101,30 +101,30 @@ impl Clone for PyGraph {
 
 impl PyGraph {
     /// Convert this graph to a SubgraphOperations trait object containing all nodes and edges
-    /// 
+    ///
     /// This enables all SubgraphOperations methods to work on the full graph:
     /// - connected_components(), bfs(), dfs()
     /// - node_count(), edge_count(), neighbors(), degree()  
     /// - nodes_table(), edges_table()
-    /// 
+    ///
     /// # Performance
     /// Creates lightweight wrapper with references to existing graph data
     pub fn as_subgraph(&self) -> PyResult<Box<dyn SubgraphOperations>> {
         let graph = self.inner.borrow();
-        
+
         // Get all nodes and edges from the graph
         let all_nodes = graph.node_ids().into_iter().collect();
         let all_edges = graph.edge_ids().into_iter().collect();
         drop(graph); // Release borrow
-        
+
         // Create subgraph containing the entire graph
         let full_subgraph = Subgraph::new(
             self.inner.clone(),
-            all_nodes, 
+            all_nodes,
             all_edges,
             "full_graph".to_string(),
         );
-        
+
         Ok(Box::new(full_subgraph))
     }
 }
@@ -141,7 +141,9 @@ impl PyGraph {
         } else {
             RustGraph::new_undirected()
         };
-        Ok(Self { inner: Rc::new(RefCell::new(rust_graph)) })
+        Ok(Self {
+            inner: Rc::new(RefCell::new(rust_graph)),
+        })
     }
 
     /// Check if this graph is directed
@@ -171,7 +173,7 @@ impl PyGraph {
                     let attr_value = python_value_to_attr_value(value);
 
                     self.inner
-.borrow_mut()
+                        .borrow_mut()
                         .set_node_attr(node_id, attr_name, attr_value?)
                         .map_err(graph_error_to_py_err)?;
                 }
@@ -244,7 +246,7 @@ impl PyGraph {
                 // OPTIMIZATION: Use bulk attribute setting - O(A) operations instead of O(N × A)
                 if !attrs_by_name.is_empty() {
                     self.inner
-.borrow_mut()
+                        .borrow_mut()
                         .set_node_attrs(attrs_by_name)
                         .map_err(graph_error_to_py_err)?;
                 }
@@ -268,7 +270,11 @@ impl PyGraph {
         let node_ids = self.inner.borrow_mut().node_ids();
 
         for node_id in node_ids {
-            if let Ok(Some(attr_value)) = self.inner.borrow_mut().get_node_attr(node_id, &uid_key.to_string()) {
+            if let Ok(Some(attr_value)) = self
+                .inner
+                .borrow_mut()
+                .get_node_attr(node_id, &uid_key.to_string())
+            {
                 match attr_value {
                     RustAttrValue::Text(s) => {
                         if s == string_id {
@@ -350,7 +356,6 @@ impl PyGraph {
         }
     }
 
-
     // === TOPOLOGY OPERATIONS ===
 
     /// Check if node exists - DELEGATED (same as has_node)
@@ -367,7 +372,7 @@ impl PyGraph {
 
     fn edge_endpoints(&self, edge: EdgeId) -> PyResult<(NodeId, NodeId)> {
         self.inner
-.borrow_mut()
+            .borrow_mut()
             .edge_endpoints(edge)
             .map_err(graph_error_to_py_err)
     }
@@ -411,10 +416,6 @@ impl PyGraph {
         let graph_ref = self_.into();
         PyGraph::create_edges_accessor_internal(graph_ref, py)
     }
-
-
-
-
 
     /// Add multiple edges at once
     fn add_edges(
@@ -543,7 +544,7 @@ impl PyGraph {
 
                 if !attrs_by_name.is_empty() {
                     self.inner
-.borrow_mut()
+                        .borrow_mut()
                         .set_edge_attrs(attrs_by_name)
                         .map_err(graph_error_to_py_err)?;
                 }
@@ -567,8 +568,9 @@ impl PyGraph {
         } else if let Ok(query_str) = filter.extract::<String>() {
             // String query - parse it using Rust core query parser (FIXED: no circular dependency)
             let mut parser = groggy::core::query_parser::QueryParser::new();
-            parser.parse_node_query(&query_str)
-                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e)))?
+            parser.parse_node_query(&query_str).map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
+            })?
         } else {
             return Err(PyErr::new::<PyTypeError, _>(
                 "filter must be a NodeFilter object or a string query (e.g., 'salary > 120000')",
@@ -576,7 +578,9 @@ impl PyGraph {
         };
 
         // Validate that any referenced attributes exist in the graph
-        if let Err(attr_name) = Self::validate_node_filter_attributes(&*slf.inner.borrow(), &node_filter) {
+        if let Err(attr_name) =
+            Self::validate_node_filter_attributes(&*slf.inner.borrow(), &node_filter)
+        {
             return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                 format!("Attribute '{}' does not exist on any nodes in the graph. Use graph.nodes.table().columns to see available attributes.", attr_name)
             ));
@@ -621,7 +625,7 @@ impl PyGraph {
             slf.inner.clone(),
             node_set,
             edge_set,
-            "filtered_nodes".to_string()
+            "filtered_nodes".to_string(),
         );
         PySubgraph::from_core_subgraph(subgraph)
     }
@@ -635,8 +639,9 @@ impl PyGraph {
         } else if let Ok(query_str) = filter.extract::<String>() {
             // String query - parse it using Rust core query parser (FIXED: no circular dependency)
             let mut parser = groggy::core::query_parser::QueryParser::new();
-            parser.parse_edge_query(&query_str)
-                .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e)))?
+            parser.parse_edge_query(&query_str).map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
+            })?
         } else {
             return Err(PyErr::new::<PyTypeError, _>(
                 "filter must be an EdgeFilter object or a string query",
@@ -644,7 +649,9 @@ impl PyGraph {
         };
 
         // Validate that any referenced attributes exist in the graph
-        if let Err(attr_name) = Self::validate_edge_filter_attributes(&*slf.inner.borrow(), &edge_filter) {
+        if let Err(attr_name) =
+            Self::validate_edge_filter_attributes(&*slf.inner.borrow(), &edge_filter)
+        {
             return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                 format!("Attribute '{}' does not exist on any edges in the graph. Use graph.edges.table().columns to see available attributes.", attr_name)
             ));
@@ -672,7 +679,7 @@ impl PyGraph {
             slf.inner.clone(),
             nodes,
             edge_set,
-            "filtered_edges".to_string()
+            "filtered_edges".to_string(),
         );
         PySubgraph::from_core_subgraph(subgraph)
     }
@@ -689,7 +696,7 @@ impl PyGraph {
     ) -> PyResult<PyGroupedAggregationResult> {
         let results = self
             .inner
-.borrow_mut()
+            .borrow_mut()
             .group_nodes_by_attribute(&attribute, &aggregation_attr, &operation)
             .map_err(graph_error_to_py_err)?;
 
@@ -726,18 +733,24 @@ impl PyGraph {
 
     /// Remove a single node from the graph
     fn remove_node(&mut self, node: NodeId) -> PyResult<()> {
-        self.inner.borrow_mut().remove_node(node).map_err(graph_error_to_py_err)
+        self.inner
+            .borrow_mut()
+            .remove_node(node)
+            .map_err(graph_error_to_py_err)
     }
 
     /// Remove a single edge from the graph
     fn remove_edge(&mut self, edge: EdgeId) -> PyResult<()> {
-        self.inner.borrow_mut().remove_edge(edge).map_err(graph_error_to_py_err)
+        self.inner
+            .borrow_mut()
+            .remove_edge(edge)
+            .map_err(graph_error_to_py_err)
     }
 
     /// Remove multiple nodes from the graph
     fn remove_nodes(&mut self, nodes: Vec<NodeId>) -> PyResult<()> {
         self.inner
-.borrow_mut()
+            .borrow_mut()
             .remove_nodes(&nodes)
             .map_err(graph_error_to_py_err)
     }
@@ -745,7 +758,7 @@ impl PyGraph {
     /// Remove multiple edges from the graph
     fn remove_edges(&mut self, edges: Vec<EdgeId>) -> PyResult<()> {
         self.inner
-.borrow_mut()
+            .borrow_mut()
             .remove_edges(&edges)
             .map_err(graph_error_to_py_err)
     }
@@ -823,28 +836,52 @@ impl PyGraph {
 
     /// Set single node attribute - delegates to PyGraphAttrMut
     #[pyo3(signature = (node, attr, value))]
-    fn set_node_attr(&mut self, node: NodeId, attr: String, value: &PyAny, py: Python) -> PyResult<()> {
+    fn set_node_attr(
+        &mut self,
+        node: NodeId,
+        attr: String,
+        value: &PyAny,
+        py: Python,
+    ) -> PyResult<()> {
         let mut attr_handler = PyGraphAttrMut::new(self.inner.clone());
         attr_handler.set_node_attr(py, node, attr, value)
     }
 
     /// Get single node attribute - delegates to PyGraphAttr
     #[pyo3(signature = (node, attr, default = None))]
-    fn get_node_attr(&self, node: NodeId, attr: String, default: Option<&PyAny>, py: Python) -> PyResult<PyObject> {
+    fn get_node_attr(
+        &self,
+        node: NodeId,
+        attr: String,
+        default: Option<&PyAny>,
+        py: Python,
+    ) -> PyResult<PyObject> {
         let attr_handler = PyGraphAttr::new(self.inner.clone());
         attr_handler.get_node_attr(py, node, attr, default)
     }
 
     /// Set single edge attribute - delegates to PyGraphAttrMut
     #[pyo3(signature = (edge, attr, value))]
-    fn set_edge_attr(&mut self, edge: EdgeId, attr: String, value: &PyAny, py: Python) -> PyResult<()> {
+    fn set_edge_attr(
+        &mut self,
+        edge: EdgeId,
+        attr: String,
+        value: &PyAny,
+        py: Python,
+    ) -> PyResult<()> {
         let mut attr_handler = PyGraphAttrMut::new(self.inner.clone());
         attr_handler.set_edge_attr(py, edge, attr, value)
     }
 
     /// Get single edge attribute - delegates to PyGraphAttr
     #[pyo3(signature = (edge, attr, default = None))]
-    fn get_edge_attr(&self, edge: EdgeId, attr: String, default: Option<&PyAny>, py: Python) -> PyResult<PyObject> {
+    fn get_edge_attr(
+        &self,
+        edge: EdgeId,
+        attr: String,
+        default: Option<&PyAny>,
+        py: Python,
+    ) -> PyResult<PyObject> {
         let attr_handler = PyGraphAttr::new(self.inner.clone());
         attr_handler.get_edge_attr(py, edge, attr, default)
     }
@@ -858,7 +895,12 @@ impl PyGraph {
 
     /// Get bulk node attributes - delegates to PyGraphAttr
     #[pyo3(signature = (nodes, attrs))]
-    fn get_node_attrs(&self, nodes: Vec<NodeId>, attrs: Vec<AttrName>, py: Python) -> PyResult<PyObject> {
+    fn get_node_attrs(
+        &self,
+        nodes: Vec<NodeId>,
+        attrs: Vec<AttrName>,
+        py: Python,
+    ) -> PyResult<PyObject> {
         let attr_handler = PyGraphAttr::new(self.inner.clone());
         attr_handler.get_node_attrs(py, nodes, attrs)
     }
@@ -872,7 +914,12 @@ impl PyGraph {
 
     /// Get bulk edge attributes - delegates to PyGraphAttr
     #[pyo3(signature = (edges, attrs))]
-    fn get_edge_attrs(&self, edges: Vec<EdgeId>, attrs: Vec<String>, py: Python) -> PyResult<PyObject> {
+    fn get_edge_attrs(
+        &self,
+        edges: Vec<EdgeId>,
+        attrs: Vec<String>,
+        py: Python,
+    ) -> PyResult<PyObject> {
         let attr_handler = PyGraphAttr::new(self.inner.clone());
         attr_handler.get_edge_attrs(py, edges, attrs)
     }
@@ -890,7 +937,6 @@ impl PyGraph {
         let attr_handler = PyGraphAttr::new(self.inner.clone());
         Ok(attr_handler.has_edge_attribute(py, edge_id, attr_name))
     }
-
 
     /// Get all attribute keys for a node - delegates to PyGraphAttr
     #[pyo3(signature = (node_id))]
@@ -911,7 +957,7 @@ impl PyGraph {
         use std::collections::HashSet;
         let graph_ref = self.inner.borrow();
         let mut all_attrs = HashSet::new();
-        
+
         for node_id in graph_ref.node_ids() {
             if let Ok(attrs) = graph_ref.get_node_attrs(node_id) {
                 for attr_name in attrs.keys() {
@@ -919,7 +965,7 @@ impl PyGraph {
                 }
             }
         }
-        
+
         all_attrs.into_iter().collect()
     }
 
@@ -928,7 +974,7 @@ impl PyGraph {
         use std::collections::HashSet;
         let graph_ref = self.inner.borrow();
         let mut all_attrs = HashSet::new();
-        
+
         for edge_id in graph_ref.edge_ids() {
             if let Ok(attrs) = graph_ref.get_edge_attrs(edge_id) {
                 for attr_name in attrs.keys() {
@@ -936,7 +982,7 @@ impl PyGraph {
                 }
             }
         }
-        
+
         all_attrs.into_iter().collect()
     }
 
@@ -947,7 +993,6 @@ impl PyGraph {
         let mut analysis_handler = PyGraphAnalysis::new(Py::new(py, self.clone())?)?;
         analysis_handler.neighbors(py, nodes)
     }
-
 
     /// Get neighborhood sampling - delegates to PyGraphAnalysis helper
     fn neighborhood(
@@ -1001,7 +1046,10 @@ impl PyGraph {
     }
 
     /// Get dense adjacency matrix - delegates to PyGraphMatrixHelper
-    fn dense_adjacency_matrix(&mut self, py: Python) -> PyResult<Py<crate::ffi::core::matrix::PyGraphMatrix>> {
+    fn dense_adjacency_matrix(
+        &mut self,
+        py: Python,
+    ) -> PyResult<Py<crate::ffi::core::matrix::PyGraphMatrix>> {
         let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
         matrix_handler.dense_adjacency_matrix(py)
     }
@@ -1023,7 +1071,10 @@ impl PyGraph {
     }
 
     /// Generate transition matrix - delegates to PyGraphMatrixHelper
-    fn transition_matrix(&mut self, py: Python) -> PyResult<Py<crate::ffi::core::matrix::PyGraphMatrix>> {
+    fn transition_matrix(
+        &mut self,
+        py: Python,
+    ) -> PyResult<Py<crate::ffi::core::matrix::PyGraphMatrix>> {
         let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
         matrix_handler.transition_matrix(py)
     }
@@ -1043,7 +1094,10 @@ impl PyGraph {
         match target.as_str() {
             "nodes" => {
                 // TODO: Core doesn't have aggregate_nodes_custom, implement if needed
-                let result = self.inner.borrow_mut().aggregate_node_attribute(&attribute, &operation);
+                let result = self
+                    .inner
+                    .borrow_mut()
+                    .aggregate_node_attribute(&attribute, &operation);
                 match result {
                     Ok(agg_result) => {
                         let py_result = PyAggregationResult {
@@ -1055,7 +1109,10 @@ impl PyGraph {
                 }
             }
             "edges" => {
-                let result = self.inner.borrow_mut().aggregate_edge_attribute(&attribute, &operation);
+                let result = self
+                    .inner
+                    .borrow_mut()
+                    .aggregate_edge_attribute(&attribute, &operation);
                 match result {
                     Ok(agg_result) => {
                         let py_result = PyAggregationResult {
@@ -1077,7 +1134,7 @@ impl PyGraph {
     /// Commit current state of the graph (FFI wrapper around core history system)
     fn commit(&mut self, message: String, author: String) -> PyResult<StateId> {
         self.inner
-.borrow_mut()
+            .borrow_mut()
             .commit(message, author)
             .map_err(graph_error_to_py_err)
     }
@@ -1085,7 +1142,7 @@ impl PyGraph {
     /// Create a new branch (FFI wrapper around core history system)
     fn create_branch(&mut self, branch_name: String) -> PyResult<()> {
         self.inner
-.borrow_mut()
+            .borrow_mut()
             .create_branch(branch_name)
             .map_err(graph_error_to_py_err)
     }
@@ -1093,7 +1150,7 @@ impl PyGraph {
     /// Checkout a branch (FFI wrapper around core history system)
     fn checkout_branch(&mut self, branch_name: String) -> PyResult<()> {
         self.inner
-.borrow_mut()
+            .borrow_mut()
             .checkout_branch(branch_name)
             .map_err(graph_error_to_py_err)
     }
@@ -1101,7 +1158,7 @@ impl PyGraph {
     /// List all branches (FFI wrapper around core history system)
     fn branches(&self) -> Vec<PyBranchInfo> {
         self.inner
-.borrow_mut()
+            .borrow_mut()
             .list_branches()
             .into_iter()
             .map(|branch_info| PyBranchInfo::new(branch_info))
@@ -1112,7 +1169,7 @@ impl PyGraph {
     fn commit_history(&self) -> Vec<PyCommit> {
         // Delegate to core history system
         self.inner
-.borrow_mut()
+            .borrow_mut()
             .commit_history()
             .into_iter()
             .map(|commit_info| PyCommit::from_commit_info(commit_info))
@@ -1179,20 +1236,7 @@ impl PyGraph {
 
     // === ADJACENCY MATRIX OPERATIONS ===
 
-
-
-
-
-
-
-
-
-
     // === DISPLAY/TABLE METHODS ===
-
-
-
-
 
     // === NEIGHBORHOOD SAMPLING OPERATIONS ===
     // Moved to graph_analysis.rs module
@@ -1208,7 +1252,7 @@ impl PyGraph {
     // === GRAPH MERGING OPERATIONS ===
 
     /// Add another graph to this graph (merge nodes and edges)
-    /// 
+    ///
     /// All nodes and edges from the other graph will be added to this graph.
     /// Node and edge IDs may be remapped to avoid conflicts.
     /// Attributes are preserved during the merge.
@@ -1216,41 +1260,48 @@ impl PyGraph {
         // Get all nodes from the other graph with their attributes
         let other_node_ids = other.inner.borrow().node_ids();
         let other_edge_ids = other.inner.borrow().edge_ids();
-        
+
         // Track ID mappings to handle potential conflicts
         let mut node_id_mapping = std::collections::HashMap::new();
-        
+
         // Add all nodes from other graph
         for &old_node_id in &other_node_ids {
             // Get all attributes for this node
             let mut node_attrs = std::collections::HashMap::new();
-            
+
             // Get attribute names for this node (this is a simplified approach)
             // TODO: This could be more efficient with a proper attribute iteration API
             let sample_attrs = ["name", "label", "type", "value", "weight", "id"]; // Common attribute names
             for attr_name in &sample_attrs {
-                if let Ok(Some(attr_value)) = other.inner.borrow().get_node_attr(old_node_id, &attr_name.to_string()) {
+                if let Ok(Some(attr_value)) = other
+                    .inner
+                    .borrow()
+                    .get_node_attr(old_node_id, &attr_name.to_string())
+                {
                     node_attrs.insert(attr_name.to_string(), attr_value);
                 }
             }
-            
+
             // Add the node to this graph
             let new_node_id = self.inner.borrow_mut().add_node();
             node_id_mapping.insert(old_node_id, new_node_id);
-            
+
             // Set all attributes on the new node
             for (attr_name, attr_value) in node_attrs {
-                let _ = self.inner.borrow_mut().set_node_attr(new_node_id, attr_name, attr_value);
+                let _ = self
+                    .inner
+                    .borrow_mut()
+                    .set_node_attr(new_node_id, attr_name, attr_value);
             }
         }
-        
+
         // Add all edges from other graph
         for &old_edge_id in &other_edge_ids {
             if let Ok((old_source, old_target)) = other.inner.borrow().edge_endpoints(old_edge_id) {
                 // Map old node IDs to new node IDs
                 if let (Some(&new_source), Some(&new_target)) = (
                     node_id_mapping.get(&old_source),
-                    node_id_mapping.get(&old_target)
+                    node_id_mapping.get(&old_target),
                 ) {
                     // Add the edge
                     match self.inner.borrow_mut().add_edge(new_source, new_target) {
@@ -1258,8 +1309,16 @@ impl PyGraph {
                             // Copy edge attributes
                             let sample_edge_attrs = ["weight", "label", "type", "capacity"]; // Common edge attribute names
                             for attr_name in &sample_edge_attrs {
-                                if let Ok(Some(attr_value)) = other.inner.borrow().get_edge_attr(old_edge_id, &attr_name.to_string()) {
-                                    let _ = self.inner.borrow_mut().set_edge_attr(new_edge_id, attr_name.to_string(), attr_value);
+                                if let Ok(Some(attr_value)) = other
+                                    .inner
+                                    .borrow()
+                                    .get_edge_attr(old_edge_id, &attr_name.to_string())
+                                {
+                                    let _ = self.inner.borrow_mut().set_edge_attr(
+                                        new_edge_id,
+                                        attr_name.to_string(),
+                                        attr_value,
+                                    );
                                 }
                             }
                         }
@@ -1271,7 +1330,7 @@ impl PyGraph {
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -1281,17 +1340,17 @@ impl PyGraph {
         // Create a simple subgraph containing all nodes and edges
         let all_nodes: Vec<NodeId> = self_.inner.borrow().node_ids();
         let all_edges: Vec<EdgeId> = self_.inner.borrow().edge_ids();
-        
+
         let node_set: std::collections::HashSet<NodeId> = all_nodes.into_iter().collect();
         let edge_set: std::collections::HashSet<EdgeId> = all_edges.into_iter().collect();
-        
+
         let subgraph = groggy::core::subgraph::Subgraph::new(
             self_.inner.clone(),
             node_set,
             edge_set,
-            "full_view".to_string()
+            "full_view".to_string(),
         );
-        
+
         let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;
         Py::new(py, py_subgraph)
     }
@@ -1301,17 +1360,17 @@ impl PyGraph {
         // Create a subgraph containing all nodes and edges, then check connectivity
         let all_nodes: Vec<NodeId> = self_.inner.borrow().node_ids();
         let all_edges: Vec<EdgeId> = self_.inner.borrow().edge_ids();
-        
+
         let node_set: std::collections::HashSet<NodeId> = all_nodes.into_iter().collect();
         let edge_set: std::collections::HashSet<EdgeId> = all_edges.into_iter().collect();
-        
+
         let subgraph = groggy::core::subgraph::Subgraph::new(
             self_.inner.clone(),
             node_set,
             edge_set,
-            "connectivity_check".to_string()
+            "connectivity_check".to_string(),
         );
-        
+
         let result = subgraph.is_connected().map_err(graph_error_to_py_err)?;
         Ok(result)
     }
@@ -1406,7 +1465,13 @@ impl PyGraph {
         node_id: NodeId,
     ) -> PyResult<Py<PyNodeView>> {
         let core_graph = graph.borrow(py).inner.clone();
-        Py::new(py, PyNodeView { graph: core_graph, node_id })
+        Py::new(
+            py,
+            PyNodeView {
+                graph: core_graph,
+                node_id,
+            },
+        )
     }
 
     pub fn create_edge_view_internal(
@@ -1415,7 +1480,13 @@ impl PyGraph {
         edge_id: EdgeId,
     ) -> PyResult<Py<PyEdgeView>> {
         let core_graph = graph.borrow(py).inner.clone();
-        Py::new(py, PyEdgeView { graph: core_graph, edge_id })
+        Py::new(
+            py,
+            PyEdgeView {
+                graph: core_graph,
+                edge_id,
+            },
+        )
     }
 
     /// Create a NodesAccessor (internal helper)
@@ -1452,7 +1523,7 @@ impl PyGraph {
 
     pub fn get_edge_endpoints(&self, edge_id: EdgeId) -> Result<(NodeId, NodeId), String> {
         self.inner
-.borrow_mut()
+            .borrow_mut()
             .edge_endpoints(edge_id)
             .map_err(|e| e.to_string())
     }
@@ -1530,7 +1601,7 @@ impl PyGraph {
     ) -> PyResult<PyGroupedAggregationResult> {
         let results = self
             .inner
-.borrow_mut()
+            .borrow_mut()
             .group_nodes_by_attribute(&attribute, &aggregation_attr, &operation)
             .map_err(graph_error_to_py_err)?;
 
@@ -1560,14 +1631,14 @@ impl PyGraph {
     fn __getattr__(slf: PyRef<Self>, py: Python, name: String) -> PyResult<PyObject> {
         use pyo3::exceptions::PyAttributeError;
         use pyo3::types::PyDict;
-        
+
         // Check if this is a node attribute name that exists in the graph
         let all_node_attrs = slf.all_node_attribute_names();
         if all_node_attrs.contains(&name) {
             // Return a dictionary mapping node IDs to their attribute values
             let result_dict = PyDict::new(py);
             let graph_ref = slf.inner.borrow();
-            
+
             for node_id in graph_ref.node_ids() {
                 match graph_ref.get_node_attr(node_id, &name) {
                     Ok(Some(attr_value)) => {
@@ -1585,17 +1656,17 @@ impl PyGraph {
                     }
                 }
             }
-            
+
             return Ok(result_dict.to_object(py));
         }
-        
+
         // Check if this is an edge attribute name that exists in the graph
         let all_edge_attrs = slf.all_edge_attribute_names();
         if all_edge_attrs.contains(&name) {
             // Return a dictionary mapping edge IDs to their attribute values
             let result_dict = PyDict::new(py);
             let graph_ref = slf.inner.borrow();
-            
+
             for edge_id in graph_ref.edge_ids() {
                 match graph_ref.get_edge_attr(edge_id, &name) {
                     Ok(Some(attr_value)) => {
@@ -1613,10 +1684,10 @@ impl PyGraph {
                     }
                 }
             }
-            
+
             return Ok(result_dict.to_object(py));
         }
-        
+
         // Try delegating to subgraph methods (like degree, in_degree, out_degree)
         match slf.as_subgraph() {
             Ok(full_subgraph_trait) => {
@@ -1639,7 +1710,7 @@ impl PyGraph {
                 // Failed to create subgraph trait, fall through to error
             }
         }
-        
+
         // Attribute not found
         Err(PyAttributeError::new_err(format!(
             "Attribute '{}' not found. Available node attributes: {:?}, Available edge attributes: {:?}",
@@ -1649,14 +1720,10 @@ impl PyGraph {
 
     /// Get complete attribute column for ALL nodes (optimized for table() method)
     /// Returns GraphArray for enhanced analytics and proper integration with table columns
-    fn _get_node_attr_column(
-        &self,
-        py: Python,
-        attr_name: &str,
-    ) -> PyResult<Py<PyGraphArray>> {
+    fn _get_node_attr_column(&self, py: Python, attr_name: &str) -> PyResult<Py<PyGraphArray>> {
         match self
             .inner
-.borrow_mut()
+            .borrow_mut()
             ._get_node_attribute_column(&attr_name.to_string())
         {
             Ok(values) => {
@@ -1775,9 +1842,4 @@ impl PyGraph {
     }
 
     // === DELEGATED METHODS - Pure SubgraphOperations delegation ===
-    
-  
-
-
-
 }

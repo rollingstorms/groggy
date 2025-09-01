@@ -226,7 +226,7 @@ impl Graph {
     */
 
     /// Get read-only access to the GraphPool storage component
-    /// 
+    ///
     /// This provides access to the columnar attribute storage and
     /// is used by traits and advanced operations that need direct
     /// access to the storage layer.
@@ -235,7 +235,7 @@ impl Graph {
     }
 
     /// Get mutable access to the GraphPool storage component
-    /// 
+    ///
     /// This provides mutable access to the columnar attribute storage
     /// for operations that need to modify the storage directly.
     pub fn pool_mut(&self) -> std::cell::RefMut<GraphPool> {
@@ -243,7 +243,7 @@ impl Graph {
     }
 
     /// Get read-only access to the GraphSpace active state component
-    /// 
+    ///
     /// This provides access to the active node/edge sets and change tracking
     /// for operations that need to query the current graph state.
     pub fn space(&self) -> &GraphSpace {
@@ -349,7 +349,7 @@ impl Graph {
         // Add all nodes from the other graph
         let other_nodes = other.node_ids();
         let node_count = other_nodes.len();
-        
+
         if node_count > 0 {
             let _new_nodes = self.add_nodes(node_count);
         }
@@ -357,7 +357,7 @@ impl Graph {
         // Add all edges from the other graph
         let other_edges = other.edge_ids();
         let mut edges_to_add = Vec::new();
-        
+
         for edge_id in other_edges {
             if let Ok((source, target)) = other.edge_endpoints(edge_id) {
                 // Map the node IDs from other graph to this graph
@@ -366,7 +366,7 @@ impl Graph {
                 edges_to_add.push((source, target));
             }
         }
-        
+
         if !edges_to_add.is_empty() {
             let _edge_ids = self.add_edges(&edges_to_add);
         }
@@ -617,9 +617,13 @@ impl Graph {
     }
 
     /// Get attributes for multiple nodes at once - bulk operation for performance
-    pub fn get_node_attrs_bulk(&self, nodes: Vec<NodeId>, attrs: Vec<AttrName>) -> Result<HashMap<NodeId, HashMap<AttrName, AttrValue>>, GraphError> {
+    pub fn get_node_attrs_bulk(
+        &self,
+        nodes: Vec<NodeId>,
+        attrs: Vec<AttrName>,
+    ) -> Result<HashMap<NodeId, HashMap<AttrName, AttrValue>>, GraphError> {
         let mut result = HashMap::new();
-        
+
         // OPTIMIZATION: Pre-validate all nodes exist to fail fast
         for &node in &nodes {
             if !self.space.contains_node(node) {
@@ -630,31 +634,29 @@ impl Graph {
                 });
             }
         }
-        
+
         // OPTIMIZATION: Bulk retrieve requested attributes for each node
         for node in nodes {
             let mut node_attrs = HashMap::new();
-            
+
             // Get all attribute indices for this node
             let attr_indices = self.space.get_node_attr_indices(node);
-            
+
             // Only retrieve requested attributes (intersection)
             for attr_name in &attrs {
                 if let Some(&index) = attr_indices.get(attr_name) {
-                    if let Some(value) = self
-                        .pool
-                        .borrow()
-                        .get_attr_by_index(attr_name, index, true)
+                    if let Some(value) =
+                        self.pool.borrow().get_attr_by_index(attr_name, index, true)
                     {
                         node_attrs.insert(attr_name.clone(), value.clone());
                     }
                 }
                 // Note: Missing attributes are simply omitted from result
             }
-            
+
             result.insert(node, node_attrs);
         }
-        
+
         Ok(result)
     }
 
@@ -690,9 +692,13 @@ impl Graph {
     }
 
     /// Get attributes for multiple edges at once - bulk operation for performance
-    pub fn get_edge_attrs_bulk(&self, edges: Vec<EdgeId>, attrs: Vec<AttrName>) -> Result<HashMap<EdgeId, HashMap<AttrName, AttrValue>>, GraphError> {
+    pub fn get_edge_attrs_bulk(
+        &self,
+        edges: Vec<EdgeId>,
+        attrs: Vec<AttrName>,
+    ) -> Result<HashMap<EdgeId, HashMap<AttrName, AttrValue>>, GraphError> {
         let mut result = HashMap::new();
-        
+
         // OPTIMIZATION: Pre-validate all edges exist to fail fast
         for &edge in &edges {
             if !self.space.contains_edge(edge) {
@@ -703,14 +709,14 @@ impl Graph {
                 });
             }
         }
-        
+
         // OPTIMIZATION: Bulk retrieve requested attributes for each edge
         for edge in edges {
             let mut edge_attrs = HashMap::new();
-            
+
             // Get all attribute indices for this edge
             let attr_indices = self.space.get_edge_attr_indices(edge);
-            
+
             // Only retrieve requested attributes (intersection)
             for attr_name in &attrs {
                 if let Some(&index) = attr_indices.get(attr_name) {
@@ -724,10 +730,10 @@ impl Graph {
                 }
                 // Note: Missing attributes are simply omitted from result
             }
-            
+
             result.insert(edge, edge_attrs);
         }
-        
+
         Ok(result)
     }
 
@@ -1066,27 +1072,42 @@ impl Graph {
     }
 
     /// Get neighbors filtered to a specific node set
-    pub fn neighbors_filtered(&self, node: NodeId, filter_nodes: &std::collections::HashSet<NodeId>) -> GraphResult<Vec<NodeId>> {
+    pub fn neighbors_filtered(
+        &self,
+        node: NodeId,
+        filter_nodes: &std::collections::HashSet<NodeId>,
+    ) -> GraphResult<Vec<NodeId>> {
         let all_neighbors = self.neighbors(node)?;
-        Ok(all_neighbors.into_iter()
+        Ok(all_neighbors
+            .into_iter()
             .filter(|&n| filter_nodes.contains(&n))
             .collect())
     }
 
     /// Get degree filtered to a specific node set
-    pub fn degree_filtered(&self, node: NodeId, filter_nodes: &std::collections::HashSet<NodeId>) -> GraphResult<usize> {
+    pub fn degree_filtered(
+        &self,
+        node: NodeId,
+        filter_nodes: &std::collections::HashSet<NodeId>,
+    ) -> GraphResult<usize> {
         let filtered_neighbors = self.neighbors_filtered(node, filter_nodes)?;
         Ok(filtered_neighbors.len())
     }
 
     /// Check if there's an edge between two nodes, filtered to a specific edge set
-    pub fn has_edge_between_filtered(&self, source: NodeId, target: NodeId, filter_edges: &std::collections::HashSet<EdgeId>) -> GraphResult<bool> {
+    pub fn has_edge_between_filtered(
+        &self,
+        source: NodeId,
+        target: NodeId,
+        filter_edges: &std::collections::HashSet<EdgeId>,
+    ) -> GraphResult<bool> {
         let incident = self.incident_edges(source)?;
         for edge_id in incident {
             if filter_edges.contains(&edge_id) {
                 if let Ok((edge_source, edge_target)) = self.edge_endpoints(edge_id) {
-                    if (edge_source == source && edge_target == target) ||
-                       (edge_source == target && edge_target == source) {
+                    if (edge_source == source && edge_target == target)
+                        || (edge_source == target && edge_target == source)
+                    {
                         return Ok(true);
                     }
                 }
@@ -1094,9 +1115,6 @@ impl Graph {
         }
         Ok(false)
     }
-
-
-
 
     /// Get basic statistics about the current graph
     pub fn statistics(&self) -> GraphStatistics {
@@ -1477,9 +1495,6 @@ impl Graph {
     pub fn traversal_statistics(&self) -> &crate::core::traversal::TraversalStats {
         self.traversal_engine.statistics()
     }
-
-
-
 
     // ===== NEIGHBORHOOD SUBGRAPH SAMPLING =====
 
@@ -1971,9 +1986,12 @@ impl Graph {
 
     // === BULK ATTRIBUTE OPERATIONS (FFI WRAPPERS) ===
     // These are thin wrappers around the trait system for FFI compatibility
-    
+
     /// Set node attributes in bulk (delegates to existing bulk operations)
-    pub fn set_node_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>) -> GraphResult<()> {
+    pub fn set_node_attrs(
+        &mut self,
+        attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
+    ) -> GraphResult<()> {
         // Batch validation - check all nodes exist upfront
         for node_values in attrs_values.values() {
             for &(node_id, _) in node_values {
@@ -1981,7 +1999,8 @@ impl Graph {
                     return Err(crate::errors::GraphError::node_not_found(
                         node_id,
                         "set bulk node attributes",
-                    ).into());
+                    )
+                    .into());
                 }
             }
         }
@@ -1992,15 +2011,19 @@ impl Graph {
         // Update space attribute indices in bulk
         for (attr_name, entity_indices) in index_changes {
             for (node_id, new_index) in entity_indices {
-                self.space.set_node_attr_index(node_id, attr_name.clone(), new_index);
+                self.space
+                    .set_node_attr_index(node_id, attr_name.clone(), new_index);
             }
         }
 
         Ok(())
     }
-    
+
     /// Set edge attributes in bulk (delegates to existing bulk operations)
-    pub fn set_edge_attrs(&mut self, attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>) -> GraphResult<()> {
+    pub fn set_edge_attrs(
+        &mut self,
+        attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
+    ) -> GraphResult<()> {
         // Batch validation - check all edges exist upfront
         for edge_values in attrs_values.values() {
             for &(edge_id, _) in edge_values {
@@ -2008,7 +2031,8 @@ impl Graph {
                     return Err(crate::errors::GraphError::edge_not_found(
                         edge_id,
                         "set bulk edge attributes",
-                    ).into());
+                    )
+                    .into());
                 }
             }
         }
@@ -2019,7 +2043,8 @@ impl Graph {
         // Update space attribute indices in bulk
         for (attr_name, entity_indices) in index_changes {
             for (edge_id, new_index) in entity_indices {
-                self.space.set_edge_attr_index(edge_id, attr_name.clone(), new_index);
+                self.space
+                    .set_edge_attr_index(edge_id, attr_name.clone(), new_index);
             }
         }
 

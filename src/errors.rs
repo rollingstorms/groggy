@@ -237,10 +237,7 @@ pub enum GraphError {
     },
 
     /// Query parsing failed
-    QueryParseError {
-        query: String,
-        message: String,
-    },
+    QueryParseError { query: String, message: String },
 
     /*
     === CONFIGURATION ERRORS ===

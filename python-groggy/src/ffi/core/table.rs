@@ -138,8 +138,10 @@ impl PyGraphTable {
             } else {
                 // Regular node attributes
                 for &node_id in &nodes {
-                    if let Ok(Some(attr_value)) =
-                        graph_ref.inner.borrow().get_node_attr(node_id as usize, attr_name)
+                    if let Ok(Some(attr_value)) = graph_ref
+                        .inner
+                        .borrow()
+                        .get_node_attr(node_id as usize, attr_name)
                     {
                         attr_values.push(attr_value);
                     } else {
@@ -206,7 +208,9 @@ impl PyGraphTable {
             } else if attr_name == "source" || attr_name == "target" {
                 // Special case: edge endpoints
                 for &edge_id in &edges {
-                    if let Ok((source, target)) = graph_ref.inner.borrow().edge_endpoints(edge_id as usize) {
+                    if let Ok((source, target)) =
+                        graph_ref.inner.borrow().edge_endpoints(edge_id as usize)
+                    {
                         let endpoint_id = if attr_name == "source" {
                             source
                         } else {
@@ -221,8 +225,10 @@ impl PyGraphTable {
             } else {
                 // Regular edge attributes
                 for &edge_id in &edges {
-                    if let Ok(Some(attr_value)) =
-                        graph_ref.inner.borrow().get_edge_attr(edge_id as usize, attr_name)
+                    if let Ok(Some(attr_value)) = graph_ref
+                        .inner
+                        .borrow()
+                        .get_edge_attr(edge_id as usize, attr_name)
                     {
                         attr_values.push(attr_value);
                     } else {
@@ -742,7 +748,12 @@ impl PyGraphTable {
 
         let filtered_table = self
             .inner
-            .filter_by_degree(&*graph_ref.inner.borrow(), &node_id_column, min_degree, max_degree)
+            .filter_by_degree(
+                &*graph_ref.inner.borrow(),
+                &node_id_column,
+                min_degree,
+                max_degree,
+            )
             .map_err(graph_error_to_py_err)?;
 
         let py_table = PyGraphTable::from_graph_table(filtered_table);

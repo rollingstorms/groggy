@@ -664,7 +664,11 @@ impl GraphPool {
     }
 
     /// Get a specific attribute for a node
-    pub fn get_node_attribute(&self, node_id: NodeId, attr_name: &AttrName) -> GraphResult<Option<AttrValue>> {
+    pub fn get_node_attribute(
+        &self,
+        node_id: NodeId,
+        attr_name: &AttrName,
+    ) -> GraphResult<Option<AttrValue>> {
         if let Some(column) = self.node_attributes.get(attr_name) {
             Ok(column.get(node_id).cloned())
         } else {
@@ -673,32 +677,45 @@ impl GraphPool {
     }
 
     /// Set a specific attribute for a node
-    pub fn set_node_attribute(&mut self, node_id: NodeId, attr_name: AttrName, value: AttrValue) -> GraphResult<()> {
+    pub fn set_node_attribute(
+        &mut self,
+        node_id: NodeId,
+        attr_name: AttrName,
+        value: AttrValue,
+    ) -> GraphResult<()> {
         // Ensure the column exists and can address node_id
-        let column = self.node_attributes
+        let column = self
+            .node_attributes
             .entry(attr_name.clone())
             .or_insert_with(|| AttributeColumn::with_capacity(self.next_node_id));
-        column.ensure_len(self.next_node_id);  // Grow to current size
-        column.set(node_id, value);            // Write per-node value
+        column.ensure_len(self.next_node_id); // Grow to current size
+        column.set(node_id, value); // Write per-node value
         Ok(())
     }
 
     /// Get all attributes for a node
-    pub fn get_all_node_attributes(&self, node_id: NodeId) -> GraphResult<std::collections::HashMap<AttrName, AttrValue>> {
+    pub fn get_all_node_attributes(
+        &self,
+        node_id: NodeId,
+    ) -> GraphResult<std::collections::HashMap<AttrName, AttrValue>> {
         let mut attributes = std::collections::HashMap::new();
-        
+
         // Iterate through all attribute columns to find this node's attributes
         for (attr_name, column) in &self.node_attributes {
             if let Some(value) = column.get(node_id) {
                 attributes.insert(attr_name.clone(), value.clone());
             }
         }
-        
+
         Ok(attributes)
     }
 
     /// Get a specific attribute for an edge
-    pub fn get_edge_attribute(&self, edge_id: EdgeId, attr_name: &AttrName) -> GraphResult<Option<AttrValue>> {
+    pub fn get_edge_attribute(
+        &self,
+        edge_id: EdgeId,
+        attr_name: &AttrName,
+    ) -> GraphResult<Option<AttrValue>> {
         if let Some(column) = self.edge_attributes.get(attr_name) {
             Ok(column.get(edge_id).cloned())
         } else {
@@ -707,27 +724,36 @@ impl GraphPool {
     }
 
     /// Set a specific attribute for an edge
-    pub fn set_edge_attribute(&mut self, edge_id: EdgeId, attr_name: AttrName, value: AttrValue) -> GraphResult<()> {
+    pub fn set_edge_attribute(
+        &mut self,
+        edge_id: EdgeId,
+        attr_name: AttrName,
+        value: AttrValue,
+    ) -> GraphResult<()> {
         // Ensure the column exists and can address edge_id
-        let column = self.edge_attributes
+        let column = self
+            .edge_attributes
             .entry(attr_name.clone())
             .or_insert_with(|| AttributeColumn::with_capacity(self.next_edge_id));
-        column.ensure_len(self.next_edge_id);  // Grow to current size
-        column.set(edge_id, value);            // Write per-edge value
+        column.ensure_len(self.next_edge_id); // Grow to current size
+        column.set(edge_id, value); // Write per-edge value
         Ok(())
     }
 
     /// Get all attributes for an edge
-    pub fn get_all_edge_attributes(&self, edge_id: EdgeId) -> GraphResult<std::collections::HashMap<AttrName, AttrValue>> {
+    pub fn get_all_edge_attributes(
+        &self,
+        edge_id: EdgeId,
+    ) -> GraphResult<std::collections::HashMap<AttrName, AttrValue>> {
         let mut attributes = std::collections::HashMap::new();
-        
+
         // Iterate through all attribute columns to find this edge's attributes
         for (attr_name, column) in &self.edge_attributes {
             if let Some(value) = column.get(edge_id) {
                 attributes.insert(attr_name.clone(), value.clone());
             }
         }
-        
+
         Ok(attributes)
     }
 
@@ -735,8 +761,9 @@ impl GraphPool {
     pub fn has_edge_between(&self, source: NodeId, target: NodeId) -> bool {
         // Check if any edge connects these two nodes
         for (_edge_id, (edge_source, edge_target)) in &self.topology {
-            if (*edge_source == source && *edge_target == target) ||
-               (*edge_source == target && *edge_target == source) {
+            if (*edge_source == source && *edge_target == target)
+                || (*edge_source == target && *edge_target == source)
+            {
                 return true;
             }
         }
@@ -746,14 +773,14 @@ impl GraphPool {
     /// Get all edges connected to a node
     pub fn get_incident_edges(&self, node_id: NodeId) -> GraphResult<Vec<EdgeId>> {
         let mut incident_edges = Vec::new();
-        
+
         // Check all edges to find ones connected to this node
         for (edge_id, (edge_source, edge_target)) in &self.topology {
             if *edge_source == node_id || *edge_target == node_id {
                 incident_edges.push(*edge_id);
             }
         }
-        
+
         Ok(incident_edges)
     }
 
@@ -777,26 +804,42 @@ impl GraphPool {
     }
 
     /// Get stored subgraph data (placeholder for now)
-    pub fn get_subgraph(&self, subgraph_id: crate::types::SubgraphId) -> GraphResult<(std::collections::HashSet<NodeId>, std::collections::HashSet<EdgeId>, String)> {
+    pub fn get_subgraph(
+        &self,
+        subgraph_id: crate::types::SubgraphId,
+    ) -> GraphResult<(
+        std::collections::HashSet<NodeId>,
+        std::collections::HashSet<EdgeId>,
+        String,
+    )> {
         // TODO: Implement proper subgraph retrieval from GraphPool
         // For now, return empty data
         let _ = subgraph_id; // Silence unused parameter warning
         Ok((
             std::collections::HashSet::new(),
             std::collections::HashSet::new(),
-            "placeholder".to_string()
+            "placeholder".to_string(),
         ))
     }
 
     /// Get subgraph attribute (placeholder for now)
-    pub fn get_subgraph_attribute(&self, subgraph_id: crate::types::SubgraphId, name: &AttrName) -> GraphResult<Option<AttrValue>> {
+    pub fn get_subgraph_attribute(
+        &self,
+        subgraph_id: crate::types::SubgraphId,
+        name: &AttrName,
+    ) -> GraphResult<Option<AttrValue>> {
         // TODO: Implement subgraph attribute storage
         let _ = (subgraph_id, name); // Silence unused parameter warnings
         Ok(None)
     }
 
     /// Set subgraph attribute (placeholder for now)  
-    pub fn set_subgraph_attribute(&mut self, subgraph_id: crate::types::SubgraphId, name: AttrName, value: AttrValue) -> GraphResult<()> {
+    pub fn set_subgraph_attribute(
+        &mut self,
+        subgraph_id: crate::types::SubgraphId,
+        name: AttrName,
+        value: AttrValue,
+    ) -> GraphResult<()> {
         // TODO: Implement subgraph attribute storage
         let _ = (subgraph_id, name, value); // Silence unused parameter warnings
         Ok(())
