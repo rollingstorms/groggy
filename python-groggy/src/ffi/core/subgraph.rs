@@ -102,7 +102,7 @@ impl PySubgraph {
             .collect();
         let graph_array = groggy::GraphArray::from_vec(attr_values);
         let py_graph_array = PyGraphArray { inner: graph_array };
-        Ok(Py::new(py, py_graph_array)?)
+        Py::new(py, py_graph_array)
     }
 
     /// Get edge IDs as PyGraphArray
@@ -116,7 +116,7 @@ impl PySubgraph {
             .collect();
         let graph_array = groggy::GraphArray::from_vec(attr_values);
         let py_graph_array = PyGraphArray { inner: graph_array };
-        Ok(Py::new(py, py_graph_array)?)
+        Py::new(py, py_graph_array)
     }
 
     /// Check if a node exists in this subgraph

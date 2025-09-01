@@ -81,7 +81,7 @@ impl PyGraphAnalysis {
         max_nodes: Option<usize>,
     ) -> PyResult<PyNeighborhoodResult> {
         let radius = radius.unwrap_or(1);
-        let max_nodes = max_nodes.unwrap_or(100);
+        let _max_nodes = max_nodes.unwrap_or(100);
 
         // DELEGATION: Choose appropriate core method based on input parameters
         let result =
@@ -172,13 +172,13 @@ impl PyGraphAnalysis {
         source: NodeId,
         target: NodeId,
         weight_attribute: Option<AttrName>,
-        inplace: Option<bool>,
-        attr_name: Option<String>,
+        _inplace: Option<bool>,
+        _attr_name: Option<String>,
     ) -> PyResult<PyObject> {
         // DELEGATION: Use core shortest_path implementation with proper options
         let path = {
             let options = groggy::core::traversal::PathFindingOptions {
-                weight_attribute: weight_attribute,
+                weight_attribute,
                 max_path_length: None,
                 heuristic: None,
             };

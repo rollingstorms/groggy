@@ -220,24 +220,22 @@ impl PyGraphQuery {
     }
 
     /// Execute a graph query with filters
-    #[pyo3(signature = (query, **kwargs))]
+    #[pyo3(signature = (query, **_kwargs))]
     fn execute(
         &self,
         py: Python,
         query: &str,
-        kwargs: Option<&pyo3::types::PyDict>,
+        _kwargs: Option<&pyo3::types::PyDict>,
     ) -> PyResult<PyObject> {
         // Parse and execute complex graph queries
         let _graph = self.graph.borrow(py);
 
         // For now, support basic query patterns
-        if query.starts_with("nodes where ") {
-            let filter_str = &query[12..]; // Remove "nodes where "
+        if let Some(filter_str) = query.strip_prefix("nodes where ") {
             let filter_py_str = filter_str.to_string().into_py(py);
             self.filter_nodes(py, filter_py_str.as_ref(py))
                 .map(|subgraph| Py::new(py, subgraph).unwrap().to_object(py))
-        } else if query.starts_with("edges where ") {
-            let filter_str = &query[12..]; // Remove "edges where "
+        } else if let Some(filter_str) = query.strip_prefix("edges where ") {
             let filter_py_str = filter_str.to_string().into_py(py);
             self.filter_edges(py, filter_py_str.as_ref(py))
                 .map(|subgraph| Py::new(py, subgraph).unwrap().to_object(py))
@@ -280,10 +278,8 @@ impl PyGraphQuery {
         let mut values = Vec::new();
 
         // Extract values from bulk result
-        for attr_value in bulk_attributes {
-            if let Some(value) = attr_value {
-                values.push(value);
-            }
+        for value in bulk_attributes.into_iter().flatten() {
+            values.push(value);
         }
 
         // Compute statistics

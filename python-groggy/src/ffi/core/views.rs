@@ -81,8 +81,8 @@ impl PyNodeView {
             PyRuntimeError::new_err(format!("Failed to get node attributes: {}", e))
         })?;
         let values = node_attrs
-            .into_iter()
-            .map(|(_, value)| PyAttrValue::from_attr_value(value))
+            .values()
+            .map(|value| PyAttrValue::from_attr_value(value.clone()))
             .collect();
         Ok(values)
     }
@@ -161,14 +161,11 @@ impl PyNodeView {
         let dict = PyDict::new(py);
         let graph = self.graph.borrow();
 
-        match graph.get_node_attrs(self.node_id) {
-            Ok(attrs) => {
-                for (key, value) in attrs {
-                    let py_attr = PyAttrValue::from_attr_value(value);
-                    dict.set_item(key, py_attr.to_object(py))?;
-                }
+        if let Ok(attrs) = graph.get_node_attrs(self.node_id) {
+            for (key, value) in attrs {
+                let py_attr = PyAttrValue::from_attr_value(value);
+                dict.set_item(key, py_attr.to_object(py))?;
             }
-            Err(_) => {} // Empty dict for nodes without attributes
         }
 
         Ok(dict.to_object(py))
@@ -184,14 +181,11 @@ impl PyNodeView {
         let graph = self.graph.borrow();
 
         let mut items = Vec::new();
-        match graph.get_node_attrs(self.node_id) {
-            Ok(attrs) => {
-                for (key, value) in attrs {
-                    let py_attr = PyAttrValue::from_attr_value(value);
-                    items.push((key, py_attr));
-                }
+        if let Ok(attrs) = graph.get_node_attrs(self.node_id) {
+            for (key, value) in attrs {
+                let py_attr = PyAttrValue::from_attr_value(value);
+                items.push((key, py_attr));
             }
-            Err(_) => {} // Empty iterator for nodes without attributes
         }
 
         Ok(NodeViewIterator { items, index: 0 })
@@ -333,8 +327,8 @@ impl PyEdgeView {
             PyRuntimeError::new_err(format!("Failed to get edge attributes: {}", e))
         })?;
         let values = edge_attrs
-            .into_iter()
-            .map(|(_, value)| PyAttrValue::from_attr_value(value))
+            .into_values()
+            .map(PyAttrValue::from_attr_value)
             .collect();
         Ok(values)
     }

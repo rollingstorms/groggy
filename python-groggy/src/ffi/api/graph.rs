@@ -238,7 +238,7 @@ impl PyGraph {
                         // Store all attributes including the id_key for later uid_key lookups
                         attrs_by_name
                             .entry(attr_name)
-                            .or_insert_with(Vec::new)
+                            .or_default()
                             .push((node_id, attr_val));
                     }
                 }
@@ -387,7 +387,7 @@ impl PyGraph {
             .collect();
         let graph_array = groggy::GraphArray::from_vec(attr_values);
         let py_graph_array = PyGraphArray { inner: graph_array };
-        Ok(Py::new(py, py_graph_array)?)
+        Py::new(py, py_graph_array)
     }
 
     /// Get all active edge IDs as GraphArray (lazy Rust view) - use .values for Python list
@@ -400,7 +400,7 @@ impl PyGraph {
             .collect();
         let graph_array = groggy::GraphArray::from_vec(attr_values);
         let py_graph_array = PyGraphArray { inner: graph_array };
-        Ok(Py::new(py, py_graph_array)?)
+        Py::new(py, py_graph_array)
     }
 
     /// Get nodes accessor for fluent API (g.nodes property)
@@ -465,7 +465,7 @@ impl PyGraph {
 
                         attrs_by_name
                             .entry(attr_name)
-                            .or_insert_with(Vec::new)
+                            .or_default()
                             .push((edge_id, attr_value?));
                     }
                 }
@@ -536,7 +536,7 @@ impl PyGraph {
                             let attr_value = python_value_to_attr_value(value);
                             attrs_by_name
                                 .entry(key_str)
-                                .or_insert_with(Vec::new)
+                                .or_default()
                                 .push((edge_id, attr_value?));
                         }
                     }
@@ -579,7 +579,7 @@ impl PyGraph {
 
         // Validate that any referenced attributes exist in the graph
         if let Err(attr_name) =
-            Self::validate_node_filter_attributes(&*slf.inner.borrow(), &node_filter)
+            Self::validate_node_filter_attributes(&slf.inner.borrow(), &node_filter)
         {
             return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                 format!("Attribute '{}' does not exist on any nodes in the graph. Use graph.nodes.table().columns to see available attributes.", attr_name)
@@ -631,7 +631,7 @@ impl PyGraph {
     }
 
     /// Filter edges using EdgeFilter object or string query
-    fn filter_edges(slf: PyRefMut<Self>, py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
+    fn filter_edges(slf: PyRefMut<Self>, _py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for EdgeFilter object first (most common case)
         let edge_filter = if let Ok(filter_obj) = filter.extract::<PyEdgeFilter>() {
             // Direct EdgeFilter object - fastest path
@@ -650,7 +650,7 @@ impl PyGraph {
 
         // Validate that any referenced attributes exist in the graph
         if let Err(attr_name) =
-            Self::validate_edge_filter_attributes(&*slf.inner.borrow(), &edge_filter)
+            Self::validate_edge_filter_attributes(&slf.inner.borrow(), &edge_filter)
         {
             return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                 format!("Attribute '{}' does not exist on any edges in the graph. Use graph.edges.table().columns to see available attributes.", attr_name)
@@ -686,7 +686,6 @@ impl PyGraph {
 
     /// Get analytics module for this graph
     // analytics() method deleted - functionality moved to direct PyGraph delegation methods
-
     /// Group nodes by attribute value and compute aggregates for each group
     pub fn group_nodes_by_attribute(
         &self,
@@ -708,7 +707,7 @@ impl PyGraph {
                 let py_agg_result = PyAggregationResult {
                     value: agg_result.value,
                 };
-                dict.set_item(Py::new(py, py_attr_value)?, Py::new(py, py_agg_result)?);
+                dict.set_item(Py::new(py, py_attr_value)?, Py::new(py, py_agg_result)?)?;
             }
 
             Ok(PyGroupedAggregationResult {
@@ -1080,14 +1079,14 @@ impl PyGraph {
     }
 
     /// Aggregate attribute values across nodes or edges
-    #[pyo3(signature = (attribute, operation, target = None, node_ids = None))]
+    #[pyo3(signature = (attribute, operation, target = None, _node_ids = None))]
     fn aggregate(
         &self,
         py: Python,
         attribute: AttrName,
         operation: String,
         target: Option<String>,
-        node_ids: Option<Vec<NodeId>>,
+        _node_ids: Option<Vec<NodeId>>,
     ) -> PyResult<PyObject> {
         let target = target.unwrap_or_else(|| "nodes".to_string());
 
@@ -1161,7 +1160,7 @@ impl PyGraph {
             .borrow_mut()
             .list_branches()
             .into_iter()
-            .map(|branch_info| PyBranchInfo::new(branch_info))
+            .map(PyBranchInfo::new)
             .collect()
     }
 
@@ -1172,7 +1171,7 @@ impl PyGraph {
             .borrow_mut()
             .commit_history()
             .into_iter()
-            .map(|commit_info| PyCommit::from_commit_info(commit_info))
+            .map(PyCommit::from_commit_info)
             .collect()
     }
 
@@ -1223,10 +1222,10 @@ impl PyGraph {
 
                 if return_inverse {
                     // Return node_id -> attribute_value mapping
-                    dict.set_item(node_id, attr_value_py);
+                    dict.set_item(node_id, attr_value_py)?;
                 } else {
                     // Return attribute_value -> node_id mapping (default behavior)
-                    dict.set_item(attr_value_py, node_id);
+                    dict.set_item(attr_value_py, node_id)?;
                 }
             }
         }
@@ -1256,7 +1255,7 @@ impl PyGraph {
     /// All nodes and edges from the other graph will be added to this graph.
     /// Node and edge IDs may be remapped to avoid conflicts.
     /// Attributes are preserved during the merge.
-    pub fn add_graph(&mut self, py: Python, other: &PyGraph) -> PyResult<()> {
+    pub fn add_graph(&mut self, _py: Python, other: &PyGraph) -> PyResult<()> {
         // Get all nodes from the other graph with their attributes
         let other_node_ids = other.inner.borrow().node_ids();
         let other_edge_ids = other.inner.borrow().edge_ids();
@@ -1356,7 +1355,7 @@ impl PyGraph {
     }
 
     /// Check if the graph is connected (delegates to subgraph implementation)
-    pub fn is_connected(self_: PyRef<Self>, py: Python<'_>) -> PyResult<bool> {
+    pub fn is_connected(self_: PyRef<Self>, _py: Python<'_>) -> PyResult<bool> {
         // Create a subgraph containing all nodes and edges, then check connectivity
         let all_nodes: Vec<NodeId> = self_.inner.borrow().node_ids();
         let all_edges: Vec<EdgeId> = self_.inner.borrow().edge_ids();
@@ -1392,12 +1391,109 @@ impl PyGraph {
         let result = edges_accessor.borrow(py).table(py);
         result
     }
+
+    /// Enable property-style attribute access (g.age instead of g.nodes['age'])
+    /// This method is called when accessing attributes that don't exist as methods
+    fn __getattr__(&self, py: Python, name: String) -> PyResult<PyObject> {
+        use pyo3::exceptions::PyAttributeError;
+        use pyo3::types::PyDict;
+
+        // Check if this is a node attribute name that exists in the graph
+        let all_node_attrs = self.all_node_attribute_names();
+        if all_node_attrs.contains(&name) {
+            // Return a dictionary mapping node IDs to their attribute values
+            let result_dict = PyDict::new(py);
+            let graph_ref = self.inner.borrow();
+
+            for node_id in graph_ref.node_ids() {
+                match graph_ref.get_node_attr(node_id, &name) {
+                    Ok(Some(attr_value)) => {
+                        use crate::ffi::types::PyAttrValue;
+                        let py_attr_value = PyAttrValue::new(attr_value);
+                        result_dict.set_item(node_id, py_attr_value)?;
+                    }
+                    Ok(None) => {
+                        // Node doesn't have this attribute, skip or set to None
+                        result_dict.set_item(node_id, py.None())?;
+                    }
+                    Err(_) => {
+                        // Error accessing attribute, skip this node
+                        continue;
+                    }
+                }
+            }
+
+            return Ok(result_dict.to_object(py));
+        }
+
+        // Check if this is an edge attribute name that exists in the graph
+        let all_edge_attrs = self.all_edge_attribute_names();
+        if all_edge_attrs.contains(&name) {
+            // Return a dictionary mapping edge IDs to their attribute values
+            let result_dict = PyDict::new(py);
+            let graph_ref = self.inner.borrow();
+
+            for edge_id in graph_ref.edge_ids() {
+                match graph_ref.get_edge_attr(edge_id, &name) {
+                    Ok(Some(attr_value)) => {
+                        use crate::ffi::types::PyAttrValue;
+                        let py_attr_value = PyAttrValue::new(attr_value);
+                        result_dict.set_item(edge_id, py_attr_value)?;
+                    }
+                    Ok(None) => {
+                        // Edge doesn't have this attribute, skip or set to None
+                        result_dict.set_item(edge_id, py.None())?;
+                    }
+                    Err(_) => {
+                        // Error accessing attribute, skip this edge
+                        continue;
+                    }
+                }
+            }
+
+            return Ok(result_dict.to_object(py));
+        }
+
+        // Try delegating to subgraph methods (like degree, in_degree, out_degree)
+        // Create a full subgraph containing all nodes and edges
+        let graph_ref = self.inner.borrow();
+        let all_nodes = graph_ref.node_ids().into_iter().collect();
+        let all_edges = graph_ref.edge_ids().into_iter().collect();
+        drop(graph_ref); // Release borrow
+
+        let concrete_subgraph = groggy::core::subgraph::Subgraph::new(
+            self.inner.clone(),
+            all_nodes,
+            all_edges,
+            "full_graph_delegation".to_string(),
+        );
+
+        match PySubgraph::from_core_subgraph(concrete_subgraph) {
+            Ok(py_subgraph) => {
+                let subgraph_obj = Py::new(py, py_subgraph)?;
+                match subgraph_obj.getattr(py, name.as_str()) {
+                    Ok(result) => return Ok(result),
+                    Err(_) => {
+                        // Subgraph doesn't have this method either, fall through to error
+                    }
+                }
+            }
+            Err(_) => {
+                // Failed to create subgraph, fall through to error
+            }
+        }
+
+        // Attribute not found
+        Err(PyAttributeError::new_err(format!(
+            "Attribute '{}' not found. Available node attributes: {:?}, Available edge attributes: {:?}",
+            name, all_node_attrs, all_edge_attrs
+        )))
+    }
 }
 
 // Internal methods for FFI integration (not exposed to Python)
 impl PyGraph {
     /// Get shared reference to the graph for creating RustSubgraphs
-
     /// Convert core AdjacencyMatrix to GraphMatrix for Python FFI
     pub(crate) fn adjacency_matrix_to_graph_matrix(
         &self,
@@ -1578,7 +1674,7 @@ impl PyGraph {
             .collect();
         let graph_array = groggy::core::array::GraphArray::from_vec(attr_values);
         let py_graph_array = PyGraphArray { inner: graph_array };
-        Ok(Py::new(py, py_graph_array)?)
+        Py::new(py, py_graph_array)
     }
 
     pub fn get_edge_ids_array(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
@@ -1589,7 +1685,7 @@ impl PyGraph {
             .collect();
         let graph_array = groggy::core::array::GraphArray::from_vec(attr_values);
         let py_graph_array = PyGraphArray { inner: graph_array };
-        Ok(Py::new(py, py_graph_array)?)
+        Py::new(py, py_graph_array)
     }
 
     /// Group nodes by attribute value and compute aggregates for each group (internal method)
@@ -1613,7 +1709,7 @@ impl PyGraph {
                 let py_agg_result = PyAggregationResult {
                     value: agg_result.value,
                 };
-                dict.set_item(Py::new(py, py_attr_value)?, Py::new(py, py_agg_result)?);
+                dict.set_item(Py::new(py, py_attr_value)?, Py::new(py, py_agg_result)?)?;
             }
 
             Ok(PyGroupedAggregationResult {
@@ -1625,98 +1721,6 @@ impl PyGraph {
     }
 
     // === PROPERTY GETTERS FOR ATTRIBUTE ACCESS ===
-
-    /// Enable property-style attribute access (g.age instead of g.nodes['age'])
-    /// This method is called when accessing attributes that don't exist as methods
-    fn __getattr__(slf: PyRef<Self>, py: Python, name: String) -> PyResult<PyObject> {
-        use pyo3::exceptions::PyAttributeError;
-        use pyo3::types::PyDict;
-
-        // Check if this is a node attribute name that exists in the graph
-        let all_node_attrs = slf.all_node_attribute_names();
-        if all_node_attrs.contains(&name) {
-            // Return a dictionary mapping node IDs to their attribute values
-            let result_dict = PyDict::new(py);
-            let graph_ref = slf.inner.borrow();
-
-            for node_id in graph_ref.node_ids() {
-                match graph_ref.get_node_attr(node_id, &name) {
-                    Ok(Some(attr_value)) => {
-                        use crate::ffi::types::PyAttrValue;
-                        let py_attr_value = PyAttrValue::new(attr_value);
-                        result_dict.set_item(node_id, py_attr_value)?;
-                    }
-                    Ok(None) => {
-                        // Node doesn't have this attribute, skip or set to None
-                        result_dict.set_item(node_id, py.None())?;
-                    }
-                    Err(_) => {
-                        // Error accessing attribute, skip this node
-                        continue;
-                    }
-                }
-            }
-
-            return Ok(result_dict.to_object(py));
-        }
-
-        // Check if this is an edge attribute name that exists in the graph
-        let all_edge_attrs = slf.all_edge_attribute_names();
-        if all_edge_attrs.contains(&name) {
-            // Return a dictionary mapping edge IDs to their attribute values
-            let result_dict = PyDict::new(py);
-            let graph_ref = slf.inner.borrow();
-
-            for edge_id in graph_ref.edge_ids() {
-                match graph_ref.get_edge_attr(edge_id, &name) {
-                    Ok(Some(attr_value)) => {
-                        use crate::ffi::types::PyAttrValue;
-                        let py_attr_value = PyAttrValue::new(attr_value);
-                        result_dict.set_item(edge_id, py_attr_value)?;
-                    }
-                    Ok(None) => {
-                        // Edge doesn't have this attribute, skip or set to None
-                        result_dict.set_item(edge_id, py.None())?;
-                    }
-                    Err(_) => {
-                        // Error accessing attribute, skip this edge
-                        continue;
-                    }
-                }
-            }
-
-            return Ok(result_dict.to_object(py));
-        }
-
-        // Try delegating to subgraph methods (like degree, in_degree, out_degree)
-        match slf.as_subgraph() {
-            Ok(full_subgraph_trait) => {
-                match PySubgraph::from_trait_object(full_subgraph_trait) {
-                    Ok(full_subgraph) => {
-                        let subgraph_obj = Py::new(py, full_subgraph)?;
-                        match subgraph_obj.getattr(py, name.as_str()) {
-                            Ok(result) => return Ok(result),
-                            Err(_) => {
-                                // Subgraph doesn't have this method either, fall through to error
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        // Failed to create subgraph, fall through to error
-                    }
-                }
-            }
-            Err(_) => {
-                // Failed to create subgraph trait, fall through to error
-            }
-        }
-
-        // Attribute not found
-        Err(PyAttributeError::new_err(format!(
-            "Attribute '{}' not found. Available node attributes: {:?}, Available edge attributes: {:?}",
-            name, all_node_attrs, all_edge_attrs
-        )))
-    }
 
     /// Get complete attribute column for ALL nodes (optimized for table() method)
     /// Returns GraphArray for enhanced analytics and proper integration with table columns
@@ -1762,16 +1766,16 @@ impl PyGraph {
             }
             NodeFilter::And(filters) => {
                 for f in filters {
-                    Self::validate_node_filter_attributes(graph, f);
+                    let _ = Self::validate_node_filter_attributes(graph, f);
                 }
             }
             NodeFilter::Or(filters) => {
                 for f in filters {
-                    Self::validate_node_filter_attributes(graph, f);
+                    let _ = Self::validate_node_filter_attributes(graph, f);
                 }
             }
             NodeFilter::Not(filter) => {
-                Self::validate_node_filter_attributes(graph, filter);
+                let _ = Self::validate_node_filter_attributes(graph, filter);
             }
             // Other filter types don't reference attributes
             _ => {}
@@ -1799,16 +1803,16 @@ impl PyGraph {
             }
             EdgeFilter::And(filters) => {
                 for f in filters {
-                    Self::validate_edge_filter_attributes(graph, f);
+                    let _ = Self::validate_edge_filter_attributes(graph, f);
                 }
             }
             EdgeFilter::Or(filters) => {
                 for f in filters {
-                    Self::validate_edge_filter_attributes(graph, f);
+                    let _ = Self::validate_edge_filter_attributes(graph, f);
                 }
             }
             EdgeFilter::Not(filter) => {
-                Self::validate_edge_filter_attributes(graph, filter);
+                let _ = Self::validate_edge_filter_attributes(graph, filter);
             }
             // Other filter types don't reference attributes
             _ => {}

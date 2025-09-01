@@ -7,6 +7,9 @@ edition = "2021"
 name = "groggy"
 crate-type = ["cdylib"]
 
+[lints.rust]
+non_local_definitions = "allow"
+
 [dependencies]
 pyo3 = { version = "0.20", features = ["extension-module"] }
 groggy = { path = "../" }  # Path to the main Rust library

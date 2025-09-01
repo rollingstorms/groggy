@@ -48,7 +48,7 @@ impl TableIterator {
             let column_names = self.table.columns();
 
             // Access each column by name
-            for (_col_idx, col_name) in column_names.iter().enumerate() {
+            for col_name in column_names.iter() {
                 // Get the column data by name
                 if let Some(array) = self.table.get_column_by_name(col_name) {
                     if self.index < array.len() {
@@ -122,7 +122,7 @@ impl PyGraphTable {
 
             // Always include node_id as first column
             let mut column_names = vec!["node_id".to_string()];
-            column_names.extend(all_attrs.into_iter());
+            column_names.extend(all_attrs);
             column_names
         });
         let mut columns = Vec::new();
@@ -192,7 +192,7 @@ impl PyGraphTable {
                 "source".to_string(),
                 "target".to_string(),
             ];
-            column_names.extend(all_attrs.into_iter());
+            column_names.extend(all_attrs);
             column_names
         });
         let mut columns = Vec::new();
@@ -749,7 +749,7 @@ impl PyGraphTable {
         let filtered_table = self
             .inner
             .filter_by_degree(
-                &*graph_ref.inner.borrow(),
+                &graph_ref.inner.borrow(),
                 &node_id_column,
                 min_degree,
                 max_degree,
@@ -790,7 +790,7 @@ impl PyGraphTable {
         let filtered_table = self
             .inner
             .filter_by_connectivity(
-                &*graph_ref.inner.borrow(),
+                &graph_ref.inner.borrow(),
                 &node_id_column,
                 &target_usize,
                 connectivity,
@@ -818,7 +818,7 @@ impl PyGraphTable {
         let filtered_table = self
             .inner
             .filter_by_distance(
-                &*graph_ref.inner.borrow(),
+                &graph_ref.inner.borrow(),
                 &node_id_column,
                 &target_usize,
                 max_distance,
