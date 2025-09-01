@@ -230,7 +230,7 @@ impl Graph {
     /// This provides access to the columnar attribute storage and
     /// is used by traits and advanced operations that need direct
     /// access to the storage layer.
-    pub fn pool(&self) -> std::cell::Ref<GraphPool> {
+    pub fn pool(&self) -> std::cell::Ref<'_, GraphPool> {
         self.pool.borrow()
     }
 
@@ -238,7 +238,7 @@ impl Graph {
     ///
     /// This provides mutable access to the columnar attribute storage
     /// for operations that need to modify the storage directly.
-    pub fn pool_mut(&self) -> std::cell::RefMut<GraphPool> {
+    pub fn pool_mut(&self) -> std::cell::RefMut<'_, GraphPool> {
         self.pool.borrow_mut()
     }
 
