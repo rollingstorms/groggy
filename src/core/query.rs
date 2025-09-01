@@ -336,9 +336,7 @@ impl QueryEngine {
             NodeFilter::Not(filter) => {
                 !self.node_matches_filter_with_topology(node_id, pool, space, filter, topology_data)
             }
-            NodeFilter::NodeSet(node_set) => {
-                node_set.contains(&node_id)
-            }
+            NodeFilter::NodeSet(node_set) => node_set.contains(&node_id),
         }
     }
 

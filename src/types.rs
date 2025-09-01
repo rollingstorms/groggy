@@ -58,20 +58,24 @@ impl EntityId {
         match self {
             EntityId::Node(id) | EntityId::MetaNode(id) => *id != usize::MAX,
             EntityId::Edge(id) => *id != usize::MAX,
-            EntityId::Subgraph(id) | EntityId::Neighborhood(id) | 
-            EntityId::Component(id) | EntityId::Path(id) | 
-            EntityId::Filter(id) => *id != usize::MAX,
+            EntityId::Subgraph(id)
+            | EntityId::Neighborhood(id)
+            | EntityId::Component(id)
+            | EntityId::Path(id)
+            | EntityId::Filter(id) => *id != usize::MAX,
         }
     }
-    
+
     /// Get the underlying numeric ID regardless of entity type
     pub fn numeric_id(&self) -> usize {
         match self {
             EntityId::Node(id) | EntityId::MetaNode(id) => *id,
             EntityId::Edge(id) => *id,
-            EntityId::Subgraph(id) | EntityId::Neighborhood(id) |
-            EntityId::Component(id) | EntityId::Path(id) |
-            EntityId::Filter(id) => *id,
+            EntityId::Subgraph(id)
+            | EntityId::Neighborhood(id)
+            | EntityId::Component(id)
+            | EntityId::Path(id)
+            | EntityId::Filter(id) => *id,
         }
     }
 }
@@ -211,18 +215,14 @@ impl PartialEq for AttrValue {
             }
 
             // Cross-type float vector comparisons
-            (FloatVec(a), CompressedFloatVec(b)) => {
-                match b.decompress_float_vec() {
-                    Ok(decompressed_b) => a == &decompressed_b,
-                    Err(_) => false,
-                }
-            }
-            (CompressedFloatVec(a), FloatVec(b)) => {
-                match a.decompress_float_vec() {
-                    Ok(decompressed_a) => &decompressed_a == b,
-                    Err(_) => false,
-                }
-            }
+            (FloatVec(a), CompressedFloatVec(b)) => match b.decompress_float_vec() {
+                Ok(decompressed_b) => a == &decompressed_b,
+                Err(_) => false,
+            },
+            (CompressedFloatVec(a), FloatVec(b)) => match a.decompress_float_vec() {
+                Ok(decompressed_a) => &decompressed_a == b,
+                Err(_) => false,
+            },
             (CompressedFloatVec(a), CompressedFloatVec(b)) => {
                 match (a.decompress_float_vec(), b.decompress_float_vec()) {
                     (Ok(decompressed_a), Ok(decompressed_b)) => decompressed_a == decompressed_b,
@@ -654,7 +654,7 @@ impl std::fmt::Display for AttrValue {
                 } else {
                     write!(f, "{}", val)
                 }
-            },
+            }
             AttrValue::Int(val) => write!(f, "{}", val),
             AttrValue::Text(val) => write!(f, "{}", val),
             AttrValue::Bool(val) => write!(f, "{}", val),
@@ -736,8 +736,14 @@ impl AttrValue {
             AttrValue::CompressedFloatVec(cd) => cd.memory_size(),
             AttrValue::Null => 0, // Null values take no memory
             AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
-            AttrValue::NodeArray(nodes) => std::mem::size_of::<Vec<crate::types::NodeId>>() + nodes.capacity() * std::mem::size_of::<crate::types::NodeId>(),
-            AttrValue::EdgeArray(edges) => std::mem::size_of::<Vec<crate::types::EdgeId>>() + edges.capacity() * std::mem::size_of::<crate::types::EdgeId>(),
+            AttrValue::NodeArray(nodes) => {
+                std::mem::size_of::<Vec<crate::types::NodeId>>()
+                    + nodes.capacity() * std::mem::size_of::<crate::types::NodeId>()
+            }
+            AttrValue::EdgeArray(edges) => {
+                std::mem::size_of::<Vec<crate::types::EdgeId>>()
+                    + edges.capacity() * std::mem::size_of::<crate::types::EdgeId>()
+            }
         }
     }
 

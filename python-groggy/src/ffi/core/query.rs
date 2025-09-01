@@ -275,7 +275,6 @@ impl PyEdgeFilter {
     }
 }
 
-
 /// Python wrapper for AggregationResult
 #[pyclass(name = "AggregationResult")]
 pub struct PyAggregationResult {

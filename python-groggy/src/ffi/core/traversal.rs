@@ -4,7 +4,6 @@
 
 use pyo3::prelude::*;
 
-
 /// Result of an aggregation operation
 #[pyclass(name = "AggregationResult")]
 pub struct PyAggregationResult {

@@ -146,11 +146,11 @@ pub mod core {
     pub mod adjacency;
     pub mod array;
     pub mod change_tracker;
-    pub mod component;  // Phase 4: Component entities
+    pub mod component; // Phase 4: Component entities
     pub mod delta;
     pub mod edge;
-    pub mod filtered;  // Phase 4: Filter entities
-    pub mod hierarchical;  // Phase 3: Hierarchical operations
+    pub mod filtered; // Phase 4: Filter entities
+    pub mod hierarchical; // Phase 3: Hierarchical operations
     pub mod history;
     pub mod matrix;
     pub mod neighborhood;
@@ -197,13 +197,13 @@ pub use core::adjacency::{
 };
 pub use core::array::{GraphArray, StatsSummary};
 pub use core::change_tracker::ChangeTracker;
-pub use core::component::{ComponentSubgraph};
+pub use core::component::ComponentSubgraph;
 pub use core::delta::{ColumnDelta, DeltaObject};
-pub use core::filtered::{FilteredSubgraph};
+pub use core::filtered::FilteredSubgraph;
+pub use core::hierarchical::{AggregationFunction, HierarchicalOperations, MetaNode};
 pub use core::matrix::JoinType;
 pub use core::matrix::{Axis, GraphMatrix, MatrixProperties};
-pub use core::hierarchical::{AggregationFunction, HierarchicalOperations, MetaNode};
-pub use core::neighborhood::{NeighborhoodSubgraph};
+pub use core::neighborhood::NeighborhoodSubgraph;
 pub use core::pool::GraphPool;
 pub use core::space::GraphSpace;
 pub use core::subgraph::SimilarityMetric;

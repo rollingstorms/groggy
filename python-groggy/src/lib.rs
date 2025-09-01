@@ -11,19 +11,19 @@ mod module;
 // Re-export main types
 pub use ffi::api::graph::PyGraph;
 pub use ffi::api::graph_version::PyHistoricalView;
+pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
 pub use ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
 pub use ffi::core::array::PyGraphArray;
-pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
-pub use ffi::core::matrix::PyGraphMatrix;
 pub use ffi::core::component::PyComponentSubgraph;
-pub use ffi::core::neighborhood::{PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph};
+pub use ffi::core::matrix::PyGraphMatrix;
+pub use ffi::core::neighborhood::{
+    PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph,
+};
 pub use ffi::core::query::{PyAttributeFilter, PyEdgeFilter, PyNodeFilter};
-pub use ffi::core::query_parser::{parse_node_query, parse_edge_query};
+pub use ffi::core::query_parser::{parse_edge_query, parse_node_query};
 pub use ffi::core::subgraph::PySubgraph;
 pub use ffi::core::table::{PyGraphTable, PyGroupBy};
-pub use ffi::core::traversal::{
-    PyAggregationResult, PyGroupedAggregationResult,
-};
+pub use ffi::core::traversal::{PyAggregationResult, PyGroupedAggregationResult};
 pub use ffi::core::views::{PyEdgeView, PyNodeView};
 pub use ffi::types::{PyAttrValue, PyAttributeCollection, PyResultHandle};
 
@@ -173,25 +173,25 @@ fn table(py: Python, data: PyObject, columns: Option<Vec<String>>) -> PyResult<P
 fn merge(py: Python, graphs: Vec<Py<PyGraph>>) -> PyResult<PyObject> {
     if graphs.is_empty() {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            "Cannot merge empty list of graphs"
+            "Cannot merge empty list of graphs",
         ));
     }
-    
+
     // Create a new empty graph with the same directionality as the first graph
     let first_graph = graphs[0].borrow(py);
     let directed = first_graph.inner.borrow().graph_type() == groggy::types::GraphType::Directed;
     drop(first_graph); // Release borrow
-    
+
     // Use the constructor through Python class instantiation
     let result_py = py.get_type::<PyGraph>().call1((directed,))?;
     let mut result: PyRefMut<PyGraph> = result_py.extract::<PyRefMut<PyGraph>>()?;
-    
+
     // Add each graph to the result
     for graph_py in graphs {
         let graph = graph_py.borrow(py);
         result.add_graph(py, &graph)?;
     }
-    
+
     // Return the PyObject
     Ok(result_py.to_object(py))
 }
@@ -224,7 +224,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyAttributeFilter>()?;
     m.add_class::<PyNodeFilter>()?;
     m.add_class::<PyEdgeFilter>()?;
-    
+
     // Register core query functions (eliminates circular dependency)
     m.add_function(wrap_pyfunction!(parse_node_query, m)?)?;
     m.add_function(wrap_pyfunction!(parse_edge_query, m)?)?;
@@ -238,8 +238,8 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
 
     // Register specialized entity types
     m.add_class::<PyComponentSubgraph>()?;
-    
-    // Register neighborhood sampling system  
+
+    // Register neighborhood sampling system
     m.add_class::<PyNeighborhoodSubgraph>()?;
     m.add_class::<PyNeighborhoodResult>()?;
     m.add_class::<PyNeighborhoodStats>()?;

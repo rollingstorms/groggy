@@ -31,7 +31,7 @@ use std::rc::Rc;
 pub enum SimilarityMetric {
     /// Jaccard similarity: |A ∩ B| / |A ∪ B|
     Jaccard,
-    /// Dice coefficient: 2 * |A ∩ B| / (|A| + |B|) 
+    /// Dice coefficient: 2 * |A ∩ B| / (|A| + |B|)
     Dice,
     /// Cosine similarity: A·B / (||A|| * ||B||)
     Cosine,
@@ -84,20 +84,20 @@ impl Subgraph {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
-        
+
         // Hash the node and edge sets by iterating over them in sorted order
         let mut sorted_nodes: Vec<_> = nodes.iter().collect();
         sorted_nodes.sort();
         for node in sorted_nodes {
             node.hash(&mut hasher);
         }
-        
+
         let mut sorted_edges: Vec<_> = edges.iter().collect();
         sorted_edges.sort();
         for edge in sorted_edges {
             edge.hash(&mut hasher);
         }
-        
+
         subgraph_type.hash(&mut hasher);
         let subgraph_id = hasher.finish() as SubgraphId;
 
@@ -271,7 +271,6 @@ impl Subgraph {
             format!("{}_value_filtered", self.subgraph_type),
         )
     }
-
 
     /// Check if the subgraph is connected (has exactly one connected component)
     pub fn is_connected(&self) -> GraphResult<bool> {
@@ -453,16 +452,17 @@ impl Subgraph {
 
     // === STRUCTURAL METRICS ===
     // Remember: All operations are on this subgraph (active nodes/edges)
-    
+
     /// Calculate clustering coefficient for a node or average for all nodes
     /// Formula: 2 * triangles / (degree * (degree - 1)) for directed graphs
     pub fn clustering_coefficient(&self, node_id: Option<NodeId>) -> GraphResult<f64> {
         match node_id {
             Some(nid) => {
                 if !self.has_node(nid) {
-                    return Err(GraphError::InvalidInput(
-                        format!("Node {} not in this subgraph", nid)
-                    ));
+                    return Err(GraphError::InvalidInput(format!(
+                        "Node {} not in this subgraph",
+                        nid
+                    )));
                 }
                 self.calculate_node_clustering_coefficient(nid)
             }
@@ -470,13 +470,13 @@ impl Subgraph {
                 // Average clustering coefficient for all nodes in subgraph
                 let mut total = 0.0;
                 let mut count = 0;
-                
+
                 for &node_id in &self.nodes {
                     let coefficient = self.calculate_node_clustering_coefficient(node_id)?;
                     total += coefficient;
                     count += 1;
                 }
-                
+
                 if count == 0 {
                     Ok(0.0)
                 } else {
@@ -489,15 +489,15 @@ impl Subgraph {
     /// Helper method to calculate clustering coefficient for a single node
     fn calculate_node_clustering_coefficient(&self, node_id: NodeId) -> GraphResult<f64> {
         let graph = self.graph.borrow();
-        
+
         // Get neighbors of this node that are also in the subgraph
         let neighbors = graph.neighbors_filtered(node_id, &self.nodes)?;
         let degree = neighbors.len();
-        
+
         if degree < 2 {
             return Ok(0.0); // Clustering coefficient is 0 for nodes with degree < 2
         }
-        
+
         // Count triangles: edges between neighbors
         let mut triangles = 0;
         for i in 0..neighbors.len() {
@@ -507,7 +507,7 @@ impl Subgraph {
                 }
             }
         }
-        
+
         // Calculate clustering coefficient
         let possible_edges = degree * (degree - 1) / 2; // For undirected graphs
         Ok(triangles as f64 / possible_edges as f64)
@@ -518,21 +518,21 @@ impl Subgraph {
     pub fn transitivity(&self) -> GraphResult<f64> {
         let mut total_triangles = 0;
         let mut total_triads = 0;
-        
+
         let graph = self.graph.borrow();
-        
+
         // Count each triangle only once by using node ordering
         let mut nodes_vec: Vec<_> = self.nodes.iter().copied().collect();
         nodes_vec.sort();
-        
+
         for (i, &node_a) in nodes_vec.iter().enumerate() {
             let neighbors_a = graph.neighbors_filtered(node_a, &self.nodes)?;
-            
+
             for (j, &node_b) in nodes_vec.iter().enumerate().skip(i + 1) {
                 if !neighbors_a.contains(&node_b) {
                     continue; // No edge between a and b
                 }
-                
+
                 for &node_c in nodes_vec.iter().skip(j + 1) {
                     if neighbors_a.contains(&node_c) {
                         let neighbors_b = graph.neighbors_filtered(node_b, &self.nodes)?;
@@ -544,17 +544,17 @@ impl Subgraph {
                 }
             }
         }
-        
+
         // Count triads (connected triples)
         for &node_id in &self.nodes {
             let neighbors = graph.neighbors_filtered(node_id, &self.nodes)?;
             let degree = neighbors.len();
-            
+
             if degree >= 2 {
                 total_triads += degree * (degree - 1) / 2;
             }
         }
-        
+
         if total_triads == 0 {
             Ok(0.0)
         } else {
@@ -566,92 +566,91 @@ impl Subgraph {
     /// Formula: 2 * edges / (nodes * (nodes - 1)) for undirected graphs
     pub fn density(&self) -> f64 {
         let node_count = self.nodes.len();
-        
+
         if node_count < 2 {
             return 0.0;
         }
-        
+
         let edge_count = self.edges.len();
         let max_possible_edges = node_count * (node_count - 1) / 2; // Undirected graph
-        
+
         edge_count as f64 / max_possible_edges as f64
     }
 
     // === SUBGRAPH SET OPERATIONS ===
-    
+
     /// Merge with another subgraph (union operation)
     /// Returns new subgraph containing all nodes and edges from both subgraphs
     pub fn merge_with(&self, other: &Subgraph) -> GraphResult<Subgraph> {
         // Union of nodes and edges
         let mut merged_nodes = self.nodes.clone();
         merged_nodes.extend(&other.nodes);
-        
+
         let mut merged_edges = self.edges.clone();
         merged_edges.extend(&other.edges);
-        
+
         // Create merged subgraph with union of nodes and edges
         Ok(Subgraph::new(
             self.graph.clone(),
             merged_nodes,
             merged_edges,
-            format!("merge_{}_{}", self.subgraph_type, other.subgraph_type)
+            format!("merge_{}_{}", self.subgraph_type, other.subgraph_type),
         ))
     }
-    
-    /// Intersect with another subgraph 
+
+    /// Intersect with another subgraph
     /// Returns new subgraph containing only nodes and edges present in both subgraphs
     pub fn intersect_with(&self, other: &Subgraph) -> GraphResult<Subgraph> {
         // Intersection of nodes
-        let intersected_nodes: HashSet<NodeId> = self.nodes
-            .intersection(&other.nodes)
-            .copied()
-            .collect();
-        
-        // Intersection of edges 
-        let intersected_edges: HashSet<EdgeId> = self.edges
-            .intersection(&other.edges)
-            .copied()
-            .collect();
-        
+        let intersected_nodes: HashSet<NodeId> =
+            self.nodes.intersection(&other.nodes).copied().collect();
+
+        // Intersection of edges
+        let intersected_edges: HashSet<EdgeId> =
+            self.edges.intersection(&other.edges).copied().collect();
+
         Ok(Subgraph::new(
             self.graph.clone(),
             intersected_nodes,
             intersected_edges,
-            format!("intersection_{}_{}", self.subgraph_type, other.subgraph_type)
+            format!(
+                "intersection_{}_{}",
+                self.subgraph_type, other.subgraph_type
+            ),
         ))
     }
-    
+
     /// Subtract another subgraph from this one (difference operation)
     /// Returns new subgraph with other's nodes and edges removed
     pub fn subtract_from(&self, other: &Subgraph) -> GraphResult<Subgraph> {
         // Remove other's nodes from this subgraph
-        let remaining_nodes: HashSet<NodeId> = self.nodes
-            .difference(&other.nodes)
-            .copied()
-            .collect();
-        
+        let remaining_nodes: HashSet<NodeId> =
+            self.nodes.difference(&other.nodes).copied().collect();
+
         // Remove other's edges from this subgraph
-        let remaining_edges: HashSet<EdgeId> = self.edges
-            .difference(&other.edges)
-            .copied()
-            .collect();
-        
+        let remaining_edges: HashSet<EdgeId> =
+            self.edges.difference(&other.edges).copied().collect();
+
         Ok(Subgraph::new(
             self.graph.clone(),
             remaining_nodes,
             remaining_edges,
-            format!("difference_{}_{}", self.subgraph_type, other.subgraph_type)
+            format!("difference_{}_{}", self.subgraph_type, other.subgraph_type),
         ))
     }
-    
+
     /// Calculate similarity with another subgraph using specified metric
-    pub fn calculate_similarity(&self, other: &Subgraph, metric: SimilarityMetric) -> GraphResult<f64> {
+    pub fn calculate_similarity(
+        &self,
+        other: &Subgraph,
+        metric: SimilarityMetric,
+    ) -> GraphResult<f64> {
         match metric {
             SimilarityMetric::Jaccard => {
                 // |A ∩ B| / |A ∪ B| for nodes
                 let intersection_size = self.nodes.intersection(&other.nodes).count();
                 let union_size = self.nodes.union(&other.nodes).count();
-                
+
                 if union_size == 0 {
                     Ok(0.0)
                 } else {
@@ -662,7 +661,7 @@ impl Subgraph {
                 // 2 * |A ∩ B| / (|A| + |B|) for nodes
                 let intersection_size = self.nodes.intersection(&other.nodes).count();
                 let total_size = self.nodes.len() + other.nodes.len();
-                
+
                 if total_size == 0 {
                     Ok(0.0)
                 } else {
@@ -673,7 +672,7 @@ impl Subgraph {
                 // |A ∩ B| / min(|A|, |B|) for nodes
                 let intersection_size = self.nodes.intersection(&other.nodes).count();
                 let min_size = self.nodes.len().min(other.nodes.len());
-                
+
                 if min_size == 0 {
                     Ok(0.0)
                 } else {
@@ -683,8 +682,9 @@ impl Subgraph {
             SimilarityMetric::Cosine => {
                 // Simplified cosine similarity based on node presence (binary vectors)
                 let intersection_size = self.nodes.intersection(&other.nodes).count();
-                let magnitude_product = (self.nodes.len() as f64).sqrt() * (other.nodes.len() as f64).sqrt();
-                
+                let magnitude_product =
+                    (self.nodes.len() as f64).sqrt() * (other.nodes.len() as f64).sqrt();
+
                 if magnitude_product == 0.0 {
                     Ok(0.0)
                 } else {
@@ -693,19 +693,19 @@ impl Subgraph {
             }
         }
     }
-    
+
     /// Find overlapping regions with multiple other subgraphs
     /// Returns vector of intersection subgraphs with each input subgraph
     pub fn find_overlaps(&self, others: Vec<&Subgraph>) -> GraphResult<Vec<Subgraph>> {
         let mut overlaps = Vec::new();
-        
+
         for other in others {
             let overlap = self.intersect_with(other)?;
             if !overlap.nodes.is_empty() || !overlap.edges.is_empty() {
                 overlaps.push(overlap);
             }
         }
-        
+
         Ok(overlaps)
     }
 }
@@ -770,7 +770,8 @@ impl SubgraphOperations for Subgraph {
 
     fn induced_subgraph(&self, nodes: &[NodeId]) -> GraphResult<Box<dyn SubgraphOperations>> {
         // Filter to nodes that exist in this subgraph
-        let filtered_nodes: HashSet<NodeId> = nodes.iter()
+        let filtered_nodes: HashSet<NodeId> = nodes
+            .iter()
             .filter(|&&node_id| self.nodes.contains(&node_id))
             .cloned()
             .collect();
@@ -779,7 +780,7 @@ impl SubgraphOperations for Subgraph {
         let induced = Subgraph::from_nodes(
             self.graph.clone(),
             filtered_nodes,
-            format!("{}_induced", self.subgraph_type)
+            format!("{}_induced", self.subgraph_type),
         )?;
 
         Ok(Box::new(induced))
@@ -787,7 +788,8 @@ impl SubgraphOperations for Subgraph {
 
     fn subgraph_from_edges(&self, edges: &[EdgeId]) -> GraphResult<Box<dyn SubgraphOperations>> {
         // Filter to edges that exist in this subgraph
-        let filtered_edges: HashSet<EdgeId> = edges.iter()
+        let filtered_edges: HashSet<EdgeId> = edges
+            .iter()
             .filter(|&&edge_id| self.edges.contains(&edge_id))
             .cloned()
             .collect();
@@ -810,7 +812,7 @@ impl SubgraphOperations for Subgraph {
             self.graph.clone(),
             endpoint_nodes,
             filtered_edges,
-            format!("{}_from_edges", self.subgraph_type)
+            format!("{}_from_edges", self.subgraph_type),
         );
 
         Ok(Box::new(edge_subgraph))
@@ -821,21 +823,28 @@ impl SubgraphOperations for Subgraph {
         let graph = self.graph.borrow();
         let nodes_vec: Vec<NodeId> = self.nodes.iter().cloned().collect();
         let options = crate::core::traversal::TraversalOptions::default();
-        
+
         // Use TraversalEngine directly - no Graph API indirection needed
         let mut traversal_engine = TraversalEngine::new();
-        let result = traversal_engine.connected_components_for_nodes(&graph.pool(), graph.space(), nodes_vec, options)?;
+        let result = traversal_engine.connected_components_for_nodes(
+            &graph.pool(),
+            graph.space(),
+            nodes_vec,
+            options,
+        )?;
 
         let mut component_subgraphs = Vec::new();
         for (i, component) in result.components.into_iter().enumerate() {
-            let component_nodes: std::collections::HashSet<NodeId> = component.nodes.into_iter().collect();
-            let component_edges: std::collections::HashSet<EdgeId> = component.edges.into_iter().collect();
-            
+            let component_nodes: std::collections::HashSet<NodeId> =
+                component.nodes.into_iter().collect();
+            let component_edges: std::collections::HashSet<EdgeId> =
+                component.edges.into_iter().collect();
+
             let component_subgraph = Subgraph::new(
                 self.graph.clone(),
                 component_nodes,
                 component_edges,
-                format!("{}_component_{}", self.subgraph_type, i)
+                format!("{}_component_{}", self.subgraph_type, i),
             );
             component_subgraphs.push(Box::new(component_subgraph) as Box<dyn SubgraphOperations>);
         }
@@ -843,9 +852,13 @@ impl SubgraphOperations for Subgraph {
         Ok(component_subgraphs)
     }
 
-    fn bfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+    fn bfs(
+        &self,
+        start: NodeId,
+        max_depth: Option<usize>,
+    ) -> GraphResult<Box<dyn SubgraphOperations>> {
         if !self.nodes.contains(&start) {
-            return Err(GraphError::NodeNotFound { 
+            return Err(GraphError::NodeNotFound {
                 node_id: start,
                 operation: "bfs_subgraph".to_string(),
                 suggestion: "Ensure start node is within this subgraph".to_string(),
@@ -858,17 +871,19 @@ impl SubgraphOperations for Subgraph {
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
         }
-        
+
         // Use TraversalEngine directly
         let mut traversal_engine = TraversalEngine::new();
         let result = traversal_engine.bfs(&graph.pool(), &mut graph.space(), start, options)?;
 
         // Filter result to nodes that exist in this subgraph
-        let filtered_nodes: std::collections::HashSet<NodeId> = result.nodes
+        let filtered_nodes: std::collections::HashSet<NodeId> = result
+            .nodes
             .into_iter()
             .filter(|node| self.nodes.contains(node))
             .collect();
-        let filtered_edges: std::collections::HashSet<EdgeId> = result.edges
+        let filtered_edges: std::collections::HashSet<EdgeId> = result
+            .edges
             .into_iter()
             .filter(|edge| self.edges.contains(edge))
             .collect();
@@ -877,15 +892,19 @@ impl SubgraphOperations for Subgraph {
             self.graph.clone(),
             filtered_nodes,
             filtered_edges,
-            format!("{}_bfs_from_{}", self.subgraph_type, start)
+            format!("{}_bfs_from_{}", self.subgraph_type, start),
         );
 
         Ok(Box::new(bfs_subgraph))
     }
 
-    fn dfs(&self, start: NodeId, max_depth: Option<usize>) -> GraphResult<Box<dyn SubgraphOperations>> {
+    fn dfs(
+        &self,
+        start: NodeId,
+        max_depth: Option<usize>,
+    ) -> GraphResult<Box<dyn SubgraphOperations>> {
         if !self.nodes.contains(&start) {
-            return Err(GraphError::NodeNotFound { 
+            return Err(GraphError::NodeNotFound {
                 node_id: start,
                 operation: "dfs_subgraph".to_string(),
                 suggestion: "Ensure start node is within this subgraph".to_string(),
@@ -898,17 +917,19 @@ impl SubgraphOperations for Subgraph {
         if let Some(depth) = max_depth {
             options.max_depth = Some(depth);
         }
-        
+
         // Use TraversalEngine directly
         let mut traversal_engine = TraversalEngine::new();
         let result = traversal_engine.dfs(&graph.pool(), &mut graph.space(), start, options)?;
 
         // Filter result to nodes that exist in this subgraph
-        let filtered_nodes: std::collections::HashSet<NodeId> = result.nodes
+        let filtered_nodes: std::collections::HashSet<NodeId> = result
+            .nodes
             .into_iter()
             .filter(|node| self.nodes.contains(node))
             .collect();
-        let filtered_edges: std::collections::HashSet<EdgeId> = result.edges
+        let filtered_edges: std::collections::HashSet<EdgeId> = result
+            .edges
             .into_iter()
             .filter(|edge| self.edges.contains(edge))
             .collect();
@@ -917,13 +938,17 @@ impl SubgraphOperations for Subgraph {
             self.graph.clone(),
             filtered_nodes,
             filtered_edges,
-            format!("{}_dfs_from_{}", self.subgraph_type, start)
+            format!("{}_dfs_from_{}", self.subgraph_type, start),
         );
 
         Ok(Box::new(dfs_subgraph))
     }
 
-    fn shortest_path_subgraph(&self, source: NodeId, target: NodeId) -> GraphResult<Option<Box<dyn SubgraphOperations>>> {
+    fn shortest_path_subgraph(
+        &self,
+        source: NodeId,
+        target: NodeId,
+    ) -> GraphResult<Option<Box<dyn SubgraphOperations>>> {
         if !self.nodes.contains(&source) || !self.nodes.contains(&target) {
             return Ok(None);
         }
@@ -931,22 +956,24 @@ impl SubgraphOperations for Subgraph {
         // Use existing efficient TraversalEngine for shortest path
         let graph = self.graph.borrow_mut();
         let options = crate::core::traversal::PathFindingOptions::default();
-        
+
         // Use TraversalEngine directly
         let mut traversal_engine = TraversalEngine::new();
         let x = if let Some(path_result) = traversal_engine.shortest_path(
-            &graph.pool(), 
+            &graph.pool(),
             &mut graph.space(),
             source,
             target,
-            options
+            options,
         )? {
             // Filter path to nodes/edges that exist in this subgraph
-            let filtered_nodes: std::collections::HashSet<NodeId> = path_result.nodes
+            let filtered_nodes: std::collections::HashSet<NodeId> = path_result
+                .nodes
                 .into_iter()
                 .filter(|node| self.nodes.contains(node))
                 .collect();
-            let filtered_edges: std::collections::HashSet<EdgeId> = path_result.edges
+            let filtered_edges: std::collections::HashSet<EdgeId> = path_result
+                .edges
                 .into_iter()
                 .filter(|edge| self.edges.contains(edge))
                 .collect();
@@ -956,7 +983,7 @@ impl SubgraphOperations for Subgraph {
                     self.graph.clone(),
                     filtered_nodes,
                     filtered_edges,
-                    format!("{}_path_{}_{}", self.subgraph_type, source, target)
+                    format!("{}_path_{}_{}", self.subgraph_type, source, target),
                 );
                 Ok(Some(Box::new(path_subgraph) as Box<dyn SubgraphOperations>))
             } else {
@@ -1027,11 +1054,11 @@ mod tests {
         let node2 = graph.add_node();
         let node3 = graph.add_node();
         let node4 = graph.add_node(); // Isolated node to test components
-        
+
         let edge1 = graph.add_edge(node1, node2).unwrap();
         let edge2 = graph.add_edge(node2, node3).unwrap();
         let _edge3 = graph.add_edge(node3, node1).unwrap(); // Triangle
-        
+
         let graph_rc = Rc::new(RefCell::new(graph));
         let node_subset = HashSet::from([node1, node2, node3, node4]);
         let subgraph = Subgraph::from_nodes(graph_rc, node_subset, "test".to_string()).unwrap();
@@ -1041,7 +1068,7 @@ mod tests {
         assert!(bfs_result.contains_node(node1));
         println!("BFS test: contains {} nodes", bfs_result.node_count());
 
-        // Test DFS subgraph  
+        // Test DFS subgraph
         let dfs_result = subgraph.dfs(node1, Some(2)).unwrap();
         assert!(dfs_result.contains_node(node1));
         println!("DFS test: contains {} nodes", dfs_result.node_count());
@@ -1051,19 +1078,19 @@ mod tests {
         let components = SubgraphOperations::connected_components(&subgraph).unwrap();
         println!("Found {} connected components", components.len());
         assert!(components.len() >= 1); // At least the triangle should form one component
-        
+
         // Test induced subgraph
         let induced = subgraph.induced_subgraph(&[node1, node2]).unwrap();
         assert_eq!(induced.node_count(), 2);
         assert!(induced.contains_node(node1));
         assert!(induced.contains_node(node2));
-        
+
         // Test subgraph from edges
         let edge_subset = [edge1, edge2];
         let edge_subgraph = subgraph.subgraph_from_edges(&edge_subset).unwrap();
         assert!(edge_subgraph.contains_edge(edge1));
         assert!(edge_subgraph.contains_edge(edge2));
-        
+
         // Test shortest path (if path exists)
         if let Some(path) = subgraph.shortest_path_subgraph(node1, node3).unwrap() {
             assert!(path.contains_node(node1));
@@ -1096,11 +1123,11 @@ mod tests {
 
         // Test connectivity
         assert!(subgraph.is_connected().unwrap());
-        
+
         // Test clustering coefficient - each node should have coefficient = 1.0 (complete triangle)
         let avg_clustering = subgraph.clustering_coefficient(None).unwrap();
         assert!((avg_clustering - 1.0).abs() < f64::EPSILON);
-        
+
         // Test transitivity
         let transitivity = subgraph.transitivity().unwrap();
         assert!((transitivity - 1.0).abs() < f64::EPSILON);
@@ -1122,10 +1149,12 @@ mod tests {
 
         // Create two overlapping subgraphs
         let subgraph1_nodes = HashSet::from([node1, node2, node3]);
-        let subgraph1 = Subgraph::from_nodes(graph_rc.clone(), subgraph1_nodes, "sub1".to_string()).unwrap();
+        let subgraph1 =
+            Subgraph::from_nodes(graph_rc.clone(), subgraph1_nodes, "sub1".to_string()).unwrap();
 
         let subgraph2_nodes = HashSet::from([node2, node3, node4]);
-        let subgraph2 = Subgraph::from_nodes(graph_rc.clone(), subgraph2_nodes, "sub2".to_string()).unwrap();
+        let subgraph2 =
+            Subgraph::from_nodes(graph_rc.clone(), subgraph2_nodes, "sub2".to_string()).unwrap();
 
         // Test merge (union)
         let merged = subgraph1.merge_with(&subgraph2).unwrap();
@@ -1148,10 +1177,14 @@ mod tests {
         assert!(!difference.has_node(node2));
 
         // Test similarity metrics
-        let jaccard = subgraph1.calculate_similarity(&subgraph2, SimilarityMetric::Jaccard).unwrap();
+        let jaccard = subgraph1
+            .calculate_similarity(&subgraph2, SimilarityMetric::Jaccard)
+            .unwrap();
         assert!((jaccard - 0.5).abs() < f64::EPSILON); // |intersection| / |union| = 2/4 = 0.5
 
-        let dice = subgraph1.calculate_similarity(&subgraph2, SimilarityMetric::Dice).unwrap();
-        assert!((dice - 2.0/3.0).abs() < f64::EPSILON); // 2 * 2 / (3 + 3) = 4/6 = 2/3
+        let dice = subgraph1
+            .calculate_similarity(&subgraph2, SimilarityMetric::Dice)
+            .unwrap();
+        assert!((dice - 2.0 / 3.0).abs() < f64::EPSILON); // 2 * 2 / (3 + 3) = 4/6 = 2/3
     }
 }

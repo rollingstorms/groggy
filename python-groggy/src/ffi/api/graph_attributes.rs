@@ -2,10 +2,10 @@
 //!
 //! Simple, structured attribute operations with pure delegation to core.
 
-use crate::ffi::types::PyAttrValue;
-use crate::ffi::utils::{python_value_to_attr_value, graph_error_to_py_err};
 use crate::ffi::core::array::PyGraphArray;
 use crate::ffi::core::table::PyGraphTable;
+use crate::ffi::types::PyAttrValue;
+use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
 use groggy::{AttrName, AttrValue, EdgeId, NodeId};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -25,7 +25,13 @@ impl PyGraphAttr {
 
     // === FOUR CORE GETTERS ===
 
-    pub fn get_node_attr(&self, py: Python, node: NodeId, attr: String, default: Option<&PyAny>) -> PyResult<PyObject> {
+    pub fn get_node_attr(
+        &self,
+        py: Python,
+        node: NodeId,
+        attr: String,
+        default: Option<&PyAny>,
+    ) -> PyResult<PyObject> {
         match self.graph.borrow().get_node_attr(node, &attr) {
             Ok(Some(attr_value)) => {
                 let py_attr_value = PyAttrValue::new(attr_value);
@@ -42,8 +48,15 @@ impl PyGraphAttr {
         }
     }
 
-    pub fn get_node_attrs(&self, py: Python, nodes: Vec<NodeId>, attrs: Vec<AttrName>) -> PyResult<PyObject> {
-        let result = self.graph.borrow()
+    pub fn get_node_attrs(
+        &self,
+        py: Python,
+        nodes: Vec<NodeId>,
+        attrs: Vec<AttrName>,
+    ) -> PyResult<PyObject> {
+        let result = self
+            .graph
+            .borrow()
             .get_node_attrs_bulk(nodes, attrs)
             .map_err(graph_error_to_py_err)?;
         let py_dict = PyDict::new(py);
@@ -58,7 +71,13 @@ impl PyGraphAttr {
         Ok(py_dict.to_object(py))
     }
 
-    pub fn get_edge_attr(&self, py: Python, edge: EdgeId, attr: String, default: Option<&PyAny>) -> PyResult<PyObject> {
+    pub fn get_edge_attr(
+        &self,
+        py: Python,
+        edge: EdgeId,
+        attr: String,
+        default: Option<&PyAny>,
+    ) -> PyResult<PyObject> {
         match self.graph.borrow().get_edge_attr(edge, &attr) {
             Ok(Some(attr_value)) => {
                 let py_attr_value = PyAttrValue::new(attr_value);
@@ -75,8 +94,15 @@ impl PyGraphAttr {
         }
     }
 
-    pub fn get_edge_attrs(&self, py: Python, edges: Vec<EdgeId>, attrs: Vec<String>) -> PyResult<PyObject> {
-        let result = self.graph.borrow()
+    pub fn get_edge_attrs(
+        &self,
+        py: Python,
+        edges: Vec<EdgeId>,
+        attrs: Vec<String>,
+    ) -> PyResult<PyObject> {
+        let result = self
+            .graph
+            .borrow()
             .get_edge_attrs_bulk(edges, attrs)
             .map_err(graph_error_to_py_err)?;
         let py_dict = PyDict::new(py);
@@ -94,28 +120,32 @@ impl PyGraphAttr {
     // === FOUR UTILITY METHODS ===
 
     pub fn has_node_attribute(&self, _py: Python, node_id: NodeId, attr_name: &str) -> bool {
-        self.graph.borrow()
+        self.graph
+            .borrow()
             .get_node_attr(node_id, &attr_name.to_string())
             .map(|opt| opt.is_some())
             .unwrap_or(false)
     }
 
     pub fn has_edge_attribute(&self, _py: Python, edge_id: EdgeId, attr_name: &str) -> bool {
-        self.graph.borrow()
+        self.graph
+            .borrow()
             .get_edge_attr(edge_id, &attr_name.to_string())
             .map(|opt| opt.is_some())
             .unwrap_or(false)
     }
 
     pub fn node_attribute_keys(&self, _py: Python, node_id: NodeId) -> Vec<String> {
-        self.graph.borrow()
+        self.graph
+            .borrow()
             .get_node_attrs(node_id)
             .map(|attrs| attrs.keys().cloned().collect())
             .unwrap_or_else(|_| vec![])
     }
 
     pub fn edge_attribute_keys(&self, _py: Python, edge_id: EdgeId) -> Vec<String> {
-        self.graph.borrow()
+        self.graph
+            .borrow()
             .get_edge_attrs(edge_id)
             .map(|attrs| attrs.keys().cloned().collect())
             .unwrap_or_else(|_| vec![])
@@ -132,9 +162,16 @@ impl PyGraphAttrMut {
         Self { graph }
     }
 
-    pub fn set_node_attr(&mut self, py: Python, node: NodeId, attr: String, value: &PyAny) -> PyResult<()> {
+    pub fn set_node_attr(
+        &mut self,
+        py: Python,
+        node: NodeId,
+        attr: String,
+        value: &PyAny,
+    ) -> PyResult<()> {
         let attr_value = python_value_to_attr_value(value)?;
-        self.graph.borrow_mut()
+        self.graph
+            .borrow_mut()
             .set_node_attr(node, attr, attr_value)
             .map_err(graph_error_to_py_err)
     }
@@ -142,14 +179,22 @@ impl PyGraphAttrMut {
     pub fn set_node_attrs(&mut self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         // Convert any format to standardized internal format
         let standardized_attrs = self.normalize_attrs_format(py, attrs_dict, true)?;
-        self.graph.borrow_mut()
+        self.graph
+            .borrow_mut()
             .set_node_attrs(standardized_attrs)
             .map_err(graph_error_to_py_err)
     }
 
-    pub fn set_edge_attr(&mut self, py: Python, edge: EdgeId, attr: String, value: &PyAny) -> PyResult<()> {
+    pub fn set_edge_attr(
+        &mut self,
+        py: Python,
+        edge: EdgeId,
+        attr: String,
+        value: &PyAny,
+    ) -> PyResult<()> {
         let attr_value = python_value_to_attr_value(value)?;
-        self.graph.borrow_mut()
+        self.graph
+            .borrow_mut()
             .set_edge_attr(edge, attr, attr_value)
             .map_err(graph_error_to_py_err)
     }
@@ -157,7 +202,8 @@ impl PyGraphAttrMut {
     pub fn set_edge_attrs(&mut self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         // Convert any format to standardized internal format
         let standardized_attrs = self.normalize_attrs_format(py, attrs_dict, false)?;
-        self.graph.borrow_mut()
+        self.graph
+            .borrow_mut()
             .set_edge_attrs(standardized_attrs)
             .map_err(graph_error_to_py_err)
     }
@@ -165,29 +211,29 @@ impl PyGraphAttrMut {
     // === FORMAT DETECTION AND NORMALIZATION ===
 
     /// Intelligently detect and normalize various bulk attribute formats
-    /// 
+    ///
     /// Supports multiple input formats:
     /// 1. Node-centric: {"attr": {node_id: value, node_id: value}}
     /// 2. Column-centric: {"attr": {"nodes": [node_ids], "values": [values]}}
     /// 3. GraphArray: {"attr": GraphArray([values])} (with matching node order)
     /// 4. GraphTable: GraphTable with node_id column + attribute columns
     fn normalize_attrs_format<T>(
-        &self, 
-        py: Python, 
-        attrs_dict: &PyDict, 
-        is_nodes: bool
+        &self,
+        py: Python,
+        attrs_dict: &PyDict,
+        is_nodes: bool,
     ) -> PyResult<HashMap<String, Vec<(T, AttrValue)>>>
-    where 
+    where
         T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
     {
         let mut normalized_attrs: HashMap<String, Vec<(T, AttrValue)>> = HashMap::new();
-        
+
         for (attr_name_py, attr_data_py) in attrs_dict.iter() {
             let attr_name: String = attr_name_py.extract()?;
             let attr_values = self.parse_attribute_format::<T>(py, attr_data_py, is_nodes)?;
             normalized_attrs.insert(attr_name, attr_values);
         }
-        
+
         Ok(normalized_attrs)
     }
 
@@ -210,17 +256,17 @@ impl PyGraphAttrMut {
             // Otherwise treat as node-centric format
             return self.parse_node_centric_format::<T>(py, node_dict);
         }
-        
+
         // Format 3: GraphArray
         if let Ok(graph_array) = attr_data.extract::<PyRef<PyGraphArray>>() {
             return self.parse_graph_array_format::<T>(py, &graph_array, is_nodes);
         }
-        
+
         // Format 4: GraphTable
         if let Ok(graph_table) = attr_data.extract::<PyRef<PyGraphTable>>() {
             return self.parse_graph_table_format::<T>(py, &graph_table, is_nodes);
         }
-        
+
         Err(pyo3::exceptions::PyTypeError::new_err(
             format!(
                 "Unsupported attribute format. Expected: dict {{id: value}}, dict {{\"nodes\": [...], \"values\": [...]}}, GraphArray, or GraphTable. Got: {}",
@@ -256,26 +302,30 @@ impl PyGraphAttrMut {
     where
         T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
     {
-        let ids_list = data_dict.get_item("nodes")?
-            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("Missing 'nodes' key in column-centric format"))?;
-        let values_list = data_dict.get_item("values")?
-            .ok_or_else(|| pyo3::exceptions::PyKeyError::new_err("Missing 'values' key in column-centric format"))?;
-        
+        let ids_list = data_dict.get_item("nodes")?.ok_or_else(|| {
+            pyo3::exceptions::PyKeyError::new_err("Missing 'nodes' key in column-centric format")
+        })?;
+        let values_list = data_dict.get_item("values")?.ok_or_else(|| {
+            pyo3::exceptions::PyKeyError::new_err("Missing 'values' key in column-centric format")
+        })?;
+
         let ids: Vec<T> = ids_list.extract()?;
         let values: &PyList = values_list.extract()?;
-        
+
         if ids.len() != values.len() {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Length mismatch: {} nodes vs {} values", ids.len(), values.len())
-            ));
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Length mismatch: {} nodes vs {} values",
+                ids.len(),
+                values.len()
+            )));
         }
-        
+
         let mut attr_values = Vec::new();
         for (id, value_py) in ids.into_iter().zip(values.iter()) {
             let attr_value = python_value_to_attr_value(value_py)?;
             attr_values.push((id, attr_value));
         }
-        
+
         Ok(attr_values)
     }
 
@@ -292,11 +342,10 @@ impl PyGraphAttrMut {
     {
         // GraphArray support requires complex type conversion between NodeId/EdgeId and T
         // This will be implemented in the next phase once we have proper type mappings
-        Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            format!("GraphArray format for {} not yet implemented - complex type conversion needed", 
-                if is_nodes { "nodes" } else { "edges" }
-            )
-        ))
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(format!(
+            "GraphArray format for {} not yet implemented - complex type conversion needed",
+            if is_nodes { "nodes" } else { "edges" }
+        )))
     }
 
     /// Parse GraphTable format: table with id column + attribute columns
@@ -311,7 +360,7 @@ impl PyGraphAttrMut {
     {
         // GraphTable support will be implemented in the next phase
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "GraphTable format support coming in next phase"
+            "GraphTable format support coming in next phase",
         ))
     }
 }

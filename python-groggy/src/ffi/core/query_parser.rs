@@ -3,9 +3,9 @@
 //! Python bindings for the core Rust query parser. This eliminates the
 //! circular dependency by providing direct access to Rust parsing functionality.
 
+use crate::ffi::core::query::{PyEdgeFilter, PyNodeFilter};
 use groggy::core::query_parser::QueryParser;
 use pyo3::prelude::*;
-use crate::ffi::core::query::{PyNodeFilter, PyEdgeFilter};
 
 /// Python wrapper for the core Rust QueryParser
 #[pyclass(name = "QueryParser")]
@@ -25,15 +25,17 @@ impl PyQueryParser {
 
     /// Parse a node query string into a NodeFilter
     pub fn parse_node_query(&mut self, query: &str) -> PyResult<PyNodeFilter> {
-        let filter = self.inner.parse_node_query(query)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e)))?;
+        let filter = self.inner.parse_node_query(query).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
+        })?;
         Ok(PyNodeFilter { inner: filter })
     }
 
     /// Parse an edge query string into an EdgeFilter  
     pub fn parse_edge_query(&mut self, query: &str) -> PyResult<PyEdgeFilter> {
-        let filter = self.inner.parse_edge_query(query)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e)))?;
+        let filter = self.inner.parse_edge_query(query).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
+        })?;
         Ok(PyEdgeFilter { inner: filter })
     }
 
@@ -110,8 +112,9 @@ impl Default for PyQueryParser {
 #[pyfunction]
 pub fn parse_node_query(query: &str) -> PyResult<PyNodeFilter> {
     let mut parser = QueryParser::new();
-    let filter = parser.parse_node_query(query)
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e)))?;
+    let filter = parser.parse_node_query(query).map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
+    })?;
     Ok(PyNodeFilter { inner: filter })
 }
 
@@ -119,8 +122,9 @@ pub fn parse_node_query(query: &str) -> PyResult<PyNodeFilter> {
 #[pyfunction]
 pub fn parse_edge_query(query: &str) -> PyResult<PyEdgeFilter> {
     let mut parser = QueryParser::new();
-    let filter = parser.parse_edge_query(query)
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e)))?;
+    let filter = parser.parse_edge_query(query).map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
+    })?;
     Ok(PyEdgeFilter { inner: filter })
 }
 
@@ -130,23 +134,23 @@ pub fn parse_edge_query(query: &str) -> PyResult<PyEdgeFilter> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn test_python_query_parser() {
         let mut parser = PyQueryParser::new();
-        
+
         // Test node query parsing
         let result = parser.parse_node_query("salary > 120000");
         assert!(result.is_ok());
-        
+
         let result = parser.parse_node_query("department == 'Engineering'");
         assert!(result.is_ok());
-        
+
         // Test complex query
-        let result = parser.parse_node_query("(salary > 120000 AND department == 'Engineering') OR age < 25");
+        let result = parser
+            .parse_node_query("(salary > 120000 AND department == 'Engineering') OR age < 25");
         assert!(result.is_ok());
-        
+
         // Test error case
         let result = parser.parse_node_query("salary >");
         assert!(result.is_err());
@@ -161,13 +165,13 @@ mod tests {
         assert!(!parser.validate_node_query(""));
     }
 
-    #[test] 
+    #[test]
     fn test_error_reporting_methods() {
         let mut parser = PyQueryParser::new();
         let error = parser.get_node_query_error("salary >");
         assert!(error.is_some());
         assert!(error.unwrap().contains("Expected"));
-        
+
         let error = parser.get_node_query_error("salary > 100000");
         assert!(error.is_none());
     }
@@ -175,10 +179,10 @@ mod tests {
     #[test]
     fn test_edge_queries() {
         let mut parser = PyQueryParser::new();
-        
+
         let result = parser.parse_edge_query("weight > 0.5");
         assert!(result.is_ok());
-        
+
         let result = parser.parse_edge_query("type == 'friendship'");
         assert!(result.is_ok());
     }
@@ -186,11 +190,11 @@ mod tests {
     #[test]
     fn test_debug_methods() {
         let mut parser = PyQueryParser::new();
-        
+
         let debug = parser.parse_node_query_debug("salary > 100000");
         assert!(debug.is_ok());
         assert!(debug.unwrap().contains("AttributeFilter"));
-        
+
         let debug = parser.parse_node_query_debug("invalid >>");
         assert!(debug.is_ok());
         assert!(debug.unwrap().contains("Error:"));

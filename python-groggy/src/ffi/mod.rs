@@ -20,7 +20,7 @@ pub mod api;
 // Display FFI bindings (mirror main project display/)
 pub mod display;
 
-// FFI Traits - Pure delegation to core trait implementations  
+// FFI Traits - Pure delegation to core trait implementations
 pub mod traits;
 
 // Re-export commonly used FFI types
