@@ -203,7 +203,7 @@ impl PyGraphVersion {
 
     /// Get commit history
     fn commit_history(&self, py: Python) -> Vec<PyCommit> {
-        let graph = self.graph.borrow(py);
+        let _graph = self.graph.borrow(py);
         // Note: This is a simplified implementation
         // In the full implementation, you'd convert from CommitInfo to Commit
         Vec::new()

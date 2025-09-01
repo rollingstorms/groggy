@@ -381,7 +381,7 @@ impl PyGraphArray {
     /// Calculate percentile (user-friendly wrapper for quantile)
     /// percentile: 0-100 (e.g., 25 for 25th percentile, 90 for 90th percentile)
     fn percentile(&self, p: f64) -> Option<f64> {
-        if p < 0.0 || p > 100.0 {
+        if !(0.0..=100.0).contains(&p) {
             return None;
         }
         self.inner.quantile(p / 100.0)
@@ -425,7 +425,7 @@ impl PyGraphArray {
             inner: unique_array,
         };
 
-        Ok(Py::new(py, py_unique)?)
+        Py::new(py, py_unique)
     }
 
     /// Get value counts (frequency of each unique value) as Python dict
@@ -647,9 +647,7 @@ impl PyGraphArray {
                 (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a > b,
 
                 // Mixed numeric type comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => {
-                    (*a as i64) > (*b as i64)
-                }
+                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => *a > (*b as i64),
                 (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) > *b,
                 (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => {
                     (*a as f64) > (*b as f64)
@@ -711,9 +709,7 @@ impl PyGraphArray {
                 (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a < b,
 
                 // Mixed numeric type comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => {
-                    (*a as i64) < (*b as i64)
-                }
+                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => *a < (*b as i64),
                 (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) < *b,
                 (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => {
                     (*a as f64) < (*b as f64)
@@ -775,9 +771,7 @@ impl PyGraphArray {
                 (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a >= b,
 
                 // Mixed numeric type comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => {
-                    (*a as i64) >= (*b as i64)
-                }
+                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => *a >= (*b as i64),
                 (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) >= *b,
                 (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => {
                     (*a as f64) >= (*b as f64)
@@ -839,9 +833,7 @@ impl PyGraphArray {
                 (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => a <= b,
 
                 // Mixed numeric type comparisons
-                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => {
-                    (*a as i64) <= (*b as i64)
-                }
+                (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => *a <= (*b as i64),
                 (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) <= *b,
                 (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => {
                     (*a as f64) <= (*b as f64)

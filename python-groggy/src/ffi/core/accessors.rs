@@ -111,14 +111,14 @@ impl PyNodesAccessor {
         if let Ok(index_or_id) = key.extract::<NodeId>() {
             let actual_node_id = if let Some(ref constrained) = self.constrained_nodes {
                 // Constrained case: treat as index into constrained list
-                if (index_or_id as usize) >= constrained.len() {
+                if (index_or_id) >= constrained.len() {
                     return Err(PyIndexError::new_err(format!(
                         "Node index {} out of range (0-{})",
                         index_or_id,
                         constrained.len() - 1
                     )));
                 }
-                constrained[index_or_id as usize]
+                constrained[index_or_id]
             } else {
                 // Unconstrained case: treat as actual node ID (existing behavior)
                 index_or_id
@@ -144,8 +144,7 @@ impl PyNodesAccessor {
                 constrained.clone()
             } else {
                 {
-                    let node_ids = graph.node_ids();
-                    node_ids
+                    graph.node_ids()
                 }
             };
 
@@ -182,10 +181,7 @@ impl PyNodesAccessor {
             // Get induced edges for selected nodes
             let node_set: std::collections::HashSet<NodeId> =
                 selected_nodes.iter().copied().collect();
-            let (edge_ids, sources, targets) = {
-                let topology = graph.get_columnar_topology();
-                topology
-            };
+            let (edge_ids, sources, targets) = { graph.get_columnar_topology() };
             let mut induced_edges = Vec::new();
 
             for i in 0..edge_ids.len() {
@@ -224,14 +220,14 @@ impl PyNodesAccessor {
                     indices_or_ids
                         .into_iter()
                         .map(|index| {
-                            if (index as usize) >= constrained.len() {
+                            if (index) >= constrained.len() {
                                 Err(PyIndexError::new_err(format!(
                                     "Node index {} out of range (0-{})",
                                     index,
                                     constrained.len() - 1
                                 )))
                             } else {
-                                Ok(constrained[index as usize])
+                                Ok(constrained[index])
                             }
                         })
                         .collect()
@@ -260,8 +256,7 @@ impl PyNodesAccessor {
             let node_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
             let (edge_ids, sources, targets) = {
                 let graph = self.graph.borrow();
-                let topology = graph.get_columnar_topology();
-                topology
+                graph.get_columnar_topology()
             };
             let mut induced_edges = Vec::new();
 
@@ -294,8 +289,7 @@ impl PyNodesAccessor {
             let all_node_ids = {
                 let graph = self.graph.borrow(); // Only need read access
                 {
-                    let node_ids = graph.node_ids();
-                    node_ids
+                    graph.node_ids()
                 }
             };
 
@@ -323,8 +317,7 @@ impl PyNodesAccessor {
                 selected_nodes.iter().copied().collect();
             let (edge_ids, sources, targets) = {
                 let graph = self.graph.borrow();
-                let topology = graph.get_columnar_topology();
-                topology
+                graph.get_columnar_topology()
             };
             let mut induced_edges = Vec::new();
 
@@ -395,8 +388,7 @@ impl PyNodesAccessor {
             constrained.clone()
         } else {
             let graph = self.graph.borrow();
-            let node_ids = graph.node_ids();
-            node_ids
+            graph.node_ids()
         };
 
         Ok(NodesIterator {
@@ -553,8 +545,7 @@ impl PyNodesAccessor {
             constrained.clone()
         } else {
             {
-                let node_ids = graph.node_ids();
-                node_ids
+                graph.node_ids()
             }
         };
 
@@ -726,14 +717,14 @@ impl PyEdgesAccessor {
         if let Ok(index_or_id) = key.extract::<EdgeId>() {
             let actual_edge_id = if let Some(ref constrained) = self.constrained_edges {
                 // Constrained case: treat as index into constrained list
-                if (index_or_id as usize) >= constrained.len() {
+                if (index_or_id) >= constrained.len() {
                     return Err(PyIndexError::new_err(format!(
                         "Edge index {} out of range (0-{})",
                         index_or_id,
                         constrained.len() - 1
                     )));
                 }
-                constrained[index_or_id as usize]
+                constrained[index_or_id]
             } else {
                 // Unconstrained case: treat as actual edge ID (existing behavior)
                 index_or_id
@@ -759,8 +750,7 @@ impl PyEdgesAccessor {
                 constrained.clone()
             } else {
                 {
-                    let edge_ids = graph.edge_ids();
-                    edge_ids
+                    graph.edge_ids()
                 }
             };
 
@@ -799,8 +789,7 @@ impl PyEdgesAccessor {
             for &edge_id in &selected_edges {
                 let endpoints = {
                     let graph = self.graph.borrow();
-                    let result = graph.edge_endpoints(edge_id);
-                    result
+                    graph.edge_endpoints(edge_id)
                 };
                 if let Ok((source, target)) = endpoints {
                     endpoint_nodes.insert(source);
@@ -834,14 +823,14 @@ impl PyEdgesAccessor {
                     indices_or_ids
                         .into_iter()
                         .map(|index| {
-                            if (index as usize) >= constrained.len() {
+                            if (index) >= constrained.len() {
                                 Err(PyIndexError::new_err(format!(
                                     "Edge index {} out of range (0-{})",
                                     index,
                                     constrained.len() - 1
                                 )))
                             } else {
-                                Ok(constrained[index as usize])
+                                Ok(constrained[index])
                             }
                         })
                         .collect()
@@ -890,8 +879,7 @@ impl PyEdgesAccessor {
             let all_edge_ids = {
                 let graph = self.graph.borrow();
                 {
-                    let edge_ids = graph.edge_ids();
-                    edge_ids
+                    graph.edge_ids()
                 }
             };
 
@@ -919,8 +907,7 @@ impl PyEdgesAccessor {
             for &edge_id in &selected_edges {
                 let endpoints = {
                     let graph = self.graph.borrow();
-                    let result = graph.edge_endpoints(edge_id);
-                    result
+                    graph.edge_endpoints(edge_id)
                 };
                 if let Ok((source, target)) = endpoints {
                     endpoint_nodes.insert(source);
@@ -955,8 +942,7 @@ impl PyEdgesAccessor {
             constrained.clone()
         } else {
             let graph = self.graph.borrow();
-            let edge_ids = graph.edge_ids();
-            edge_ids
+            graph.edge_ids()
         };
 
         Ok(EdgesIterator {
@@ -995,8 +981,7 @@ impl PyEdgesAccessor {
         } else {
             // Get all edge IDs from the graph
             {
-                let edge_ids = graph.edge_ids();
-                edge_ids
+                graph.edge_ids()
             }
         };
 
@@ -1113,10 +1098,10 @@ impl PyEdgesAccessor {
     /// Support property-style attribute access: g.edges.weight
     fn __getattr__(&self, _py: Python, name: &str) -> PyResult<PyObject> {
         // TODO: Complete implementation - temporarily disabled
-        return Err(PyKeyError::new_err(format!(
+        Err(PyKeyError::new_err(format!(
             "Edge attribute '{}' access is under development.",
             name
-        )));
+        )))
     }
 
     /// Get edge attribute column with proper error checking
@@ -1128,8 +1113,7 @@ impl PyEdgesAccessor {
             constrained.clone()
         } else {
             {
-                let edge_ids = graph.edge_ids();
-                edge_ids
+                graph.edge_ids()
             }
         };
 

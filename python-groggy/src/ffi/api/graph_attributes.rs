@@ -12,7 +12,6 @@ use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
 
 /// Clean attribute operations - 12 essential methods only
-
 /// Immutable attribute access (getters/utilities)
 pub struct PyGraphAttr {
     pub graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
@@ -164,7 +163,7 @@ impl PyGraphAttrMut {
 
     pub fn set_node_attr(
         &mut self,
-        py: Python,
+        _py: Python,
         node: NodeId,
         attr: String,
         value: &PyAny,
@@ -187,7 +186,7 @@ impl PyGraphAttrMut {
 
     pub fn set_edge_attr(
         &mut self,
-        py: Python,
+        _py: Python,
         edge: EdgeId,
         attr: String,
         value: &PyAny,
@@ -296,7 +295,7 @@ impl PyGraphAttrMut {
     /// Parse column-centric format: {"nodes": [node_ids], "values": [values]}
     fn parse_column_centric_format<T>(
         &self,
-        py: Python,
+        _py: Python,
         data_dict: &PyDict,
     ) -> PyResult<Vec<(T, AttrValue)>>
     where
@@ -333,7 +332,7 @@ impl PyGraphAttrMut {
     /// Note: Complex type conversion deferred to next phase
     fn parse_graph_array_format<T>(
         &self,
-        py: Python,
+        _py: Python,
         _graph_array: &PyRef<PyGraphArray>,
         is_nodes: bool,
     ) -> PyResult<Vec<(T, AttrValue)>>
@@ -351,7 +350,7 @@ impl PyGraphAttrMut {
     /// Parse GraphTable format: table with id column + attribute columns
     fn parse_graph_table_format<T>(
         &self,
-        py: Python,
+        _py: Python,
         _graph_table: &PyRef<PyGraphTable>,
         _is_nodes: bool,
     ) -> PyResult<Vec<(T, AttrValue)>>

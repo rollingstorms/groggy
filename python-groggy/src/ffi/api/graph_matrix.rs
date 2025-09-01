@@ -56,12 +56,12 @@ impl PyGraphMatrixHelper {
         // Convert AdjacencyMatrix to GraphMatrix
         let graph_ref = self.graph.borrow(py);
         let graph_matrix = graph_ref.adjacency_matrix_to_graph_matrix(matrix)?;
-        Ok(Py::new(
+        Py::new(
             py,
             PyGraphMatrix {
                 inner: graph_matrix,
             },
-        )?)
+        )
     }
 
     /// Get weighted adjacency matrix - PURE DELEGATION to core
@@ -87,12 +87,12 @@ impl PyGraphMatrixHelper {
         // Convert AdjacencyMatrix to GraphMatrix
         let graph_ref = self.graph.borrow(py);
         let graph_matrix = graph_ref.adjacency_matrix_to_graph_matrix(matrix)?;
-        Ok(Py::new(
+        Py::new(
             py,
             PyGraphMatrix {
                 inner: graph_matrix,
             },
-        )?)
+        )
     }
 
     /// Get dense adjacency matrix - PURE DELEGATION to core
@@ -114,12 +114,12 @@ impl PyGraphMatrixHelper {
         // Convert AdjacencyMatrix to GraphMatrix
         let graph_ref = self.graph.borrow(py);
         let graph_matrix = graph_ref.adjacency_matrix_to_graph_matrix(matrix)?;
-        Ok(Py::new(
+        Py::new(
             py,
             PyGraphMatrix {
                 inner: graph_matrix,
             },
-        )?)
+        )
     }
 
     /// Get sparse adjacency matrix - PURE DELEGATION to core
@@ -166,12 +166,12 @@ impl PyGraphMatrixHelper {
         // Convert AdjacencyMatrix to GraphMatrix
         let graph_ref = self.graph.borrow(py);
         let graph_matrix = graph_ref.adjacency_matrix_to_graph_matrix(matrix)?;
-        Ok(Py::new(
+        Py::new(
             py,
             PyGraphMatrix {
                 inner: graph_matrix,
             },
-        )?)
+        )
     }
 
     /// Generate transition matrix - MISSING FROM CORE (needs implementation)

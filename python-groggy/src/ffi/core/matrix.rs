@@ -64,14 +64,14 @@ impl PyGraphMatrix {
         };
 
         let matrix = GraphMatrix::zeros(rows, cols, attr_type);
-        Ok(Py::new(py, Self { inner: matrix })?)
+        Py::new(py, Self { inner: matrix })
     }
 
     /// Create an identity matrix with specified size
     #[classmethod]
     fn identity(_cls: &PyType, py: Python, size: usize) -> PyResult<Py<Self>> {
         let matrix = GraphMatrix::identity(size);
-        Ok(Py::new(py, Self { inner: matrix })?)
+        Py::new(py, Self { inner: matrix })
     }
 
     /// Create matrix from graph attributes
@@ -256,7 +256,7 @@ impl PyGraphMatrix {
     /// Transpose the matrix
     fn transpose(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
         let transposed = self.inner.transpose();
-        Ok(Py::new(py, PyGraphMatrix { inner: transposed })?)
+        Py::new(py, PyGraphMatrix { inner: transposed })
     }
 
     /// Matrix multiplication - multiply this matrix with another
@@ -267,7 +267,7 @@ impl PyGraphMatrix {
         })?;
 
         let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
-        Ok(Py::new(py, py_result)?)
+        Py::new(py, py_result)
     }
 
     /// Matrix inverse (Phase 5 - placeholder for now)
@@ -286,7 +286,7 @@ impl PyGraphMatrix {
             .map_err(|e| PyRuntimeError::new_err(format!("Matrix power failed: {:?}", e)))?;
 
         let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
-        Ok(Py::new(py, py_result)?)
+        Py::new(py, py_result)
     }
 
     /// Elementwise multiplication (Hadamard product)
@@ -301,7 +301,7 @@ impl PyGraphMatrix {
         })?;
 
         let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
-        Ok(Py::new(py, py_result)?)
+        Py::new(py, py_result)
     }
 
     /// Determinant calculation (Phase 5 - placeholder for now)
@@ -414,10 +414,10 @@ impl PyGraphMatrix {
                 // Fallback to simple representation
                 let (rows, cols) = self.inner.shape();
                 Ok(format!(
-                    "GraphMatrix({} x {}, dtype={})",
+                    "GraphMatrix({} x {}, dtype={:?})",
                     rows,
                     cols,
-                    format!("{:?}", self.inner.dtype())
+                    self.inner.dtype()
                 ))
             }
         }
@@ -439,11 +439,11 @@ impl PyGraphMatrix {
                     r#"<div style="font-family: monospace; padding: 10px; border: 1px solid #ddd;">
                     <strong>GraphMatrix</strong><br>
                     Shape: {} x {}<br>
-                    Dtype: {}
+                    Dtype: {:?}
                     </div>"#,
                     rows,
                     cols,
-                    format!("{:?}", self.inner.dtype())
+                    self.inner.dtype()
                 ))
             }
         }
@@ -569,7 +569,7 @@ impl PyGraphMatrix {
     fn dense(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
         let dense_matrix = self.inner.dense();
         let py_result = PyGraphMatrix::from_graph_matrix(dense_matrix);
-        Ok(Py::new(py, py_result)?)
+        Py::new(py, py_result)
     }
 
     /// Convert to NumPy array (when numpy available)
