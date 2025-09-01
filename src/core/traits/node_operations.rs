@@ -244,7 +244,7 @@ pub trait NodeOperations: GraphEntity {
         let result = neighborhood_sampler.unified_neighborhood(
             &graph.pool(),
             graph.space(),
-            &vec![self.node_id()],
+            &[self.node_id()],
             hops,
         )?;
 
@@ -273,7 +273,7 @@ pub trait NodeOperations: GraphEntity {
             let mut traversal_engine = TraversalEngine::new();
             if let Some(path_result) = traversal_engine.shortest_path(
                 &graph.pool(),
-                &mut graph.space(),
+                graph.space(),
                 self.node_id(),
                 target,
                 options,

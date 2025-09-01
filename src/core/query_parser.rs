@@ -198,7 +198,7 @@ impl QueryParser {
                     let mut value = String::new();
                     let mut escaped = false;
 
-                    while let Some((_, ch)) = chars.next() {
+                    for (_, ch) in chars.by_ref() {
                         if escaped {
                             value.push(ch);
                             escaped = false;

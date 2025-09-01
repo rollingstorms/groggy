@@ -196,7 +196,7 @@ impl SubgraphOperations for FilteredSubgraph {
 
         let mut traversal_engine = TraversalEngine::new();
         let result =
-            traversal_engine.connected_components(&graph.pool(), &mut graph.space(), options)?;
+            traversal_engine.connected_components(&graph.pool(), graph.space(), options)?;
 
         let mut components = Vec::new();
         for component in result.components {
@@ -243,7 +243,7 @@ impl SubgraphOperations for FilteredSubgraph {
         }
 
         let mut traversal_engine = TraversalEngine::new();
-        let result = traversal_engine.bfs(&graph.pool(), &mut graph.space(), start, options)?;
+        let result = traversal_engine.bfs(&graph.pool(), graph.space(), start, options)?;
 
         // Filter result to nodes/edges that exist in this filtered subgraph
         let filtered_nodes: HashSet<NodeId> = result
@@ -290,7 +290,7 @@ impl SubgraphOperations for FilteredSubgraph {
         }
 
         let mut traversal_engine = TraversalEngine::new();
-        let result = traversal_engine.dfs(&graph.pool(), &mut graph.space(), start, options)?;
+        let result = traversal_engine.dfs(&graph.pool(), graph.space(), start, options)?;
 
         // Filter result to nodes/edges that exist in this filtered subgraph
         let filtered_nodes: HashSet<NodeId> = result
@@ -332,7 +332,7 @@ impl SubgraphOperations for FilteredSubgraph {
         let mut traversal_engine = TraversalEngine::new();
         let x = if let Some(path_result) = traversal_engine.shortest_path(
             &graph.pool(),
-            &mut graph.space(),
+            graph.space(),
             source,
             target,
             options,
