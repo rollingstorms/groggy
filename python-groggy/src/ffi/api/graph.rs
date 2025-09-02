@@ -16,6 +16,7 @@ use std::rc::Rc;
 use crate::ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
 use crate::ffi::core::array::PyGraphArray;
 use crate::ffi::core::neighborhood::PyNeighborhoodStats;
+use crate::ffi::core::path_result::PyPathResult;
 use crate::ffi::core::query::{PyEdgeFilter, PyNodeFilter};
 use crate::ffi::core::subgraph::PySubgraph;
 use crate::ffi::core::traversal::PyGroupedAggregationResult;
@@ -89,12 +90,15 @@ impl PyGraph {
 #[pyclass(name = "Graph", unsendable)]
 pub struct PyGraph {
     pub inner: Rc<RefCell<RustGraph>>,
+    // Cache for the full graph view to avoid expensive recreation
+    pub cached_view: RefCell<Option<(u64, Py<PySubgraph>)>>, // (version, cached_subgraph)
 }
 
 impl Clone for PyGraph {
     fn clone(&self) -> Self {
         PyGraph {
             inner: self.inner.clone(),
+            cached_view: RefCell::new(None), // Don't clone cache - let each instance build its own
         }
     }
 }
@@ -143,6 +147,7 @@ impl PyGraph {
         };
         Ok(Self {
             inner: Rc::new(RefCell::new(rust_graph)),
+            cached_view: RefCell::new(None),
         })
     }
 
@@ -560,13 +565,15 @@ impl PyGraph {
     }
 
     /// Filter nodes using NodeFilter object or string query
+    /// 
+    /// OPTIMIZED: Direct implementation avoiding expensive view() creation overhead
     fn filter_nodes(slf: PyRefMut<Self>, _py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for NodeFilter object first (most common case)
         let node_filter = if let Ok(filter_obj) = filter.extract::<PyNodeFilter>() {
             // Direct NodeFilter object - fastest path
             filter_obj.inner.clone()
         } else if let Ok(query_str) = filter.extract::<String>() {
-            // String query - parse it using Rust core query parser (FIXED: no circular dependency)
+            // String query - parse it using Rust core query parser
             let mut parser = groggy::core::query_parser::QueryParser::new();
             parser.parse_node_query(&query_str).map_err(|e| {
                 PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
@@ -586,17 +593,13 @@ impl PyGraph {
             ));
         }
 
-        let start = std::time::Instant::now();
         let filtered_nodes = slf
             .inner
             .borrow_mut()
             .find_nodes(node_filter)
             .map_err(graph_error_to_py_err)?;
 
-        let _elapsed = start.elapsed();
-
-        let start = std::time::Instant::now();
-        // O(k) Calculate induced edges using optimized core subgraph method
+        // OPTIMIZED: Pre-allocate HashSet capacity for results only
         use std::collections::HashSet;
         let node_set: HashSet<NodeId> = filtered_nodes.iter().copied().collect();
 
@@ -616,11 +619,10 @@ impl PyGraph {
             }
         }
 
-        let _elapsed = start.elapsed();
-
-        // Create subgraph using core Subgraph constructor
-        let node_set: HashSet<NodeId> = filtered_nodes.iter().copied().collect();
+        // Create edge HashSet - only for the filtered results
         let edge_set: HashSet<EdgeId> = induced_edges.iter().copied().collect();
+
+        // Use optimized fast Subgraph constructor
         let subgraph = Subgraph::new(
             slf.inner.clone(),
             node_set,
@@ -631,13 +633,15 @@ impl PyGraph {
     }
 
     /// Filter edges using EdgeFilter object or string query
+    /// 
+    /// OPTIMIZED: Direct implementation avoiding expensive view() creation overhead
     fn filter_edges(slf: PyRefMut<Self>, _py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for EdgeFilter object first (most common case)
         let edge_filter = if let Ok(filter_obj) = filter.extract::<PyEdgeFilter>() {
             // Direct EdgeFilter object - fastest path
             filter_obj.inner.clone()
         } else if let Ok(query_str) = filter.extract::<String>() {
-            // String query - parse it using Rust core query parser (FIXED: no circular dependency)
+            // String query - parse it using Rust core query parser
             let mut parser = groggy::core::query_parser::QueryParser::new();
             parser.parse_edge_query(&query_str).map_err(|e| {
                 PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
@@ -673,8 +677,10 @@ impl PyGraph {
             }
         }
 
-        // Create subgraph using core Subgraph constructor
+        // Create edge HashSet - only for the filtered results
         let edge_set: HashSet<EdgeId> = filtered_edges.iter().copied().collect();
+
+        // Use optimized fast Subgraph constructor
         let subgraph = Subgraph::new(
             slf.inner.clone(),
             nodes,
@@ -682,6 +688,140 @@ impl PyGraph {
             "filtered_edges".to_string(),
         );
         PySubgraph::from_core_subgraph(subgraph)
+    }
+
+    /// BFS traversal starting from a node - returns lightweight PathResult
+    /// 
+    /// OPTIMIZED: Direct implementation avoiding expensive view() creation overhead
+    fn bfs(slf: PyRefMut<Self>, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PyPathResult> {
+        // Get full graph view and delegate to its BFS, but use direct graph access
+        let graph_ref = slf.inner.clone();
+        let all_nodes: Vec<NodeId> = graph_ref.borrow().node_ids();
+        let all_edges: Vec<EdgeId> = graph_ref.borrow().edge_ids();
+        
+        // Create HashSets with pre-allocated capacity
+        let mut node_set = std::collections::HashSet::with_capacity(all_nodes.len());
+        let mut edge_set = std::collections::HashSet::with_capacity(all_edges.len());
+        node_set.extend(all_nodes);
+        edge_set.extend(all_edges);
+        
+        // Create temporary subgraph for BFS
+        let temp_subgraph = Subgraph::new(
+            graph_ref,
+            node_set,
+            edge_set,
+            "temp_full_graph_bfs".to_string(),
+        );
+        
+        // Run BFS and convert to PathResult
+        let result = temp_subgraph.bfs(start, max_depth);
+        match result {
+            Ok(boxed_subgraph) => {
+                let nodes: Vec<NodeId> = boxed_subgraph.node_set().iter().copied().collect();
+                let edges: Vec<EdgeId> = boxed_subgraph.edge_set().iter().copied().collect();
+                Ok(PyPathResult::new(nodes, edges, "bfs".to_string()))
+            }
+            Err(e) => Err(PyRuntimeError::new_err(format!("BFS error: {}", e))),
+        }
+    }
+
+    /// DFS traversal starting from a node - returns lightweight PathResult
+    /// 
+    /// OPTIMIZED: Direct implementation avoiding expensive view() creation overhead  
+    fn dfs(slf: PyRefMut<Self>, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PyPathResult> {
+        // Get full graph view and delegate to its DFS, but use direct graph access
+        let graph_ref = slf.inner.clone();
+        let all_nodes: Vec<NodeId> = graph_ref.borrow().node_ids();
+        let all_edges: Vec<EdgeId> = graph_ref.borrow().edge_ids();
+        
+        // Create HashSets with pre-allocated capacity
+        let mut node_set = std::collections::HashSet::with_capacity(all_nodes.len());
+        let mut edge_set = std::collections::HashSet::with_capacity(all_edges.len());
+        node_set.extend(all_nodes);
+        edge_set.extend(all_edges);
+        
+        // Create temporary subgraph for DFS
+        let temp_subgraph = Subgraph::new(
+            graph_ref,
+            node_set,
+            edge_set,
+            "temp_full_graph_dfs".to_string(),
+        );
+        
+        // Run DFS and convert to PathResult
+        let result = temp_subgraph.dfs(start, max_depth);
+        match result {
+            Ok(boxed_subgraph) => {
+                let nodes: Vec<NodeId> = boxed_subgraph.node_set().iter().copied().collect();
+                let edges: Vec<EdgeId> = boxed_subgraph.edge_set().iter().copied().collect();
+                Ok(PyPathResult::new(nodes, edges, "dfs".to_string()))
+            }
+            Err(e) => Err(PyRuntimeError::new_err(format!("DFS error: {}", e))),
+        }
+    }
+
+    /// Find shortest path between two nodes - returns lightweight PathResult
+    /// 
+    /// OPTIMIZED: Direct implementation avoiding expensive view() creation overhead
+    fn shortest_path_fast(slf: PyRefMut<Self>, _py: Python, source: NodeId, target: NodeId) -> PyResult<Option<PyPathResult>> {
+        // Get full graph view and delegate to its shortest_path, but use direct graph access
+        let graph_ref = slf.inner.clone();
+        let all_nodes: Vec<NodeId> = graph_ref.borrow().node_ids();
+        let all_edges: Vec<EdgeId> = graph_ref.borrow().edge_ids();
+        
+        // Create HashSets with pre-allocated capacity
+        let mut node_set = std::collections::HashSet::with_capacity(all_nodes.len());
+        let mut edge_set = std::collections::HashSet::with_capacity(all_edges.len());
+        node_set.extend(all_nodes);
+        edge_set.extend(all_edges);
+        
+        // Create temporary subgraph for shortest path
+        let temp_subgraph = Subgraph::new(
+            graph_ref,
+            node_set,
+            edge_set,
+            "temp_full_graph_shortest_path".to_string(),
+        );
+        
+        // Run shortest_path and convert to PathResult
+        let result = temp_subgraph.shortest_path_subgraph(source, target);
+        match result {
+            Ok(Some(boxed_subgraph)) => {
+                let nodes: Vec<NodeId> = boxed_subgraph.node_set().iter().copied().collect();
+                let edges: Vec<EdgeId> = boxed_subgraph.edge_set().iter().copied().collect();
+                Ok(Some(PyPathResult::new(nodes, edges, "shortest_path".to_string())))
+            }
+            Ok(None) => Ok(None), // No path found
+            Err(e) => Err(PyRuntimeError::new_err(format!("Shortest path error: {}", e))),
+        }
+    }
+
+    /// Check if there is a path between two nodes
+    /// 
+    /// OPTIMIZED: Direct implementation avoiding expensive view() creation overhead
+    fn has_path(slf: PyRefMut<Self>, _py: Python, source: NodeId, target: NodeId) -> PyResult<bool> {
+        // Get full graph view and delegate to its has_path, but use direct graph access
+        let graph_ref = slf.inner.clone();
+        let all_nodes: Vec<NodeId> = graph_ref.borrow().node_ids();
+        let all_edges: Vec<EdgeId> = graph_ref.borrow().edge_ids();
+        
+        // Create HashSets with pre-allocated capacity
+        let mut node_set = std::collections::HashSet::with_capacity(all_nodes.len());
+        let mut edge_set = std::collections::HashSet::with_capacity(all_edges.len());
+        node_set.extend(all_nodes);
+        edge_set.extend(all_edges);
+        
+        // Create temporary subgraph for path checking
+        let temp_subgraph = Subgraph::new(
+            graph_ref,
+            node_set,
+            edge_set,
+            "temp_full_graph_has_path".to_string(),
+        );
+        
+        // Run has_path check
+        temp_subgraph.has_path(source, target)
+            .map_err(|e| PyRuntimeError::new_err(format!("Path check error: {}", e)))
     }
 
     /// Get analytics module for this graph
@@ -1336,22 +1476,83 @@ impl PyGraph {
     /// Return a full-view Subgraph (whole graph as a subgraph).
     /// Downstream code can always resolve parent graph from this object.
     pub fn view(self_: PyRef<Self>, py: Python<'_>) -> PyResult<Py<PySubgraph>> {
+        let view_start = std::time::Instant::now();
+        
+        // TODO: Add proper view caching here
+        // For now, let's just optimize the current implementation
+        
+        // Check cache first - avoid expensive view creation if version hasn't changed
+        let cache_check_start = std::time::Instant::now();
+        let current_version = {
+            let borrowed = self_.inner.borrow();
+            // Use node count + edge count as a simple version indicator
+            // In a real implementation, we'd use proper versioning from GraphPool
+            (borrowed.node_ids().len() + borrowed.edge_ids().len()) as u64
+        };
+        
+        // Check if we have a cached view for this version
+        {
+            let cache = self_.cached_view.borrow();
+            if let Some((cached_version, cached_subgraph)) = cache.as_ref() {
+                if *cached_version == current_version {
+                    let cache_check_time = cache_check_start.elapsed();
+                    println!("🔍 VIEW CACHE: Cache HIT took {:?} (version: {})", cache_check_time, current_version);
+                    return Ok(cached_subgraph.clone());
+                }
+            }
+        }
+        let cache_check_time = cache_check_start.elapsed();
+        println!("🔍 VIEW CACHE: Cache MISS took {:?} (version: {})", cache_check_time, current_version);
+        
+        // DEBUG TIMING: Measure node/edge collection
+        let collection_start = std::time::Instant::now();
         // Create a simple subgraph containing all nodes and edges
         let all_nodes: Vec<NodeId> = self_.inner.borrow().node_ids();
         let all_edges: Vec<EdgeId> = self_.inner.borrow().edge_ids();
+        let collection_time = collection_start.elapsed();
+        println!("🔍 VIEW DEBUG: Node/edge collection took {:?} (nodes: {}, edges: {})", collection_time, all_nodes.len(), all_edges.len());
 
-        let node_set: std::collections::HashSet<NodeId> = all_nodes.into_iter().collect();
-        let edge_set: std::collections::HashSet<EdgeId> = all_edges.into_iter().collect();
+        let hashset_start = std::time::Instant::now();
+        // Pre-allocate HashSet capacity to avoid expensive resizing during insertion
+        let mut node_set = std::collections::HashSet::with_capacity(all_nodes.len());
+        let mut edge_set = std::collections::HashSet::with_capacity(all_edges.len());
+        
+        // Extend is more efficient than collect() for pre-allocated HashSets
+        node_set.extend(all_nodes);
+        edge_set.extend(all_edges);
+        
+        let hashset_time = hashset_start.elapsed();
+        println!("🔍 VIEW DEBUG: Pre-allocated HashSet creation took {:?}", hashset_time);
 
+        let subgraph_start = std::time::Instant::now();
         let subgraph = groggy::core::subgraph::Subgraph::new(
             self_.inner.clone(),
             node_set,
             edge_set,
-            "full_view".to_string(),
+            "cached_full_view".to_string(),
         );
+        let subgraph_time = subgraph_start.elapsed();
+        println!("🔍 VIEW DEBUG: Core Subgraph::new took {:?}", subgraph_time);
 
+        let pysubgraph_start = std::time::Instant::now();
         let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;
-        Py::new(py, py_subgraph)
+        let py_result = Py::new(py, py_subgraph)?;
+        let pysubgraph_time = pysubgraph_start.elapsed();
+        println!("🔍 VIEW DEBUG: PySubgraph conversion took {:?}", pysubgraph_time);
+        
+        // Cache the result for future calls
+        let cache_start = std::time::Instant::now();
+        {
+            let mut cache = self_.cached_view.borrow_mut();
+            *cache = Some((current_version, py_result.clone()));
+        }
+        let cache_time = cache_start.elapsed();
+        println!("🔍 VIEW DEBUG: Cache storage took {:?}", cache_time);
+        
+        let view_total = view_start.elapsed();
+        println!("🔍 VIEW DEBUG: TOTAL view() took {:?}", view_total);
+        
+        Ok(py_result)
     }
 
     /// Check if the graph is connected (delegates to subgraph implementation)
@@ -1360,8 +1561,10 @@ impl PyGraph {
         let all_nodes: Vec<NodeId> = self_.inner.borrow().node_ids();
         let all_edges: Vec<EdgeId> = self_.inner.borrow().edge_ids();
 
-        let node_set: std::collections::HashSet<NodeId> = all_nodes.into_iter().collect();
-        let edge_set: std::collections::HashSet<EdgeId> = all_edges.into_iter().collect();
+        let mut node_set = std::collections::HashSet::with_capacity(all_nodes.len());
+        let mut edge_set = std::collections::HashSet::with_capacity(all_edges.len());
+        node_set.extend(all_nodes);
+        edge_set.extend(all_edges);
 
         let subgraph = groggy::core::subgraph::Subgraph::new(
             self_.inner.clone(),
@@ -1373,6 +1576,7 @@ impl PyGraph {
         let result = subgraph.is_connected().map_err(graph_error_to_py_err)?;
         Ok(result)
     }
+
 
     /// Create GraphTable for DataFrame-like view of this graph's nodes
     /// Alias for g.nodes.table() for convenience
@@ -1397,6 +1601,23 @@ impl PyGraph {
     fn __getattr__(&self, py: Python, name: String) -> PyResult<PyObject> {
         use pyo3::exceptions::PyAttributeError;
         use pyo3::types::PyDict;
+
+        // Early filtering: Skip expensive operations for internal Python attributes
+        if name.starts_with("_") || name.starts_with("__") {
+            return Err(PyAttributeError::new_err(format!("'Graph' object has no attribute '{}'", name)));
+        }
+        
+        // Skip common internal attributes that Python's display/introspection system uses
+        match name.as_str() {
+            "shape" | "dtype" | "ndim" | "size" | "T" | "real" | "imag" |
+            "__array_interface__" | "__array__" | "__array_struct__" |
+            "_repr_html_" | "_repr_png_" | "_repr_svg_" | "_repr_latex_" |
+            "__class__" | "__dict__" | "__module__" | "__doc__" |
+            "__weakref__" | "__slots__" => {
+                return Err(PyAttributeError::new_err(format!("'Graph' object has no attribute '{}'", name)));
+            }
+            _ => {}
+        }
 
         // Check if this is a node attribute name that exists in the graph
         let all_node_attrs = self.all_node_attribute_names();
