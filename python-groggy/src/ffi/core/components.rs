@@ -2,9 +2,9 @@
 //!
 //! Lazy array of connected components - only materializes PySubgraphs on access
 
+use groggy::api::graph::Graph;
 use groggy::core::subgraph::Subgraph;
 use groggy::{EdgeId, NodeId};
-use groggy::api::graph::Graph;
 use pyo3::exceptions::{PyIndexError, PyRuntimeError};
 use pyo3::prelude::*;
 use std::cell::RefCell;
@@ -19,7 +19,7 @@ pub struct PyComponentsArray {
     // Store only the lightweight metadata, not materialized subgraphs!
     components_data: Vec<(HashSet<NodeId>, HashSet<EdgeId>)>,
     graph_ref: Rc<RefCell<Graph>>,
-    
+
     // Lazy cache for materialized components (only created when accessed)
     materialized_cache: RefCell<HashMap<usize, PySubgraph>>,
 }
@@ -29,7 +29,7 @@ impl PyComponentsArray {
     pub fn len(&self) -> usize {
         self.components_data.len()
     }
-    
+
     /// Create new ComponentsArray from trait objects (internal use)
     pub fn from_components(
         components: Vec<Box<dyn groggy::core::traits::SubgraphOperations>>,
@@ -38,9 +38,7 @@ impl PyComponentsArray {
         // Extract lightweight data from trait objects
         let components_data: Vec<(HashSet<NodeId>, HashSet<EdgeId>)> = components
             .into_iter()
-            .map(|comp| {
-                (comp.node_set().clone(), comp.edge_set().clone())
-            })
+            .map(|comp| (comp.node_set().clone(), comp.edge_set().clone()))
             .collect();
 
         Self {
@@ -61,7 +59,7 @@ impl PyComponentsArray {
     /// Lazy access to individual components - only materializes on demand
     fn __getitem__(&self, index: isize) -> PyResult<PySubgraph> {
         let len = self.components_data.len() as isize;
-        
+
         // Handle negative indexing
         let actual_index = if index < 0 {
             (len + index) as usize
@@ -90,13 +88,16 @@ impl PyComponentsArray {
             edges.clone(),
             format!("component_{}", actual_index),
         );
-        
-        let py_subgraph = PySubgraph::from_core_subgraph(subgraph)
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create component subgraph: {}", e)))?;
+
+        let py_subgraph = PySubgraph::from_core_subgraph(subgraph).map_err(|e| {
+            PyRuntimeError::new_err(format!("Failed to create component subgraph: {}", e))
+        })?;
 
         // Cache for next time
-        self.materialized_cache.borrow_mut().insert(actual_index, py_subgraph.clone());
-        
+        self.materialized_cache
+            .borrow_mut()
+            .insert(actual_index, py_subgraph.clone());
+
         Ok(py_subgraph)
     }
 
@@ -137,7 +138,8 @@ impl PyComponentsArray {
         }
 
         // Find largest by node count
-        let largest_index = self.components_data
+        let largest_index = self
+            .components_data
             .iter()
             .enumerate()
             .max_by_key(|(_, (nodes, _))| nodes.len())

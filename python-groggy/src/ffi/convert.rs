@@ -13,11 +13,12 @@ use pyo3::types::PyDict;
 /// internal NetworkXGraph representation.
 pub fn networkx_graph_to_python(py: Python, nx_graph: &NetworkXGraph) -> PyResult<PyObject> {
     // Import NetworkX - try both common import patterns
-    let networkx = py.import("networkx")
+    let networkx = py
+        .import("networkx")
         .or_else(|_| py.import("nx"))
         .map_err(|_| {
             pyo3::exceptions::PyImportError::new_err(
-                "NetworkX is not installed. Please install it with 'pip install networkx'"
+                "NetworkX is not installed. Please install it with 'pip install networkx'",
             )
         })?;
 
@@ -47,12 +48,12 @@ pub fn networkx_graph_to_python(py: Python, nx_graph: &NetworkXGraph) -> PyResul
     // Add edges with attributes
     for edge in &nx_graph.edges {
         let edge_attrs = PyDict::new(py);
-        
+
         for (key, value) in &edge.attributes {
             let py_value = networkx_value_to_python(py, value)?;
             edge_attrs.set_item(key, py_value)?;
         }
-        
+
         // Only pass edge attributes if they exist
         if edge_attrs.len() > 0 {
             graph.call_method("add_edge", (edge.source, edge.target), Some(edge_attrs))?;
@@ -87,11 +88,12 @@ fn networkx_value_to_python(py: Python, value: &NetworkXValue) -> PyResult<PyObj
 /// This is for future bidirectional conversion support.
 pub fn python_to_networkx_graph(py: Python, py_graph: &PyAny) -> PyResult<NetworkXGraph> {
     // Check if it's a NetworkX graph
-    let networkx = py.import("networkx")
+    let networkx = py
+        .import("networkx")
         .or_else(|_| py.import("nx"))
         .map_err(|_| {
             pyo3::exceptions::PyImportError::new_err(
-                "NetworkX is not installed. Please install it with 'pip install networkx'"
+                "NetworkX is not installed. Please install it with 'pip install networkx'",
             )
         })?;
 
@@ -102,17 +104,17 @@ pub fn python_to_networkx_graph(py: Python, py_graph: &PyAny) -> PyResult<Networ
     // Get nodes with attributes
     let mut nodes = Vec::new();
     let nodes_data = py_graph.call_method1("nodes", (true,))?; // nodes(data=True)
-    
+
     for item in nodes_data.iter()? {
         let (node_id, attrs_dict) = item?.extract::<(usize, &PyDict)>()?;
         let mut attributes = std::collections::HashMap::new();
-        
+
         for (key, value) in attrs_dict {
             let key_str = key.extract::<String>()?;
             let nx_value = python_to_networkx_value(value)?;
             attributes.insert(key_str, nx_value);
         }
-        
+
         nodes.push(groggy::convert::NetworkXNode {
             id: node_id,
             attributes,
@@ -122,17 +124,17 @@ pub fn python_to_networkx_graph(py: Python, py_graph: &PyAny) -> PyResult<Networ
     // Get edges with attributes
     let mut edges = Vec::new();
     let edges_data = py_graph.call_method1("edges", (true,))?; // edges(data=True)
-    
+
     for item in edges_data.iter()? {
         let (source, target, attrs_dict) = item?.extract::<(usize, usize, &PyDict)>()?;
         let mut attributes = std::collections::HashMap::new();
-        
+
         for (key, value) in attrs_dict {
             let key_str = key.extract::<String>()?;
             let nx_value = python_to_networkx_value(value)?;
             attributes.insert(key_str, nx_value);
         }
-        
+
         edges.push(groggy::convert::NetworkXEdge {
             source,
             target,
@@ -143,7 +145,7 @@ pub fn python_to_networkx_graph(py: Python, py_graph: &PyAny) -> PyResult<Networ
     // Get graph-level attributes
     let mut graph_attrs = std::collections::HashMap::new();
     let graph_dict = py_graph.getattr("graph")?;
-    
+
     if let Ok(dict) = graph_dict.downcast::<PyDict>() {
         for (key, value) in dict {
             let key_str = key.extract::<String>()?;

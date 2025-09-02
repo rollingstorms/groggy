@@ -510,7 +510,7 @@ pub trait SubgraphOperations: GraphEntity {
         // This ensures g.nodes[g.table()['column'] == value] works correctly
         let node_set = self.node_set();
         let max_node_id = node_set.iter().max().copied().unwrap_or(0);
-        
+
         // Create a sparse representation where table[node_id] = node_data
         // Missing nodes will have null values
         let table_size = (max_node_id + 1) as usize;

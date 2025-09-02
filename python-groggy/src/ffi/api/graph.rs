@@ -435,12 +435,12 @@ impl PyGraph {
         // Format 1: List of (source, target) tuples - most common case for benchmarks
         if let Ok(edge_pairs) = edges.extract::<Vec<(NodeId, NodeId)>>() {
             let result = self.inner.borrow_mut().add_edges(&edge_pairs);
-            
+
             // OPTIMIZATION: Warm cache after bulk edge addition if requested
             if warm_cache.unwrap_or(false) {
                 self.warm_caches_after_bulk_operation(py)?;
             }
-            
+
             return Ok(result);
         }
         // Format 2: List of (source, target, attrs_dict) tuples
@@ -495,7 +495,7 @@ impl PyGraph {
             if warm_cache.unwrap_or(false) {
                 self.warm_caches_after_bulk_operation(py)?;
             }
-            
+
             return Ok(edge_ids);
         }
         // Format 3: List of dictionaries with node mapping
@@ -574,7 +574,7 @@ impl PyGraph {
             if warm_cache.unwrap_or(false) {
                 self.warm_caches_after_bulk_operation(py)?;
             }
-            
+
             return Ok(edge_ids);
         }
 
@@ -585,7 +585,7 @@ impl PyGraph {
     }
 
     /// Filter nodes using NodeFilter object or string query
-    /// 
+    ///
     /// OPTIMIZED: Direct implementation avoiding expensive view() creation overhead
     fn filter_nodes(slf: PyRefMut<Self>, _py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for NodeFilter object first (most common case)
@@ -653,7 +653,7 @@ impl PyGraph {
     }
 
     /// Filter edges using EdgeFilter object or string query
-    /// 
+    ///
     /// OPTIMIZED: Direct implementation avoiding expensive view() creation overhead
     fn filter_edges(slf: PyRefMut<Self>, _py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Fast path optimization: Check for EdgeFilter object first (most common case)
@@ -709,10 +709,6 @@ impl PyGraph {
         );
         PySubgraph::from_core_subgraph(subgraph)
     }
-
-
-
-
 
     /// Get analytics module for this graph
     // analytics() method deleted - functionality moved to direct PyGraph delegation methods
@@ -1400,7 +1396,7 @@ impl PyGraph {
             // Use node count + edge count as a simple version indicator
             (borrowed.node_ids().len() + borrowed.edge_ids().len()) as u64
         };
-        
+
         // Check if we have a cached view for this version
         {
             let cache = self_.cached_view.borrow();
@@ -1412,7 +1408,7 @@ impl PyGraph {
             }
         }
         // Cache miss - need to rebuild
-        
+
         // Create a simple subgraph containing all nodes and edges
         let all_nodes: Vec<NodeId> = self_.inner.borrow().node_ids();
         let all_edges: Vec<EdgeId> = self_.inner.borrow().edge_ids();
@@ -1420,7 +1416,7 @@ impl PyGraph {
         // Pre-allocate HashSet capacity to avoid expensive resizing during insertion
         let mut node_set = std::collections::HashSet::with_capacity(all_nodes.len());
         let mut edge_set = std::collections::HashSet::with_capacity(all_edges.len());
-        
+
         // Extend is more efficient than collect() for pre-allocated HashSets
         node_set.extend(all_nodes);
         edge_set.extend(all_edges);
@@ -1434,13 +1430,13 @@ impl PyGraph {
 
         let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;
         let py_result = Py::new(py, py_subgraph)?;
-        
+
         // Cache the result for future calls
         {
             let mut cache = self_.cached_view.borrow_mut();
             *cache = Some((current_version, py_result.clone()));
         }
-        
+
         Ok(py_result)
     }
 
@@ -1465,7 +1461,6 @@ impl PyGraph {
         let result = subgraph.is_connected().map_err(graph_error_to_py_err)?;
         Ok(result)
     }
-
 
     /// Create GraphTable for DataFrame-like view of this graph's nodes
     /// Alias for g.nodes.table() for convenience
@@ -1508,9 +1503,10 @@ impl PyGraph {
     /// ```
     fn to_networkx(&self, py: Python) -> PyResult<PyObject> {
         // Convert to our internal NetworkX representation
-        let nx_graph = self.inner.borrow().to_networkx()
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to convert to NetworkX: {}", e)))?;
-        
+        let nx_graph = self.inner.borrow().to_networkx().map_err(|e| {
+            PyRuntimeError::new_err(format!("Failed to convert to NetworkX: {}", e))
+        })?;
+
         // Convert to actual Python NetworkX graph
         crate::ffi::convert::networkx_graph_to_python(py, &nx_graph)
     }
@@ -1523,17 +1519,38 @@ impl PyGraph {
 
         // Early filtering: Skip expensive operations for internal Python attributes
         if name.starts_with("_") || name.starts_with("__") {
-            return Err(PyAttributeError::new_err(format!("'Graph' object has no attribute '{}'", name)));
+            return Err(PyAttributeError::new_err(format!(
+                "'Graph' object has no attribute '{}'",
+                name
+            )));
         }
-        
+
         // Skip common internal attributes that Python's display/introspection system uses
         match name.as_str() {
-            "shape" | "dtype" | "ndim" | "size" | "T" | "real" | "imag" |
-            "__array_interface__" | "__array__" | "__array_struct__" |
-            "_repr_html_" | "_repr_png_" | "_repr_svg_" | "_repr_latex_" |
-            "__class__" | "__dict__" | "__module__" | "__doc__" |
-            "__weakref__" | "__slots__" => {
-                return Err(PyAttributeError::new_err(format!("'Graph' object has no attribute '{}'", name)));
+            "shape"
+            | "dtype"
+            | "ndim"
+            | "size"
+            | "T"
+            | "real"
+            | "imag"
+            | "__array_interface__"
+            | "__array__"
+            | "__array_struct__"
+            | "_repr_html_"
+            | "_repr_png_"
+            | "_repr_svg_"
+            | "_repr_latex_"
+            | "__class__"
+            | "__dict__"
+            | "__module__"
+            | "__doc__"
+            | "__weakref__"
+            | "__slots__" => {
+                return Err(PyAttributeError::new_err(format!(
+                    "'Graph' object has no attribute '{}'",
+                    name
+                )));
             }
             _ => {}
         }
@@ -1548,7 +1565,8 @@ impl PyGraph {
             for node_id in graph_ref.node_ids() {
                 match graph_ref.get_node_attr(node_id, &name) {
                     Ok(Some(attr_value)) => {
-                        let py_value = crate::ffi::utils::attr_value_to_python_value(py, &attr_value)?;
+                        let py_value =
+                            crate::ffi::utils::attr_value_to_python_value(py, &attr_value)?;
                         result_dict.set_item(node_id, py_value)?;
                     }
                     Ok(None) => {
@@ -1575,7 +1593,8 @@ impl PyGraph {
             for edge_id in graph_ref.edge_ids() {
                 match graph_ref.get_edge_attr(edge_id, &name) {
                     Ok(Some(attr_value)) => {
-                        let py_value = crate::ffi::utils::attr_value_to_python_value(py, &attr_value)?;
+                        let py_value =
+                            crate::ffi::utils::attr_value_to_python_value(py, &attr_value)?;
                         result_dict.set_item(edge_id, py_value)?;
                     }
                     Ok(None) => {
@@ -1754,21 +1773,21 @@ impl PyGraph {
     }
 
     // === CACHE OPTIMIZATION METHODS ===
-    
+
     /// Warm various caches after bulk operations to improve subsequent algorithm performance
-    /// 
+    ///
     /// This method proactively builds caches that are commonly needed after bulk data insertion:
     /// - View cache: Pre-builds the full graph view for quick access
     /// - Adjacency snapshots: Triggers traversal engine cache building
-    /// 
+    ///
     /// Use this after large bulk operations (add_edges, add_nodes) before running algorithms
     /// like BFS, DFS, connected_components, etc. for optimal performance.
     fn warm_caches_after_bulk_operation(&mut self, py: Python) -> PyResult<()> {
         // 1. Warm the view cache by creating a full graph view
         // This is the most commonly accessed cache for algorithms
-        // Note: We can't directly call view() from &mut self, but the warming effect 
+        // Note: We can't directly call view() from &mut self, but the warming effect
         // is mainly from the traversal operations below
-        
+
         // 2. Warm the traversal engine snapshot cache by triggering a minimal operation
         // This builds the adjacency map cache that BFS/DFS/shortest_path algorithms use
         let node_ids = self.inner.borrow().node_ids();
@@ -1776,15 +1795,15 @@ impl PyGraph {
             // Trigger a minimal BFS to warm the traversal snapshot cache
             let _ = self.bfs(py, node_ids[0], Some(1), None, None);
         }
-        
+
         Ok(())
     }
-    
+
     /// Advanced cache warming with fine-grained control
-    /// 
+    ///
     /// Parameters:
     /// - warm_view: Whether to warm the view cache (default: true)
-    /// - warm_traversal: Whether to warm traversal caches (default: true) 
+    /// - warm_traversal: Whether to warm traversal caches (default: true)
     /// - sample_node: Optional specific node to use for traversal warming (default: first node)
     fn warm_caches(
         &mut self,
@@ -1797,7 +1816,7 @@ impl PyGraph {
             // Note: View cache warming would require PyRef access
             // For now, the main warming effect comes from traversal operations
         }
-        
+
         if warm_traversal {
             // Warm traversal engine caches
             let node_ids = self.inner.borrow().node_ids();
@@ -1807,7 +1826,7 @@ impl PyGraph {
                 let _ = self.bfs(py, start_node, Some(1), None, None);
             }
         }
-        
+
         Ok(())
     }
 
