@@ -1646,6 +1646,29 @@ impl Graph {
     }
 
     /*
+    === CONVERSION OPERATIONS ===
+    Export graph to external formats like NetworkX.
+    */
+
+    /// Convert this graph to NetworkX format
+    ///
+    /// This creates a NetworkXGraph representation that can be easily
+    /// converted to a Python NetworkX graph in the FFI layer.
+    ///
+    /// # Returns
+    /// * `NetworkXGraph` - A representation compatible with NetworkX
+    ///
+    /// # Examples
+    /// ```rust,no_run
+    /// use groggy::Graph;
+    /// let graph = Graph::new();
+    /// let nx_graph = graph.to_networkx().unwrap();
+    /// ```
+    pub fn to_networkx(&self) -> Result<crate::convert::NetworkXGraph, GraphError> {
+        crate::convert::graph_to_networkx(self)
+    }
+
+    /*
     === MAINTENANCE OPERATIONS ===
     Housekeeping, optimization, and system management.
     */

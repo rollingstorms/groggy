@@ -1485,6 +1485,36 @@ impl PyGraph {
         result
     }
 
+    /// Convert this graph to a NetworkX graph
+    ///
+    /// Returns a NetworkX Graph or DiGraph (depending on the graph type)
+    /// with all nodes, edges, and their attributes preserved.
+    ///
+    /// # Returns
+    /// * `PyObject` - A NetworkX graph object
+    ///
+    /// # Raises
+    /// * `ImportError` - If NetworkX is not installed
+    /// * `RuntimeError` - If conversion fails
+    ///
+    /// # Examples
+    /// ```python
+    /// import groggy
+    /// import networkx as nx
+    ///
+    /// g = groggy.Graph()
+    /// # ... add nodes and edges ...
+    /// nx_graph = g.to_networkx()
+    /// ```
+    fn to_networkx(&self, py: Python) -> PyResult<PyObject> {
+        // Convert to our internal NetworkX representation
+        let nx_graph = self.inner.borrow().to_networkx()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to convert to NetworkX: {}", e)))?;
+        
+        // Convert to actual Python NetworkX graph
+        crate::ffi::convert::networkx_graph_to_python(py, &nx_graph)
+    }
+
     /// Enable property-style attribute access (g.age instead of g.nodes['age'])
     /// This method is called when accessing attributes that don't exist as methods
     fn __getattr__(&self, py: Python, name: String) -> PyResult<PyObject> {
@@ -1518,9 +1548,8 @@ impl PyGraph {
             for node_id in graph_ref.node_ids() {
                 match graph_ref.get_node_attr(node_id, &name) {
                     Ok(Some(attr_value)) => {
-                        use crate::ffi::types::PyAttrValue;
-                        let py_attr_value = PyAttrValue::new(attr_value);
-                        result_dict.set_item(node_id, py_attr_value)?;
+                        let py_value = crate::ffi::utils::attr_value_to_python_value(py, &attr_value)?;
+                        result_dict.set_item(node_id, py_value)?;
                     }
                     Ok(None) => {
                         // Node doesn't have this attribute, skip or set to None
@@ -1546,9 +1575,8 @@ impl PyGraph {
             for edge_id in graph_ref.edge_ids() {
                 match graph_ref.get_edge_attr(edge_id, &name) {
                     Ok(Some(attr_value)) => {
-                        use crate::ffi::types::PyAttrValue;
-                        let py_attr_value = PyAttrValue::new(attr_value);
-                        result_dict.set_item(edge_id, py_attr_value)?;
+                        let py_value = crate::ffi::utils::attr_value_to_python_value(py, &attr_value)?;
+                        result_dict.set_item(edge_id, py_value)?;
                     }
                     Ok(None) => {
                         // Edge doesn't have this attribute, skip or set to None

@@ -21,10 +21,10 @@ pub struct PyNodeView {
 #[pymethods]
 impl PyNodeView {
     /// Get node attribute value
-    fn __getitem__(&self, _py: Python, key: &str) -> PyResult<PyAttrValue> {
+    fn __getitem__(&self, py: Python, key: &str) -> PyResult<Py<PyAny>> {
         let graph = self.graph.borrow();
         match graph.get_node_attr(self.node_id, &key.to_string()) {
-            Ok(Some(attr_value)) => Ok(PyAttrValue::from_attr_value(attr_value)),
+            Ok(Some(attr_value)) => crate::ffi::utils::attr_value_to_python_value(py, &attr_value),
             Ok(None) => Err(PyKeyError::new_err(format!(
                 "Node {} has no attribute '{}'",
                 self.node_id, key
@@ -75,15 +75,15 @@ impl PyNodeView {
     }
 
     /// Get all attribute values
-    fn values(&self, _py: Python) -> PyResult<Vec<PyAttrValue>> {
+    fn values(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
         let graph = self.graph.borrow();
         let node_attrs = graph.get_node_attrs(self.node_id).map_err(|e| {
             PyRuntimeError::new_err(format!("Failed to get node attributes: {}", e))
         })?;
         let values = node_attrs
             .values()
-            .map(|value| PyAttrValue::from_attr_value(value.clone()))
-            .collect();
+            .map(|value| crate::ffi::utils::attr_value_to_python_value(py, value))
+            .collect::<PyResult<Vec<_>>>()?;
         Ok(values)
     }
 

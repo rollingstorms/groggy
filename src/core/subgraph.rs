@@ -280,6 +280,28 @@ impl Subgraph {
         Ok(components.len() == 1 && !self.nodes.is_empty())
     }
 
+    /// Convert this subgraph to NetworkX format
+    ///
+    /// This creates a NetworkXGraph representation that contains only
+    /// the nodes and edges from this subgraph.
+    ///
+    /// # Returns
+    /// * `NetworkXGraph` - A representation compatible with NetworkX
+    ///
+    /// # Examples
+    /// ```rust,no_run
+    /// # use groggy::core::subgraph::Subgraph;
+    /// # use groggy::errors::GraphResult;
+    /// # fn example() -> GraphResult<()> {
+    /// # let subgraph: Subgraph = todo!(); // Placeholder for actual subgraph
+    /// let nx_graph = subgraph.to_networkx()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn to_networkx(&self) -> GraphResult<crate::convert::NetworkXGraph> {
+        crate::convert::subgraph_to_networkx(self)
+    }
+
     /// Check if there is a path between two nodes within this subgraph
     ///
     /// This is more efficient than `shortest_path_subgraph` when you only need

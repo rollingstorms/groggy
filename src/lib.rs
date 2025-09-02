@@ -137,6 +137,7 @@
 
 // Core type definitions
 pub mod config;
+pub mod convert;
 pub mod errors;
 pub mod types;
 pub mod util;
@@ -179,6 +180,10 @@ pub mod api {
 // Re-export commonly used types and the main API
 pub use api::graph::Graph;
 pub use config::GraphConfig;
+pub use convert::{
+    NetworkXEdge, NetworkXGraph, NetworkXNode, NetworkXValue, ToNetworkX,
+    graph_to_networkx, networkx_to_graph, subgraph_to_networkx,
+};
 pub use core::history::{HistoricalView, HistoryForest, ViewSummary};
 pub use errors::{GraphError, GraphResult};
 pub use types::{AttrName, AttrValue, AttrValueType, BranchName, EdgeId, NodeId, StateId};

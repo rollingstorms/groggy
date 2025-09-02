@@ -334,12 +334,34 @@ impl PySubgraph {
     }
 
     /// Convert to NetworkX graph (if available)
+    ///
+    /// Returns a NetworkX Graph or DiGraph (depending on the parent graph type)
+    /// containing only the nodes and edges from this subgraph, with all attributes preserved.
+    ///
+    /// # Returns
+    /// * `PyObject` - A NetworkX graph object containing only this subgraph
+    ///
+    /// # Raises
+    /// * `ImportError` - If NetworkX is not installed
+    /// * `RuntimeError` - If conversion fails
+    ///
+    /// # Examples
+    /// ```python
+    /// import groggy
+    /// import networkx as nx
+    ///
+    /// g = groggy.Graph()
+    /// # ... add nodes and edges ...
+    /// subgraph = g.filter_nodes("age > 25")
+    /// nx_subgraph = subgraph.to_networkx()
+    /// ```
     fn to_networkx(&self, py: Python) -> PyResult<PyObject> {
-        // Convert to NetworkX format using existing logic
-        // This is a complex method that would delegate to existing NetworkX export
-
-        // For now, return None as placeholder
-        Ok(py.None())
+        // Convert to our internal NetworkX representation
+        let nx_graph = self.inner.to_networkx()
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to convert subgraph to NetworkX: {}", e)))?;
+        
+        // Convert to actual Python NetworkX graph
+        crate::ffi::convert::networkx_graph_to_python(py, &nx_graph)
     }
 
     /// Get degree of nodes in subgraph as GraphArray
