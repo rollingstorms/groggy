@@ -872,6 +872,6 @@ mod tests {
         assert_eq!(central_nodes_at_hop.len(), 1);
         assert_eq!(central_nodes_at_hop[0], center);
 
-        println!("NeighborhoodOperations tests passed!");
+        // NeighborhoodOperations tests passed
     }
 }

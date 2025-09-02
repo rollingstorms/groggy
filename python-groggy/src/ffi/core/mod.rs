@@ -9,7 +9,7 @@ pub mod component;
 pub mod components; // Lazy components array
 pub mod matrix;
 pub mod neighborhood;
-pub mod path_result; // Lightweight traversal results
+// pub mod path_result; // Lightweight traversal results - unused
 pub mod query;
 pub mod query_parser;
 pub mod subgraph;

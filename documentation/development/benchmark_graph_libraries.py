@@ -350,14 +350,14 @@ class GroggyPhase3Benchmark:
         """Test BFS traversal"""
         start = time.time()
         start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
-        result = self.graph.view().bfs(start_node=start_node, max_depth=3)
+        result = self.graph.bfs(start=start_node, max_depth=3)
         return time.time() - start, len(result.nodes)
     
     def traversal_dfs(self):
         """Test DFS traversal"""
         start = time.time()
         start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
-        result = self.graph.view().dfs(start_node=start_node, max_depth=3)
+        result = self.graph.dfs(start=start_node, max_depth=3)
         return time.time() - start, len(result.nodes)
     
     def traversal_bfs_filtered(self):
@@ -366,7 +366,7 @@ class GroggyPhase3Benchmark:
         start_node = self.node_id_map[0]  # Use same start node as NetworkX (original ID 0)
         # Note: filtered traversal is not yet supported in analytics module
         # Fall back to basic BFS for now
-        result = self.graph.view().bfs(start_node=start_node, max_depth=2)
+        result = self.graph.bfs(start=start_node, max_depth=2)
         return time.time() - start, len(result.nodes)
     
     def connected_components(self):

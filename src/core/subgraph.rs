@@ -1128,17 +1128,17 @@ mod tests {
         // Test BFS subgraph
         let bfs_result = subgraph.bfs(node1, Some(2)).unwrap();
         assert!(bfs_result.contains_node(node1));
-        println!("BFS test: contains {} nodes", bfs_result.node_count());
+        // BFS test completed
 
         // Test DFS subgraph
         let dfs_result = subgraph.dfs(node1, Some(2)).unwrap();
         assert!(dfs_result.contains_node(node1));
-        println!("DFS test: contains {} nodes", dfs_result.node_count());
+        // DFS test completed
 
         // Test connected components
         use crate::core::traits::SubgraphOperations;
         let components = SubgraphOperations::connected_components(&subgraph).unwrap();
-        println!("Found {} connected components", components.len());
+        // Connected components test completed
         assert!(components.len() >= 1); // At least the triangle should form one component
 
         // Test induced subgraph
@@ -1157,7 +1157,7 @@ mod tests {
         if let Some(path) = subgraph.shortest_path_subgraph(node1, node3).unwrap() {
             assert!(path.contains_node(node1));
             assert!(path.contains_node(node3));
-            println!("Shortest path found with {} nodes", path.node_count());
+            // Shortest path found
         }
     }
 

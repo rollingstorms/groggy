@@ -632,7 +632,7 @@ mod tests {
         assert!(stats.node_retention_rate > 0.0);
         assert!(stats.criteria_complexity == 1);
 
-        println!("FilteredSubgraph tests passed!");
+        // FilteredSubgraph tests passed
     }
 
     #[test]
@@ -685,6 +685,6 @@ mod tests {
         let and_result = filter1.and_filter(&filter2).unwrap();
         assert_eq!(and_result.node_count(), 0); // No nodes match both criteria
 
-        println!("Filter combination tests passed!");
+        // Filter combination tests passed
     }
 }

@@ -525,7 +525,7 @@ mod tests {
         let density = component.internal_density();
         assert!(density > 0.0 && density <= 1.0);
 
-        println!("ComponentSubgraph tests passed!");
+        // ComponentSubgraph tests passed
     }
 
     #[test]
@@ -551,17 +551,17 @@ mod tests {
         // Test BFS from node1
         let bfs_result = component.bfs(node1, Some(2)).unwrap();
         assert!(bfs_result.contains_node(node1));
-        println!("BFS result has {} nodes", bfs_result.node_count());
+        // BFS algorithm test completed
 
         // Test DFS from node1
         let dfs_result = component.dfs(node1, Some(2)).unwrap();
         assert!(dfs_result.contains_node(node1));
-        println!("DFS result has {} nodes", dfs_result.node_count());
+        // DFS algorithm test completed
 
         // Test boundary nodes (should be empty for a single component)
         let boundary = component.boundary_nodes().unwrap();
-        println!("Found {} boundary nodes", boundary.len());
+        // Boundary nodes test completed
 
-        println!("Component algorithm tests passed!");
+        // Component algorithm tests passed
     }
 }
