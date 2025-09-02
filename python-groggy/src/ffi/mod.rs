@@ -5,6 +5,7 @@
 
 // Core type wrappers and utilities
 pub mod config;
+pub mod convert;
 pub mod errors;
 pub mod types;
 

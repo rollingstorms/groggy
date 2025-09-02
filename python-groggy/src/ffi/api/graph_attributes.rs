@@ -33,8 +33,7 @@ impl PyGraphAttr {
     ) -> PyResult<PyObject> {
         match self.graph.borrow().get_node_attr(node, &attr) {
             Ok(Some(attr_value)) => {
-                let py_attr_value = PyAttrValue::new(attr_value);
-                Ok(py_attr_value.to_object(py))
+                crate::ffi::utils::attr_value_to_python_value(py, &attr_value)
             }
             Ok(None) => {
                 if let Some(default_val) = default {
@@ -62,8 +61,8 @@ impl PyGraphAttr {
         for (node_id, node_attrs) in result {
             let node_dict = PyDict::new(py);
             for (attr_name, attr_value) in node_attrs {
-                let py_attr_value = PyAttrValue::new(attr_value);
-                node_dict.set_item(attr_name, py_attr_value)?;
+                let py_value = crate::ffi::utils::attr_value_to_python_value(py, &attr_value)?;
+                node_dict.set_item(attr_name, py_value)?;
             }
             py_dict.set_item(node_id, node_dict)?;
         }
@@ -79,8 +78,7 @@ impl PyGraphAttr {
     ) -> PyResult<PyObject> {
         match self.graph.borrow().get_edge_attr(edge, &attr) {
             Ok(Some(attr_value)) => {
-                let py_attr_value = PyAttrValue::new(attr_value);
-                Ok(py_attr_value.to_object(py))
+                crate::ffi::utils::attr_value_to_python_value(py, &attr_value)
             }
             Ok(None) => {
                 if let Some(default_val) = default {
@@ -108,8 +106,8 @@ impl PyGraphAttr {
         for (edge_id, edge_attrs) in result {
             let edge_dict = PyDict::new(py);
             for (attr_name, attr_value) in edge_attrs {
-                let py_attr_value = PyAttrValue::new(attr_value);
-                edge_dict.set_item(attr_name, py_attr_value)?;
+                let py_value = crate::ffi::utils::attr_value_to_python_value(py, &attr_value)?;
+                edge_dict.set_item(attr_name, py_value)?;
             }
             py_dict.set_item(edge_id, edge_dict)?;
         }
