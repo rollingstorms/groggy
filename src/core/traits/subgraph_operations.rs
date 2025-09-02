@@ -506,13 +506,18 @@ pub trait SubgraphOperations: GraphEntity {
         let binding = self.graph_ref();
         let graph = binding.borrow();
 
-        // Sort node IDs for consistent table ordering
-        let mut sorted_node_ids: Vec<_> = self.node_set().iter().copied().collect();
-        sorted_node_ids.sort();
+        // Create index-aligned table where table row index = node_id
+        // This ensures g.nodes[g.table()['column'] == value] works correctly
+        let node_set = self.node_set();
+        let max_node_id = node_set.iter().max().copied().unwrap_or(0);
+        
+        // Create a sparse representation where table[node_id] = node_data
+        // Missing nodes will have null values
+        let table_size = (max_node_id + 1) as usize;
 
         // Collect all unique attribute names across all nodes
         let mut all_attrs = std::collections::HashSet::new();
-        for &node_id in &sorted_node_ids {
+        for &node_id in node_set.iter() {
             if let Ok(attrs) = graph.get_node_attrs(node_id) {
                 for attr_name in attrs.keys() {
                     all_attrs.insert(attr_name.clone());
@@ -527,20 +532,29 @@ pub trait SubgraphOperations: GraphEntity {
         let mut columns = Vec::new();
 
         for column_name in &column_names {
-            let mut attr_values = Vec::new();
+            let mut attr_values = Vec::with_capacity(table_size);
 
             if column_name == "node_id" {
-                // Node ID column
-                for &node_id in &sorted_node_ids {
-                    attr_values.push(crate::types::AttrValue::Int(node_id as i64));
+                // Node ID column - sparse array where table[i] = i if node exists, null otherwise
+                for node_id in 0..table_size {
+                    if node_set.contains(&node_id) {
+                        attr_values.push(crate::types::AttrValue::Int(node_id as i64));
+                    } else {
+                        attr_values.push(crate::types::AttrValue::Null);
+                    }
                 }
             } else {
-                // Attribute column
-                for &node_id in &sorted_node_ids {
-                    if let Ok(Some(attr_value)) = graph.get_node_attr(node_id, column_name) {
-                        attr_values.push(attr_value);
+                // Attribute column - sparse array where table[node_id] = attribute_value
+                for node_id in 0..table_size {
+                    if node_set.contains(&node_id) {
+                        if let Ok(Some(attr_value)) = graph.get_node_attr(node_id, column_name) {
+                            attr_values.push(attr_value);
+                        } else {
+                            // Use null placeholder for missing attributes
+                            attr_values.push(crate::types::AttrValue::Null);
+                        }
                     } else {
-                        // Use null placeholder for missing attributes
+                        // Node doesn't exist in subgraph - null value
                         attr_values.push(crate::types::AttrValue::Null);
                     }
                 }

@@ -913,6 +913,20 @@ impl PyGraphArray {
             inner: groggy::GraphArray::from_vec(result),
         })
     }
+
+    /// Extract indices where boolean array is True 
+    /// This is used for efficient boolean indexing with node/edge accessors
+    fn true_indices(&self) -> PyResult<Vec<usize>> {
+        let mut indices = Vec::new();
+        
+        for (i, value) in self.inner.iter().enumerate() {
+            if let groggy::AttrValue::Bool(true) = value {
+                indices.push(i);
+            }
+        }
+        
+        Ok(indices)
+    }
 }
 
 /// Python wrapper for StatsSummary

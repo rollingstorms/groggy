@@ -8,6 +8,9 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySlice};
 use std::collections::HashSet;
 
+// Import utils for conversion functions
+use crate::ffi::utils::python_value_to_attr_value;
+
 /// Utility function to convert AttrValue to Python object
 fn attr_value_to_python_value(py: Python, attr_value: &AttrValue) -> PyResult<PyObject> {
     match attr_value {
@@ -137,15 +140,67 @@ impl PyNodesAccessor {
             return Ok(node_view.to_object(py));
         }
 
-        // Try to extract as boolean array/list (boolean indexing) - CHECK FIRST before integers
+        // Try to extract as GraphArray (indexed boolean lookup) - CHECK FIRST
+        if let Ok(graph_array) = key.extract::<PyRef<crate::ffi::core::array::PyGraphArray>>() {
+            let graph = self.graph.borrow();
+            let all_node_ids = if let Some(ref constrained) = self.constrained_nodes {
+                constrained.clone()
+            } else {
+                graph.node_ids()
+            };
+
+            let mut selected_nodes = Vec::new();
+            
+            // Use GraphArray as indexed lookup: for each node_id, check grapharray[node_id]
+            // The table is indexed so that row index = node_id
+            for &node_id in &all_node_ids {
+                // Use node_id as index into GraphArray to get boolean value
+                if let Some(attr_value) = graph_array.inner.get(node_id as usize) {
+                    if let groggy::AttrValue::Bool(true) = attr_value {
+                        selected_nodes.push(node_id);
+                    }
+                }
+            }
+
+            if selected_nodes.is_empty() {
+                return Err(PyIndexError::new_err("GraphArray boolean mask selected no nodes"));
+            }
+            
+            // Create subgraph with selected nodes and their edges
+            let graph = self.graph.borrow();
+            let mut edge_ids = std::collections::HashSet::new();
+            for &node_id in &selected_nodes {
+                if let Ok(incident) = graph.incident_edges(node_id) {
+                    for edge_id in incident {
+                        // Only include edges where both endpoints are in selected_nodes
+                        if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
+                            if selected_nodes.contains(&source) && selected_nodes.contains(&target) {
+                                edge_ids.insert(edge_id);
+                            }
+                        }
+                    }
+                }
+            }
+            drop(graph);
+
+            let subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                selected_nodes.into_iter().collect(),
+                edge_ids,
+                "boolean_filtered".to_string(),
+            );
+
+            let py_subgraph = crate::ffi::core::subgraph::PySubgraph::from_core_subgraph(subgraph)?;
+            return Ok(Py::new(py, py_subgraph)?.to_object(py));
+        }
+
+        // Try to extract as boolean array/list (positional boolean indexing) - FALLBACK
         if let Ok(boolean_mask) = key.extract::<Vec<bool>>() {
             let graph = self.graph.borrow();
             let all_node_ids = if let Some(ref constrained) = self.constrained_nodes {
                 constrained.clone()
             } else {
-                {
-                    graph.node_ids()
-                }
+                graph.node_ids()
             };
 
             // Check if boolean mask length matches node count
@@ -349,30 +404,8 @@ impl PyNodesAccessor {
 
         // Try to extract as string (attribute name access)
         if let Ok(attr_name) = key.extract::<String>() {
-            // Return GraphArray of attribute values for all nodes
-            let graph = self.graph.borrow();
-            let node_ids = if let Some(ref constrained) = self.constrained_nodes {
-                constrained.clone()
-            } else {
-                graph.node_ids()
-            };
-
-            let mut attr_values = Vec::new();
-            for node_id in node_ids {
-                match graph.get_node_attr(node_id, &attr_name) {
-                    Ok(Some(attr_value)) => {
-                        attr_values.push(attr_value);
-                    }
-                    Ok(None) | Err(_) => {
-                        // Use null for missing attributes
-                        attr_values.push(AttrValue::Null);
-                    }
-                }
-            }
-
-            let graph_array = groggy::GraphArray::from_vec(attr_values);
-            let py_graph_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
-            return Ok(Py::new(py, py_graph_array)?.to_object(py));
+            // Use index-aligned attribute access to match table behavior
+            return self._get_node_attribute_column(py, &attr_name);
         }
 
         // If none of the above worked, return error
@@ -595,38 +628,52 @@ impl PyNodesAccessor {
             )));
         }
 
-        // Collect attribute values - allow None for nodes without the attribute
-        let mut values: Vec<Option<PyObject>> = Vec::new();
+        // Create index-aligned attribute values where values[node_id] = attribute_value
+        // This ensures g.nodes[g.nodes['attr'] == value] works correctly
+        let max_node_id = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.iter().max().copied().unwrap_or(0)
+        } else {
+            node_ids.iter().max().copied().unwrap_or(0)
+        };
+        
+        let mut values: Vec<Option<PyObject>> = vec![None; (max_node_id + 1) as usize];
+        
         for &node_id in &node_ids {
             if graph.contains_node(node_id) {
                 match graph.get_node_attr(node_id, &attr_name.to_string()) {
                     Ok(Some(value)) => {
                         // Convert the attribute value to Python object
                         let py_value = attr_value_to_python_value(py, &value)?;
-                        values.push(Some(py_value));
+                        values[node_id as usize] = Some(py_value);
                     }
                     Ok(None) => {
-                        values.push(None);
+                        values[node_id as usize] = None;
                     }
                     Err(_) => {
-                        values.push(None);
+                        values[node_id as usize] = None;
                     }
                 }
             } else {
-                values.push(None);
+                values[node_id as usize] = None;
             }
         }
 
-        // Convert to Python list
-        let py_values: Vec<PyObject> = values
+        // Convert to AttrValue vector for GraphArray
+        let attr_values: Vec<groggy::AttrValue> = values
             .into_iter()
             .map(|opt_val| match opt_val {
-                Some(val) => val,
-                None => py.None(),
+                Some(val) => {
+                    // Convert Python object back to AttrValue
+                    python_value_to_attr_value(val.as_ref(py)).unwrap_or(groggy::AttrValue::Null)
+                }
+                None => groggy::AttrValue::Null,
             })
             .collect();
 
-        Ok(py_values.to_object(py))
+        // Create GraphArray and wrap in Python
+        let graph_array = groggy::GraphArray::from_vec(attr_values);
+        let py_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
+        Ok(Py::new(py, py_array)?.to_object(py))
     }
 }
 
@@ -743,15 +790,61 @@ impl PyEdgesAccessor {
             return Ok(edge_view.to_object(py));
         }
 
-        // Try to extract as boolean array/list (boolean indexing) - CHECK FIRST before integers
+        // Try to extract as GraphArray (indexed boolean lookup) - CHECK FIRST
+        if let Ok(graph_array) = key.extract::<PyRef<crate::ffi::core::array::PyGraphArray>>() {
+            let graph = self.graph.borrow();
+            let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
+                constrained.clone()
+            } else {
+                graph.edge_ids()
+            };
+
+            let mut selected_edges = Vec::new();
+            
+            // Use GraphArray as indexed lookup: for each edge_id, check grapharray[edge_id]
+            // The table/accessor is indexed so that row index = edge_id
+            for &edge_id in &all_edge_ids {
+                // Use edge_id as index into GraphArray to get boolean value
+                if let Some(attr_value) = graph_array.inner.get(edge_id as usize) {
+                    if let groggy::AttrValue::Bool(true) = attr_value {
+                        selected_edges.push(edge_id);
+                    }
+                }
+            }
+
+            if selected_edges.is_empty() {
+                return Err(PyIndexError::new_err("GraphArray boolean mask selected no edges"));
+            }
+            
+            // Create subgraph with selected edges and their endpoint nodes
+            let graph = self.graph.borrow();
+            let mut node_ids = std::collections::HashSet::new();
+            for &edge_id in &selected_edges {
+                if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
+                    node_ids.insert(source);
+                    node_ids.insert(target);
+                }
+            }
+            drop(graph);
+
+            let subgraph = groggy::core::subgraph::Subgraph::new(
+                self.graph.clone(),
+                node_ids.clone(),
+                selected_edges.into_iter().collect(),
+                "boolean_filtered".to_string(),
+            );
+
+            let py_subgraph = crate::ffi::core::subgraph::PySubgraph::from_core_subgraph(subgraph)?;
+            return Ok(Py::new(py, py_subgraph)?.to_object(py));
+        }
+
+        // Try to extract as boolean array/list (positional boolean indexing) - FALLBACK
         if let Ok(boolean_mask) = key.extract::<Vec<bool>>() {
             let graph = self.graph.borrow();
             let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
                 constrained.clone()
             } else {
-                {
-                    graph.edge_ids()
-                }
+                graph.edge_ids()
             };
 
             // Check if boolean mask length matches edge count
@@ -1159,20 +1252,28 @@ impl PyEdgesAccessor {
             )));
         }
 
-        // Collect attribute values - allow None for edges without the attribute
-        let mut values: Vec<Option<PyObject>> = Vec::new();
+        // Create index-aligned attribute values where values[edge_id] = attribute_value
+        // This ensures g.edges[g.edges['attr'] == value] works correctly
+        let max_edge_id = if let Some(ref constrained) = self.constrained_edges {
+            constrained.iter().max().copied().unwrap_or(0)
+        } else {
+            edge_ids.iter().max().copied().unwrap_or(0)
+        };
+        
+        let mut values: Vec<Option<PyObject>> = vec![None; (max_edge_id + 1) as usize];
+        
         for &edge_id in &edge_ids {
             match graph.get_edge_attr(edge_id, &attr_name.to_string()) {
                 Ok(Some(value)) => {
                     // Convert the attribute value to Python object
                     let py_value = attr_value_to_python_value(py, &value)?;
-                    values.push(Some(py_value));
+                    values[edge_id as usize] = Some(py_value);
                 }
                 Ok(None) => {
-                    values.push(None);
+                    values[edge_id as usize] = None;
                 }
                 Err(_) => {
-                    values.push(None);
+                    values[edge_id as usize] = None;
                 }
             }
         }
