@@ -56,7 +56,7 @@ impl PySubgraph {
     #[getter]
     fn nodes(&self, py: Python) -> PyResult<Py<PyNodesAccessor>> {
         let node_collection = self.inner.node_set().iter().copied().collect();
-        
+
         Py::new(
             py,
             PyNodesAccessor {
@@ -70,7 +70,7 @@ impl PySubgraph {
     #[getter]
     fn edges(&self, py: Python) -> PyResult<Py<PyEdgesAccessor>> {
         let edge_collection = self.inner.edge_set().iter().copied().collect();
-        
+
         Py::new(
             py,
             PyEdgesAccessor {
@@ -161,13 +161,11 @@ impl PySubgraph {
             .inner
             .connected_components()
             .map_err(|e| PyRuntimeError::new_err(format!("Connected components error: {}", e)))?;
-        
+
         // Create lazy ComponentsArray - no immediate PySubgraph materialization!
-        let components_array = PyComponentsArray::from_components(
-            components,
-            self.inner.graph().clone(),
-        );
-        
+        let components_array =
+            PyComponentsArray::from_components(components, self.inner.graph().clone());
+
         Ok(components_array)
     }
 
@@ -357,9 +355,10 @@ impl PySubgraph {
     /// ```
     fn to_networkx(&self, py: Python) -> PyResult<PyObject> {
         // Convert to our internal NetworkX representation
-        let nx_graph = self.inner.to_networkx()
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to convert subgraph to NetworkX: {}", e)))?;
-        
+        let nx_graph = self.inner.to_networkx().map_err(|e| {
+            PyRuntimeError::new_err(format!("Failed to convert subgraph to NetworkX: {}", e))
+        })?;
+
         // Convert to actual Python NetworkX graph
         crate::ffi::convert::networkx_graph_to_python(py, &nx_graph)
     }
@@ -1002,7 +1001,7 @@ impl PySubgraph {
     /// BFS traversal - returns subgraph result
     fn bfs(&self, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PySubgraph> {
         let result = self.inner.bfs(start, max_depth);
-        
+
         match result {
             Ok(boxed_subgraph) => {
                 // Create concrete Subgraph from the trait object data
@@ -1013,7 +1012,9 @@ impl PySubgraph {
                     boxed_subgraph.edge_set().clone(),
                     format!("bfs_from_{}", start),
                 );
-                Ok(PySubgraph { inner: concrete_subgraph })
+                Ok(PySubgraph {
+                    inner: concrete_subgraph,
+                })
             }
             Err(e) => Err(PyRuntimeError::new_err(format!("BFS error: {}", e))),
         }
@@ -1022,7 +1023,7 @@ impl PySubgraph {
     /// DFS traversal - returns subgraph result
     fn dfs(&self, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PySubgraph> {
         let result = self.inner.dfs(start, max_depth);
-        
+
         match result {
             Ok(boxed_subgraph) => {
                 // Create concrete Subgraph from the trait object data
@@ -1033,7 +1034,9 @@ impl PySubgraph {
                     boxed_subgraph.edge_set().clone(),
                     format!("dfs_from_{}", start),
                 );
-                Ok(PySubgraph { inner: concrete_subgraph })
+                Ok(PySubgraph {
+                    inner: concrete_subgraph,
+                })
             }
             Err(e) => Err(PyRuntimeError::new_err(format!("DFS error: {}", e))),
         }

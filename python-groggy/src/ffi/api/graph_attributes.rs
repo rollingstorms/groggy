@@ -32,9 +32,7 @@ impl PyGraphAttr {
         default: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         match self.graph.borrow().get_node_attr(node, &attr) {
-            Ok(Some(attr_value)) => {
-                crate::ffi::utils::attr_value_to_python_value(py, &attr_value)
-            }
+            Ok(Some(attr_value)) => crate::ffi::utils::attr_value_to_python_value(py, &attr_value),
             Ok(None) => {
                 if let Some(default_val) = default {
                     Ok(default_val.to_object(py))
@@ -77,9 +75,7 @@ impl PyGraphAttr {
         default: Option<&PyAny>,
     ) -> PyResult<PyObject> {
         match self.graph.borrow().get_edge_attr(edge, &attr) {
-            Ok(Some(attr_value)) => {
-                crate::ffi::utils::attr_value_to_python_value(py, &attr_value)
-            }
+            Ok(Some(attr_value)) => crate::ffi::utils::attr_value_to_python_value(py, &attr_value),
             Ok(None) => {
                 if let Some(default_val) = default {
                     Ok(default_val.to_object(py))

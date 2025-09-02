@@ -181,8 +181,8 @@ pub mod api {
 pub use api::graph::Graph;
 pub use config::GraphConfig;
 pub use convert::{
-    NetworkXEdge, NetworkXGraph, NetworkXNode, NetworkXValue, ToNetworkX,
-    graph_to_networkx, networkx_to_graph, subgraph_to_networkx,
+    graph_to_networkx, networkx_to_graph, subgraph_to_networkx, NetworkXEdge, NetworkXGraph,
+    NetworkXNode, NetworkXValue, ToNetworkX,
 };
 pub use core::history::{HistoricalView, HistoryForest, ViewSummary};
 pub use errors::{GraphError, GraphResult};

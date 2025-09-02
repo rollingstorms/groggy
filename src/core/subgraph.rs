@@ -1086,7 +1086,7 @@ impl SubgraphOperations for Subgraph {
         let graph = binding.borrow();
 
         // For subgraphs, create dense table with only the nodes in this subgraph
-        // Sort node IDs for consistent ordering  
+        // Sort node IDs for consistent ordering
         let mut node_ids: Vec<_> = self.nodes.iter().copied().collect();
         node_ids.sort();
 

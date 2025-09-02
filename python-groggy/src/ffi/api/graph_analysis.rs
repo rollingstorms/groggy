@@ -236,14 +236,14 @@ impl PyGraphAnalysis {
         use crate::ffi::core::subgraph::PySubgraph;
         use groggy::core::subgraph::Subgraph;
         use groggy::core::traversal::TraversalOptions;
-        
+
         let inplace = inplace.unwrap_or(false);
         let graph_ref = self.graph.borrow_mut(py);
 
         // Create traversal options
         let options = TraversalOptions {
             node_filter: None,
-            edge_filter: None, 
+            edge_filter: None,
             max_depth,
             max_nodes: None,
             target_node: None,
@@ -308,7 +308,7 @@ impl PyGraphAnalysis {
         use crate::ffi::core::subgraph::PySubgraph;
         use groggy::core::subgraph::Subgraph;
         use groggy::core::traversal::TraversalOptions;
-        
+
         let inplace = inplace.unwrap_or(false);
         let graph_ref = self.graph.borrow_mut(py);
 

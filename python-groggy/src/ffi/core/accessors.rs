@@ -150,7 +150,7 @@ impl PyNodesAccessor {
             };
 
             let mut selected_nodes = Vec::new();
-            
+
             // Use GraphArray as indexed lookup: for each node_id, check grapharray[node_id]
             // The table is indexed so that row index = node_id
             for &node_id in &all_node_ids {
@@ -163,9 +163,11 @@ impl PyNodesAccessor {
             }
 
             if selected_nodes.is_empty() {
-                return Err(PyIndexError::new_err("GraphArray boolean mask selected no nodes"));
+                return Err(PyIndexError::new_err(
+                    "GraphArray boolean mask selected no nodes",
+                ));
             }
-            
+
             // Create subgraph with selected nodes and their edges
             let graph = self.graph.borrow();
             let mut edge_ids = std::collections::HashSet::new();
@@ -174,7 +176,8 @@ impl PyNodesAccessor {
                     for edge_id in incident {
                         // Only include edges where both endpoints are in selected_nodes
                         if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
-                            if selected_nodes.contains(&source) && selected_nodes.contains(&target) {
+                            if selected_nodes.contains(&source) && selected_nodes.contains(&target)
+                            {
                                 edge_ids.insert(edge_id);
                             }
                         }
@@ -635,9 +638,9 @@ impl PyNodesAccessor {
         } else {
             node_ids.iter().max().copied().unwrap_or(0)
         };
-        
+
         let mut values: Vec<Option<PyObject>> = vec![None; (max_node_id + 1) as usize];
-        
+
         for &node_id in &node_ids {
             if graph.contains_node(node_id) {
                 match graph.get_node_attr(node_id, &attr_name.to_string()) {
@@ -800,7 +803,7 @@ impl PyEdgesAccessor {
             };
 
             let mut selected_edges = Vec::new();
-            
+
             // Use GraphArray as indexed lookup: for each edge_id, check grapharray[edge_id]
             // The table/accessor is indexed so that row index = edge_id
             for &edge_id in &all_edge_ids {
@@ -813,9 +816,11 @@ impl PyEdgesAccessor {
             }
 
             if selected_edges.is_empty() {
-                return Err(PyIndexError::new_err("GraphArray boolean mask selected no edges"));
+                return Err(PyIndexError::new_err(
+                    "GraphArray boolean mask selected no edges",
+                ));
             }
-            
+
             // Create subgraph with selected edges and their endpoint nodes
             let graph = self.graph.borrow();
             let mut node_ids = std::collections::HashSet::new();
@@ -1259,9 +1264,9 @@ impl PyEdgesAccessor {
         } else {
             edge_ids.iter().max().copied().unwrap_or(0)
         };
-        
+
         let mut values: Vec<Option<PyObject>> = vec![None; (max_edge_id + 1) as usize];
-        
+
         for &edge_id in &edge_ids {
             match graph.get_edge_attr(edge_id, &attr_name.to_string()) {
                 Ok(Some(value)) => {
