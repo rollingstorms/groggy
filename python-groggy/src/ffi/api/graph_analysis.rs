@@ -223,4 +223,148 @@ impl PyGraphAnalysis {
             None => Ok(py.None()),
         }
     }
+
+    /// Perform breadth-first search traversal
+    pub fn bfs(
+        &mut self,
+        py: Python,
+        start: NodeId,
+        max_depth: Option<usize>,
+        inplace: Option<bool>,
+        attr_name: Option<String>,
+    ) -> PyResult<PyObject> {
+        use crate::ffi::core::subgraph::PySubgraph;
+        use groggy::core::subgraph::Subgraph;
+        use groggy::core::traversal::TraversalOptions;
+        
+        let inplace = inplace.unwrap_or(false);
+        let graph_ref = self.graph.borrow_mut(py);
+
+        // Create traversal options
+        let options = TraversalOptions {
+            node_filter: None,
+            edge_filter: None, 
+            max_depth,
+            max_nodes: None,
+            target_node: None,
+        };
+
+        // Perform BFS traversal using core API
+        let result = graph_ref
+            .inner
+            .borrow_mut()
+            .bfs(start, options)
+            .map_err(graph_error_to_py_err)?;
+
+        // If inplace=True, set distance/order attributes on nodes
+        if inplace {
+            let attr_name = attr_name.unwrap_or_else(|| "bfs_distance".to_string());
+
+            // Use bulk attribute setting for performance
+            let mut attrs_values = std::collections::HashMap::new();
+            let node_value_pairs: Vec<(NodeId, groggy::AttrValue)> = result
+                .nodes
+                .iter()
+                .enumerate()
+                .map(|(order, &node_id)| (node_id, groggy::AttrValue::Int(order as i64)))
+                .collect();
+            attrs_values.insert(attr_name, node_value_pairs);
+
+            graph_ref
+                .inner
+                .borrow_mut()
+                .set_node_attrs(attrs_values)
+                .map_err(graph_error_to_py_err)?;
+        }
+
+        // Create subgraph from result
+        let core_graph = graph_ref.inner.clone();
+        drop(graph_ref);
+
+        let mut node_set = std::collections::HashSet::new();
+        for &node_id in &result.nodes {
+            node_set.insert(node_id);
+        }
+
+        let mut edge_set = std::collections::HashSet::new();
+        for &edge_id in &result.edges {
+            edge_set.insert(edge_id);
+        }
+
+        let subgraph = Subgraph::new(core_graph, node_set, edge_set, "bfs_traversal".to_string());
+        let py_subgraph = PySubgraph { inner: subgraph };
+        Ok(Py::new(py, py_subgraph)?.to_object(py))
+    }
+
+    /// Perform depth-first search traversal
+    pub fn dfs(
+        &mut self,
+        py: Python,
+        start: NodeId,
+        max_depth: Option<usize>,
+        inplace: Option<bool>,
+        attr_name: Option<String>,
+    ) -> PyResult<PyObject> {
+        use crate::ffi::core::subgraph::PySubgraph;
+        use groggy::core::subgraph::Subgraph;
+        use groggy::core::traversal::TraversalOptions;
+        
+        let inplace = inplace.unwrap_or(false);
+        let graph_ref = self.graph.borrow_mut(py);
+
+        // Create traversal options
+        let options = TraversalOptions {
+            node_filter: None,
+            edge_filter: None,
+            max_depth,
+            max_nodes: None,
+            target_node: None,
+        };
+
+        // Perform DFS traversal using core API
+        let result = graph_ref
+            .inner
+            .borrow_mut()
+            .dfs(start, options)
+            .map_err(graph_error_to_py_err)?;
+
+        // If inplace=True, set distance/order attributes on nodes
+        if inplace {
+            let attr_name = attr_name.unwrap_or_else(|| "dfs_order".to_string());
+
+            // Use bulk attribute setting for performance
+            let mut attrs_values = std::collections::HashMap::new();
+            let node_value_pairs: Vec<(NodeId, groggy::AttrValue)> = result
+                .nodes
+                .iter()
+                .enumerate()
+                .map(|(order, &node_id)| (node_id, groggy::AttrValue::Int(order as i64)))
+                .collect();
+            attrs_values.insert(attr_name, node_value_pairs);
+
+            graph_ref
+                .inner
+                .borrow_mut()
+                .set_node_attrs(attrs_values)
+                .map_err(graph_error_to_py_err)?;
+        }
+
+        // Create subgraph from result
+        let core_graph = graph_ref.inner.clone();
+        drop(graph_ref);
+
+        let mut node_set = std::collections::HashSet::new();
+        for &node_id in &result.nodes {
+            node_set.insert(node_id);
+        }
+
+        let mut edge_set = std::collections::HashSet::new();
+        for &edge_id in &result.edges {
+            edge_set.insert(edge_id);
+        }
+
+        let subgraph = Subgraph::new(core_graph, node_set, edge_set, "dfs_traversal".to_string());
+        let py_subgraph = PySubgraph { inner: subgraph };
+        Ok(Py::new(py, py_subgraph)?.to_object(py))
+    }
 }

@@ -329,6 +329,6 @@ mod tests {
         let is_not_connected = entity_node.is_connected_to(node3).unwrap();
         assert!(!is_not_connected);
 
-        println!("EntityNode tests passed!");
+        // EntityNode tests passed
     }
 }

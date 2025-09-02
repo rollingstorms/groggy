@@ -20,7 +20,7 @@ pub use ffi::core::matrix::PyGraphMatrix;
 pub use ffi::core::neighborhood::{
     PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph,
 };
-pub use ffi::core::path_result::PyPathResult;
+// pub use ffi::core::path_result::PyPathResult; // Unused
 pub use ffi::core::query::{PyAttributeFilter, PyEdgeFilter, PyNodeFilter};
 pub use ffi::core::query_parser::{parse_edge_query, parse_node_query};
 pub use ffi::core::subgraph::PySubgraph;
@@ -210,7 +210,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyComponentsArray>()?;
     m.add_class::<ffi::core::components::PyComponentsArrayIterator>()?;
     m.add_class::<PyGraphMatrix>()?;
-    m.add_class::<PyPathResult>()?;
+    // m.add_class::<PyPathResult>()?; // Unused
     m.add_class::<PyGraphTable>()?;
     m.add_class::<PyGroupBy>()?;
 
