@@ -4,6 +4,7 @@
 //! This replaces the 800+ line complex version with pure delegation to existing trait methods.
 
 use crate::ffi::core::neighborhood::PyNeighborhoodResult;
+use crate::ffi::core::path_result::PyPathResult;
 use groggy::core::subgraph::Subgraph;
 use groggy::core::traits::SubgraphOperations;
 use groggy::{AttrValue, EdgeId, NodeId, SimilarityMetric};
@@ -16,6 +17,7 @@ use std::collections::HashSet;
 use crate::ffi::api::graph::PyGraph;
 use crate::ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
 use crate::ffi::core::array::PyGraphArray;
+use crate::ffi::core::components::PyComponentsArray;
 use crate::ffi::core::table::PyGraphTable;
 
 /// Python wrapper for core Subgraph - Pure delegation to existing trait methods
@@ -31,7 +33,19 @@ pub struct PySubgraph {
 impl PySubgraph {
     /// Create from Rust Subgraph
     pub fn from_core_subgraph(subgraph: Subgraph) -> PyResult<Self> {
-        Ok(Self { inner: subgraph })
+        let conversion_start = std::time::Instant::now();
+        
+        // Capture debug info before moving
+        let subgraph_info = format!("nodes={}, edges={}, type='{}'", 
+                                   subgraph.node_count(), 
+                                   subgraph.edge_count(), 
+                                   subgraph.subgraph_type());
+        
+        let result = Ok(Self { inner: subgraph });
+        let conversion_time = conversion_start.elapsed();
+        
+        println!("🔍 FFI DEBUG: PySubgraph::from_core_subgraph took {:?} [{}]", conversion_time, subgraph_info);
+        result
     }
 
     /// Create from trait object (used by trait delegation)
@@ -53,27 +67,61 @@ impl PySubgraph {
     /// Get nodes as a property that supports indexing and attribute access
     #[getter]
     fn nodes(&self, py: Python) -> PyResult<Py<PyNodesAccessor>> {
+        let nodes_start = std::time::Instant::now();
+        
+        // Time the node collection creation
+        let collect_start = std::time::Instant::now();
+        let node_collection = self.inner.node_set().iter().copied().collect();
+        let collect_time = collect_start.elapsed();
+        println!("🔍 FFI DEBUG: Node collection creation took {:?}", collect_time);
+        
+        // Time the PyNodesAccessor creation
+        let accessor_start = std::time::Instant::now();
         // Use the core graph directly - no more PyGraph wrapper needed
-        Py::new(
+        let result = Py::new(
             py,
             PyNodesAccessor {
                 graph: self.inner.graph(),
-                constrained_nodes: Some(self.inner.node_set().iter().copied().collect()),
+                constrained_nodes: Some(node_collection),
             },
-        )
+        );
+        let accessor_time = accessor_start.elapsed();
+        println!("🔍 FFI DEBUG: PyNodesAccessor creation took {:?}", accessor_time);
+        
+        let total_nodes_time = nodes_start.elapsed();
+        println!("🔍 FFI DEBUG: Total nodes() property took {:?}", total_nodes_time);
+        
+        result
     }
 
     /// Get edges as a property that supports indexing and attribute access
     #[getter]
     fn edges(&self, py: Python) -> PyResult<Py<PyEdgesAccessor>> {
+        let edges_start = std::time::Instant::now();
+        
+        // Time the edge collection creation
+        let collect_start = std::time::Instant::now();
+        let edge_collection = self.inner.edge_set().iter().copied().collect();
+        let collect_time = collect_start.elapsed();
+        println!("🔍 FFI DEBUG: Edge collection creation took {:?}", collect_time);
+        
+        // Time the PyEdgesAccessor creation
+        let accessor_start = std::time::Instant::now();
         // Create accessor using the graph reference from inner subgraph
-        Py::new(
+        let result = Py::new(
             py,
             PyEdgesAccessor {
                 graph: self.inner.graph(),
-                constrained_edges: Some(self.inner.edge_set().iter().copied().collect()),
+                constrained_edges: Some(edge_collection),
             },
-        )
+        );
+        let accessor_time = accessor_start.elapsed();
+        println!("🔍 FFI DEBUG: PyEdgesAccessor creation took {:?}", accessor_time);
+        
+        let total_edges_time = edges_start.elapsed();
+        println!("🔍 FFI DEBUG: Total edges() property took {:?}", total_edges_time);
+        
+        result
     }
 
     /// Python len() support - returns number of nodes
@@ -151,35 +199,20 @@ impl PySubgraph {
         }
     }
 
-    /// Get connected components within this subgraph
-    fn connected_components(&self) -> PyResult<Vec<PySubgraph>> {
+    /// Get connected components within this subgraph (lazy array)
+    fn connected_components(&self) -> PyResult<PyComponentsArray> {
         let components = self
             .inner
             .connected_components()
             .map_err(|e| PyRuntimeError::new_err(format!("Connected components error: {}", e)))?;
-
-        // Convert trait objects back to PySubgraph
-        let py_components: PyResult<Vec<PySubgraph>> = components
-            .into_iter()
-            .map(|comp| {
-                // Create new PySubgraph from the component's data
-                // This is tricky because we get Box<dyn SubgraphOperations> back
-                // For now, create a new Subgraph with the component's nodes/edges
-                let nodes: std::collections::HashSet<NodeId> = comp.node_set().clone();
-                let edges: std::collections::HashSet<EdgeId> = comp.edge_set().clone();
-
-                // Create new Subgraph - this will need the same graph reference
-                let component_subgraph = Subgraph::new(
-                    self.inner.graph().clone(),
-                    nodes,
-                    edges,
-                    "component".to_string(),
-                );
-
-                PySubgraph::from_core_subgraph(component_subgraph)
-            })
-            .collect();
-        py_components
+        
+        // Create lazy ComponentsArray - no immediate PySubgraph materialization!
+        let components_array = PyComponentsArray::from_components(
+            components,
+            self.inner.graph().clone(),
+        );
+        
+        Ok(components_array)
     }
 
     /// Check if this subgraph is connected
@@ -818,6 +851,7 @@ impl PySubgraph {
         // Create a temporary PyGraph wrapper
         let py_graph = PyGraph {
             inner: self.inner.graph(),
+            cached_view: std::cell::RefCell::new(None),
         };
 
         // Create PyGraphAnalysis and delegate to it
@@ -987,43 +1021,37 @@ impl PySubgraph {
 
     // === MISSING SUBGRAPH OPERATIONS ===
 
-    /// Create subgraph from BFS traversal
-    fn bfs(&self, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PySubgraph> {
-        match self.inner.bfs(start, max_depth) {
+    /// BFS traversal - returns lightweight PathResult (MUCH faster than old PySubgraph approach)
+    fn bfs(&self, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PyPathResult> {
+        let result = self.inner.bfs(start, max_depth);
+        
+        match result {
             Ok(boxed_subgraph) => {
-                // Create a concrete Subgraph from the trait object data
-                use groggy::core::subgraph::Subgraph;
-                use groggy::core::traits::GraphEntity;
-                let concrete_subgraph = Subgraph::new(
-                    self.inner.graph_ref(),
-                    boxed_subgraph.node_set().clone(),
-                    boxed_subgraph.edge_set().clone(),
-                    format!("bfs_from_{}", start),
-                );
-                Ok(PySubgraph {
-                    inner: concrete_subgraph,
-                })
+                // Convert HashSets to Vecs for PathResult
+                let nodes: Vec<NodeId> = boxed_subgraph.node_set().iter().copied().collect();
+                let edges: Vec<EdgeId> = boxed_subgraph.edge_set().iter().copied().collect();
+                
+                // Create lightweight PathResult instead of expensive PySubgraph
+                let path_result = PyPathResult::new(nodes, edges, "bfs".to_string());
+                Ok(path_result)
             }
             Err(e) => Err(PyRuntimeError::new_err(format!("BFS error: {}", e))),
         }
     }
 
-    /// Create subgraph from DFS traversal  
-    fn dfs(&self, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PySubgraph> {
-        match self.inner.dfs(start, max_depth) {
+    /// DFS traversal - returns lightweight PathResult (MUCH faster than old PySubgraph approach)
+    fn dfs(&self, _py: Python, start: NodeId, max_depth: Option<usize>) -> PyResult<PyPathResult> {
+        let result = self.inner.dfs(start, max_depth);
+        
+        match result {
             Ok(boxed_subgraph) => {
-                // Create a concrete Subgraph from the trait object data
-                use groggy::core::subgraph::Subgraph;
-                use groggy::core::traits::GraphEntity;
-                let concrete_subgraph = Subgraph::new(
-                    self.inner.graph_ref(),
-                    boxed_subgraph.node_set().clone(),
-                    boxed_subgraph.edge_set().clone(),
-                    format!("dfs_from_{}", start),
-                );
-                Ok(PySubgraph {
-                    inner: concrete_subgraph,
-                })
+                // Convert HashSets to Vecs for PathResult
+                let nodes: Vec<NodeId> = boxed_subgraph.node_set().iter().copied().collect();
+                let edges: Vec<EdgeId> = boxed_subgraph.edge_set().iter().copied().collect();
+                
+                // Create lightweight PathResult instead of expensive PySubgraph
+                let path_result = PyPathResult::new(nodes, edges, "dfs".to_string());
+                Ok(path_result)
             }
             Err(e) => Err(PyRuntimeError::new_err(format!("DFS error: {}", e))),
         }
