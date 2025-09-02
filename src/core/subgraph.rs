@@ -1056,6 +1056,61 @@ impl SubgraphOperations for Subgraph {
         };
         x
     }
+
+    /// Override default nodes_table to create dense table for subgraphs
+    /// Subgraphs should have compact tables with only their nodes, not sparse index-aligned tables
+    fn nodes_table(&self) -> GraphResult<crate::core::table::GraphTable> {
+        let binding = self.graph_ref();
+        let graph = binding.borrow();
+
+        // For subgraphs, create dense table with only the nodes in this subgraph
+        // Sort node IDs for consistent ordering  
+        let mut node_ids: Vec<_> = self.nodes.iter().copied().collect();
+        node_ids.sort();
+
+        // Collect all unique attribute names across all nodes in subgraph
+        let mut all_attrs = std::collections::HashSet::new();
+        for &node_id in &node_ids {
+            if let Ok(attrs) = graph.get_node_attrs(node_id) {
+                for attr_name in attrs.keys() {
+                    all_attrs.insert(attr_name.clone());
+                }
+            }
+        }
+
+        // Build columns: node_id first, then attributes
+        let mut column_names = vec!["node_id".to_string()];
+        column_names.extend(all_attrs.into_iter());
+
+        let mut columns = Vec::new();
+
+        for column_name in &column_names {
+            let mut attr_values = Vec::new();
+
+            if column_name == "node_id" {
+                // Node ID column - dense array with only subgraph nodes
+                for &node_id in &node_ids {
+                    attr_values.push(crate::types::AttrValue::Int(node_id as i64));
+                }
+            } else {
+                // Attribute column - dense array with only subgraph nodes
+                for &node_id in &node_ids {
+                    if let Ok(Some(attr_value)) = graph.get_node_attr(node_id, column_name) {
+                        attr_values.push(attr_value);
+                    } else {
+                        // Use null placeholder for missing attributes
+                        attr_values.push(crate::types::AttrValue::Null);
+                    }
+                }
+            }
+
+            let graph_array = crate::core::array::GraphArray::from_vec(attr_values);
+            columns.push(graph_array);
+        }
+
+        // Use existing GraphTable::from_arrays_standalone (no graph reference needed)
+        crate::core::table::GraphTable::from_arrays_standalone(columns, Some(column_names))
+    }
 }
 
 #[cfg(test)]
