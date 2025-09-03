@@ -1299,10 +1299,16 @@ impl PyEdgesAccessor {
             return Ok(Py::new(py, subgraph)?.to_object(py));
         }
 
+        // Try to extract as string (attribute name access)
+        if let Ok(attr_name) = key.extract::<String>() {
+            // Use edge attribute column access to match nodes behavior
+            return self._get_edge_attribute_column(py, &attr_name);
+        }
+
         // If none of the above worked, return error
         Err(PyTypeError::new_err(
-            "Edge index must be int, list of ints, or slice. \
-            Examples: g.edges[0], g.edges[0:10]. For attribute access use g.edges.weight syntax.",
+            "Edge index must be int, list of ints, slice, or string attribute name. \
+            Examples: g.edges[0], g.edges[0:10], g.edges['weight'], or g.edges.weight for attribute access.",
         ))
     }
 
@@ -1497,12 +1503,9 @@ impl PyEdgesAccessor {
     }
 
     /// Support property-style attribute access: g.edges.weight
-    fn __getattr__(&self, _py: Python, name: &str) -> PyResult<PyObject> {
-        // TODO: Complete implementation - temporarily disabled
-        Err(PyKeyError::new_err(format!(
-            "Edge attribute '{}' access is under development.",
-            name
-        )))
+    fn __getattr__(&self, py: Python, name: &str) -> PyResult<PyObject> {
+        // Delegate to edge attribute column access
+        self._get_edge_attribute_column(py, name)
     }
 
     /// Get edge attribute column with proper error checking
