@@ -110,19 +110,16 @@ python-groggy/src/
 │   ├── subgraphs/                 # NEW: Mirror core subgraphs
 │   │   ├── mod.rs
 │   │   ├── subgraph.rs           # moved from core/
+        ├── component.rs          # moved from core/
 │   │   └── neighborhood.rs       # moved from core/
 │   ├── storage/                   # NEW: Mirror core storage
 │   │   ├── mod.rs
+│   │   ├── components.rs         # moved from core/
 │   │   ├── matrix.rs             # moved from core/
 │   │   ├── table.rs              # moved from core/
 │   │   ├── array.rs              # moved from core/
 │   │   ├── accessors.rs          # moved from core/
 │   │   └── views.rs              # moved from core/
-│   ├── operations/                # NEW: Core operations FFI
-│   │   ├── mod.rs
-│   │   ├── component.rs          # moved from core/
-│   │   ├── components.rs         # moved from core/
-│   │   └── path_result.rs        # moved from core/
 │   ├── query/                     # NEW: Query operations FFI
 │   │   ├── mod.rs
 │   │   ├── query.rs              # moved from core/

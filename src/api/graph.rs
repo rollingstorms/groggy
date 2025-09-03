@@ -11,16 +11,16 @@
 //! - HistoryForest = Version Control (immutable snapshots, branching)
 //! - QueryEngine = Read-only Analysis (filtering, aggregation, views)
 
-use crate::config::GraphConfig;
-use crate::core::adjacency::{AdjacencyMatrix, AdjacencyMatrixBuilder, MatrixFormat, MatrixType};
-use crate::core::change_tracker::ChangeTracker;
-use crate::core::history::{CommitDiff, HistoricalView, HistoryForest};
-use crate::core::neighborhood::NeighborhoodSampler;
-use crate::core::pool::GraphPool;
-use crate::core::query::{EdgeFilter, NodeFilter, QueryEngine};
-use crate::core::ref_manager::BranchInfo;
-use crate::core::space::GraphSpace;
-use crate::core::traversal::TraversalEngine;
+use crate::utils::config::GraphConfig;
+use crate::storage::adjacency::{AdjacencyMatrix, AdjacencyMatrixBuilder, MatrixFormat, MatrixType};
+use crate::state::change_tracker::ChangeTracker;
+use crate::state::history::{CommitDiff, HistoricalView, HistoryForest};
+use crate::subgraphs::neighborhood::NeighborhoodSampler;
+use crate::storage::pool::GraphPool;
+use crate::query::query::{EdgeFilter, NodeFilter, QueryEngine};
+use crate::state::ref_manager::BranchInfo;
+use crate::utils::space::GraphSpace;
+use crate::query::traversal::TraversalEngine;
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{
     AttrName, AttrValue, BranchName, CompressionStatistics, EdgeId, MemoryEfficiency,
@@ -1169,7 +1169,7 @@ impl Graph {
     /// Calculate pool memory usage with detailed breakdown
     fn calculate_pool_memory(&self) -> usize {
         // Basic structure overhead
-        let base_size = std::mem::size_of::<crate::core::pool::GraphPool>();
+        let base_size = std::mem::size_of::<crate::storage::pool::GraphPool>();
 
         // Node and edge storage
         let topology_size = std::mem::size_of::<
@@ -1202,7 +1202,7 @@ impl Graph {
 
     /// Calculate space memory usage
     fn calculate_space_memory(&self) -> usize {
-        let base_size = std::mem::size_of::<crate::core::space::GraphSpace>();
+        let base_size = std::mem::size_of::<crate::utils::space::GraphSpace>();
 
         // Active sets
         let active_nodes_size =
@@ -1222,7 +1222,7 @@ impl Graph {
     /// Calculate history memory usage
     fn calculate_history_memory(&self) -> usize {
         // Simplified estimate - in real implementation, would query history component
-        let base_size = std::mem::size_of::<crate::core::history::HistoryForest>();
+        let base_size = std::mem::size_of::<crate::state::history::HistoryForest>();
         let commits = self.statistics().commit_count;
         let estimated_commit_size = 1000; // bytes per commit (rough estimate)
 
@@ -1439,8 +1439,8 @@ impl Graph {
     pub fn bfs(
         &mut self,
         start: NodeId,
-        options: crate::core::traversal::TraversalOptions,
-    ) -> Result<crate::core::traversal::TraversalResult, GraphError> {
+        options: crate::query::traversal::TraversalOptions,
+    ) -> Result<crate::query::traversal::TraversalResult, GraphError> {
         self.traversal_engine
             .bfs(&self.pool.borrow(), &mut self.space, start, options)
             .map_err(|e| e.into())
@@ -1450,8 +1450,8 @@ impl Graph {
     pub fn dfs(
         &mut self,
         start: NodeId,
-        options: crate::core::traversal::TraversalOptions,
-    ) -> Result<crate::core::traversal::TraversalResult, GraphError> {
+        options: crate::query::traversal::TraversalOptions,
+    ) -> Result<crate::query::traversal::TraversalResult, GraphError> {
         self.traversal_engine
             .dfs(&self.pool.borrow(), &mut self.space, start, options)
             .map_err(|e| e.into())
@@ -1462,8 +1462,8 @@ impl Graph {
         &mut self,
         start: NodeId,
         end: NodeId,
-        options: crate::core::traversal::PathFindingOptions,
-    ) -> Result<Option<crate::core::traversal::Path>, GraphError> {
+        options: crate::query::traversal::PathFindingOptions,
+    ) -> Result<Option<crate::query::traversal::Path>, GraphError> {
         self.traversal_engine
             .shortest_path(&self.pool.borrow(), &mut self.space, start, end, options)
             .map_err(|e| e.into())
@@ -1475,7 +1475,7 @@ impl Graph {
         start: NodeId,
         end: NodeId,
         max_length: usize,
-    ) -> Result<Vec<crate::core::traversal::Path>, GraphError> {
+    ) -> Result<Vec<crate::query::traversal::Path>, GraphError> {
         self.traversal_engine
             .all_paths(&self.pool.borrow(), &mut self.space, start, end, max_length)
             .map_err(|e| e.into())
@@ -1484,15 +1484,15 @@ impl Graph {
     /// Find all connected components in the graph
     pub fn connected_components(
         &mut self,
-        options: crate::core::traversal::TraversalOptions,
-    ) -> Result<crate::core::traversal::ConnectedComponentsResult, GraphError> {
+        options: crate::query::traversal::TraversalOptions,
+    ) -> Result<crate::query::traversal::ConnectedComponentsResult, GraphError> {
         self.traversal_engine
             .connected_components(&self.pool.borrow(), &self.space, options)
             .map_err(|e| e.into())
     }
 
     /// Get traversal performance statistics
-    pub fn traversal_statistics(&self) -> &crate::core::traversal::TraversalStats {
+    pub fn traversal_statistics(&self) -> &crate::query::traversal::TraversalStats {
         self.traversal_engine.statistics()
     }
 
@@ -1503,7 +1503,7 @@ impl Graph {
     pub fn neighborhood(
         &mut self,
         node_id: NodeId,
-    ) -> Result<crate::core::neighborhood::NeighborhoodSubgraph, GraphError> {
+    ) -> Result<crate::subgraphs::neighborhood::NeighborhoodSubgraph, GraphError> {
         self.neighborhood_sampler
             .single_neighborhood(&self.pool.borrow(), &self.space, node_id)
             .map_err(|e| e.into())
@@ -1514,7 +1514,7 @@ impl Graph {
     pub fn multi_neighborhood(
         &mut self,
         node_ids: &[NodeId],
-    ) -> Result<crate::core::neighborhood::NeighborhoodResult, GraphError> {
+    ) -> Result<crate::subgraphs::neighborhood::NeighborhoodResult, GraphError> {
         self.neighborhood_sampler
             .multi_neighborhood(&self.pool.borrow(), &self.space, node_ids)
             .map_err(|e| e.into())
@@ -1526,7 +1526,7 @@ impl Graph {
         &mut self,
         node_id: NodeId,
         k: usize,
-    ) -> Result<crate::core::neighborhood::NeighborhoodSubgraph, GraphError> {
+    ) -> Result<crate::subgraphs::neighborhood::NeighborhoodSubgraph, GraphError> {
         self.neighborhood_sampler
             .k_hop_neighborhood(&self.pool.borrow(), &self.space, node_id, k)
             .map_err(|e| e.into())
@@ -1538,14 +1538,14 @@ impl Graph {
         &mut self,
         node_ids: &[NodeId],
         k: usize,
-    ) -> Result<crate::core::neighborhood::NeighborhoodSubgraph, GraphError> {
+    ) -> Result<crate::subgraphs::neighborhood::NeighborhoodSubgraph, GraphError> {
         self.neighborhood_sampler
             .unified_neighborhood(&self.pool.borrow(), &self.space, node_ids, k)
             .map_err(|e| e.into())
     }
 
     /// Get neighborhood sampling performance statistics
-    pub fn neighborhood_statistics(&self) -> &crate::core::neighborhood::NeighborhoodStats {
+    pub fn neighborhood_statistics(&self) -> &crate::subgraphs::neighborhood::NeighborhoodStats {
         self.neighborhood_sampler.stats()
     }
 
@@ -1592,11 +1592,11 @@ impl Graph {
     /// This is used during branch switching to restore the graph to a specific state
     fn reset_to_snapshot(
         &mut self,
-        snapshot: crate::core::state::GraphSnapshot,
+        snapshot: crate::state::state::GraphSnapshot,
     ) -> Result<(), GraphError> {
         // 1. Clear current state
-        self.pool = Rc::new(RefCell::new(crate::core::pool::GraphPool::new()));
-        self.space = crate::core::space::GraphSpace::new(self.pool.clone(), snapshot.state_id);
+        self.pool = Rc::new(RefCell::new(crate::storage::pool::GraphPool::new()));
+        self.space = crate::utils::space::GraphSpace::new(self.pool.clone(), snapshot.state_id);
 
         // 2. Restore nodes
         for &node_id in &snapshot.active_nodes {
@@ -1664,8 +1664,8 @@ impl Graph {
     /// let graph = Graph::new();
     /// let nx_graph = graph.to_networkx().unwrap();
     /// ```
-    pub fn to_networkx(&self) -> Result<crate::convert::NetworkXGraph, GraphError> {
-        crate::convert::graph_to_networkx(self)
+    pub fn to_networkx(&self) -> Result<crate::utils::convert::NetworkXGraph, GraphError> {
+        crate::utils::convert::graph_to_networkx(self)
     }
 
     /*

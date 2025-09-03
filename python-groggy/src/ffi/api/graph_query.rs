@@ -5,7 +5,7 @@
 use crate::ffi::core::query::{PyEdgeFilter, PyNodeFilter};
 use crate::ffi::core::subgraph::PySubgraph;
 use crate::ffi::utils::graph_error_to_py_err;
-use groggy::core::subgraph::Subgraph;
+use groggy::subgraphs::Subgraph;
 use groggy::{AttrName, EdgeId, NodeId};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -109,7 +109,7 @@ impl PyGraphQuery {
             filter_obj.inner.clone()
         } else if let Ok(query_str) = filter.extract::<String>() {
             // String query - parse it using Rust core query parser (FIXED: no circular dependency)
-            let mut parser = groggy::core::query_parser::QueryParser::new();
+            let mut parser = groggy::query::QueryParser::new();
             parser.parse_node_query(&query_str).map_err(|e| {
                 PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
             })?

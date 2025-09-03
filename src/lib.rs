@@ -136,38 +136,17 @@
 //! ```
 
 // Core type definitions
-pub mod config;
-pub mod convert;
 pub mod errors;
 pub mod types;
-pub mod util;
 
-// Core graph data structures and components
-pub mod core {
-    pub mod adjacency;
-    pub mod array;
-    pub mod change_tracker;
-    pub mod component; // Phase 4: Component entities
-    pub mod delta;
-    pub mod edge;
-    pub mod filtered; // Phase 4: Filter entities
-    pub mod hierarchical; // Phase 3: Hierarchical operations
-    pub mod history;
-    pub mod matrix;
-    pub mod neighborhood;
-    pub mod node;
-    pub mod pool;
-    pub mod query;
-    pub mod query_parser;
-    pub mod ref_manager;
-    pub mod space;
-    pub mod state;
-    pub mod strategies;
-    pub mod subgraph;
-    pub mod table;
-    pub mod traits;
-    pub mod traversal;
-}
+// Reorganized module structure
+pub mod subgraphs;   // Subgraph types and operations
+pub mod storage;     // Storage and view types  
+pub mod operations;  // Core graph operations
+pub mod query;       // Query and traversal functionality
+pub mod state;       // State management
+pub mod utils;       // Utilities and configuration
+pub mod traits;      // Graph entity traits
 
 // Display formatting
 pub mod display;
@@ -179,40 +158,30 @@ pub mod api {
 
 // Re-export commonly used types and the main API
 pub use api::graph::Graph;
-pub use config::GraphConfig;
-pub use convert::{
-    graph_to_networkx, networkx_to_graph, subgraph_to_networkx, NetworkXEdge, NetworkXGraph,
-    NetworkXNode, NetworkXValue, ToNetworkX,
-};
-pub use core::history::{HistoricalView, HistoryForest, ViewSummary};
+pub use utils::{GraphConfig, convert::*};
+pub use state::{HistoricalView, HistoryForest, ViewSummary};
 pub use errors::{GraphError, GraphResult};
 pub use types::{AttrName, AttrValue, AttrValueType, BranchName, EdgeId, NodeId, StateId};
-// pub use core::query::{
+// pub use query::{
 //     AttributeFilter, NumericComparison, StringComparison, MultiCriteria, Criterion,
 //     filter_nodes_by_attributes, filter_edges_by_attributes,
 //     filter_by_numeric_comparison, filter_by_string_comparison, filter_by_multi_criteria,
 // };
-pub use core::ref_manager::{Branch, BranchInfo, RefManager, TagInfo};
-pub use core::state::{StateMetadata, StateObject};
+pub use state::{Branch, BranchInfo, RefManager, TagInfo};
+pub use state::{StateMetadata, StateObject};
 
 // Re-export core types for advanced usage
-pub use core::adjacency::{
+pub use storage::{
     AdjacencyMatrix, AdjacencyMatrixResult, IndexMapping, MatrixFormat, MatrixType,
-    SparseAdjacencyMatrix,
+    SparseAdjacencyMatrix, GraphArray, StatsSummary, JoinType, Axis, GraphMatrix, 
+    MatrixProperties, GraphPool, AggregateOp, ConnectivityType, GraphTable, GroupBy, 
+    TableMetadata
 };
-pub use core::array::{GraphArray, StatsSummary};
-pub use core::change_tracker::ChangeTracker;
-pub use core::component::ComponentSubgraph;
-pub use core::delta::{ColumnDelta, DeltaObject};
-pub use core::filtered::FilteredSubgraph;
-pub use core::hierarchical::{AggregationFunction, HierarchicalOperations, MetaNode};
-pub use core::matrix::JoinType;
-pub use core::matrix::{Axis, GraphMatrix, MatrixProperties};
-pub use core::neighborhood::NeighborhoodSubgraph;
-pub use core::pool::GraphPool;
-pub use core::space::GraphSpace;
-pub use core::subgraph::SimilarityMetric;
-pub use core::table::{AggregateOp, ConnectivityType, GraphTable, GroupBy, TableMetadata};
+pub use state::{ChangeTracker, ColumnDelta, DeltaObject};
+pub use operations::{ComponentSubgraph};
+pub use subgraphs::{FilteredSubgraph, AggregationFunction, HierarchicalOperations, MetaNode, 
+    NeighborhoodSubgraph, SimilarityMetric};
+pub use utils::{GraphSpace};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -309,7 +278,7 @@ mod tests {
         // assert_eq!(stats.current_branch, "test_branch".to_string());
 
         // Filtering
-        use crate::core::query::NodeFilter;
+        use crate::query::NodeFilter;
         let filter = NodeFilter::AttributeEquals {
             name: "name".to_string(),
             value: AttrValue::Text("Alice".to_string()),

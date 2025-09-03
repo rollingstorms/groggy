@@ -3,8 +3,8 @@ use crate::ffi::api::graph_attributes::{PyGraphAttr, PyGraphAttrMut};
 //
 // Main Python bindings for the Graph API.
 
-use groggy::core::subgraph::Subgraph;
-use groggy::core::traits::SubgraphOperations;
+use groggy::subgraphs::Subgraph;
+use groggy::traits::SubgraphOperations;
 use groggy::{AttrName, AttrValue as RustAttrValue, EdgeId, Graph as RustGraph, NodeId, StateId};
 use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
@@ -594,7 +594,7 @@ impl PyGraph {
             filter_obj.inner.clone()
         } else if let Ok(query_str) = filter.extract::<String>() {
             // String query - parse it using Rust core query parser
-            let mut parser = groggy::core::query_parser::QueryParser::new();
+            let mut parser = groggy::query::QueryParser::new();
             parser.parse_node_query(&query_str).map_err(|e| {
                 PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
             })?
@@ -662,7 +662,7 @@ impl PyGraph {
             filter_obj.inner.clone()
         } else if let Ok(query_str) = filter.extract::<String>() {
             // String query - parse it using Rust core query parser
-            let mut parser = groggy::core::query_parser::QueryParser::new();
+            let mut parser = groggy::query::QueryParser::new();
             parser.parse_edge_query(&query_str).map_err(|e| {
                 PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Query parse error: {}", e))
             })?
@@ -1656,8 +1656,8 @@ impl PyGraph {
         &self,
         adjacency_matrix: groggy::AdjacencyMatrix,
     ) -> PyResult<groggy::GraphMatrix> {
-        use groggy::core::array::GraphArray;
-        use groggy::core::matrix::GraphMatrix;
+        use groggy::storage::GraphArray;
+        use groggy::storage::GraphMatrix;
 
         // Extract matrix data and convert to GraphArrays (columns)
         let size = adjacency_matrix.size;
