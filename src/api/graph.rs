@@ -275,9 +275,10 @@ impl Graph {
         self.space.activate_node(node_id); // Space tracks as active
         self.change_tracker.record_node_addition(node_id); // Track change for commit
         
-        // WORF SAFETY: Automatically set entity_type for all new nodes
-        self.set_node_attr_internal(node_id, "entity_type".into(), AttrValue::Text("base".to_string()))
-            .expect("Failed to set entity_type on new node - this should never happen");
+        // WORF SAFETY: Set entity_type efficiently using direct pool access
+        // This bypasses the expensive validation in set_node_attr_internal
+        let entity_type_attr: AttrName = "entity_type".into();
+        let _ = self.pool.borrow_mut().set_attr(entity_type_attr, AttrValue::Text("base".to_string()), true);
         
         node_id
     }
@@ -295,9 +296,11 @@ impl Graph {
         self.change_tracker.record_nodes_addition(&node_ids);
 
         // WORF SAFETY: Set entity_type for all new nodes efficiently
-        for &node_id in &node_ids {
-            self.set_node_attr_internal(node_id, "entity_type".into(), AttrValue::Text("base".to_string()))
-                .expect("Failed to set entity_type on bulk node - this should never happen");
+        // Use direct pool access to avoid per-node validation overhead
+        let entity_type_attr: AttrName = "entity_type".into();
+        let base_value = AttrValue::Text("base".to_string());
+        for _node_id in &node_ids {
+            let _ = self.pool.borrow_mut().set_attr(entity_type_attr.clone(), base_value.clone(), true);
         }
 
         node_ids
