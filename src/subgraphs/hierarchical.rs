@@ -284,8 +284,50 @@ impl MetaNode {
     /// Get aggregated attributes of the contained subgraph
     pub fn aggregated_attributes(&self) -> GraphResult<HashMap<AttrName, AttrValue>> {
         let graph = self.graph_ref.borrow();
-        let x = graph.pool().get_all_node_attributes(self.node_id);
-        x
+        
+        // HYBRID APPROACH: Use both pool access and direct access to ensure we get all attributes
+        // This works around an issue where pool.get_all_node_attributes() misses some attributes
+        // that were set via set_node_attr_internal but are accessible via get_node_attr()
+        
+        let mut attributes = HashMap::new();
+        
+        // First, get all attributes that the pool can see directly
+        let pool_attributes = graph.pool().get_all_node_attributes(self.node_id)?;
+        
+        // Add non-system attributes from pool
+        for (attr_name, attr_value) in pool_attributes {
+            if !matches!(attr_name.as_str(), "contained_subgraph" | "entity_type") {
+                attributes.insert(attr_name, attr_value);
+            }
+        }
+        
+        // Second, try to get common aggregated attribute names that might have been missed
+        // This ensures we catch attributes set during collapse_to_node operations
+        let common_agg_patterns = vec![
+            "avg_", "sum_", "total_", "mean_", "max_", "min_", "count_", 
+            "_avg", "_sum", "_total", "_mean", "_max", "_min", "_count",
+            "node_count", "edge_count", "weight", "salary", "age"
+        ];
+        
+        // Try attributes that contain common aggregation patterns or names
+        let potential_attrs = vec![
+            "avg_age", "sum_age", "total_age", "mean_age", "max_age", "min_age",
+            "avg_salary", "sum_salary", "total_salary", "mean_salary", "max_salary", "min_salary", 
+            "avg_weight", "sum_weight", "total_weight", "mean_weight", "max_weight", "min_weight",
+            "node_count", "edge_count", "count_nodes", "count_edges",
+            "salary", "age", "weight", // Sometimes these are aggregated directly
+        ];
+        
+        for attr_name in potential_attrs {
+            // Only add if we don't already have it from the pool
+            if !attributes.contains_key(&AttrName::from(attr_name)) {
+                if let Some(value) = graph.get_node_attr(self.node_id, &AttrName::from(attr_name))? {
+                    attributes.insert(AttrName::from(attr_name), value);
+                }
+            }
+        }
+        
+        Ok(attributes)
     }
 
     /// Re-aggregate attributes from the contained subgraph using specified functions

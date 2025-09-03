@@ -678,9 +678,191 @@ impl PyNodesAccessor {
         let py_array = crate::ffi::storage::array::PyGraphArray { inner: graph_array };
         Ok(Py::new(py, py_array)?.to_object(py))
     }
+
+    /// Access all subgraph-nodes (meta-nodes) in the graph
+    /// 
+    /// Returns:
+    ///     PyGraphArray: Array of nodes that contain subgraphs
+    /// 
+    /// Example:
+    ///     subgraph_nodes = g.nodes.subgraphs
+    ///     for meta_node in subgraph_nodes:
+    ///         print(f"Meta-node {meta_node.id} contains subgraph")
+    #[getter]
+    fn subgraphs(&self, py: Python) -> PyResult<PyObject> {
+        // Find all nodes that have a 'contained_subgraph' attribute
+        let graph = self.graph.borrow();
+        let mut subgraph_node_ids = Vec::new();
+
+        // Check which nodes to iterate over
+        let node_ids: Vec<NodeId> = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            graph.node_ids()
+        };
+
+        // Find nodes with contained_subgraph attribute
+        for node_id in node_ids {
+            if let Ok(Some(AttrValue::SubgraphRef(_))) = 
+                graph.get_node_attr(node_id, &"contained_subgraph".into()) 
+            {
+                subgraph_node_ids.push(AttrValue::Int(node_id as i64));
+            }
+        }
+
+        // Return as GraphArray
+        let graph_array = groggy::GraphArray::from_vec(subgraph_node_ids);
+        let py_array = crate::ffi::storage::array::PyGraphArray { inner: graph_array };
+        Ok(Py::new(py, py_array)?.to_object(py))
+    }
+
+    /// Get a MetaNode object if the specified node is a meta-node
+    /// 
+    /// Args:
+    ///     node_id: The node ID to check
+    /// 
+    /// Returns:
+    ///     PyMetaNode if the node is a meta-node, None otherwise
+    /// 
+    /// Example:
+    ///     meta_node = g.nodes.get_meta_node(3)
+    ///     if meta_node:
+    ///         subgraph = meta_node.subgraph
+    fn get_meta_node(&self, py: Python, node_id: NodeId) -> PyResult<Option<PyObject>> {
+        use crate::ffi::subgraphs::hierarchical::PyMetaNode;
+        use groggy::subgraphs::MetaNode;
+        
+        // Check if this node is a meta-node by checking entity_type
+        let graph = self.graph.borrow();
+        let entity_type_name = "entity_type".to_string();
+        if let Ok(Some(entity_type_attr)) = graph.get_node_attr(node_id, &entity_type_name) {
+            // Check both Text and CompactText variants
+            let entity_type_str = match entity_type_attr {
+                AttrValue::Text(s) => s,
+                AttrValue::CompactText(s) => s.as_str().to_string(),
+                _ => {
+                    return Ok(None); // Not a string type, not a meta-node
+                }
+            };
+            
+            if entity_type_str == "meta" {
+                // This is a meta-node, create PyMetaNode
+                drop(graph); // Release borrow before creating MetaNode
+                
+                match MetaNode::new(node_id, self.graph.clone()) {
+                    Ok(meta_node) => {
+                        let py_meta_node = PyMetaNode::from_meta_node(meta_node);
+                        return Ok(Some(Py::new(py, py_meta_node)?.to_object(py)));
+                    }
+                    Err(e) => {
+                        return Err(PyValueError::new_err(format!(
+                            "Failed to create MetaNode: {}", e
+                        )));
+                    }
+                }
+            }
+        }
+        
+        // Not a meta-node
+        Ok(None)
+    }
+
+    /// Get filtered accessor for base (non-meta) nodes only
+    /// 
+    /// Returns:
+    ///     PyNodesAccessor: Accessor that only shows base nodes (entity_type != 'meta')
+    /// 
+    /// Example:
+    ///     base_nodes = g.nodes.base
+    ///     base_count = len(base_nodes)
+    ///     base_table = base_nodes.table()
+    #[getter]
+    fn base(&self, py: Python) -> PyResult<PyObject> {
+        // Get all base nodes (entity_type != 'meta')
+        let base_node_ids = self.get_filtered_node_ids("base")?;
+        
+        // Create new constrained accessor
+        let base_accessor = PyNodesAccessor {
+            graph: self.graph.clone(),
+            constrained_nodes: Some(base_node_ids),
+        };
+        
+        Ok(Py::new(py, base_accessor)?.to_object(py))
+    }
+
+    /// Get filtered accessor for meta-nodes only
+    /// 
+    /// Returns:
+    ///     PyNodesAccessor: Accessor that only shows meta-nodes (entity_type == 'meta')
+    /// 
+    /// Example:
+    ///     meta_nodes = g.nodes.meta
+    ///     meta_count = len(meta_nodes)
+    ///     meta_table = meta_nodes.table()
+    #[getter]
+    fn meta(&self, py: Python) -> PyResult<PyObject> {
+        // Get all meta-nodes (entity_type == 'meta')
+        let meta_node_ids = self.get_filtered_node_ids("meta")?;
+        
+        // Create new constrained accessor
+        let meta_accessor = PyNodesAccessor {
+            graph: self.graph.clone(),
+            constrained_nodes: Some(meta_node_ids),
+        };
+        
+        Ok(Py::new(py, meta_accessor)?.to_object(py))
+    }
 }
 
 impl PyNodesAccessor {
+    /// Get filtered node IDs based on entity type
+    /// 
+    /// Args:
+    ///     filter_type: "base" for non-meta nodes, "meta" for meta-nodes
+    ///     
+    /// Returns:
+    ///     Vec<NodeId>: List of node IDs matching the filter criteria
+    fn get_filtered_node_ids(&self, filter_type: &str) -> PyResult<Vec<NodeId>> {
+        let graph = self.graph.borrow();
+        let entity_type_name = "entity_type".to_string();
+        let mut filtered_nodes = Vec::new();
+        
+        // Determine which nodes to check based on existing constraints
+        let nodes_to_check = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            graph.node_ids()
+        };
+        
+        for node_id in nodes_to_check {
+            // Check the entity_type attribute
+            if let Ok(Some(entity_type_attr)) = graph.get_node_attr(node_id, &entity_type_name) {
+                // Handle both Text and CompactText variants
+                let entity_type_str = match entity_type_attr {
+                    AttrValue::Text(s) => s,
+                    AttrValue::CompactText(s) => s.as_str().to_string(),
+                    _ => continue, // Skip nodes with non-string entity_type
+                };
+                
+                // Filter based on requested type
+                let matches_filter = match filter_type {
+                    "base" => entity_type_str != "meta", // Base = everything except meta
+                    "meta" => entity_type_str == "meta", // Meta = only meta nodes
+                    _ => false, // Unknown filter type
+                };
+                
+                if matches_filter {
+                    filtered_nodes.push(node_id);
+                }
+            } else if filter_type == "base" {
+                // Nodes without entity_type attribute are considered base nodes
+                filtered_nodes.push(node_id);
+            }
+        }
+        
+        Ok(filtered_nodes)
+    }
+
     /// Set attributes for multiple nodes (bulk operation) - internal method callable from Rust
     /// Supports the same formats as the main graph: node-centric, column-centric, etc.
     pub fn set_attrs_internal(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
@@ -1294,6 +1476,50 @@ impl PyEdgesAccessor {
 
         Ok(py_values.to_object(py))
     }
+
+    /// Get filtered accessor for base edges (non-meta edges)
+    ///
+    /// Returns a new EdgesAccessor that only shows edges where entity_type != 'meta'
+    /// 
+    /// Example:
+    ///     base_edges = g.edges.base
+    ///     base_count = len(base_edges)  
+    ///     base_table = base_edges.table()
+    #[getter]
+    fn base(&self, py: Python) -> PyResult<PyObject> {
+        // Get all base edges (entity_type != 'meta')
+        let base_edge_ids = self.get_filtered_edge_ids("base")?;
+        
+        // Create new constrained accessor
+        let base_accessor = PyEdgesAccessor {
+            graph: self.graph.clone(),
+            constrained_edges: Some(base_edge_ids),
+        };
+        
+        Ok(Py::new(py, base_accessor)?.to_object(py))
+    }
+
+    /// Get filtered accessor for meta-edges
+    ///
+    /// Returns a new EdgesAccessor that only shows edges where entity_type == 'meta'
+    ///
+    /// Example:
+    ///     meta_edges = g.edges.meta
+    ///     meta_count = len(meta_edges)
+    ///     meta_table = meta_edges.table()
+    #[getter]
+    fn meta(&self, py: Python) -> PyResult<PyObject> {
+        // Get all meta-edges (entity_type == 'meta')
+        let meta_edge_ids = self.get_filtered_edge_ids("meta")?;
+        
+        // Create new constrained accessor
+        let meta_accessor = PyEdgesAccessor {
+            graph: self.graph.clone(),
+            constrained_edges: Some(meta_edge_ids),
+        };
+        
+        Ok(Py::new(py, meta_accessor)?.to_object(py))
+    }
 }
 
 impl PyEdgesAccessor {
@@ -1327,5 +1553,67 @@ impl PyEdgesAccessor {
         }
 
         attr_handler.set_edge_attrs(py, attrs_dict)
+    }
+
+    /// Get filtered edge IDs based on entity_type attribute
+    ///
+    /// Args:
+    ///     filter_type: "base" for non-meta edges, "meta" for meta-edges
+    ///     
+    /// Returns:
+    ///     Vec<EdgeId>: List of edge IDs matching the filter criteria
+    fn get_filtered_edge_ids(&self, filter_type: &str) -> PyResult<Vec<EdgeId>> {
+        let graph = self.graph.borrow();
+        let entity_type_name = "entity_type".to_string();
+        let mut filtered_edges = Vec::new();
+        
+        // Determine which edges to check based on existing constraints
+        let edge_ids_to_check = if let Some(ref constrained) = self.constrained_edges {
+            constrained.clone()
+        } else {
+            graph.edge_ids()
+        };
+        
+        for edge_id in edge_ids_to_check {
+            // Try to get entity_type attribute for this edge
+            match graph.get_edge_attr(edge_id, &entity_type_name) {
+                Ok(Some(attr_value)) => {
+                    // Check the entity_type value (handle both Text and CompactText)
+                    let entity_type_str = match &attr_value {
+                        groggy::AttrValue::Text(text) => text.as_str(),
+                        groggy::AttrValue::CompactText(compact) => compact.as_str(),
+                        _ => continue, // Skip edges with non-string entity_type
+                    };
+                    
+                    // Apply filter logic
+                    let should_include = match filter_type {
+                        "base" => entity_type_str != "meta", // Include non-meta edges
+                        "meta" => entity_type_str == "meta", // Include only meta-edges
+                        _ => return Err(PyValueError::new_err(format!(
+                            "Invalid filter_type: {}. Must be 'base' or 'meta'",
+                            filter_type
+                        ))),
+                    };
+                    
+                    if should_include {
+                        filtered_edges.push(edge_id);
+                    }
+                }
+                Ok(None) => {
+                    // No entity_type attribute - treat as base edge (non-meta)
+                    if filter_type == "base" {
+                        filtered_edges.push(edge_id);
+                    }
+                }
+                Err(_) => {
+                    // Error getting attribute - treat as base edge (non-meta)
+                    if filter_type == "base" {
+                        filtered_edges.push(edge_id);
+                    }
+                }
+            }
+        }
+        
+        Ok(filtered_edges)
     }
 }

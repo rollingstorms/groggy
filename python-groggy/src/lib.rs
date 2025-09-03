@@ -29,6 +29,9 @@ pub use ffi::query::traversal::{PyAggregationResult, PyGroupedAggregationResult}
 pub use ffi::storage::views::{PyEdgeView, PyNodeView};
 pub use ffi::types::{PyAttrValue, PyAttributeCollection, PyResultHandle};
 
+// Hierarchical subgraph types
+pub use ffi::subgraphs::hierarchical::{PyAggregationFunction, PyMetaNode};
+
 // ====================================================================
 // UNIFIED BUILDER PATTERNS
 // ====================================================================
@@ -266,6 +269,10 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Register traversal and aggregation results
     m.add_class::<PyAggregationResult>()?;
     m.add_class::<PyGroupedAggregationResult>()?;
+
+    // Register hierarchical subgraph types
+    m.add_class::<ffi::subgraphs::hierarchical::PyAggregationFunction>()?;
+    m.add_class::<ffi::subgraphs::hierarchical::PyMetaNode>()?;
 
     // Add aliases for Python imports - these are already added with correct names
 

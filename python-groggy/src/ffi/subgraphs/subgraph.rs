@@ -11,7 +11,7 @@ use groggy::{AttrValue, EdgeId, NodeId, SimilarityMetric};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 // Import FFI types we need to preserve compatibility
 use crate::ffi::api::graph::PyGraph;
@@ -45,6 +45,27 @@ impl PySubgraph {
         Err(PyRuntimeError::new_err(
             "from_trait_object not yet implemented - use concrete Subgraph types",
         ))
+    }
+
+    /// Create MetaNode with enhanced aggregation syntax support
+    fn create_enhanced_meta_node(&self, agg_specs: Vec<groggy::traits::subgraph_operations::AggregationSpec>) -> PyResult<groggy::subgraphs::MetaNode> {
+        use groggy::traits::SubgraphOperations;
+        use groggy::subgraphs::MetaNode;
+        
+        // First create the collapsed node using enhanced syntax
+        let node_id = self.inner.collapse_to_node_enhanced(agg_specs).map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Enhanced collapse failed: {}", e))
+        })?;
+        
+        // Get the graph reference to create MetaNode
+        let graph_ref = self.inner.graph();
+        
+        // Create MetaNode with the node_id and graph reference
+        let meta_node = MetaNode::new(node_id, graph_ref).map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("MetaNode creation failed: {}", e))
+        })?;
+        
+        Ok(meta_node)
     }
 }
 
@@ -1140,11 +1161,206 @@ impl PySubgraph {
     }
 
     /// Collapse subgraph to a single node with aggregated attributes
-    fn collapse_to_node(&self, _py: Python, _agg_functions: &PyDict) -> PyResult<NodeId> {
-        // This is complex and needs proper aggregation logic
-        Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "Subgraph collapse not yet implemented - requires aggregation logic in core",
-        ))
+    fn collapse_to_node(&self, _py: Python, agg_functions: &pyo3::types::PyDict) -> PyResult<NodeId> {
+        self.collapse_to_node_with_defaults(_py, agg_functions, None)
+    }
+
+    /// Collapse subgraph to a single node with enhanced missing attribute handling
+    /// 
+    /// # Arguments
+    /// * `agg_functions` - Dictionary of {attribute_name: aggregation_function}
+    /// * `defaults` - Optional dictionary of {attribute_name: default_value} for missing attributes
+    /// 
+    /// # Behavior  
+    /// * Errors by default when aggregating non-existent attributes (strict validation)
+    /// * Uses provided defaults for missing attributes when specified
+    /// * Count aggregation always works regardless of attribute existence
+    fn collapse_to_node_with_defaults(
+        &self, 
+        _py: Python, 
+        agg_functions: &pyo3::types::PyDict,
+        defaults: Option<&pyo3::types::PyDict>
+    ) -> PyResult<NodeId> {
+        use crate::ffi::subgraphs::hierarchical::parse_aggregation_functions;
+        
+        // Convert Python dict to HashMap<String, String> for compatibility
+        let mut agg_strings = HashMap::new();
+        for (key, value) in agg_functions {
+            let attr_name = key.extract::<String>()?;
+            let func_str = if let Ok(s) = value.extract::<String>() {
+                s
+            } else {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "Aggregation function must be a string"
+                ));
+            };
+            agg_strings.insert(attr_name, func_str);
+        }
+
+        // Convert defaults dict if provided
+        let defaults_map = if let Some(defaults_dict) = defaults {
+            let mut defaults_map = HashMap::new();
+            for (key, value) in defaults_dict {
+                let attr_name = key.extract::<String>()?;
+                // Convert Python value to AttrValue using the same logic as PyAttrValue::py_new
+                let attr_value = if let Ok(b) = value.extract::<bool>() {
+                    AttrValue::Bool(b)
+                } else if let Ok(i) = value.extract::<i64>() {
+                    AttrValue::Int(i)
+                } else if let Ok(f) = value.extract::<f64>() {
+                    AttrValue::Float(f as f32)
+                } else if let Ok(f) = value.extract::<f32>() {
+                    AttrValue::Float(f)
+                } else if let Ok(s) = value.extract::<String>() {
+                    AttrValue::Text(s)
+                } else if let Ok(vec) = value.extract::<Vec<f32>>() {
+                    AttrValue::FloatVec(vec)
+                } else if let Ok(vec) = value.extract::<Vec<f64>>() {
+                    let f32_vec: Vec<f32> = vec.into_iter().map(|f| f as f32).collect();
+                    AttrValue::FloatVec(f32_vec)
+                } else if let Ok(bytes) = value.extract::<Vec<u8>>() {
+                    AttrValue::Bytes(bytes)
+                } else {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(
+                        "Unsupported default value type. Supported: int, float, str, bool, List[float], bytes"
+                    ));
+                };
+                defaults_map.insert(attr_name.into(), attr_value);
+            }
+            defaults_map
+        } else {
+            HashMap::new()
+        };
+
+        match self.inner.collapse_to_node_with_defaults(agg_strings, defaults_map) {
+            Ok(node_id) => Ok(node_id),
+            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+                "Failed to collapse subgraph: {}", e
+            ))),
+        }
+    }
+
+    /// Enhanced collapse supporting three syntax forms for flexible aggregation
+    /// 
+    /// # Supported Syntax Forms:
+    /// 
+    /// ## Form 1: Simple (backward compatible)
+    /// ```python
+    /// subgraph.add_to_graph({"age": "mean", "salary": "sum"})
+    /// ```
+    /// 
+    /// ## Form 2: Tuple (custom attribute names)
+    /// ```python
+    /// subgraph.add_to_graph({
+    ///     "avg_age": ("mean", "age"),
+    ///     "total_salary": ("sum", "salary"),
+    ///     "person_count": ("count", None)
+    /// })
+    /// ```
+    /// 
+    /// ## Form 3: Dict-of-dicts (advanced with defaults)
+    /// ```python
+    /// subgraph.add_to_graph({
+    ///     "avg_age": {"func": "mean", "source": "age"},
+    ///     "total_salary": {"func": "sum", "source": "salary", "default": 0}
+    /// })
+    /// ```
+    pub fn add_to_graph(&self, py: Python, agg_spec: Option<&pyo3::types::PyDict>) -> PyResult<PyObject> {
+        use crate::ffi::subgraphs::hierarchical::{parse_aggregation_functions, PyMetaNode};
+        use groggy::subgraphs::HierarchicalOperations;
+        use std::collections::HashMap;
+        
+        if let Some(spec_dict) = agg_spec {
+            // Try enhanced aggregation syntax first
+            if let Ok(agg_specs) = parse_enhanced_aggregation_spec(spec_dict) {
+                // Create meta-node using enhanced syntax
+                let meta_node = self.create_enhanced_meta_node(agg_specs)?;
+                let py_meta_node = PyMetaNode::from_meta_node(meta_node);
+                return Ok(Py::new(py, py_meta_node)?.to_object(py));
+            }
+        }
+        
+        // Fall back to original hierarchical system
+        let agg_funcs = if let Some(dict) = agg_spec {
+            parse_aggregation_functions(py, dict)?
+        } else {
+            HashMap::new()
+        };
+
+        // Create meta-node using hierarchical system
+        let meta_node = self.inner.collapse_to_meta_node(agg_funcs).map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e))
+        })?;
+
+        // Wrap in Python MetaNode
+        let py_meta_node = PyMetaNode::from_meta_node(meta_node);
+        Ok(Py::new(py, py_meta_node)?.to_object(py))
+    }
+
+    // === HIERARCHICAL OPERATIONS ===
+
+    /// Get parent meta-node if this subgraph is contained within one
+    fn parent_meta_node(&self, py: Python) -> PyResult<Option<PyObject>> {
+        use crate::ffi::subgraphs::hierarchical::PyMetaNode;
+        use groggy::subgraphs::HierarchicalOperations;
+
+        match self.inner.parent_meta_node() {
+            Ok(Some(meta_node)) => {
+                let py_meta_node = PyMetaNode::from_meta_node(meta_node);
+                Ok(Some(Py::new(py, py_meta_node)?.to_object(py)))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+                "Failed to get parent meta-node: {}",
+                e
+            ))),
+        }
+    }
+
+    /// Get child meta-nodes if this subgraph contains them
+    fn child_meta_nodes(&self, py: Python) -> PyResult<Vec<PyObject>> {
+        use crate::ffi::subgraphs::hierarchical::PyMetaNode;
+        use groggy::subgraphs::HierarchicalOperations;
+
+        let child_nodes = self.inner.child_meta_nodes().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get child meta-nodes: {}", e))
+        })?;
+
+        let py_children: Result<Vec<PyObject>, PyErr> = child_nodes
+            .into_iter()
+            .map(|meta_node| {
+                let py_meta_node = PyMetaNode::from_meta_node(meta_node);
+                Ok(Py::new(py, py_meta_node)?.to_object(py))
+            })
+            .collect();
+
+        py_children
+    }
+
+    /// Get hierarchy level of this subgraph (0 = root level)
+    #[getter]
+    fn hierarchy_level(&self) -> PyResult<usize> {
+        use groggy::subgraphs::HierarchicalOperations;
+        
+        self.inner.hierarchy_level().map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!(
+                "Failed to get hierarchy level: {}",
+                e
+            ))
+        })
+    }
+
+    /// Check if this subgraph contains nodes that are meta-nodes
+    fn has_meta_nodes(&self) -> bool {
+        use groggy::subgraphs::HierarchicalOperations;
+        
+        // Check if any child meta-nodes exist
+        self.inner.child_meta_nodes().unwrap_or_default().len() > 0
+    }
+
+    /// Get all meta-nodes within this subgraph
+    fn meta_nodes(&self, py: Python) -> PyResult<Vec<PyObject>> {
+        self.child_meta_nodes(py)
     }
 
     fn __str__(&self) -> String {
@@ -1154,6 +1370,88 @@ impl PySubgraph {
             self.inner.edge_count()
         )
     }
+}
+
+/// Parse enhanced aggregation specification from Python dict supporting three syntax forms
+fn parse_enhanced_aggregation_spec(py_dict: &pyo3::types::PyDict) -> PyResult<Vec<groggy::traits::subgraph_operations::AggregationSpec>> {
+    let mut specs = Vec::new();
+    
+    for (key, value) in py_dict {
+        let target_attr = key.extract::<String>()?;
+        
+        // Parse the value based on its type
+        let agg_spec = if let Ok(func_str) = value.extract::<String>() {
+            // FORM 1: Simple - {"age": "mean"}
+            groggy::traits::subgraph_operations::AggregationSpec {
+                target_attr: target_attr.clone(),
+                function: func_str,
+                source_attr: Some(target_attr), // source = target for simple form
+                default_value: None,
+            }
+        } else if let Ok(tuple) = value.extract::<(&str, Option<&str>)>() {
+            // FORM 2: Tuple - {"avg_age": ("mean", "age")}
+            let (func_str, source_str) = tuple;
+            groggy::traits::subgraph_operations::AggregationSpec {
+                target_attr: target_attr,
+                function: func_str.to_string(),
+                source_attr: source_str.map(|s| s.to_string()),
+                default_value: None,
+            }
+        } else if let Ok(dict) = value.extract::<&pyo3::types::PyDict>() {
+            // FORM 3: Dict - {"avg_age": {"func": "mean", "source": "age", "default": 0}}
+            let func_str = dict.get_item("func")?
+                .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Missing 'func' in aggregation spec"))?
+                .extract::<String>()?;
+                
+            let source_attr = dict.get_item("source")?
+                .map(|s| s.extract::<String>())
+                .transpose()?;
+                
+            let default_value = if let Some(default_item) = dict.get_item("default")? {
+                // Convert Python value to AttrValue using the same logic as before
+                let attr_value = if let Ok(b) = default_item.extract::<bool>() {
+                    AttrValue::Bool(b)
+                } else if let Ok(i) = default_item.extract::<i64>() {
+                    AttrValue::Int(i)
+                } else if let Ok(f) = default_item.extract::<f64>() {
+                    AttrValue::Float(f as f32)
+                } else if let Ok(f) = default_item.extract::<f32>() {
+                    AttrValue::Float(f)
+                } else if let Ok(s) = default_item.extract::<String>() {
+                    AttrValue::Text(s)
+                } else if let Ok(vec) = default_item.extract::<Vec<f32>>() {
+                    AttrValue::FloatVec(vec)
+                } else if let Ok(vec) = default_item.extract::<Vec<f64>>() {
+                    let f32_vec: Vec<f32> = vec.into_iter().map(|f| f as f32).collect();
+                    AttrValue::FloatVec(f32_vec)
+                } else if let Ok(bytes) = default_item.extract::<Vec<u8>>() {
+                    AttrValue::Bytes(bytes)
+                } else {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(
+                        "Unsupported default value type. Supported: int, float, str, bool, List[float], bytes"
+                    ));
+                };
+                Some(attr_value)
+            } else {
+                None
+            };
+            
+            groggy::traits::subgraph_operations::AggregationSpec {
+                target_attr: target_attr,
+                function: func_str,
+                source_attr: source_attr,
+                default_value: default_value,
+            }
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                "Invalid aggregation specification for '{}'. Expected string, tuple, or dict.", target_attr
+            )));
+        };
+        
+        specs.push(agg_spec);
+    }
+    
+    Ok(specs)
 }
 
 // ============================================================================

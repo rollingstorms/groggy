@@ -291,6 +291,14 @@ pub struct GraphPool {
     topology: HashMap<EdgeId, (NodeId, NodeId)>,
 
     /*
+    === SUBGRAPH STORAGE ===
+    Storage for subgraph data used by meta-nodes
+    */
+    /// Stored subgraphs: subgraph_id -> (nodes, edges, type)
+    /// STORAGE: Used by hierarchical meta-nodes to reconstruct contained subgraphs
+    stored_subgraphs: HashMap<crate::types::SubgraphId, (std::collections::HashSet<NodeId>, std::collections::HashSet<EdgeId>, String)>,
+
+    /*
     === ID MANAGEMENT ===
     Simple incrementing counters for new entities
     */
@@ -314,6 +322,7 @@ impl GraphPool {
             node_attributes: HashMap::new(),
             edge_attributes: HashMap::new(),
             topology: HashMap::new(),
+            stored_subgraphs: HashMap::new(),
             next_node_id: 0,
             next_edge_id: 0,
         }
@@ -791,19 +800,29 @@ impl GraphPool {
         edges: std::collections::HashSet<EdgeId>,
         subgraph_type: String,
     ) -> GraphResult<crate::types::SubgraphId> {
-        // TODO: Implement proper subgraph storage in GraphPool
-        // For now, just return a hash-based ID
+        // Generate a unique subgraph ID using a hash of the content
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
-        nodes.len().hash(&mut hasher);
-        edges.len().hash(&mut hasher);
+        // Hash the actual node and edge IDs for uniqueness
+        let mut sorted_nodes: Vec<NodeId> = nodes.iter().copied().collect();
+        sorted_nodes.sort();
+        sorted_nodes.hash(&mut hasher);
+        
+        let mut sorted_edges: Vec<EdgeId> = edges.iter().copied().collect();
+        sorted_edges.sort();
+        sorted_edges.hash(&mut hasher);
+        
         subgraph_type.hash(&mut hasher);
         let subgraph_id = (hasher.finish() as usize) as crate::types::SubgraphId;
+        
+        // Store the subgraph data
+        self.stored_subgraphs.insert(subgraph_id, (nodes, edges, subgraph_type));
+        
         Ok(subgraph_id)
     }
 
-    /// Get stored subgraph data (placeholder for now)
+    /// Get stored subgraph data
     pub fn get_subgraph(
         &self,
         subgraph_id: crate::types::SubgraphId,
@@ -812,14 +831,16 @@ impl GraphPool {
         std::collections::HashSet<EdgeId>,
         String,
     )> {
-        // TODO: Implement proper subgraph retrieval from GraphPool
-        // For now, return empty data
-        let _ = subgraph_id; // Silence unused parameter warning
-        Ok((
-            std::collections::HashSet::new(),
-            std::collections::HashSet::new(),
-            "placeholder".to_string(),
-        ))
+        match self.stored_subgraphs.get(&subgraph_id) {
+            Some((nodes, edges, subgraph_type)) => {
+                Ok((nodes.clone(), edges.clone(), subgraph_type.clone()))
+            }
+            None => {
+                Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Subgraph with ID {} not found in storage", subgraph_id
+                )))
+            }
+        }
     }
 
     /// Get subgraph attribute (placeholder for now)
