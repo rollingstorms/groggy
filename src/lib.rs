@@ -142,7 +142,6 @@ pub mod types;
 // Reorganized module structure
 pub mod subgraphs;   // Subgraph types and operations
 pub mod storage;     // Storage and view types  
-pub mod operations;  // Core graph operations
 pub mod query;       // Query and traversal functionality
 pub mod state;       // State management
 pub mod utils;       // Utilities and configuration
@@ -177,11 +176,9 @@ pub use storage::{
     MatrixProperties, GraphPool, AggregateOp, ConnectivityType, GraphTable, GroupBy, 
     TableMetadata
 };
-pub use state::{ChangeTracker, ColumnDelta, DeltaObject};
-pub use operations::{ComponentSubgraph};
+pub use state::{ChangeTracker, ColumnDelta, DeltaObject, GraphSpace};
 pub use subgraphs::{FilteredSubgraph, AggregationFunction, HierarchicalOperations, MetaNode, 
-    NeighborhoodSubgraph, SimilarityMetric};
-pub use utils::{GraphSpace};
+    NeighborhoodSubgraph, SimilarityMetric, ComponentSubgraph};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

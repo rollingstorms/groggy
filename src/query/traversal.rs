@@ -12,7 +12,7 @@
 
 use crate::storage::pool::GraphPool;
 use crate::query::query::{EdgeFilter, NodeFilter, QueryEngine};
-use crate::utils::space::GraphSpace;
+use crate::state::space::GraphSpace;
 use crate::errors::GraphResult;
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 use std::cmp::Ordering;

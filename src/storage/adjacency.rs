@@ -14,7 +14,7 @@
 
 use crate::storage::array::GraphArray; // Our enhanced array type
 use crate::storage::pool::GraphPool;
-use crate::utils::space::GraphSpace;
+use crate::state::space::GraphSpace;
 use crate::errors::GraphResult;
 use crate::types::{AttrValue, EdgeId, NodeId};
 use std::collections::HashMap;

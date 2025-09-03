@@ -26,7 +26,7 @@ KEY DESIGN DECISIONS:
 - Environment variable overrides for deployment flexibility
 */
 
-use crate::operations::strategies::StorageStrategyType;
+use crate::utils::strategies::StorageStrategyType;
 use crate::types::GraphType;
 
 /// The main configuration structure for the entire graph system

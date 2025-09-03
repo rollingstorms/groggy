@@ -5,13 +5,16 @@
 //! - Hierarchical subgraphs  
 //! - Neighborhood subgraphs
 //! - Filtered subgraphs
+//! - Component subgraphs
 
 pub mod subgraph;
 pub mod hierarchical;
 pub mod neighborhood;
 pub mod filtered;
+pub mod component;
 
 pub use subgraph::*;
 pub use hierarchical::*;
 pub use neighborhood::*;
 pub use filtered::*;
+pub use component::*;

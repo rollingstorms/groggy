@@ -50,7 +50,7 @@ pub struct ChangeTracker {
 
 use crate::state::delta::DeltaObject;
 use crate::storage::pool::GraphPool;
-use crate::operations::strategies::{
+use crate::utils::strategies::{
     create_strategy, StorageCharacteristics, StorageStrategyType, TemporalStorageStrategy,
 };
 use crate::errors::GraphError;

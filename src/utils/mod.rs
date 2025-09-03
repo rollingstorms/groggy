@@ -4,14 +4,14 @@
 //! - Configuration management
 //! - Type conversion utilities
 //! - General utilities
-//! - Space management
+//! - Graph strategies
 
 pub mod config;
 pub mod convert;
 pub mod util;
-pub mod space;
+pub mod strategies;
 
 pub use config::*;
 pub use convert::*;
 pub use util::*;
-pub use space::*;
+pub use strategies::*;

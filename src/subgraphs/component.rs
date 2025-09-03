@@ -129,7 +129,7 @@ impl GraphEntity for ComponentSubgraph {
 
     fn related_entities(&self) -> GraphResult<Vec<Box<dyn GraphEntity>>> {
         // Return nodes in this component as EntityNode wrappers
-        use crate::operations::node::EntityNode;
+        use crate::storage::node::EntityNode;
 
         let entities: Vec<Box<dyn GraphEntity>> = self
             .nodes

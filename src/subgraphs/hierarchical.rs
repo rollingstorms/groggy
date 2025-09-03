@@ -430,7 +430,7 @@ impl<T: SubgraphOperations> HierarchicalOperations for T {
 
     fn to_root(&self) -> GraphResult<Box<dyn GraphEntity>> {
         // For now, return self as root (TODO: implement proper hierarchy traversal)
-        Ok(Box::new(crate::operations::node::EntityNode::new(
+        Ok(Box::new(crate::storage::node::EntityNode::new(
             self.node_set().iter().next().copied().unwrap_or(0),
             self.graph_ref(),
         )))

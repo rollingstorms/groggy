@@ -19,7 +19,7 @@ use crate::subgraphs::neighborhood::NeighborhoodSampler;
 use crate::storage::pool::GraphPool;
 use crate::query::query::{EdgeFilter, NodeFilter, QueryEngine};
 use crate::state::ref_manager::BranchInfo;
-use crate::utils::space::GraphSpace;
+use crate::state::space::GraphSpace;
 use crate::query::traversal::TraversalEngine;
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{
@@ -1202,7 +1202,7 @@ impl Graph {
 
     /// Calculate space memory usage
     fn calculate_space_memory(&self) -> usize {
-        let base_size = std::mem::size_of::<crate::utils::space::GraphSpace>();
+        let base_size = std::mem::size_of::<crate::state::space::GraphSpace>();
 
         // Active sets
         let active_nodes_size =
@@ -1596,7 +1596,7 @@ impl Graph {
     ) -> Result<(), GraphError> {
         // 1. Clear current state
         self.pool = Rc::new(RefCell::new(crate::storage::pool::GraphPool::new()));
-        self.space = crate::utils::space::GraphSpace::new(self.pool.clone(), snapshot.state_id);
+        self.space = crate::state::space::GraphSpace::new(self.pool.clone(), snapshot.state_id);
 
         // 2. Restore nodes
         for &node_id in &snapshot.active_nodes {
