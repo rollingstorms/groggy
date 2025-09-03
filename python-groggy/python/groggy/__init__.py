@@ -35,6 +35,9 @@ from ._groggy import (
     format_table,
     format_data_structure,
     detect_display_type,
+    # Hierarchical subgraph functionality
+    AggregationFunction,
+    MetaNode,
 )
 
 from .types import NodeId, EdgeId, AttrName, StateId, BranchName
@@ -147,4 +150,7 @@ __all__ = [
     "array",
     "matrix", 
     "table",
+    # Hierarchical subgraph functionality
+    "AggregationFunction",
+    "MetaNode",
 ]

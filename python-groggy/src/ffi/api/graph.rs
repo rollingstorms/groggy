@@ -2061,4 +2061,39 @@ impl PyGraph {
     }
 
     // === DELEGATED METHODS - Pure SubgraphOperations delegation ===
+
+    // === HIERARCHICAL METHODS ===
+
+    /// Add multiple subgraphs to the graph as meta-nodes (batch operation)
+    /// 
+    /// Args:
+    ///     subgraphs: List of Subgraph objects to add as meta-nodes
+    ///     agg_functions: Optional dict mapping attribute names to aggregation functions
+    /// 
+    /// Returns:
+    ///     List[MetaNode]: The created meta-nodes
+    /// 
+    /// Example:
+    ///     communities = g.connected_components()
+    ///     meta_nodes = g.add_subgraphs(communities, {
+    ///         "total_weight": "sum",
+    ///         "avg_degree": "mean"
+    ///     })
+    fn add_subgraphs(
+        &self,
+        py: Python,
+        subgraphs: Vec<Py<crate::ffi::subgraphs::subgraph::PySubgraph>>,
+        agg_functions: Option<&pyo3::types::PyDict>,
+    ) -> PyResult<Vec<PyObject>> {
+        let mut meta_nodes = Vec::new();
+
+        for py_subgraph in subgraphs {
+            // Extract the PySubgraph and call its add_to_graph method
+            let subgraph = py_subgraph.borrow(py);
+            let meta_node = subgraph.add_to_graph(py, agg_functions)?;
+            meta_nodes.push(meta_node);
+        }
+
+        Ok(meta_nodes)
+    }
 }

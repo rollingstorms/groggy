@@ -91,13 +91,61 @@ aggregated = subgraphs.aggregate({
 subgraph_nodes = g.nodes.subgraphs            # PyArray[Node] where is_subgraph_node=True
 ```
 
-## 🔗 **Edge Handling in Hierarchical Graphs**
+## 🔗 **Advanced Edge Handling in Hierarchical Graphs**
+
+### Two-Tier Entity System Architecture
+```python
+# === ACCESSORS (Filtered Views) ===
+g.nodes           # All nodes accessor (base + meta)
+g.nodes.base      # Base/regular nodes accessor  
+g.nodes.meta      # Meta-nodes accessor
+g.edges           # All edges accessor (base + meta)
+g.edges.base      # Base/regular edges accessor
+g.edges.meta      # Meta-edges accessor
+
+# === SUBGRAPHS (Actionable) ===
+g.nodes()         # All nodes subgraph
+g.nodes.base()    # Base nodes subgraph
+g.nodes.meta()    # Meta-nodes subgraph
+
+# === TABLES (Data Views) ===
+g.nodes.table()      # All nodes table
+g.nodes.base.table() # Base nodes table (auto-sliced NaN columns)
+g.nodes.meta.table() # Meta-nodes table (auto-sliced NaN columns)
+```
+
+### Meta-Edge Creation During Collapse
+```python
+# Advanced collapse with comprehensive edge handling
+meta_node = subgraph.collapse_to_node(
+    agg_functions={"salary": "sum", "age": "mean"},
+    defaults={"bonus": 0},           # Default values for missing attributes
+    
+    # Edge handling options
+    edge_to_external="copy",         # copy, aggregate, count
+    edge_to_meta="auto",             # auto, explicit, none  
+    meta_edge_agg="sum"              # How to aggregate parallel meta-edges
+)
+```
+
+### Meta-Edge Types and Behavior
+```python
+# Type 1: Child-to-External Meta-edges (always created)
+# When nodes [1,2,3] collapse to meta_node_A:
+# - If node 1 → external_node, creates meta_node_A → external_node
+# - If node 2 → external_node, aggregates to strengthen meta_node_A → external_node
+
+# Type 2: Meta-to-Meta edges (created when applicable)  
+# If collapsed nodes had edges to nodes that are now in other meta-nodes:
+# - node 1 → node 4, and node 4 is now in meta_node_B
+# - Creates meta_node_A → meta_node_B
+```
 
 ### Inter-Level Edges
 ```python
 # Edges between different hierarchical levels
-g.add_edge(regular_node_id, meta_node_id)     # Regular node ↔ Meta-node
-g.add_edge(meta_node_1, meta_node_2)          # Meta-node ↔ Meta-node
+g.add_edge(base_node_id, meta_node_id)     # Base node ↔ Meta-node
+g.add_edge(meta_node_1, meta_node_2)       # Meta-node ↔ Meta-node
 
 # Edge aggregation during collapse
 community_1 = g.nodes([1, 2, 3])
@@ -107,18 +155,51 @@ community_2 = g.nodes([4, 5, 6])
 inter_edges = g.edges.between_subgraphs(community_1, community_2)
 ```
 
-### Edge Transformation Strategies
+## 📊 **Enhanced Aggregation and Feature Engineering**
+
+### Enhanced Missing Attribute Handling
 ```python
-# Different strategies for handling internal edges
-meta_node = subgraph.add_to_graph(
-    edge_strategy="aggregate",     # Sum weights of internal edges
-    # edge_strategy="preserve",    # Keep internal edges as self-loops
-    # edge_strategy="discard",     # Remove internal edges
-    # edge_strategy="external_only" # Only preserve edges to outside nodes
+# Strict validation by default (errors on missing attributes)
+try:
+    meta_node = subgraph.collapse_to_node({
+        "salary": "sum",
+        "bonus": "mean"      # Error if 'bonus' doesn't exist on any nodes
+    })
+except MissingAttributeError as e:
+    print(f"Attribute '{e.attribute}' not found")
+
+# Advanced usage with defaults for power users
+meta_node = subgraph.collapse_to_node(
+    agg_functions={"salary": "sum", "age": "mean"},
+    defaults={
+        "bonus": 0,          # Default value if 'bonus' attribute missing
+        "rating": 3.0,       # Default value if 'rating' attribute missing
+        "department": "unknown"  # Default for categorical attributes
+    }
 )
+
+# Default value behavior by aggregation type:
+# sum/mean → 0
+# count → 0 (but count always works regardless of attributes)
+# max/min → None 
+# first/last → None
+# concat → "" (empty string)
 ```
 
-## 📊 **Aggregation and Feature Engineering**
+### Auto-Optimized Table Views
+```python
+# Tables automatically slice out NaN-only columns
+base_table = g.nodes.base.table()     # Excludes meta-node-only attributes
+meta_table = g.nodes.meta.table()     # Excludes base-node-only attributes
+
+# Manual control over column slicing
+all_table = g.nodes.table(auto_slice=False)  # Include all columns
+clean_table = g.nodes.table(auto_slice=True) # Auto-remove NaN columns
+
+# Prefetch attribute schema for performance
+g.nodes.base.prefetch_schema()        # Cache which attributes exist
+optimized_table = g.nodes.base.table()  # Faster with prefetched schema
+```
 
 ### Built-in Aggregation Functions
 ```python
@@ -368,7 +449,122 @@ except AggregationTypeError as e:
     )
 ```
 
-## 🏗️ **Implementation Architecture**
+## 🏗️ **Architectural Decisions and Implementation**
+
+### Key Design Decisions
+
+#### 1. Missing Attribute Handling Strategy
+**Decision**: Error by default + defaults dict for advanced usage
+- **Primary behavior**: `MissingAttributeError` when aggregating non-existent attributes
+- **Advanced usage**: Optional `defaults` parameter for power users
+- **Rationale**: Strict validation catches typos while remaining flexible
+
+#### 2. Base vs Meta Entity Terminology  
+**Decision**: Use "base" for all non-meta entities
+- `g.nodes.base` → Regular/original nodes
+- `g.nodes.meta` → Meta-nodes  
+- `g.edges.base` → Regular edges
+- `g.edges.meta` → Meta-edges
+- **Rationale**: "base" is clear, semantic, and avoids confusion with "regular"
+
+#### 3. Filtered Accessors vs Subgraphs
+**Decision**: Dual-purpose accessor pattern
+- **Accessor**: `g.nodes.meta` (no parentheses) → Filtered view for data access
+- **Subgraph**: `g.nodes.meta()` (with parentheses) → Actionable subgraph
+- **Rationale**: Clean separation between data access and graph operations
+
+#### 4. Auto-Sliced Table Views
+**Decision**: Remove NaN-only columns by default in filtered tables
+- `g.nodes.base.table()` → Excludes meta-only attributes automatically
+- `g.nodes.meta.table()` → Excludes base-only attributes automatically
+- `auto_slice=False` → Override for full column access
+- **Rationale**: Cleaner data views, better performance, more intuitive
+
+#### 5. Meta-Edge Creation Strategy
+**Decision**: Heterogeneous meta-nodes with optional edge aggregation
+- **Default**: Copy all edges from collapsed nodes to meta-edges
+- **Optional**: Edge aggregation (sum, count, mean) for parallel edges
+- **Two types**: Child-to-external (always) + meta-to-meta (conditional)
+- **Rationale**: Maximum flexibility while maintaining graph connectivity
+
+#### 6. Worf's Airtight Entity Type System 🛡️
+**Decision**: Balance simplicity and safety using columnar storage with type markers
+- **Core Approach**: Use `entity_type` attribute to distinguish base vs meta entities
+- **Safety Guarantees**: Type-safe creation, immutable types, atomic operations, validation
+- **Performance**: Leverage existing efficient columnar storage and attribute indexing
+- **Migration**: Safe upgrade path for existing nodes
+
+### Worf's Safety Architecture
+
+#### Type-Safe Entity Creation
+```rust
+impl Graph {
+    /// SAFE: Create base node (default behavior)
+    pub fn add_node(&mut self) -> NodeId {
+        let node_id = self.pool.allocate_node_id();
+        self.pool.set_attr(node_id, "entity_type", AttrValue::Text("base")).unwrap();
+        self.space.mark_node_active(node_id);
+        node_id
+    }
+
+    /// SAFE: Create meta-node atomically with required attributes
+    pub fn create_meta_node(&mut self, subgraph_id: SubgraphId) -> GraphResult<NodeId> {
+        let node_id = self.pool.allocate_node_id();
+        
+        // ATOMIC OPERATION: Either all succeed or all fail
+        let mut transaction = self.begin_transaction();
+        transaction.set_attr(node_id, "entity_type", AttrValue::Text("meta"))?;
+        transaction.set_attr(node_id, "contained_subgraph", AttrValue::SubgraphRef(subgraph_id))?;
+        transaction.validate_meta_node_requirements(node_id)?;
+        transaction.commit()?;
+        
+        self.space.mark_node_active(node_id);
+        Ok(node_id)
+    }
+
+    /// FORBIDDEN: Direct entity_type modification
+    pub fn set_node_attr(&mut self, node_id: NodeId, attr_name: AttrName, value: AttrValue) -> GraphResult<()> {
+        if attr_name == "entity_type" {
+            return Err(GraphError::InvalidInput(
+                "entity_type is immutable. Use create_meta_node() or add_node()".to_string()
+            ));
+        }
+        // ... rest of implementation
+    }
+}
+```
+
+#### Safety Guarantees
+1. **✅ Type Safety**: No invalid entity types possible through API design
+2. **✅ Immutability**: Entity types cannot be changed after creation
+3. **✅ Atomicity**: All meta-node creation is transactional (all-or-nothing)
+4. **✅ Validation**: All entities validated on creation and query operations
+5. **✅ Migration**: Safe upgrade path for existing nodes without entity_type
+6. **✅ Performance**: Validation cached, type queries use efficient columnar storage
+
+#### Entity Validation System
+```rust
+pub struct EntityValidator {
+    /// REQUIREMENT: Meta-nodes MUST have entity_type = "meta"
+    /// REQUIREMENT: Meta-nodes MUST have valid contained_subgraph reference
+    /// REQUIREMENT: Base nodes MUST NOT have contained_subgraph (unless migrated)
+    /// PERFORMANCE: Validation results cached for repeated queries
+}
+```
+
+#### Safe Query Interface
+```rust
+// Type-checked queries using efficient columnar storage
+impl Graph {
+    pub fn is_meta_node(&self, node_id: NodeId) -> bool
+    pub fn is_base_node(&self, node_id: NodeId) -> bool
+    pub fn get_meta_nodes(&self) -> Vec<NodeId>          // Only validated meta-nodes
+    pub fn get_base_nodes(&self) -> Vec<NodeId>          // Only validated base nodes
+    pub fn migrate_entity_types(&mut self) -> GraphResult<()> // Safe migration
+}
+```
+
+### Implementation Architecture
 
 ### Core Data Structures
 ```rust
