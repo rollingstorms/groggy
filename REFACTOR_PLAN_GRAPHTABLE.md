@@ -18,6 +18,60 @@ The existing `GraphTable` is a generic DataFrame-like structure:
 
 ## New Architecture Design
 
+### 0. Table Trait (Foundation)
+```rust
+/// Core table operations shared by all table types
+pub trait Table {
+    // Basic table info
+    fn nrows(&self) -> usize;
+    fn ncols(&self) -> usize;
+    fn column_names(&self) -> &[String];
+    fn shape(&self) -> (usize, usize) { (self.nrows(), self.ncols()) }
+    
+    // Column access
+    fn column(&self, name: &str) -> Option<&GraphArray>;
+    fn column_by_index(&self, index: usize) -> Option<&GraphArray>;
+    fn has_column(&self, name: &str) -> bool;
+    
+    // Data access patterns
+    fn head(&self, n: usize) -> Self;
+    fn tail(&self, n: usize) -> Self;
+    fn slice(&self, start: usize, end: usize) -> Self;
+    
+    // DataFrame-like operations  
+    fn sort_by(&self, column: &str, ascending: bool) -> GraphResult<Self> where Self: Sized;
+    fn filter(&self, predicate: &str) -> GraphResult<Self> where Self: Sized;
+    fn group_by(&self, columns: &[String]) -> GraphResult<Vec<Self>> where Self: Sized;
+    
+    // Schema and metadata
+    fn schema(&self) -> TableSchema;
+    fn dtypes(&self) -> HashMap<String, DataType>;
+    fn metadata(&self) -> &TableMetadata;
+    
+    // Iteration
+    fn iter_rows(&self) -> impl Iterator<Item = HashMap<String, AttrValue>>;
+    fn iter_column(&self, name: &str) -> Option<impl Iterator<Item = &AttrValue>>;
+    
+    // Validation and quality
+    fn lint(&self) -> Vec<ValidationWarning>;
+    fn validate_schema(&self, spec: &SchemaSpec) -> ValidationResult;
+    
+    // I/O operations
+    fn to_parquet(&self, path: &Path) -> GraphResult<()>;
+    fn to_csv(&self, path: &Path) -> GraphResult<()>;
+    fn load_parquet(path: &Path) -> GraphResult<Self>;
+    fn load_csv(path: &Path) -> GraphResult<Self>;
+}
+
+/// Optional mutable operations (not all table types need these)
+pub trait TableMut: Table {
+    fn column_mut(&mut self, name: &str) -> Option<&mut GraphArray>;
+    fn add_column(&mut self, name: String, data: GraphArray) -> GraphResult<()>;
+    fn drop_column(&mut self, name: &str) -> GraphResult<()>;
+    fn rename_column(&mut self, old: &str, new: &str) -> GraphResult<()>;
+}
+```
+
 ### 1. BaseTable (Foundation)
 ```rust
 // Keep most of current GraphTable functionality
@@ -28,10 +82,22 @@ pub struct BaseTable {
     metadata: TableMetadata,
 }
 
-impl BaseTable {
+impl Table for BaseTable {
+    // Implement all trait methods - core table operations
     // All current GraphTable methods: head, tail, sort_by, group_by, etc.
     // Basic pandas-like operations
     // No graph-specific assumptions
+}
+
+impl TableMut for BaseTable {
+    // Mutable operations for BaseTable (it's the most permissive)
+}
+
+impl BaseTable {
+    // BaseTable-specific methods beyond the trait
+    pub fn new(columns: Vec<GraphArray>, names: Vec<String>) -> Self;
+    pub fn from_parquet(path: &Path) -> GraphResult<Self>;
+    pub fn from_csv(path: &Path) -> GraphResult<Self>;
 }
 ```
 
@@ -43,13 +109,28 @@ pub struct NodesTable {
     node_id_mapping: Option<HashMap<String, NodeId>>, // uid -> internal node ID
 }
 
+impl Table for NodesTable {
+    // Delegate all Table trait methods to underlying BaseTable
+    fn nrows(&self) -> usize { self.base.nrows() }
+    fn ncols(&self) -> usize { self.base.ncols() }
+    fn column_names(&self) -> &[String] { self.base.column_names() }
+    // ... etc. Most methods can be simple delegation
+    
+    // Override lint() to include node-specific validations
+    fn lint(&self) -> Vec<ValidationWarning> {
+        let mut warnings = self.base.lint();
+        warnings.extend(self.validate_node_structure());
+        warnings
+    }
+}
+
 impl NodesTable {
     // Convert from BaseTable with validation
     fn from_base_table(table: BaseTable, uid_key: String) -> GraphResult<Self>;
     
-    // Validation methods
+    // Node-specific validation methods
     fn validate_uids(&self) -> GraphResult<()>; // Check uniqueness, no nulls
-    fn lint(&self) -> Vec<ValidationWarning>;   // Non-blocking warnings
+    fn validate_node_structure(&self) -> Vec<ValidationWarning>; // Node-specific lint
     
     // Graph-specific methods
     fn get_by_uid(&self, uid: &str) -> Option<&HashMap<String, AttrValue>>;
@@ -70,35 +151,50 @@ impl BaseTable {
 ```rust
 pub struct EdgesTable {
     base: BaseTable,
-    src_column: String,       // Column containing source node IDs
-    dst_column: String,       // Column containing destination node IDs
+    source_column: String,       // Column containing source node IDs
+    target_column: String,       // Column containing destination node IDs
     edge_config: EdgeConfig,  // Policy settings
 }
 
 pub struct EdgeConfig {
     drop_self_loops: bool,
     allow_duplicates: bool,
-    src_type: String,         // Expected type for src column
-    dst_type: String,         // Expected type for dst column
+    source_type: String,         // Expected type for src column
+    target_type: String,         // Expected type for dst column
+}
+
+impl Table for EdgesTable {
+    // Delegate most Table trait methods to underlying BaseTable
+    fn nrows(&self) -> usize { self.base.nrows() }
+    fn ncols(&self) -> usize { self.base.ncols() }
+    fn column_names(&self) -> &[String] { self.base.column_names() }
+    // ... etc.
+    
+    // Override lint() to include edge-specific validations
+    fn lint(&self) -> Vec<ValidationWarning> {
+        let mut warnings = self.base.lint();
+        warnings.extend(self.validate_edge_structure());
+        warnings
+    }
 }
 
 impl EdgesTable {
     // Convert from BaseTable with validation
     fn from_base_table(
         table: BaseTable, 
-        src: &str, 
-        dst: &str, 
+        source: &str, 
+        target: &str, 
         config: EdgeConfig
     ) -> GraphResult<Self>;
     
-    // Validation methods
+    // Edge-specific validation methods
     fn validate_endpoints(&self) -> GraphResult<()>;
-    fn lint(&self) -> Vec<ValidationWarning>;
+    fn validate_edge_structure(&self) -> Vec<ValidationWarning>; // Edge-specific lint
     
     // Edge-specific methods
     fn iter_edges(&self) -> impl Iterator<Item = (String, String)>; // (src_uid, dst_uid)
     fn to_edge_list(&self) -> Vec<(String, String)>;
-    fn filter_by_endpoints(&self, src_uids: &[String], dst_uids: &[String]) -> EdgesTable;
+    fn filter_by_endpoints(&self, source_uids: &[String], target_uids: &[String]) -> EdgesTable;
     
     // Access underlying BaseTable
     fn base(&self) -> &BaseTable;
@@ -107,9 +203,9 @@ impl EdgesTable {
 
 // Conversion methods
 impl BaseTable {
-    fn to_edges(self, src: &str, dst: &str, config: EdgeConfig) -> GraphResult<EdgesTable>;
+    fn to_edges(self, source: &str, target: &str, config: EdgeConfig) -> GraphResult<EdgesTable>;
     // Convenience method with defaults
-    fn to_edges_simple(self, src: &str, dst: &str) -> GraphResult<EdgesTable>;
+    fn to_edges_simple(self, source: &str, target: &str) -> GraphResult<EdgesTable>;
 }
 ```
 
@@ -133,14 +229,53 @@ pub enum MissingNodePolicy {
     Warn,         // Log warnings but proceed
 }
 
+impl Table for GraphTable {
+    // For composite GraphTable, Table operations could:
+    // 1. Throw error (GraphTable doesn't represent a single table)
+    // 2. Default to nodes table operations  
+    // 3. Provide summary statistics across both tables
+    
+    fn nrows(&self) -> usize { 
+        self.nodes.nrows() + self.edges.nrows() // Total rows across both tables
+    }
+    
+    fn ncols(&self) -> usize { 
+        // Could return combined unique columns, or max of the two
+        self.nodes.ncols().max(self.edges.ncols())
+    }
+    
+    fn column_names(&self) -> &[String] {
+        // Note: This is tricky for composite - might need to return a computed Vec
+        // For now, prioritize nodes table column names
+        self.nodes.column_names()
+    }
+    
+    fn lint(&self) -> Vec<ValidationWarning> {
+        let mut warnings = self.nodes.lint();
+        warnings.extend(self.edges.lint());
+        warnings.extend(self.validate_graph_consistency());
+        warnings
+    }
+    
+    // Some Table operations might not make sense for GraphTable
+    // and could return errors or delegate to nodes table
+    fn head(&self, n: usize) -> Self {
+        // For demo - could return GraphTable with head of both nodes and edges
+        unimplemented!("head() for GraphTable requires design decision")
+    }
+    
+    // ... other trait methods
+}
+
 impl GraphTable {
     // Creation methods
     fn new(nodes: NodesTable, edges: EdgesTable, policy: ValidationPolicy) -> GraphResult<Self>;
     fn from_nodes_only(nodes: NodesTable) -> Self; // Empty edges
     fn from_edges_only(edges: EdgesTable, policy: ValidationPolicy) -> GraphResult<Self>; // Infer nodes
     
-    // Validation and conformance
+    // Graph-specific validation methods  
     fn validate(&self) -> GraphResult<ValidationReport>;
+    fn validate_graph_consistency(&self) -> Vec<ValidationWarning>; // Cross-table validation
     fn conform(&self, spec: SchemaSpec) -> GraphResult<(Self, ConformReport)>;
     
     // Conversion to final Graph
@@ -170,8 +305,8 @@ NODES_PATH = "nodes.parquet"        # columns like: ENTITY_ID, name, type, ...
 EDGES_PATH = "edges.parquet"        # columns like: from, to, relation, weight, ...
 
 # --- 1) Loose ingest → BaseTable -------------------------------------------
-raw_nodes = gr.table(NODES_PATH)     # BaseTable (no assumptions)
-raw_edges = gr.table(EDGES_PATH)     # BaseTable
+raw_nodes = gr.table.from_parquet(NODES_PATH)     # BaseTable (no assumptions)
+raw_edges = gr.table.from_parquet(EDGES_PATH)     # BaseTable
 
 # Light, optional cleanup on BaseTable before typing (keeps ingest frictionless)
 clean_nodes = (
@@ -191,7 +326,7 @@ clean_edges = (
 # --- 2) Declare intent (typing) --------------------------------------------
 # BaseTable -> NodesTable / EdgesTable
 nodes = clean_nodes.to_nodes(uid_key="entity_id")     # or: gr.nodes(clean_nodes, uid_key="entity_id")
-edges = clean_edges.to_edges(src="src", dst="dst", drop_self_loops=True)
+edges = clean_edges.to_edges(source="src", target="dst", drop_self_loops=True)
 
 # --- 3) Assemble a GraphTable (strict children) ----------------------------
 # Canonical case: both nodes & edges provided
@@ -243,7 +378,7 @@ g_nodes_only = gt_nodes_only.to_graph()          # graph with |V|>0, |E|=0
 
 # --- 8) Edges-only pipeline (infer nodes) ----------------------------------
 # Sometimes you only have edges; infer the node set from src∪dst
-edges_only = gr.table("follows.parquet").rename({"from":"src","to":"dst"}).to_edges(src="src", dst="dst")
+edges_only = gr.table("follows.parquet").rename({"from":"source","to":"target"}).to_edges(source="source", target="target")
 gt_edges_only = gr.GraphTable(edges=edges_only)  # infer nodes automatically
 g_edges_only, report_edges_only = gt_edges_only.to_graph(report=True)
 print("Inferred nodes:", report_edges_only.inferred_nodes_count)
@@ -252,17 +387,17 @@ print("Inferred nodes:", report_edges_only.inferred_nodes_count)
 # Say you have separate domain bundles that you want in one graph:
 gt_users  = gr.GraphTable(
     nodes=gr.table("users.parquet").to_nodes(uid_key="user_id"),
-    edges=gr.table("user_user_edges.parquet").rename({"u":"src","v":"dst"}).to_edges(src="src", dst="dst")
+    edges=gr.table("user_user_edges.parquet").rename({"u":"source","v":"target"}).to_edges(source="source", target="target")
 )
 
 gt_orgs   = gr.GraphTable(
     nodes=gr.table("orgs.parquet").to_nodes(uid_key="org_id"),
-    edges=gr.table("org_org_edges.parquet").rename({"a":"src","b":"dst"}).to_edges(src="src", dst="dst")
+    edges=gr.table("org_org_edges.parquet").rename({"a":"source","b":"target"}).to_edges(source="source", target="target")
 )
 
 gt_events = gr.GraphTable(
     nodes=gr.table("events.parquet").to_nodes(uid_key="event_id"),
-    edges=gr.table("user_event_edges.parquet").to_edges(src="user_id", dst="event_id")
+    edges=gr.table("user_event_edges.parquet").to_edges(source="user_id", target="event_id")
 )
 
 # Unify them into one graph. Two common strategies:
@@ -344,6 +479,7 @@ assert gr.validate_ids(g)  # contiguous int32, no gaps
 ```
 src/
 ├── storage/                    # From reorganization plan
+│   ├── table_trait.rs         # NEW: Table trait definition
 │   ├── table.rs               # Renamed from GraphTable to BaseTable
 │   ├── nodes_table.rs         # NEW: NodesTable implementation
 │   ├── edges_table.rs         # NEW: EdgesTable implementation
@@ -383,7 +519,14 @@ python-groggy/src/ffi/storage/
 
 ## Benefits of New Architecture
 
-### 1. **Type Safety**
+### 1. **Unified Table Interface**
+- `Table` trait provides consistent API across all table types
+- Functions can accept any table type generically: `fn analyze<T: Table>(table: &T)`
+- Common operations (head, filter, sort) work identically on all table types
+- Reduces code duplication - shared implementation for common functionality
+- Enables polymorphic table operations and generic table utilities
+
+### 2. **Type Safety**
 - NodesTable guarantees valid node structure
 - EdgesTable ensures proper edge format
 - Compile-time checks prevent misuse
@@ -428,8 +571,10 @@ python-groggy/src/ffi/storage/
 
 ## Implementation Checklist
 
-### Phase 1: BaseTable Foundation
+### Phase 1: BaseTable Foundation & Table Trait
+- [ ] Define Table trait and TableMut trait in src/storage/table_trait.rs
 - [ ] Rename GraphTable to BaseTable in src/storage/
+- [ ] Implement Table trait for BaseTable (and TableMut)
 - [ ] Update all internal references and imports
 - [ ] Create GraphTable alias for backward compatibility
 - [ ] Update Python bindings
@@ -437,6 +582,7 @@ python-groggy/src/ffi/storage/
 
 ### Phase 2: NodesTable
 - [ ] Create NodesTable struct with BaseTable composition
+- [ ] Implement Table trait for NodesTable (delegate to BaseTable)
 - [ ] Implement validation methods (validate_uids, lint)
 - [ ] Add conversion method BaseTable::to_nodes()
 - [ ] Create Python bindings for NodesTable
@@ -444,6 +590,7 @@ python-groggy/src/ffi/storage/
 
 ### Phase 3: EdgesTable  
 - [ ] Create EdgesTable struct and EdgeConfig
+- [ ] Implement Table trait for EdgesTable (delegate to BaseTable)
 - [ ] Implement validation and iteration methods
 - [ ] Add conversion method BaseTable::to_edges()
 - [ ] Create Python bindings for EdgesTable
@@ -451,6 +598,7 @@ python-groggy/src/ffi/storage/
 
 ### Phase 4: Composite GraphTable
 - [ ] Create new GraphTable with NodesTable + EdgesTable
+- [ ] Implement Table trait for GraphTable (composite semantics)
 - [ ] Implement ValidationPolicy and conformance
 - [ ] Add enhanced to_graph() method
 - [ ] Create bundle storage functionality
