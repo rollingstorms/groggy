@@ -1266,8 +1266,20 @@ impl PySubgraph {
     /// })
     /// ```
     pub fn add_to_graph(&self, py: Python, agg_spec: Option<&pyo3::types::PyDict>) -> PyResult<PyObject> {
-        use crate::ffi::subgraphs::hierarchical::{parse_aggregation_functions, PyMetaNode};
-        use groggy::subgraphs::HierarchicalOperations;
+        // Call enhanced method with default edge configuration
+        self.add_to_graph_with_edge_config(py, agg_spec, None)
+    }
+
+    /// Enhanced add_to_graph with configurable edge aggregation
+    #[pyo3(signature = (agg_spec = None, edge_config = None))]
+    pub fn add_to_graph_with_edge_config(
+        &self,
+        py: Python,
+        agg_spec: Option<&pyo3::types::PyDict>,
+        edge_config: Option<&pyo3::types::PyDict>,
+    ) -> PyResult<PyObject> {
+        use crate::ffi::subgraphs::hierarchical::{parse_aggregation_functions, parse_edge_config, PyMetaNode};
+        use groggy::traits::SubgraphOperations;
         use std::collections::HashMap;
         
         if let Some(spec_dict) = agg_spec {
@@ -1280,17 +1292,40 @@ impl PySubgraph {
             }
         }
         
-        // Fall back to original hierarchical system
+        // Parse edge configuration
+        let edge_config_parsed = parse_edge_config(edge_config).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid edge configuration: {}", e))
+        })?;
+        
+        // Convert aggregation spec to simple HashMap for node attributes
         let agg_funcs = if let Some(dict) = agg_spec {
-            parse_aggregation_functions(py, dict)?
+            // Convert to HashMap<AttrName, String> for node aggregation
+            let mut node_agg = HashMap::new();
+            for (key, value) in dict.iter() {
+                let attr_name = key.extract::<String>()?;
+                let agg_func = value.extract::<String>()?;
+                node_agg.insert(attr_name, agg_func);
+            }
+            node_agg
         } else {
             HashMap::new()
         };
 
-        // Create meta-node using hierarchical system
-        let meta_node = self.inner.collapse_to_meta_node(agg_funcs).map_err(|e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e))
-        })?;
+        // Use the new enhanced collapse method with edge configuration
+        let meta_node_id = self.inner.collapse_to_node_with_edge_config(agg_funcs, &edge_config_parsed)
+            .map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e))
+            })?;
+
+        // Get the created meta-node from the graph
+        let graph_binding = self.inner.graph_ref();
+        let graph = graph_binding.borrow();
+        
+        // Create MetaNode wrapper
+        let meta_node = groggy::subgraphs::MetaNode::from_node_id(&*graph, meta_node_id)
+            .map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to retrieve meta-node: {}", e))
+            })?;
 
         // Wrap in Python MetaNode
         let py_meta_node = PyMetaNode::from_meta_node(meta_node);

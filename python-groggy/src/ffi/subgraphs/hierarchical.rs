@@ -5,6 +5,7 @@
 
 use groggy::subgraphs::{AggregationFunction, HierarchicalOperations, MetaNode};
 use groggy::traits::GraphEntity;
+use groggy::traits::subgraph_operations::{ExternalEdgeStrategy, MetaEdgeStrategy, EdgeAggregationFunction, EdgeAggregationConfig};
 use groggy::{AttrName, AttrValue, NodeId};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -119,6 +120,287 @@ impl PyAggregationFunction {
 
         // Convert result back to Python
         crate::ffi::utils::attr_value_to_python_value(py, &result)
+    }
+}
+
+/// Python wrapper for ExternalEdgeStrategy
+#[pyclass(name = "ExternalEdgeStrategy", unsendable)]
+#[derive(Clone)]
+pub struct PyExternalEdgeStrategy {
+    pub inner: ExternalEdgeStrategy,
+}
+
+#[pymethods]
+impl PyExternalEdgeStrategy {
+    /// Create separate meta-edges for each original edge (preserves all attributes)
+    #[classmethod]
+    fn copy(_cls: &PyType) -> Self {
+        Self {
+            inner: ExternalEdgeStrategy::Copy,
+        }
+    }
+
+    /// Create single meta-edge with aggregated attributes (default)
+    #[classmethod]
+    fn aggregate(_cls: &PyType) -> Self {
+        Self {
+            inner: ExternalEdgeStrategy::Aggregate,
+        }
+    }
+
+    /// Create single meta-edge with only count information
+    #[classmethod]
+    fn count(_cls: &PyType) -> Self {
+        Self {
+            inner: ExternalEdgeStrategy::Count,
+        }
+    }
+
+    /// No meta-edges to external nodes created
+    #[classmethod]
+    fn none(_cls: &PyType) -> Self {
+        Self {
+            inner: ExternalEdgeStrategy::None,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{:?}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("ExternalEdgeStrategy.{:?}", self.inner)
+    }
+}
+
+/// Python wrapper for MetaEdgeStrategy
+#[pyclass(name = "MetaEdgeStrategy", unsendable)]
+#[derive(Clone)]
+pub struct PyMetaEdgeStrategy {
+    pub inner: MetaEdgeStrategy,
+}
+
+#[pymethods]
+impl PyMetaEdgeStrategy {
+    /// Automatically create meta-to-meta edges based on subgraph connections (default)
+    #[classmethod]
+    fn auto(_cls: &PyType) -> Self {
+        Self {
+            inner: MetaEdgeStrategy::Auto,
+        }
+    }
+
+    /// Only create meta-to-meta edges when explicitly requested
+    #[classmethod]
+    fn explicit(_cls: &PyType) -> Self {
+        Self {
+            inner: MetaEdgeStrategy::Explicit,
+        }
+    }
+
+    /// No meta-to-meta edges created automatically
+    #[classmethod]
+    fn none(_cls: &PyType) -> Self {
+        Self {
+            inner: MetaEdgeStrategy::None,
+        }
+    }
+
+    fn __str__(&self) -> String {
+        format!("{:?}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("MetaEdgeStrategy.{:?}", self.inner)
+    }
+}
+
+/// Python wrapper for EdgeAggregationFunction
+#[pyclass(name = "EdgeAggregationFunction", unsendable)]
+#[derive(Clone)]
+pub struct PyEdgeAggregationFunction {
+    pub inner: EdgeAggregationFunction,
+}
+
+#[pymethods]
+impl PyEdgeAggregationFunction {
+    #[classmethod]
+    fn sum(_cls: &PyType) -> Self {
+        Self { inner: EdgeAggregationFunction::Sum }
+    }
+
+    #[classmethod]
+    fn mean(_cls: &PyType) -> Self {
+        Self { inner: EdgeAggregationFunction::Mean }
+    }
+
+    #[classmethod]
+    fn max(_cls: &PyType) -> Self {
+        Self { inner: EdgeAggregationFunction::Max }
+    }
+
+    #[classmethod]
+    fn min(_cls: &PyType) -> Self {
+        Self { inner: EdgeAggregationFunction::Min }
+    }
+
+    #[classmethod]
+    fn count(_cls: &PyType) -> Self {
+        Self { inner: EdgeAggregationFunction::Count }
+    }
+
+    #[classmethod]
+    fn concat(_cls: &PyType) -> Self {
+        Self { inner: EdgeAggregationFunction::Concat }
+    }
+
+    #[classmethod]
+    fn concat_unique(_cls: &PyType) -> Self {
+        Self { inner: EdgeAggregationFunction::ConcatUnique }
+    }
+
+    #[classmethod]
+    fn first(_cls: &PyType) -> Self {
+        Self { inner: EdgeAggregationFunction::First }
+    }
+
+    #[classmethod]
+    fn last(_cls: &PyType) -> Self {
+        Self { inner: EdgeAggregationFunction::Last }
+    }
+
+    /// Parse aggregation function from string
+    #[classmethod]
+    fn from_string(_cls: &PyType, s: String) -> PyResult<Self> {
+        let inner = EdgeAggregationFunction::from_string(&s)
+            .map_err(|e| PyValueError::new_err(format!("Invalid edge aggregation function: {}", e)))?;
+        Ok(Self { inner })
+    }
+
+    fn __str__(&self) -> String {
+        format!("{:?}", self.inner)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("EdgeAggregationFunction.{:?}", self.inner)
+    }
+}
+
+/// Python wrapper for EdgeAggregationConfig
+#[pyclass(name = "EdgeAggregationConfig", unsendable)]
+#[derive(Clone)]
+pub struct PyEdgeAggregationConfig {
+    pub inner: EdgeAggregationConfig,
+}
+
+impl Default for PyEdgeAggregationConfig {
+    fn default() -> Self {
+        Self {
+            inner: EdgeAggregationConfig::default(),
+        }
+    }
+}
+
+#[pymethods]
+impl PyEdgeAggregationConfig {
+    #[new]
+    #[pyo3(signature = (
+        edge_to_external = None,
+        edge_to_meta = None,
+        edge_aggregation = None,
+        default_aggregation = None,
+        min_edge_count = None,
+        include_edge_count = None,
+        mark_entity_type = None
+    ))]
+    fn new(
+        edge_to_external: Option<PyExternalEdgeStrategy>,
+        edge_to_meta: Option<PyMetaEdgeStrategy>,
+        edge_aggregation: Option<&PyDict>,
+        default_aggregation: Option<PyEdgeAggregationFunction>,
+        min_edge_count: Option<u32>,
+        include_edge_count: Option<bool>,
+        mark_entity_type: Option<bool>,
+    ) -> PyResult<Self> {
+        let mut config = EdgeAggregationConfig::default();
+
+        if let Some(strategy) = edge_to_external {
+            config.edge_to_external = strategy.inner;
+        }
+
+        if let Some(strategy) = edge_to_meta {
+            config.edge_to_meta = strategy.inner;
+        }
+
+        if let Some(agg_dict) = edge_aggregation {
+            for (key, value) in agg_dict.iter() {
+                let attr_name: AttrName = key.extract::<String>()?;
+                if let Ok(func) = value.extract::<PyEdgeAggregationFunction>() {
+                    config.edge_aggregation.insert(attr_name, func.inner);
+                } else if let Ok(func_str) = value.extract::<String>() {
+                    let func = EdgeAggregationFunction::from_string(&func_str)
+                        .map_err(|e| PyValueError::new_err(format!("Invalid aggregation function '{}': {}", func_str, e)))?;
+                    config.edge_aggregation.insert(attr_name, func);
+                } else {
+                    return Err(PyTypeError::new_err(format!("Invalid aggregation function type for attribute '{}'", attr_name)));
+                }
+            }
+        }
+
+        if let Some(default_agg) = default_aggregation {
+            config.default_aggregation = default_agg.inner;
+        }
+
+        if let Some(min_count) = min_edge_count {
+            config.min_edge_count = min_count;
+        }
+
+        if let Some(include_count) = include_edge_count {
+            config.include_edge_count = include_count;
+        }
+
+        if let Some(mark_type) = mark_entity_type {
+            config.mark_entity_type = mark_type;
+        }
+
+        Ok(Self { inner: config })
+    }
+
+    /// Create default configuration
+    #[classmethod]
+    fn default(_cls: &PyType) -> Self {
+        Default::default()
+    }
+
+    fn __repr__(&self) -> String {
+        format!("EdgeAggregationConfig({:?})", self.inner)
+    }
+}
+
+/// Parse edge aggregation configuration from Python dict
+pub fn parse_edge_config(edge_config_dict: Option<&PyDict>) -> PyResult<EdgeAggregationConfig> {
+    if let Some(config_dict) = edge_config_dict {
+        // Try to extract as EdgeAggregationConfig object first
+        if let Ok(config) = config_dict.get_item("_config") {
+            if let Some(config_obj) = config {
+                if let Ok(py_config) = config_obj.extract::<PyEdgeAggregationConfig>() {
+                    return Ok(py_config.inner);
+                }
+            }
+        }
+
+        // Otherwise, parse individual parameters
+        PyEdgeAggregationConfig::new(
+            config_dict.get_item("edge_to_external")?.and_then(|v| v.extract().ok()),
+            config_dict.get_item("edge_to_meta")?.and_then(|v| v.extract().ok()),
+            config_dict.get_item("edge_aggregation")?.and_then(|v| v.extract().ok()),
+            config_dict.get_item("default_aggregation")?.and_then(|v| v.extract().ok()),
+            config_dict.get_item("min_edge_count")?.and_then(|v| v.extract().ok()),
+            config_dict.get_item("include_edge_count")?.and_then(|v| v.extract().ok()),
+            config_dict.get_item("mark_entity_type")?.and_then(|v| v.extract().ok()),
+        ).map(|config| config.inner)
+    } else {
+        Ok(EdgeAggregationConfig::default())
     }
 }
 
