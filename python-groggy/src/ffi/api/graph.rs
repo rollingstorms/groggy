@@ -13,14 +13,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 // Import all graph modules
-use crate::ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
-use crate::ffi::core::array::PyGraphArray;
-use crate::ffi::core::neighborhood::PyNeighborhoodStats;
+use crate::ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
+use crate::ffi::storage::array::PyGraphArray;
+use crate::ffi::subgraphs::neighborhood::PyNeighborhoodStats;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
-use crate::ffi::core::query::{PyEdgeFilter, PyNodeFilter};
-use crate::ffi::core::subgraph::PySubgraph;
-use crate::ffi::core::traversal::PyGroupedAggregationResult;
-use crate::ffi::core::views::{PyEdgeView, PyNodeView};
+use crate::ffi::query::query::{PyEdgeFilter, PyNodeFilter};
+use crate::ffi::subgraphs::subgraph::PySubgraph;
+use crate::ffi::query::traversal::PyGroupedAggregationResult;
+use crate::ffi::storage::views::{PyEdgeView, PyNodeView};
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
 
@@ -58,7 +58,7 @@ impl PyGraph {
         py: Python,
         matrix: groggy::AdjacencyMatrix,
     ) -> PyResult<PyObject> {
-        use crate::ffi::core::matrix::PyGraphMatrix;
+        use crate::ffi::storage::matrix::PyGraphMatrix;
         use pyo3::types::PyDict;
 
         // Create metadata dict
@@ -1026,7 +1026,7 @@ impl PyGraph {
         center_nodes: Vec<NodeId>,
         radius: Option<usize>,
         max_nodes: Option<usize>,
-    ) -> PyResult<crate::ffi::core::neighborhood::PyNeighborhoodResult> {
+    ) -> PyResult<crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult> {
         let mut analysis_handler = PyGraphAnalysis::new(Py::new(py, self.clone())?)?;
         analysis_handler.neighborhood(py, center_nodes, radius, max_nodes)
     }
@@ -1083,7 +1083,7 @@ impl PyGraph {
     }
 
     /// Simple adjacency matrix (alias) - delegates to PyGraphMatrixHelper
-    fn adjacency(&mut self, py: Python) -> PyResult<Py<crate::ffi::core::matrix::PyGraphMatrix>> {
+    fn adjacency(&mut self, py: Python) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
         matrix_handler.adjacency(py)
     }
@@ -1093,7 +1093,7 @@ impl PyGraph {
         &mut self,
         py: Python,
         weight_attr: &str,
-    ) -> PyResult<Py<crate::ffi::core::matrix::PyGraphMatrix>> {
+    ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
         matrix_handler.weighted_adjacency_matrix(py, weight_attr)
     }
@@ -1102,7 +1102,7 @@ impl PyGraph {
     fn dense_adjacency_matrix(
         &mut self,
         py: Python,
-    ) -> PyResult<Py<crate::ffi::core::matrix::PyGraphMatrix>> {
+    ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
         matrix_handler.dense_adjacency_matrix(py)
     }
@@ -1118,7 +1118,7 @@ impl PyGraph {
         &mut self,
         py: Python,
         normalized: Option<bool>,
-    ) -> PyResult<Py<crate::ffi::core::matrix::PyGraphMatrix>> {
+    ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
         matrix_handler.laplacian_matrix(py, normalized)
     }
@@ -1127,7 +1127,7 @@ impl PyGraph {
     fn transition_matrix(
         &mut self,
         py: Python,
-    ) -> PyResult<Py<crate::ffi::core::matrix::PyGraphMatrix>> {
+    ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
         matrix_handler.transition_matrix(py)
     }
@@ -1421,7 +1421,7 @@ impl PyGraph {
         node_set.extend(all_nodes);
         edge_set.extend(all_edges);
 
-        let subgraph = groggy::core::subgraph::Subgraph::new(
+        let subgraph = groggy::subgraphs::Subgraph::new(
             self_.inner.clone(),
             node_set,
             edge_set,
@@ -1451,7 +1451,7 @@ impl PyGraph {
         node_set.extend(all_nodes);
         edge_set.extend(all_edges);
 
-        let subgraph = groggy::core::subgraph::Subgraph::new(
+        let subgraph = groggy::subgraphs::Subgraph::new(
             self_.inner.clone(),
             node_set,
             edge_set,
@@ -1508,7 +1508,7 @@ impl PyGraph {
         })?;
 
         // Convert to actual Python NetworkX graph
-        crate::ffi::convert::networkx_graph_to_python(py, &nx_graph)
+        crate::ffi::utils::convert::networkx_graph_to_python(py, &nx_graph)
     }
 
     /// Enable property-style attribute access (g.age instead of g.nodes['age'])
@@ -1618,7 +1618,7 @@ impl PyGraph {
         let all_edges = graph_ref.edge_ids().into_iter().collect();
         drop(graph_ref); // Release borrow
 
-        let concrete_subgraph = groggy::core::subgraph::Subgraph::new(
+        let concrete_subgraph = groggy::subgraphs::Subgraph::new(
             self.inner.clone(),
             all_nodes,
             all_edges,
@@ -1887,7 +1887,7 @@ impl PyGraph {
             .into_iter()
             .map(|id| groggy::AttrValue::Int(id as i64))
             .collect();
-        let graph_array = groggy::core::array::GraphArray::from_vec(attr_values);
+        let graph_array = groggy::storage::GraphArray::from_vec(attr_values);
         let py_graph_array = PyGraphArray { inner: graph_array };
         Py::new(py, py_graph_array)
     }
@@ -1898,7 +1898,7 @@ impl PyGraph {
             .into_iter()
             .map(|id| groggy::AttrValue::Int(id as i64))
             .collect();
-        let graph_array = groggy::core::array::GraphArray::from_vec(attr_values);
+        let graph_array = groggy::storage::GraphArray::from_vec(attr_values);
         let py_graph_array = PyGraphArray { inner: graph_array };
         Py::new(py, py_graph_array)
     }
@@ -1953,7 +1953,7 @@ impl PyGraph {
                     .collect();
 
                 // Create GraphArray and convert to PyGraphArray
-                let graph_array = groggy::core::array::GraphArray::from_vec(attr_values);
+                let graph_array = groggy::storage::GraphArray::from_vec(attr_values);
                 let py_graph_array = PyGraphArray::from_graph_array(graph_array);
 
                 Py::new(py, py_graph_array)
@@ -1966,9 +1966,9 @@ impl PyGraph {
     /// Returns Ok(()) if valid, Err(attr_name) if an attribute doesn't exist
     fn validate_node_filter_attributes(
         graph: &groggy::api::graph::Graph,
-        filter: &groggy::core::query::NodeFilter,
+        filter: &groggy::query::NodeFilter,
     ) -> Result<(), String> {
-        use groggy::core::query::NodeFilter;
+        use groggy::query::NodeFilter;
 
         match filter {
             NodeFilter::AttributeFilter { name, .. }
@@ -2003,9 +2003,9 @@ impl PyGraph {
     /// Returns Ok(()) if valid, Err(attr_name) if an attribute doesn't exist
     fn validate_edge_filter_attributes(
         graph: &groggy::api::graph::Graph,
-        filter: &groggy::core::query::EdgeFilter,
+        filter: &groggy::query::EdgeFilter,
     ) -> Result<(), String> {
-        use groggy::core::query::EdgeFilter;
+        use groggy::query::EdgeFilter;
 
         match filter {
             EdgeFilter::AttributeFilter { name, .. }

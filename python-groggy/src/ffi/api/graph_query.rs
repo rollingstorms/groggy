@@ -2,8 +2,8 @@
 //!
 //! Python bindings for advanced query operations on graphs.
 
-use crate::ffi::core::query::{PyEdgeFilter, PyNodeFilter};
-use crate::ffi::core::subgraph::PySubgraph;
+use crate::ffi::query::query::{PyEdgeFilter, PyNodeFilter};
+use crate::ffi::subgraphs::subgraph::PySubgraph;
 use crate::ffi::utils::graph_error_to_py_err;
 use groggy::subgraphs::Subgraph;
 use groggy::{AttrName, EdgeId, NodeId};

@@ -12,21 +12,21 @@ mod module;
 pub use ffi::api::graph::PyGraph;
 pub use ffi::api::graph_version::PyHistoricalView;
 pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
-pub use ffi::core::accessors::{PyEdgesAccessor, PyNodesAccessor};
-pub use ffi::core::array::PyGraphArray;
-pub use ffi::core::component::PyComponentSubgraph;
-pub use ffi::core::components::PyComponentsArray;
-pub use ffi::core::matrix::PyGraphMatrix;
-pub use ffi::core::neighborhood::{
+pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
+pub use ffi::storage::array::PyGraphArray;
+pub use ffi::subgraphs::component::PyComponentSubgraph;
+pub use ffi::storage::components::PyComponentsArray;
+pub use ffi::storage::matrix::PyGraphMatrix;
+pub use ffi::subgraphs::neighborhood::{
     PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph,
 };
-// pub use ffi::core::path_result::PyPathResult; // Unused
-pub use ffi::core::query::{PyAttributeFilter, PyEdgeFilter, PyNodeFilter};
-pub use ffi::core::query_parser::{parse_edge_query, parse_node_query};
-pub use ffi::core::subgraph::PySubgraph;
-pub use ffi::core::table::{PyGraphTable, PyGroupBy};
-pub use ffi::core::traversal::{PyAggregationResult, PyGroupedAggregationResult};
-pub use ffi::core::views::{PyEdgeView, PyNodeView};
+// pub use ffi::storage::path_result::PyPathResult; // Unused
+pub use ffi::query::query::{PyAttributeFilter, PyEdgeFilter, PyNodeFilter};
+pub use ffi::query::query_parser::{parse_edge_query, parse_node_query};
+pub use ffi::subgraphs::subgraph::PySubgraph;
+pub use ffi::storage::table::{PyGraphTable, PyGroupBy};
+pub use ffi::query::traversal::{PyAggregationResult, PyGroupedAggregationResult};
+pub use ffi::storage::views::{PyEdgeView, PyNodeView};
 pub use ffi::types::{PyAttrValue, PyAttributeCollection, PyResultHandle};
 
 // ====================================================================
@@ -64,7 +64,7 @@ fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
         }
 
         // Create core GraphMatrix directly
-        let matrix = groggy::core::matrix::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
+        let matrix = groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                 "Failed to create matrix: {:?}",
                 e
@@ -80,7 +80,7 @@ fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
         let core_arrays = vec![py_array.inner];
 
         // Create core GraphMatrix directly
-        let matrix = groggy::core::matrix::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
+        let matrix = groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                 "Failed to create matrix: {:?}",
                 e
@@ -91,7 +91,21 @@ fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
     }
     // Check if data is a list of GraphArrays
     else if let Ok(array_list) = data.extract::<Vec<Py<PyGraphArray>>>(py) {
-        PyGraphMatrix::new(py, array_list)
+        // Convert PyGraphArrays to core GraphArrays
+        let core_arrays: Vec<groggy::storage::GraphArray> = array_list
+            .iter()
+            .map(|py_array| py_array.borrow(py).inner.clone())
+            .collect();
+
+        // Create core GraphMatrix
+        let matrix = groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "Failed to create matrix: {:?}",
+                e
+            ))
+        })?;
+
+        Ok(PyGraphMatrix::from_graph_matrix(matrix))
     } else {
         Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
             "matrix() expects nested lists [[1,2],[3,4]], flat list [1,2,3,4], or list of GraphArrays"
@@ -126,7 +140,7 @@ fn table(py: Python, data: PyObject, columns: Option<Vec<String>>) -> PyResult<P
 
         // Create core GraphTable directly
         let table =
-            groggy::core::table::GraphTable::from_arrays(core_arrays, Some(column_names), None)
+            groggy::storage::GraphTable::from_arrays(core_arrays, Some(column_names), None)
                 .map_err(|e| {
                     PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                         "Failed to create table: {:?}",
@@ -146,7 +160,7 @@ fn table(py: Python, data: PyObject, columns: Option<Vec<String>>) -> PyResult<P
         }
 
         // Create core GraphTable directly
-        let table = groggy::core::table::GraphTable::from_arrays(core_arrays, columns, None)
+        let table = groggy::storage::GraphTable::from_arrays(core_arrays, columns, None)
             .map_err(|e| {
                 PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                     "Failed to create table: {:?}",
@@ -208,7 +222,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Register array and matrix types
     m.add_class::<PyGraphArray>()?;
     m.add_class::<PyComponentsArray>()?;
-    m.add_class::<ffi::core::components::PyComponentsArrayIterator>()?;
+    m.add_class::<ffi::storage::components::PyComponentsArrayIterator>()?;
     m.add_class::<PyGraphMatrix>()?;
     // m.add_class::<PyPathResult>()?; // Unused
     m.add_class::<PyGraphTable>()?;

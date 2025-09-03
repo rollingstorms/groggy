@@ -115,7 +115,7 @@ pub fn python_to_networkx_graph(py: Python, py_graph: &PyAny) -> PyResult<Networ
             attributes.insert(key_str, nx_value);
         }
 
-        nodes.push(groggy::convert::NetworkXNode {
+        nodes.push(groggy::utils::convert::NetworkXNode {
             id: node_id,
             attributes,
         });
@@ -135,7 +135,7 @@ pub fn python_to_networkx_graph(py: Python, py_graph: &PyAny) -> PyResult<Networ
             attributes.insert(key_str, nx_value);
         }
 
-        edges.push(groggy::convert::NetworkXEdge {
+        edges.push(groggy::utils::convert::NetworkXEdge {
             source,
             target,
             attributes,

@@ -12,7 +12,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 
 // Use utility functions from utils module
-use crate::ffi::core::array::PyGraphArray;
+use crate::ffi::storage::array::PyGraphArray;
 use crate::ffi::utils::attr_value_to_python_value;
 
 /// Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays
@@ -316,8 +316,8 @@ impl PyGraphMatrix {
     /// Sum along specified axis (0=rows, 1=columns)
     fn sum_axis(&self, py: Python, axis: usize) -> PyResult<PyObject> {
         let axis_enum = match axis {
-            0 => groggy::storage::Axis::Rows;
-            1 => groggy::storage::Axis::Columns;
+            0 => groggy::storage::Axis::Rows,
+            1 => groggy::storage::Axis::Columns,
             _ => {
                 return Err(PyValueError::new_err(
                     "Axis must be 0 (rows) or 1 (columns)",
@@ -333,8 +333,8 @@ impl PyGraphMatrix {
     /// Mean along specified axis (0=rows, 1=columns)
     fn mean_axis(&self, py: Python, axis: usize) -> PyResult<PyObject> {
         let axis_enum = match axis {
-            0 => groggy::storage::Axis::Rows;
-            1 => groggy::storage::Axis::Columns;
+            0 => groggy::storage::Axis::Rows,
+            1 => groggy::storage::Axis::Columns,
             _ => {
                 return Err(PyValueError::new_err(
                     "Axis must be 0 (rows) or 1 (columns)",
@@ -350,8 +350,8 @@ impl PyGraphMatrix {
     /// Standard deviation along specified axis (0=rows, 1=columns)
     fn std_axis(&self, py: Python, axis: usize) -> PyResult<PyObject> {
         let axis_enum = match axis {
-            0 => groggy::storage::Axis::Rows;
-            1 => groggy::storage::Axis::Columns;
+            0 => groggy::storage::Axis::Rows,
+            1 => groggy::storage::Axis::Columns,
             _ => {
                 return Err(PyValueError::new_err(
                     "Axis must be 0 (rows) or 1 (columns)",

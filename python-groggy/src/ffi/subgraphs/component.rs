@@ -2,7 +2,7 @@
 //!
 //! Python bindings for ComponentSubgraph - pure delegation to existing trait methods.
 
-use groggy::subgraphs::ComponentSubgraph;
+use groggy::operations::ComponentSubgraph;
 use groggy::traits::{ComponentOperations, SubgraphOperations};
 use groggy::{EdgeId, NodeId};
 use pyo3::prelude::*;
