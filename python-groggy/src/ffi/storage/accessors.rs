@@ -25,8 +25,8 @@ fn attr_value_to_python_value(py: Python, attr_value: &AttrValue) -> PyResult<Py
 }
 
 // Import types from our FFI modules
-use crate::ffi::core::subgraph::PySubgraph;
-use crate::ffi::core::views::PyNodeView;
+use crate::ffi::subgraphs::subgraph::PySubgraph;
+use crate::ffi::storage::views::PyNodeView;
 
 /// Helper function to create NodeView from core Graph
 fn create_node_view_from_core(
@@ -48,7 +48,7 @@ fn create_edge_view_from_core(
     edge_id: EdgeId,
 ) -> PyResult<PyObject> {
     // Create proper EdgeView object
-    use crate::ffi::core::views::PyEdgeView;
+    use crate::ffi::storage::views::PyEdgeView;
 
     let graph_ref = graph.borrow();
     if graph_ref.has_edge(edge_id) {
@@ -141,7 +141,7 @@ impl PyNodesAccessor {
         }
 
         // Try to extract as GraphArray (indexed boolean lookup) - CHECK FIRST
-        if let Ok(graph_array) = key.extract::<PyRef<crate::ffi::core::array::PyGraphArray>>() {
+        if let Ok(graph_array) = key.extract::<PyRef<crate::ffi::storage::array::PyGraphArray>>() {
             let graph = self.graph.borrow();
             let all_node_ids = if let Some(ref constrained) = self.constrained_nodes {
                 constrained.clone()
@@ -193,7 +193,7 @@ impl PyNodesAccessor {
                 "boolean_filtered".to_string(),
             );
 
-            let py_subgraph = crate::ffi::core::subgraph::PySubgraph::from_core_subgraph(subgraph)?;
+            let py_subgraph = crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(subgraph)?;
             return Ok(Py::new(py, py_subgraph)?.to_object(py));
         }
 
@@ -486,7 +486,7 @@ impl PyNodesAccessor {
 
     /// Get table view of nodes (GraphTable with node attributes) - DELEGATED to SubgraphOperations
     pub fn table(&self, py: Python) -> PyResult<PyObject> {
-        use crate::ffi::core::table::PyGraphTable;
+        use crate::ffi::storage::table::PyGraphTable;
 
         // Pure delegation to SubgraphOperations through graph's as_subgraph() method
         let graph = self.graph.borrow();
@@ -675,7 +675,7 @@ impl PyNodesAccessor {
 
         // Create GraphArray and wrap in Python
         let graph_array = groggy::GraphArray::from_vec(attr_values);
-        let py_array = crate::ffi::core::array::PyGraphArray { inner: graph_array };
+        let py_array = crate::ffi::storage::array::PyGraphArray { inner: graph_array };
         Ok(Py::new(py, py_array)?.to_object(py))
     }
 }
@@ -794,7 +794,7 @@ impl PyEdgesAccessor {
         }
 
         // Try to extract as GraphArray (indexed boolean lookup) - CHECK FIRST
-        if let Ok(graph_array) = key.extract::<PyRef<crate::ffi::core::array::PyGraphArray>>() {
+        if let Ok(graph_array) = key.extract::<PyRef<crate::ffi::storage::array::PyGraphArray>>() {
             let graph = self.graph.borrow();
             let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
                 constrained.clone()
@@ -839,7 +839,7 @@ impl PyEdgesAccessor {
                 "boolean_filtered".to_string(),
             );
 
-            let py_subgraph = crate::ffi::core::subgraph::PySubgraph::from_core_subgraph(subgraph)?;
+            let py_subgraph = crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(subgraph)?;
             return Ok(Py::new(py, py_subgraph)?.to_object(py));
         }
 
@@ -1102,7 +1102,7 @@ impl PyEdgesAccessor {
 
     /// Get table view of edges (GraphTable with edge attributes) - DELEGATED to SubgraphOperations
     pub fn table(&self, py: Python) -> PyResult<PyObject> {
-        use crate::ffi::core::table::PyGraphTable;
+        use crate::ffi::storage::table::PyGraphTable;
 
         // Pure delegation to SubgraphOperations through graph's as_subgraph() method
         let graph = self.graph.borrow();

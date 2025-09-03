@@ -2,8 +2,8 @@
 //!
 //! Simple, structured attribute operations with pure delegation to core.
 
-use crate::ffi::core::array::PyGraphArray;
-use crate::ffi::core::table::PyGraphTable;
+use crate::ffi::storage::array::PyGraphArray;
+use crate::ffi::storage::table::PyGraphTable;
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
 use groggy::{AttrName, AttrValue, EdgeId, NodeId};

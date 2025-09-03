@@ -2,7 +2,7 @@
 //!
 //! PyGraphMatrix helper class that handles all graph matrix operations.
 
-use crate::ffi::core::matrix::PyGraphMatrix;
+use crate::ffi::storage::matrix::PyGraphMatrix;
 use crate::ffi::utils::graph_error_to_py_err;
 use pyo3::prelude::*;
 
@@ -39,7 +39,7 @@ impl PyGraphMatrixHelper {
 
     /// Simple adjacency matrix (alias) - PURE DELEGATION to core
     pub fn adjacency(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        use crate::ffi::core::matrix::PyGraphMatrix;
+        use crate::ffi::storage::matrix::PyGraphMatrix;
 
         // DELEGATION: Use core adjacency implementation (just added - alias for adjacency_matrix)
         let matrix = {
@@ -70,7 +70,7 @@ impl PyGraphMatrixHelper {
         py: Python,
         weight_attr: &str,
     ) -> PyResult<Py<PyGraphMatrix>> {
-        use crate::ffi::core::matrix::PyGraphMatrix;
+        use crate::ffi::storage::matrix::PyGraphMatrix;
 
         // DELEGATION: Use core weighted_adjacency_matrix implementation (graph.rs:1788)
         let matrix = {
@@ -97,7 +97,7 @@ impl PyGraphMatrixHelper {
 
     /// Get dense adjacency matrix - PURE DELEGATION to core
     pub fn dense_adjacency_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        use crate::ffi::core::matrix::PyGraphMatrix;
+        use crate::ffi::storage::matrix::PyGraphMatrix;
 
         // DELEGATION: Use core dense_adjacency_matrix implementation (graph.rs:1797)
         let matrix = {
@@ -147,7 +147,7 @@ impl PyGraphMatrixHelper {
         py: Python,
         normalized: Option<bool>,
     ) -> PyResult<Py<PyGraphMatrix>> {
-        use crate::ffi::core::matrix::PyGraphMatrix;
+        use crate::ffi::storage::matrix::PyGraphMatrix;
 
         let is_normalized = normalized.unwrap_or(false);
 

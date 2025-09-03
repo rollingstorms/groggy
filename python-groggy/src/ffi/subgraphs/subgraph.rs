@@ -232,7 +232,7 @@ impl PySubgraph {
     fn filter_nodes(&self, _py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Extract the filter from Python object - support both NodeFilter objects and string queries
         let node_filter = if let Ok(filter_obj) =
-            filter.extract::<crate::ffi::core::query::PyNodeFilter>()
+            filter.extract::<crate::ffi::query::query::PyNodeFilter>()
         {
             filter_obj.inner.clone()
         } else if let Ok(query_str) = filter.extract::<String>() {
@@ -273,7 +273,7 @@ impl PySubgraph {
     fn filter_edges(&self, _py: Python, filter: &PyAny) -> PyResult<PySubgraph> {
         // Extract the filter from Python object - support both EdgeFilter objects and string queries
         let edge_filter = if let Ok(filter_obj) =
-            filter.extract::<crate::ffi::core::query::PyEdgeFilter>()
+            filter.extract::<crate::ffi::query::query::PyEdgeFilter>()
         {
             filter_obj.inner.clone()
         } else if let Ok(query_str) = filter.extract::<String>() {
@@ -360,7 +360,7 @@ impl PySubgraph {
         })?;
 
         // Convert to actual Python NetworkX graph
-        crate::ffi::convert::networkx_graph_to_python(py, &nx_graph)
+        crate::ffi::utils::convert::networkx_graph_to_python(py, &nx_graph)
     }
 
     /// Get degree of nodes in subgraph as GraphArray
@@ -882,7 +882,7 @@ impl PySubgraph {
                     .map(|id| AttrValue::Int(id as i64))
                     .collect();
                 let py_array = PyGraphArray {
-                    inner: groggy::storage::GraphArray::from_vec(attr_values);
+                    inner: groggy::storage::GraphArray::from_vec(attr_values)
                 };
                 Py::new(py, py_array)
             }

@@ -4,16 +4,11 @@
 //! for the Groggy graph library components.
 
 // Core type wrappers and utilities
-pub mod config;
-pub mod convert;
 pub mod errors;
 pub mod types;
 
-// Move existing utils here
+// Utility functions
 pub mod utils;
-
-// Core FFI bindings (mirror main project core/)
-pub mod core;
 
 // API FFI bindings (mirror main project api/)
 pub mod api;
@@ -21,7 +16,16 @@ pub mod api;
 // Display FFI bindings (mirror main project display/)
 pub mod display;
 
-// FFI Traits - Pure delegation to core trait implementations
+// Query FFI bindings (mirror main project query/)
+pub mod query;
+
+// Storage FFI bindings (mirror main project storage/)
+pub mod storage;
+
+// Subgraphs FFI bindings (mirror main project subgraphs/)
+pub mod subgraphs;
+
+// FFI Traits - Pure delegation to trait implementations
 pub mod traits;
 
 // Re-export commonly used FFI types

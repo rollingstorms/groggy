@@ -19,12 +19,12 @@ pub struct PyGraphVersion {
 #[pyclass(name = "Commit")]
 #[derive(Clone)]
 pub struct PyCommit {
-    inner: std::sync::Arc<groggy::core::history::Commit>,
+    inner: std::sync::Arc<groggy::state::Commit>,
 }
 
 impl PyCommit {
     /// Create a PyCommit from a core Commit
-    pub fn from_core_commit(commit: std::sync::Arc<groggy::core::history::Commit>) -> Self {
+    pub fn from_core_commit(commit: std::sync::Arc<groggy::state::Commit>) -> Self {
         Self { inner: commit }
     }
 
@@ -37,7 +37,7 @@ impl PyCommit {
             None => vec![],
         };
 
-        let fake_delta = std::sync::Arc::new(groggy::core::history::Delta {
+        let fake_delta = std::sync::Arc::new(groggy::state::Delta {
             content_hash: [0u8; 32],
             nodes_added: Vec::new(),
             nodes_removed: Vec::new(),
@@ -47,7 +47,7 @@ impl PyCommit {
             edge_attr_changes: Vec::new(),
         });
 
-        let commit = groggy::core::history::Commit::new(
+        let commit = groggy::state::Commit::new(
             info.id,
             parents,
             fake_delta,
@@ -100,12 +100,12 @@ impl PyCommit {
 #[pyclass(name = "BranchInfo")]
 #[derive(Clone)]
 pub struct PyBranchInfo {
-    inner: groggy::core::ref_manager::BranchInfo,
+    inner: groggy::state::BranchInfo,
 }
 
 impl PyBranchInfo {
     /// Create a new PyBranchInfo from core BranchInfo
-    pub fn new(inner: groggy::core::ref_manager::BranchInfo) -> Self {
+    pub fn new(inner: groggy::state::BranchInfo) -> Self {
         Self { inner }
     }
 }

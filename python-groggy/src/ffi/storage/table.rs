@@ -15,8 +15,8 @@ use std::collections::HashMap;
 
 // Import utilities
 use crate::ffi::api::graph::PyGraph;
-use crate::ffi::core::array::PyGraphArray;
-use crate::ffi::core::matrix::PyGraphMatrix;
+use crate::ffi::storage::array::PyGraphArray;
+use crate::ffi::storage::matrix::PyGraphMatrix;
 use crate::ffi::utils::{attr_value_to_python_value, graph_error_to_py_err};
 
 /// Python wrapper around core GraphTable implementation

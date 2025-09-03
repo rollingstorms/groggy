@@ -2,7 +2,7 @@
 //!
 //! PyGraphAnalysis helper class that handles all graph analysis operations.
 
-use crate::ffi::core::neighborhood::PyNeighborhoodResult;
+use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
 use crate::ffi::utils::graph_error_to_py_err;
 use groggy::traits::SubgraphOperations;
 use groggy::{AttrName, GraphError, NodeId};
@@ -196,7 +196,7 @@ impl PyGraphAnalysis {
         match path {
             Some(path) => {
                 // Create a subgraph from the path nodes and edges
-                use crate::ffi::core::subgraph::PySubgraph;
+                use crate::ffi::subgraphs::subgraph::PySubgraph;
                 use groggy::subgraphs::Subgraph;
 
                 let graph_ref = self.graph.borrow(py);
@@ -233,7 +233,7 @@ impl PyGraphAnalysis {
         inplace: Option<bool>,
         attr_name: Option<String>,
     ) -> PyResult<PyObject> {
-        use crate::ffi::core::subgraph::PySubgraph;
+        use crate::ffi::subgraphs::subgraph::PySubgraph;
         use groggy::subgraphs::Subgraph;
         use groggy::query::TraversalOptions;
 
@@ -305,7 +305,7 @@ impl PyGraphAnalysis {
         inplace: Option<bool>,
         attr_name: Option<String>,
     ) -> PyResult<PyObject> {
-        use crate::ffi::core::subgraph::PySubgraph;
+        use crate::ffi::subgraphs::subgraph::PySubgraph;
         use groggy::subgraphs::Subgraph;
         use groggy::query::TraversalOptions;
 
