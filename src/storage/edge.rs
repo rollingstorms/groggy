@@ -61,11 +61,11 @@ impl GraphEntity for EntityEdge {
         let (source, target) = graph.edge_endpoints(self.edge_id)?;
 
         let entities: Vec<Box<dyn GraphEntity>> = vec![
-            Box::new(crate::operations::node::EntityNode::new(
+            Box::new(crate::storage::node::EntityNode::new(
                 source,
                 self.graph_ref.clone(),
             )),
-            Box::new(crate::operations::node::EntityNode::new(
+            Box::new(crate::storage::node::EntityNode::new(
                 target,
                 self.graph_ref.clone(),
             )),

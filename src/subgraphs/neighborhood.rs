@@ -13,7 +13,7 @@
 
 use crate::api::graph::Graph;
 use crate::storage::pool::GraphPool;
-use crate::utils::space::GraphSpace;
+use crate::state::space::GraphSpace;
 use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::query::traversal::TraversalEngine;
 use crate::errors::GraphResult;
@@ -143,7 +143,7 @@ impl GraphEntity for NeighborhoodSubgraph {
             .central_nodes
             .iter()
             .map(|&central_id| {
-                Box::new(crate::operations::node::EntityNode::new(
+                Box::new(crate::storage::node::EntityNode::new(
                     central_id,
                     self.graph_ref.clone(),
                 )) as Box<dyn GraphEntity>
