@@ -4,7 +4,7 @@
 
 use crate::ffi::core::neighborhood::PyNeighborhoodResult;
 use crate::ffi::utils::graph_error_to_py_err;
-use groggy::core::traits::SubgraphOperations;
+use groggy::traits::SubgraphOperations;
 use groggy::{AttrName, GraphError, NodeId};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -98,7 +98,7 @@ impl PyGraphAnalysis {
                             let result = graph_ref.inner.borrow_mut().neighborhood(node_id).map(
                                 |subgraph| {
                                     let size = subgraph.node_set().len();
-                                    groggy::core::neighborhood::NeighborhoodResult {
+                                    groggy::subgraphs::NeighborhoodResult {
                                         neighborhoods: vec![subgraph],
                                         total_neighborhoods: 1,
                                         largest_neighborhood_size: size,
@@ -117,7 +117,7 @@ impl PyGraphAnalysis {
                                 .k_hop_neighborhood(node_id, radius)
                                 .map(|subgraph| {
                                     let size = subgraph.node_set().len();
-                                    groggy::core::neighborhood::NeighborhoodResult {
+                                    groggy::subgraphs::NeighborhoodResult {
                                         neighborhoods: vec![subgraph],
                                         total_neighborhoods: 1,
                                         largest_neighborhood_size: size,
@@ -147,7 +147,7 @@ impl PyGraphAnalysis {
                                 .unified_neighborhood(&center_nodes, radius)
                                 .map(|subgraph| {
                                     let size = subgraph.node_set().len();
-                                    groggy::core::neighborhood::NeighborhoodResult {
+                                    groggy::subgraphs::NeighborhoodResult {
                                         neighborhoods: vec![subgraph],
                                         total_neighborhoods: 1,
                                         largest_neighborhood_size: size,
@@ -177,7 +177,7 @@ impl PyGraphAnalysis {
     ) -> PyResult<PyObject> {
         // DELEGATION: Use core shortest_path implementation with proper options
         let path = {
-            let options = groggy::core::traversal::PathFindingOptions {
+            let options = groggy::query::PathFindingOptions {
                 weight_attribute,
                 max_path_length: None,
                 heuristic: None,
@@ -197,7 +197,7 @@ impl PyGraphAnalysis {
             Some(path) => {
                 // Create a subgraph from the path nodes and edges
                 use crate::ffi::core::subgraph::PySubgraph;
-                use groggy::core::subgraph::Subgraph;
+                use groggy::subgraphs::Subgraph;
 
                 let graph_ref = self.graph.borrow(py);
                 let core_graph = graph_ref.inner.clone();
@@ -234,8 +234,8 @@ impl PyGraphAnalysis {
         attr_name: Option<String>,
     ) -> PyResult<PyObject> {
         use crate::ffi::core::subgraph::PySubgraph;
-        use groggy::core::subgraph::Subgraph;
-        use groggy::core::traversal::TraversalOptions;
+        use groggy::subgraphs::Subgraph;
+        use groggy::query::TraversalOptions;
 
         let inplace = inplace.unwrap_or(false);
         let graph_ref = self.graph.borrow_mut(py);
@@ -306,8 +306,8 @@ impl PyGraphAnalysis {
         attr_name: Option<String>,
     ) -> PyResult<PyObject> {
         use crate::ffi::core::subgraph::PySubgraph;
-        use groggy::core::subgraph::Subgraph;
-        use groggy::core::traversal::TraversalOptions;
+        use groggy::subgraphs::Subgraph;
+        use groggy::query::TraversalOptions;
 
         let inplace = inplace.unwrap_or(false);
         let graph_ref = self.graph.borrow_mut(py);
