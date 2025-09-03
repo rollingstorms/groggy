@@ -1467,7 +1467,7 @@ impl PyGraph {
     pub fn table(self_: PyRef<Self>, py: Python<'_>) -> PyResult<PyObject> {
         // Forward to g.nodes.table() for consistency
         let nodes_accessor = Self::nodes(self_, py)?;
-        let result = nodes_accessor.borrow(py).table(py);
+        let result = nodes_accessor.borrow(py).table(py, None);
         result
     }
 
@@ -1476,7 +1476,7 @@ impl PyGraph {
     pub fn edges_table(self_: PyRef<Self>, py: Python<'_>) -> PyResult<PyObject> {
         // Forward to g.edges.table() for consistency
         let edges_accessor = Self::edges(self_, py)?;
-        let result = edges_accessor.borrow(py).table(py);
+        let result = edges_accessor.borrow(py).table(py, None);
         result
     }
 

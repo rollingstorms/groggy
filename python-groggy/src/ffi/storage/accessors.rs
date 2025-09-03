@@ -484,9 +484,27 @@ impl PyNodesAccessor {
         Ok(result)
     }
 
-    /// Get table view of nodes (GraphTable with node attributes) - DELEGATED to SubgraphOperations
-    pub fn table(&self, py: Python) -> PyResult<PyObject> {
+    /// Get table view of nodes (GraphTable with node attributes) with optional auto-slicing
+    /// 
+    /// Args:
+    ///     auto_slice: If True (default), automatically exclude columns that are all NaN/None
+    ///                 for the current node set. If False, include all columns.
+    /// 
+    /// For filtered accessors (base/meta), auto_slice=True by default to exclude 
+    /// irrelevant attributes. For full accessors, auto_slice=False by default.
+    #[pyo3(signature = (auto_slice = None))]
+    pub fn table(&self, py: Python, auto_slice: Option<bool>) -> PyResult<PyObject> {
         use crate::ffi::storage::table::PyGraphTable;
+
+        // Determine default auto_slice behavior based on accessor type
+        let should_auto_slice = match auto_slice {
+            Some(explicit_value) => explicit_value,
+            None => {
+                // Auto-slice by default for filtered accessors (base/meta)
+                // This is determined by checking if we're constrained to specific nodes
+                self.constrained_nodes.is_some()
+            }
+        };
 
         // Pure delegation to SubgraphOperations through graph's as_subgraph() method
         let graph = self.graph.borrow();
@@ -505,16 +523,22 @@ impl PyNodesAccessor {
             // Create subgraph and delegate to SubgraphOperations::nodes_table()
             let subgraph = groggy::subgraphs::Subgraph::new(
                 self.graph.clone(),
-                constrained_set,
+                constrained_set.clone(),
                 all_edges, // TODO: Should be induced edges, but this maintains current behavior
                 "nodes_accessor_subgraph".to_string(),
             );
 
             // Delegate to SubgraphOperations trait
             let subgraph_ops: &dyn groggy::traits::SubgraphOperations = &subgraph;
-            let core_table = subgraph_ops
+            let mut core_table = subgraph_ops
                 .nodes_table()
                 .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            
+            // Apply auto-slicing if enabled
+            if should_auto_slice {
+                core_table = self.apply_node_auto_slice(core_table, &constrained_set)?;
+            }
+            
             let py_table = PyGraphTable::from_graph_table(core_table);
             Ok(Py::new(py, py_table)?.to_object(py))
         } else {
@@ -528,6 +552,7 @@ impl PyNodesAccessor {
                 .into_iter()
                 .collect::<std::collections::HashSet<_>>();
 
+            let all_nodes_clone = all_nodes.clone();
             let subgraph = groggy::subgraphs::Subgraph::new(
                 self.graph.clone(),
                 all_nodes,
@@ -537,9 +562,15 @@ impl PyNodesAccessor {
 
             // Delegate to SubgraphOperations trait
             let subgraph_ops: &dyn groggy::traits::SubgraphOperations = &subgraph;
-            let core_table = subgraph_ops
+            let mut core_table = subgraph_ops
                 .nodes_table()
                 .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            
+            // Apply auto-slicing if enabled (for full graph, should_auto_slice is false by default)
+            if should_auto_slice {
+                core_table = self.apply_node_auto_slice(core_table, &all_nodes_clone)?;
+            }
+            
             let py_table = PyGraphTable::from_graph_table(core_table);
             Ok(Py::new(py, py_table)?.to_object(py))
         }
@@ -897,6 +928,65 @@ impl PyNodesAccessor {
 
         // Delegate to the graph attributes handler (it has the smart format detection)
         attr_handler.set_node_attrs(py, attrs_dict)
+    }
+
+    /// Apply auto-slicing to remove columns that are all NaN/None for the given node set
+    fn apply_node_auto_slice(
+        &self, 
+        table: groggy::storage::table::GraphTable, 
+        node_set: &std::collections::HashSet<groggy::NodeId>
+    ) -> PyResult<groggy::storage::table::GraphTable> {
+        let graph = self.graph.borrow();
+        
+        // Get all attribute names in the table
+        let column_names = table.columns(); 
+        let mut columns_to_keep = Vec::new();
+        
+        for column_name in column_names {
+            // Check if this column has any non-null values for the nodes in our set
+            let mut has_non_null_value = false;
+            
+            for &node_id in node_set {
+                // Try to get the attribute value for this node
+                match graph.get_node_attr(node_id, &groggy::AttrName::from(column_name.clone())) {
+                    Ok(Some(attr_value)) => {
+                        // Check if the value is not null/none
+                        if !matches!(attr_value, groggy::AttrValue::Null) {
+                            has_non_null_value = true;
+                            break;
+                        }
+                    }
+                    Ok(None) => {
+                        // No attribute value for this node - continue checking others
+                        continue;
+                    }
+                    Err(_) => {
+                        // Error getting attribute - continue checking others
+                        continue;
+                    }
+                }
+            }
+            
+            // If this column has at least one non-null value, keep it
+            if has_non_null_value {
+                columns_to_keep.push(column_name.as_str());
+            }
+        }
+        
+        // Create a new table with only the columns that have data
+        if columns_to_keep.len() == column_names.len() {
+            // All columns have data, return original table
+            Ok(table)
+        } else if columns_to_keep.is_empty() {
+            // No columns have data, but we should keep the table structure
+            // Return the original table to avoid breaking things
+            Ok(table)
+        } else {
+            // Select only the columns with data
+            table.select(&columns_to_keep).map_err(|e| {
+                PyValueError::new_err(format!("Failed to slice table columns: {}", e))
+            })
+        }
     }
 }
 
@@ -1282,9 +1372,27 @@ impl PyEdgesAccessor {
         Ok(result)
     }
 
-    /// Get table view of edges (GraphTable with edge attributes) - DELEGATED to SubgraphOperations
-    pub fn table(&self, py: Python) -> PyResult<PyObject> {
+    /// Get table view of edges (GraphTable with edge attributes) with optional auto-slicing
+    /// 
+    /// Args:
+    ///     auto_slice: If True (default), automatically exclude columns that are all NaN/None
+    ///                 for the current edge set. If False, include all columns.
+    /// 
+    /// For filtered accessors (base/meta), auto_slice=True by default to exclude 
+    /// irrelevant attributes. For full accessors, auto_slice=False by default.
+    #[pyo3(signature = (auto_slice = None))]
+    pub fn table(&self, py: Python, auto_slice: Option<bool>) -> PyResult<PyObject> {
         use crate::ffi::storage::table::PyGraphTable;
+
+        // Determine default auto_slice behavior based on accessor type
+        let should_auto_slice = match auto_slice {
+            Some(explicit_value) => explicit_value,
+            None => {
+                // Auto-slice by default for filtered accessors (base/meta)
+                // This is determined by checking if we're constrained to specific edges
+                self.constrained_edges.is_some()
+            }
+        };
 
         // Pure delegation to SubgraphOperations through graph's as_subgraph() method
         let graph = self.graph.borrow();
@@ -1304,15 +1412,21 @@ impl PyEdgesAccessor {
             let subgraph = groggy::subgraphs::Subgraph::new(
                 self.graph.clone(),
                 all_nodes,
-                constrained_set,
+                constrained_set.clone(),
                 "edges_accessor_subgraph".to_string(),
             );
 
             // Delegate to SubgraphOperations trait
             let subgraph_ops: &dyn groggy::traits::SubgraphOperations = &subgraph;
-            let core_table = subgraph_ops
+            let mut core_table = subgraph_ops
                 .edges_table()
                 .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            
+            // Apply auto-slicing if enabled
+            if should_auto_slice {
+                core_table = self.apply_edge_auto_slice(core_table, &constrained_set)?;
+            }
+            
             let py_table = PyGraphTable::from_graph_table(core_table);
             Ok(Py::new(py, py_table)?.to_object(py))
         } else {
@@ -1326,6 +1440,7 @@ impl PyEdgesAccessor {
                 .into_iter()
                 .collect::<std::collections::HashSet<_>>();
 
+            let all_edges_clone = all_edges.clone();
             let subgraph = groggy::subgraphs::Subgraph::new(
                 self.graph.clone(),
                 all_nodes,
@@ -1335,9 +1450,15 @@ impl PyEdgesAccessor {
 
             // Delegate to SubgraphOperations trait
             let subgraph_ops: &dyn groggy::traits::SubgraphOperations = &subgraph;
-            let core_table = subgraph_ops
+            let mut core_table = subgraph_ops
                 .edges_table()
                 .map_err(crate::ffi::utils::graph_error_to_py_err)?;
+            
+            // Apply auto-slicing if enabled (for full graph, should_auto_slice is false by default)
+            if should_auto_slice {
+                core_table = self.apply_edge_auto_slice(core_table, &all_edges_clone)?;
+            }
+            
             let py_table = PyGraphTable::from_graph_table(core_table);
             Ok(Py::new(py, py_table)?.to_object(py))
         }
@@ -1615,5 +1736,64 @@ impl PyEdgesAccessor {
         }
         
         Ok(filtered_edges)
+    }
+
+    /// Apply auto-slicing to remove columns that are all NaN/None for the given edge set
+    fn apply_edge_auto_slice(
+        &self, 
+        table: groggy::storage::table::GraphTable, 
+        edge_set: &std::collections::HashSet<groggy::EdgeId>
+    ) -> PyResult<groggy::storage::table::GraphTable> {
+        let graph = self.graph.borrow();
+        
+        // Get all attribute names in the table
+        let column_names = table.columns();
+        let mut columns_to_keep = Vec::new();
+        
+        for column_name in column_names {
+            // Check if this column has any non-null values for the edges in our set
+            let mut has_non_null_value = false;
+            
+            for &edge_id in edge_set {
+                // Try to get the attribute value for this edge
+                match graph.get_edge_attr(edge_id, &column_name) {
+                    Ok(Some(attr_value)) => {
+                        // Check if the value is not null/none
+                        if !matches!(attr_value, groggy::AttrValue::Null) {
+                            has_non_null_value = true;
+                            break;
+                        }
+                    }
+                    Ok(None) => {
+                        // No attribute value for this edge - continue checking others
+                        continue;
+                    }
+                    Err(_) => {
+                        // Error getting attribute - continue checking others
+                        continue;
+                    }
+                }
+            }
+            
+            // If this column has at least one non-null value, keep it
+            if has_non_null_value {
+                columns_to_keep.push(column_name.as_str());
+            }
+        }
+        
+        // Create a new table with only the columns that have data
+        if columns_to_keep.len() == column_names.len() {
+            // All columns have data, return original table
+            Ok(table)
+        } else if columns_to_keep.is_empty() {
+            // No columns have data, but we should keep the table structure
+            // Return the original table to avoid breaking things
+            Ok(table)
+        } else {
+            // Select only the columns with data
+            table.select(&columns_to_keep).map_err(|e| {
+                PyValueError::new_err(format!("Failed to slice table columns: {}", e))
+            })
+        }
     }
 }
