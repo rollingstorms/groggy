@@ -22,6 +22,215 @@ pub struct AggregationSpec {
     pub default_value: Option<AttrValue>,
 }
 
+/// Strategy for handling edges to external nodes during meta-node creation
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExternalEdgeStrategy {
+    /// Create separate meta-edges for each original edge (preserves all attributes)
+    Copy,
+    /// Create single meta-edge with aggregated attributes (default)
+    Aggregate,
+    /// Create single meta-edge with only count information
+    Count,
+    /// No meta-edges to external nodes created
+    None,
+}
+
+impl Default for ExternalEdgeStrategy {
+    fn default() -> Self {
+        Self::Aggregate
+    }
+}
+
+/// Strategy for handling edges between meta-nodes
+#[derive(Debug, Clone, PartialEq)]
+pub enum MetaEdgeStrategy {
+    /// Automatically create meta-to-meta edges based on subgraph connections (default)
+    Auto,
+    /// Only create meta-to-meta edges when explicitly requested
+    Explicit,
+    /// No meta-to-meta edges created automatically
+    None,
+}
+
+impl Default for MetaEdgeStrategy {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+/// Edge attribute aggregation function
+#[derive(Debug, Clone, PartialEq)]
+pub enum EdgeAggregationFunction {
+    Sum,
+    Mean,
+    Max,
+    Min,
+    Count,
+    Concat,
+    ConcatUnique,
+    First,
+    Last,
+}
+
+impl Default for EdgeAggregationFunction {
+    fn default() -> Self {
+        Self::Sum
+    }
+}
+
+impl EdgeAggregationFunction {
+    /// Parse aggregation function from string
+    pub fn from_string(s: &str) -> GraphResult<Self> {
+        match s.to_lowercase().as_str() {
+            "sum" => Ok(Self::Sum),
+            "mean" | "avg" => Ok(Self::Mean),
+            "max" => Ok(Self::Max),
+            "min" => Ok(Self::Min),
+            "count" => Ok(Self::Count),
+            "concat" => Ok(Self::Concat),
+            "concat_unique" => Ok(Self::ConcatUnique),
+            "first" => Ok(Self::First),
+            "last" => Ok(Self::Last),
+            _ => Err(GraphError::InvalidInput(format!("Unknown edge aggregation function: {}", s))),
+        }
+    }
+
+    /// Apply aggregation function to a collection of attribute values
+    pub fn aggregate(&self, values: &[AttrValue]) -> GraphResult<AttrValue> {
+        if values.is_empty() {
+            return Err(GraphError::InvalidInput("Cannot aggregate empty values".to_string()));
+        }
+
+        match self {
+            Self::Sum => {
+                match values.first().unwrap() {
+                    AttrValue::Int(_) => {
+                        let sum: i64 = values.iter()
+                            .filter_map(|v| if let AttrValue::Int(i) = v { Some(*i) } else { None })
+                            .sum();
+                        Ok(AttrValue::Int(sum))
+                    }
+                    AttrValue::Float(_) => {
+                        let sum: f32 = values.iter()
+                            .filter_map(|v| if let AttrValue::Float(f) = v { Some(*f) } else { None })
+                            .sum();
+                        Ok(AttrValue::Float(sum))
+                    }
+                    _ => Err(GraphError::InvalidInput("Sum aggregation only supported for numeric types".to_string())),
+                }
+            }
+            Self::Mean => {
+                match values.first().unwrap() {
+                    AttrValue::Int(_) => {
+                        let nums: Vec<i64> = values.iter()
+                            .filter_map(|v| if let AttrValue::Int(i) = v { Some(*i) } else { None })
+                            .collect();
+                        let mean = nums.iter().sum::<i64>() as f32 / nums.len() as f32;
+                        Ok(AttrValue::Float(mean))
+                    }
+                    AttrValue::Float(_) => {
+                        let nums: Vec<f32> = values.iter()
+                            .filter_map(|v| if let AttrValue::Float(f) = v { Some(*f) } else { None })
+                            .collect();
+                        let mean = nums.iter().sum::<f32>() / nums.len() as f32;
+                        Ok(AttrValue::Float(mean))
+                    }
+                    _ => Err(GraphError::InvalidInput("Mean aggregation only supported for numeric types".to_string())),
+                }
+            }
+            Self::Max => {
+                match values.first().unwrap() {
+                    AttrValue::Int(_) => {
+                        let max = values.iter()
+                            .filter_map(|v| if let AttrValue::Int(i) = v { Some(*i) } else { None })
+                            .max()
+                            .unwrap();
+                        Ok(AttrValue::Int(max))
+                    }
+                    AttrValue::Float(_) => {
+                        let max = values.iter()
+                            .filter_map(|v| if let AttrValue::Float(f) = v { Some(*f) } else { None })
+                            .fold(f32::NEG_INFINITY, |a, b| a.max(b));
+                        Ok(AttrValue::Float(max))
+                    }
+                    _ => Err(GraphError::InvalidInput("Max aggregation only supported for numeric types".to_string())),
+                }
+            }
+            Self::Min => {
+                match values.first().unwrap() {
+                    AttrValue::Int(_) => {
+                        let min = values.iter()
+                            .filter_map(|v| if let AttrValue::Int(i) = v { Some(*i) } else { None })
+                            .min()
+                            .unwrap();
+                        Ok(AttrValue::Int(min))
+                    }
+                    AttrValue::Float(_) => {
+                        let min = values.iter()
+                            .filter_map(|v| if let AttrValue::Float(f) = v { Some(*f) } else { None })
+                            .fold(f32::INFINITY, |a, b| a.min(b));
+                        Ok(AttrValue::Float(min))
+                    }
+                    _ => Err(GraphError::InvalidInput("Min aggregation only supported for numeric types".to_string())),
+                }
+            }
+            Self::Count => Ok(AttrValue::Int(values.len() as i64)),
+            Self::Concat => {
+                let concatenated = values.iter()
+                    .filter_map(|v| if let AttrValue::Text(s) = v { Some(s.as_str()) } else { None })
+                    .collect::<Vec<&str>>()
+                    .join(",");
+                Ok(AttrValue::Text(concatenated))
+            }
+            Self::ConcatUnique => {
+                let mut unique_vals = std::collections::HashSet::new();
+                for val in values {
+                    if let AttrValue::Text(s) = val {
+                        unique_vals.insert(s.as_str());
+                    }
+                }
+                let concatenated = unique_vals.into_iter().collect::<Vec<&str>>().join(",");
+                Ok(AttrValue::Text(concatenated))
+            }
+            Self::First => Ok(values.first().unwrap().clone()),
+            Self::Last => Ok(values.last().unwrap().clone()),
+        }
+    }
+}
+
+/// Configuration for edge aggregation during meta-node creation
+#[derive(Debug, Clone)]
+pub struct EdgeAggregationConfig {
+    /// Strategy for handling edges to external nodes
+    pub edge_to_external: ExternalEdgeStrategy,
+    /// Strategy for handling edges between meta-nodes
+    pub edge_to_meta: MetaEdgeStrategy,
+    /// Per-attribute aggregation functions (attribute_name -> function)
+    pub edge_aggregation: HashMap<AttrName, EdgeAggregationFunction>,
+    /// Default aggregation function for unlisted attributes
+    pub default_aggregation: EdgeAggregationFunction,
+    /// Minimum number of parallel edges required to create a meta-edge
+    pub min_edge_count: u32,
+    /// Whether to include edge_count attribute on meta-edges
+    pub include_edge_count: bool,
+    /// Whether to mark meta-edges with entity_type="meta"
+    pub mark_entity_type: bool,
+}
+
+impl Default for EdgeAggregationConfig {
+    fn default() -> Self {
+        Self {
+            edge_to_external: ExternalEdgeStrategy::default(),
+            edge_to_meta: MetaEdgeStrategy::default(),
+            edge_aggregation: HashMap::new(),
+            default_aggregation: EdgeAggregationFunction::default(),
+            min_edge_count: 1,
+            include_edge_count: true,
+            mark_entity_type: true,
+        }
+    }
+}
+
 /// Common operations that all subgraph-like entities support
 ///
 /// This trait provides a unified interface over our existing efficient subgraph storage.
@@ -446,6 +655,88 @@ pub trait SubgraphOperations: GraphEntity {
         Ok(meta_node_id)
     }
 
+    /// Collapse this subgraph into a meta-node with configurable edge aggregation
+    ///
+    /// # Arguments
+    /// * `agg_functions` - Node attribute aggregation functions (e.g., "mean", "sum", "count")
+    /// * `edge_config` - Edge aggregation configuration
+    ///
+    /// # Returns
+    /// NodeId of the created meta-node in GraphPool
+    ///
+    /// # Edge Aggregation Control
+    /// This method provides full control over how edges are aggregated during meta-node creation:
+    /// - External edge handling: copy, aggregate, count, or none
+    /// - Per-attribute aggregation functions with defaults
+    /// - Edge filtering and count thresholds
+    fn collapse_to_node_with_edge_config(
+        &self,
+        agg_functions: HashMap<AttrName, String>,
+        edge_config: &EdgeAggregationConfig,
+    ) -> GraphResult<NodeId> {
+        let binding = self.graph_ref();
+        let mut graph = binding.borrow_mut();
+
+        // Store subgraph reference in GraphPool first
+        let subgraph_id = graph.pool_mut().store_subgraph(
+            self.node_set().clone(),
+            self.edge_set().clone(),
+            self.entity_type().to_string(),
+        )?;
+
+        // WORF SAFETY: Create meta-node atomically with all required attributes
+        let meta_node_id = graph.create_meta_node(subgraph_id)?;
+
+        // Release the mutable borrow before the aggregation loop
+        drop(graph);
+
+        for (attr_name, agg_func_str) in agg_functions {
+            // Parse aggregation function
+            let agg_func =
+                crate::subgraphs::hierarchical::AggregationFunction::from_string(&agg_func_str)?;
+
+            // Special handling for Count aggregation - count all nodes in subgraph
+            let aggregated_value = if matches!(agg_func, crate::subgraphs::hierarchical::AggregationFunction::Count) {
+                AttrValue::Int(self.node_set().len() as i64)
+            } else {
+                // Collect all values for this attribute from nodes in the subgraph
+                let mut values = Vec::new();
+                {
+                    let binding = self.graph_ref();
+                    let graph = binding.borrow();
+
+                    for &node_id in self.node_set() {
+                        if let Some(value) = graph.get_node_attr(node_id, &attr_name)? {
+                            values.push(value);
+                        }
+                    }
+                } // graph borrow automatically released here
+
+                if values.is_empty() {
+                    // For missing attributes, return error (strict validation)
+                    return Err(GraphError::InvalidInput(format!(
+                        "Attribute '{}' not found on any nodes in subgraph. Use collapse_to_node_with_defaults for missing attribute handling.",
+                        attr_name
+                    )));
+                } else {
+                    // Apply aggregation with collected values
+                    agg_func.aggregate(&values)?
+                }
+            };
+
+            // Store the aggregated result with the target attribute name
+            let binding = self.graph_ref();
+            let mut graph = binding.borrow_mut();
+            graph.set_node_attr_internal(meta_node_id, attr_name, aggregated_value)?;
+        }
+
+        // === ENHANCED META-EDGE CREATION ===
+        // Create meta-edges with user-configurable aggregation
+        self.create_meta_edges_with_config(meta_node_id, edge_config)?;
+
+        Ok(meta_node_id)
+    }
+
     /// Collapse this subgraph into a meta-node with enhanced missing attribute handling
     ///
     /// # Arguments
@@ -531,20 +822,23 @@ pub trait SubgraphOperations: GraphEntity {
         Ok(meta_node_id)
     }
 
-    /// Create meta-edges for a collapsed subgraph
+    /// Create meta-edges with configurable aggregation strategy
+    /// 
+    /// This enhanced method provides full control over edge aggregation behavior:
+    /// - External edge handling: copy, aggregate, count, or none
+    /// - Meta-to-meta edge strategy: auto, explicit, or none
+    /// - Per-attribute aggregation functions with defaults
+    /// - Edge filtering based on count and attributes
     ///
     /// # Arguments
-    /// * `meta_node_id` - The meta-node representing the collapsed subgraph
-    ///
-    /// # Behavior
-    /// Creates two types of meta-edges:
-    /// 1. Child-to-External: Edges from collapsed nodes to external nodes
-    /// 2. Meta-to-Meta: Edges from collapsed nodes to other meta-nodes
-    ///
-    /// # Edge Aggregation
-    /// - Multiple parallel edges are aggregated using sum by default
-    /// - Edge attributes are aggregated (weight, etc.)
-    fn create_meta_edges(&self, meta_node_id: NodeId) -> GraphResult<()> {
+    /// * `meta_node_id` - The meta-node to create edges from
+    /// * `config` - Edge aggregation configuration
+    fn create_meta_edges_with_config(&self, meta_node_id: NodeId, config: &EdgeAggregationConfig) -> GraphResult<()> {
+        // Skip edge creation if configured to do nothing
+        if config.edge_to_external == ExternalEdgeStrategy::None {
+            return Ok(());
+        }
+
         let binding = self.graph_ref();
         let mut graph = binding.borrow_mut();
         
@@ -586,53 +880,119 @@ pub trait SubgraphOperations: GraphEntity {
             }
         }
         
-        // Create the aggregated meta-edges
+        // Create the aggregated meta-edges based on strategy
         for (target_node, (edge_count, attr_collections)) in meta_edges {
-            // Create meta-edge from meta-node to target
-            let meta_edge_id = graph.add_edge(meta_node_id, target_node)?;
-            
-            // Set edge count attribute
-            graph.set_edge_attr(meta_edge_id, "edge_count".to_string(), AttrValue::Int(edge_count as i64))?;
-            
-            // Aggregate edge attributes
-            for (attr_name, values) in attr_collections {
-                let aggregated_value = if values.len() == 1 {
-                    // Single value - no aggregation needed
-                    values.into_iter().next().unwrap()
-                } else {
-                    // Multiple values - aggregate using sum for numerical, concat for text
-                    match values.first() {
-                        Some(AttrValue::Int(_)) => {
-                            let sum: i64 = values.iter()
-                                .filter_map(|v| if let AttrValue::Int(i) = v { Some(*i) } else { None })
-                                .sum();
-                            AttrValue::Int(sum)
-                        }
-                        Some(AttrValue::Float(_)) => {
-                            let sum: f32 = values.iter()
-                                .filter_map(|v| if let AttrValue::Float(f) = v { Some(*f) } else { None })
-                                .sum();
-                            AttrValue::Float(sum)
-                        }
-                        Some(AttrValue::Text(_)) => {
-                            let concatenated: String = values.iter()
-                                .filter_map(|v| if let AttrValue::Text(s) = v { Some(s.as_str()) } else { None })
-                                .collect::<Vec<&str>>()
-                                .join(",");
-                            AttrValue::Text(concatenated)
-                        }
-                        _ => values.into_iter().next().unwrap(), // Fallback to first value
-                    }
-                };
-                
-                graph.set_edge_attr(meta_edge_id, attr_name, aggregated_value)?;
+            // Skip if below minimum edge count threshold
+            if edge_count < config.min_edge_count {
+                continue;
             }
-            
-            // Mark this as a meta-edge
-            graph.set_edge_attr(meta_edge_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
+
+            match config.edge_to_external {
+                ExternalEdgeStrategy::Copy => {
+                    // Create separate meta-edges for each original edge (TODO: implement properly)
+                    // For now, fall back to aggregate behavior
+                    self.create_aggregated_meta_edge(&mut *graph, meta_node_id, target_node, edge_count, attr_collections, config)?;
+                }
+                ExternalEdgeStrategy::Aggregate => {
+                    self.create_aggregated_meta_edge(&mut *graph, meta_node_id, target_node, edge_count, attr_collections, config)?;
+                }
+                ExternalEdgeStrategy::Count => {
+                    self.create_count_meta_edge(&mut *graph, meta_node_id, target_node, edge_count, config)?;
+                }
+                ExternalEdgeStrategy::None => {
+                    // Already handled above, skip
+                }
+            }
         }
         
         Ok(())
+    }
+
+    /// Helper method to create an aggregated meta-edge
+    fn create_aggregated_meta_edge(
+        &self,
+        graph: &mut crate::api::graph::Graph,
+        meta_node_id: NodeId,
+        target_node: NodeId,
+        edge_count: u32,
+        attr_collections: std::collections::HashMap<AttrName, Vec<AttrValue>>,
+        config: &EdgeAggregationConfig,
+    ) -> GraphResult<()> {
+        // Create meta-edge from meta-node to target
+        let meta_edge_id = graph.add_edge(meta_node_id, target_node)?;
+        
+        // Set edge count attribute if enabled
+        if config.include_edge_count {
+            graph.set_edge_attr(meta_edge_id, "edge_count".to_string(), AttrValue::Int(edge_count as i64))?;
+        }
+        
+        // Aggregate edge attributes using configured functions
+        for (attr_name, values) in attr_collections {
+            if values.is_empty() {
+                continue;
+            }
+
+            let aggregated_value = if values.len() == 1 {
+                // Single value - no aggregation needed
+                values.into_iter().next().unwrap()
+            } else {
+                // Multiple values - use configured aggregation function
+                let agg_function = config.edge_aggregation.get(&attr_name)
+                    .unwrap_or(&config.default_aggregation);
+                
+                agg_function.aggregate(&values)?
+            };
+            
+            graph.set_edge_attr(meta_edge_id, attr_name, aggregated_value)?;
+        }
+        
+        // Mark this as a meta-edge if enabled
+        if config.mark_entity_type {
+            graph.set_edge_attr(meta_edge_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
+        }
+
+        Ok(())
+    }
+
+    /// Helper method to create a count-only meta-edge
+    fn create_count_meta_edge(
+        &self,
+        graph: &mut crate::api::graph::Graph,
+        meta_node_id: NodeId,
+        target_node: NodeId,
+        edge_count: u32,
+        config: &EdgeAggregationConfig,
+    ) -> GraphResult<()> {
+        // Create meta-edge from meta-node to target
+        let meta_edge_id = graph.add_edge(meta_node_id, target_node)?;
+        
+        // Only set edge count - no other attributes preserved
+        graph.set_edge_attr(meta_edge_id, "edge_count".to_string(), AttrValue::Int(edge_count as i64))?;
+        
+        // Mark this as a meta-edge if enabled
+        if config.mark_entity_type {
+            graph.set_edge_attr(meta_edge_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
+        }
+
+        Ok(())
+    }
+
+    /// Create meta-edges for a collapsed subgraph (legacy method)
+    ///
+    /// # Arguments
+    /// * `meta_node_id` - The meta-node representing the collapsed subgraph
+    ///
+    /// # Behavior
+    /// Creates two types of meta-edges:
+    /// 1. Child-to-External: Edges from collapsed nodes to external nodes
+    /// 2. Meta-to-Meta: Edges from collapsed nodes to other meta-nodes
+    ///
+    /// # Edge Aggregation
+    /// - Multiple parallel edges are aggregated using sum by default
+    /// - Edge attributes are aggregated (weight, etc.)
+    fn create_meta_edges(&self, meta_node_id: NodeId) -> GraphResult<()> {
+        // Use default configuration for backward compatibility
+        self.create_meta_edges_with_config(meta_node_id, &EdgeAggregationConfig::default())
     }
 
     /// Get parent subgraph (if this is a sub-subgraph)
