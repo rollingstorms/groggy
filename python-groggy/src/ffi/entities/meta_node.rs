@@ -177,9 +177,20 @@ impl PyMetaNode {
         use groggy::traits::MetaNodeOperations;
         
         match self.inner.subgraph() {
-            Ok(Some(_subgraph_trait_obj)) => {
-                // TODO: Convert SubgraphOperations trait object to PySubgraph
-                // For now, return None as placeholder
+            Ok(Some(subgraph_trait_obj)) => {
+                // Try to convert the SubgraphOperations trait object to a concrete Subgraph
+                // This is a workaround until we have proper trait object to concrete conversion
+                
+                // For now, we need to reconstruct a concrete subgraph from the trait object
+                // This is challenging because we only have a trait object reference
+                
+                // As a future enhancement, we would:
+                // 1. Store SubgraphId in the meta-node and retrieve concrete subgraph from graph pool
+                // 2. Or implement a way to convert trait objects back to concrete types
+                
+                // For now, return None to indicate that subgraph expansion is not yet fully implemented
+                // The meta-node still provides subgraph_id() and has_subgraph() for inspection
+                let _ = subgraph_trait_obj; // Suppress unused variable warning
                 Ok(None)
             }
             Ok(None) => Ok(None),

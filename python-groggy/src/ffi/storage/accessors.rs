@@ -80,16 +80,6 @@ fn create_node_entity_from_core(
     }
 }
 
-/// Legacy helper function to create NodeView from core Graph (for backwards compatibility)
-fn create_node_view_from_core(
-    graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
-    py: Python,
-    node_id: NodeId,
-) -> PyResult<PyObject> {
-    // For now, delegate to smart entity creation
-    // TODO: This can be removed once all callers are updated
-    create_node_entity_from_core(graph, py, node_id)
-}
 
 /// Smart helper function to create appropriate Edge entity from core Graph
 /// Returns PyMetaEdge for meta-edges, PyEdge for regular edges
@@ -152,16 +142,6 @@ fn create_edge_entity_from_core(
     }
 }
 
-/// Legacy helper function to create EdgeView from core Graph (for backwards compatibility)
-fn create_edge_view_from_core(
-    graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
-    py: Python,
-    edge_id: EdgeId,
-) -> PyResult<PyObject> {
-    // For now, delegate to smart entity creation
-    // TODO: This can be removed once all callers are updated
-    create_edge_entity_from_core(graph, py, edge_id)
-}
 
 /// Iterator for nodes that yields NodeViews
 #[pyclass(unsendable)]
