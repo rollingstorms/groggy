@@ -211,15 +211,24 @@ impl MetaNodeOperations for MetaNode {
     }
     
     fn subgraph(&self) -> GraphResult<Option<Box<dyn SubgraphOperations>>> {
-        if let Some(_subgraph_id) = self.subgraph_id() {
-            // TODO: Implement subgraph reconstruction from stored subgraph ID
-            // This would need to:
-            // 1. Get the stored subgraph data from the graph pool
-            // 2. Reconstruct a Subgraph instance
-            // 3. Return it as a SubgraphOperations trait object
+        if let Some(subgraph_id) = self.subgraph_id() {
+            // Get the stored subgraph data from the graph pool
+            let (nodes, edges, _subgraph_type) = {
+                let graph = self.graph.borrow();
+                let result = graph.pool().get_subgraph(subgraph_id)?;
+                result
+            };
             
-            // For now, return None as a placeholder
-            Ok(None)
+            // Reconstruct a concrete Subgraph instance
+            let subgraph = crate::subgraphs::Subgraph::new(
+                self.graph.clone(),
+                nodes,
+                edges,
+                format!("expanded_from_meta_node_{}", self.id),
+            );
+            
+            // Return as a SubgraphOperations trait object
+            Ok(Some(Box::new(subgraph)))
         } else {
             Ok(None)
         }
