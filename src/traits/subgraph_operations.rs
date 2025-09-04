@@ -829,7 +829,11 @@ pub trait SubgraphOperations: GraphEntity {
                 continue;
             }
 
-            match config.edge_to_external {
+                // DEFENSIVE CHECK: Validate that target_node still exists before creating edges
+                if !graph.contains_node(target_node) {
+                    eprintln!("Warning: Skipping meta-edge to non-existent node {}", target_node);
+                    continue;
+                }            match config.edge_to_external {
                 ExternalEdgeStrategy::Copy => {
                     // Create separate meta-edges for each original edge (TODO: implement properly)
                     // For now, fall back to aggregate behavior
@@ -860,6 +864,18 @@ pub trait SubgraphOperations: GraphEntity {
         attr_collections: std::collections::HashMap<AttrName, Vec<AttrValue>>,
         config: &EdgeAggregationConfig,
     ) -> GraphResult<()> {
+        // DEFENSIVE CHECK: Validate both nodes exist before creating edge
+        if !graph.contains_node(meta_node_id) {
+            return Err(GraphError::InvalidInput(
+                format!("Meta-node {} does not exist", meta_node_id)
+            ));
+        }
+        if !graph.contains_node(target_node) {
+            return Err(GraphError::InvalidInput(
+                format!("Target node {} does not exist", target_node)
+            ));
+        }
+
         // Create meta-edge from meta-node to target
         let meta_edge_id = graph.add_edge(meta_node_id, target_node)?;
         
@@ -909,6 +925,18 @@ pub trait SubgraphOperations: GraphEntity {
         edge_count: u32,
         config: &EdgeAggregationConfig,
     ) -> GraphResult<()> {
+        // DEFENSIVE CHECK: Validate both nodes exist before creating edge
+        if !graph.contains_node(meta_node_id) {
+            return Err(GraphError::InvalidInput(
+                format!("Meta-node {} does not exist", meta_node_id)
+            ));
+        }
+        if !graph.contains_node(target_node) {
+            return Err(GraphError::InvalidInput(
+                format!("Target node {} does not exist", target_node)
+            ));
+        }
+
         // Create meta-edge from meta-node to target
         let meta_edge_id = graph.add_edge(meta_node_id, target_node)?;
         

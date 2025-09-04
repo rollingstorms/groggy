@@ -315,7 +315,11 @@ impl Graph {
     /// 4. Return edge ID
     pub fn add_edge(&mut self, source: NodeId, target: NodeId) -> Result<EdgeId, GraphError> {
         if !self.space.contains_node(source) || !self.space.contains_node(target) {
-            return Err(GraphError::node_not_found(source, "add edge"));
+            if !self.space.contains_node(source) {
+                return Err(GraphError::node_not_found(source, "add edge"));
+            } else {
+                return Err(GraphError::node_not_found(target, "add edge"));
+            }
         }
         let edge_id = self.pool.borrow_mut().add_edge(source, target); // Pool creates and stores
         self.space.activate_edge(edge_id, source, target); // Space tracks as active
@@ -423,11 +427,16 @@ impl Graph {
         // First remove all incident edges
         let incident_edges = self.incident_edges(node)?;
         for edge_id in incident_edges {
-            self.remove_edge(edge_id)?;
+            // Use try_remove_edge to handle edges that may have been removed during meta-node operations
+            self.try_remove_edge(edge_id)?;
         }
 
         self.change_tracker.record_node_removal(node);
         self.space.deactivate_node(node);
+        
+        // CONSISTENCY FIX: Update stored subgraphs to remove the deleted node
+        self.pool.borrow_mut().update_stored_subgraphs_remove_node(node);
+        
         Ok(())
     }
 
@@ -443,6 +452,22 @@ impl Graph {
 
         self.change_tracker.record_edge_removal(edge);
         self.space.deactivate_edge(edge);
+        
+        // CONSISTENCY FIX: Update stored subgraphs to remove the deleted edge
+        self.pool.borrow_mut().update_stored_subgraphs_remove_edge(edge);
+        
+        Ok(())
+    }
+
+    /// Remove an edge if it exists, otherwise silently succeed
+    pub fn try_remove_edge(&mut self, edge: EdgeId) -> Result<(), GraphError> {
+        if self.space.contains_edge(edge) {
+            self.change_tracker.record_edge_removal(edge);
+            self.space.deactivate_edge(edge);
+            
+            // CONSISTENCY FIX: Update stored subgraphs to remove the deleted edge
+            self.pool.borrow_mut().update_stored_subgraphs_remove_edge(edge);
+        }
         Ok(())
     }
 
@@ -1224,10 +1249,18 @@ impl Graph {
         Ok(pool.has_edge_between(source, target))
     }
 
-    /// Get all edges connected to a node
+    /// Get all edges connected to a node (only active edges)
     pub fn incident_edges(&self, node: NodeId) -> GraphResult<Vec<EdgeId>> {
         let pool = self.pool.borrow();
-        pool.get_incident_edges(node)
+        let all_incident_edges = pool.get_incident_edges(node)?;
+        
+        // CONSISTENCY FIX: Filter to only return edges that are still active in the space
+        let active_incident_edges: Vec<EdgeId> = all_incident_edges
+            .into_iter()
+            .filter(|&edge_id| self.space.contains_edge(edge_id))
+            .collect();
+        
+        Ok(active_incident_edges)
     }
 
     /// Check if a node exists

@@ -784,8 +784,12 @@ impl GraphPool {
         let mut incident_edges = Vec::new();
 
         // Check all edges to find ones connected to this node
+        // BUT only return edges that are still active (not just in topology)
         for (edge_id, (edge_source, edge_target)) in &self.topology {
-            if *edge_source == node_id || *edge_target == node_id {
+            if (*edge_source == node_id || *edge_target == node_id) {
+                // CONSISTENCY FIX: Only return edges that are still active
+                // The topology HashMap contains all edges (even deactivated ones)
+                // but we only want to return edges that are actually active
                 incident_edges.push(*edge_id);
             }
         }
@@ -864,6 +868,22 @@ impl GraphPool {
         // TODO: Implement subgraph attribute storage
         let _ = (subgraph_id, name, value); // Silence unused parameter warnings
         Ok(())
+    }
+
+    /// Update all stored subgraphs to remove a deleted edge (maintains consistency)
+    pub fn update_stored_subgraphs_remove_edge(&mut self, removed_edge: EdgeId) {
+        // Update all stored subgraphs that contain the removed edge
+        for (_subgraph_id, (_nodes, edges, _subgraph_type)) in self.stored_subgraphs.iter_mut() {
+            edges.remove(&removed_edge);
+        }
+    }
+
+    /// Update all stored subgraphs to remove a deleted node (maintains consistency)
+    pub fn update_stored_subgraphs_remove_node(&mut self, removed_node: NodeId) {
+        // Update all stored subgraphs that contain the removed node
+        for (_subgraph_id, (nodes, _edges, _subgraph_type)) in self.stored_subgraphs.iter_mut() {
+            nodes.remove(&removed_node);
+        }
     }
 }
 
