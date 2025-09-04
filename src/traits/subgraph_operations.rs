@@ -7,6 +7,7 @@
 use crate::traits::GraphEntity;
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
+use crate::subgraphs::composer::{MetaNodePlan, NodeAggregation, EdgeAggregation, EdgeStrategy, ComposerPreview};
 use std::collections::{HashMap, HashSet};
 
 /// Enhanced aggregation specification supporting multiple syntax forms
@@ -1253,6 +1254,77 @@ pub trait SubgraphOperations: GraphEntity {
 
         // Use existing GraphTable::from_arrays_standalone (no graph reference needed)
         crate::storage::table::GraphTable::from_arrays_standalone(columns, Some(column_names))
+    }
+    
+    /// Modern MetaGraph Composer API - Clean interface for meta-node creation
+    /// 
+    /// This is the new, intuitive way to create meta-nodes with flexible configuration.
+    /// It replaces the complex EdgeAggregationConfig system with a simple, discoverable API.
+    /// 
+    /// # Arguments
+    /// * `node_aggs` - Node aggregation specifications (flexible input)
+    /// * `edge_aggs` - Edge aggregation specifications  
+    /// * `edge_strategy` - How to handle edges ("aggregate", "keep_external", "drop_all", "contract_all")
+    /// * `preset` - Optional preset configuration
+    /// * `include_edge_count` - Add edge_count attribute to meta-edges
+    /// * `mark_entity_type` - Mark meta-nodes/edges with entity_type
+    /// * `entity_type` - Entity type to use for marking
+    /// 
+    /// # Returns
+    /// A `MetaNodePlan` that can be previewed, modified, and executed with `.add_to_graph()`
+    /// 
+    /// # Examples
+    /// ```rust
+    /// // Basic usage
+    /// let plan = subgraph.collapse(
+    ///     vec![("avg_salary", "mean", Some("salary"))],
+    ///     vec![("weight", "mean")],
+    ///     EdgeStrategy::Aggregate,
+    ///     None,
+    ///     true,
+    ///     true,
+    ///     "meta".to_string()
+    /// )?;
+    /// let meta_node = plan.add_to_graph()?;
+    /// ```
+    fn collapse(
+        &self,
+        node_aggs: Vec<(String, String, Option<String>)>, // (target, function, source)
+        edge_aggs: Vec<(String, String)>, // (attr_name, function)  
+        edge_strategy: EdgeStrategy,
+        preset: Option<String>,
+        include_edge_count: bool,
+        mark_entity_type: bool,
+        entity_type: String,
+    ) -> GraphResult<MetaNodePlan> {
+        // Create base plan
+        let mut plan = MetaNodePlan::new(
+            self.node_set().clone(),
+            self.edge_set().clone(),
+        );
+        
+        // Apply preset if provided
+        if let Some(preset_name) = preset {
+            plan = plan.with_preset(&preset_name)?;
+        }
+        
+        // Add node aggregations
+        for (target, function, source) in node_aggs {
+            plan = plan.with_node_agg(target, function, source);
+        }
+        
+        // Add edge aggregations
+        for (attr_name, function) in edge_aggs {
+            plan = plan.with_edge_agg(attr_name, function);
+        }
+        
+        // Configure plan
+        plan.edge_strategy = edge_strategy;
+        plan.include_edge_count = include_edge_count;
+        plan.mark_entity_type = mark_entity_type;
+        plan.entity_type = entity_type;
+        
+        Ok(plan)
     }
 }
 

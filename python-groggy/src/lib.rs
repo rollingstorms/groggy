@@ -32,6 +32,9 @@ pub use ffi::types::{PyAttrValue, PyAttributeCollection, PyResultHandle};
 // Hierarchical subgraph types
 pub use ffi::subgraphs::hierarchical::{PyAggregationFunction, PyMetaNode};
 
+// MetaGraph Composer types
+pub use ffi::subgraphs::composer::{PyEdgeStrategy, PyComposerPreview, PyMetaNodePlan, PyMetaNodePlanExecutor};
+
 // ====================================================================
 // UNIFIED BUILDER PATTERNS
 // ====================================================================
@@ -273,6 +276,12 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Register hierarchical subgraph types
     m.add_class::<ffi::subgraphs::hierarchical::PyAggregationFunction>()?;
     m.add_class::<ffi::subgraphs::hierarchical::PyMetaNode>()?;
+    
+    // Register MetaGraph Composer types
+    m.add_class::<ffi::subgraphs::composer::PyEdgeStrategy>()?;
+    m.add_class::<ffi::subgraphs::composer::PyComposerPreview>()?;
+    m.add_class::<ffi::subgraphs::composer::PyMetaNodePlan>()?;
+    m.add_class::<ffi::subgraphs::composer::PyMetaNodePlanExecutor>()?;
 
     // Add aliases for Python imports - these are already added with correct names
 

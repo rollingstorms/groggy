@@ -6,7 +6,7 @@
 use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
 use groggy::subgraphs::Subgraph;
-use groggy::traits::SubgraphOperations;
+use groggy::traits::{SubgraphOperations, GraphEntity};
 use groggy::{AttrValue, EdgeId, NodeId, SimilarityMetric};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
@@ -1265,9 +1265,10 @@ impl PySubgraph {
     ///     "total_salary": {"func": "sum", "source": "salary", "default": 0}
     /// })
     /// ```
-    pub fn add_to_graph(&self, py: Python, agg_spec: Option<&pyo3::types::PyDict>) -> PyResult<PyObject> {
+    #[pyo3(signature = (agg_spec = None, edge_config = None))]
+    pub fn add_to_graph(&self, py: Python, agg_spec: Option<&pyo3::types::PyDict>, edge_config: Option<&pyo3::types::PyDict>) -> PyResult<PyObject> {
         // Call enhanced method with default edge configuration
-        self.add_to_graph_with_edge_config(py, agg_spec, None)
+        self.add_to_graph_with_edge_config(py, agg_spec, edge_config)
     }
 
     /// Enhanced add_to_graph with configurable edge aggregation
@@ -1317,12 +1318,8 @@ impl PySubgraph {
                 pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e))
             })?;
 
-        // Get the created meta-node from the graph
-        let graph_binding = self.inner.graph_ref();
-        let graph = graph_binding.borrow();
-        
         // Create MetaNode wrapper
-        let meta_node = groggy::subgraphs::MetaNode::from_node_id(&*graph, meta_node_id)
+        let meta_node = groggy::subgraphs::MetaNode::new(meta_node_id, self.inner.graph_ref())
             .map_err(|e| {
                 pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to retrieve meta-node: {}", e))
             })?;
@@ -1398,6 +1395,89 @@ impl PySubgraph {
         self.child_meta_nodes(py)
     }
 
+    /// Modern MetaGraph Composer API - Clean interface for meta-node creation
+    /// 
+    /// This is the new, intuitive way to create meta-nodes with flexible configuration.
+    /// Returns a MetaNodePlan that can be previewed, modified, and executed.
+    /// 
+    /// # Arguments
+    /// * `node_aggs` - Node aggregation specifications (dict or list format)
+    /// * `edge_aggs` - Edge aggregation specifications (dict format)
+    /// * `edge_strategy` - Edge handling strategy ("aggregate", "keep_external", "drop_all", "contract_all")
+    /// * `preset` - Optional preset name ("social_network", "org_hierarchy", "flow_network")
+    /// * `include_edge_count` - Include edge_count attribute in meta-edges
+    /// * `mark_entity_type` - Mark meta-nodes/edges with entity_type
+    /// * `entity_type` - Entity type for marking
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Dict format for node aggregations
+    /// plan = subgraph.collapse(
+    ///     node_aggs={"avg_salary": ("mean", "salary"), "size": "count"},
+    ///     edge_aggs={"weight": "mean"},
+    ///     edge_strategy="aggregate"
+    /// )
+    /// meta_node = plan.add_to_graph()
+    /// 
+    /// # With preset
+    /// plan = subgraph.collapse(preset="social_network")
+    /// meta_node = plan.add_to_graph()
+    /// ```
+    #[pyo3(signature = (
+        node_aggs = None,
+        edge_aggs = None, 
+        edge_strategy = "aggregate",
+        preset = None,
+        include_edge_count = true,
+        mark_entity_type = true,
+        entity_type = "meta"
+    ))]
+    fn collapse(
+        &self,
+        py: Python,
+        node_aggs: Option<&PyAny>,
+        edge_aggs: Option<&PyAny>,
+        edge_strategy: &str,
+        preset: Option<String>,
+        include_edge_count: bool,
+        mark_entity_type: bool,
+        entity_type: &str,
+    ) -> PyResult<PyObject> {
+        use crate::ffi::subgraphs::composer::{PyMetaNodePlanExecutor, parse_node_aggs_from_python, parse_edge_aggs_from_python};
+        use groggy::subgraphs::composer::EdgeStrategy;
+        
+        // Parse input parameters
+        let parsed_node_aggs = if let Some(aggs) = node_aggs {
+            parse_node_aggs_from_python(aggs)?
+        } else {
+            Vec::new()
+        };
+        
+        let parsed_edge_aggs = if let Some(aggs) = edge_aggs {
+            parse_edge_aggs_from_python(aggs)?
+        } else {
+            Vec::new()
+        };
+        
+        let strategy = EdgeStrategy::from_str(edge_strategy)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid edge strategy: {}", e)))?;
+        
+        // Call the trait method
+        let plan = self.inner.collapse(
+            parsed_node_aggs,
+            parsed_edge_aggs,
+            strategy,
+            preset,
+            include_edge_count,
+            mark_entity_type,
+            entity_type.to_string(),
+        ).map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create plan: {}", e)))?;
+        
+        // Create Python wrapper that can execute the plan
+        let py_plan = PyMetaNodePlanExecutor::new(plan);
+        Ok(Py::new(py, py_plan)?.to_object(py))
+    }
+    
     fn __str__(&self) -> String {
         format!(
             "Subgraph with {} nodes and {} edges",

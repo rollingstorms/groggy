@@ -12,9 +12,11 @@ pub mod hierarchical;
 pub mod neighborhood;
 pub mod filtered;
 pub mod component;
+pub mod composer;
 
 pub use subgraph::*;
 pub use hierarchical::*;
 pub use neighborhood::*;
 pub use filtered::*;
 pub use component::*;
+pub use composer::*;
