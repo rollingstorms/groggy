@@ -26,40 +26,141 @@ fn attr_value_to_python_value(py: Python, attr_value: &AttrValue) -> PyResult<Py
 
 // Import types from our FFI modules
 use crate::ffi::subgraphs::subgraph::PySubgraph;
-use crate::ffi::storage::views::PyNodeView;
 
-/// Helper function to create NodeView from core Graph
+/// Smart helper function to create appropriate Node entity from core Graph
+/// Returns PyMetaNode for meta-nodes, PyNode for regular nodes
+fn create_node_entity_from_core(
+    graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    py: Python,
+    node_id: NodeId,
+) -> PyResult<PyObject> {
+    // Check if this is a meta-node by examining entity_type attribute
+    let is_meta_node = {
+        let graph_ref = graph.borrow();
+        match graph_ref.get_node_attr(node_id, &"entity_type".into()) {
+            Ok(Some(attr_value)) => {
+                match attr_value {
+                    groggy::AttrValue::Text(s) => s == "meta",
+                    groggy::AttrValue::CompactText(s) => s.as_str() == "meta",
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    };
+    
+    if is_meta_node {
+        // Create PyMetaNode entity wrapper
+        use crate::ffi::entities::PyMetaNode;
+        use groggy::entities::MetaNode;
+        
+        match MetaNode::new(node_id, graph) {
+            Ok(meta_node) => {
+                let py_meta_node = PyMetaNode::from_meta_node(meta_node);
+                Ok(Py::new(py, py_meta_node)?.to_object(py))
+            }
+            Err(e) => Err(PyRuntimeError::new_err(format!(
+                "Failed to create MetaNode entity: {}", e
+            ))),
+        }
+    } else {
+        // Create PyNode entity wrapper
+        use crate::ffi::entities::PyNode;
+        use groggy::entities::Node;
+        
+        match Node::new(node_id, graph) {
+            Ok(node) => {
+                let py_node = PyNode::from_node(node);
+                Ok(Py::new(py, py_node)?.to_object(py))
+            }
+            Err(e) => Err(PyRuntimeError::new_err(format!(
+                "Failed to create Node entity: {}", e
+            ))),
+        }
+    }
+}
+
+/// Legacy helper function to create NodeView from core Graph (for backwards compatibility)
 fn create_node_view_from_core(
     graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
     py: Python,
     node_id: NodeId,
 ) -> PyResult<PyObject> {
-    let node_view = PyNodeView {
-        graph: graph.clone(),
-        node_id,
-    };
-    Ok(Py::new(py, node_view)?.to_object(py))
+    // For now, delegate to smart entity creation
+    // TODO: This can be removed once all callers are updated
+    create_node_entity_from_core(graph, py, node_id)
 }
 
-/// Helper function to create EdgeView from core Graph
+/// Smart helper function to create appropriate Edge entity from core Graph
+/// Returns PyMetaEdge for meta-edges, PyEdge for regular edges
+fn create_edge_entity_from_core(
+    graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
+    py: Python,
+    edge_id: EdgeId,
+) -> PyResult<PyObject> {
+    // Check if edge exists first
+    {
+        let graph_ref = graph.borrow();
+        if !graph_ref.has_edge(edge_id) {
+            return Err(PyKeyError::new_err(format!("Edge {} not found", edge_id)));
+        }
+    }
+    
+    // Check if this is a meta-edge by examining entity_type attribute
+    let is_meta_edge = {
+        let graph_ref = graph.borrow();
+        match graph_ref.get_edge_attr(edge_id, &"entity_type".into()) {
+            Ok(Some(attr_value)) => {
+                match attr_value {
+                    groggy::AttrValue::Text(s) => s == "meta",
+                    groggy::AttrValue::CompactText(s) => s.as_str() == "meta",
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    };
+    
+    if is_meta_edge {
+        // Create PyMetaEdge entity wrapper
+        use crate::ffi::entities::PyMetaEdge;
+        use groggy::entities::MetaEdge;
+        
+        match MetaEdge::new(edge_id, graph) {
+            Ok(meta_edge) => {
+                let py_meta_edge = PyMetaEdge::from_meta_edge(meta_edge);
+                Ok(Py::new(py, py_meta_edge)?.to_object(py))
+            }
+            Err(e) => Err(PyRuntimeError::new_err(format!(
+                "Failed to create MetaEdge entity: {}", e
+            ))),
+        }
+    } else {
+        // Create PyEdge entity wrapper
+        use crate::ffi::entities::PyEdge;
+        use groggy::entities::Edge;
+        
+        match Edge::new(edge_id, graph) {
+            Ok(edge) => {
+                let py_edge = PyEdge::from_edge(edge);
+                Ok(Py::new(py, py_edge)?.to_object(py))
+            }
+            Err(e) => Err(PyRuntimeError::new_err(format!(
+                "Failed to create Edge entity: {}", e
+            ))),
+        }
+    }
+}
+
+/// Legacy helper function to create EdgeView from core Graph (for backwards compatibility)
 fn create_edge_view_from_core(
     graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
     py: Python,
     edge_id: EdgeId,
 ) -> PyResult<PyObject> {
-    // Create proper EdgeView object
-    use crate::ffi::storage::views::PyEdgeView;
-
-    let graph_ref = graph.borrow();
-    if graph_ref.has_edge(edge_id) {
-        let edge_view = PyEdgeView {
-            graph: graph.clone(),
-            edge_id,
-        };
-        Ok(Py::new(py, edge_view)?.to_object(py))
-    } else {
-        Err(PyKeyError::new_err(format!("Edge {} not found", edge_id)))
-    }
+    // For now, delegate to smart entity creation
+    // TODO: This can be removed once all callers are updated
+    create_edge_entity_from_core(graph, py, edge_id)
 }
 
 /// Iterator for nodes that yields NodeViews
@@ -81,12 +182,9 @@ impl NodesIterator {
             let node_id = self.node_ids[self.index];
             self.index += 1;
 
-            // Create PyNodeView that supports 'attr' in node and node['attr'] syntax
-            let node_view = PyNodeView {
-                graph: self.graph.clone(),
-                node_id,
-            };
-            Ok(Some(Py::new(py, node_view)?.to_object(py)))
+            // Use smart entity creation to return appropriate type
+            let node_entity = create_node_entity_from_core(self.graph.clone(), py, node_id)?;
+            Ok(Some(node_entity))
         } else {
             Ok(None)
         }
@@ -136,8 +234,8 @@ impl PyNodesAccessor {
                 )));
             }
 
-            let node_view = create_node_view_from_core(self.graph.clone(), py, actual_node_id)?;
-            return Ok(node_view.to_object(py));
+            let node_entity = create_node_entity_from_core(self.graph.clone(), py, actual_node_id)?;
+            return Ok(node_entity);
         }
 
         // Try to extract as GraphArray (indexed boolean lookup) - CHECK FIRST
@@ -1009,9 +1107,9 @@ impl EdgesIterator {
             let edge_id = self.edge_ids[self.index];
             self.index += 1;
 
-            // Create EdgeView for this edge using core Graph directly
-            let edge_view = create_edge_view_from_core(self.graph.clone(), py, edge_id)?;
-            Ok(Some(edge_view.to_object(py)))
+            // Use smart entity creation to return appropriate type
+            let edge_entity = create_edge_entity_from_core(self.graph.clone(), py, edge_id)?;
+            Ok(Some(edge_entity))
         } else {
             Ok(None)
         }
@@ -1061,8 +1159,8 @@ impl PyEdgesAccessor {
                 )));
             }
 
-            let edge_view = create_edge_view_from_core(self.graph.clone(), py, actual_edge_id)?;
-            return Ok(edge_view.to_object(py));
+            let edge_entity = create_edge_entity_from_core(self.graph.clone(), py, actual_edge_id)?;
+            return Ok(edge_entity);
         }
 
         // Try to extract as GraphArray (indexed boolean lookup) - CHECK FIRST
