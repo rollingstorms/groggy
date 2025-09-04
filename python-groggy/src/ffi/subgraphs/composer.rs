@@ -3,7 +3,7 @@
 //! Clean, intuitive API for meta-node creation that replaces the complex
 //! EdgeAggregationConfig system.
 
-use crate::ffi::subgraphs::hierarchical::PyMetaNode;
+use crate::ffi::entities::PyMetaNode;
 use groggy::subgraphs::{Subgraph, composer::{EdgeStrategy, MetaNodePlan, ComposerPreview}};
 use pyo3::exceptions::{PyValueError, PyRuntimeError};
 use pyo3::prelude::*;
@@ -113,10 +113,11 @@ impl PyComposerPreview {
     }
 }
 
-/// Python wrapper for MetaNodePlan
+/// Python wrapper for executed MetaNodePlan with stored result
 #[pyclass(name = "MetaNodePlan")]
 pub struct PyMetaNodePlan {
-    pub inner: MetaNodePlan,
+    pub preview_info: ComposerPreview,
+    pub meta_node_id: Option<groggy::types::NodeId>,
 }
 
 #[pymethods]
@@ -124,65 +125,72 @@ impl PyMetaNodePlan {
     /// Preview what the plan will create without executing
     fn preview(&self) -> PyComposerPreview {
         PyComposerPreview {
-            inner: self.inner.preview()
+            inner: self.preview_info.clone()
         }
     }
     
-    /// Add a node aggregation to the plan
-    /// 
-    /// # Arguments
-    /// * `target` - Target attribute name
-    /// * `function` - Aggregation function ("mean", "sum", "count", etc.)
-    /// * `source` - Source attribute name (optional, defaults to target)
-    #[pyo3(signature = (target, function, source = None))]
-    fn with_node_agg(&mut self, target: String, function: String, source: Option<String>) {
-        self.inner = self.inner.clone().with_node_agg(target, function, source);
-    }
-    
-    /// Add an edge aggregation to the plan
-    /// 
-    /// # Arguments  
-    /// * `attr_name` - Edge attribute name to aggregate
-    /// * `function` - Aggregation function ("mean", "sum", "concat", etc.)
-    fn with_edge_agg(&mut self, attr_name: String, function: String) {
-        self.inner = self.inner.clone().with_edge_agg(attr_name, function);
-    }
-    
-    /// Set the edge strategy
-    fn with_edge_strategy(&mut self, strategy: &PyEdgeStrategy) {
-        self.inner = self.inner.clone().with_edge_strategy(strategy.inner.clone());
-    }
-    
-    /// Set the entity type
-    fn with_entity_type(&mut self, entity_type: String) {
-        self.inner = self.inner.clone().with_entity_type(entity_type);
-    }
-    
-    /// Apply a preset configuration
-    fn with_preset(&mut self, preset_name: String) -> PyResult<()> {
-        self.inner = self.inner.clone().with_preset(&preset_name)
-            .map_err(|e| PyValueError::new_err(format!("Invalid preset: {}", e)))?;
-        Ok(())
-    }
-    
-    /// Execute the plan and create the meta-node
-    /// 
-    /// This method needs to be called from the subgraph that created the plan.
-    /// For now, we'll implement this when we add the collapse method to PySubgraph.
-    fn add_to_graph(&self) -> PyResult<PyObject> {
+    /// Plans cannot be modified after execution - they are immutable snapshots
+    fn with_node_agg(&mut self, _target: String, _function: String, _source: Option<String>) -> PyResult<()> {
         Err(PyRuntimeError::new_err(
-            "add_to_graph() must be called from the subgraph that created this plan. Use subgraph.collapse(...).add_to_graph() instead."
+            "Cannot modify plan after creation. Create a new plan with different parameters instead."
         ))
     }
     
+    fn with_edge_agg(&mut self, _attr_name: String, _function: String) -> PyResult<()> {
+        Err(PyRuntimeError::new_err(
+            "Cannot modify plan after creation. Create a new plan with different parameters instead."
+        ))
+    }
+    
+    fn with_edge_strategy(&mut self, _strategy: &PyEdgeStrategy) -> PyResult<()> {
+        Err(PyRuntimeError::new_err(
+            "Cannot modify plan after creation. Create a new plan with different parameters instead."
+        ))
+    }
+    
+    fn with_entity_type(&mut self, _entity_type: String) -> PyResult<()> {
+        Err(PyRuntimeError::new_err(
+            "Cannot modify plan after creation. Create a new plan with different parameters instead."
+        ))
+    }
+    
+    fn with_preset(&mut self, _preset_name: String) -> PyResult<()> {
+        Err(PyRuntimeError::new_err(
+            "Cannot modify plan after creation. Create a new plan with different parameters instead."
+        ))
+    }
+    
+    /// Execute the plan and create the meta-node
+    pub fn add_to_graph(&self, _py: Python) -> PyResult<PyObject> {
+        if let Some(_node_id) = &self.meta_node_id {
+            // The meta-node was already created during collapse()
+            // In the current design, the meta-node is returned directly from collapse()
+            // This method exists for API consistency but the work is already done
+            Err(PyRuntimeError::new_err(
+                "This MetaNodePlan has already been executed. The MetaNode was returned directly from collapse()."
+            ))
+        } else {
+            Err(PyRuntimeError::new_err(
+                "Plan execution failed - no meta-node was created"
+            ))
+        }
+    }
+    
     fn __str__(&self) -> String {
-        let preview = self.inner.preview();
-        format!(
-            "MetaNodePlan(node_aggs={}, edge_aggs={}, strategy={:?})",
-            self.inner.node_aggs.len(),
-            self.inner.edge_aggs.len(),
-            self.inner.edge_strategy
-        )
+        if self.meta_node_id.is_some() {
+            format!(
+                "MetaNodePlan(executed - {} attributes, {} meta-edges, strategy={:?})",
+                self.preview_info.meta_node_attributes.len(),
+                self.preview_info.meta_edges_count,
+                self.preview_info.edge_strategy
+            )
+        } else {
+            format!(
+                "MetaNodePlan(failed - {} attributes configured, strategy={:?})",
+                self.preview_info.meta_node_attributes.len(),
+                self.preview_info.edge_strategy
+            )
+        }
     }
     
     fn __repr__(&self) -> String {
@@ -239,18 +247,50 @@ pub fn parse_node_aggs_from_python(node_aggs: &PyAny) -> PyResult<Vec<(String, S
     Ok(result)
 }
 
-/// Parse edge aggregations from Python dict
+/// Parse edge aggregations from Python dict or list (same format as node_aggs)
 pub fn parse_edge_aggs_from_python(edge_aggs: &PyAny) -> PyResult<Vec<(String, String)>> {
     let mut result = Vec::new();
     
+    // Handle dict format: {"attr": "function"} or {"attr": ("function", "source_attr")}
     if let Ok(dict) = edge_aggs.downcast::<PyDict>() {
         for (key, value) in dict {
             let attr_name = key.extract::<String>()?;
-            let function = value.extract::<String>()?;
-            result.push((attr_name, function));
+            
+            if let Ok(function) = value.extract::<String>() {
+                // Simple format: {"weight": "mean"}
+                result.push((attr_name, function));
+            } else if let Ok(tuple) = value.extract::<(String, String)>() {
+                // Tuple format: {"avg_weight": ("mean", "weight")}
+                let (function, _source) = tuple;
+                result.push((attr_name, function));
+            } else {
+                return Err(PyValueError::new_err(format!(
+                    "Invalid edge aggregation format for '{}'. Expected string or (function, source) tuple.",
+                    attr_name
+                )));
+            }
+        }
+    }
+    // Handle list format: [("attr", "function"), ("attr", "function", "source"), ...]
+    else if let Ok(list) = edge_aggs.iter() {
+        for item in list {
+            let item = item?;
+            if let Ok(tuple2) = item.extract::<(String, String)>() {
+                let (attr_name, function) = tuple2;
+                result.push((attr_name, function));
+            } else if let Ok(tuple3) = item.extract::<(String, String, String)>() {
+                let (attr_name, function, _source) = tuple3;
+                result.push((attr_name, function));
+            } else {
+                return Err(PyValueError::new_err(
+                    "Invalid edge aggregation format. Expected (attr, function) or (attr, function, source) tuples."
+                ));
+            }
         }
     } else {
-        return Err(PyValueError::new_err("edge_aggs must be a dict"));
+        return Err(PyValueError::new_err(
+            "edge_aggs must be a dict or list of tuples (same format as node_aggs)"
+        ));
     }
     
     Ok(result)
@@ -273,7 +313,7 @@ impl PyMetaNodePlanExecutor {
         }
     }
     
-    pub fn execute_immediately<T: groggy::traits::SubgraphOperations>(plan: MetaNodePlan, subgraph: &T) -> PyResult<groggy::subgraphs::MetaNode> {
+    pub fn execute_immediately<T: groggy::traits::SubgraphOperations>(plan: MetaNodePlan, subgraph: &T) -> PyResult<groggy::entities::MetaNode> {
         plan.add_to_graph(subgraph)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e)))
     }

@@ -420,6 +420,12 @@ impl Graph {
             });
         }
 
+        // First remove all incident edges
+        let incident_edges = self.incident_edges(node)?;
+        for edge_id in incident_edges {
+            self.remove_edge(edge_id)?;
+        }
+
         self.change_tracker.record_node_removal(node);
         self.space.deactivate_node(node);
         Ok(())
@@ -827,14 +833,14 @@ impl Graph {
             )),
         }
 
-        // REQUIREMENT 2: Must have contained_subgraph reference
-        match self.get_node_attr(node_id, &"contained_subgraph".into())? {
+        // REQUIREMENT 2: Must have contains_subgraph reference
+        match self.get_node_attr(node_id, &"contains_subgraph".into())? {
             Some(AttrValue::SubgraphRef(_subgraph_id)) => {
                 // TODO: Validate subgraph exists in pool
                 Ok(())
             },
             _ => Err(GraphError::InvalidInput(
-                format!("Meta-node {} missing required contained_subgraph attribute", node_id)
+                format!("Meta-node {} missing required contains_subgraph attribute", node_id)
             )),
         }
     }
@@ -881,8 +887,8 @@ impl Graph {
         // Set entity_type = "meta"
         self.set_node_attr_internal(node_id, "entity_type".into(), AttrValue::Text("meta".to_string()))?;
         
-        // Set contained_subgraph reference
-        self.set_node_attr_internal(node_id, "contained_subgraph".into(), AttrValue::SubgraphRef(subgraph_id))?;
+        // Set contains_subgraph reference
+        self.set_node_attr_internal(node_id, "contains_subgraph".into(), AttrValue::SubgraphRef(subgraph_id))?;
         
         // Validate the meta-node structure
         self.validate_meta_node_structure_for_id(node_id)?;

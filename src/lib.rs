@@ -140,6 +140,7 @@ pub mod errors;
 pub mod types;
 
 // Reorganized module structure
+pub mod entities;    // Concrete entity implementations (Node, MetaNode, Edge, MetaEdge)
 pub mod subgraphs;   // Subgraph types and operations
 pub mod storage;     // Storage and view types  
 pub mod query;       // Query and traversal functionality

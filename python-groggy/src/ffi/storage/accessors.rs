@@ -838,8 +838,8 @@ impl PyNodesAccessor {
     ///     if meta_node:
     ///         subgraph = meta_node.subgraph
     fn get_meta_node(&self, py: Python, node_id: NodeId) -> PyResult<Option<PyObject>> {
-        use crate::ffi::subgraphs::hierarchical::PyMetaNode;
-        use groggy::subgraphs::MetaNode;
+        use crate::ffi::entities::PyMetaNode;
+        use groggy::entities::MetaNode;
         
         // Check if this node is a meta-node by checking entity_type
         let graph = self.graph.borrow();
