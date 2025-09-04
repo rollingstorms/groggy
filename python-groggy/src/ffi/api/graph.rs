@@ -2090,7 +2090,7 @@ impl PyGraph {
         for py_subgraph in subgraphs {
             // Extract the PySubgraph and call its add_to_graph method
             let subgraph = py_subgraph.borrow(py);
-            let meta_node = subgraph.add_to_graph(py, agg_functions)?;
+            let meta_node = subgraph.add_to_graph(py, agg_functions, None)?;
             meta_nodes.push(meta_node);
         }
 
