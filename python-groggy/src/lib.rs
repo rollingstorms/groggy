@@ -29,6 +29,9 @@ pub use ffi::query::traversal::{PyAggregationResult, PyGroupedAggregationResult}
 pub use ffi::storage::views::{PyEdgeView, PyNodeView};
 pub use ffi::types::{PyAttrValue, PyAttributeCollection, PyResultHandle};
 
+// Entity system - trait-based wrappers
+pub use ffi::entities::{PyNode, PyEdge, PyMetaNode as PyEntityMetaNode, PyMetaEdge};
+
 // Hierarchical subgraph types
 pub use ffi::subgraphs::hierarchical::{PyAggregationFunction, PyMetaNode};
 
@@ -263,6 +266,12 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
 
     // Register specialized entity types
     m.add_class::<PyComponentSubgraph>()?;
+
+    // Register trait-based entity system
+    m.add_class::<ffi::entities::PyNode>()?;
+    m.add_class::<ffi::entities::PyEdge>()?;
+    m.add_class::<ffi::entities::PyMetaNode>()?;
+    m.add_class::<ffi::entities::PyMetaEdge>()?;
 
     // Register neighborhood sampling system
     m.add_class::<PyNeighborhoodSubgraph>()?;

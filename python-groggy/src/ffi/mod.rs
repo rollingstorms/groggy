@@ -25,6 +25,9 @@ pub mod storage;
 // Subgraphs FFI bindings (mirror main project subgraphs/)
 pub mod subgraphs;
 
+// Entity FFI bindings - Trait-based entity wrappers
+pub mod entities;
+
 // FFI Traits - Pure delegation to trait implementations
 pub mod traits;
 
