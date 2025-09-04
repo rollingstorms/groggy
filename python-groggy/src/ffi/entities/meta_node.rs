@@ -178,20 +178,20 @@ impl PyMetaNode {
         
         match self.inner.subgraph() {
             Ok(Some(subgraph_trait_obj)) => {
-                // Try to convert the SubgraphOperations trait object to a concrete Subgraph
-                // This is a workaround until we have proper trait object to concrete conversion
+                // Extract the data from the trait object and create a concrete subgraph
+                use crate::ffi::subgraphs::subgraph::PySubgraph;
+                use groggy::subgraphs::Subgraph;
                 
-                // For now, we need to reconstruct a concrete subgraph from the trait object
-                // This is challenging because we only have a trait object reference
+                // Create a new concrete Subgraph from the trait object data
+                let concrete_subgraph = Subgraph::new(
+                    subgraph_trait_obj.graph_ref().clone(),
+                    subgraph_trait_obj.node_set().clone(),
+                    subgraph_trait_obj.edge_set().clone(),
+                    format!("expanded_subgraph_{}", self.inner.id()),
+                );
                 
-                // As a future enhancement, we would:
-                // 1. Store SubgraphId in the meta-node and retrieve concrete subgraph from graph pool
-                // 2. Or implement a way to convert trait objects back to concrete types
-                
-                // For now, return None to indicate that subgraph expansion is not yet fully implemented
-                // The meta-node still provides subgraph_id() and has_subgraph() for inspection
-                let _ = subgraph_trait_obj; // Suppress unused variable warning
-                Ok(None)
+                let py_subgraph = PySubgraph::from_core_subgraph(concrete_subgraph)?;
+                Ok(Some(Py::new(py, py_subgraph)?.to_object(py)))
             }
             Ok(None) => Ok(None),
             Err(e) => Err(PyRuntimeError::new_err(format!(
