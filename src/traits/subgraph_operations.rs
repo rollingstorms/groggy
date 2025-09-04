@@ -551,192 +551,8 @@ pub trait SubgraphOperations: GraphEntity {
 
     // === HIERARCHICAL OPERATIONS (Integration with GraphPool storage) ===
 
-    /// Collapse this subgraph into a meta-node stored in GraphPool
-    ///
-    /// # Arguments
-    /// * `agg_functions` - Attribute aggregation functions (e.g., "mean", "sum", "count")
-    ///
-    /// # Returns
-    /// NodeId of the created meta-node in GraphPool
-    ///
-    /// # Storage Integration
-    /// - Creates new node in GraphPool
-    /// - Stores subgraph reference using SubgraphRef attribute
-    /// - Applies aggregation functions using existing bulk operations
-    /// - All attributes stored in our efficient columnar storage
-    fn collapse_to_node(&self, agg_functions: HashMap<AttrName, String>) -> GraphResult<NodeId> {
-        self.collapse_to_node_with_defaults(agg_functions, HashMap::new())
-    }
 
-    /// Collapse this subgraph into a meta-node with enhanced aggregation syntax
-    ///
-    /// # Arguments
-    /// * `agg_specs` - Vector of enhanced aggregation specifications
-    ///
-    /// # Enhanced Syntax Support
-    /// Supports three forms of aggregation specification:
-    /// 1. Simple: target_attr = source_attr, function specified separately
-    /// 2. Tuple: target_attr ≠ source_attr, custom naming
-    /// 3. Dict: Full control with defaults and advanced options
-    fn collapse_to_node_enhanced(&self, agg_specs: Vec<AggregationSpec>) -> GraphResult<NodeId> {
-        let binding = self.graph_ref();
-        let mut graph = binding.borrow_mut();
 
-        // Store subgraph reference in GraphPool first
-        let subgraph_id = graph.pool_mut().store_subgraph(
-            self.node_set().clone(),
-            self.edge_set().clone(),
-            self.entity_type().to_string(),
-        )?;
-
-        // WORF SAFETY: Create meta-node atomically with all required attributes
-        let meta_node_id = graph.create_meta_node(subgraph_id)?;
-
-        // Release the mutable borrow before the aggregation loop
-        drop(graph);
-
-        for agg_spec in agg_specs {
-            // Parse aggregation function
-            let agg_func = crate::subgraphs::hierarchical::AggregationFunction::from_string(&agg_spec.function)?;
-
-            // Enhanced aggregation logic
-            let aggregated_value = if matches!(agg_func, crate::subgraphs::hierarchical::AggregationFunction::Count) {
-                // Count aggregation: count all nodes in subgraph
-                AttrValue::Int(self.node_set().len() as i64)
-            } else {
-                // Determine source attribute (defaults to target if not specified)
-                let source_attr = agg_spec.source_attr
-                    .unwrap_or_else(|| agg_spec.target_attr.clone());
-
-                // Collect all values for this attribute from nodes in the subgraph
-                let mut values = Vec::new();
-                {
-                    let binding = self.graph_ref();
-                    let graph = binding.borrow();
-
-                    for &node_id in self.node_set() {
-                        if let Some(value) = graph.get_node_attr(node_id, &source_attr)? {
-                            values.push(value);
-                        }
-                    }
-                } // graph borrow automatically released here
-
-                // Enhanced missing attribute handling
-                if values.is_empty() {
-                    // Check if we have a default value for this attribute
-                    if let Some(default_value) = agg_spec.default_value.clone() {
-                        // Apply default value per node and aggregate
-                        let node_count = self.node_set().len();
-                        let default_values: Vec<AttrValue> = (0..node_count).map(|_| default_value.clone()).collect();
-                        agg_func.aggregate(&default_values)?
-                    } else {
-                        // Strict validation: error on missing attributes
-                        return Err(GraphError::InvalidInput(format!(
-                            "Source attribute '{}' not found on any nodes in subgraph for target '{}' and no default provided. \
-                             Available attributes can be checked or provide a default value.",
-                            source_attr, agg_spec.target_attr
-                        )));
-                    }
-                } else {
-                    // Apply aggregation with collected values
-                    agg_func.aggregate(&values)?
-                }
-            };
-
-            // Store the aggregated result with the target attribute name
-            let binding = self.graph_ref();
-            let mut graph = binding.borrow_mut();
-            graph.set_node_attr_internal(meta_node_id, agg_spec.target_attr, aggregated_value)?;
-        }
-
-        // === META-EDGE CREATION ===
-        // Create meta-edges from the collapsed subgraph to external nodes/meta-nodes
-        self.create_meta_edges(meta_node_id)?;
-
-        Ok(meta_node_id)
-    }
-
-    /// Collapse this subgraph into a meta-node with configurable edge aggregation
-    ///
-    /// # Arguments
-    /// * `agg_functions` - Node attribute aggregation functions (e.g., "mean", "sum", "count")
-    /// * `edge_config` - Edge aggregation configuration
-    ///
-    /// # Returns
-    /// NodeId of the created meta-node in GraphPool
-    ///
-    /// # Edge Aggregation Control
-    /// This method provides full control over how edges are aggregated during meta-node creation:
-    /// - External edge handling: copy, aggregate, count, or none
-    /// - Per-attribute aggregation functions with defaults
-    /// - Edge filtering and count thresholds
-    fn collapse_to_node_with_edge_config(
-        &self,
-        agg_functions: HashMap<AttrName, String>,
-        edge_config: &EdgeAggregationConfig,
-    ) -> GraphResult<NodeId> {
-        let binding = self.graph_ref();
-        let mut graph = binding.borrow_mut();
-
-        // Store subgraph reference in GraphPool first
-        let subgraph_id = graph.pool_mut().store_subgraph(
-            self.node_set().clone(),
-            self.edge_set().clone(),
-            self.entity_type().to_string(),
-        )?;
-
-        // WORF SAFETY: Create meta-node atomically with all required attributes
-        let meta_node_id = graph.create_meta_node(subgraph_id)?;
-
-        // Release the mutable borrow before the aggregation loop
-        drop(graph);
-
-        for (attr_name, agg_func_str) in agg_functions {
-            // Parse aggregation function
-            let agg_func =
-                crate::subgraphs::hierarchical::AggregationFunction::from_string(&agg_func_str)?;
-
-            // Special handling for Count aggregation - count all nodes in subgraph
-            let aggregated_value = if matches!(agg_func, crate::subgraphs::hierarchical::AggregationFunction::Count) {
-                AttrValue::Int(self.node_set().len() as i64)
-            } else {
-                // Collect all values for this attribute from nodes in the subgraph
-                let mut values = Vec::new();
-                {
-                    let binding = self.graph_ref();
-                    let graph = binding.borrow();
-
-                    for &node_id in self.node_set() {
-                        if let Some(value) = graph.get_node_attr(node_id, &attr_name)? {
-                            values.push(value);
-                        }
-                    }
-                } // graph borrow automatically released here
-
-                if values.is_empty() {
-                    // For missing attributes, return error (strict validation)
-                    return Err(GraphError::InvalidInput(format!(
-                        "Attribute '{}' not found on any nodes in subgraph. Use collapse_to_node_with_defaults for missing attribute handling.",
-                        attr_name
-                    )));
-                } else {
-                    // Apply aggregation with collected values
-                    agg_func.aggregate(&values)?
-                }
-            };
-
-            // Store the aggregated result with the target attribute name
-            let binding = self.graph_ref();
-            let mut graph = binding.borrow_mut();
-            graph.set_node_attr_internal(meta_node_id, attr_name, aggregated_value)?;
-        }
-
-        // === ENHANCED META-EDGE CREATION ===
-        // Create meta-edges with user-configurable aggregation
-        self.create_meta_edges_with_config(meta_node_id, edge_config)?;
-
-        Ok(meta_node_id)
-    }
 
     /// Collapse this subgraph into a meta-node with enhanced missing attribute handling
     ///
@@ -751,6 +567,70 @@ pub trait SubgraphOperations: GraphEntity {
     /// - Errors by default when aggregating non-existent attributes (strict validation)
     /// - Uses provided defaults for missing attributes when specified
     /// - Count aggregation always works regardless of attribute existence
+    /// Collapse subgraph with both defaults for missing attributes AND edge configuration
+    fn collapse_to_node_with_defaults_and_edge_config(
+        &self,
+        agg_functions: HashMap<AttrName, String>,
+        defaults: HashMap<AttrName, AttrValue>,
+        edge_config: &EdgeAggregationConfig,
+    ) -> GraphResult<NodeId> {
+        let binding = self.graph_ref();
+        let mut graph = binding.borrow_mut();
+
+        // Store subgraph reference in GraphPool first
+        let subgraph_id = graph.pool_mut().store_subgraph(
+            self.node_set().clone(),
+            self.edge_set().clone(),
+            self.entity_type().to_string(),
+        )?;
+
+        // WORF SAFETY: Create meta-node atomically with all required attributes
+        let meta_node_id = graph.add_node();
+        graph.set_node_attr_internal(meta_node_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
+        graph.set_node_attr_internal(meta_node_id, "contains_subgraph".to_string(), AttrValue::SubgraphRef(subgraph_id))?;
+
+        // Mark original nodes as absorbed first - use bulk operation
+        drop(graph); // Release borrow for bulk operation
+        {
+            let entity_type_attrs = self.node_set().iter()
+                .map(|&node_id| (node_id, AttrValue::Text("base".to_string())))
+                .collect();
+            let mut bulk_attrs = std::collections::HashMap::new();
+            bulk_attrs.insert("entity_type".into(), entity_type_attrs);
+            self.set_node_attrs(bulk_attrs)?;
+        }
+        
+        // Reacquire mutable borrow
+        let binding = self.graph_ref();
+        let mut graph = binding.borrow_mut();
+
+        // Release the mutable borrow temporarily
+        drop(graph);
+        
+        // Calculate aggregated attributes with defaults for missing values (requires separate borrows)
+        let mut aggregated_attrs = Vec::new();
+        for (attr_name, agg_function) in agg_functions {
+            let aggregated_value = self.aggregate_attribute_with_defaults(&attr_name, &agg_function, &defaults)?;
+            aggregated_attrs.push((attr_name, aggregated_value));
+        }
+        
+        // Set all aggregated attributes in bulk
+        if !aggregated_attrs.is_empty() {
+            let mut bulk_attrs = std::collections::HashMap::new();
+            for (attr_name, aggregated_value) in aggregated_attrs {
+                let node_value_pairs = vec![(meta_node_id, aggregated_value)];
+                bulk_attrs.insert(attr_name.into(), node_value_pairs);
+            }
+            self.set_node_attrs(bulk_attrs)?;
+        }
+
+        
+        // Create meta-edges according to edge configuration
+        self.create_meta_edges_with_config(meta_node_id, edge_config)?;
+
+        Ok(meta_node_id)
+    }
+
     fn collapse_to_node_with_defaults(
         &self, 
         agg_functions: HashMap<AttrName, String>,
@@ -772,6 +652,8 @@ pub trait SubgraphOperations: GraphEntity {
         // Release the mutable borrow before the aggregation loop
         drop(graph);
 
+        // Calculate all aggregated attributes first, then set them in bulk
+        let mut aggregated_attrs = Vec::new();
         for (attr_name, agg_func_str) in agg_functions {
             // Parse aggregation function
             let agg_func =
@@ -814,10 +696,17 @@ pub trait SubgraphOperations: GraphEntity {
                 }
             };
 
-            // Store the aggregated result
-            let binding = self.graph_ref();
-            let mut graph = binding.borrow_mut();
-            graph.set_node_attr(meta_node_id, attr_name, aggregated_value)?;
+            aggregated_attrs.push((attr_name, aggregated_value));
+        }
+
+        // Set all aggregated attributes on the meta-node in bulk
+        if !aggregated_attrs.is_empty() {
+            let mut bulk_attrs = std::collections::HashMap::new();
+            for (attr_name, aggregated_value) in aggregated_attrs {
+                let node_value_pairs = vec![(meta_node_id, aggregated_value)];
+                bulk_attrs.insert(attr_name.into(), node_value_pairs);
+            }
+            self.set_node_attrs(bulk_attrs)?;
         }
 
         Ok(meta_node_id)
@@ -829,6 +718,58 @@ pub trait SubgraphOperations: GraphEntity {
     /// - External edge handling: copy, aggregate, count, or none
     /// - Meta-to-meta edge strategy: auto, explicit, or none
     /// - Per-attribute aggregation functions with defaults
+    /// Aggregate attribute with defaults for missing values
+    fn aggregate_attribute_with_defaults(
+        &self,
+        attr_name: &str,
+        agg_function: &str,
+        defaults: &HashMap<AttrName, AttrValue>
+    ) -> GraphResult<AttrValue> {
+        use crate::subgraphs::hierarchical::AggregationFunction;
+        
+        let attr_name: AttrName = attr_name.into();
+        let agg_func = AggregationFunction::from_string(agg_function)?;
+        
+        // Special handling for Count aggregation - count all nodes in subgraph
+        if matches!(agg_func, AggregationFunction::Count) {
+            return Ok(AttrValue::Int(self.node_set().len() as i64));
+        }
+        
+        // Handle missing attributes
+        if let Some(default_value) = defaults.get(&attr_name) {
+            return Ok(default_value.clone());
+        }
+        
+        // Collect all values for this attribute from nodes in the subgraph
+        let mut values = Vec::new();
+        let binding = self.graph_ref();
+        let graph = binding.borrow();
+        
+        for &node_id in self.node_set() {
+            if let Some(value) = graph.get_node_attr(node_id, &attr_name)? {
+                values.push(value);
+            }
+        }
+        
+        // If no values found, provide sensible defaults based on aggregation function
+        if values.is_empty() {
+            let default = match agg_function {
+                "sum" => AttrValue::Int(0),
+                "mean" | "min" | "max" => AttrValue::Float(0.0),
+                "first" | "concat" => AttrValue::Text("".to_string()),
+                _ => AttrValue::Int(0),
+            };
+            Ok(default)
+        } else {
+            // Release borrow before aggregation
+            drop(graph);
+            drop(binding);
+            
+            // Apply aggregation with collected values
+            agg_func.aggregate(&values)
+        }
+    }
+
     /// - Edge filtering based on count and attributes
     ///
     /// # Arguments
@@ -951,6 +892,10 @@ pub trait SubgraphOperations: GraphEntity {
         if config.mark_entity_type {
             graph.set_edge_attr(meta_edge_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
         }
+        
+        // Add explicit source and target attributes to meta-edges
+        graph.set_edge_attr(meta_edge_id, "source".to_string(), AttrValue::Int(meta_node_id as i64))?;
+        graph.set_edge_attr(meta_edge_id, "target".to_string(), AttrValue::Int(target_node as i64))?;
 
         Ok(())
     }
@@ -974,6 +919,10 @@ pub trait SubgraphOperations: GraphEntity {
         if config.mark_entity_type {
             graph.set_edge_attr(meta_edge_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
         }
+        
+        // Add explicit source and target attributes to meta-edges
+        graph.set_edge_attr(meta_edge_id, "source".to_string(), AttrValue::Int(meta_node_id as i64))?;
+        graph.set_edge_attr(meta_edge_id, "target".to_string(), AttrValue::Int(target_node as i64))?;
 
         Ok(())
     }

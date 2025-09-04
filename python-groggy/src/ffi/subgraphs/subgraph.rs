@@ -47,26 +47,6 @@ impl PySubgraph {
         ))
     }
 
-    /// Create MetaNode with enhanced aggregation syntax support
-    fn create_enhanced_meta_node(&self, agg_specs: Vec<groggy::traits::subgraph_operations::AggregationSpec>) -> PyResult<groggy::subgraphs::MetaNode> {
-        use groggy::traits::SubgraphOperations;
-        use groggy::subgraphs::MetaNode;
-        
-        // First create the collapsed node using enhanced syntax
-        let node_id = self.inner.collapse_to_node_enhanced(agg_specs).map_err(|e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!("Enhanced collapse failed: {}", e))
-        })?;
-        
-        // Get the graph reference to create MetaNode
-        let graph_ref = self.inner.graph();
-        
-        // Create MetaNode with the node_id and graph reference
-        let meta_node = MetaNode::new(node_id, graph_ref).map_err(|e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!("MetaNode creation failed: {}", e))
-        })?;
-        
-        Ok(meta_node)
-    }
 }
 
 #[pymethods]
@@ -1265,108 +1245,23 @@ impl PySubgraph {
     ///     "total_salary": {"func": "sum", "source": "salary", "default": 0}
     /// })
     /// ```
-    #[pyo3(signature = (agg_spec = None, edge_config = None))]
-    pub fn add_to_graph(&self, py: Python, agg_spec: Option<&pyo3::types::PyDict>, edge_config: Option<&pyo3::types::PyDict>) -> PyResult<PyObject> {
-        // Call enhanced method with default edge configuration
-        self.add_to_graph_with_edge_config(py, agg_spec, edge_config)
-    }
-
-    /// Enhanced add_to_graph with configurable edge aggregation
-    #[pyo3(signature = (agg_spec = None, edge_config = None))]
-    pub fn add_to_graph_with_edge_config(
-        &self,
-        py: Python,
-        agg_spec: Option<&pyo3::types::PyDict>,
-        edge_config: Option<&pyo3::types::PyDict>,
-    ) -> PyResult<PyObject> {
-        use crate::ffi::subgraphs::hierarchical::{parse_aggregation_functions, parse_edge_config, PyMetaNode};
-        use groggy::traits::SubgraphOperations;
-        use std::collections::HashMap;
-        
-        if let Some(spec_dict) = agg_spec {
-            // Try enhanced aggregation syntax first
-            if let Ok(agg_specs) = parse_enhanced_aggregation_spec(spec_dict) {
-                // Create meta-node using enhanced syntax
-                let meta_node = self.create_enhanced_meta_node(agg_specs)?;
-                let py_meta_node = PyMetaNode::from_meta_node(meta_node);
-                return Ok(Py::new(py, py_meta_node)?.to_object(py));
-            }
-        }
-        
-        // Parse edge configuration
-        let edge_config_parsed = parse_edge_config(edge_config).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Invalid edge configuration: {}", e))
-        })?;
-        
-        // Convert aggregation spec to simple HashMap for node attributes
-        let agg_funcs = if let Some(dict) = agg_spec {
-            // Convert to HashMap<AttrName, String> for node aggregation
-            let mut node_agg = HashMap::new();
-            for (key, value) in dict.iter() {
-                let attr_name = key.extract::<String>()?;
-                let agg_func = value.extract::<String>()?;
-                node_agg.insert(attr_name, agg_func);
-            }
-            node_agg
-        } else {
-            HashMap::new()
-        };
-
-        // Use the new enhanced collapse method with edge configuration
-        let meta_node_id = self.inner.collapse_to_node_with_edge_config(agg_funcs, &edge_config_parsed)
-            .map_err(|e| {
-                pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e))
-            })?;
-
-        // Create MetaNode wrapper
-        let meta_node = groggy::subgraphs::MetaNode::new(meta_node_id, self.inner.graph_ref())
-            .map_err(|e| {
-                pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to retrieve meta-node: {}", e))
-            })?;
-
-        // Wrap in Python MetaNode
-        let py_meta_node = PyMetaNode::from_meta_node(meta_node);
-        Ok(Py::new(py, py_meta_node)?.to_object(py))
-    }
 
     // === HIERARCHICAL OPERATIONS ===
 
     /// Get parent meta-node if this subgraph is contained within one
-    fn parent_meta_node(&self, py: Python) -> PyResult<Option<PyObject>> {
-        use crate::ffi::subgraphs::hierarchical::PyMetaNode;
-        use groggy::subgraphs::HierarchicalOperations;
-
-        match self.inner.parent_meta_node() {
-            Ok(Some(meta_node)) => {
-                let py_meta_node = PyMetaNode::from_meta_node(meta_node);
-                Ok(Some(Py::new(py, py_meta_node)?.to_object(py)))
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
-                "Failed to get parent meta-node: {}",
-                e
-            ))),
-        }
+    /// NOTE: This feature is not yet implemented - always returns None
+    fn parent_meta_node(&self, _py: Python) -> PyResult<Option<PyObject>> {
+        // TODO: Implement hierarchical navigation in future version
+        // The current HierarchicalOperations trait methods are stubs that return None
+        Ok(None)
     }
 
     /// Get child meta-nodes if this subgraph contains them
-    fn child_meta_nodes(&self, py: Python) -> PyResult<Vec<PyObject>> {
-        use crate::ffi::subgraphs::hierarchical::PyMetaNode;
-        use groggy::subgraphs::HierarchicalOperations;
-
-        let child_nodes = self.inner.child_meta_nodes().map_err(|e| {
-            pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to get child meta-nodes: {}", e))
-        })?;
-
-        let py_children: Result<Vec<PyObject>, PyErr> = child_nodes
-            .into_iter()
-            .map(|meta_node| {
-                let py_meta_node = PyMetaNode::from_meta_node(meta_node);
-                Ok(Py::new(py, py_meta_node)?.to_object(py))
-            })
-            .collect();
-
-        py_children
+    /// NOTE: This feature is not yet implemented - always returns empty list
+    fn child_meta_nodes(&self, _py: Python) -> PyResult<Vec<PyObject>> {
+        // TODO: Implement hierarchical navigation in future version
+        // The current HierarchicalOperations trait methods are stubs 
+        Ok(Vec::new())
     }
 
     /// Get hierarchy level of this subgraph (0 = root level)
@@ -1430,7 +1325,8 @@ impl PySubgraph {
         preset = None,
         include_edge_count = true,
         mark_entity_type = true,
-        entity_type = "meta"
+        entity_type = "meta",
+        allow_missing_attributes = true
     ))]
     fn collapse(
         &self,
@@ -1442,6 +1338,7 @@ impl PySubgraph {
         include_edge_count: bool,
         mark_entity_type: bool,
         entity_type: &str,
+        allow_missing_attributes: bool,
     ) -> PyResult<PyObject> {
         use crate::ffi::subgraphs::composer::{PyMetaNodePlanExecutor, parse_node_aggs_from_python, parse_edge_aggs_from_python};
         use groggy::subgraphs::composer::EdgeStrategy;
@@ -1473,17 +1370,49 @@ impl PySubgraph {
             entity_type.to_string(),
         ).map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create plan: {}", e)))?;
         
-        // Create Python wrapper that can execute the plan
-        let py_plan = PyMetaNodePlanExecutor::new(plan);
-        Ok(Py::new(py, py_plan)?.to_object(py))
+        // Execute using appropriate method based on allow_missing_attributes
+        let meta_node = if allow_missing_attributes {
+            // Use collapse_to_node_with_defaults - allows missing attributes
+            plan.add_to_graph_with_defaults(&self.inner)
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e)))?
+        } else {
+            // Use strict collapse_to_node_with_edge_config - fails on missing attributes
+            plan.add_to_graph(&self.inner)
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e)))?
+        };
+        
+        // Return the MetaNode directly using the new trait-based entity
+        use crate::ffi::entities::PyMetaNode;
+        let py_meta_node = PyMetaNode::from_meta_node(meta_node);
+        Ok(Py::new(py, py_meta_node)?.to_object(py))
     }
     
     fn __str__(&self) -> String {
-        format!(
+        let mut result = format!(
             "Subgraph with {} nodes and {} edges",
             self.inner.node_count(),
             self.inner.edge_count()
-        )
+        );
+        
+        // Add edge table if there are edges
+        if self.inner.edge_count() > 0 {
+            result.push_str("\n\nEdges:");
+            result.push_str("\n  ID    Source → Target");
+            result.push_str("\n  ----  ---------------");
+            
+            // Get graph reference to access edge endpoints
+            let graph = self.inner.graph_ref();
+            let graph_borrowed = graph.borrow();
+            
+            // Iterate through edges in the subgraph
+            for &edge_id in self.inner.edge_set() {
+                if let Ok((source, target)) = graph_borrowed.edge_endpoints(edge_id) {
+                    result.push_str(&format!("\n  {:4}  {:6} → {}", edge_id, source, target));
+                }
+            }
+        }
+        
+        result
     }
 }
 

@@ -404,13 +404,13 @@ pub fn parse_edge_config(edge_config_dict: Option<&PyDict>) -> PyResult<EdgeAggr
     }
 }
 
-/// Python wrapper for MetaNode
-#[pyclass(name = "MetaNode", unsendable)]
-pub struct PyMetaNode {
+/// DEPRECATED: Old Python wrapper for MetaNode - use crate::ffi::entities::PyMetaNode instead
+#[pyclass(name = "OldMetaNode", unsendable)]
+pub struct PyMetaNodeOld {
     pub inner: MetaNode,
 }
 
-impl PyMetaNode {
+impl PyMetaNodeOld {
     /// Create from core MetaNode
     pub fn from_meta_node(meta_node: MetaNode) -> Self {
         Self { inner: meta_node }
@@ -418,7 +418,7 @@ impl PyMetaNode {
 }
 
 #[pymethods]
-impl PyMetaNode {
+impl PyMetaNodeOld {
     /// Get the node ID of this meta-node
     #[getter]
     fn node_id(&self) -> NodeId {

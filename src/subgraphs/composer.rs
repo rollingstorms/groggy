@@ -7,7 +7,7 @@
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, NodeId};
 use crate::traits::SubgraphOperations;
-use crate::subgraphs::MetaNode;
+use crate::entities::MetaNode;
 use std::collections::HashMap;
 
 /// Edge strategies for meta-node creation
@@ -296,7 +296,7 @@ pub struct ComposerPreview {
 }
 
 impl MetaNodePlan {
-    /// Execute the plan and create the meta-node in the graph
+    /// Execute the plan and create the meta-node in the graph (strict - fails on missing attributes)
     /// 
     /// This converts the plan into actual graph modifications, creating the meta-node
     /// with aggregated attributes and meta-edges according to the configured strategy.
@@ -312,8 +312,48 @@ impl MetaNodePlan {
         let edge_config = self.convert_to_edge_config()?;
         
         // Execute using existing implementation
-        let meta_node_id = subgraph.collapse_to_node_with_edge_config(
+        let meta_node_id = subgraph.collapse_to_node_with_defaults_and_edge_config(
             node_agg_functions,
+            HashMap::new(), // No defaults for strict mode
+            &edge_config,
+        )?;
+        
+        // Create MetaNode wrapper
+        let meta_node = MetaNode::new(meta_node_id, subgraph.graph_ref())?;
+        
+        Ok(meta_node)
+    }
+    
+    /// Execute the plan with defaults for missing attributes (lenient)
+    pub fn add_to_graph_with_defaults<T: SubgraphOperations>(&self, subgraph: &T) -> GraphResult<MetaNode> {
+        use std::collections::HashMap;
+        use crate::types::AttrValue;
+        
+        // Convert plan to functions and provide sensible defaults for missing attributes
+        let node_agg_functions = self.convert_to_agg_functions();
+        let mut defaults: HashMap<crate::types::AttrName, AttrValue> = HashMap::new();
+        
+        // For each aggregation, provide a sensible default if attribute might be missing
+        for agg in &self.node_aggs {
+            let target = agg.target_attr();
+            let function = agg.function();
+            
+            // Provide defaults based on aggregation function
+            let default_value = match function {
+                "sum" | "count" => AttrValue::Int(0),
+                "mean" | "min" | "max" => AttrValue::Float(0.0),
+                "first" | "concat" => AttrValue::Text("".to_string()),
+                _ => AttrValue::Int(0), // Fallback
+            };
+            
+            defaults.insert(target.into(), default_value);
+        }
+        
+        // Execute using combined method with defaults AND edge configuration
+        let edge_config = self.convert_to_edge_config()?;
+        let meta_node_id = subgraph.collapse_to_node_with_defaults_and_edge_config(
+            node_agg_functions,
+            defaults,
             &edge_config,
         )?;
         
@@ -361,7 +401,7 @@ impl MetaNodePlan {
             edge_to_external: external_strategy,
             edge_to_meta: MetaEdgeStrategy::Auto,
             edge_aggregation,
-            default_aggregation: EdgeAggregationFunction::Sum,
+            default_aggregation: EdgeAggregationFunction::First, // Safer default than Sum
             min_edge_count: 1,
             include_edge_count: self.include_edge_count,
             mark_entity_type: self.mark_entity_type,

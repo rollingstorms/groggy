@@ -2082,15 +2082,14 @@ impl PyGraph {
     fn add_subgraphs(
         &self,
         py: Python,
-        subgraphs: Vec<Py<crate::ffi::subgraphs::subgraph::PySubgraph>>,
-        agg_functions: Option<&pyo3::types::PyDict>,
+        plans: Vec<Py<crate::ffi::subgraphs::composer::PyMetaNodePlan>>,
     ) -> PyResult<Vec<PyObject>> {
         let mut meta_nodes = Vec::new();
 
-        for py_subgraph in subgraphs {
-            // Extract the PySubgraph and call its add_to_graph method
-            let subgraph = py_subgraph.borrow(py);
-            let meta_node = subgraph.add_to_graph(py, agg_functions, None)?;
+        for py_plan in plans {
+            // Extract the plan and execute it
+            let plan = py_plan.borrow(py);
+            let meta_node = plan.add_to_graph(py)?;
             meta_nodes.push(meta_node);
         }
 

@@ -30,10 +30,10 @@ pub use ffi::storage::views::{PyEdgeView, PyNodeView};
 pub use ffi::types::{PyAttrValue, PyAttributeCollection, PyResultHandle};
 
 // Entity system - trait-based wrappers
-pub use ffi::entities::{PyNode, PyEdge, PyMetaNode as PyEntityMetaNode, PyMetaEdge};
+pub use ffi::entities::{PyNode, PyEdge, PyMetaNode, PyMetaEdge};
 
 // Hierarchical subgraph types
-pub use ffi::subgraphs::hierarchical::{PyAggregationFunction, PyMetaNode};
+pub use ffi::subgraphs::hierarchical::PyAggregationFunction;
 
 // MetaGraph Composer types
 pub use ffi::subgraphs::composer::{PyEdgeStrategy, PyComposerPreview, PyMetaNodePlan, PyMetaNodePlanExecutor};
@@ -284,7 +284,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
 
     // Register hierarchical subgraph types
     m.add_class::<ffi::subgraphs::hierarchical::PyAggregationFunction>()?;
-    m.add_class::<ffi::subgraphs::hierarchical::PyMetaNode>()?;
+    m.add_class::<ffi::entities::PyMetaNode>()?;
     
     // Register MetaGraph Composer types
     m.add_class::<ffi::subgraphs::composer::PyEdgeStrategy>()?;

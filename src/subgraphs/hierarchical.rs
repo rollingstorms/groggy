@@ -228,8 +228,10 @@ impl MetaNode {
     pub fn new(node_id: NodeId, graph_ref: Rc<RefCell<Graph>>) -> GraphResult<Self> {
         let contained_subgraph_id = {
             let graph = graph_ref.borrow();
-            let x = match graph.get_node_attr(node_id, &"contained_subgraph".into())? {
+            let x = match graph.get_node_attr(node_id, &"contains_subgraph".into())? {
                 Some(AttrValue::SubgraphRef(id)) => Some(id),
+                // Also accept integers (when converted from Python FFI)
+                Some(AttrValue::Int(id)) => Some(id as usize),
                 _ => None,
             };
             x
@@ -441,7 +443,7 @@ impl<T: SubgraphOperations> HierarchicalOperations for T {
             .map(|(k, v)| (k.clone(), v.to_string())) // Use proper string conversion
             .collect();
 
-        let meta_node_id = self.collapse_to_node(agg_strings)?;
+        let meta_node_id = self.collapse_to_node_with_defaults(agg_strings, HashMap::new())?;
         MetaNode::new(meta_node_id, self.graph_ref())
     }
 
