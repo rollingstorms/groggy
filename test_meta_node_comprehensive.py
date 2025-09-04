@@ -52,15 +52,15 @@ def test_meta_node_creation():
     subgraph = g.nodes[[0, 1, 2]]
     print(f"✓ Created subgraph: {subgraph.node_count()} nodes, {subgraph.edge_count()} edges")
     
-    # Test meta-node creation with various aggregations
+    # Test meta-node creation with various aggregations using proper source attributes
     meta_node = subgraph.collapse(
         node_aggs={
             "team_size": "count",
-            "avg_age": "mean",
-            "total_salary": "sum",
-            "max_age": "max",
-            "min_salary": "min",
-            "team_name": "first"  # Using "first" instead of "concat"
+            "avg_age": ("mean", "age"),        # Explicit source: aggregate age -> avg_age
+            "total_salary": ("sum", "salary"), # Explicit source: aggregate salary -> total_salary
+            "max_age": ("max", "age"),         # Explicit source: aggregate age -> max_age
+            "min_salary": ("min", "salary"),   # Explicit source: aggregate salary -> min_salary
+            "team_name": ("first", "name")     # Explicit source: aggregate name -> team_name
         }
     )
     
