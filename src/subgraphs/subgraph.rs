@@ -1081,7 +1081,7 @@ impl SubgraphOperations for Subgraph {
 
     /// Override default nodes_table to create dense table for subgraphs
     /// Subgraphs should have compact tables with only their nodes, not sparse index-aligned tables
-    fn nodes_table(&self) -> GraphResult<crate::storage::table::GraphTable> {
+    fn nodes_table(&self) -> GraphResult<crate::storage::legacy_table::GraphTable> {
         let binding = self.graph_ref();
         let graph = binding.borrow();
 
@@ -1126,12 +1126,12 @@ impl SubgraphOperations for Subgraph {
                 }
             }
 
-            let graph_array = crate::storage::array::GraphArray::from_vec(attr_values);
+            let graph_array = crate::storage::legacy_array::GraphArray::from_vec(attr_values);
             columns.push(graph_array);
         }
 
         // Use existing GraphTable::from_arrays_standalone (no graph reference needed)
-        crate::storage::table::GraphTable::from_arrays_standalone(columns, Some(column_names))
+        crate::storage::legacy_table::GraphTable::from_arrays_standalone(columns, Some(column_names))
     }
 }
 

@@ -572,7 +572,7 @@ impl PyNodesAccessor {
     /// irrelevant attributes. For full accessors, auto_slice=False by default.
     #[pyo3(signature = (auto_slice = None))]
     pub fn table(&self, py: Python, auto_slice: Option<bool>) -> PyResult<PyObject> {
-        use crate::ffi::storage::table::PyGraphTable;
+        use crate::ffi::storage::table::PyBaseTable;
 
         // Determine default auto_slice behavior based on accessor type
         let should_auto_slice = match auto_slice {
@@ -1011,9 +1011,9 @@ impl PyNodesAccessor {
     /// Apply auto-slicing to remove columns that are all NaN/None for the given node set
     fn apply_node_auto_slice(
         &self, 
-        table: groggy::storage::table::GraphTable, 
+        table: groggy::storage::table::BaseTable, 
         node_set: &std::collections::HashSet<groggy::NodeId>
-    ) -> PyResult<groggy::storage::table::GraphTable> {
+    ) -> PyResult<groggy::storage::table::BaseTable> {
         let graph = self.graph.borrow();
         
         // Get all attribute names in the table
@@ -1466,7 +1466,7 @@ impl PyEdgesAccessor {
     /// irrelevant attributes. For full accessors, auto_slice=False by default.
     #[pyo3(signature = (auto_slice = None))]
     pub fn table(&self, py: Python, auto_slice: Option<bool>) -> PyResult<PyObject> {
-        use crate::ffi::storage::table::PyGraphTable;
+        use crate::ffi::storage::table::PyBaseTable;
 
         // Determine default auto_slice behavior based on accessor type
         let should_auto_slice = match auto_slice {
@@ -1822,9 +1822,9 @@ impl PyEdgesAccessor {
     /// Apply auto-slicing to remove columns that are all NaN/None for the given edge set
     fn apply_edge_auto_slice(
         &self, 
-        table: groggy::storage::table::GraphTable, 
+        table: groggy::storage::table::BaseTable, 
         edge_set: &std::collections::HashSet<groggy::EdgeId>
-    ) -> PyResult<groggy::storage::table::GraphTable> {
+    ) -> PyResult<groggy::storage::table::BaseTable> {
         let graph = self.graph.borrow();
         
         // Get all attribute names in the table

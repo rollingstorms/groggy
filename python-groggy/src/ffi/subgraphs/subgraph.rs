@@ -15,10 +15,10 @@ use std::collections::{HashMap, HashSet};
 
 // Import FFI types we need to preserve compatibility
 use crate::ffi::api::graph::PyGraph;
-use crate::ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
+use crate::ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor}; // Essential FFI - re-enabled
 use crate::ffi::storage::array::PyGraphArray;
 use crate::ffi::storage::components::PyComponentsArray;
-use crate::ffi::storage::table::PyGraphTable;
+// use crate::ffi::storage::table::PyBaseTable; // Temporarily disabled
 
 /// Python wrapper for core Subgraph - Pure delegation to existing trait methods
 ///
@@ -211,8 +211,9 @@ impl PySubgraph {
             .map_err(|e| PyRuntimeError::new_err(format!("Table creation error: {}", e)))?;
 
         // Wrap core GraphTable in PyGraphTable - pure delegation
-        let py_table = PyGraphTable { inner: core_table };
-        Ok(Py::new(py, py_table)?.into_py(py))
+        // let py_table = PyGraphTable { inner: core_table }; // Temporarily disabled
+        // Ok(Py::new(py, py_table)?.into_py(py)) // Temporarily disabled
+        Err(PyRuntimeError::new_err("Table functionality temporarily disabled for BaseArray testing"))
     }
 
     /// Convert subgraph edges to a table - pure delegation to core GraphTable
@@ -223,8 +224,9 @@ impl PySubgraph {
             .map_err(|e| PyRuntimeError::new_err(format!("Edges table creation error: {}", e)))?;
 
         // Wrap core GraphTable in PyGraphTable - pure delegation
-        let py_table = PyGraphTable { inner: core_table };
-        Ok(Py::new(py, py_table)?.into_py(py))
+        // let py_table = PyGraphTable { inner: core_table }; // Temporarily disabled
+        // Ok(Py::new(py, py_table)?.into_py(py)) // Temporarily disabled
+        Err(PyRuntimeError::new_err("Table functionality temporarily disabled for BaseArray testing"))
     }
 
     // === Filtering Methods - delegate to SubgraphOperations ===

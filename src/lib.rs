@@ -174,9 +174,9 @@ pub use state::{StateMetadata, StateObject};
 pub use storage::{
     AdjacencyMatrix, AdjacencyMatrixResult, IndexMapping, MatrixFormat, MatrixType,
     SparseAdjacencyMatrix, GraphArray, StatsSummary, JoinType, Axis, GraphMatrix, 
-    MatrixProperties, GraphPool, AggregateOp, ConnectivityType, GraphTable, GroupBy, 
-    TableMetadata
+    MatrixProperties, GraphPool, GraphTable
 };
+pub use storage::legacy_table::{AggregateOp, ConnectivityType, GroupBy, TableMetadata};
 pub use state::{ChangeTracker, ColumnDelta, DeltaObject, GraphSpace};
 pub use subgraphs::{FilteredSubgraph, AggregationFunction, HierarchicalOperations, MetaNode, 
     NeighborhoodSubgraph, SimilarityMetric, ComponentSubgraph};

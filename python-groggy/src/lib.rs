@@ -12,8 +12,9 @@ mod module;
 pub use ffi::api::graph::PyGraph;
 pub use ffi::api::graph_version::PyHistoricalView;
 pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
-pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
-pub use ffi::storage::array::PyGraphArray;
+// Temporarily disable accessor exports to focus on BaseArray testing
+// pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
+pub use ffi::storage::array::{PyGraphArray, PyBaseArray, PyNodesArray, PyEdgesArray, PyMetaNodeArray};
 pub use ffi::subgraphs::component::PyComponentSubgraph;
 pub use ffi::storage::components::PyComponentsArray;
 pub use ffi::storage::matrix::PyGraphMatrix;
@@ -24,9 +25,10 @@ pub use ffi::subgraphs::neighborhood::{
 pub use ffi::query::query::{PyAttributeFilter, PyEdgeFilter, PyNodeFilter};
 pub use ffi::query::query_parser::{parse_edge_query, parse_node_query};
 pub use ffi::subgraphs::subgraph::PySubgraph;
-pub use ffi::storage::table::{PyGraphTable, PyGroupBy};
+// Temporarily disable table exports to focus on BaseArray testing
+// pub use ffi::storage::table::{PyBaseTable, PyNodesTable, PyEdgesTable};
 pub use ffi::query::traversal::{PyAggregationResult, PyGroupedAggregationResult};
-pub use ffi::storage::views::{PyEdgeView, PyNodeView};
+// pub use ffi::storage::views::{PyEdgeView, PyNodeView}; // Temporarily disabled
 pub use ffi::types::{PyAttrValue, PyAttributeCollection, PyResultHandle};
 
 // Entity system - trait-based wrappers
@@ -127,6 +129,7 @@ fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
 /// Examples:
 ///   gr.table({'name': ['Alice', 'Bob'], 'age': [25, 30]})
 ///   gr.table([arr1, arr2], columns=['col1', 'col2'])
+/*
 #[pyfunction]
 #[pyo3(signature = (data, columns = None))]
 fn table(py: Python, data: PyObject, columns: Option<Vec<String>>) -> PyResult<PyGraphTable> {
@@ -188,6 +191,7 @@ fn table(py: Python, data: PyObject, columns: Option<Vec<String>>) -> PyResult<P
         ))
     }
 }
+*/
 
 /// Merge multiple graphs into a single new graph
 ///
@@ -230,18 +234,25 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
 
     // Register array and matrix types
     m.add_class::<PyGraphArray>()?;
+    m.add_class::<PyBaseArray>()?;
+    m.add_class::<PyNodesArray>()?;
+    m.add_class::<PyEdgesArray>()?;
+    m.add_class::<PyMetaNodeArray>()?;
     m.add_class::<PyComponentsArray>()?;
     m.add_class::<ffi::storage::components::PyComponentsArrayIterator>()?;
     m.add_class::<PyGraphMatrix>()?;
     // m.add_class::<PyPathResult>()?; // Unused
-    m.add_class::<PyGraphTable>()?;
-    m.add_class::<PyGroupBy>()?;
+    // m.add_class::<PyGraphTable>()?; // Temporarily disabled
+    // m.add_class::<PyGroupBy>()?; // Temporarily disabled  
+    // m.add_class::<PyBaseTable>()?; // Temporarily disabled
+    // m.add_class::<PyNodesTable>()?; // Temporarily disabled  
+    // m.add_class::<PyEdgesTable>()?; // Temporarily disabled
 
-    // Register accessor and view types
-    m.add_class::<PyNodesAccessor>()?;
-    m.add_class::<PyEdgesAccessor>()?;
-    m.add_class::<PyNodeView>()?;
-    m.add_class::<PyEdgeView>()?;
+    // Register accessor and view types - Temporarily disabled
+    // m.add_class::<PyNodesAccessor>()?; // Temporarily disabled
+    // m.add_class::<PyEdgesAccessor>()?; // Temporarily disabled
+    // m.add_class::<PyNodeView>()?; // Temporarily disabled
+    // m.add_class::<PyEdgeView>()?; // Temporarily disabled
 
     // Register type system
     m.add_class::<PyAttrValue>()?;
@@ -300,7 +311,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Add unified builder functions
     m.add_function(wrap_pyfunction!(array, m)?)?;
     m.add_function(wrap_pyfunction!(matrix, m)?)?;
-    m.add_function(wrap_pyfunction!(table, m)?)?;
+    // m.add_function(wrap_pyfunction!(table, m)?)?; // Temporarily disabled
     m.add_function(wrap_pyfunction!(merge, m)?)?;
 
     // Use the module registration function
