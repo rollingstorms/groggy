@@ -59,6 +59,20 @@ impl Default for MetaEdgeStrategy {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum NodeStrategy {
+    /// Extract: Keep original nodes alongside the meta-node (current behavior)
+    Extract,
+    /// Collapse: Remove original nodes after creating the meta-node
+    Collapse,
+}
+
+impl Default for NodeStrategy {
+    fn default() -> Self {
+        Self::Extract  // Current behavior - extract creates meta-node but keeps originals
+    }
+}
+
 /// Edge attribute aggregation function
 #[derive(Debug, Clone, PartialEq)]
 pub enum EdgeAggregationFunction {
@@ -216,6 +230,8 @@ pub struct EdgeAggregationConfig {
     pub include_edge_count: bool,
     /// Whether to mark meta-edges with entity_type="meta"
     pub mark_entity_type: bool,
+    /// Strategy for handling original nodes during collapse
+    pub node_strategy: NodeStrategy,
 }
 
 impl Default for EdgeAggregationConfig {
@@ -228,6 +244,7 @@ impl Default for EdgeAggregationConfig {
             min_edge_count: 1,
             include_edge_count: true,
             mark_entity_type: true,
+            node_strategy: NodeStrategy::default(),
         }
     }
 }
@@ -589,22 +606,7 @@ pub trait SubgraphOperations: GraphEntity {
         graph.set_node_attr_internal(meta_node_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
         graph.set_node_attr_internal(meta_node_id, "contains_subgraph".to_string(), AttrValue::SubgraphRef(subgraph_id))?;
 
-        // Mark original nodes as absorbed first - use bulk operation
-        drop(graph); // Release borrow for bulk operation
-        {
-            let entity_type_attrs = self.node_set().iter()
-                .map(|&node_id| (node_id, AttrValue::Text("base".to_string())))
-                .collect();
-            let mut bulk_attrs = std::collections::HashMap::new();
-            bulk_attrs.insert("entity_type".into(), entity_type_attrs);
-            self.set_node_attrs(bulk_attrs)?;
-        }
-        
-        // Reacquire mutable borrow
-        let binding = self.graph_ref();
-        let mut graph = binding.borrow_mut();
-
-        // Release the mutable borrow temporarily
+        // Release borrow for bulk operation
         drop(graph);
         
         // Calculate aggregated attributes with defaults for missing values (requires separate borrows)
@@ -627,6 +629,28 @@ pub trait SubgraphOperations: GraphEntity {
         
         // Create meta-edges according to edge configuration
         self.create_meta_edges_with_config(meta_node_id, edge_config)?;
+
+        // Handle original nodes based on node strategy AFTER all processing is complete
+        match edge_config.node_strategy {
+            NodeStrategy::Extract => {
+                // Extract: Mark original nodes as absorbed but keep them in graph (current behavior)
+                let entity_type_attrs = self.node_set().iter()
+                    .map(|&node_id| (node_id, AttrValue::Text("base".to_string())))
+                    .collect();
+                let mut bulk_attrs = std::collections::HashMap::new();
+                bulk_attrs.insert("entity_type".into(), entity_type_attrs);
+                self.set_node_attrs(bulk_attrs)?;
+            }
+            NodeStrategy::Collapse => {
+                // Collapse: Remove original nodes from the graph completely
+                let binding = self.graph_ref();
+                let mut graph = binding.borrow_mut();
+                let nodes_to_remove: Vec<NodeId> = self.node_set().iter().copied().collect();
+                for node_id in nodes_to_remove {
+                    graph.remove_node(node_id)?;
+                }
+            }
+        }
 
         Ok(meta_node_id)
     }
@@ -1233,7 +1257,7 @@ pub trait SubgraphOperations: GraphEntity {
         crate::storage::table::GraphTable::from_arrays_standalone(columns, Some(column_names))
     }
     
-    /// Modern MetaGraph Composer API - Clean interface for meta-node creation
+    /// MetaGraph Composer API - Clean interface for meta-node creation
     /// 
     /// This is the new, intuitive way to create meta-nodes with flexible configuration.
     /// It replaces the complex EdgeAggregationConfig system with a simple, discoverable API.
@@ -1269,6 +1293,7 @@ pub trait SubgraphOperations: GraphEntity {
         node_aggs: Vec<(String, String, Option<String>)>, // (target, function, source)
         edge_aggs: Vec<(String, String)>, // (attr_name, function)  
         edge_strategy: EdgeStrategy,
+        node_strategy: NodeStrategy,
         preset: Option<String>,
         include_edge_count: bool,
         mark_entity_type: bool,
@@ -1279,6 +1304,9 @@ pub trait SubgraphOperations: GraphEntity {
             self.node_set().clone(),
             self.edge_set().clone(),
         );
+        
+        // Set the node strategy
+        plan.node_strategy = node_strategy;
         
         // Apply preset if provided
         if let Some(preset_name) = preset {

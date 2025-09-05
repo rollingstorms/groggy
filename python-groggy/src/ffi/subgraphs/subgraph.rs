@@ -1299,6 +1299,7 @@ impl PySubgraph {
     /// * `node_aggs` - Node aggregation specifications (dict or list format)
     /// * `edge_aggs` - Edge aggregation specifications (dict format)
     /// * `edge_strategy` - Edge handling strategy ("aggregate", "keep_external", "drop_all", "contract_all")
+    /// * `node_strategy` - Node handling strategy ("extract", "collapse")
     /// * `preset` - Optional preset name ("social_network", "org_hierarchy", "flow_network")
     /// * `include_edge_count` - Include edge_count attribute in meta-edges
     /// * `mark_entity_type` - Mark meta-nodes/edges with entity_type
@@ -1310,7 +1311,8 @@ impl PySubgraph {
     /// plan = subgraph.collapse(
     ///     node_aggs={"avg_salary": ("mean", "salary"), "size": "count"},
     ///     edge_aggs={"weight": "mean"},
-    ///     edge_strategy="aggregate"
+    ///     edge_strategy="aggregate",
+    ///     node_strategy="extract"
     /// )
     /// meta_node = plan.add_to_graph()
     /// 
@@ -1322,6 +1324,7 @@ impl PySubgraph {
         node_aggs = None,
         edge_aggs = None, 
         edge_strategy = "aggregate",
+        node_strategy = "extract",
         preset = None,
         include_edge_count = true,
         mark_entity_type = true,
@@ -1334,6 +1337,7 @@ impl PySubgraph {
         node_aggs: Option<&PyAny>,
         edge_aggs: Option<&PyAny>,
         edge_strategy: &str,
+        node_strategy: &str,
         preset: Option<String>,
         include_edge_count: bool,
         mark_entity_type: bool,
@@ -1342,6 +1346,7 @@ impl PySubgraph {
     ) -> PyResult<PyObject> {
         use crate::ffi::subgraphs::composer::{PyMetaNodePlanExecutor, parse_node_aggs_from_python, parse_edge_aggs_from_python};
         use groggy::subgraphs::composer::EdgeStrategy;
+        use groggy::traits::subgraph_operations::NodeStrategy;
         
         // Parse input parameters
         let parsed_node_aggs = if let Some(aggs) = node_aggs {
@@ -1359,11 +1364,20 @@ impl PySubgraph {
         let strategy = EdgeStrategy::from_str(edge_strategy)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid edge strategy: {}", e)))?;
         
+        let node_strategy = match node_strategy {
+            "extract" => NodeStrategy::Extract,
+            "collapse" => NodeStrategy::Collapse,
+            _ => return Err(pyo3::exceptions::PyValueError::new_err(
+                format!("Invalid node strategy '{}'. Must be 'extract' or 'collapse'", node_strategy)
+            ))
+        };
+        
         // Call the trait method
         let plan = self.inner.collapse(
             parsed_node_aggs,
             parsed_edge_aggs,
             strategy,
+            node_strategy,
             preset,
             include_edge_count,
             mark_entity_type,
