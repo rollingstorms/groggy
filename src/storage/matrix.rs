@@ -11,7 +11,7 @@
 //! - Linear algebra operations for numeric matrices
 //! - Memory-efficient storage and lazy evaluation
 
-use crate::storage::array::GraphArray;
+use crate::storage::legacy_array::GraphArray;
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrValue, AttrValueType, NodeId};
 use std::fmt;

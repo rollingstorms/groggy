@@ -3,7 +3,7 @@
 //! Simple, structured attribute operations with pure delegation to core.
 
 use crate::ffi::storage::array::PyGraphArray;
-use crate::ffi::storage::table::PyGraphTable;
+// use crate::ffi::storage::table::PyBaseTable; // Temporarily disabled
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
 use groggy::{AttrName, AttrValue, EdgeId, NodeId};
@@ -255,10 +255,10 @@ impl PyGraphAttrMut {
             return self.parse_graph_array_format::<T>(py, &graph_array, is_nodes);
         }
 
-        // Format 4: GraphTable
-        if let Ok(graph_table) = attr_data.extract::<PyRef<PyGraphTable>>() {
-            return self.parse_graph_table_format::<T>(py, &graph_table, is_nodes);
-        }
+        // Format 4: GraphTable - Temporarily disabled
+        // if let Ok(graph_table) = attr_data.extract::<PyRef<PyGraphTable>>() {
+        //     return self.parse_graph_table_format::<T>(py, &graph_table, is_nodes);
+        // }
 
         Err(pyo3::exceptions::PyTypeError::new_err(
             format!(
@@ -341,7 +341,8 @@ impl PyGraphAttrMut {
         )))
     }
 
-    /// Parse GraphTable format: table with id column + attribute columns
+    // Parse GraphTable format: table with id column + attribute columns
+    /*
     fn parse_graph_table_format<T>(
         &self,
         _py: Python,
@@ -356,4 +357,5 @@ impl PyGraphAttrMut {
             "GraphTable format support coming in next phase",
         ))
     }
+    */
 }

@@ -10,7 +10,7 @@
 //! - Rich statistical operations and data manipulation
 //! - Native integration with graph attributes and entities
 
-use crate::storage::array::GraphArray;
+use crate::storage::legacy_array::GraphArray;
 use crate::storage::matrix::JoinType;
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrValue, AttrValueType, EdgeId, NodeId};
@@ -1029,7 +1029,7 @@ impl GraphTable {
         for row_idx in 0..rows {
             // Get node ID from the specified column
             if let Some(AttrValue::Int(node_id)) = node_col.get(row_idx) {
-                let node_id = *node_id as NodeId;
+                let node_id = *node_id as usize;
 
                 // Collect row attributes for the predicate
                 let mut row_attrs = HashMap::new();

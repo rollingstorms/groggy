@@ -7,7 +7,7 @@
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
 use crate::traits::{GraphEntity, EdgeOperations};
-use crate::types::{EntityId, EdgeId, NodeId};
+use crate::types::{EntityId, EdgeId};
 use std::cell::RefCell;
 use std::rc::Rc;
 

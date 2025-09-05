@@ -26,3 +26,6 @@ ahash = "0.8"         # Fast hash algorithm
 bitvec = "1.0"        # Efficient bit vectors for indexing
 wide = "0.7"          # SIMD operations
 console = "0.15"      # Console utilities for display
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }

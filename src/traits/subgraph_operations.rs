@@ -1108,7 +1108,7 @@ pub trait SubgraphOperations: GraphEntity {
     ///
     /// # Performance
     /// Uses optimized columnar access to build table efficiently
-    fn nodes_table(&self) -> GraphResult<crate::storage::table::GraphTable> {
+    fn nodes_table(&self) -> GraphResult<crate::storage::legacy_table::GraphTable> {
         let binding = self.graph_ref();
         let graph = binding.borrow();
 
@@ -1166,12 +1166,12 @@ pub trait SubgraphOperations: GraphEntity {
                 }
             }
 
-            let graph_array = crate::storage::array::GraphArray::from_vec(attr_values);
+            let graph_array = crate::storage::legacy_array::GraphArray::from_vec(attr_values);
             columns.push(graph_array);
         }
 
         // Use existing GraphTable::from_arrays_standalone (no graph reference needed)
-        crate::storage::table::GraphTable::from_arrays_standalone(columns, Some(column_names))
+        crate::storage::legacy_table::GraphTable::from_arrays_standalone(columns, Some(column_names))
     }
 
     /// Create table from subgraph edges with all their attributes  
@@ -1181,7 +1181,7 @@ pub trait SubgraphOperations: GraphEntity {
     ///
     /// # Performance
     /// Uses optimized columnar access to build table efficiently
-    fn edges_table(&self) -> GraphResult<crate::storage::table::GraphTable> {
+    fn edges_table(&self) -> GraphResult<crate::storage::legacy_table::GraphTable> {
         let binding = self.graph_ref();
         let graph = binding.borrow();
 
@@ -1249,12 +1249,12 @@ pub trait SubgraphOperations: GraphEntity {
                 }
             }
 
-            let graph_array = crate::storage::array::GraphArray::from_vec(attr_values);
+            let graph_array = crate::storage::legacy_array::GraphArray::from_vec(attr_values);
             columns.push(graph_array);
         }
 
         // Use existing GraphTable::from_arrays_standalone (no graph reference needed)
-        crate::storage::table::GraphTable::from_arrays_standalone(columns, Some(column_names))
+        crate::storage::legacy_table::GraphTable::from_arrays_standalone(columns, Some(column_names))
     }
     
     /// MetaGraph Composer API - Clean interface for meta-node creation

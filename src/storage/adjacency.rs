@@ -12,7 +12,7 @@
 //! - Leverages existing statistical operations from GraphArray
 //! - Memory-efficient storage formats
 
-use crate::storage::array::GraphArray; // Our enhanced array type
+use crate::storage::legacy_array::GraphArray; // Our enhanced array type
 use crate::storage::pool::GraphPool;
 use crate::state::space::GraphSpace;
 use crate::errors::GraphResult;

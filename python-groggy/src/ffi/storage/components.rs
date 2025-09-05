@@ -5,13 +5,16 @@
 use groggy::api::graph::Graph;
 use groggy::subgraphs::Subgraph;
 use groggy::{EdgeId, NodeId};
+use groggy::storage::array::{ArrayOps, ArrayIterator, SubgraphLike};
 use pyo3::exceptions::{PyIndexError, PyRuntimeError};
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::ffi::subgraphs::subgraph::PySubgraph;
+use crate::ffi::entities::meta_node::PyMetaNode;
 
 /// Lazy array of connected components - avoids creating hundreds of PySubgraphs immediately
 #[pyclass(name = "ComponentsArray", unsendable)]
@@ -148,6 +151,17 @@ impl PyComponentsArray {
 
         self.__getitem__(largest_index as isize)
     }
+    
+    /// NEW: Enable fluent chaining with .iter() method
+    /// Returns a PyComponentsIterator that supports method chaining
+    fn iter(slf: PyRef<Self>) -> PyResult<PyComponentsIterator> {
+        // Use our ArrayOps implementation to create the iterator
+        let array_iterator = ArrayOps::iter(&*slf);
+        
+        Ok(PyComponentsIterator {
+            inner: array_iterator,
+        })
+    }
 }
 
 /// Iterator for ComponentsArray
@@ -172,5 +186,121 @@ impl PyComponentsArrayIterator {
         } else {
             Ok(None)
         }
+    }
+}
+
+// =============================================================================
+// BaseArray integration - implement ArrayOps for chaining support
+// =============================================================================
+
+impl ArrayOps<PySubgraph> for PyComponentsArray {
+    fn len(&self) -> usize {
+        self.components_data.len()
+    }
+    
+    fn get(&self, _index: usize) -> Option<&PySubgraph> {
+        // For ArrayOps, we can't return a reference because we create on demand
+        // This is a limitation of our lazy materialization approach
+        // We'll need to materialize and cache to support this properly
+        None // TODO: Consider changing ArrayOps to return owned values for some types
+    }
+    
+    fn iter(&self) -> ArrayIterator<PySubgraph> 
+    where 
+        PySubgraph: Clone + 'static 
+    {
+        // Materialize all components for the iterator
+        let mut materialized: Vec<PySubgraph> = Vec::new();
+        
+        for i in 0..self.components_data.len() {
+            // Use our existing lazy materialization logic
+            if let Ok(py_subgraph) = self.__getitem__(i as isize) {
+                materialized.push(py_subgraph);
+            }
+        }
+        
+        // Create iterator with graph reference for graph-aware operations
+        ArrayIterator::with_graph(materialized, self.graph_ref.clone())
+    }
+}
+
+// Implement SubgraphLike for PySubgraph to enable subgraph-specific operations
+impl SubgraphLike for PySubgraph {
+    // Marker trait - no methods required
+    // This enables .filter_nodes(), .filter_edges(), .collapse() operations
+}
+
+// =============================================================================
+// Python chaining iterator - wraps ArrayIterator for Python FFI
+// =============================================================================
+
+/// Python wrapper for ArrayIterator<PySubgraph> that supports method chaining
+#[pyclass(name = "ComponentsIterator", unsendable)]
+pub struct PyComponentsIterator {
+    inner: ArrayIterator<PySubgraph>,
+}
+
+#[pymethods]
+impl PyComponentsIterator {
+    /// Filter nodes within subgraphs using a query string
+    /// Enables: g.connected_components().iter().filter_nodes('age > 25')
+    fn filter_nodes(slf: PyRefMut<Self>, query: &str) -> PyResult<Self> {
+        let inner = slf.inner.clone(); // Clone the inner ArrayIterator
+        Ok(Self {
+            inner: inner.filter_nodes(query),
+        })
+    }
+    
+    /// Filter edges within subgraphs using a query string
+    /// Enables: g.connected_components().iter().filter_edges('weight > 0.5')
+    fn filter_edges(slf: PyRefMut<Self>, query: &str) -> PyResult<Self> {
+        let inner = slf.inner.clone(); // Clone the inner ArrayIterator
+        Ok(Self {
+            inner: inner.filter_edges(query),
+        })
+    }
+    
+    /// Collapse subgraphs into meta-nodes with aggregations
+    /// Enables: g.connected_components().iter().collapse({'avg_age': ('mean', 'age')})
+    fn collapse(slf: PyRefMut<Self>, aggs: &PyDict) -> PyResult<PyMetaNodeIterator> {
+        // Convert PyDict to HashMap<String, String> for now
+        let mut agg_map = std::collections::HashMap::new();
+        for (key, value) in aggs.iter() {
+            let key_str = key.str()?.to_str()?;
+            let value_str = value.str()?.to_str()?;
+            agg_map.insert(key_str.to_string(), value_str.to_string());
+        }
+        
+        let inner = slf.inner.clone(); // Clone the inner ArrayIterator
+        let meta_iterator = inner.collapse(agg_map);
+        
+        Ok(PyMetaNodeIterator {
+            inner: meta_iterator,
+        })
+    }
+    
+    /// Collect results back into a ComponentsArray-like structure
+    /// Enables: g.connected_components().iter().filter_nodes().collect()
+    fn collect(slf: PyRefMut<Self>) -> PyResult<Vec<PySubgraph>> {
+        // Extract the elements from our ArrayIterator
+        let inner = slf.inner.clone(); // Clone the inner ArrayIterator
+        Ok(inner.into_vec())
+    }
+}
+
+/// Python wrapper for ArrayIterator<MetaNode> 
+#[pyclass(name = "MetaNodeIterator", unsendable)]
+pub struct PyMetaNodeIterator {
+    inner: ArrayIterator<()>, // Placeholder for now
+}
+
+#[pymethods] 
+impl PyMetaNodeIterator {
+    /// Collect meta-nodes into a list - placeholder implementation
+    fn collect(slf: PyRefMut<Self>) -> PyResult<Vec<String>> {
+        let inner = slf.inner.clone(); // Clone the inner ArrayIterator
+        let _elements = inner.into_vec(); // Get the placeholder elements
+        // Return placeholder result for now
+        Ok(vec!["placeholder_meta_node".to_string()])
     }
 }

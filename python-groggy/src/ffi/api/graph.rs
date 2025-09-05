@@ -13,14 +13,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 // Import all graph modules
-use crate::ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
+use crate::ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor}; // Essential FFI - re-enabled
+use crate::ffi::storage::views::{PyEdgeView, PyNodeView}; // Essential FFI - re-enabled
 use crate::ffi::storage::array::PyGraphArray;
 use crate::ffi::subgraphs::neighborhood::PyNeighborhoodStats;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
 use crate::ffi::query::query::{PyEdgeFilter, PyNodeFilter};
 use crate::ffi::subgraphs::subgraph::PySubgraph;
 use crate::ffi::query::traversal::PyGroupedAggregationResult;
-use crate::ffi::storage::views::{PyEdgeView, PyNodeView};
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
 
