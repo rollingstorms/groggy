@@ -6,7 +6,7 @@
 
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, NodeId};
-use crate::traits::SubgraphOperations;
+use crate::traits::{SubgraphOperations, NodeStrategy};
 use crate::entities::MetaNode;
 use std::collections::HashMap;
 
@@ -171,6 +171,9 @@ pub struct MetaNodePlan {
     /// Edge handling strategy
     pub edge_strategy: EdgeStrategy,
     
+    /// Node handling strategy  
+    pub node_strategy: NodeStrategy,
+    
     /// Include edge count in meta-edges
     pub include_edge_count: bool,
     
@@ -197,6 +200,7 @@ impl MetaNodePlan {
             node_aggs: Vec::new(),
             edge_aggs: Vec::new(),
             edge_strategy: EdgeStrategy::default(),
+            node_strategy: NodeStrategy::default(),  // Default to Extract behavior
             include_edge_count: true,
             mark_entity_type: true,
             entity_type: "meta".to_string(),
@@ -326,12 +330,39 @@ impl MetaNodePlan {
         graph.set_node_attr_internal(meta_node_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
         graph.set_node_attr_internal(meta_node_id, "contains_subgraph".to_string(), AttrValue::SubgraphRef(subgraph_id))?;
 
-        // Mark original nodes as absorbed first
+        // Mark original nodes as absorbed, but preserve existing meta-nodes
         drop(graph); // Release borrow for bulk operation
         {
-            let entity_type_attrs = subgraph.node_set().iter()
-                .map(|&node_id| (node_id, AttrValue::Text("base".to_string())))
-                .collect();
+            let binding = subgraph.graph_ref();
+            let graph_ref = binding.borrow();
+            let mut entity_type_attrs = Vec::new();
+            
+            for &node_id in subgraph.node_set() {
+                // Check if node is already a meta-node
+                let current_entity_type = graph_ref.get_node_attr(node_id, &"entity_type".into())
+                    .unwrap_or(None);
+                
+                let new_entity_type = match current_entity_type {
+                    Some(AttrValue::Text(ref s)) if s == "meta" => {
+                        // Preserve meta-nodes
+                        AttrValue::Text("meta".to_string())
+                    }
+                    Some(AttrValue::CompactText(ref s)) if s.as_str() == "meta" => {
+                        // Preserve meta-nodes
+                        AttrValue::Text("meta".to_string())
+                    }
+                    _ => {
+                        // Mark non-meta nodes as base
+                        AttrValue::Text("base".to_string())
+                    }
+                };
+                
+                entity_type_attrs.push((node_id, new_entity_type));
+            }
+            
+            drop(graph_ref);
+            drop(binding);
+            
             let mut bulk_attrs = HashMap::new();
             bulk_attrs.insert("entity_type".into(), entity_type_attrs);
             subgraph.set_node_attrs(bulk_attrs)?;
@@ -424,12 +455,39 @@ impl MetaNodePlan {
         graph.set_node_attr_internal(meta_node_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
         graph.set_node_attr_internal(meta_node_id, "contains_subgraph".to_string(), AttrValue::SubgraphRef(subgraph_id))?;
 
-        // Mark original nodes as absorbed first
+        // Mark original nodes as absorbed, but preserve existing meta-nodes  
         drop(graph); // Release borrow for bulk operation
         {
-            let entity_type_attrs = subgraph.node_set().iter()
-                .map(|&node_id| (node_id, AttrValue::Text("base".to_string())))
-                .collect();
+            let binding = subgraph.graph_ref();
+            let graph_ref = binding.borrow();
+            let mut entity_type_attrs = Vec::new();
+            
+            for &node_id in subgraph.node_set() {
+                // Check if node is already a meta-node
+                let current_entity_type = graph_ref.get_node_attr(node_id, &"entity_type".into())
+                    .unwrap_or(None);
+                
+                let new_entity_type = match current_entity_type {
+                    Some(AttrValue::Text(ref s)) if s == "meta" => {
+                        // Preserve meta-nodes
+                        AttrValue::Text("meta".to_string())
+                    }
+                    Some(AttrValue::CompactText(ref s)) if s.as_str() == "meta" => {
+                        // Preserve meta-nodes
+                        AttrValue::Text("meta".to_string())
+                    }
+                    _ => {
+                        // Mark non-meta nodes as base
+                        AttrValue::Text("base".to_string())
+                    }
+                };
+                
+                entity_type_attrs.push((node_id, new_entity_type));
+            }
+            
+            drop(graph_ref);
+            drop(binding);
+            
             let mut bulk_attrs = HashMap::new();
             bulk_attrs.insert("entity_type".into(), entity_type_attrs);
             subgraph.set_node_attrs(bulk_attrs)?;
@@ -495,6 +553,23 @@ impl MetaNodePlan {
         let edge_config = self.convert_to_edge_config()?;
         subgraph.create_meta_edges_with_config(meta_node_id, &edge_config)?;
         
+        // Handle original nodes based on node strategy AFTER all processing is complete
+        match self.node_strategy {
+            NodeStrategy::Extract => {
+                // Extract: Mark original nodes as absorbed but keep them in graph (current behavior)
+                // This is already done above in the current implementation, so nothing more needed
+            }
+            NodeStrategy::Collapse => {
+                // Collapse: Remove original nodes from the graph completely
+                let binding = subgraph.graph_ref();
+                let mut graph = binding.borrow_mut();
+                let nodes_to_remove: Vec<crate::types::NodeId> = subgraph.node_set().iter().copied().collect();
+                for node_id in nodes_to_remove {
+                    graph.remove_node(node_id)?;
+                }
+            }
+        }
+        
         // Create MetaNode wrapper
         let meta_node = MetaNode::new(meta_node_id, subgraph.graph_ref())?;
         
@@ -543,6 +618,7 @@ impl MetaNodePlan {
             min_edge_count: 1,
             include_edge_count: self.include_edge_count,
             mark_entity_type: self.mark_entity_type,
+            node_strategy: self.node_strategy, // Use the stored node_strategy
         })
     }
 }

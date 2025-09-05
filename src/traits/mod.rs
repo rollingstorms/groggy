@@ -21,4 +21,4 @@ pub use graph_entity::GraphEntity;
 pub use meta_operations::{MetaNodeOperations, MetaEdgeOperations};
 pub use neighborhood_operations::{NeighborhoodOperations, NeighborhoodStats};
 pub use node_operations::NodeOperations;
-pub use subgraph_operations::SubgraphOperations;
+pub use subgraph_operations::{SubgraphOperations, NodeStrategy};
