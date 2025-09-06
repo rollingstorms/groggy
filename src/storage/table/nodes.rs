@@ -2,10 +2,10 @@
 
 use super::base::BaseTable;
 use super::traits::{Table, TableIterator};
-use crate::storage::array::BaseArray;
+use crate::storage::array::{BaseArray, ArrayOps};
 use crate::types::{NodeId, AttrValue};
-use crate::errors::GraphResult;
-use std::collections::HashMap;
+use crate::errors::{GraphResult, GraphError};
+use std::collections::{HashMap, HashSet};
 
 /// Specialized table for node data - requires a node_id column
 #[derive(Clone, Debug)]
@@ -92,6 +92,133 @@ impl NodesTable {
     /// Get reference to underlying BaseTable
     pub fn base_table(&self) -> &BaseTable {
         &self.base
+    }
+    
+    // =============================================================================
+    // Phase 2: Node-specific validation and access methods  
+    // =============================================================================
+    
+    /// Validate that all UIDs (node_ids) are unique and not null
+    pub fn validate_uids(&self) -> GraphResult<()> {
+        let node_id_column = self.base.column("node_id")
+            .ok_or_else(|| GraphError::InvalidInput("node_id column required".to_string()))?;
+        
+        let mut seen_ids = HashSet::new();
+        for i in 0..node_id_column.len() {
+            match node_id_column.get(i) {
+                Some(AttrValue::Int(id)) => {
+                    if !seen_ids.insert((*id) as NodeId) {
+                        return Err(GraphError::InvalidInput(
+                            format!("Duplicate node_id found: {}", id)
+                        ));
+                    }
+                },
+                Some(AttrValue::Null) => {
+                    return Err(GraphError::InvalidInput(
+                        "Null node_id found - all node IDs must be non-null".to_string()
+                    ));
+                },
+                _ => {
+                    return Err(GraphError::InvalidInput(
+                        "Invalid node_id type - must be integer".to_string()
+                    ));
+                }
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Node-specific validation warnings
+    pub fn validate_node_structure(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        
+        // Check if node_id column exists
+        if !self.base.has_column("node_id") {
+            warnings.push("Missing required 'node_id' column".to_string());
+        }
+        
+        // Check for reasonable node count
+        if self.nrows() == 0 {
+            warnings.push("Empty nodes table".to_string());
+        } else if self.nrows() > 1_000_000 {
+            warnings.push(format!("Large nodes table ({} rows) - consider partitioning", self.nrows()));
+        }
+        
+        // Check for suspicious column patterns
+        for col_name in self.column_names() {
+            if col_name.contains(' ') {
+                warnings.push(format!("Column '{}' contains spaces - may cause query issues", col_name));
+            }
+        }
+        
+        // Validate UIDs if possible
+        if let Err(e) = self.validate_uids() {
+            warnings.push(format!("UID validation failed: {}", e));
+        }
+        
+        warnings
+    }
+    
+    /// Get a node row by its UID (node_id) 
+    pub fn get_by_uid(&self, uid: NodeId) -> Option<HashMap<String, AttrValue>> {
+        let node_id_column = self.base.column("node_id")?;
+        
+        // Find the row with matching node_id
+        for i in 0..node_id_column.len() {
+            match node_id_column.get(i) {
+                Some(AttrValue::Int(id)) if (*id) as NodeId == uid => {
+                    // Found the row, collect all column values
+                    let mut row = HashMap::new();
+                    for col_name in self.column_names() {
+                        if let Some(column) = self.base.column(col_name) {
+                            if let Some(value) = column.get(i) {
+                                row.insert(col_name.clone(), value.clone());
+                            }
+                        }
+                    }
+                    return Some(row);
+                },
+                _ => continue,
+            }
+        }
+        
+        None
+    }
+    
+    /// Iterator over (NodeId, row_data) pairs
+    pub fn iter_with_ids(&self) -> impl Iterator<Item = (NodeId, HashMap<String, AttrValue>)> + '_ {
+        let node_id_column = self.base.column("node_id");
+        
+        (0..self.nrows()).filter_map(move |i| {
+            // Get node_id for this row
+            let node_id = match node_id_column?.get(i) {
+                Some(AttrValue::Int(id)) => (*id) as NodeId,
+                _ => return None,
+            };
+            
+            // Collect row data
+            let mut row = HashMap::new();
+            for col_name in self.column_names() {
+                if let Some(column) = self.base.column(col_name) {
+                    if let Some(value) = column.get(i) {
+                        row.insert(col_name.clone(), value.clone());
+                    }
+                }
+            }
+            
+            Some((node_id, row))
+        })
+    }
+    
+    /// Access underlying BaseTable (Phase 2 plan method)
+    pub fn base(&self) -> &BaseTable {
+        &self.base
+    }
+    
+    /// Convert into BaseTable (Phase 2 plan method)
+    pub fn into_base(self) -> BaseTable {
+        self.base
     }
 }
 

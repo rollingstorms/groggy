@@ -2,10 +2,31 @@
 
 use super::base::BaseTable;
 use super::traits::{Table, TableIterator};
-use crate::storage::array::BaseArray;
+use crate::storage::array::{BaseArray, ArrayOps};
 use crate::types::{EdgeId, NodeId, AttrValue};
-use crate::errors::GraphResult;
-use std::collections::HashMap;
+use crate::errors::{GraphResult, GraphError};
+use std::collections::{HashMap, HashSet};
+
+/// Configuration for edge validation policies
+#[derive(Clone, Debug)]
+pub struct EdgeConfig {
+    /// Whether to allow self-loops (edges from a node to itself)
+    pub allow_self_loops: bool,
+    /// Whether to allow multiple edges between the same source-target pair
+    pub allow_multi_edges: bool,
+    /// Whether to validate that source and target nodes exist in a provided node set
+    pub validate_node_references: bool,
+}
+
+impl Default for EdgeConfig {
+    fn default() -> Self {
+        Self {
+            allow_self_loops: true,
+            allow_multi_edges: true,
+            validate_node_references: false,
+        }
+    }
+}
 
 /// Specialized table for edge data - requires edge_id, source, target columns
 #[derive(Clone, Debug)]
@@ -150,6 +171,209 @@ impl EdgesTable {
     /// Get reference to underlying BaseTable
     pub fn base_table(&self) -> &BaseTable {
         &self.base
+    }
+    
+    // =============================================================================
+    // Phase 3: Edge-specific validation and iteration methods  
+    // =============================================================================
+    
+    /// Validate edge structure according to EdgeConfig policies
+    pub fn validate_edges(&self, config: &EdgeConfig) -> GraphResult<()> {
+        let edge_ids = self.edge_ids()?;
+        let sources = self.sources()?;
+        let targets = self.targets()?;
+        
+        // Validate edge IDs are unique
+        let mut seen_edge_ids = HashSet::new();
+        for edge_id in &edge_ids {
+            if !seen_edge_ids.insert(edge_id) {
+                return Err(GraphError::InvalidInput(
+                    format!("Duplicate edge_id found: {}", edge_id)
+                ));
+            }
+        }
+        
+        // Check for null values in required columns
+        let edge_id_column = self.base.column("edge_id").unwrap();
+        let source_column = self.base.column("source").unwrap();
+        let target_column = self.base.column("target").unwrap();
+        
+        for i in 0..edge_id_column.len() {
+            if let Some(AttrValue::Null) = edge_id_column.get(i) {
+                return Err(GraphError::InvalidInput("Null edge_id found".to_string()));
+            }
+            if let Some(AttrValue::Null) = source_column.get(i) {
+                return Err(GraphError::InvalidInput("Null source found".to_string()));
+            }
+            if let Some(AttrValue::Null) = target_column.get(i) {
+                return Err(GraphError::InvalidInput("Null target found".to_string()));
+            }
+        }
+        
+        // Policy-based validation
+        if !config.allow_self_loops {
+            for (source, target) in sources.iter().zip(targets.iter()) {
+                if source == target {
+                    return Err(GraphError::InvalidInput(
+                        format!("Self-loop detected: {} -> {} (disallowed by config)", source, target)
+                    ));
+                }
+            }
+        }
+        
+        if !config.allow_multi_edges {
+            let mut seen_pairs = HashSet::new();
+            for (source, target) in sources.iter().zip(targets.iter()) {
+                let pair = (*source, *target);
+                if !seen_pairs.insert(pair) {
+                    return Err(GraphError::InvalidInput(
+                        format!("Multi-edge detected: {} -> {} (disallowed by config)", source, target)
+                    ));
+                }
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Edge-specific structural validation warnings
+    pub fn validate_edge_structure(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+        
+        // Check required columns exist
+        for required_col in &["edge_id", "source", "target"] {
+            if !self.base.has_column(required_col) {
+                warnings.push(format!("Missing required '{}' column", required_col));
+            }
+        }
+        
+        // Check for reasonable edge count
+        if self.nrows() == 0 {
+            warnings.push("Empty edges table".to_string());
+        } else if self.nrows() > 10_000_000 {
+            warnings.push(format!("Large edges table ({} rows) - consider partitioning", self.nrows()));
+        }
+        
+        // Check for suspicious column patterns
+        for col_name in self.column_names() {
+            if col_name.contains(' ') {
+                warnings.push(format!("Column '{}' contains spaces - may cause query issues", col_name));
+            }
+        }
+        
+        // Validate edges with default config
+        if let Err(e) = self.validate_edges(&EdgeConfig::default()) {
+            warnings.push(format!("Edge validation failed: {}", e));
+        }
+        
+        warnings
+    }
+    
+    /// Get an edge by its ID
+    pub fn get_by_edge_id(&self, edge_id: EdgeId) -> Option<HashMap<String, AttrValue>> {
+        let edge_id_column = self.base.column("edge_id")?;
+        
+        // Find the row with matching edge_id
+        for i in 0..edge_id_column.len() {
+            match edge_id_column.get(i) {
+                Some(AttrValue::Int(id)) if (*id) as EdgeId == edge_id => {
+                    // Found the row, collect all column values
+                    let mut row = HashMap::new();
+                    for col_name in self.column_names() {
+                        if let Some(column) = self.base.column(col_name) {
+                            if let Some(value) = column.get(i) {
+                                row.insert(col_name.clone(), value.clone());
+                            }
+                        }
+                    }
+                    return Some(row);
+                },
+                _ => continue,
+            }
+        }
+        
+        None
+    }
+    
+    /// Iterator over (EdgeId, source, target, row_data) tuples
+    pub fn iter_with_edge_info(&self) -> impl Iterator<Item = (EdgeId, NodeId, NodeId, HashMap<String, AttrValue>)> + '_ {
+        let edge_id_column = self.base.column("edge_id");
+        let source_column = self.base.column("source");
+        let target_column = self.base.column("target");
+        
+        (0..self.nrows()).filter_map(move |i| {
+            // Get edge info for this row
+            let edge_id = match edge_id_column?.get(i) {
+                Some(AttrValue::Int(id)) => (*id) as EdgeId,
+                _ => return None,
+            };
+            
+            let source = match source_column?.get(i) {
+                Some(AttrValue::Int(id)) => (*id) as NodeId,
+                _ => return None,
+            };
+            
+            let target = match target_column?.get(i) {
+                Some(AttrValue::Int(id)) => (*id) as NodeId,
+                _ => return None,
+            };
+            
+            // Collect row data
+            let mut row = HashMap::new();
+            for col_name in self.column_names() {
+                if let Some(column) = self.base.column(col_name) {
+                    if let Some(value) = column.get(i) {
+                        row.insert(col_name.clone(), value.clone());
+                    }
+                }
+            }
+            
+            Some((edge_id, source, target, row))
+        })
+    }
+    
+    /// Get all incoming edges for a set of target nodes
+    pub fn incoming_edges(&self, target_nodes: &[NodeId]) -> GraphResult<Self> {
+        self.filter_by_targets(target_nodes)
+    }
+    
+    /// Get all outgoing edges for a set of source nodes
+    pub fn outgoing_edges(&self, source_nodes: &[NodeId]) -> GraphResult<Self> {
+        self.filter_by_sources(source_nodes)
+    }
+    
+    /// Get edge statistics
+    pub fn edge_stats(&self) -> GraphResult<HashMap<String, usize>> {
+        let mut stats = HashMap::new();
+        
+        stats.insert("total_edges".to_string(), self.nrows());
+        stats.insert("total_columns".to_string(), self.ncols());
+        
+        // Count self-loops
+        let sources = self.sources()?;
+        let targets = self.targets()?;
+        let self_loops = sources.iter().zip(targets.iter())
+            .filter(|(s, t)| s == t)
+            .count();
+        stats.insert("self_loops".to_string(), self_loops);
+        
+        // Count unique sources and targets
+        let unique_sources: HashSet<_> = sources.into_iter().collect();
+        let unique_targets: HashSet<_> = targets.into_iter().collect();
+        stats.insert("unique_sources".to_string(), unique_sources.len());
+        stats.insert("unique_targets".to_string(), unique_targets.len());
+        
+        Ok(stats)
+    }
+    
+    /// Access underlying BaseTable (Phase 3 plan method)
+    pub fn base(&self) -> &BaseTable {
+        &self.base
+    }
+    
+    /// Convert into BaseTable (Phase 3 plan method)
+    pub fn into_base(self) -> BaseTable {
+        self.base
     }
 }
 

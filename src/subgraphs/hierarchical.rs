@@ -634,22 +634,22 @@ mod tests {
 
         // Test collapse with aggregation
         let mut agg_functions = HashMap::new();
-        agg_functions.insert("value".into(), "sum".to_string());
+        agg_functions.insert("value".into(), AggregationFunction::Sum);
 
-        let meta_node_id = subgraph.collapse_to_node(agg_functions).unwrap();
+        let meta_node_id = subgraph.collapse_to_meta_node(agg_functions).unwrap();
 
         // Verify meta-node was created with aggregated attributes
         let graph_ref = graph_rc.borrow();
 
         // Check that meta-node has the subgraph reference
         let subgraph_ref = graph_ref
-            .get_node_attr(meta_node_id, &"contained_subgraph".into())
+            .get_node_attr(meta_node_id.node_id(), &"contained_subgraph".into())
             .unwrap();
         assert!(matches!(subgraph_ref, Some(AttrValue::SubgraphRef(_))));
 
         // Check aggregated value
         let aggregated_value = graph_ref
-            .get_node_attr(meta_node_id, &"value".into())
+            .get_node_attr(meta_node_id.node_id(), &"value".into())
             .unwrap();
         match aggregated_value {
             Some(AttrValue::Int(sum)) => assert_eq!(sum, 60), // 10 + 20 + 30
