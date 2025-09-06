@@ -578,6 +578,28 @@ impl PyNodesAccessor {
         Ok(crate::ffi::storage::table::PyNodesTable { table: nodes_table })
     }
 
+    /// Get node IDs as a GraphArray
+    /// Implements: g.nodes.ids()
+    pub fn ids(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+        let node_ids = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            let graph = self.graph.borrow();
+            graph.node_ids()
+        };
+        
+        // Convert node IDs to AttrValue vector
+        let attr_values: Vec<groggy::AttrValue> = node_ids
+            .into_iter()
+            .map(|id| groggy::AttrValue::Int(id as i64))
+            .collect();
+            
+        // Create GraphArray from AttrValues
+        let graph_array = groggy::GraphArray::from_vec(attr_values);
+            
+        Ok(crate::ffi::storage::array::PyGraphArray { inner: graph_array })
+    }
+
     /// Get all nodes as a subgraph (equivalent to g.nodes[:]) - DELEGATED to SubgraphOperations  
     /// Returns a subgraph containing all nodes and all induced edges
     fn all(&self, _py: Python) -> PyResult<PySubgraph> {
@@ -1565,6 +1587,28 @@ impl PyEdgesAccessor {
         };
         
         Ok(crate::ffi::storage::table::PyEdgesTable { table: edges_table })
+    }
+
+    /// Get edge IDs as a GraphArray
+    /// Implements: g.edges.ids()
+    pub fn ids(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+        let edge_ids = if let Some(ref constrained) = self.constrained_edges {
+            constrained.clone()
+        } else {
+            let graph = self.graph.borrow();
+            graph.edge_ids()
+        };
+        
+        // Convert edge IDs to AttrValue vector
+        let attr_values: Vec<groggy::AttrValue> = edge_ids
+            .into_iter()
+            .map(|id| groggy::AttrValue::Int(id as i64))
+            .collect();
+            
+        // Create GraphArray from AttrValues
+        let graph_array = groggy::GraphArray::from_vec(attr_values);
+            
+        Ok(crate::ffi::storage::array::PyGraphArray { inner: graph_array })
     }
 }
 

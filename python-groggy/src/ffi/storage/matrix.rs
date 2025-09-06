@@ -405,22 +405,15 @@ impl PyGraphMatrix {
 
     // === DISPLAY & REPRESENTATION ===
 
-    /// String representation with rich display formatting
+    /// String representation
     fn __repr__(&self, py: Python) -> PyResult<String> {
-        // Try rich display formatting first
-        match self._try_rich_display(py) {
-            Ok(formatted) => Ok(formatted),
-            Err(_) => {
-                // Fallback to simple representation
-                let (rows, cols) = self.inner.shape();
-                Ok(format!(
-                    "GraphMatrix({} x {}, dtype={:?})",
-                    rows,
-                    cols,
-                    self.inner.dtype()
-                ))
-            }
-        }
+        let (rows, cols) = self.inner.shape();
+        Ok(format!(
+            "GraphMatrix({} x {}, dtype={:?})",
+            rows,
+            cols,
+            self.inner.dtype()
+        ))
     }
 
     /// String representation (same as __repr__ for consistency)
@@ -428,59 +421,6 @@ impl PyGraphMatrix {
         self.__repr__(py)
     }
 
-    /// Rich HTML representation for Jupyter notebooks
-    fn _repr_html_(&self, py: Python) -> PyResult<String> {
-        match self._try_rich_html_display(py) {
-            Ok(html) => Ok(html),
-            Err(_) => {
-                // Fallback to basic HTML
-                let (rows, cols) = self.inner.shape();
-                Ok(format!(
-                    r#"<div style="font-family: monospace; padding: 10px; border: 1px solid #ddd;">
-                    <strong>GraphMatrix</strong><br>
-                    Shape: {} x {}<br>
-                    Dtype: {:?}
-                    </div>"#,
-                    rows,
-                    cols,
-                    self.inner.dtype()
-                ))
-            }
-        }
-    }
-
-    /// Try to use rich display formatting
-    fn _try_rich_display(&self, py: Python) -> PyResult<String> {
-        // Get display data for formatting
-        let display_data = self._get_display_data(py)?;
-
-        // Import the format_matrix function from Python
-        let groggy_module = py.import("groggy")?;
-        let format_matrix = groggy_module.getattr("format_matrix")?;
-
-        // Call the Python formatter
-        let result = format_matrix.call1((display_data,))?;
-        let formatted_str: String = result.extract()?;
-
-        Ok(formatted_str)
-    }
-
-    /// Try to use rich HTML display formatting
-    fn _try_rich_html_display(&self, py: Python) -> PyResult<String> {
-        // Get display data for formatting
-        let display_data = self._get_display_data(py)?;
-
-        // Import the format_matrix_html function from Python
-        let groggy_module = py.import("groggy")?;
-        let display_module = groggy_module.getattr("display")?;
-        let format_matrix_html = display_module.getattr("format_matrix_html")?;
-
-        // Call the Python HTML formatter
-        let result = format_matrix_html.call1((display_data,))?;
-        let html_str: String = result.extract()?;
-
-        Ok(html_str)
-    }
 
     /// Extract display data for Python display formatters
     fn _get_display_data(&self, py: Python) -> PyResult<PyObject> {

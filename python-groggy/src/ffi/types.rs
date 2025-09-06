@@ -28,6 +28,35 @@ impl PyAttrValue {
     pub fn to_attr_value(&self) -> RustAttrValue {
         self.inner.clone()
     }
+
+    /// Create PyAttrValue from Python value (public constructor)
+    pub fn from_py_value(value: &PyAny) -> PyResult<Self> {
+        let rust_value = if let Ok(b) = value.extract::<bool>() {
+            RustAttrValue::Bool(b)
+        } else if let Ok(i) = value.extract::<i64>() {
+            RustAttrValue::Int(i)
+        } else if let Ok(f) = value.extract::<f64>() {
+            RustAttrValue::Float(f as f32) // Convert f64 to f32
+        } else if let Ok(f) = value.extract::<f32>() {
+            RustAttrValue::Float(f)
+        } else if let Ok(s) = value.extract::<String>() {
+            RustAttrValue::Text(s)
+        } else if let Ok(vec) = value.extract::<Vec<f32>>() {
+            RustAttrValue::FloatVec(vec)
+        } else if let Ok(vec) = value.extract::<Vec<f64>>() {
+            // Convert Vec<f64> to Vec<f32>
+            let f32_vec: Vec<f32> = vec.into_iter().map(|f| f as f32).collect();
+            RustAttrValue::FloatVec(f32_vec)
+        } else if let Ok(bytes) = value.extract::<Vec<u8>>() {
+            RustAttrValue::Bytes(bytes)
+        } else {
+            return Err(PyErr::new::<PyTypeError, _>(
+                "Unsupported attribute value type. Supported types: int, float, str, bool, List[float], bytes"
+            ));
+        };
+
+        Ok(Self { inner: rust_value })
+    }
 }
 
 #[pymethods]

@@ -530,6 +530,7 @@ impl PyEdgeGroupsIterator {
 
 /// Native performance-oriented GraphArray for statistical operations
 #[pyclass(name = "GraphArray")]
+#[derive(Clone)]
 pub struct PyGraphArray {
     pub inner: GraphArray,
 }
@@ -674,34 +675,11 @@ impl PyGraphArray {
         }
     }
 
-    /// String representation with rich display formatting
+    /// String representation
     fn __repr__(&self, py: Python) -> PyResult<String> {
-        // Try rich display formatting first, with graceful fallback
-        match self._try_rich_display(py) {
-            Ok(formatted) => Ok(formatted),
-            Err(_) => {
-                // Fallback to simple representation
-                let len = self.inner.len();
-                let dtype = self._get_dtype();
-                Ok(format!("GraphArray(len={}, dtype={})", len, dtype))
-            }
-        }
-    }
-
-    /// Try to use rich display formatting
-    fn _try_rich_display(&self, py: Python) -> PyResult<String> {
-        // Get display data for formatting
-        let display_data = self._get_display_data(py)?;
-
-        // Import the format_array function from Python
-        let groggy_module = py.import("groggy")?;
-        let format_array = groggy_module.getattr("format_array")?;
-
-        // Call the Python formatter
-        let result = format_array.call1((display_data,))?;
-        let formatted_str: String = result.extract()?;
-
-        Ok(formatted_str)
+        let len = self.inner.len();
+        let dtype = self._get_dtype();
+        Ok(format!("GraphArray(len={}, dtype={})", len, dtype))
     }
 
     /// String representation (same as __repr__ for consistency)
@@ -709,66 +687,6 @@ impl PyGraphArray {
         self.__repr__(py)
     }
 
-    /// Rich HTML representation for Jupyter notebooks
-    fn _repr_html_(&self, _py: Python) -> PyResult<String> {
-        // Simple, effective HTML display for GraphArray
-        let len = self.inner.len();
-        let dtype = self._get_dtype();
-
-        if len == 0 {
-            return Ok(format!(
-                "<div style='font-family: monospace; color: #666;'><strong>GraphArray:</strong> 0 elements, dtype: {}</div>",
-                dtype
-            ));
-        }
-
-        // Show first few elements
-        let display_count = std::cmp::min(len, 10);
-        let mut elements = Vec::new();
-
-        for i in 0..display_count {
-            if let Some(value) = self.inner.get(i) {
-                let display_value = match value {
-                    groggy::AttrValue::Int(i) => i.to_string(),
-                    groggy::AttrValue::SmallInt(i) => i.to_string(),
-                    groggy::AttrValue::Float(f) => format!("{:.3}", f),
-                    groggy::AttrValue::Text(s) => format!("'{}'", s),
-                    groggy::AttrValue::Bool(b) => b.to_string(),
-                    groggy::AttrValue::CompactText(cs) => format!("'{}'", cs.as_str()),
-                    _ => format!("{:?}", value),
-                };
-                elements.push(display_value);
-            }
-        }
-
-        let elements_str = elements.join(", ");
-        let ellipsis = if len > display_count { ", ..." } else { "" };
-
-        Ok(format!(
-            "<div style='font-family: monospace; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9;'>\
-            <div style='font-weight: bold; margin-bottom: 4px;'>GraphArray: {} elements, dtype: {}</div>\
-            <div style='color: #333;'>[{}{}]</div>\
-            </div>",
-            len, dtype, elements_str, ellipsis
-        ))
-    }
-
-    /// Try to use rich HTML display formatting
-    fn _try_rich_html_display(&self, py: Python) -> PyResult<String> {
-        // Get display data for formatting
-        let display_data = self._get_display_data(py)?;
-
-        // Import the format_array_html function from Python
-        let groggy_module = py.import("groggy")?;
-        let display_module = groggy_module.getattr("display")?;
-        let format_array_html = display_module.getattr("format_array_html")?;
-
-        // Call the Python HTML formatter
-        let result = format_array_html.call1((display_data,))?;
-        let html_str: String = result.extract()?;
-
-        Ok(html_str)
-    }
 
     /// Iterator support (for value in array)
     fn __iter__(slf: PyRef<Self>) -> GraphArrayIterator {

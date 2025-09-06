@@ -97,6 +97,14 @@ class TableDisplayFormatter:
             summary_parts.append(f"nulls: {null_info}")
         
         summary_parts.append(f"index: {index_type}")
+        
+        # Add special info for GraphTable
+        if table_data.get("table_type") == "GraphTable":
+            nodes_shape = table_data.get("nodes_shape", (0, 0))
+            edges_shape = table_data.get("edges_shape", (0, 0))
+            summary_parts.append(f"nodes: {nodes_shape[0]:,}×{nodes_shape[1]}")
+            summary_parts.append(f"edges: {edges_shape[0]:,}×{edges_shape[1]}")
+        
         summary = f" {Symbols.DOT_SEPARATOR} ".join(summary_parts)
         lines.append(summary)
         

@@ -12,4 +12,4 @@ pub use traits::{Table, TableIterator, TableOperation};
 pub use base::BaseTable;
 pub use nodes::NodesTable;
 pub use edges::{EdgesTable, EdgeConfig};
-pub use graph_table::{GraphTable, ValidationPolicy, ValidationStrictness, ValidationReport, BundleMetadata};
+pub use graph_table::{GraphTable, ValidationPolicy, ValidationStrictness, ValidationReport, BundleMetadata, ConflictResolution};
