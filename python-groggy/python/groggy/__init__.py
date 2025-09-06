@@ -24,17 +24,19 @@ from ._groggy import (
     GraphArray,
     GraphMatrix,
     GraphTable,
+    # Table classes
+    BaseTable,
+    NodesTable,
+    EdgesTable,
     # Builder functions with auto-conversion
     array,
     matrix,
     table,
     # Display functionality
     DisplayConfig,
-    format_array,
-    format_matrix,
-    format_table,
-    format_data_structure,
-    detect_display_type,
+    # Display system
+    DisplayConfig,
+    TableFormatter,
     # Hierarchical subgraph functionality
     AggregationFunction,
     MetaNode,
@@ -121,6 +123,10 @@ __all__ = [
     "GraphArray",
     "GraphMatrix",
     "GraphTable",
+    # Table classes
+    "BaseTable",
+    "NodesTable", 
+    "EdgesTable",
     # Display functionality  
     "DisplayConfig",
     "format_array",

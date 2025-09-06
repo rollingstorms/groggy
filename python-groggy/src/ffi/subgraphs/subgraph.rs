@@ -210,10 +210,9 @@ impl PySubgraph {
             .nodes_table()
             .map_err(|e| PyRuntimeError::new_err(format!("Table creation error: {}", e)))?;
 
-        // Wrap core GraphTable in PyGraphTable - pure delegation
-        // let py_table = PyGraphTable { inner: core_table }; // Temporarily disabled
-        // Ok(Py::new(py, py_table)?.into_py(py)) // Temporarily disabled
-        Err(PyRuntimeError::new_err("Table functionality temporarily disabled for BaseArray testing"))
+        // Return as PyNodesTable
+        let py_table = crate::ffi::storage::table::PyNodesTable { table: core_table };
+        Ok(Py::new(py, py_table)?.into_py(py))
     }
 
     /// Convert subgraph edges to a table - pure delegation to core GraphTable
@@ -223,10 +222,9 @@ impl PySubgraph {
             .edges_table()
             .map_err(|e| PyRuntimeError::new_err(format!("Edges table creation error: {}", e)))?;
 
-        // Wrap core GraphTable in PyGraphTable - pure delegation
-        // let py_table = PyGraphTable { inner: core_table }; // Temporarily disabled
-        // Ok(Py::new(py, py_table)?.into_py(py)) // Temporarily disabled
-        Err(PyRuntimeError::new_err("Table functionality temporarily disabled for BaseArray testing"))
+        // Return as PyEdgesTable
+        let py_table = crate::ffi::storage::table::PyEdgesTable { table: core_table };
+        Ok(Py::new(py, py_table)?.into_py(py))
     }
 
     // === Filtering Methods - delegate to SubgraphOperations ===

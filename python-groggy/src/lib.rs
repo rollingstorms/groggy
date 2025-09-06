@@ -12,8 +12,8 @@ mod module;
 pub use ffi::api::graph::PyGraph;
 pub use ffi::api::graph_version::PyHistoricalView;
 pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
-// Temporarily disable accessor exports to focus on BaseArray testing
-// pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
+// Re-enabled accessor exports for table integration
+pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
 pub use ffi::storage::array::{PyGraphArray, PyBaseArray, PyNodesArray, PyEdgesArray, PyMetaNodeArray};
 pub use ffi::subgraphs::component::PyComponentSubgraph;
 pub use ffi::storage::components::PyComponentsArray;
@@ -25,8 +25,8 @@ pub use ffi::subgraphs::neighborhood::{
 pub use ffi::query::query::{PyAttributeFilter, PyEdgeFilter, PyNodeFilter};
 pub use ffi::query::query_parser::{parse_edge_query, parse_node_query};
 pub use ffi::subgraphs::subgraph::PySubgraph;
-// Temporarily disable table exports to focus on BaseArray testing
-// pub use ffi::storage::table::{PyBaseTable, PyNodesTable, PyEdgesTable};
+// Re-enabled table exports for Phase 5 completion
+pub use ffi::storage::table::{PyBaseTable, PyNodesTable, PyEdgesTable, PyGraphTable};
 pub use ffi::query::traversal::{PyAggregationResult, PyGroupedAggregationResult};
 // pub use ffi::storage::views::{PyEdgeView, PyNodeView}; // Temporarily disabled
 pub use ffi::types::{PyAttrValue, PyAttributeCollection, PyResultHandle};
@@ -39,6 +39,9 @@ pub use ffi::subgraphs::hierarchical::PyAggregationFunction;
 
 // MetaGraph Composer types
 pub use ffi::subgraphs::composer::{PyEdgeStrategy, PyComposerPreview, PyMetaNodePlan, PyMetaNodePlanExecutor};
+
+// Display system exports
+pub use ffi::display::{PyDisplayConfig, PyTableFormatter};
 
 // ====================================================================
 // UNIFIED BUILDER PATTERNS
@@ -225,6 +228,104 @@ fn merge(py: Python, graphs: Vec<Py<PyGraph>>) -> PyResult<PyObject> {
     Ok(result_py.to_object(py))
 }
 
+/// Create a BaseTable from a Python list of dictionaries or other data
+///
+/// Examples:
+///   gr.table([{"name": "Alice", "age": 25}, {"name": "Bob", "age": 30}])
+///   gr.table({"node_id": [1, 2, 3], "name": ["A", "B", "C"]})
+#[pyfunction]
+fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
+    use std::collections::HashMap;
+    use groggy::storage::array::BaseArray;
+    use groggy::storage::table::BaseTable;
+    use pyo3::types::{PyDict, PyList};
+    use groggy::AttrValue;
+    
+    // Handle dict-like input: {"col1": [1, 2, 3], "col2": ["a", "b", "c"]}
+    if let Ok(dict) = data.downcast::<PyDict>() {
+        let mut columns = HashMap::new();
+        
+        for (key, value) in dict.iter() {
+            let column_name = key.extract::<String>()?;
+            
+            // Convert value to BaseArray
+            if let Ok(list) = value.downcast::<PyList>() {
+                // Convert list to AttrValues and create BaseArray
+                let mut attr_values = Vec::new();
+                for item in list.iter() {
+                    let attr_val = crate::ffi::types::PyAttrValue::from_py_value(item)?;
+                    attr_values.push(attr_val.inner);
+                }
+                
+                let base_array = BaseArray::from_attr_values(attr_values);
+                columns.insert(column_name, base_array);
+            }
+        }
+        
+        // Create BaseTable
+        let base_table = BaseTable::from_columns(columns)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        let py_table = PyBaseTable { table: base_table };
+        return Ok(py_table.into_py(py));
+    }
+    
+    // Handle list-like input: [{"name": "Alice", "age": 25}, ...]
+    if let Ok(list) = data.downcast::<PyList>() {
+        if list.is_empty() {
+            // Empty table
+            let empty_table = BaseTable::from_columns(HashMap::new())
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            let py_table = PyBaseTable { table: empty_table };
+            return Ok(py_table.into_py(py));
+        }
+        
+        // Get column names from first row
+        let first_row = list.get_item(0)?;
+        if let Ok(row_dict) = first_row.downcast::<PyDict>() {
+            let column_names: Vec<String> = row_dict.keys().iter()
+                .map(|k| k.extract::<String>())
+                .collect::<Result<Vec<_>, _>>()?;
+            
+            // Collect data for each column
+            let mut columns_data: HashMap<String, Vec<AttrValue>> = HashMap::new();
+            for col_name in &column_names {
+                columns_data.insert(col_name.clone(), Vec::new());
+            }
+            
+            // Extract values from each row
+            for row_py in list.iter() {
+                if let Ok(row_dict) = row_py.downcast::<PyDict>() {
+                    for col_name in &column_names {
+                        if let Some(value) = row_dict.get_item(col_name)? {
+                            let attr_val = crate::ffi::types::PyAttrValue::from_py_value(value)?;
+                            columns_data.get_mut(col_name).unwrap().push(attr_val.inner);
+                        }
+                    }
+                }
+            }
+            
+            // Create BaseArrays from collected data
+            let mut columns = HashMap::new();
+            for (col_name, values) in columns_data {
+                let base_array = BaseArray::from_attr_values(values);
+                columns.insert(col_name, base_array);
+            }
+            
+            // Create BaseTable
+            let base_table = BaseTable::from_columns(columns)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            
+            let py_table = PyBaseTable { table: base_table };
+            return Ok(py_table.into_py(py));
+        }
+    }
+    
+    Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+        "table() expects a dict of lists or a list of dicts"
+    ))
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
@@ -242,17 +343,21 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<ffi::storage::components::PyComponentsArrayIterator>()?;
     m.add_class::<PyGraphMatrix>()?;
     // m.add_class::<PyPathResult>()?; // Unused
-    // m.add_class::<PyGraphTable>()?; // Temporarily disabled
-    // m.add_class::<PyGroupBy>()?; // Temporarily disabled  
-    // m.add_class::<PyBaseTable>()?; // Temporarily disabled
-    // m.add_class::<PyNodesTable>()?; // Temporarily disabled  
-    // m.add_class::<PyEdgesTable>()?; // Temporarily disabled
+    m.add_class::<PyGraphTable>()?; // Re-enabled for Phase 5 completion
+    // m.add_class::<PyGroupBy>()?; // Still disabled  
+    m.add_class::<PyBaseTable>()?; // Re-enabled for Phase 5 completion
+    m.add_class::<PyNodesTable>()?; // Re-enabled for Phase 5 completion  
+    m.add_class::<PyEdgesTable>()?; // Re-enabled for Phase 5 completion
 
-    // Register accessor and view types - Temporarily disabled
-    // m.add_class::<PyNodesAccessor>()?; // Temporarily disabled
-    // m.add_class::<PyEdgesAccessor>()?; // Temporarily disabled
-    // m.add_class::<PyNodeView>()?; // Temporarily disabled
-    // m.add_class::<PyEdgeView>()?; // Temporarily disabled
+    // Register display system types
+    m.add_class::<PyDisplayConfig>()?;
+    m.add_class::<PyTableFormatter>()?;
+
+    // Register accessor and view types
+    m.add_class::<ffi::storage::accessors::PyNodesAccessor>()?; // Re-enabled for table integration
+    m.add_class::<ffi::storage::accessors::PyEdgesAccessor>()?; // Re-enabled for table integration
+    // m.add_class::<PyNodeView>()?; // Still disabled - not essential for current functionality
+    // m.add_class::<PyEdgeView>()?; // Still disabled - not essential for current functionality
 
     // Register type system
     m.add_class::<PyAttrValue>()?;
@@ -311,7 +416,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Add unified builder functions
     m.add_function(wrap_pyfunction!(array, m)?)?;
     m.add_function(wrap_pyfunction!(matrix, m)?)?;
-    // m.add_function(wrap_pyfunction!(table, m)?)?; // Temporarily disabled
+    m.add_function(wrap_pyfunction!(table, m)?)?; // Re-enabled for Phase 5 completion
     m.add_function(wrap_pyfunction!(merge, m)?)?;
 
     // Use the module registration function

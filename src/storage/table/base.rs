@@ -33,22 +33,28 @@ impl BaseTable {
             return Ok(Self::new());
         }
         
-        // Validate all columns have same length
-        let first_len = columns.values().next().unwrap().len();
-        for (name, column) in &columns {
-            if column.len() != first_len {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("Column '{}' has length {} but expected {}", name, column.len(), first_len)
-                ));
+        // Find the maximum column length to handle sparse attributes
+        let max_len = columns.values().map(|col| col.len()).max().unwrap();
+        
+        // Pad shorter columns with nulls to handle sparse attribute matrices
+        let mut normalized_columns = HashMap::new();
+        for (name, column) in columns {
+            if column.len() < max_len {
+                // Pad with nulls to match max length
+                let mut data = column.data().clone();
+                data.resize(max_len, crate::types::AttrValue::Null);
+                normalized_columns.insert(name, BaseArray::from_attr_values(data));
+            } else {
+                normalized_columns.insert(name, column);
             }
         }
         
-        let column_order: Vec<String> = columns.keys().cloned().collect();
+        let column_order: Vec<String> = normalized_columns.keys().cloned().collect();
         
         Ok(Self {
-            columns,
+            columns: normalized_columns,
             column_order,
-            nrows: first_len,
+            nrows: max_len,
         })
     }
     
