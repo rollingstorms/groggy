@@ -103,6 +103,29 @@ impl BaseTable {
         }
     }
     
+    /// Convert to NodesTable with UID key validation (Phase 2 plan method)
+    pub fn to_nodes(self, uid_key: &str) -> GraphResult<super::nodes::NodesTable> {
+        // Validate that the UID key column exists
+        if !self.has_column(uid_key) {
+            return Err(crate::errors::GraphError::InvalidInput(
+                format!("UID column '{}' not found", uid_key)
+            ));
+        }
+        
+        // If uid_key is not "node_id", we need to rename it
+        let table_with_node_id = if uid_key == "node_id" {
+            self
+        } else {
+            // For now, require that the UID column is already named "node_id"
+            // Future enhancement could rename the column
+            return Err(crate::errors::GraphError::InvalidInput(
+                format!("UID column must be named 'node_id', found '{}'", uid_key)
+            ));
+        };
+        
+        super::nodes::NodesTable::from_base_table(table_with_node_id)
+    }
+    
     /// Convert to EdgesTable if appropriate (contains edge_id column)  
     pub fn as_edges_table(&self) -> Option<super::edges::EdgesTable> {
         if self.has_column("edge_id") {
@@ -110,6 +133,21 @@ impl BaseTable {
         } else {
             None
         }
+    }
+    
+    /// Convert to EdgesTable with validation (Phase 3 plan method)
+    pub fn to_edges(self) -> GraphResult<super::edges::EdgesTable> {
+        // Validate that required edge columns exist
+        let required_cols = ["edge_id", "source", "target"];
+        for col in &required_cols {
+            if !self.has_column(col) {
+                return Err(crate::errors::GraphError::InvalidInput(
+                    format!("EdgesTable requires '{}' column", col)
+                ));
+            }
+        }
+        
+        super::edges::EdgesTable::from_base_table(self)
     }
 }
 

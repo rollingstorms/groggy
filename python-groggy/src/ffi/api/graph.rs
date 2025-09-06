@@ -1462,23 +1462,6 @@ impl PyGraph {
         Ok(result)
     }
 
-    /// Create GraphTable for DataFrame-like view of this graph's nodes
-    /// Alias for g.nodes.table() for convenience
-    pub fn table(self_: PyRef<Self>, py: Python<'_>) -> PyResult<PyObject> {
-        // Forward to g.nodes.table() for consistency
-        let nodes_accessor = Self::nodes(self_, py)?;
-        let result = nodes_accessor.borrow(py).table(py, None);
-        result
-    }
-
-    /// Create GraphTable for DataFrame-like view of this graph's edges
-    /// Alias for g.edges.table() for convenience
-    pub fn edges_table(self_: PyRef<Self>, py: Python<'_>) -> PyResult<PyObject> {
-        // Forward to g.edges.table() for consistency
-        let edges_accessor = Self::edges(self_, py)?;
-        let result = edges_accessor.borrow(py).table(py, None);
-        result
-    }
 
     /// Convert this graph to a NetworkX graph
     ///
@@ -1645,6 +1628,18 @@ impl PyGraph {
             "Attribute '{}' not found. Available node attributes: {:?}, Available edge attributes: {:?}",
             name, all_node_attrs, all_edge_attrs
         )))
+    }
+    
+    /// Get a GraphTable representation of this graph
+    /// Implements: g.table()
+    pub fn table(&self) -> PyResult<crate::ffi::storage::table::PyGraphTable> {
+        let graph_table = {
+            let graph = self.inner.borrow();
+            graph.table()
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to create graph table: {}", e)))?
+        };
+        
+        Ok(crate::ffi::storage::table::PyGraphTable { table: graph_table })
     }
 }
 
