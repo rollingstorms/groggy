@@ -210,7 +210,22 @@ impl PyBaseTable {
         let display_data = self.to_display_data();
         let default_config = groggy::display::DisplayConfig::default();
         let rust_config = config.map(|c| c.get_config()).unwrap_or(&default_config);
-        Ok(groggy::display::format_table(display_data, rust_config))
+        let mut formatted = groggy::display::format_table(display_data, rust_config);
+        
+        // Replace the footer with BaseTable-specific info
+        let nrows = self.table.nrows();
+        let ncols = self.table.ncols();
+        let footer = format!("rows: {} • cols: {} • type: BaseTable", nrows, ncols);
+        
+        // Replace the last line (which contains the table stats) with our custom footer
+        let lines: Vec<&str> = formatted.lines().collect();
+        if let Some(last_line_idx) = lines.iter().rposition(|line| line.contains("rows:") || line.contains("•")) {
+            let mut new_lines = lines[..last_line_idx].to_vec();
+            new_lines.push(&footer);
+            formatted = new_lines.join("\n");
+        }
+        
+        Ok(formatted)
     }
     
     /// Rich HTML representation for Jupyter notebooks
@@ -611,6 +626,30 @@ impl PyNodesTable {
         Ok(dict.to_object(py))
     }
     
+    /// Get rich display representation with NodesTable type
+    pub fn rich_display(&self, config: Option<&crate::ffi::display::PyDisplayConfig>) -> PyResult<String> {
+        let base_table = self.base_table();
+        let display_data = base_table.to_display_data();
+        let default_config = groggy::display::DisplayConfig::default();
+        let rust_config = config.map(|c| c.get_config()).unwrap_or(&default_config);
+        let mut formatted = groggy::display::format_table(display_data, rust_config);
+        
+        // Replace the footer with NodesTable-specific info
+        let nrows = self.table.nrows();
+        let ncols = self.table.ncols();
+        let footer = format!("rows: {} • cols: {} • type: NodesTable", nrows, ncols);
+        
+        // Replace the last line with our custom footer
+        let lines: Vec<&str> = formatted.lines().collect();
+        if let Some(last_line_idx) = lines.iter().rposition(|line| line.contains("rows:") || line.contains("•")) {
+            let mut new_lines = lines[..last_line_idx].to_vec();
+            new_lines.push(&footer);
+            formatted = new_lines.join("\n");
+        }
+        
+        Ok(formatted)
+    }
+    
     /// Delegate to BaseTable for missing methods (enables rich display)
     pub fn __getattr__(&self, py: Python, name: &str) -> PyResult<PyObject> {
         let base_table = self.base_table();
@@ -924,6 +963,30 @@ impl PyEdgesTable {
         dict.set_item("index_type", "int64")?;
         
         Ok(dict.to_object(py))
+    }
+    
+    /// Get rich display representation with EdgesTable type
+    pub fn rich_display(&self, config: Option<&crate::ffi::display::PyDisplayConfig>) -> PyResult<String> {
+        let base_table = self.base_table();
+        let display_data = base_table.to_display_data();
+        let default_config = groggy::display::DisplayConfig::default();
+        let rust_config = config.map(|c| c.get_config()).unwrap_or(&default_config);
+        let mut formatted = groggy::display::format_table(display_data, rust_config);
+        
+        // Replace the footer with EdgesTable-specific info
+        let nrows = self.table.nrows();
+        let ncols = self.table.ncols();
+        let footer = format!("rows: {} • cols: {} • type: EdgesTable", nrows, ncols);
+        
+        // Replace the last line with our custom footer
+        let lines: Vec<&str> = formatted.lines().collect();
+        if let Some(last_line_idx) = lines.iter().rposition(|line| line.contains("rows:") || line.contains("•")) {
+            let mut new_lines = lines[..last_line_idx].to_vec();
+            new_lines.push(&footer);
+            formatted = new_lines.join("\n");
+        }
+        
+        Ok(formatted)
     }
     
     /// Delegate to BaseTable for missing methods (enables rich display)

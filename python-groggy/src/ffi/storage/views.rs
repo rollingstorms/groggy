@@ -37,9 +37,10 @@ impl PyNodeView {
     }
 
     /// Set node attribute value (chainable)
-    fn __setitem__(&mut self, _py: Python, key: &str, value: PyAttrValue) -> PyResult<()> {
+    fn __setitem__(&mut self, _py: Python, key: &str, value: &PyAny) -> PyResult<()> {
         let mut graph = self.graph.borrow_mut();
-        let attr_value = value.to_attr_value();
+        let py_attr_value = crate::ffi::types::PyAttrValue::from_py_value(value)?;
+        let attr_value = py_attr_value.to_attr_value();
         graph
             .set_node_attr(self.node_id, key.to_string(), attr_value)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to set node attribute: {}", e)))?;
@@ -254,9 +255,10 @@ impl PyEdgeView {
     }
 
     /// Set edge attribute value (chainable)  
-    fn __setitem__(&mut self, _py: Python, key: &str, value: PyAttrValue) -> PyResult<()> {
+    fn __setitem__(&mut self, _py: Python, key: &str, value: &PyAny) -> PyResult<()> {
         let mut graph = self.graph.borrow_mut();
-        let attr_value = value.to_attr_value();
+        let py_attr_value = crate::ffi::types::PyAttrValue::from_py_value(value)?;
+        let attr_value = py_attr_value.to_attr_value();
         graph
             .set_edge_attr(self.edge_id, key.to_string(), attr_value)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to set edge attribute: {}", e)))?;

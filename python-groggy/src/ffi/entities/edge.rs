@@ -79,10 +79,12 @@ impl PyEdge {
     ///
     /// # Raises
     /// * `RuntimeError` - If there's an error setting the attribute
-    fn __setitem__(&self, key: &str, value: crate::ffi::types::PyAttrValue) -> PyResult<()> {
+    fn __setitem__(&self, key: &str, value: &PyAny) -> PyResult<()> {
         use groggy::traits::GraphEntity;
         
-        let attr_value = value.to_attr_value();
+        // Convert PyAny to PyAttrValue
+        let py_attr_value = crate::ffi::types::PyAttrValue::from_py_value(value)?;
+        let attr_value = py_attr_value.to_attr_value();
         self.inner
             .set_attribute(key.into(), attr_value)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to set edge attribute: {}", e)))?;
