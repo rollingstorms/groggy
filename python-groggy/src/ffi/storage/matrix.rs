@@ -9,6 +9,7 @@ use pyo3::exceptions::{
     PyValueError,
 };
 use pyo3::prelude::*;
+use std::collections::HashMap;
 use pyo3::types::PyType;
 
 // Use utility functions from utils module
@@ -421,6 +422,129 @@ impl PyGraphMatrix {
         self.__repr__(py)
     }
 
+    /// Get rich display representation using Rust formatter
+    pub fn rich_display(&self, config: Option<&crate::ffi::display::PyDisplayConfig>) -> PyResult<String> {
+        let (total_rows, total_cols) = self.inner.shape();
+        let dtype = format!("{:?}", self.inner.dtype());
+        let sample_rows = std::cmp::min(5, total_rows);
+        let sample_cols = std::cmp::min(5, total_cols);
+        
+        // Create custom matrix display without index column
+        let mut lines = Vec::new();
+        
+        // Calculate column widths based on content
+        let mut col_widths = vec![5; sample_cols]; // minimum width of 5
+        
+        // Check header widths
+        for j in 0..sample_cols {
+            let header = format!("col_{}", j);
+            col_widths[j] = std::cmp::max(col_widths[j], header.len());
+        }
+        
+        // Check data widths
+        for i in 0..sample_rows {
+            for j in 0..sample_cols {
+                if let Some(value) = self.inner.get(i, j) {
+                    let value_str = match value {
+                        groggy::AttrValue::Text(s) => s.clone(),
+                        groggy::AttrValue::CompactText(s) => format!("{:?}", s),
+                        groggy::AttrValue::Int(n) => format!("{}", n),
+                        groggy::AttrValue::SmallInt(n) => format!("{}", n),
+                        groggy::AttrValue::Float(f) => format!("{}", f),
+                        groggy::AttrValue::Bool(b) => format!("{}", b),
+                        groggy::AttrValue::Null => "null".to_string(),
+                        _ => format!("{:?}", value),
+                    };
+                    col_widths[j] = std::cmp::max(col_widths[j], value_str.len());
+                }
+            }
+        }
+        
+        // Build top border
+        let mut top_border = "╭".to_string();
+        for (j, &width) in col_widths.iter().enumerate() {
+            top_border.push_str(&"─".repeat(width + 2));
+            if j < col_widths.len() - 1 {
+                top_border.push('┬');
+            }
+        }
+        top_border.push('╮');
+        lines.push(top_border);
+        
+        // Build header line
+        let mut header_line = "│".to_string();
+        for (j, &width) in col_widths.iter().enumerate() {
+            let header = format!("col_{}", j);
+            header_line.push_str(&format!(" {:<width$} │", header, width = width));
+        }
+        lines.push(header_line);
+        
+        // Build type header line
+        let mut type_line = "│".to_string();
+        for &width in &col_widths {
+            type_line.push_str(&format!(" {:<width$} │", "obj", width = width));
+        }
+        lines.push(type_line);
+        
+        // Build separator
+        let mut sep_border = "├".to_string();
+        for (j, &width) in col_widths.iter().enumerate() {
+            sep_border.push_str(&"─".repeat(width + 2));
+            if j < col_widths.len() - 1 {
+                sep_border.push('┼');
+            }
+        }
+        sep_border.push('┤');
+        lines.push(sep_border);
+        
+        // Build data rows
+        for i in 0..sample_rows {
+            let mut row_line = "│".to_string();
+            for (j, &width) in col_widths.iter().enumerate() {
+                let value_str = if let Some(value) = self.inner.get(i, j) {
+                    match value {
+                        groggy::AttrValue::Text(s) => s.clone(),
+                        groggy::AttrValue::CompactText(s) => format!("{:?}", s),
+                        groggy::AttrValue::Int(n) => format!("{}", n),
+                        groggy::AttrValue::SmallInt(n) => format!("{}", n),
+                        groggy::AttrValue::Float(f) => format!("{}", f),
+                        groggy::AttrValue::Bool(b) => format!("{}", b),
+                        groggy::AttrValue::Null => "null".to_string(),
+                        _ => format!("{:?}", value),
+                    }
+                } else {
+                    "null".to_string()
+                };
+                row_line.push_str(&format!(" {:<width$} │", value_str, width = width));
+            }
+            lines.push(row_line);
+        }
+        
+        // Build bottom border
+        let mut bottom_border = "╰".to_string();
+        for (j, &width) in col_widths.iter().enumerate() {
+            bottom_border.push_str(&"─".repeat(width + 2));
+            if j < col_widths.len() - 1 {
+                bottom_border.push('┴');
+            }
+        }
+        bottom_border.push('╯');
+        lines.push(bottom_border);
+        
+        // Footer with matrix info
+        let footer = format!("rows: {} • cols: {} • type: GraphMatrix • dtype: {}", total_rows, total_cols, dtype);
+        lines.push(footer);
+        
+        Ok(lines.join("\n"))
+    }
+    
+    /// Rich HTML representation for Jupyter notebooks
+    fn _repr_html_(&self, _py: Python) -> PyResult<String> {
+        let formatted = self.rich_display(None)?;
+        // Convert to HTML format for Jupyter
+        Ok(format!("<pre>{}</pre>", html_escape::encode_text(&formatted)))
+    }
+
 
     /// Extract display data for Python display formatters
     fn _get_display_data(&self, py: Python) -> PyResult<PyObject> {
@@ -528,6 +652,60 @@ impl PyGraphMatrix {
         // Convert to numpy array
         let array = numpy.call_method1("array", (data,))?;
         Ok(array.to_object(py))
+    }
+}
+
+// Implement display data conversion for PyGraphMatrix
+impl PyGraphMatrix {
+    /// Convert matrix to display data format expected by Rust formatter
+    fn to_display_data(&self) -> HashMap<String, serde_json::Value> {
+        let mut data = HashMap::new();
+        
+        // Get matrix dimensions
+        let (total_rows, total_cols) = self.inner.shape();
+        let sample_rows = std::cmp::min(5, total_rows);
+        let sample_cols = std::cmp::min(5, total_cols);
+        
+        // Table shape (show total dimensions, not just sample)
+        data.insert("shape".to_string(), serde_json::Value::Array(vec![
+            serde_json::Value::Number(serde_json::Number::from(total_rows)), 
+            serde_json::Value::Number(serde_json::Number::from(total_cols))
+        ]));
+        
+        // Generate column names (col_0, col_1, etc.)
+        let mut column_names = Vec::new();
+        for j in 0..sample_cols {
+            column_names.push(serde_json::Value::String(format!("col_{}", j)));
+        }
+        data.insert("columns".to_string(), serde_json::Value::Array(column_names));
+        
+        // Create rows data  
+        let mut table_rows = Vec::new();
+        for i in 0..sample_rows {
+            let mut row_data = Vec::new();
+            for j in 0..sample_cols {
+                if let Some(value) = self.inner.get(i, j) {
+                    let json_value = match value {
+                        groggy::AttrValue::Text(s) => serde_json::Value::String(s.clone()),
+                        groggy::AttrValue::CompactText(s) => serde_json::Value::String(format!("{:?}", s)),
+                        groggy::AttrValue::Int(n) => serde_json::Value::Number(serde_json::Number::from(*n)),
+                        groggy::AttrValue::SmallInt(n) => serde_json::Value::Number(serde_json::Number::from(*n)),
+                        groggy::AttrValue::Float(f) => serde_json::Value::Number(serde_json::Number::from_f64(*f as f64).unwrap_or(serde_json::Number::from(0))),
+                        groggy::AttrValue::Bool(b) => serde_json::Value::Bool(*b),
+                        groggy::AttrValue::Null => serde_json::Value::Null,
+                        // Handle other variants by converting to string representation
+                        _ => serde_json::Value::String(format!("{:?}", value)),
+                    };
+                    row_data.push(json_value);
+                } else {
+                    row_data.push(serde_json::Value::Null);
+                }
+            }
+            table_rows.push(serde_json::Value::Array(row_data));
+        }
+        data.insert("data".to_string(), serde_json::Value::Array(table_rows));
+        
+        data
     }
 }
 
