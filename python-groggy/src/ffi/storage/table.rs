@@ -3,6 +3,7 @@
 use pyo3::prelude::*;
 use crate::ffi::storage::array::PyBaseArray;
 use groggy::storage::table::{BaseTable, NodesTable, EdgesTable, Table, TableIterator};
+use groggy::GraphArray;  // Correct import path
 use groggy::types::{NodeId, EdgeId};
 use std::collections::HashMap;
 use serde_json::{Map, Value};
@@ -76,6 +77,94 @@ impl PyBaseTable {
         }
     }
     
+    /// Sort table by column
+    /// 
+    /// Args:
+    ///     column: Name of the column to sort by
+    ///     ascending: If True, sort in ascending order; if False, descending
+    /// 
+    /// Returns:
+    ///     PyBaseTable: A new sorted table
+    #[pyo3(signature = (column, ascending = true))]
+    pub fn sort_by(&self, column: &str, ascending: bool) -> PyResult<Self> {
+        let sorted_table = self.table.sort_by(column, ascending)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: sorted_table })
+    }
+    
+    /// Select specific columns to create a new table
+    ///
+    /// Args:
+    ///     columns: List of column names to select
+    ///
+    /// Returns:
+    ///     PyBaseTable: A new table with only the selected columns
+    pub fn select(&self, columns: Vec<String>) -> PyResult<Self> {
+        let selected_table = self.table.select(&columns)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: selected_table })
+    }
+    
+    /// Drop columns from the table
+    ///
+    /// Args:
+    ///     columns: List of column names to drop
+    ///
+    /// Returns:
+    ///     PyBaseTable: A new table without the specified columns
+    pub fn drop_columns(&self, columns: Vec<String>) -> PyResult<Self> {
+        let new_table = self.table.drop_columns(&columns)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: new_table })
+    }
+    
+    /// Filter rows using a query expression
+    ///
+    /// Args:
+    ///     predicate: Query expression to filter rows
+    ///
+    /// Returns:
+    ///     PyBaseTable: A new table with filtered rows
+    pub fn filter(&self, predicate: &str) -> PyResult<Self> {
+        let filtered_table = self.table.filter(predicate)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: filtered_table })
+    }
+    
+    /// Group by columns and return grouped tables
+    ///
+    /// Args:
+    ///     columns: List of column names to group by
+    ///
+    /// Returns:
+    ///     List[PyBaseTable]: List of grouped tables
+    pub fn group_by(&self, columns: Vec<String>) -> PyResult<Vec<Self>> {
+        let grouped_tables = self.table.group_by(&columns)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(grouped_tables.into_iter()
+            .map(|table| Self { table })
+            .collect())
+    }
+    
+    /// Get a slice of rows [start, end)
+    ///
+    /// Args:
+    ///     start: Starting row index (inclusive)
+    ///     end: Ending row index (exclusive)
+    ///
+    /// Returns:
+    ///     PyBaseTable: A new table with the specified row slice
+    pub fn slice(&self, start: usize, end: usize) -> Self {
+        Self {
+            table: self.table.slice(start, end),
+        }
+    }
+    
     /// String representation
     pub fn __str__(&self) -> String {
         // Simple fallback for now - return basic info
@@ -91,6 +180,14 @@ impl PyBaseTable {
     /// Get length (number of rows) for len() function
     pub fn __len__(&self) -> usize {
         self.table.nrows()
+    }
+    
+    /// Support iteration over rows: for row in table:
+    pub fn __iter__(&self) -> PyBaseTableRowIterator {
+        PyBaseTableRowIterator {
+            table: self.table.clone(),
+            current_row: 0,
+        }
     }
     
     /// Convert to pandas DataFrame
@@ -323,6 +420,48 @@ impl PyBaseTable {
 }
 
 // =============================================================================
+// PyBaseTableRowIterator - Iterator for table rows
+// =============================================================================
+
+/// Iterator for iterating over table rows as dictionaries
+#[pyclass(name = "BaseTableRowIterator", module = "groggy")]
+pub struct PyBaseTableRowIterator {
+    pub(crate) table: BaseTable,
+    pub(crate) current_row: usize,
+}
+
+#[pymethods]
+impl PyBaseTableRowIterator {
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
+    }
+    
+    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+        if self.current_row >= self.table.nrows() {
+            return Ok(None);
+        }
+        
+        // Create a dictionary for the current row
+        let dict = pyo3::types::PyDict::new(py);
+        
+        for col_name in self.table.column_names() {
+            if let Some(column) = self.table.column(col_name) {
+                let attr_values = column.data();
+                if let Some(value) = attr_values.get(self.current_row) {
+                    let py_attr = crate::ffi::types::PyAttrValue::new(value.clone());
+                    dict.set_item(col_name, py_attr.to_object(py))?;
+                } else {
+                    dict.set_item(col_name, py.None())?;
+                }
+            }
+        }
+        
+        self.current_row += 1;
+        Ok(Some(dict.to_object(py)))
+    }
+}
+
+// =============================================================================
 // PyBaseTableIterator - Python wrapper for TableIterator<BaseTable>
 // =============================================================================
 
@@ -365,9 +504,17 @@ impl PyNodesTable {
     }
     
     /// Get node IDs
-    pub fn node_ids(&self) -> PyResult<Vec<NodeId>> {
-        self.table.node_ids()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    pub fn node_ids(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+        let node_ids = self.table.node_ids()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        
+        // Convert to AttrValue vector and then to PyGraphArray
+        let attr_values: Vec<groggy::AttrValue> = node_ids.into_iter()
+            .map(|id| groggy::AttrValue::Int(id as i64))
+            .collect();
+        
+        let graph_array = GraphArray::from_vec(attr_values);
+        Ok(crate::ffi::storage::array::PyGraphArray::from_graph_array(graph_array))
     }
     
     /// Add node attributes from a HashMap
@@ -385,8 +532,10 @@ impl PyNodesTable {
     }
     
     /// Filter nodes by attribute value
-    pub fn filter_by_attr(&self, attr_name: &str, value: &crate::ffi::types::PyAttrValue) -> PyResult<Self> {
-        let result = self.table.filter_by_attr(attr_name, &value.inner)
+    pub fn filter_by_attr(&self, attr_name: &str, value: &PyAny) -> PyResult<Self> {
+        // Convert PyAny to PyAttrValue for compatibility
+        let py_attr_value = crate::ffi::types::PyAttrValue::from_py_value(value)?;
+        let result = self.table.filter_by_attr(attr_name, &py_attr_value.inner)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
         Ok(Self { table: result })
@@ -456,6 +605,14 @@ impl PyNodesTable {
         self.table.nrows()
     }
     
+    /// Support iteration over rows: for row in table:
+    pub fn __iter__(&self) -> PyNodesTableRowIterator {
+        PyNodesTableRowIterator {
+            table: self.table.clone(),
+            current_row: 0,
+        }
+    }
+    
     /// Get first n rows (default 5)
     #[pyo3(signature = (n = 5))]
     pub fn head(&self, n: usize) -> PyNodesTable {
@@ -466,6 +623,120 @@ impl PyNodesTable {
     #[pyo3(signature = (n = 5))]
     pub fn tail(&self, n: usize) -> PyNodesTable {
         PyNodesTable { table: self.table.tail(n) }
+    }
+    
+    /// Sort table by column
+    /// 
+    /// Args:
+    ///     column: Name of the column to sort by
+    ///     ascending: If True, sort in ascending order; if False, descending
+    /// 
+    /// Returns:
+    ///     PyNodesTable: A new sorted table
+    #[pyo3(signature = (column, ascending = true))]
+    pub fn sort_by(&self, column: &str, ascending: bool) -> PyResult<Self> {
+        let sorted_table = self.table.sort_by(column, ascending)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: sorted_table })
+    }
+    
+    /// Select specific columns to create a new table
+    ///
+    /// Args:
+    ///     columns: List of column names to select
+    ///
+    /// Returns:
+    ///     PyNodesTable: A new table with only the selected columns
+    pub fn select(&self, columns: Vec<String>) -> PyResult<Self> {
+        // For NodesTable, ensure node_id column is always included
+        let mut all_columns = vec!["node_id".to_string()];
+        for col_name in columns {
+            if col_name != "node_id" {
+                all_columns.push(col_name);
+            }
+        }
+        
+        let selected_base = self.table.base_table().select(&all_columns)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let selected_nodes = groggy::storage::table::NodesTable::from_base_table(selected_base)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: selected_nodes })
+    }
+    
+    /// Drop columns from the table (cannot drop node_id)
+    ///
+    /// Args:
+    ///     columns: List of column names to drop
+    ///
+    /// Returns:
+    ///     PyNodesTable: A new table without the specified columns
+    pub fn drop_columns(&self, columns: Vec<String>) -> PyResult<Self> {
+        // Prevent dropping node_id column
+        if columns.contains(&"node_id".to_string()) {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Cannot drop 'node_id' column from NodesTable"
+            ));
+        }
+        
+        let new_base = self.table.base_table().drop_columns(&columns)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let new_nodes = groggy::storage::table::NodesTable::from_base_table(new_base)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: new_nodes })
+    }
+    
+    /// Filter rows using a query expression
+    ///
+    /// Args:
+    ///     predicate: Query expression to filter rows
+    ///
+    /// Returns:
+    ///     PyNodesTable: A new table with filtered rows
+    pub fn filter(&self, predicate: &str) -> PyResult<Self> {
+        let filtered_base = self.table.base_table().filter(predicate)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let filtered_nodes = groggy::storage::table::NodesTable::from_base_table(filtered_base)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: filtered_nodes })
+    }
+    
+    /// Group by columns and return grouped tables
+    ///
+    /// Args:
+    ///     columns: List of column names to group by
+    ///
+    /// Returns:
+    ///     List[PyNodesTable]: List of grouped tables
+    pub fn group_by(&self, columns: Vec<String>) -> PyResult<Vec<Self>> {
+        let grouped_bases = self.table.base_table().group_by(&columns)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        let mut grouped_nodes = Vec::new();
+        for base_table in grouped_bases {
+            let nodes_table = groggy::storage::table::NodesTable::from_base_table(base_table)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            grouped_nodes.push(Self { table: nodes_table });
+        }
+        
+        Ok(grouped_nodes)
+    }
+    
+    /// Get a slice of rows [start, end)
+    ///
+    /// Args:
+    ///     start: Starting row index (inclusive)
+    ///     end: Ending row index (exclusive)
+    ///
+    /// Returns:
+    ///     PyNodesTable: A new table with the specified row slice
+    pub fn slice(&self, start: usize, end: usize) -> Self {
+        Self {
+            table: self.table.slice(start, end),
+        }
     }
     
     /// Enable subscripting: table[column_name] or table[slice]  
@@ -494,7 +765,18 @@ impl PyNodesTable {
             }
         } else if let Ok(column_names) = key.extract::<Vec<String>>() {
             // Multi-column access: table[['col1', 'col2', ...]]
-            let selected_base = self.table.base_table().select(&column_names)
+            // For NodesTable, we need to ensure required columns are included
+            let mut required_columns = vec!["node_id".to_string()];
+            let mut all_columns = required_columns.clone();
+            
+            // Add requested columns that aren't already required
+            for col_name in column_names {
+                if !required_columns.contains(&col_name) {
+                    all_columns.push(col_name);
+                }
+            }
+            
+            let selected_base = self.table.base_table().select(&all_columns)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                     format!("Failed to select columns: {}", e)
                 ))?;
@@ -659,6 +941,48 @@ impl PyNodesTable {
 }
 
 // =============================================================================
+// PyNodesTableRowIterator - Iterator for nodes table rows
+// =============================================================================
+
+/// Iterator for iterating over nodes table rows as dictionaries
+#[pyclass(name = "NodesTableRowIterator", module = "groggy")]
+pub struct PyNodesTableRowIterator {
+    pub(crate) table: NodesTable,
+    pub(crate) current_row: usize,
+}
+
+#[pymethods]
+impl PyNodesTableRowIterator {
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
+    }
+    
+    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+        if self.current_row >= self.table.nrows() {
+            return Ok(None);
+        }
+        
+        // Create a dictionary for the current row
+        let dict = pyo3::types::PyDict::new(py);
+        
+        for col_name in self.table.column_names() {
+            if let Some(column) = self.table.column(col_name) {
+                let attr_values = column.data();
+                if let Some(value) = attr_values.get(self.current_row) {
+                    let py_attr = crate::ffi::types::PyAttrValue::new(value.clone());
+                    dict.set_item(col_name, py_attr.to_object(py))?;
+                } else {
+                    dict.set_item(col_name, py.None())?;
+                }
+            }
+        }
+        
+        self.current_row += 1;
+        Ok(Some(dict.to_object(py)))
+    }
+}
+
+// =============================================================================
 // PyNodesTableIterator - Python wrapper for TableIterator<NodesTable>
 // =============================================================================
 
@@ -701,21 +1025,45 @@ impl PyEdgesTable {
     }
     
     /// Get edge IDs
-    pub fn edge_ids(&self) -> PyResult<Vec<EdgeId>> {
-        self.table.edge_ids()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    pub fn edge_ids(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+        let edge_ids = self.table.edge_ids()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        
+        // Convert to AttrValue vector and then to PyGraphArray
+        let attr_values: Vec<groggy::AttrValue> = edge_ids.into_iter()
+            .map(|id| groggy::AttrValue::Int(id as i64))
+            .collect();
+        
+        let graph_array = GraphArray::from_vec(attr_values);
+        Ok(crate::ffi::storage::array::PyGraphArray::from_graph_array(graph_array))
     }
     
     /// Get source node IDs
-    pub fn sources(&self) -> PyResult<Vec<NodeId>> {
-        self.table.sources()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    pub fn sources(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+        let sources = self.table.sources()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        
+        // Convert to AttrValue vector and then to PyGraphArray
+        let attr_values: Vec<groggy::AttrValue> = sources.into_iter()
+            .map(|id| groggy::AttrValue::Int(id as i64))
+            .collect();
+        
+        let graph_array = GraphArray::from_vec(attr_values);
+        Ok(crate::ffi::storage::array::PyGraphArray::from_graph_array(graph_array))
     }
     
     /// Get target node IDs  
-    pub fn targets(&self) -> PyResult<Vec<NodeId>> {
-        self.table.targets()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+    pub fn targets(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+        let targets = self.table.targets()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+        
+        // Convert to AttrValue vector and then to PyGraphArray
+        let attr_values: Vec<groggy::AttrValue> = targets.into_iter()
+            .map(|id| groggy::AttrValue::Int(id as i64))
+            .collect();
+        
+        let graph_array = GraphArray::from_vec(attr_values);
+        Ok(crate::ffi::storage::array::PyGraphArray::from_graph_array(graph_array))
     }
     
     /// Get edges as tuples (edge_id, source, target)
@@ -738,6 +1086,26 @@ impl PyEdgesTable {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
         Ok(Self { table: result })
+    }
+    
+    /// Filter edges by attribute value
+    pub fn filter_by_attr(&self, attr_name: &str, value: &PyAny) -> PyResult<Self> {
+        // Convert PyAny to PyAttrValue for compatibility
+        let py_attr_value = crate::ffi::types::PyAttrValue::from_py_value(value)?;
+        let result = self.table.filter_by_attr(attr_name, &py_attr_value.inner)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: result })
+    }
+    
+    /// Get unique values for an attribute
+    pub fn unique_attr_values(&self, attr_name: &str) -> PyResult<Vec<crate::ffi::types::PyAttrValue>> {
+        let values = self.table.unique_attr_values(attr_name)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            
+        Ok(values.into_iter()
+            .map(|v| crate::ffi::types::PyAttrValue::new(v))
+            .collect())
     }
     
     /// Get number of rows
@@ -795,6 +1163,14 @@ impl PyEdgesTable {
         self.table.nrows()
     }
     
+    /// Support iteration over rows: for row in table:
+    pub fn __iter__(&self) -> PyEdgesTableRowIterator {
+        PyEdgesTableRowIterator {
+            table: self.table.clone(),
+            current_row: 0,
+        }
+    }
+    
     /// Get first n rows (default 5)
     #[pyo3(signature = (n = 5))]
     pub fn head(&self, n: usize) -> PyEdgesTable {
@@ -805,6 +1181,123 @@ impl PyEdgesTable {
     #[pyo3(signature = (n = 5))]
     pub fn tail(&self, n: usize) -> PyEdgesTable {
         PyEdgesTable { table: self.table.tail(n) }
+    }
+    
+    /// Sort table by column
+    /// 
+    /// Args:
+    ///     column: Name of the column to sort by
+    ///     ascending: If True, sort in ascending order; if False, descending
+    /// 
+    /// Returns:
+    ///     PyEdgesTable: A new sorted table
+    #[pyo3(signature = (column, ascending = true))]
+    pub fn sort_by(&self, column: &str, ascending: bool) -> PyResult<Self> {
+        let sorted_table = self.table.sort_by(column, ascending)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: sorted_table })
+    }
+    
+    /// Select specific columns to create a new table
+    ///
+    /// Args:
+    ///     columns: List of column names to select
+    ///
+    /// Returns:
+    ///     PyEdgesTable: A new table with only the selected columns
+    pub fn select(&self, columns: Vec<String>) -> PyResult<Self> {
+        // For EdgesTable, ensure required columns are always included
+        let mut all_columns = vec!["edge_id".to_string(), "source".to_string(), "target".to_string()];
+        for col_name in columns {
+            if !all_columns.contains(&col_name) {
+                all_columns.push(col_name);
+            }
+        }
+        
+        let selected_base = self.table.base_table().select(&all_columns)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let selected_edges = groggy::storage::table::EdgesTable::from_base_table(selected_base)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: selected_edges })
+    }
+    
+    /// Drop columns from the table (cannot drop edge_id, source, or target)
+    ///
+    /// Args:
+    ///     columns: List of column names to drop
+    ///
+    /// Returns:
+    ///     PyEdgesTable: A new table without the specified columns
+    pub fn drop_columns(&self, columns: Vec<String>) -> PyResult<Self> {
+        // Prevent dropping required columns
+        let required = ["edge_id", "source", "target"];
+        for req_col in &required {
+            if columns.contains(&req_col.to_string()) {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    format!("Cannot drop '{}' column from EdgesTable", req_col)
+                ));
+            }
+        }
+        
+        let new_base = self.table.base_table().drop_columns(&columns)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let new_edges = groggy::storage::table::EdgesTable::from_base_table(new_base)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: new_edges })
+    }
+    
+    /// Filter rows using a query expression
+    ///
+    /// Args:
+    ///     predicate: Query expression to filter rows
+    ///
+    /// Returns:
+    ///     PyEdgesTable: A new table with filtered rows
+    pub fn filter(&self, predicate: &str) -> PyResult<Self> {
+        let filtered_base = self.table.base_table().filter(predicate)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let filtered_edges = groggy::storage::table::EdgesTable::from_base_table(filtered_base)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        Ok(Self { table: filtered_edges })
+    }
+    
+    /// Group by columns and return grouped tables
+    ///
+    /// Args:
+    ///     columns: List of column names to group by
+    ///
+    /// Returns:
+    ///     List[PyEdgesTable]: List of grouped tables
+    pub fn group_by(&self, columns: Vec<String>) -> PyResult<Vec<Self>> {
+        let grouped_bases = self.table.base_table().group_by(&columns)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        
+        let mut grouped_edges = Vec::new();
+        for base_table in grouped_bases {
+            let edges_table = groggy::storage::table::EdgesTable::from_base_table(base_table)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            grouped_edges.push(Self { table: edges_table });
+        }
+        
+        Ok(grouped_edges)
+    }
+    
+    /// Get a slice of rows [start, end)
+    ///
+    /// Args:
+    ///     start: Starting row index (inclusive)
+    ///     end: Ending row index (exclusive)
+    ///
+    /// Returns:
+    ///     PyEdgesTable: A new table with the specified row slice
+    pub fn slice(&self, start: usize, end: usize) -> Self {
+        Self {
+            table: self.table.slice(start, end),
+        }
     }
     
     /// Enable subscripting: table[column_name] or table[slice]
@@ -833,7 +1326,18 @@ impl PyEdgesTable {
             }
         } else if let Ok(column_names) = key.extract::<Vec<String>>() {
             // Multi-column access: table[['col1', 'col2', ...]]
-            let selected_base = self.table.base_table().select(&column_names)
+            // For EdgesTable, we need to ensure required columns are included
+            let mut required_columns = vec!["edge_id".to_string(), "source".to_string(), "target".to_string()];
+            let mut all_columns = required_columns.clone();
+            
+            // Add requested columns that aren't already required
+            for col_name in column_names {
+                if !required_columns.contains(&col_name) {
+                    all_columns.push(col_name);
+                }
+            }
+            
+            let selected_base = self.table.base_table().select(&all_columns)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                     format!("Failed to select columns: {}", e)
                 ))?;
@@ -994,6 +1498,48 @@ impl PyEdgesTable {
         let base_table = self.base_table();
         let base_obj = base_table.into_py(py);
         base_obj.getattr(py, name)
+    }
+}
+
+// =============================================================================
+// PyEdgesTableRowIterator - Iterator for edges table rows
+// =============================================================================
+
+/// Iterator for iterating over edges table rows as dictionaries
+#[pyclass(name = "EdgesTableRowIterator", module = "groggy")]
+pub struct PyEdgesTableRowIterator {
+    pub(crate) table: EdgesTable,
+    pub(crate) current_row: usize,
+}
+
+#[pymethods]
+impl PyEdgesTableRowIterator {
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
+    }
+    
+    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+        if self.current_row >= self.table.nrows() {
+            return Ok(None);
+        }
+        
+        // Create a dictionary for the current row
+        let dict = pyo3::types::PyDict::new(py);
+        
+        for col_name in self.table.column_names() {
+            if let Some(column) = self.table.column(col_name) {
+                let attr_values = column.data();
+                if let Some(value) = attr_values.get(self.current_row) {
+                    let py_attr = crate::ffi::types::PyAttrValue::new(value.clone());
+                    dict.set_item(col_name, py_attr.to_object(py))?;
+                } else {
+                    dict.set_item(col_name, py.None())?;
+                }
+            }
+        }
+        
+        self.current_row += 1;
+        Ok(Some(dict.to_object(py)))
     }
 }
 

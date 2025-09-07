@@ -78,47 +78,65 @@ impl EdgesTable {
         Ok(Self { base })
     }
     
-    /// Get the edge IDs as a typed array
+    /// Get the edge IDs as a typed array (only returns valid integer edge IDs)
     pub fn edge_ids(&self) -> GraphResult<Vec<EdgeId>> {
         let edge_id_column = self.base.column("edge_id")
             .ok_or_else(|| crate::errors::GraphError::InvalidInput(
                 "edge_id column not found".to_string()
             ))?;
         
-        edge_id_column.as_edge_ids()
+        let (edge_ids, _) = edge_id_column.as_edge_ids_filtered();
+        Ok(edge_ids)
     }
     
-    /// Get the source node IDs
+    /// Get the source node IDs (only returns valid integer node IDs)
     pub fn sources(&self) -> GraphResult<Vec<NodeId>> {
         let source_column = self.base.column("source")
             .ok_or_else(|| crate::errors::GraphError::InvalidInput(
                 "source column not found".to_string()
             ))?;
         
-        source_column.as_node_ids()
+        let (sources, _) = source_column.as_node_ids_filtered();
+        Ok(sources)
     }
     
-    /// Get the target node IDs
+    /// Get the target node IDs (only returns valid integer node IDs)
     pub fn targets(&self) -> GraphResult<Vec<NodeId>> {
         let target_column = self.base.column("target")
             .ok_or_else(|| crate::errors::GraphError::InvalidInput(
                 "target column not found".to_string()
             ))?;
         
-        target_column.as_node_ids()
+        let (targets, _) = target_column.as_node_ids_filtered();
+        Ok(targets)
     }
     
-    /// Get edges as tuples (edge_id, source, target)
+    /// Get edges as tuples (edge_id, source, target) - only returns complete rows
     pub fn as_tuples(&self) -> GraphResult<Vec<(EdgeId, NodeId, NodeId)>> {
-        let edge_ids = self.edge_ids()?;
-        let sources = self.sources()?;
-        let targets = self.targets()?;
+        let edge_id_column = self.base.column("edge_id").unwrap();
+        let source_column = self.base.column("source").unwrap();
+        let target_column = self.base.column("target").unwrap();
         
-        Ok(edge_ids.into_iter()
-            .zip(sources.into_iter())
-            .zip(targets.into_iter())
-            .map(|((edge_id, source), target)| (edge_id, source, target))
-            .collect())
+        let (edge_ids, edge_indices) = edge_id_column.as_edge_ids_filtered();
+        let (sources, source_indices) = source_column.as_node_ids_filtered();
+        let (targets, target_indices) = target_column.as_node_ids_filtered();
+        
+        // Find rows where all three columns have valid values
+        let valid_indices: Vec<usize> = edge_indices.iter()
+            .filter(|&&i| source_indices.contains(&i) && target_indices.contains(&i))
+            .cloned()
+            .collect();
+        
+        let mut result = Vec::new();
+        for &index in &valid_indices {
+            let edge_id_pos = edge_indices.iter().position(|&i| i == index).unwrap();
+            let source_pos = source_indices.iter().position(|&i| i == index).unwrap(); 
+            let target_pos = target_indices.iter().position(|&i| i == index).unwrap();
+            
+            result.push((edge_ids[edge_id_pos], sources[source_pos], targets[target_pos]));
+        }
+        
+        Ok(result)
     }
     
     /// Filter edges by source nodes
@@ -374,6 +392,30 @@ impl EdgesTable {
     /// Convert into BaseTable (Phase 3 plan method)
     pub fn into_base(self) -> BaseTable {
         self.base
+    }
+    
+    /// Filter edges by attribute value
+    pub fn filter_by_attr(&self, attr_name: &str, value: &AttrValue) -> GraphResult<Self> {
+        let predicate = match value {
+            AttrValue::Text(s) => format!("{} == \"{}\"", attr_name, s),
+            AttrValue::Int(i) => format!("{} == {}", attr_name, i),
+            AttrValue::Float(f) => format!("{} == {}", attr_name, f),
+            AttrValue::Bool(b) => format!("{} == {}", attr_name, b),
+            _ => format!("{} == null", attr_name),
+        };
+        
+        let filtered_base = self.base.filter(&predicate)?;
+        Self::from_base_table(filtered_base)
+    }
+    
+    /// Get unique values for an attribute
+    pub fn unique_attr_values(&self, attr_name: &str) -> GraphResult<Vec<AttrValue>> {
+        let column = self.base.column(attr_name)
+            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
+                format!("Column '{}' not found", attr_name)
+            ))?;
+        
+        column.unique_values()
     }
 }
 

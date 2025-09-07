@@ -569,7 +569,11 @@ impl PyNodesAccessor {
     /// Get a NodesTable representation of accessible nodes  
     /// Implements: g.nodes.table()
     pub fn table(&self) -> PyResult<crate::ffi::storage::table::PyNodesTable> {
-        let nodes_table = {
+        let nodes_table = if let Some(ref constrained) = self.constrained_nodes {
+            // Constrained case: create table with only the specified nodes
+            self.create_constrained_nodes_table(constrained)?
+        } else {
+            // Unconstrained case: use the full graph table
             let graph = self.graph.borrow();
             graph.nodes_table()
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to create nodes table: {}", e)))?
@@ -870,6 +874,94 @@ impl PyNodesAccessor {
 }
 
 impl PyNodesAccessor {
+    /// Create a NodesTable for only the constrained nodes
+    fn create_constrained_nodes_table(&self, constrained_nodes: &[groggy::NodeId]) -> PyResult<groggy::storage::table::NodesTable> {
+        use groggy::storage::table::{BaseTable, NodesTable};
+        use groggy::storage::array::BaseArray;
+        use std::collections::HashMap;
+        
+        let graph = self.graph.borrow();
+        
+        // Collect all constrained nodes with their attributes
+        let mut attribute_columns: HashMap<String, Vec<groggy::AttrValue>> = HashMap::new();
+        
+        // Initialize with node_id column
+        attribute_columns.insert("node_id".to_string(), Vec::new());
+        
+        // First pass: collect all attribute names that exist on ANY of the constrained nodes
+        let mut all_attr_names = std::collections::HashSet::new();
+        all_attr_names.insert("node_id".to_string());
+        
+        for &node_id in constrained_nodes {
+            if let Ok(attrs) = graph.get_node_attrs(node_id) {
+                for attr_name in attrs.keys() {
+                    all_attr_names.insert(attr_name.clone());
+                }
+            }
+        }
+        
+        // Initialize all columns
+        for attr_name in &all_attr_names {
+            if !attribute_columns.contains_key(attr_name) {
+                attribute_columns.insert(attr_name.clone(), Vec::new());
+            }
+        }
+        
+        // Second pass: collect data for each constrained node
+        for &node_id in constrained_nodes {
+            // Add node_id
+            attribute_columns.get_mut("node_id").unwrap().push(groggy::AttrValue::Int(node_id as i64));
+            
+            // Get all attributes for this node
+            let node_attrs = graph.get_node_attrs(node_id).unwrap_or_default();
+            
+            // For each expected attribute, add the value or null
+            for attr_name in &all_attr_names {
+                if attr_name == "node_id" {
+                    continue; // Already handled
+                }
+                
+                let attr_value = node_attrs.get(attr_name)
+                    .cloned()
+                    .unwrap_or(groggy::AttrValue::Null);
+                    
+                attribute_columns.get_mut(attr_name).unwrap().push(attr_value);
+            }
+        }
+        
+        // Apply auto-slicing: remove columns that are all null for this node set
+        let node_set: std::collections::HashSet<groggy::NodeId> = constrained_nodes.iter().copied().collect();
+        let mut columns_to_keep = Vec::new();
+        
+        for (attr_name, values) in &attribute_columns {
+            if attr_name == "node_id" {
+                // Always keep node_id column
+                columns_to_keep.push(attr_name.clone());
+            } else {
+                // Check if this column has any non-null values
+                let has_non_null = values.iter().any(|v| !matches!(v, groggy::AttrValue::Null));
+                if has_non_null {
+                    columns_to_keep.push(attr_name.clone());
+                }
+            }
+        }
+        
+        // Create filtered attribute columns
+        let mut filtered_columns = HashMap::new();
+        for attr_name in columns_to_keep {
+            if let Some(values) = attribute_columns.remove(&attr_name) {
+                filtered_columns.insert(attr_name, BaseArray::from_attr_values(values));
+            }
+        }
+        
+        // Convert to BaseTable and then NodesTable
+        let base_table = BaseTable::from_columns(filtered_columns)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create BaseTable: {}", e)))?;
+            
+        NodesTable::from_base_table(base_table)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to convert to NodesTable: {}", e)))
+    }
+
     /// Get filtered node IDs based on entity type
     /// 
     /// Args:
@@ -1580,7 +1672,11 @@ impl PyEdgesAccessor {
     /// Get an EdgesTable representation of accessible edges
     /// Implements: g.edges.table()  
     pub fn table(&self) -> PyResult<crate::ffi::storage::table::PyEdgesTable> {
-        let edges_table = {
+        let edges_table = if let Some(ref constrained) = self.constrained_edges {
+            // Constrained case: create table with only the specified edges
+            self.create_constrained_edges_table(constrained)?
+        } else {
+            // Unconstrained case: use the full graph table
             let graph = self.graph.borrow();
             graph.edges_table()
                 .map_err(|e| PyRuntimeError::new_err(format!("Failed to create edges table: {}", e)))?
@@ -1613,6 +1709,107 @@ impl PyEdgesAccessor {
 }
 
 impl PyEdgesAccessor {
+    /// Create an EdgesTable for only the constrained edges
+    fn create_constrained_edges_table(&self, constrained_edges: &[groggy::EdgeId]) -> PyResult<groggy::storage::table::EdgesTable> {
+        use groggy::storage::table::{BaseTable, EdgesTable};
+        use groggy::storage::array::BaseArray;
+        use std::collections::HashMap;
+        
+        let graph = self.graph.borrow();
+        
+        // Collect all constrained edges with their attributes
+        let mut attribute_columns: HashMap<String, Vec<groggy::AttrValue>> = HashMap::new();
+        
+        // Initialize with required edge columns: edge_id, source, target
+        attribute_columns.insert("edge_id".to_string(), Vec::new());
+        attribute_columns.insert("source".to_string(), Vec::new());
+        attribute_columns.insert("target".to_string(), Vec::new());
+        
+        // First pass: collect all attribute names that exist on ANY of the constrained edges
+        let mut all_attr_names = std::collections::HashSet::new();
+        all_attr_names.insert("edge_id".to_string());
+        all_attr_names.insert("source".to_string());
+        all_attr_names.insert("target".to_string());
+        
+        for &edge_id in constrained_edges {
+            if let Ok(attrs) = graph.get_edge_attrs(edge_id) {
+                for attr_name in attrs.keys() {
+                    all_attr_names.insert(attr_name.clone());
+                }
+            }
+        }
+        
+        // Initialize all columns
+        for attr_name in &all_attr_names {
+            if !attribute_columns.contains_key(attr_name) {
+                attribute_columns.insert(attr_name.clone(), Vec::new());
+            }
+        }
+        
+        // Second pass: collect data for each constrained edge
+        for &edge_id in constrained_edges {
+            // Add edge_id
+            attribute_columns.get_mut("edge_id").unwrap().push(groggy::AttrValue::Int(edge_id as i64));
+            
+            // Add source and target
+            if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
+                attribute_columns.get_mut("source").unwrap().push(groggy::AttrValue::Int(source as i64));
+                attribute_columns.get_mut("target").unwrap().push(groggy::AttrValue::Int(target as i64));
+            } else {
+                // Handle missing endpoints
+                attribute_columns.get_mut("source").unwrap().push(groggy::AttrValue::Null);
+                attribute_columns.get_mut("target").unwrap().push(groggy::AttrValue::Null);
+            }
+            
+            // Get all attributes for this edge
+            let edge_attrs = graph.get_edge_attrs(edge_id).unwrap_or_default();
+            
+            // For each expected attribute, add the value or null
+            for attr_name in &all_attr_names {
+                if matches!(attr_name.as_str(), "edge_id" | "source" | "target") {
+                    continue; // Already handled
+                }
+                
+                let attr_value = edge_attrs.get(attr_name)
+                    .cloned()
+                    .unwrap_or(groggy::AttrValue::Null);
+                    
+                attribute_columns.get_mut(attr_name).unwrap().push(attr_value);
+            }
+        }
+        
+        // Apply auto-slicing: remove columns that are all null for this edge set
+        let mut columns_to_keep = Vec::new();
+        
+        for (attr_name, values) in &attribute_columns {
+            if matches!(attr_name.as_str(), "edge_id" | "source" | "target") {
+                // Always keep required edge columns
+                columns_to_keep.push(attr_name.clone());
+            } else {
+                // Check if this column has any non-null values
+                let has_non_null = values.iter().any(|v| !matches!(v, groggy::AttrValue::Null));
+                if has_non_null {
+                    columns_to_keep.push(attr_name.clone());
+                }
+            }
+        }
+        
+        // Create filtered attribute columns
+        let mut filtered_columns = HashMap::new();
+        for attr_name in columns_to_keep {
+            if let Some(values) = attribute_columns.remove(&attr_name) {
+                filtered_columns.insert(attr_name, BaseArray::from_attr_values(values));
+            }
+        }
+        
+        // Convert to BaseTable and then EdgesTable
+        let base_table = BaseTable::from_columns(filtered_columns)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create BaseTable: {}", e)))?;
+            
+        EdgesTable::from_base_table(base_table)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to convert to EdgesTable: {}", e)))
+    }
+
     /// Set attributes for multiple edges (bulk operation) - internal method callable from Rust
     pub fn set_attrs_internal(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         use crate::ffi::api::graph_attributes::PyGraphAttrMut;
