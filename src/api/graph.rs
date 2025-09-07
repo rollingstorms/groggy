@@ -2306,16 +2306,31 @@ impl Graph {
         attribute_columns.insert("node_id".to_string(), Vec::new());
 
         // Collect all nodes
-        for node_id in self.node_ids() {
+        for (node_index, node_id) in self.node_ids().into_iter().enumerate() {
             node_ids.push(node_id);
             attribute_columns.get_mut("node_id").unwrap().push(crate::types::AttrValue::Int(node_id as i64));
 
             // Get all attributes for this node
             if let Ok(attrs) = self.get_node_attrs(node_id) {
                 for (attr_name, attr_value) in attrs {
-                    attribute_columns.entry(attr_name)
-                        .or_insert_with(|| Vec::with_capacity(node_ids.len()))
-                        .push(attr_value);
+                    let column = attribute_columns.entry(attr_name)
+                        .or_insert_with(|| {
+                            // Initialize new column with nulls for all previous rows
+                            let mut col = Vec::with_capacity(self.space.node_count());
+                            col.resize(node_index, crate::types::AttrValue::Null);
+                            col
+                        });
+                    column.push(attr_value);
+                }
+            }
+            
+            // For any existing columns that didn't get a value for this node, add null
+            for (attr_name, column) in attribute_columns.iter_mut() {
+                if attr_name == "node_id" {
+                    continue; // Skip node_id column as we already handled it
+                }
+                while column.len() <= node_index {
+                    column.push(crate::types::AttrValue::Null);
                 }
             }
         }
@@ -2356,7 +2371,7 @@ impl Graph {
         attribute_columns.insert("target".to_string(), Vec::new());
 
         // Collect all edges
-        for edge_id in self.edge_ids() {
+        for (edge_index, edge_id) in self.edge_ids().into_iter().enumerate() {
             let (source, target) = self.edge_endpoints(edge_id)?;
             edge_data.push((edge_id, source, target));
 
@@ -2368,9 +2383,24 @@ impl Graph {
             // Get all attributes for this edge
             if let Ok(attrs) = self.get_edge_attrs(edge_id) {
                 for (attr_name, attr_value) in attrs {
-                    attribute_columns.entry(attr_name)
-                        .or_insert_with(|| Vec::with_capacity(edge_data.len()))
-                        .push(attr_value);
+                    let column = attribute_columns.entry(attr_name)
+                        .or_insert_with(|| {
+                            // Initialize new column with nulls for all previous rows
+                            let mut col = Vec::with_capacity(self.space.edge_count());
+                            col.resize(edge_index, crate::types::AttrValue::Null);
+                            col
+                        });
+                    column.push(attr_value);
+                }
+            }
+            
+            // For any existing columns that didn't get a value for this edge, add null
+            for (attr_name, column) in attribute_columns.iter_mut() {
+                if matches!(attr_name.as_str(), "edge_id" | "source" | "target") {
+                    continue; // Skip required columns as we already handled them
+                }
+                while column.len() <= edge_index {
+                    column.push(crate::types::AttrValue::Null);
                 }
             }
         }

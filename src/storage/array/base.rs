@@ -110,6 +110,42 @@ impl BaseArray {
         }).collect()
     }
     
+    /// Extract as NodeId vector, filtering out rows with invalid values
+    pub fn as_node_ids_filtered(&self) -> (Vec<crate::types::NodeId>, Vec<usize>) {
+        let mut node_ids = Vec::new();
+        let mut valid_indices = Vec::new();
+        
+        for (index, val) in self.data.iter().enumerate() {
+            match val {
+                AttrValue::Int(i) => {
+                    node_ids.push(*i as crate::types::NodeId);
+                    valid_indices.push(index);
+                }
+                _ => {} // Skip invalid values
+            }
+        }
+        
+        (node_ids, valid_indices)
+    }
+    
+    /// Extract as EdgeId vector, filtering out rows with invalid values  
+    pub fn as_edge_ids_filtered(&self) -> (Vec<crate::types::EdgeId>, Vec<usize>) {
+        let mut edge_ids = Vec::new();
+        let mut valid_indices = Vec::new();
+        
+        for (index, val) in self.data.iter().enumerate() {
+            match val {
+                AttrValue::Int(i) => {
+                    edge_ids.push(*i as crate::types::EdgeId);
+                    valid_indices.push(index);
+                }
+                _ => {} // Skip invalid values
+            }
+        }
+        
+        (edge_ids, valid_indices)
+    }
+    
     // =================================================================
     // Sorting and indexing operations
     // =================================================================
