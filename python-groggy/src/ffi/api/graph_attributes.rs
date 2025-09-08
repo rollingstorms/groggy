@@ -268,10 +268,10 @@ impl PyGraphAttrMut {
         ))
     }
 
-    /// Parse node-centric format: {node_id: value, node_id: value}
+    /// Parse node-centric format: {node_id: value, node_id: value}  
     fn parse_node_centric_format<T>(
         &self,
-        _py: Python,
+        py: Python,
         node_dict: &PyDict,
     ) -> PyResult<Vec<(T, AttrValue)>>
     where
@@ -279,7 +279,41 @@ impl PyGraphAttrMut {
     {
         let mut attr_values = Vec::new();
         for (id_py, value_py) in node_dict.iter() {
-            let id: T = id_py.extract()?;
+            // First try direct extraction
+            let id: T = match id_py.extract::<T>() {
+                Ok(direct_id) => direct_id,
+                Err(_) => {
+                    // Try flexible conversions by creating Python objects and extracting from them
+                    if let Ok(int_id) = id_py.extract::<i64>() {
+                        // Try converting int to string and then extracting
+                        let py_str = pyo3::types::PyString::new(py, &int_id.to_string());
+                        py_str.extract::<T>().map_err(|_| {
+                            pyo3::exceptions::PyTypeError::new_err(
+                                format!("Cannot convert integer key '{}' to expected ID type", int_id)
+                            )
+                        })?
+                    } else if let Ok(str_id) = id_py.extract::<String>() {
+                        // Try parsing string as int and extracting
+                        if let Ok(parsed_int) = str_id.parse::<i64>() {
+                            let py_int = parsed_int.to_object(py);
+                            py_int.extract::<T>(py).map_err(|_| {
+                                pyo3::exceptions::PyTypeError::new_err(
+                                    format!("Cannot convert string key '{}' to expected ID type", str_id)
+                                )
+                            })?
+                        } else {
+                            return Err(pyo3::exceptions::PyTypeError::new_err(
+                                format!("Cannot parse string key '{}' as integer", str_id)
+                            ));
+                        }
+                    } else {
+                        return Err(pyo3::exceptions::PyTypeError::new_err(
+                            format!("Key type '{}' cannot be converted to ID type", id_py.get_type().name()?)
+                        ));
+                    }
+                }
+            };
+            
             let attr_value = python_value_to_attr_value(value_py)?;
             attr_values.push((id, attr_value));
         }

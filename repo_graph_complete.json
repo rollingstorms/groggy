@@ -1,0 +1,408 @@
+{
+  "nodes": [
+    {
+      "id": 0,
+      "object_type": "Graph",
+      "total_methods": 65,
+      "successful_methods": 39,
+      "success_rate": 60.0,
+      "working_methods": [
+        "__len__",
+        "__repr__",
+        "__str__",
+        "adjacency",
+        "adjacency_matrix",
+        "all_edge_attribute_names",
+        "all_node_attribute_names",
+        "bfs",
+        "branches",
+        "commit",
+        "commit_history",
+        "contains_node",
+        "create_branch",
+        "dense_adjacency_matrix",
+        "density",
+        "dfs",
+        "edge_attribute_keys",
+        "edge_count",
+        "filter_nodes",
+        "get_node_attr",
+        "get_node_mapping",
+        "group_by",
+        "group_nodes_by_attribute",
+        "has_edge",
+        "has_edge_attribute",
+        "has_node",
+        "has_node_attribute",
+        "has_uncommitted_changes",
+        "is_connected",
+        "laplacian_matrix",
+        "neighborhood_statistics",
+        "node_attribute_keys",
+        "node_count",
+        "remove_node",
+        "shortest_path",
+        "sparse_adjacency_matrix",
+        "table",
+        "to_networkx",
+        "view"
+      ],
+      "failing_methods": [
+        "add_edge",
+        "add_edges",
+        "add_graph",
+        "add_node",
+        "add_nodes",
+        "aggregate",
+        "checkout_branch",
+        "contains_edge",
+        "edge_endpoints",
+        "filter_edges",
+        "get_edge_attr",
+        "get_edge_attrs",
+        "get_node_attrs",
+        "historical_view",
+        "neighborhood",
+        "neighbors",
+        "remove_edge",
+        "remove_edges",
+        "remove_nodes",
+        "resolve_string_id_to_node",
+        "set_edge_attr",
+        "set_edge_attrs",
+        "set_node_attr",
+        "set_node_attrs",
+        "transition_matrix",
+        "weighted_adjacency_matrix"
+      ]
+    },
+    {
+      "id": 1,
+      "object_type": "AttrName",
+      "total_methods": 8,
+      "successful_methods": 5,
+      "success_rate": 62.5,
+      "working_methods": [
+        "__contains__",
+        "__iter__",
+        "__len__",
+        "__repr__",
+        "__str__"
+      ],
+      "failing_methods": [
+        "__getitem__",
+        "removeprefix",
+        "removesuffix"
+      ]
+    },
+    {
+      "id": 2,
+      "object_type": "BaseTable",
+      "total_methods": 21,
+      "successful_methods": 15,
+      "success_rate": 71.42857142857143,
+      "working_methods": [
+        "__iter__",
+        "__len__",
+        "__repr__",
+        "__str__",
+        "column_names",
+        "drop_columns",
+        "has_column",
+        "head",
+        "iter",
+        "ncols",
+        "nrows",
+        "rich_display",
+        "shape",
+        "tail",
+        "to_pandas"
+      ],
+      "failing_methods": [
+        "__getitem__",
+        "filter",
+        "group_by",
+        "select",
+        "slice",
+        "sort_by"
+      ]
+    },
+    {
+      "id": 3,
+      "object_type": "BranchName",
+      "total_methods": 8,
+      "successful_methods": 5,
+      "success_rate": 62.5,
+      "working_methods": [
+        "__contains__",
+        "__iter__",
+        "__len__",
+        "__repr__",
+        "__str__"
+      ],
+      "failing_methods": [
+        "__getitem__",
+        "removeprefix",
+        "removesuffix"
+      ]
+    },
+    {
+      "id": 4,
+      "object_type": "EdgeId",
+      "total_methods": 8,
+      "successful_methods": 5,
+      "success_rate": 62.5,
+      "working_methods": [
+        "__bool__",
+        "__repr__",
+        "__str__",
+        "as_integer_ratio",
+        "bit_length"
+      ],
+      "failing_methods": [
+        "conjugate",
+        "from_bytes",
+        "to_bytes"
+      ]
+    },
+    {
+      "id": 5,
+      "object_type": "EdgesTable",
+      "total_methods": 0,
+      "successful_methods": 0,
+      "success_rate": 0,
+      "working_methods": [],
+      "failing_methods": []
+    },
+    {
+      "id": 6,
+      "object_type": "GraphArray",
+      "total_methods": 28,
+      "successful_methods": 12,
+      "success_rate": 42.857142857142854,
+      "working_methods": [
+        "__repr__",
+        "__str__",
+        "dense",
+        "iter_columns",
+        "iter_rows",
+        "power",
+        "preview",
+        "rich_display",
+        "summary",
+        "to_numpy",
+        "to_pandas",
+        "transpose"
+      ],
+      "failing_methods": [
+        "__getitem__",
+        "__iter__",
+        "determinant",
+        "elementwise_multiply",
+        "from_graph_attributes",
+        "get_cell",
+        "get_column",
+        "get_column_by_name",
+        "get_row",
+        "identity",
+        "inverse",
+        "mean_axis",
+        "multiply",
+        "std_axis",
+        "sum_axis",
+        "zeros"
+      ]
+    },
+    {
+      "id": 7,
+      "object_type": "GraphMatrix",
+      "total_methods": 19,
+      "successful_methods": 9,
+      "success_rate": 47.368421052631575,
+      "working_methods": [
+        "__contains__",
+        "__iter__",
+        "__len__",
+        "__repr__",
+        "__setitem__",
+        "__str__",
+        "get",
+        "popitem",
+        "setdefault"
+      ],
+      "failing_methods": [
+        "__delitem__",
+        "__getitem__",
+        "clear",
+        "copy",
+        "fromkeys",
+        "items",
+        "keys",
+        "pop",
+        "update",
+        "values"
+      ]
+    },
+    {
+      "id": 8,
+      "object_type": "GraphTable",
+      "total_methods": 18,
+      "successful_methods": 10,
+      "success_rate": 55.55555555555556,
+      "working_methods": [
+        "__len__",
+        "__repr__",
+        "__str__",
+        "head",
+        "ncols",
+        "nrows",
+        "shape",
+        "stats",
+        "tail",
+        "validate"
+      ],
+      "failing_methods": [
+        "__getitem__",
+        "from_federated_bundles",
+        "load_bundle",
+        "merge",
+        "merge_with",
+        "merge_with_strategy",
+        "save_bundle",
+        "to_graph"
+      ]
+    },
+    {
+      "id": 9,
+      "object_type": "NodeId",
+      "total_methods": 8,
+      "successful_methods": 5,
+      "success_rate": 62.5,
+      "working_methods": [
+        "__bool__",
+        "__repr__",
+        "__str__",
+        "as_integer_ratio",
+        "bit_length"
+      ],
+      "failing_methods": [
+        "conjugate",
+        "from_bytes",
+        "to_bytes"
+      ]
+    },
+    {
+      "id": 10,
+      "object_type": "NodesTable",
+      "total_methods": 10,
+      "successful_methods": 8,
+      "success_rate": 80.0,
+      "working_methods": [
+        "__iter__",
+        "__len__",
+        "__repr__",
+        "__str__",
+        "all",
+        "get_meta_node",
+        "ids",
+        "table"
+      ],
+      "failing_methods": [
+        "__getitem__",
+        "set_attrs"
+      ]
+    },
+    {
+      "id": 11,
+      "object_type": "StateId",
+      "total_methods": 8,
+      "successful_methods": 5,
+      "success_rate": 62.5,
+      "working_methods": [
+        "__bool__",
+        "__repr__",
+        "__str__",
+        "as_integer_ratio",
+        "bit_length"
+      ],
+      "failing_methods": [
+        "conjugate",
+        "from_bytes",
+        "to_bytes"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": 0,
+      "target": 7,
+      "method_name": "adjacency",
+      "signature": "()",
+      "execution_time": 2e-06,
+      "transform": "Graph -> GraphMatrix"
+    },
+    {
+      "source": 0,
+      "target": 7,
+      "method_name": "dense_adjacency_matrix",
+      "signature": "()",
+      "execution_time": 3e-06,
+      "transform": "Graph -> GraphMatrix"
+    },
+    {
+      "source": 0,
+      "target": 7,
+      "method_name": "laplacian_matrix",
+      "signature": "(normalized=None)",
+      "execution_time": 5e-06,
+      "transform": "Graph -> GraphMatrix"
+    },
+    {
+      "source": 0,
+      "target": 8,
+      "method_name": "table",
+      "signature": "()",
+      "execution_time": 3e-06,
+      "transform": "Graph -> GraphTable"
+    },
+    {
+      "source": 6,
+      "target": 7,
+      "method_name": "dense",
+      "signature": "()",
+      "execution_time": 2e-06,
+      "transform": "GraphArray -> GraphMatrix"
+    },
+    {
+      "source": 6,
+      "target": 7,
+      "method_name": "power",
+      "signature": "(n)",
+      "execution_time": 8e-06,
+      "transform": "GraphArray -> GraphMatrix"
+    },
+    {
+      "source": 6,
+      "target": 7,
+      "method_name": "transpose",
+      "signature": "()",
+      "execution_time": 2e-06,
+      "transform": "GraphArray -> GraphMatrix"
+    },
+    {
+      "source": 10,
+      "target": 6,
+      "method_name": "ids",
+      "signature": "()",
+      "execution_time": 1e-06,
+      "transform": "NodesTable -> GraphArray"
+    }
+  ],
+  "metadata": {
+    "total_object_types": 12,
+    "total_methods_analyzed": 201,
+    "successful_methods": 118,
+    "method_transforms": 8,
+    "timestamp": "2025-09-07T23:14:25.798730"
+  }
+}

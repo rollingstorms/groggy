@@ -1,0 +1,1192 @@
+Master Test Results - 2025-09-07 21:41:06.373775
+==================================================
+
+Script: documentation/testing/generated_tests/test_graph.py
+Success: True
+Output:
+# Graph Comprehensive Test Suite
+Generated: 2025-09-07 21:41:04
+Testing 71 methods
+
+🏗️ Creating test objects...
+## Testing Graph Methods
+
+  ✅ __len__() → int: 5
+  ✅ __repr__() → str: Graph(nodes=5, edges=5)
+  ✅ __str__() → str: Graph(nodes=5, edges=5)
+  ✅ add_edge() → int: 5
+  ✅ add_edges() → list: [6]
+  ✅ add_graph() → NoneType: None
+  ✅ add_node() → int: 8
+  ✅ add_nodes() → list: [9, 10]
+  ✅ adjacency() → GraphMatrix: GraphMatrix(11 x 11, dtype=Float)
+  ✅ adjacency_matrix() → dict: {'size': 11, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(11 x 11, dtype=Float)}
+  ✅ aggregate() → AggregationResult: AggregationResult(29.166666666666668)
+  ✅ all_edge_attribute_names() → list: ['type', 'weight', 'strength']
+  ✅ all_node_attribute_names() → list: ['age', 'name', 'team', 'level', 'salary', 'active']
+  ✅ bfs() → Subgraph: Subgraph with 5 nodes and 4 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     0       0 → 1
+     4       1 → 4
+     1       1 → 2
+     3       0 → 3
+  ✅ branches() → list: [BranchInfo(name='main', head=0, current=true)]
+  ❌ checkout_branch() → Error: Branch 'test_branch' not found
+  ✅ commit() → int: 1
+  ✅ commit_history() → list: [Commit(id=1, message='Test commit', author='test@example.com')]
+  ✅ contains_edge() → bool: True
+  ✅ contains_node() → bool: True
+  ✅ create_branch() → NoneType: None
+  ✅ dense_adjacency_matrix() → GraphMatrix: GraphMatrix(11 x 11, dtype=Float)
+  ✅ density() → float: 0.18181818181818182
+  ✅ dfs() → Subgraph: Subgraph with 5 nodes and 7 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     4       1 → 4
+     1       1 → 2
+     2       2 → 3
+     6       0 → 1
+     3       0 → 3
+     0       0 → 1
+     5       0 → 1
+  ✅ edge_attribute_keys() → list: ['weight', 'type', 'strength']
+  ✅ edge_count() → int: 10
+  ✅ edge_endpoints() → tuple: (0, 1)
+  ✅ edge_ids() → GraphArray: GraphArray(len=10, dtype=int64)
+  ✅ edges() → EdgesAccessor: EdgesAccessor(10 edges)
+  ✅ filter_edges() → Subgraph: Subgraph with 3 nodes and 2 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     3       0 → 3
+     0       0 → 1
+  ✅ filter_nodes() → Subgraph: Subgraph with 1 nodes and 0 edges
+  ✅ get_edge_attr() → str: collaboration
+  ❌ get_edge_attrs() → Error: argument 'edges': 'int' object cannot be converted to 'Sequence'
+  ✅ get_node_attr() → str: Engineering
+  ❌ get_node_attrs() → Error: argument 'nodes': 'int' object cannot be converted to 'Sequence'
+  ✅ get_node_mapping() → dict: {}
+  ⚠️ group_by() → Skipped (needs argument fixes)
+  ✅ group_nodes_by_attribute() → GroupedAggregationResult: GroupedAggregationResult(operation='mean', attribute='salary')
+  ✅ has_edge() → bool: True
+  ✅ has_edge_attribute() → bool: True
+  ✅ has_node() → bool: True
+  ✅ has_node_attribute() → bool: True
+  ✅ has_uncommitted_changes() → bool: False
+  ✅ historical_view() → HistoricalView: HistoricalView(state_id=1)
+  ✅ is_connected() → bool: False
+  ✅ is_directed() → bool: False
+  ✅ is_undirected() → bool: True
+  ✅ laplacian_matrix() → GraphMatrix: GraphMatrix(11 x 11, dtype=Float)
+  ✅ neighborhood() → NeighborhoodResult: NeighborhoodResult(1 neighborhoods, largest_size=5, time=0.00ms)
+  ✅ neighborhood_statistics() → NeighborhoodStats: NeighborhoodStats(neighborhoods=1, nodes=5, time=0.00ms, avg=5.0 nodes/nbh)
+  ✅ neighbors() → list: [1, 1, 3, 1]
+  ✅ node_attribute_keys() → list: ['level', 'name', 'salary', 'team', 'age', 'active']
+  ✅ node_count() → int: 11
+  ✅ node_ids() → GraphArray: GraphArray(len=11, dtype=int64)
+  ✅ nodes() → NodesAccessor: NodesAccessor(11 nodes)
+  ✅ remove_edge() → NoneType: None
+  ❌ remove_edges() → Error: Edge 0 not found during remove edge. Check if edge exists with contains_edge()
+  ✅ remove_node() → NoneType: None
+  ❌ remove_nodes() → Error: Node 0 not found during remove node. Check if node exists with contains_node()
+  ❌ resolve_string_id_to_node() → Error: "No node found with name='Alice'"
+  ❌ set_edge_attr() → Error: Edge 0 not found during set attribute. Check if edge exists with contains_edge()
+  ❌ set_edge_attrs() → Error: 'int' object cannot be converted to 'PyString'
+  ❌ set_node_attr() → Error: Node 0 not found during set attribute. Check that node 0 exists before trying to set attribute
+  ❌ set_node_attrs() → Error: 'int' object cannot be converted to 'PyString'
+  ✅ shortest_path() → NoneType: None
+  ✅ sparse_adjacency_matrix() → dict: {'size': 10, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(10 x 10, dtype=Float)}
+  ✅ table() → GraphTable: GraphTable[10 nodes, 6 edges]
+Validation Policy: Standard
+Nodes:
+NodesTable[10 x 7]
+BaseTable[10 x 7]
+|      level |       name |     active |     salary |        age |       team |    node_id | 
+|------------|------------|------------|------------|------------|------------|------------|
+|        nan |      test1 |        nan |        nan |        nan |        nan |          9 | 
+|        nan |      test2 |        nan |        nan |        nan |        nan |         10 | 
+|    Manager |        Eve |       true |      90000 |         32 |    Product |          4 | 
+|        nan |  test_node |        nan |        nan |         25 |        nan |          8 | 
+|     Senior |      Diana |       true |      80000 |         28 | Engineering |          3 | 
+... (5 more rows)
+Edges:
+EdgesTable[6 x 6]
+BaseTable[6 x 6]
+|    edge_id |       type |     source |     weight |   strength |     target | 
+|------------|------------|------------|------------|------------|------------|
+|          2 |       peer |          2 |        0.8 |       weak |          3 | 
+|          8 |        nan |          6 |        nan |        nan |          5 | 
+|          7 |        nan |          5 |        nan |        nan |          7 | 
+|          9 |        nan |          6 |        nan |        nan |          7 | 
+|          4 | cross_team |          1 |        1.8 |     strong |          4 | 
+... (1 more rows)
+
+  ✅ to_networkx() → Graph: Graph with 10 nodes and 6 edges
+  ❌ transition_matrix() → Error: transition_matrix needs to be implemented in core first
+  ✅ view() → Subgraph: Subgraph with 10 nodes and 6 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     4       1 → 4
+     1       1 → 2
+     2       2 → 3
+     8       6 → 5
+     7       5 → 7
+     9       6 → 7
+  ✅ weighted_adjacency_matrix() → GraphMatrix: GraphMatrix(10 x 10, dtype=Float)
+
+# Graph Test Summary
+**Results**: 59/71 methods working (83.1%)
+
+**Working Methods (59):**
+  ✅ __len__
+  ✅ __repr__
+  ✅ __str__
+  ✅ add_edge
+  ✅ add_edges
+  ✅ add_graph
+  ✅ add_node
+  ✅ add_nodes
+  ✅ adjacency
+  ✅ adjacency_matrix
+  ✅ aggregate
+  ✅ all_edge_attribute_names
+  ✅ all_node_attribute_names
+  ✅ bfs
+  ✅ branches
+  ✅ commit
+  ✅ commit_history
+  ✅ contains_edge
+  ✅ contains_node
+  ✅ create_branch
+  ✅ dense_adjacency_matrix
+  ✅ density
+  ✅ dfs
+  ✅ edge_attribute_keys
+  ✅ edge_count
+  ✅ edge_endpoints
+  ✅ edge_ids
+  ✅ edges
+  ✅ filter_edges
+  ✅ filter_nodes
+  ✅ get_edge_attr
+  ✅ get_node_attr
+  ✅ get_node_mapping
+  ✅ group_nodes_by_attribute
+  ✅ has_edge
+  ✅ has_edge_attribute
+  ✅ has_node
+  ✅ has_node_attribute
+  ✅ has_uncommitted_changes
+  ✅ historical_view
+  ✅ is_connected
+  ✅ is_directed
+  ✅ is_undirected
+  ✅ laplacian_matrix
+  ✅ neighborhood
+  ✅ neighborhood_statistics
+  ✅ neighbors
+  ✅ node_attribute_keys
+  ✅ node_count
+  ✅ node_ids
+  ✅ nodes
+  ✅ remove_edge
+  ✅ remove_node
+  ✅ shortest_path
+  ✅ sparse_adjacency_matrix
+  ✅ table
+  ✅ to_networkx
+  ✅ view
+  ✅ weighted_adjacency_matrix
+
+**Failing Methods (12):**
+  ❌ checkout_branch: Branch 'test_branch' not found
+  ❌ get_edge_attrs: argument 'edges': 'int' object cannot be converted to 'Sequence'
+  ❌ get_node_attrs: argument 'nodes': 'int' object cannot be converted to 'Sequence'
+  ❌ group_by: Skipped - needs argument fixes
+  ❌ remove_edges: Edge 0 not found during remove edge. Check if edge exists with contains_edge()
+  ❌ remove_nodes: Node 0 not found during remove node. Check if node exists with contains_node()
+  ❌ resolve_string_id_to_node: "No node found with name='Alice'"
+  ❌ set_edge_attr: Edge 0 not found during set attribute. Check if edge exists with contains_edge()
+  ❌ set_edge_attrs: 'int' object cannot be converted to 'PyString'
+  ❌ set_node_attr: Node 0 not found during set attribute. Check that node 0 exists before trying to set attribute
+  ❌ set_node_attrs: 'int' object cannot be converted to 'PyString'
+  ❌ transition_matrix: transition_matrix needs to be implemented in core first
+
+------------------------------
+
+Script: documentation/testing/generated_tests/test_nodestable.py
+Success: True
+Output:
+# NodesTable Comprehensive Test Suite
+Generated: 2025-09-07 21:41:04
+Testing 25 methods
+
+🏗️ Creating test objects...
+## Testing NodesTable Methods
+
+  ✅ __getitem__() → GraphArray: GraphArray(len=5, dtype=bool)
+  ✅ __iter__() → NodesTableRowIterator: <groggy.NodesTableRowIterator object at 0x104dff7a0>
+  ✅ __len__() → int: 5
+  ✅ __repr__() → str: NodesTable[5 x 7]
+  ✅ __str__() → str: NodesTable[5 x 7]
+BaseTable[5 x 7]
+|        age |       team |      level |     salary |     active |    node_id |       name | 
+|------------|------------|------------|------------|------------|------------|------------|
+|         30 |      Sales |    Manager |      85000 |       true |          1 |        Bob | 
+|         25 | Engineering |     Senior |      75000 |       true |          0 |      Alice | 
+|         35 |  Marketing |   Director |      95000 |      false |          2 |    Charlie | 
+|         28 | Engineering |     Senior |      80000 |       true |          3 |      Diana | 
+|         32 |    Product |    Manager |      90000 |       true |          4 |        Eve | 
+
+  ✅ base_table() → BaseTable: BaseTable[5 x 7]
+  ✅ drop_columns() → NodesTable: NodesTable[5 x 6]
+BaseTable[5 x 6]
+|        age |       team |      level |     salary |    node_id |       name | 
+|------------|------------|------------|------------|------------|------------|
+|         30 |      Sales |    Manager |      85000 |          1 |        Bob | 
+|         25 | Engineering |     Senior |      75000 |          0 |      Alice | 
+|         35 |  Marketing |   Director |      95000 |          2 |    Charlie | 
+|         28 | Engineering |     Senior |      80000 |          3 |      Diana | 
+|         32 |    Product |    Manager |      90000 |          4 |        Eve | 
+
+  ❌ filter() → Error: argument 'predicate': 'function' object cannot be converted to 'PyString'
+  ✅ filter_by_attr() → NodesTable: NodesTable[0 x 7]
+BaseTable[0 x 7]
+
+  ❌ group_by() → Error: NotImplemented { feature: "group_by for BaseTable", tracking_issue: None }
+  ✅ head() → NodesTable: NodesTable[5 x 7]
+BaseTable[5 x 7]
+|        age |       team |      level |     salary |     active |    node_id |       name | 
+|------------|------------|------------|------------|------------|------------|------------|
+|         30 |      Sales |    Manager |      85000 |       true |          1 |        Bob | 
+|         25 | Engineering |     Senior |      75000 |       true |          0 |      Alice | 
+|         35 |  Marketing |   Director |      95000 |      false |          2 |    Charlie | 
+|         28 | Engineering |     Senior |      80000 |       true |          3 |      Diana | 
+|         32 |    Product |    Manager |      90000 |       true |          4 |        Eve | 
+
+  ✅ into_base_table() → BaseTable: BaseTable[5 x 7]
+  ✅ iter() → NodesTableIterator: <groggy.NodesTableIterator object at 0x104e03a30>
+  ✅ ncols() → int: 7
+  ✅ node_ids() → GraphArray: GraphArray(len=5, dtype=int64)
+  ✅ nrows() → int: 5
+  ✅ rich_display() → str: ⊖⊖ gr.table
+╭─────────┬───────────┬───────────────────┬────────────────┬──────────────┬──────────────┬──────────────┬──────────────╮
+│       # │ age       │ team              │ level          │ salary       │ active       │ node_id      │ name         │
+│         │ i32       │ str[8]            │ str[8]         │ i32          │ bool         │ i64          │ str[8]       │
+├─────────┼───────────┼───────────────────┼────────────────┼──────────────┼──────────────┼──────────────┼──────────────┤
+│       0 │ 30        │ Sales             │ Manager        │ 85000        │ true         │ 1            │ Bob          │
+│       1 │ 25        │ Engineering       │ Senior         │ 75000        │ true         │ 0            │ Alice        │
+│       2 │ 35        │ Marketing         │ Director       │ 95000        │ false        │ 2            │ Charlie      │
+│       3 │ 28        │ Engineering       │ Senior         │ 80000        │ true         │ 3            │ Diana        │
+│       4 │ 32        │ Product           │ Manager        │ 90000        │ true         │ 4            │ Eve          │
+╰─────────┴───────────┴───────────────────┴────────────────┴──────────────┴──────────────┴──────────────┴──────────────╯
+rows: 5 • cols: 7 • type: NodesTable
+  ✅ select() → NodesTable: NodesTable[5 x 2]
+BaseTable[5 x 2]
+|    node_id |     active | 
+|------------|------------|
+|          1 |       true | 
+|          0 |       true | 
+|          2 |      false | 
+|          3 |       true | 
+|          4 |       true | 
+
+  ✅ shape() → tuple: (5, 7)
+  ✅ slice() → NodesTable: NodesTable[5 x 7]
+BaseTable[5 x 7]
+|        age |       team |      level |     salary |     active |    node_id |       name | 
+|------------|------------|------------|------------|------------|------------|------------|
+|         30 |      Sales |    Manager |      85000 |       true |          1 |        Bob | 
+|         25 | Engineering |     Senior |      75000 |       true |          0 |      Alice | 
+|         35 |  Marketing |   Director |      95000 |      false |          2 |    Charlie | 
+|         28 | Engineering |     Senior |      80000 |       true |          3 |      Diana | 
+|         32 |    Product |    Manager |      90000 |       true |          4 |        Eve | 
+
+  ✅ sort_by() → NodesTable: NodesTable[5 x 7]
+BaseTable[5 x 7]
+|        age |       team |      level |     salary |     active |    node_id |       name | 
+|------------|------------|------------|------------|------------|------------|------------|
+|         35 |  Marketing |   Director |      95000 |      false |          2 |    Charlie | 
+|         30 |      Sales |    Manager |      85000 |       true |          1 |        Bob | 
+|         25 | Engineering |     Senior |      75000 |       true |          0 |      Alice | 
+|         28 | Engineering |     Senior |      80000 |       true |          3 |      Diana | 
+|         32 |    Product |    Manager |      90000 |       true |          4 |        Eve | 
+
+  ✅ tail() → NodesTable: NodesTable[5 x 7]
+BaseTable[5 x 7]
+|        age |       team |      level |     salary |     active |    node_id |       name | 
+|------------|------------|------------|------------|------------|------------|------------|
+|         30 |      Sales |    Manager |      85000 |       true |          1 |        Bob | 
+|         25 | Engineering |     Senior |      75000 |       true |          0 |      Alice | 
+|         35 |  Marketing |   Director |      95000 |      false |          2 |    Charlie | 
+|         28 | Engineering |     Senior |      80000 |       true |          3 |      Diana | 
+|         32 |    Product |    Manager |      90000 |       true |          4 |        Eve | 
+
+  ✅ to_pandas() → DataFrame:    node_id  active     name         team  age     level  salary
+0        1    True      Bob        Sales   30   Manager   85000
+1        0    True    Alice  Engineering   25    Senior   75000
+2        2   False  Charlie    Marketing   35  Director   95000
+3        3    True    Diana  Engineering   28    Senior   80000
+4        4    True      Eve      Product   32   Manager   90000
+  ✅ unique_attr_values() → list: [AttrValue(true), AttrValue(false)]
+  ❌ with_attributes() → Error: argument 'attributes': 'list' object cannot be converted to 'PyDict'
+
+# NodesTable Test Summary
+**Results**: 22/25 methods working (88.0%)
+
+**Working Methods (22):**
+  ✅ __getitem__
+  ✅ __iter__
+  ✅ __len__
+  ✅ __repr__
+  ✅ __str__
+  ✅ base_table
+  ✅ drop_columns
+  ✅ filter_by_attr
+  ✅ head
+  ✅ into_base_table
+  ✅ iter
+  ✅ ncols
+  ✅ node_ids
+  ✅ nrows
+  ✅ rich_display
+  ✅ select
+  ✅ shape
+  ✅ slice
+  ✅ sort_by
+  ✅ tail
+  ✅ to_pandas
+  ✅ unique_attr_values
+
+**Failing Methods (3):**
+  ❌ filter: argument 'predicate': 'function' object cannot be converted to 'PyString'
+  ❌ group_by: NotImplemented { feature: "group_by for BaseTable", tracking_issue: None }
+  ❌ with_attributes: argument 'attributes': 'list' object cannot be converted to 'PyDict'
+
+------------------------------
+
+Script: documentation/testing/generated_tests/test_edgestable.py
+Success: True
+Output:
+# EdgesTable Comprehensive Test Suite
+Generated: 2025-09-07 21:41:05
+Testing 29 methods
+
+🏗️ Creating test objects...
+## Testing EdgesTable Methods
+
+  ✅ __getitem__() → GraphArray: GraphArray(len=5, dtype=f32)
+  ✅ __iter__() → EdgesTableRowIterator: <groggy.EdgesTableRowIterator object at 0x102b759d0>
+  ✅ __len__() → int: 5
+  ✅ __repr__() → str: EdgesTable[5 x 6]
+  ✅ __str__() → str: EdgesTable[5 x 6]
+BaseTable[5 x 6]
+|   strength |     source |     target |       type |     weight |    edge_id | 
+|------------|------------|------------|------------|------------|------------|
+|     formal |          1 |          2 | reports_to |          2 |          1 | 
+|     strong |          1 |          4 | cross_team |        1.8 |          4 | 
+|     strong |          0 |          1 | collaboration |        1.5 |          0 | 
+|       weak |          2 |          3 |       peer |        0.8 |          2 | 
+|     medium |          0 |          3 | collaboration |        1.2 |          3 | 
+
+  ✅ as_tuples() → list: [(1, 1, 2), (4, 1, 4), (0, 0, 1), (2, 2, 3), (3, 0, 3)]
+  ✅ base_table() → BaseTable: BaseTable[5 x 6]
+  ✅ drop_columns() → EdgesTable: EdgesTable[5 x 5]
+BaseTable[5 x 5]
+|   strength |     source |     target |       type |    edge_id | 
+|------------|------------|------------|------------|------------|
+|     formal |          1 |          2 | reports_to |          1 | 
+|     strong |          1 |          4 | cross_team |          4 | 
+|     strong |          0 |          1 | collaboration |          0 | 
+|       weak |          2 |          3 |       peer |          2 | 
+|     medium |          0 |          3 | collaboration |          3 | 
+
+  ✅ edge_ids() → GraphArray: GraphArray(len=5, dtype=int64)
+  ❌ filter() → Error: argument 'predicate': 'function' object cannot be converted to 'PyString'
+  ✅ filter_by_attr() → EdgesTable: EdgesTable[0 x 6]
+BaseTable[0 x 6]
+
+  ✅ filter_by_sources() → EdgesTable: EdgesTable[4 x 6]
+BaseTable[4 x 6]
+|   strength |     source |     target |       type |     weight |    edge_id | 
+|------------|------------|------------|------------|------------|------------|
+|     formal |          1 |          2 | reports_to |          2 |          1 | 
+|     strong |          1 |          4 | cross_team |        1.8 |          4 | 
+|     strong |          0 |          1 | collaboration |        1.5 |          0 | 
+|     medium |          0 |          3 | collaboration |        1.2 |          3 | 
+
+  ✅ filter_by_targets() → EdgesTable: EdgesTable[1 x 6]
+BaseTable[1 x 6]
+|   strength |     source |     target |       type |     weight |    edge_id | 
+|------------|------------|------------|------------|------------|------------|
+|     strong |          0 |          1 | collaboration |        1.5 |          0 | 
+
+  ❌ group_by() → Error: NotImplemented { feature: "group_by for BaseTable", tracking_issue: None }
+  ✅ head() → EdgesTable: EdgesTable[5 x 6]
+BaseTable[5 x 6]
+|   strength |     source |     target |       type |     weight |    edge_id | 
+|------------|------------|------------|------------|------------|------------|
+|     formal |          1 |          2 | reports_to |          2 |          1 | 
+|     strong |          1 |          4 | cross_team |        1.8 |          4 | 
+|     strong |          0 |          1 | collaboration |        1.5 |          0 | 
+|       weak |          2 |          3 |       peer |        0.8 |          2 | 
+|     medium |          0 |          3 | collaboration |        1.2 |          3 | 
+
+  ✅ into_base_table() → BaseTable: BaseTable[5 x 6]
+  ✅ iter() → EdgesTableIterator: <groggy.EdgesTableIterator object at 0x102b2af30>
+  ✅ ncols() → int: 6
+  ✅ nrows() → int: 5
+  ✅ rich_display() → str: ⊖⊖ gr.table
+╭───────────┬──────────────────┬────────────────┬───────────────┬─────────────────────┬───────────────┬────────────────╮
+│         # │ strength         │ source         │ target        │ type                │ weight        │ edge_id        │
+│           │ str[8]           │ i64            │ i64           │ str[8]              │ f64           │ i64            │
+├───────────┼──────────────────┼────────────────┼───────────────┼─────────────────────┼───────────────┼────────────────┤
+│         0 │ formal           │ 1              │ 2             │ reports_to          │ 2.00          │ 1              │
+│         1 │ strong           │ 1              │ 4             │ cross_team          │ 1.80          │ 4              │
+│         2 │ strong           │ 0              │ 1             │ collaborati…        │ 1.50          │ 0              │
+│         3 │ weak             │ 2              │ 3             │ peer                │ 0.80          │ 2              │
+│         4 │ medium           │ 0              │ 3             │ collaborati…        │ 1.20          │ 3              │
+╰───────────┴──────────────────┴────────────────┴───────────────┴─────────────────────┴───────────────┴────────────────╯
+rows: 5 • cols: 6 • type: EdgesTable
+  ✅ select() → EdgesTable: EdgesTable[5 x 4]
+BaseTable[5 x 4]
+|    edge_id |     source |     target |     weight | 
+|------------|------------|------------|------------|
+|          1 |          1 |          2 |          2 | 
+|          4 |          1 |          4 |        1.8 | 
+|          0 |          0 |          1 |        1.5 | 
+|          2 |          2 |          3 |        0.8 | 
+|          3 |          0 |          3 |        1.2 | 
+
+  ✅ shape() → tuple: (5, 6)
+  ✅ slice() → EdgesTable: EdgesTable[5 x 6]
+BaseTable[5 x 6]
+|   strength |     source |     target |       type |     weight |    edge_id | 
+|------------|------------|------------|------------|------------|------------|
+|     formal |          1 |          2 | reports_to |          2 |          1 | 
+|     strong |          1 |          4 | cross_team |        1.8 |          4 | 
+|     strong |          0 |          1 | collaboration |        1.5 |          0 | 
+|       weak |          2 |          3 |       peer |        0.8 |          2 | 
+|     medium |          0 |          3 | collaboration |        1.2 |          3 | 
+
+  ✅ sort_by() → EdgesTable: EdgesTable[5 x 6]
+BaseTable[5 x 6]
+|   strength |     source |     target |       type |     weight |    edge_id | 
+|------------|------------|------------|------------|------------|------------|
+|       weak |          2 |          3 |       peer |        0.8 |          2 | 
+|     medium |          0 |          3 | collaboration |        1.2 |          3 | 
+|     strong |          0 |          1 | collaboration |        1.5 |          0 | 
+|     strong |          1 |          4 | cross_team |        1.8 |          4 | 
+|     formal |          1 |          2 | reports_to |          2 |          1 | 
+
+  ✅ sources() → GraphArray: GraphArray(len=5, dtype=int64)
+  ✅ tail() → EdgesTable: EdgesTable[5 x 6]
+BaseTable[5 x 6]
+|   strength |     source |     target |       type |     weight |    edge_id | 
+|------------|------------|------------|------------|------------|------------|
+|     formal |          1 |          2 | reports_to |          2 |          1 | 
+|     strong |          1 |          4 | cross_team |        1.8 |          4 | 
+|     strong |          0 |          1 | collaboration |        1.5 |          0 | 
+|       weak |          2 |          3 |       peer |        0.8 |          2 | 
+|     medium |          0 |          3 | collaboration |        1.2 |          3 | 
+
+  ✅ targets() → GraphArray: GraphArray(len=5, dtype=int64)
+  ✅ to_pandas() → DataFrame:    source  target           type  edge_id strength  weight
+0       1       2     reports_to        1   formal     2.0
+1       1       4     cross_team        4   strong     1.8
+2       0       1  collaboration        0   strong     1.5
+3       2       3           peer        2     weak     0.8
+4       0       3  collaboration        3   medium     1.2
+  ✅ unique_attr_values() → list: [AttrValue(2), AttrValue(1.8), AttrValue(1.5), AttrValue(0.8), AttrValue(1.2)]
+
+# EdgesTable Test Summary
+**Results**: 27/29 methods working (93.1%)
+
+**Working Methods (27):**
+  ✅ __getitem__
+  ✅ __iter__
+  ✅ __len__
+  ✅ __repr__
+  ✅ __str__
+  ✅ as_tuples
+  ✅ base_table
+  ✅ drop_columns
+  ✅ edge_ids
+  ✅ filter_by_attr
+  ✅ filter_by_sources
+  ✅ filter_by_targets
+  ✅ head
+  ✅ into_base_table
+  ✅ iter
+  ✅ ncols
+  ✅ nrows
+  ✅ rich_display
+  ✅ select
+  ✅ shape
+  ✅ slice
+  ✅ sort_by
+  ✅ sources
+  ✅ tail
+  ✅ targets
+  ✅ to_pandas
+  ✅ unique_attr_values
+
+**Failing Methods (2):**
+  ❌ filter: argument 'predicate': 'function' object cannot be converted to 'PyString'
+  ❌ group_by: NotImplemented { feature: "group_by for BaseTable", tracking_issue: None }
+
+------------------------------
+
+Script: documentation/testing/generated_tests/test_grapharray.py
+Success: True
+Output:
+# GraphArray Comprehensive Test Suite
+Generated: 2025-09-07 21:41:05
+Testing 31 methods
+
+🏗️ Creating test objects...
+## Testing GraphArray Methods
+
+  ✅ __getitem__() → int: 2
+  ✅ __iter__() → GraphArrayIterator: <builtins.GraphArrayIterator object at 0x1032d9a30>
+  ✅ __len__() → int: 5
+  ✅ __repr__() → str: GraphArray(len=5, dtype=int64)
+  ✅ __str__() → str: GraphArray(len=5, dtype=int64)
+  ✅ count() → int: 5
+  ✅ describe() → StatsSummary: Statistical Summary:
+  Count: 5
+  Mean:  2.00
+  Std:   1.58
+  Min:   Int(0)
+  25%:   1.00
+  50%:   2.00
+  75%:   3.00
+  Max:   Int(4)
+
+  ✅ drop_na() → GraphArray: GraphArray(len=5, dtype=int64)
+  ✅ fill_na() → GraphArray: GraphArray(len=5, dtype=int64)
+  ✅ has_null() → bool: False
+  ✅ is_sparse() → bool: False
+  ✅ items() → list: [(0, 2), (1, 4), (2, 0), (3, 3), (4, 1)]
+  ✅ max() → int: 4
+  ✅ mean() → float: 2.0
+  ✅ median() → float: 2.0
+  ✅ min() → int: 0
+  ✅ null_count() → int: 0
+  ✅ percentile() → float: 0.0
+  ✅ preview() → list: [2, 4, 0, 3, 1]
+  ✅ quantile() → float: 2.0
+  ✅ rich_display() → str: ╭───┬───────╮
+│ # │ value │
+│   │ obj   │
+├───┼───────┤
+│ 0 │ 2     │
+│ 1 │ 4     │
+│ 2 │ 0     │
+│ 3 │ 3     │
+│ 4 │ 1     │
+╰───┴───────╯
+rows: 5 • type: GraphArray • dtype: int64
+  ✅ std() → float: 1.5811388300841898
+  ✅ summary() → str: GraphArray('unnamed', length=5, dtype=Int, sparse=false)
+  ✅ to_list() → list: [2, 4, 0, 3, 1]
+  ✅ to_numpy() → ndarray: [2 4 0 3 1]
+  ✅ to_pandas() → Series: 0    2
+1    4
+2    0
+3    3
+4    1
+dtype: int64
+  ✅ to_scipy_sparse() → csr_matrix:   (np.int32(0), np.int32(0))	2
+  (np.int32(0), np.int32(1))	4
+  (np.int32(0), np.int32(3))	3
+  (np.int32(0), np.int32(4))	1
+  ✅ true_indices() → list: []
+  ✅ unique() → GraphArray: GraphArray(len=5, dtype=int64)
+  ✅ value_counts() → dict: {2: 1, 4: 1, 3: 1, 1: 1, 0: 1}
+  ✅ values() → list: [2, 4, 0, 3, 1]
+
+# GraphArray Test Summary
+**Results**: 31/31 methods working (100.0%)
+
+**Working Methods (31):**
+  ✅ __getitem__
+  ✅ __iter__
+  ✅ __len__
+  ✅ __repr__
+  ✅ __str__
+  ✅ count
+  ✅ describe
+  ✅ drop_na
+  ✅ fill_na
+  ✅ has_null
+  ✅ is_sparse
+  ✅ items
+  ✅ max
+  ✅ mean
+  ✅ median
+  ✅ min
+  ✅ null_count
+  ✅ percentile
+  ✅ preview
+  ✅ quantile
+  ✅ rich_display
+  ✅ std
+  ✅ summary
+  ✅ to_list
+  ✅ to_numpy
+  ✅ to_pandas
+  ✅ to_scipy_sparse
+  ✅ true_indices
+  ✅ unique
+  ✅ value_counts
+  ✅ values
+
+**Failing Methods (0):**
+
+------------------------------
+
+Script: documentation/testing/generated_tests/test_graphmatrix.py
+Success: True
+Output:
+# GraphMatrix Comprehensive Test Suite
+Generated: 2025-09-07 21:41:05
+Testing 16 methods
+
+🏗️ Creating test objects...
+## Testing GraphMatrix Methods
+
+  ❌ __getitem__() → Error: 0
+  ✅ __iter__() → dict_keyiterator: <dict_keyiterator object at 0x1052ca6d0>
+  ✅ __len__() → int: 4
+  ✅ __repr__() → str: {'size': 5, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(5 x 5, dtype=Float)}
+  ✅ __str__() → str: {'size': 5, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(5 x 5, dtype=Float)}
+  ✅ clear() → NoneType: None
+  ✅ copy() → dict: {}
+  ✅ fromkeys() → dict: {'key1': 'default_value', 'key2': 'default_value'}
+  ✅ get() → NoneType: None
+  ✅ items() → dict_items: dict_items([])
+  ✅ keys() → dict_keys: dict_keys([])
+  ❌ pop() → Error: pop expected at least 1 argument, got 0
+  ❌ popitem() → Error: 'popitem(): dictionary is empty'
+  ✅ setdefault() → str: default_value
+  ✅ update() → NoneType: None
+  ✅ values() → dict_values: dict_values(['default_value'])
+
+# GraphMatrix Test Summary
+**Results**: 13/16 methods working (81.2%)
+
+**Working Methods (13):**
+  ✅ __iter__
+  ✅ __len__
+  ✅ __repr__
+  ✅ __str__
+  ✅ clear
+  ✅ copy
+  ✅ fromkeys
+  ✅ get
+  ✅ items
+  ✅ keys
+  ✅ setdefault
+  ✅ update
+  ✅ values
+
+**Failing Methods (3):**
+  ❌ __getitem__: 0
+  ❌ pop: pop expected at least 1 argument, got 0
+  ❌ popitem: 'popitem(): dictionary is empty'
+
+------------------------------
+
+Script: documentation/testing/generated_tests/test_graphtable.py
+Success: True
+Output:
+# GraphTable Comprehensive Test Suite
+Generated: 2025-09-07 21:41:05
+Testing 20 methods
+
+🏗️ Creating test objects...
+## Testing GraphTable Methods
+
+  ✅ __getitem__() → GraphArray: GraphArray(len=5, dtype=str)
+  ✅ __len__() → int: 10
+  ✅ __repr__() → str: GraphTable[
+  NodesTable: 5 rows × 7 cols
+  EdgesTable: 5 rows × 6 cols
+]
+  ✅ __str__() → str: GraphTable[5 nodes, 5 edges]
+Validation Policy: Standard
+Nodes:
+NodesTable[5 x 7]
+BaseTable[5 x 7]
+|      level |    node_id |       name |     salary |       team |        age |     active | 
+|------------|------------|------------|------------|------------|------------|------------|
+|     Senior |          0 |      Alice |      75000 | Engineering |         25 |       true | 
+|   Director |          2 |    Charlie |      95000 |  Marketing |         35 |      false | 
+|     Senior |          3 |      Diana |      80000 | Engineering |         28 |       true | 
+|    Manager |          4 |        Eve |      90000 |    Product |         32 |       true | 
+|    Manager |          1 |        Bob |      85000 |      Sales |         30 |       true | 
+Edges:
+EdgesTable[5 x 6]
+BaseTable[5 x 6]
+|     source |    edge_id |   strength |       type |     target |     weight | 
+|------------|------------|------------|------------|------------|------------|
+|          0 |          3 |     medium | collaboration |          3 |        1.2 | 
+|          1 |          1 |     formal | reports_to |          2 |          2 | 
+|          1 |          4 |     strong | cross_team |          4 |        1.8 | 
+|          2 |          2 |       weak |       peer |          3 |        0.8 | 
+|          0 |          0 |     strong | collaboration |          1 |        1.5 | 
+
+  ✅ edges() → EdgesTable: EdgesTable[5 x 6]
+BaseTable[5 x 6]
+|     source |    edge_id |   strength |       type |     target |     weight | 
+|------------|------------|------------|------------|------------|------------|
+|          0 |          3 |     medium | collaboration |          3 |        1.2 | 
+|          1 |          1 |     formal | reports_to |          2 |          2 | 
+|          1 |          4 |     strong | cross_team |          4 |        1.8 | 
+|          2 |          2 |       weak |       peer |          3 |        0.8 | 
+|          0 |          0 |     strong | collaboration |          1 |        1.5 | 
+
+  ❌ from_federated_bundles() → Error: InvalidInput("Bundle path does not exist: bundle1.json")
+  ✅ head() → GraphTable: GraphTable[5 nodes, 5 edges]
+Validation Policy: Standard
+Nodes:
+NodesTable[5 x 7]
+BaseTable[5 x 7]
+|      level |    node_id |       name |     salary |       team |        age |     active | 
+|------------|------------|------------|------------|------------|------------|------------|
+|     Senior |          0 |      Alice |      75000 | Engineering |         25 |       true | 
+|   Director |          2 |    Charlie |      95000 |  Marketing |         35 |      false | 
+|     Senior |          3 |      Diana |      80000 | Engineering |         28 |       true | 
+|    Manager |          4 |        Eve |      90000 |    Product |         32 |       true | 
+|    Manager |          1 |        Bob |      85000 |      Sales |         30 |       true | 
+Edges:
+EdgesTable[5 x 6]
+BaseTable[5 x 6]
+|     source |    edge_id |   strength |       type |     target |     weight | 
+|------------|------------|------------|------------|------------|------------|
+|          0 |          3 |     medium | collaboration |          3 |        1.2 | 
+|          1 |          1 |     formal | reports_to |          2 |          2 | 
+|          1 |          4 |     strong | cross_team |          4 |        1.8 | 
+|          2 |          2 |       weak |       peer |          3 |        0.8 | 
+|          0 |          0 |     strong | collaboration |          1 |        1.5 | 
+
+  ✅ load_bundle() → GraphTable: GraphTable[5 nodes, 5 edges]
+Validation Policy: Standard
+Nodes:
+NodesTable[5 x 1]
+BaseTable[5 x 1]
+|    node_id | 
+|------------|
+|          2 | 
+|          1 | 
+|          4 | 
+|          0 | 
+|          3 | 
+Edges:
+EdgesTable[5 x 3]
+BaseTable[5 x 3]
+|    edge_id |     source |     target | 
+|------------|------------|------------|
+|          0 |          0 |          1 | 
+|          1 |          1 |          2 | 
+|          2 |          2 |          3 | 
+|          4 |          1 |          4 | 
+|          3 |          0 |          3 | 
+
+  ❌ merge() → Error: argument 'tables': GraphTable indices must be strings (column names)
+  ❌ merge_with() → Error: name 'g' is not defined
+  ❌ merge_with_strategy() → Error: argument 'tables': GraphTable indices must be strings (column names)
+  ✅ ncols() → int: 13
+  ✅ nodes() → NodesTable: NodesTable[5 x 7]
+BaseTable[5 x 7]
+|      level |    node_id |       name |     salary |       team |        age |     active | 
+|------------|------------|------------|------------|------------|------------|------------|
+|     Senior |          0 |      Alice |      75000 | Engineering |         25 |       true | 
+|   Director |          2 |    Charlie |      95000 |  Marketing |         35 |      false | 
+|     Senior |          3 |      Diana |      80000 | Engineering |         28 |       true | 
+|    Manager |          4 |        Eve |      90000 |    Product |         32 |       true | 
+|    Manager |          1 |        Bob |      85000 |      Sales |         30 |       true | 
+
+  ✅ nrows() → int: 10
+  ✅ save_bundle() → NoneType: None
+  ✅ shape() → tuple: (10, 13)
+  ✅ stats() → dict: {'total_nodes': 5, 'unique_targets': 4, 'node_columns': 7, 'self_loops': 0, 'unique_sources': 3, 'total_edges': 5, 'edge_columns': 6, 'total_columns': 6}
+  ✅ tail() → GraphTable: GraphTable[5 nodes, 5 edges]
+Validation Policy: Standard
+Nodes:
+NodesTable[5 x 7]
+BaseTable[5 x 7]
+|      level |    node_id |       name |     salary |       team |        age |     active | 
+|------------|------------|------------|------------|------------|------------|------------|
+|     Senior |          0 |      Alice |      75000 | Engineering |         25 |       true | 
+|   Director |          2 |    Charlie |      95000 |  Marketing |         35 |      false | 
+|     Senior |          3 |      Diana |      80000 | Engineering |         28 |       true | 
+|    Manager |          4 |        Eve |      90000 |    Product |         32 |       true | 
+|    Manager |          1 |        Bob |      85000 |      Sales |         30 |       true | 
+Edges:
+EdgesTable[5 x 6]
+BaseTable[5 x 6]
+|     source |    edge_id |   strength |       type |     target |     weight | 
+|------------|------------|------------|------------|------------|------------|
+|          0 |          3 |     medium | collaboration |          3 |        1.2 | 
+|          1 |          1 |     formal | reports_to |          2 |          2 | 
+|          1 |          4 |     strong | cross_team |          4 |        1.8 | 
+|          2 |          2 |       weak |       peer |          3 |        0.8 | 
+|          0 |          0 |     strong | collaboration |          1 |        1.5 | 
+
+  ✅ to_graph() → Graph: Graph(nodes=5, edges=5)
+  ✅ validate() → str: ValidationReport { errors: [], warnings: [], info: ["Node UIDs validation passed", "Edge validation passed", "Edge node reference validation passed"], stats: {"total_nodes": 5, "total_edges": 5} }
+
+# GraphTable Test Summary
+**Results**: 16/20 methods working (80.0%)
+
+**Working Methods (16):**
+  ✅ __getitem__
+  ✅ __len__
+  ✅ __repr__
+  ✅ __str__
+  ✅ edges
+  ✅ head
+  ✅ load_bundle
+  ✅ ncols
+  ✅ nodes
+  ✅ nrows
+  ✅ save_bundle
+  ✅ shape
+  ✅ stats
+  ✅ tail
+  ✅ to_graph
+  ✅ validate
+
+**Failing Methods (4):**
+  ❌ from_federated_bundles: InvalidInput("Bundle path does not exist: bundle1.json")
+  ❌ merge: argument 'tables': GraphTable indices must be strings (column names)
+  ❌ merge_with: name 'g' is not defined
+  ❌ merge_with_strategy: argument 'tables': GraphTable indices must be strings (column names)
+
+------------------------------
+
+Script: documentation/testing/generated_tests/test_subgraph.py
+Success: True
+Output:
+# Subgraph Comprehensive Test Suite
+Generated: 2025-09-07 21:41:05
+Testing 57 methods
+
+🏗️ Creating test objects...
+## Testing Subgraph Methods
+
+  ❌ __getitem__() → Error: expected 1 argument, got 0
+  ✅ __len__() → int: 5
+  ✅ __repr__() → str: Subgraph(nodes=5, edges=5)
+  ✅ __str__() → str: Subgraph with 5 nodes and 5 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     1       1 → 2
+     3       0 → 3
+     4       1 → 4
+     0       0 → 1
+     2       2 → 3
+  ✅ bfs() → Subgraph: Subgraph with 5 nodes and 4 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     2       2 → 3
+     3       0 → 3
+     0       0 → 1
+     4       1 → 4
+  ❌ calculate_similarity() → Error: name 'g' is not defined
+  ✅ child_meta_nodes() → list: []
+  ❌ clustering_coefficient() → Error: Clustering coefficient not yet implemented in core - coming in future version
+  ✅ collapse() → MetaNode: MetaNode(id=5, degree=0, subgraph_id=Some(9396794471654072095)) 
+  ❌ collapse_to_node() → Error: Subgraph.collapse_to_node() takes 1 positional arguments but 2 were given
+  ❌ collapse_to_node_with_defaults() → Error: argument 'agg_functions': 'str' object cannot be converted to 'PyDict'
+  ✅ connected_components() → ComponentsArray: ComponentsArray(1 components)
+  ✅ contains_edge() → bool: True
+  ✅ contains_node() → bool: True
+  ✅ degree() → GraphArray: GraphArray(len=5, dtype=int64)
+  ✅ density() → float: 0.5
+  ✅ dfs() → Subgraph: Subgraph with 5 nodes and 5 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     1       1 → 2
+     0       0 → 1
+     4       1 → 4
+     3       0 → 3
+     2       2 → 3
+  ✅ edge_count() → int: 5
+  ✅ edge_endpoints() → tuple: (0, 1)
+  ✅ edge_ids() → GraphArray: GraphArray(len=5, dtype=int64)
+  ✅ edges() → EdgesAccessor: EdgesAccessor(5 edges)
+  ✅ edges_table() → EdgesTable: EdgesTable[5 x 6]
+BaseTable[5 x 6]
+|       type |   strength |     target |    edge_id |     weight |     source | 
+|------------|------------|------------|------------|------------|------------|
+| reports_to |     formal |          2 |          1 |          2 |          1 | 
+| collaboration |     medium |          3 |          3 |        1.2 |          0 | 
+| cross_team |     strong |          4 |          4 |        1.8 |          1 | 
+| collaboration |     strong |          1 |          0 |        1.5 |          0 | 
+|       peer |       weak |          3 |          2 |        0.8 |          2 | 
+
+  ✅ entity_type() → str: Subgraph
+  ✅ filter_edges() → Subgraph: Subgraph with 3 nodes and 2 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     3       0 → 3
+     0       0 → 1
+  ✅ filter_nodes() → Subgraph: Subgraph with 1 nodes and 0 edges
+  ✅ get_edge_attribute() → NoneType: None
+  ✅ get_node_attribute() → NoneType: None
+  ✅ has_edge() → bool: True
+  ✅ has_edge_between() → bool: True
+  ✅ has_meta_nodes() → bool: False
+  ✅ has_node() → bool: True
+  ✅ has_path() → bool: True
+  ✅ hierarchy_level() → int: 0
+  ✅ in_degree() → GraphArray: GraphArray(len=5, dtype=int64)
+  ✅ induced_subgraph() → Subgraph: Subgraph with 2 nodes and 1 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     0       0 → 1
+  ❌ intersect_with() → Error: name 'g' is not defined
+  ✅ is_connected() → bool: True
+  ✅ is_empty() → bool: False
+  ❌ merge_with() → Error: name 'g' is not defined
+  ✅ meta_nodes() → list: []
+  ✅ neighborhood() → NeighborhoodResult: NeighborhoodResult(1 neighborhoods, largest_size=5, time=0.00ms)
+  ✅ neighbors() → GraphArray: GraphArray(len=2, dtype=int64)
+  ✅ node_count() → int: 5
+  ✅ node_ids() → GraphArray: GraphArray(len=5, dtype=int64)
+  ✅ nodes() → NodesAccessor: NodesAccessor(6 nodes)
+  ✅ out_degree() → GraphArray: GraphArray(len=5, dtype=int64)
+  ✅ parent_meta_node() → NoneType: None
+  ❌ set_edge_attrs() → Error: 'int' object cannot be converted to 'PyString'
+  ❌ set_node_attrs() → Error: 'int' object cannot be converted to 'PyString'
+  ✅ shortest_path_subgraph() → Subgraph: Subgraph with 2 nodes and 1 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     0       0 → 1
+  ✅ subgraph_from_edges() → Subgraph: Subgraph with 2 nodes and 1 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     0       0 → 1
+  ❌ subtract_from() → Error: name 'g' is not defined
+  ✅ summary() → str: Subgraph: 5 nodes, 5 edges, density: 0.500
+  ✅ table() → NodesTable: NodesTable[5 x 8]
+BaseTable[5 x 8]
+|       name |        age |    node_id |      level |     active |       team |     salary | entity_type | 
+|------------|------------|------------|------------|------------|------------|------------|------------|
+|        Bob |         30 |          1 |    Manager |       true |      Sales |      85000 |       base | 
+|      Alice |         25 |          0 |     Senior |       true | Engineering |      75000 |       base | 
+|      Diana |         28 |          3 |     Senior |       true | Engineering |      80000 |       base | 
+|        Eve |         32 |          4 |    Manager |       true |    Product |      90000 |       base | 
+|    Charlie |         35 |          2 |   Director |      false |  Marketing |      95000 |       base | 
+
+  ✅ to_graph() → Graph: Graph(nodes=0, edges=0)
+  ✅ to_networkx() → Graph: Graph with 5 nodes and 5 edges
+  ❌ transitivity() → Error: Transitivity not yet implemented in core - coming in future version
+
+# Subgraph Test Summary
+**Results**: 46/57 methods working (80.7%)
+
+**Working Methods (46):**
+  ✅ __len__
+  ✅ __repr__
+  ✅ __str__
+  ✅ bfs
+  ✅ child_meta_nodes
+  ✅ collapse
+  ✅ connected_components
+  ✅ contains_edge
+  ✅ contains_node
+  ✅ degree
+  ✅ density
+  ✅ dfs
+  ✅ edge_count
+  ✅ edge_endpoints
+  ✅ edge_ids
+  ✅ edges
+  ✅ edges_table
+  ✅ entity_type
+  ✅ filter_edges
+  ✅ filter_nodes
+  ✅ get_edge_attribute
+  ✅ get_node_attribute
+  ✅ has_edge
+  ✅ has_edge_between
+  ✅ has_meta_nodes
+  ✅ has_node
+  ✅ has_path
+  ✅ hierarchy_level
+  ✅ in_degree
+  ✅ induced_subgraph
+  ✅ is_connected
+  ✅ is_empty
+  ✅ meta_nodes
+  ✅ neighborhood
+  ✅ neighbors
+  ✅ node_count
+  ✅ node_ids
+  ✅ nodes
+  ✅ out_degree
+  ✅ parent_meta_node
+  ✅ shortest_path_subgraph
+  ✅ subgraph_from_edges
+  ✅ summary
+  ✅ table
+  ✅ to_graph
+  ✅ to_networkx
+
+**Failing Methods (11):**
+  ❌ __getitem__: expected 1 argument, got 0
+  ❌ calculate_similarity: name 'g' is not defined
+  ❌ clustering_coefficient: Clustering coefficient not yet implemented in core - coming in future version
+  ❌ collapse_to_node: Subgraph.collapse_to_node() takes 1 positional arguments but 2 were given
+  ❌ collapse_to_node_with_defaults: argument 'agg_functions': 'str' object cannot be converted to 'PyDict'
+  ❌ intersect_with: name 'g' is not defined
+  ❌ merge_with: name 'g' is not defined
+  ❌ set_edge_attrs: 'int' object cannot be converted to 'PyString'
+  ❌ set_node_attrs: 'int' object cannot be converted to 'PyString'
+  ❌ subtract_from: name 'g' is not defined
+  ❌ transitivity: Transitivity not yet implemented in core - coming in future version
+
+------------------------------
+
+Script: documentation/testing/generated_tests/test_neighborhoodresult.py
+Success: True
+Output:
+# NeighborhoodResult Comprehensive Test Suite
+Generated: 2025-09-07 21:41:06
+Testing 9 methods
+
+🏗️ Creating test objects...
+## Testing NeighborhoodResult Methods
+
+  ✅ __getitem__() → NeighborhoodSubgraph: Neighborhood of node 0 (2-hop, 5 nodes, 5 edges)
+  ✅ __iter__() → PyNeighborhoodResultIterator: <builtins.PyNeighborhoodResultIterator object at 0x102fef810>
+  ✅ __len__() → int: 1
+  ✅ __repr__() → str: NeighborhoodResult(1 neighborhoods, largest_size=5, time=0.00ms)
+  ✅ __str__() → str: NeighborhoodResult(1 neighborhoods, largest_size=5, time=0.00ms)
+  ✅ execution_time_ms() → float: 0.0
+  ✅ largest_neighborhood_size() → int: 5
+  ✅ neighborhoods() → list: [NeighborhoodSubgraph(central_nodes=[0], hops=2, nodes=5, edges=5)]
+  ✅ total_neighborhoods() → int: 1
+
+# NeighborhoodResult Test Summary
+**Results**: 9/9 methods working (100.0%)
+
+**Working Methods (9):**
+  ✅ __getitem__
+  ✅ __iter__
+  ✅ __len__
+  ✅ __repr__
+  ✅ __str__
+  ✅ execution_time_ms
+  ✅ largest_neighborhood_size
+  ✅ neighborhoods
+  ✅ total_neighborhoods
+
+**Failing Methods (0):**
+
+------------------------------
+
+Script: documentation/testing/generated_tests/test_basetable.py
+Success: True
+Output:
+# BaseTable Comprehensive Test Suite
+Generated: 2025-09-07 21:41:06
+Testing 21 methods
+
+🏗️ Creating test objects...
+## Testing BaseTable Methods
+
+  ✅ __getitem__() → GraphArray: GraphArray(len=5, dtype=str)
+  ✅ __iter__() → BaseTableRowIterator: <groggy.BaseTableRowIterator object at 0x104f6b3b0>
+  ✅ __len__() → int: 5
+  ✅ __repr__() → str: BaseTable[5 x 7]
+  ✅ __str__() → str: BaseTable[5 x 7]
+  ✅ column_names() → list: ['level', 'active', 'age', 'name', 'node_id', 'salary', 'team']
+  ✅ drop_columns() → BaseTable: BaseTable[5 x 6]
+  ❌ filter() → Error: argument 'predicate': 'function' object cannot be converted to 'PyString'
+  ❌ group_by() → Error: NotImplemented { feature: "group_by for BaseTable", tracking_issue: None }
+  ✅ has_column() → bool: True
+  ✅ head() → BaseTable: BaseTable[5 x 7]
+  ✅ iter() → BaseTableIterator: <groggy.BaseTableIterator object at 0x104f62cb0>
+  ✅ ncols() → int: 7
+  ✅ nrows() → int: 5
+  ✅ rich_display() → str: ⊖⊖ gr.table
+╭─────────┬────────────────┬──────────────┬───────────┬───────────────┬───────────────┬─────────────┬──────────────────╮
+│       # │ level          │ active       │ age       │ name          │ node_id       │ salary      │ team             │
+│         │ str[8]         │ bool         │ i32       │ str[8]        │ i64           │ i32         │ str[8]           │
+├─────────┼────────────────┼──────────────┼───────────┼───────────────┼───────────────┼─────────────┼──────────────────┤
+│       0 │ Manager        │ true         │ 32        │ Eve           │ 4             │ 90000       │ Product          │
+│       1 │ Director       │ false        │ 35        │ Charlie       │ 2             │ 95000       │ Marketing        │
+│       2 │ Manager        │ true         │ 30        │ Bob           │ 1             │ 85000       │ Sales            │
+│       3 │ Senior         │ true         │ 25        │ Alice         │ 0             │ 75000       │ Engineering      │
+│       4 │ Senior         │ true         │ 28        │ Diana         │ 3             │ 80000       │ Engineering      │
+╰─────────┴────────────────┴──────────────┴───────────┴───────────────┴───────────────┴─────────────┴──────────────────╯
+rows: 5 • cols: 7 • type: BaseTable
+  ✅ select() → BaseTable: BaseTable[5 x 1]
+  ✅ shape() → tuple: (5, 7)
+  ✅ slice() → BaseTable: BaseTable[5 x 7]
+  ✅ sort_by() → BaseTable: BaseTable[5 x 7]
+  ✅ tail() → BaseTable: BaseTable[5 x 7]
+  ✅ to_pandas() → DataFrame:    salary  age         team     name     level  active  node_id
+0   90000   32      Product      Eve   Manager    True        4
+1   95000   35    Marketing  Charlie  Director   False        2
+2   85000   30        Sales      Bob   Manager    True        1
+3   75000   25  Engineering    Alice    Senior    True        0
+4   80000   28  Engineering    Diana    Senior    True        3
+
+# BaseTable Test Summary
+**Results**: 19/21 methods working (90.5%)
+
+**Working Methods (19):**
+  ✅ __getitem__
+  ✅ __iter__
+  ✅ __len__
+  ✅ __repr__
+  ✅ __str__
+  ✅ column_names
+  ✅ drop_columns
+  ✅ has_column
+  ✅ head
+  ✅ iter
+  ✅ ncols
+  ✅ nrows
+  ✅ rich_display
+  ✅ select
+  ✅ shape
+  ✅ slice
+  ✅ sort_by
+  ✅ tail
+  ✅ to_pandas
+
+**Failing Methods (2):**
+  ❌ filter: argument 'predicate': 'function' object cannot be converted to 'PyString'
+  ❌ group_by: NotImplemented { feature: "group_by for BaseTable", tracking_issue: None }
+
+------------------------------
+

@@ -1,0 +1,2532 @@
+{
+  "timestamp": "20250907_231425",
+  "discovered_types": [
+    "AggregationFunction",
+    "AttrName",
+    "AttributeFilter",
+    "BaseTable",
+    "BranchName",
+    "EdgeFilter",
+    "EdgeId",
+    "EdgesTable",
+    "Graph",
+    "GraphArray",
+    "GraphMatrix",
+    "GraphTable",
+    "MetaNode",
+    "NodeFilter",
+    "NodeId",
+    "NodesTable",
+    "PyAttributeCollection",
+    "StateId"
+  ],
+  "example_objects": [
+    "Graph",
+    "AttrName",
+    "BaseTable",
+    "BranchName",
+    "EdgeId",
+    "EdgesTable",
+    "GraphArray",
+    "GraphMatrix",
+    "GraphTable",
+    "NodeId",
+    "NodesTable",
+    "StateId"
+  ],
+  "method_graph": [
+    {
+      "source_type": "Graph",
+      "target_type": "int",
+      "method_name": "__len__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 6e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "str",
+      "method_name": "__repr__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 4e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "str",
+      "method_name": "__str__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "add_edge",
+      "signature": "(source, target, uid_key=None, **kwargs)",
+      "params": [
+        "source",
+        "target",
+        "uid_key",
+        "kwargs"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Graph.add_edge() takes from 2 to 3 positional arguments but 4 were given",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "add_edges",
+      "signature": "(edges, node_mapping=None, _uid_key=None, warm_cache=None)",
+      "params": [
+        "edges",
+        "node_mapping",
+        "_uid_key",
+        "warm_cache"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "add_edges expects a list of (source, target) tuples, (source, target, attrs) tuples, or dictionaries with node_mapping",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "add_graph",
+      "signature": "(other)",
+      "params": [
+        "other"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'other': 'function' object cannot be converted to 'Graph'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "add_node",
+      "signature": "(**kwargs)",
+      "params": [
+        "kwargs"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Graph.add_node() takes 0 positional arguments but 1 was given",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "add_nodes",
+      "signature": "(data, uid_key=None)",
+      "params": [
+        "data",
+        "uid_key"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "add_nodes expects either an integer count or a list of dictionaries",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "GraphMatrix",
+      "method_name": "adjacency",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "dict",
+      "method_name": "adjacency_matrix",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "aggregate",
+      "signature": "(attribute, operation, target=None, _node_ids=None)",
+      "params": [
+        "attribute",
+        "operation",
+        "target",
+        "_node_ids"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'target': 'int' object cannot be converted to 'PyString'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "list",
+      "method_name": "all_edge_attribute_names",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "list",
+      "method_name": "all_node_attribute_names",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Subgraph",
+      "method_name": "bfs",
+      "signature": "(start, max_depth=None, inplace=None, attr_name=None)",
+      "params": [
+        "start",
+        "max_depth",
+        "inplace",
+        "attr_name"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1.7e-05
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "list",
+      "method_name": "branches",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 5e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "checkout_branch",
+      "signature": "(branch_name)",
+      "params": [
+        "branch_name"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Branch 'test_branch' not found",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "int",
+      "method_name": "commit",
+      "signature": "(message, author)",
+      "params": [
+        "message",
+        "author"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1.1e-05
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "list",
+      "method_name": "commit_history",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "contains_edge",
+      "signature": "(edge)",
+      "params": [
+        "edge"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'edge': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "bool",
+      "method_name": "contains_node",
+      "signature": "(node)",
+      "params": [
+        "node"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "create_branch",
+      "signature": "(branch_name)",
+      "params": [
+        "branch_name"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "GraphMatrix",
+      "method_name": "dense_adjacency_matrix",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "float",
+      "method_name": "density",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Subgraph",
+      "method_name": "dfs",
+      "signature": "(start, max_depth=None, inplace=None, attr_name=None)",
+      "params": [
+        "start",
+        "max_depth",
+        "inplace",
+        "attr_name"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 9e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "list",
+      "method_name": "edge_attribute_keys",
+      "signature": "(edge_id)",
+      "params": [
+        "edge_id"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 5e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "int",
+      "method_name": "edge_count",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "edge_endpoints",
+      "signature": "(edge)",
+      "params": [
+        "edge"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'edge': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "filter_edges",
+      "signature": "(filter)",
+      "params": [
+        "filter"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "\"Attribute 'relationship' does not exist on any edges in the graph. Use graph.edges.table().columns to see available attributes.\"",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Subgraph",
+      "method_name": "filter_nodes",
+      "signature": "(filter)",
+      "params": [
+        "filter"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 9e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "get_edge_attr",
+      "signature": "(edge, attr, default=None)",
+      "params": [
+        "edge",
+        "attr",
+        "default"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'edge': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "get_edge_attrs",
+      "signature": "(edges, attrs)",
+      "params": [
+        "edges",
+        "attrs"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'attrs': Can't extract `str` to `Vec`",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "str",
+      "method_name": "get_node_attr",
+      "signature": "(node, attr, default=None)",
+      "params": [
+        "node",
+        "attr",
+        "default"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1.1e-05
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "get_node_attrs",
+      "signature": "(nodes, attrs)",
+      "params": [
+        "nodes",
+        "attrs"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'attrs': Can't extract `str` to `Vec`",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "dict",
+      "method_name": "get_node_mapping",
+      "signature": "(uid_key, return_inverse=False)",
+      "params": [
+        "uid_key",
+        "return_inverse"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 8e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "GroupedAggregationResult",
+      "method_name": "group_by",
+      "signature": "(attribute, aggregation_attr, operation)",
+      "params": [
+        "attribute",
+        "aggregation_attr",
+        "operation"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-05
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "GroupedAggregationResult",
+      "method_name": "group_nodes_by_attribute",
+      "signature": "(attribute, aggregation_attr, operation)",
+      "params": [
+        "attribute",
+        "aggregation_attr",
+        "operation"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1.8e-05
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "bool",
+      "method_name": "has_edge",
+      "signature": "(edge_id)",
+      "params": [
+        "edge_id"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 4e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "bool",
+      "method_name": "has_edge_attribute",
+      "signature": "(edge_id, attr_name)",
+      "params": [
+        "edge_id",
+        "attr_name"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 5e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "bool",
+      "method_name": "has_node",
+      "signature": "(node_id)",
+      "params": [
+        "node_id"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "bool",
+      "method_name": "has_node_attribute",
+      "signature": "(node_id, attr_name)",
+      "params": [
+        "node_id",
+        "attr_name"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 6e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "bool",
+      "method_name": "has_uncommitted_changes",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "historical_view",
+      "signature": "(commit_id)",
+      "params": [
+        "commit_id"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'commit_id': 'str' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "bool",
+      "method_name": "is_connected",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 7e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "GraphMatrix",
+      "method_name": "laplacian_matrix",
+      "signature": "(normalized=None)",
+      "params": [
+        "normalized"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 5e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "neighborhood",
+      "signature": "(center_nodes, radius=None, max_nodes=None)",
+      "params": [
+        "center_nodes",
+        "radius",
+        "max_nodes"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'max_nodes': 'list' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "NeighborhoodStats",
+      "method_name": "neighborhood_statistics",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "neighbors",
+      "signature": "(nodes=None)",
+      "params": [
+        "nodes"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Node 1 not found during get neighbors. Check if node exists with contains_node()",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "list",
+      "method_name": "node_attribute_keys",
+      "signature": "(node_id)",
+      "params": [
+        "node_id"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 5e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "int",
+      "method_name": "node_count",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "remove_edge",
+      "signature": "(edge)",
+      "params": [
+        "edge"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'edge': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "remove_edges",
+      "signature": "(edges)",
+      "params": [
+        "edges"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Edge 0 not found during remove edge. Check if edge exists with contains_edge()",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "remove_node",
+      "signature": "(node)",
+      "params": [
+        "node"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 4e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "remove_nodes",
+      "signature": "(nodes)",
+      "params": [
+        "nodes"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Node 0 not found during remove node. Check if node exists with contains_node()",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "resolve_string_id_to_node",
+      "signature": "(string_id, uid_key)",
+      "params": [
+        "string_id",
+        "uid_key"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "\"No node found with age='test_id'\"",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "set_edge_attr",
+      "signature": "(edge, attr, value)",
+      "params": [
+        "edge",
+        "attr",
+        "value"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'edge': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "set_edge_attrs",
+      "signature": "(attrs_dict)",
+      "params": [
+        "attrs_dict"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'attrs_dict': 'str' object cannot be converted to 'PyDict'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "set_node_attr",
+      "signature": "(node, attr, value)",
+      "params": [
+        "node",
+        "attr",
+        "value"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Node 0 not found during set attribute. Check that node 0 exists before trying to set attribute",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "set_node_attrs",
+      "signature": "(attrs_dict)",
+      "params": [
+        "attrs_dict"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'attrs_dict': 'str' object cannot be converted to 'PyDict'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "shortest_path",
+      "signature": "(source, target, weight_attribute=None, inplace=None, attr_name=None)",
+      "params": [
+        "source",
+        "target",
+        "weight_attribute",
+        "inplace",
+        "attr_name"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1.1e-05
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "dict",
+      "method_name": "sparse_adjacency_matrix",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 4e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "GraphTable",
+      "method_name": "table",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "DiGraph",
+      "method_name": "to_networkx",
+      "signature": "(directed: bool = False, include_attributes: bool = True)",
+      "params": [
+        "directed",
+        "include_attributes"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 0.142685
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "transition_matrix",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "transition_matrix needs to be implemented in core first",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Subgraph",
+      "method_name": "view",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "Graph",
+      "target_type": "Unknown",
+      "method_name": "weighted_adjacency_matrix",
+      "signature": "(weight_attr)",
+      "params": [
+        "weight_attr"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Failed to create GraphMatrix from adjacency matrix: InvalidInput(\"Cannot create matrix from empty array list\")",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "AttrName",
+      "target_type": "bool",
+      "method_name": "__contains__",
+      "signature": "(key, /)",
+      "params": [
+        "key"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "AttrName",
+      "target_type": "Unknown",
+      "method_name": "__getitem__",
+      "signature": "(key, /)",
+      "params": [
+        "key"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "string indices must be integers",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "AttrName",
+      "target_type": "str_iterator",
+      "method_name": "__iter__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "AttrName",
+      "target_type": "int",
+      "method_name": "__len__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "AttrName",
+      "target_type": "str",
+      "method_name": "__repr__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "AttrName",
+      "target_type": "str",
+      "method_name": "__str__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "AttrName",
+      "target_type": "Unknown",
+      "method_name": "removeprefix",
+      "signature": "(prefix, /)",
+      "params": [
+        "prefix"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "removeprefix() argument must be str, not None",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "AttrName",
+      "target_type": "Unknown",
+      "method_name": "removesuffix",
+      "signature": "(suffix, /)",
+      "params": [
+        "suffix"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "removesuffix() argument must be str, not None",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "Unknown",
+      "method_name": "__getitem__",
+      "signature": "(key, /)",
+      "params": [
+        "key"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "\"Column 'relationship' not found\"",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "BaseTableRowIterator",
+      "method_name": "__iter__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 6e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "int",
+      "method_name": "__len__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "str",
+      "method_name": "__repr__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "str",
+      "method_name": "__str__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "list",
+      "method_name": "column_names",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "BaseTable",
+      "method_name": "drop_columns",
+      "signature": "(columns)",
+      "params": [
+        "columns"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 6e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "Unknown",
+      "method_name": "filter",
+      "signature": "(predicate)",
+      "params": [
+        "predicate"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "InvalidInput(\"Only '==' predicates supported currently\")",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "Unknown",
+      "method_name": "group_by",
+      "signature": "(columns)",
+      "params": [
+        "columns"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "NotImplemented { feature: \"group_by for BaseTable\", tracking_issue: None }",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "bool",
+      "method_name": "has_column",
+      "signature": "(name)",
+      "params": [
+        "name"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 4e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "BaseTable",
+      "method_name": "head",
+      "signature": "(n=5)",
+      "params": [
+        "n"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "BaseTableIterator",
+      "method_name": "iter",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 5e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "int",
+      "method_name": "ncols",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "int",
+      "method_name": "nrows",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "str",
+      "method_name": "rich_display",
+      "signature": "(config=None)",
+      "params": [
+        "config"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1.5e-05
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "Unknown",
+      "method_name": "select",
+      "signature": "(columns)",
+      "params": [
+        "columns"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "InvalidInput(\"Column 'col1' not found\")",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "tuple",
+      "method_name": "shape",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "Unknown",
+      "method_name": "slice",
+      "signature": "(start, end)",
+      "params": [
+        "start",
+        "end"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'end': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "Unknown",
+      "method_name": "sort_by",
+      "signature": "(column, ascending=True)",
+      "params": [
+        "column",
+        "ascending"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "InvalidInput(\"Column 'age' not found\")",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "BaseTable",
+      "method_name": "tail",
+      "signature": "(n=5)",
+      "params": [
+        "n"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "BaseTable",
+      "target_type": "DataFrame",
+      "method_name": "to_pandas",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 0.266429
+    },
+    {
+      "source_type": "BranchName",
+      "target_type": "bool",
+      "method_name": "__contains__",
+      "signature": "(key, /)",
+      "params": [
+        "key"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 7e-06
+    },
+    {
+      "source_type": "BranchName",
+      "target_type": "Unknown",
+      "method_name": "__getitem__",
+      "signature": "(key, /)",
+      "params": [
+        "key"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "string indices must be integers",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "BranchName",
+      "target_type": "str_iterator",
+      "method_name": "__iter__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "BranchName",
+      "target_type": "int",
+      "method_name": "__len__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "BranchName",
+      "target_type": "str",
+      "method_name": "__repr__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "BranchName",
+      "target_type": "str",
+      "method_name": "__str__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "BranchName",
+      "target_type": "Unknown",
+      "method_name": "removeprefix",
+      "signature": "(prefix, /)",
+      "params": [
+        "prefix"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "removeprefix() argument must be str, not None",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "BranchName",
+      "target_type": "Unknown",
+      "method_name": "removesuffix",
+      "signature": "(suffix, /)",
+      "params": [
+        "suffix"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "removesuffix() argument must be str, not None",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "EdgeId",
+      "target_type": "bool",
+      "method_name": "__bool__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "EdgeId",
+      "target_type": "str",
+      "method_name": "__repr__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "EdgeId",
+      "target_type": "str",
+      "method_name": "__str__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "EdgeId",
+      "target_type": "tuple",
+      "method_name": "as_integer_ratio",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "EdgeId",
+      "target_type": "int",
+      "method_name": "bit_length",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "EdgeId",
+      "target_type": "Unknown",
+      "method_name": "conjugate",
+      "signature": "<built-in>",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Built-in method - no signature available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "EdgeId",
+      "target_type": "Unknown",
+      "method_name": "from_bytes",
+      "signature": "(bytes, byteorder, *, signed=False)",
+      "params": [
+        "bytes",
+        "byteorder",
+        "signed"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "from_bytes() takes exactly 2 positional arguments (3 given)",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "EdgeId",
+      "target_type": "Unknown",
+      "method_name": "to_bytes",
+      "signature": "(length, byteorder, *, signed=False)",
+      "params": [
+        "length",
+        "byteorder",
+        "signed"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "to_bytes() takes exactly 2 positional arguments (3 given)",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "__getitem__",
+      "signature": "(key, /)",
+      "params": [
+        "key"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "\"Column 'relationship' not found\"",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "__iter__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Matrix iteration temporarily disabled during Phase 3 - use matrix[i] for row access",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "str",
+      "method_name": "__repr__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "str",
+      "method_name": "__str__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "GraphMatrix",
+      "method_name": "dense",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "determinant",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Determinant calculation will be implemented in Phase 5",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "elementwise_multiply",
+      "signature": "(other)",
+      "params": [
+        "other"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'other': 'function' object cannot be converted to 'GraphMatrix'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "from_graph_attributes",
+      "signature": "(_graph, _attrs, _entities)",
+      "params": [
+        "_graph",
+        "_attrs",
+        "_entities"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument '_attrs': Can't extract `str` to `Vec`",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "get_cell",
+      "signature": "(row, col)",
+      "params": [
+        "row",
+        "col"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'row': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "get_column",
+      "signature": "(col)",
+      "params": [
+        "col"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'col': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "get_column_by_name",
+      "signature": "(name)",
+      "params": [
+        "name"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "\"Column 'test_name' not found\"",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "get_row",
+      "signature": "(row)",
+      "params": [
+        "row"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'row': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "identity",
+      "signature": "(size)",
+      "params": [
+        "size"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'size': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "inverse",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Matrix inverse will be implemented in Phase 5",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "list",
+      "method_name": "iter_columns",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "list",
+      "method_name": "iter_rows",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "mean_axis",
+      "signature": "(axis)",
+      "params": [
+        "axis"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'axis': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "multiply",
+      "signature": "(other)",
+      "params": [
+        "other"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'other': 'function' object cannot be converted to 'GraphMatrix'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "GraphMatrix",
+      "method_name": "power",
+      "signature": "(n)",
+      "params": [
+        "n"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 8e-06
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "list",
+      "method_name": "preview",
+      "signature": "(row_limit=None, col_limit=None)",
+      "params": [
+        "row_limit",
+        "col_limit"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 8e-06
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "str",
+      "method_name": "rich_display",
+      "signature": "(config=None)",
+      "params": [
+        "config"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1.2e-05
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "std_axis",
+      "signature": "(axis)",
+      "params": [
+        "axis"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'axis': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "sum_axis",
+      "signature": "(axis)",
+      "params": [
+        "axis"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'axis': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "str",
+      "method_name": "summary",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "ndarray",
+      "method_name": "to_numpy",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2.4e-05
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "DataFrame",
+      "method_name": "to_pandas",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 0.000148
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "GraphMatrix",
+      "method_name": "transpose",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "GraphArray",
+      "target_type": "Unknown",
+      "method_name": "zeros",
+      "signature": "(rows, cols, dtype=None)",
+      "params": [
+        "rows",
+        "cols",
+        "dtype"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'rows': 'NoneType' object cannot be interpreted as an integer",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "bool",
+      "method_name": "__contains__",
+      "signature": "(key, /)",
+      "params": [
+        "key"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "__delitem__",
+      "signature": "(key, /)",
+      "params": [
+        "key"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "'relationship'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "__getitem__",
+      "signature": "<built-in>",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Built-in method - no signature available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "dict_keyiterator",
+      "method_name": "__iter__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "int",
+      "method_name": "__len__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "str",
+      "method_name": "__repr__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "__setitem__",
+      "signature": "(key, value, /)",
+      "params": [
+        "key",
+        "value"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "str",
+      "method_name": "__str__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "clear",
+      "signature": "<built-in>",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Built-in method - no signature available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "copy",
+      "signature": "<built-in>",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Built-in method - no signature available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "fromkeys",
+      "signature": "(iterable, value=None, /)",
+      "params": [
+        "iterable",
+        "value"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "'NoneType' object is not iterable",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "str",
+      "method_name": "get",
+      "signature": "(key, default=None, /)",
+      "params": [
+        "key",
+        "default"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 4e-06
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "items",
+      "signature": "<built-in>",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Built-in method - no signature available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "keys",
+      "signature": "<built-in>",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Built-in method - no signature available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "pop",
+      "signature": "<built-in>",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Built-in method - no signature available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "tuple",
+      "method_name": "popitem",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "setdefault",
+      "signature": "(key, default=None, /)",
+      "params": [
+        "key",
+        "default"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 4e-06
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "update",
+      "signature": "<built-in>",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Built-in method - no signature available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphMatrix",
+      "target_type": "Unknown",
+      "method_name": "values",
+      "signature": "<built-in>",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Built-in method - no signature available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "Unknown",
+      "method_name": "__getitem__",
+      "signature": "(key, /)",
+      "params": [
+        "key"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "\"Column 'relationship' not found in nodes or edges\"",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "int",
+      "method_name": "__len__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "str",
+      "method_name": "__repr__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "str",
+      "method_name": "__str__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-05
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "Unknown",
+      "method_name": "from_federated_bundles",
+      "signature": "(bundle_paths, domain_names=None)",
+      "params": [
+        "bundle_paths",
+        "domain_names"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'bundle_paths': 'NoneType' object cannot be converted to 'Sequence'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "GraphTable",
+      "method_name": "head",
+      "signature": "(n=5)",
+      "params": [
+        "n"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 5e-06
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "Unknown",
+      "method_name": "load_bundle",
+      "signature": "(path)",
+      "params": [
+        "path"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'path': 'NoneType' object cannot be converted to 'PyString'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "Unknown",
+      "method_name": "merge",
+      "signature": "(tables)",
+      "params": [
+        "tables"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'tables': 'NoneType' object cannot be converted to 'Sequence'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "Unknown",
+      "method_name": "merge_with",
+      "signature": "(other, strategy)",
+      "params": [
+        "other",
+        "strategy"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'other': 'function' object cannot be converted to 'GraphTable'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "Unknown",
+      "method_name": "merge_with_strategy",
+      "signature": "(tables, strategy)",
+      "params": [
+        "tables",
+        "strategy"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'tables': 'NoneType' object cannot be converted to 'Sequence'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "int",
+      "method_name": "ncols",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 3e-06
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "int",
+      "method_name": "nrows",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "Unknown",
+      "method_name": "save_bundle",
+      "signature": "(path)",
+      "params": [
+        "path"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'path': 'NoneType' object cannot be converted to 'PyString'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "tuple",
+      "method_name": "shape",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "dict",
+      "method_name": "stats",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 7e-06
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "GraphTable",
+      "method_name": "tail",
+      "signature": "(n=5)",
+      "params": [
+        "n"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 4e-06
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "Unknown",
+      "method_name": "to_graph",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "InvalidInput(\"Cannot convert invalid GraphTable to Graph. Errors: [\\\"Node UID validation failed: InvalidInput(\\\\\\\"Invalid node_id type - must be integer\\\\\\\")\\\"]\")",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "GraphTable",
+      "target_type": "str",
+      "method_name": "validate",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 8e-06
+    },
+    {
+      "source_type": "NodeId",
+      "target_type": "bool",
+      "method_name": "__bool__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "NodeId",
+      "target_type": "str",
+      "method_name": "__repr__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "NodeId",
+      "target_type": "str",
+      "method_name": "__str__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "NodeId",
+      "target_type": "tuple",
+      "method_name": "as_integer_ratio",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "NodeId",
+      "target_type": "int",
+      "method_name": "bit_length",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "NodeId",
+      "target_type": "Unknown",
+      "method_name": "conjugate",
+      "signature": "<built-in>",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Built-in method - no signature available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "NodeId",
+      "target_type": "Unknown",
+      "method_name": "from_bytes",
+      "signature": "(bytes, byteorder, *, signed=False)",
+      "params": [
+        "bytes",
+        "byteorder",
+        "signed"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "from_bytes() takes exactly 2 positional arguments (3 given)",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "NodeId",
+      "target_type": "Unknown",
+      "method_name": "to_bytes",
+      "signature": "(length, byteorder, *, signed=False)",
+      "params": [
+        "length",
+        "byteorder",
+        "signed"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "to_bytes() takes exactly 2 positional arguments (3 given)",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "NodesTable",
+      "target_type": "Unknown",
+      "method_name": "__getitem__",
+      "signature": "(key, /)",
+      "params": [
+        "key"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Cannot access attribute 'age': No nodes available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "NodesTable",
+      "target_type": "NodesIterator",
+      "method_name": "__iter__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 7e-06
+    },
+    {
+      "source_type": "NodesTable",
+      "target_type": "int",
+      "method_name": "__len__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "NodesTable",
+      "target_type": "str",
+      "method_name": "__repr__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "NodesTable",
+      "target_type": "str",
+      "method_name": "__str__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 2e-06
+    },
+    {
+      "source_type": "NodesTable",
+      "target_type": "Subgraph",
+      "method_name": "all",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 5e-06
+    },
+    {
+      "source_type": "NodesTable",
+      "target_type": "Unknown",
+      "method_name": "get_meta_node",
+      "signature": "(node_id)",
+      "params": [
+        "node_id"
+      ],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 6e-06
+    },
+    {
+      "source_type": "NodesTable",
+      "target_type": "GraphArray",
+      "method_name": "ids",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "NodesTable",
+      "target_type": "Unknown",
+      "method_name": "set_attrs",
+      "signature": "(attrs_dict)",
+      "params": [
+        "attrs_dict"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "argument 'attrs_dict': 'str' object cannot be converted to 'PyDict'",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "NodesTable",
+      "target_type": "NodesTable",
+      "method_name": "table",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 4e-06
+    },
+    {
+      "source_type": "StateId",
+      "target_type": "bool",
+      "method_name": "__bool__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "StateId",
+      "target_type": "str",
+      "method_name": "__repr__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "StateId",
+      "target_type": "str",
+      "method_name": "__str__",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "StateId",
+      "target_type": "tuple",
+      "method_name": "as_integer_ratio",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "StateId",
+      "target_type": "int",
+      "method_name": "bit_length",
+      "signature": "()",
+      "params": [],
+      "return_annotation": "Any",
+      "success": true,
+      "error": null,
+      "execution_time": 1e-06
+    },
+    {
+      "source_type": "StateId",
+      "target_type": "Unknown",
+      "method_name": "conjugate",
+      "signature": "<built-in>",
+      "params": [],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "Built-in method - no signature available",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "StateId",
+      "target_type": "Unknown",
+      "method_name": "from_bytes",
+      "signature": "(bytes, byteorder, *, signed=False)",
+      "params": [
+        "bytes",
+        "byteorder",
+        "signed"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "from_bytes() takes exactly 2 positional arguments (3 given)",
+      "execution_time": 0.0
+    },
+    {
+      "source_type": "StateId",
+      "target_type": "Unknown",
+      "method_name": "to_bytes",
+      "signature": "(length, byteorder, *, signed=False)",
+      "params": [
+        "length",
+        "byteorder",
+        "signed"
+      ],
+      "return_annotation": "Any",
+      "success": false,
+      "error": "to_bytes() takes exactly 2 positional arguments (3 given)",
+      "execution_time": 0.0
+    }
+  ],
+  "summary": {
+    "total_methods": 201,
+    "successful_methods": 118,
+    "object_types": 12
+  }
+}
