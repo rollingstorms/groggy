@@ -1,0 +1,401 @@
+object_name,object_type,method_name,method_signature,test_status,success,return_type,return_preview,error_message,execution_time_ms
+Graph,Graph,__len__,(),PASS,True,int,5,,0.002
+Graph,Graph,__repr__,(),PASS,True,str,"""Graph(nodes=5, edges=5)""",,0.022
+Graph,Graph,__str__,(),PASS,True,str,"""Graph(nodes=5, edges=5)""",,0.002
+Graph,Graph,add_edge,"(source, target, uid_key=None, **kwargs)",FAIL,False,,,Missing arguments: Graph.add_edge() missing 2 required positional arguments: 'source' and 'target',0.0
+Graph,Graph,add_edges,"(edges, node_mapping=None, _uid_key=None, warm_cache=None)",FAIL,False,,,Missing arguments: Graph.add_edges() missing 1 required positional argument: 'edges',0.0
+Graph,Graph,add_graph,(other),PASS,True,NoneType,None,,0.003
+Graph,Graph,add_node,(**kwargs),PASS,True,int,6,,0.003
+Graph,Graph,add_nodes,"(data, uid_key=None)",PASS,True,list,list[2],,0.011
+Graph,Graph,adjacency,(),PASS,True,GraphMatrix,GraphMatrix,,0.012
+Graph,Graph,adjacency_matrix,(),PASS,True,dict,dict[4],,0.009
+Graph,Graph,aggregate,"(attribute, operation, target=None, _node_ids=None)",PASS,True,AggregationResult,AggregationResult,,0.012
+Graph,Graph,all_edge_attribute_names,(),PASS,True,list,list[3],,0.005
+Graph,Graph,all_node_attribute_names,(),PASS,True,list,list[6],,0.01
+Graph,Graph,bfs,"(start, max_depth=None, inplace=None, attr_name=None)",FAIL,False,,,Missing arguments: Graph.bfs() missing 1 required positional argument: 'start',0.0
+Graph,Graph,branches,(),PASS,True,list,list[1],,0.002
+Graph,Graph,checkout_branch,(branch_name),FAIL,False,,,Not found: Branch 'test_branch' not found,0.0
+Graph,Graph,commit,"(message, author)",PASS,True,int,1,,0.007
+Graph,Graph,commit_history,(),PASS,True,list,list[1],,0.004
+Graph,Graph,contains_edge,(edge),FAIL,False,,,Missing arguments: Graph.contains_edge() missing 1 required positional argument: 'edge',0.0
+Graph,Graph,contains_node,(node),FAIL,False,,,Missing arguments: Graph.contains_node() missing 1 required positional argument: 'node',0.0
+Graph,Graph,create_branch,(branch_name),PASS,True,NoneType,None,,0.001
+Graph,Graph,dense_adjacency_matrix,(),PASS,True,GraphMatrix,GraphMatrix,,0.008
+Graph,Graph,density,(),PASS,True,float,0.1388888888888889,,0.002
+Graph,Graph,dfs,"(start, max_depth=None, inplace=None, attr_name=None)",FAIL,False,,,Missing arguments: Graph.dfs() missing 1 required positional argument: 'start',0.0
+Graph,Graph,edge_attribute_keys,(edge_id),FAIL,False,,,Missing arguments: Graph.edge_attribute_keys() missing 1 required positional argument: 'edge_id',0.0
+Graph,Graph,edge_count,(),PASS,True,int,5,,0.002
+Graph,Graph,edge_endpoints,(edge),FAIL,False,,,Missing arguments: Graph.edge_endpoints() missing 1 required positional argument: 'edge',0.0
+Graph,Graph,edge_ids,(...),PASS,True,GraphArray,GraphArray[5],,0.001
+Graph,Graph,edges,(...),PASS,True,EdgesAccessor,EdgesAccessor[5],,0.0
+Graph,Graph,filter_edges,(filter),FAIL,False,,,Skipped - complex method,0.0
+Graph,Graph,filter_nodes,(filter),FAIL,False,,,Skipped - complex method,0.0
+Graph,Graph,get_edge_attr,"(edge, attr, default=None)",FAIL,False,,,Missing arguments: Graph.get_edge_attr() missing 2 required positional arguments: 'edge' and 'attr',0.0
+Graph,Graph,get_edge_attrs,"(edges, attrs)",FAIL,False,,,Missing arguments: Graph.get_edge_attrs() missing 2 required positional arguments: 'edges' and 'attrs',0.0
+Graph,Graph,get_node_attr,"(node, attr, default=None)",FAIL,False,,,Missing arguments: Graph.get_node_attr() missing 2 required positional arguments: 'node' and 'attr',0.0
+Graph,Graph,get_node_attrs,"(nodes, attrs)",FAIL,False,,,Missing arguments: Graph.get_node_attrs() missing 2 required positional arguments: 'nodes' and 'attrs',0.0
+Graph,Graph,get_node_mapping,"(uid_key, return_inverse=False)",PASS,True,dict,dict[9],,0.006
+Graph,Graph,group_by,"(attribute, aggregation_attr, operation)",FAIL,False,,,Missing arguments: Graph.group_by() missing 2 required positional arguments: 'aggregation_attr' and 'operation',0.0
+Graph,Graph,group_nodes_by_attribute,"(attribute, aggregation_attr, operation)",PASS,True,GroupedAggregationResult,GroupedAggregationResult,,0.441
+Graph,Graph,has_edge,(edge_id),FAIL,False,,,Missing arguments: Graph.has_edge() missing 1 required positional argument: 'edge_id',0.0
+Graph,Graph,has_edge_attribute,"(edge_id, attr_name)",FAIL,False,,,Missing arguments: Graph.has_edge_attribute() missing 2 required positional arguments: 'edge_id' and 'attr_name',0.0
+Graph,Graph,has_node,(node_id),FAIL,False,,,Missing arguments: Graph.has_node() missing 1 required positional argument: 'node_id',0.0
+Graph,Graph,has_node_attribute,"(node_id, attr_name)",FAIL,False,,,Missing arguments: Graph.has_node_attribute() missing 2 required positional arguments: 'node_id' and 'attr_name',0.0
+Graph,Graph,has_uncommitted_changes,(),PASS,True,bool,False,,0.003
+Graph,Graph,historical_view,(commit_id),FAIL,False,,,argument 'commit_id': 'str' object cannot be interpreted as an integer,0.0
+Graph,Graph,is_connected,(),PASS,True,bool,False,,0.815
+Graph,Graph,is_directed,(...),PASS,True,bool,False,,0.0
+Graph,Graph,is_undirected,(...),PASS,True,bool,True,,0.0
+Graph,Graph,laplacian_matrix,(normalized=None),PASS,True,GraphMatrix,GraphMatrix,,0.013
+Graph,Graph,neighborhood,"(center_nodes, radius=None, max_nodes=None)",FAIL,False,,,Missing arguments: Graph.neighborhood() missing 1 required positional argument: 'center_nodes',0.0
+Graph,Graph,neighborhood_statistics,(),PASS,True,NeighborhoodStats,NeighborhoodStats,,0.005
+Graph,Graph,neighbors,(nodes=None),FAIL,False,,,nodes parameter is required,0.0
+Graph,Graph,node_attribute_keys,(node_id),FAIL,False,,,Missing arguments: Graph.node_attribute_keys() missing 1 required positional argument: 'node_id',0.0
+Graph,Graph,node_count,(),PASS,True,int,9,,0.003
+Graph,Graph,node_ids,(...),PASS,True,GraphArray,GraphArray[5],,0.0
+Graph,Graph,nodes,(...),PASS,True,NodesAccessor,NodesAccessor[9],,0.001
+Graph,Graph,remove_edge,(edge),FAIL,False,,,Missing arguments: Graph.remove_edge() missing 1 required positional argument: 'edge',0.0
+Graph,Graph,remove_edges,(edges),FAIL,False,,,Missing arguments: Graph.remove_edges() missing 1 required positional argument: 'edges',0.0
+Graph,Graph,remove_node,(node),FAIL,False,,,Missing arguments: Graph.remove_node() missing 1 required positional argument: 'node',0.0
+Graph,Graph,remove_nodes,(nodes),FAIL,False,,,Missing arguments: Graph.remove_nodes() missing 1 required positional argument: 'nodes',0.0
+Graph,Graph,resolve_string_id_to_node,"(string_id, uid_key)",PASS,True,int,0,,0.002
+Graph,Graph,set_edge_attr,"(edge, attr, value)",FAIL,False,,,"Missing arguments: Graph.set_edge_attr() missing 3 required positional arguments: 'edge', 'attr', and 'value'",0.0
+Graph,Graph,set_edge_attrs,(attrs_dict),FAIL,False,,,"Unsupported attribute format. Expected: dict {id: value}, dict {""nodes"": [...], ""values"": [...]}, GraphArray, or GraphTable. Got: str",0.0
+Graph,Graph,set_node_attr,"(node, attr, value)",FAIL,False,,,"Missing arguments: Graph.set_node_attr() missing 3 required positional arguments: 'node', 'attr', and 'value'",0.0
+Graph,Graph,set_node_attrs,(attrs_dict),FAIL,False,,,"Unsupported attribute format. Expected: dict {id: value}, dict {""nodes"": [...], ""values"": [...]}, GraphArray, or GraphTable. Got: str",0.0
+Graph,Graph,shortest_path,"(source, target, weight_attribute=None, inplace=None, attr_name=None)",FAIL,False,,,Missing arguments: Graph.shortest_path() missing 2 required positional arguments: 'source' and 'target',0.0
+Graph,Graph,sparse_adjacency_matrix,(),PASS,True,dict,dict[4],,0.017
+Graph,Graph,table,(),PASS,True,GraphTable,GraphTable[14],,0.023
+Graph,Graph,to_networkx,"(directed: bool = False, include_attributes: bool = True)",PASS,True,Graph,Graph[9],,280.929
+Graph,Graph,transition_matrix,(),FAIL,False,,,transition_matrix needs to be implemented in core first,0.0
+Graph,Graph,view,(),PASS,True,Subgraph,Subgraph[9],,0.004
+Graph,Graph,weighted_adjacency_matrix,(weight_attr),PASS,True,GraphMatrix,GraphMatrix,,0.02
+NodesTable,NodesTable,__getitem__,"(key, /)",PASS,True,GraphArray,GraphArray[5],,0.004
+NodesTable,NodesTable,__iter__,(),PASS,True,NodesTableRowIterator,NodesTableRowIterator,,0.006
+NodesTable,NodesTable,__len__,(),PASS,True,int,5,,0.0
+NodesTable,NodesTable,__repr__,(),PASS,True,str,"""NodesTable[5 x 7]""",,0.001
+NodesTable,NodesTable,__str__,(),PASS,True,str,"""NodesTable[5 x 7]
+BaseTable[5 x 7]
+|       name | ...""",,0.024
+NodesTable,NodesTable,base_table,(),PASS,True,BaseTable,BaseTable[5],,0.001
+NodesTable,NodesTable,drop_columns,(columns),PASS,True,NodesTable,NodesTable[5],,0.005
+NodesTable,NodesTable,filter,(predicate),FAIL,False,,,Skipped - complex method,0.0
+NodesTable,NodesTable,filter_by_attr,"(attr_name, value)",FAIL,False,,,Skipped - complex method,0.0
+NodesTable,NodesTable,group_by,(columns),FAIL,False,,,"NotImplemented { feature: ""group_by for BaseTable"", tracking_issue: None }",0.0
+NodesTable,NodesTable,head,(n=5),PASS,True,NodesTable,NodesTable[3],,0.003
+NodesTable,NodesTable,into_base_table,(),PASS,True,BaseTable,BaseTable[5],,0.001
+NodesTable,NodesTable,iter,(),PASS,True,NodesTableIterator,NodesTableIterator,,0.008
+NodesTable,NodesTable,ncols,(),PASS,True,int,7,,0.0
+NodesTable,NodesTable,node_ids,(),PASS,True,GraphArray,GraphArray[5],,0.001
+NodesTable,NodesTable,nrows,(),PASS,True,int,5,,0.001
+NodesTable,NodesTable,rich_display,(config=None),PASS,True,str,"""⊖⊖ gr.table
+╭─────────┬───────────────┬───────────...""",,0.308
+NodesTable,NodesTable,select,(columns),PASS,True,NodesTable,NodesTable[5],,0.003
+NodesTable,NodesTable,shape,(),PASS,True,tuple,tuple[2],,0.001
+NodesTable,NodesTable,slice,"(start, end)",PASS,True,NodesTable,NodesTable[3],,0.002
+NodesTable,NodesTable,sort_by,"(column, ascending=True)",PASS,True,NodesTable,NodesTable[5],,0.003
+NodesTable,NodesTable,tail,(n=5),PASS,True,NodesTable,NodesTable[3],,0.001
+NodesTable,NodesTable,to_pandas,(),PASS,True,DataFrame,DataFrame[5],,310.112
+NodesTable,NodesTable,unique_attr_values,(attr_name),PASS,True,list,list[5],,0.005
+NodesTable,NodesTable,with_attributes,"(attr_name, attributes)",FAIL,False,,,Missing arguments: NodesTable.with_attributes() missing 2 required positional arguments: 'attr_name' and 'attributes',0.0
+EdgesTable,EdgesTable,__getitem__,"(key, /)",PASS,True,GraphArray,GraphArray[5],,0.022
+EdgesTable,EdgesTable,__iter__,(),PASS,True,EdgesTableRowIterator,EdgesTableRowIterator,,0.01
+EdgesTable,EdgesTable,__len__,(),PASS,True,int,5,,0.001
+EdgesTable,EdgesTable,__repr__,(),PASS,True,str,"""EdgesTable[5 x 6]""",,0.0
+EdgesTable,EdgesTable,__str__,(),PASS,True,str,"""EdgesTable[5 x 6]
+BaseTable[5 x 6]
+|     source | ...""",,0.021
+EdgesTable,EdgesTable,as_tuples,(),PASS,True,list,list[5],,0.003
+EdgesTable,EdgesTable,base_table,(),PASS,True,BaseTable,BaseTable[5],,0.001
+EdgesTable,EdgesTable,drop_columns,(columns),FAIL,False,,,Cannot drop 'source' column from EdgesTable,0.0
+EdgesTable,EdgesTable,edge_ids,(),PASS,True,GraphArray,GraphArray[5],,0.001
+EdgesTable,EdgesTable,filter,(predicate),FAIL,False,,,Skipped - complex method,0.0
+EdgesTable,EdgesTable,filter_by_attr,"(attr_name, value)",FAIL,False,,,Skipped - complex method,0.0
+EdgesTable,EdgesTable,filter_by_sources,(source_nodes),FAIL,False,,,Skipped - complex method,0.0
+EdgesTable,EdgesTable,filter_by_targets,(target_nodes),FAIL,False,,,Skipped - complex method,0.0
+EdgesTable,EdgesTable,group_by,(columns),FAIL,False,,,"NotImplemented { feature: ""group_by for BaseTable"", tracking_issue: None }",0.0
+EdgesTable,EdgesTable,head,(n=5),PASS,True,EdgesTable,EdgesTable[3],,0.003
+EdgesTable,EdgesTable,into_base_table,(),PASS,True,BaseTable,BaseTable[5],,0.0
+EdgesTable,EdgesTable,iter,(),PASS,True,EdgesTableIterator,EdgesTableIterator,,0.006
+EdgesTable,EdgesTable,ncols,(),PASS,True,int,6,,0.0
+EdgesTable,EdgesTable,nrows,(),PASS,True,int,5,,0.001
+EdgesTable,EdgesTable,rich_display,(config=None),PASS,True,str,"""⊖⊖ gr.table
+╭───────────┬────────────────┬────────...""",,0.05
+EdgesTable,EdgesTable,select,(columns),PASS,True,EdgesTable,EdgesTable[5],,0.001
+EdgesTable,EdgesTable,shape,(),PASS,True,tuple,tuple[2],,0.0
+EdgesTable,EdgesTable,slice,"(start, end)",PASS,True,EdgesTable,EdgesTable[3],,0.001
+EdgesTable,EdgesTable,sort_by,"(column, ascending=True)",PASS,True,EdgesTable,EdgesTable[5],,0.003
+EdgesTable,EdgesTable,sources,(),PASS,True,GraphArray,GraphArray[5],,0.001
+EdgesTable,EdgesTable,tail,(n=5),PASS,True,EdgesTable,EdgesTable[3],,0.001
+EdgesTable,EdgesTable,targets,(),PASS,True,GraphArray,GraphArray[5],,0.001
+EdgesTable,EdgesTable,to_pandas,(),PASS,True,DataFrame,DataFrame[5],,0.129
+EdgesTable,EdgesTable,unique_attr_values,(attr_name),PASS,True,list,list[3],,0.002
+GraphArray_node_ids,GraphArray,__getitem__,"(key, /)",PASS,True,int,0,,0.001
+GraphArray_node_ids,GraphArray,__iter__,(),PASS,True,GraphArrayIterator,GraphArrayIterator,,0.001
+GraphArray_node_ids,GraphArray,__len__,(),PASS,True,int,5,,0.001
+GraphArray_node_ids,GraphArray,__repr__,(),PASS,True,str,"""GraphArray(len=5, dtype=int64)""",,0.003
+GraphArray_node_ids,GraphArray,__str__,(),PASS,True,str,"""GraphArray(len=5, dtype=int64)""",,0.001
+GraphArray_node_ids,GraphArray,count,(),PASS,True,int,5,,0.001
+GraphArray_node_ids,GraphArray,describe,(),PASS,True,StatsSummary,StatsSummary,,0.012
+GraphArray_node_ids,GraphArray,drop_na,(),PASS,True,GraphArray,GraphArray[5],,0.002
+GraphArray_node_ids,GraphArray,fill_na,(fill_value),PASS,True,GraphArray,GraphArray[5],,0.002
+GraphArray_node_ids,GraphArray,has_null,(),PASS,True,bool,False,,0.0
+GraphArray_node_ids,GraphArray,is_sparse,(...),PASS,True,bool,False,,0.0
+GraphArray_node_ids,GraphArray,items,(),PASS,True,list,list[5],,0.002
+GraphArray_node_ids,GraphArray,max,(),PASS,True,int,4,,0.001
+GraphArray_node_ids,GraphArray,mean,(),PASS,True,float,2.0,,0.001
+GraphArray_node_ids,GraphArray,median,(),PASS,True,float,2.0,,0.001
+GraphArray_node_ids,GraphArray,min,(),PASS,True,int,0,,0.001
+GraphArray_node_ids,GraphArray,null_count,(),PASS,True,int,0,,0.001
+GraphArray_node_ids,GraphArray,percentile,(p),PASS,True,float,0.0,,0.001
+GraphArray_node_ids,GraphArray,preview,(limit=None),PASS,True,list,list[5],,0.001
+GraphArray_node_ids,GraphArray,quantile,(q),PASS,True,float,2.0,,0.001
+GraphArray_node_ids,GraphArray,rich_display,(config=None),PASS,True,str,"""╭───┬───────╮
+│ # │ value │
+│   │ obj   │
+├───┼───...""",,0.022
+GraphArray_node_ids,GraphArray,std,(),PASS,True,float,1.5811388300841898,,0.001
+GraphArray_node_ids,GraphArray,summary,(),PASS,True,str,"""GraphArray('unnamed', length=5, dtype=Int, sparse=...""",,0.001
+GraphArray_node_ids,GraphArray,to_list,(),PASS,True,list,list[5],,0.001
+GraphArray_node_ids,GraphArray,to_numpy,(),PASS,True,ndarray,ndarray[5],,0.004
+GraphArray_node_ids,GraphArray,to_pandas,(),PASS,True,Series,Series[5],,0.102
+GraphArray_node_ids,GraphArray,to_scipy_sparse,(),PASS,True,csr_matrix,csr_matrix,,265.3
+GraphArray_node_ids,GraphArray,true_indices,(),PASS,True,list,list[0],,0.004
+GraphArray_node_ids,GraphArray,unique,(),PASS,True,GraphArray,GraphArray[5],,0.012
+GraphArray_node_ids,GraphArray,value_counts,(),PASS,True,dict,dict[5],,0.003
+GraphArray_node_ids,GraphArray,values,(...),PASS,True,list,list[5],,0.0
+GraphArray_ages,GraphArray,__getitem__,"(key, /)",PASS,True,int,25,,0.001
+GraphArray_ages,GraphArray,__iter__,(),PASS,True,GraphArrayIterator,GraphArrayIterator,,0.002
+GraphArray_ages,GraphArray,__len__,(),PASS,True,int,5,,0.001
+GraphArray_ages,GraphArray,__repr__,(),PASS,True,str,"""GraphArray(len=5, dtype=int64)""",,0.002
+GraphArray_ages,GraphArray,__str__,(),PASS,True,str,"""GraphArray(len=5, dtype=int64)""",,0.001
+GraphArray_ages,GraphArray,count,(),PASS,True,int,5,,0.001
+GraphArray_ages,GraphArray,describe,(),PASS,True,StatsSummary,StatsSummary,,0.002
+GraphArray_ages,GraphArray,drop_na,(),PASS,True,GraphArray,GraphArray[5],,0.002
+GraphArray_ages,GraphArray,fill_na,(fill_value),PASS,True,GraphArray,GraphArray[5],,0.002
+GraphArray_ages,GraphArray,has_null,(),PASS,True,bool,False,,0.0
+GraphArray_ages,GraphArray,is_sparse,(...),PASS,True,bool,False,,0.0
+GraphArray_ages,GraphArray,items,(),PASS,True,list,list[5],,0.002
+GraphArray_ages,GraphArray,max,(),PASS,True,int,35,,0.001
+GraphArray_ages,GraphArray,mean,(),PASS,True,float,30.0,,0.001
+GraphArray_ages,GraphArray,median,(),PASS,True,float,30.0,,0.001
+GraphArray_ages,GraphArray,min,(),PASS,True,int,25,,0.001
+GraphArray_ages,GraphArray,null_count,(),PASS,True,int,0,,0.001
+GraphArray_ages,GraphArray,percentile,(p),PASS,True,float,25.0,,0.0
+GraphArray_ages,GraphArray,preview,(limit=None),PASS,True,list,list[5],,0.002
+GraphArray_ages,GraphArray,quantile,(q),PASS,True,float,30.0,,0.001
+GraphArray_ages,GraphArray,rich_display,(config=None),PASS,True,str,"""╭───┬───────╮
+│ # │ value │
+│   │ obj   │
+├───┼───...""",,0.01
+GraphArray_ages,GraphArray,std,(),PASS,True,float,3.8078865529319543,,0.0
+GraphArray_ages,GraphArray,summary,(),PASS,True,str,"""GraphArray('unnamed', length=5, dtype=Int, sparse=...""",,0.001
+GraphArray_ages,GraphArray,to_list,(),PASS,True,list,list[5],,0.001
+GraphArray_ages,GraphArray,to_numpy,(),PASS,True,ndarray,ndarray[5],,0.009
+GraphArray_ages,GraphArray,to_pandas,(),PASS,True,Series,Series[5],,0.297
+GraphArray_ages,GraphArray,to_scipy_sparse,(),PASS,True,csr_matrix,csr_matrix,,0.097
+GraphArray_ages,GraphArray,true_indices,(),PASS,True,list,list[0],,0.001
+GraphArray_ages,GraphArray,unique,(),PASS,True,GraphArray,GraphArray[5],,0.002
+GraphArray_ages,GraphArray,value_counts,(),PASS,True,dict,dict[5],,0.002
+GraphArray_ages,GraphArray,values,(...),PASS,True,list,list[5],,0.0
+GraphArray_names,GraphArray,__getitem__,"(key, /)",PASS,True,str,"""Alice""",,0.001
+GraphArray_names,GraphArray,__iter__,(),PASS,True,GraphArrayIterator,GraphArrayIterator,,0.001
+GraphArray_names,GraphArray,__len__,(),PASS,True,int,5,,0.0
+GraphArray_names,GraphArray,__repr__,(),PASS,True,str,"""GraphArray(len=5, dtype=str)""",,0.002
+GraphArray_names,GraphArray,__str__,(),PASS,True,str,"""GraphArray(len=5, dtype=str)""",,0.001
+GraphArray_names,GraphArray,count,(),PASS,True,int,5,,0.001
+GraphArray_names,GraphArray,describe,(),PASS,True,StatsSummary,StatsSummary,,0.001
+GraphArray_names,GraphArray,drop_na,(),PASS,True,GraphArray,GraphArray[5],,0.001
+GraphArray_names,GraphArray,fill_na,(fill_value),PASS,True,GraphArray,GraphArray[5],,0.001
+GraphArray_names,GraphArray,has_null,(),PASS,True,bool,False,,0.001
+GraphArray_names,GraphArray,is_sparse,(...),PASS,True,bool,False,,0.0
+GraphArray_names,GraphArray,items,(),PASS,True,list,list[5],,0.001
+GraphArray_names,GraphArray,max,(),PASS,True,str,"""Eve""",,0.001
+GraphArray_names,GraphArray,mean,(),PASS,True,NoneType,None,,0.001
+GraphArray_names,GraphArray,median,(),PASS,True,NoneType,None,,0.0
+GraphArray_names,GraphArray,min,(),PASS,True,str,"""Alice""",,0.0
+GraphArray_names,GraphArray,null_count,(),PASS,True,int,0,,0.001
+GraphArray_names,GraphArray,percentile,(p),PASS,True,NoneType,None,,0.001
+GraphArray_names,GraphArray,preview,(limit=None),PASS,True,list,list[5],,0.001
+GraphArray_names,GraphArray,quantile,(q),PASS,True,NoneType,None,,0.001
+GraphArray_names,GraphArray,rich_display,(config=None),PASS,True,str,"""╭───┬─────────╮
+│ # │ value   │
+│   │ obj     │
+├─...""",,0.008
+GraphArray_names,GraphArray,std,(),PASS,True,NoneType,None,,0.001
+GraphArray_names,GraphArray,summary,(),PASS,True,str,"""GraphArray('unnamed', length=5, dtype=Text, sparse...""",,0.002
+GraphArray_names,GraphArray,to_list,(),PASS,True,list,list[5],,0.002
+GraphArray_names,GraphArray,to_numpy,(),PASS,True,ndarray,ndarray[5],,0.009
+GraphArray_names,GraphArray,to_pandas,(),PASS,True,Series,Series[5],,0.05
+GraphArray_names,GraphArray,to_scipy_sparse,(),FAIL,False,,,unsupported data types in input,0.0
+GraphArray_names,GraphArray,true_indices,(),PASS,True,list,list[0],,0.001
+GraphArray_names,GraphArray,unique,(),PASS,True,GraphArray,GraphArray[5],,0.002
+GraphArray_names,GraphArray,value_counts,(),PASS,True,dict,dict[5],,0.003
+GraphArray_names,GraphArray,values,(...),PASS,True,list,list[5],,0.0
+GraphMatrix_adjacency,dict,__getitem__,(...),FAIL,False,,,dict.__getitem__() takes exactly one argument (0 given),0.0
+GraphMatrix_adjacency,dict,__iter__,(),PASS,True,dict_keyiterator,dict_keyiterator,,0.0
+GraphMatrix_adjacency,dict,__len__,(),PASS,True,int,4,,0.004
+GraphMatrix_adjacency,dict,__repr__,(),PASS,True,str,"""{'size': 5, 'is_sparse': True, 'type': 'adjacency_...""",,0.053
+GraphMatrix_adjacency,dict,__str__,(),PASS,True,str,"""{'size': 5, 'is_sparse': True, 'type': 'adjacency_...""",,0.002
+GraphMatrix_adjacency,dict,clear,(...),PASS,True,NoneType,None,,0.005
+GraphMatrix_adjacency,dict,copy,(...),PASS,True,dict,dict[0],,0.0
+GraphMatrix_adjacency,dict,fromkeys,"(iterable, value=None, /)",FAIL,False,,,"fromkeys expected at least 1 argument, got 0",0.0
+GraphMatrix_adjacency,dict,get,"(key, default=None, /)",FAIL,False,,,"get expected at least 1 argument, got 0",0.0
+GraphMatrix_adjacency,dict,items,(...),PASS,True,dict_items,dict_items[0],,0.0
+GraphMatrix_adjacency,dict,keys,(...),PASS,True,dict_keys,dict_keys[0],,0.001
+GraphMatrix_adjacency,dict,pop,(...),FAIL,False,,,"pop expected at least 1 argument, got 0",0.0
+GraphMatrix_adjacency,dict,popitem,(),FAIL,False,,,'popitem(): dictionary is empty',0.0
+GraphMatrix_adjacency,dict,setdefault,"(key, default=None, /)",FAIL,False,,,"setdefault expected at least 1 argument, got 0",0.0
+GraphMatrix_adjacency,dict,update,(...),PASS,True,NoneType,None,,0.0
+GraphMatrix_adjacency,dict,values,(...),PASS,True,dict_values,dict_values[0],,0.0
+GraphMatrix_laplacian,GraphMatrix,__getitem__,"(key, /)",FAIL,False,,,"expected 1 argument, got 0",0.0
+GraphMatrix_laplacian,GraphMatrix,__iter__,(),FAIL,False,,,Matrix iteration temporarily disabled during Phase 3 - use matrix[i] for row access,0.0
+GraphMatrix_laplacian,GraphMatrix,__repr__,(),PASS,True,str,"""GraphMatrix(5 x 5, dtype=Float)""",,0.0
+GraphMatrix_laplacian,GraphMatrix,__str__,(),PASS,True,str,"""GraphMatrix(5 x 5, dtype=Float)""",,0.005
+GraphMatrix_laplacian,GraphMatrix,columns,(...),PASS,True,list,list[5],,0.0
+GraphMatrix_laplacian,GraphMatrix,data,(...),PASS,True,list,list[5],,0.004
+GraphMatrix_laplacian,GraphMatrix,dense,(),PASS,True,GraphMatrix,GraphMatrix,,0.004
+GraphMatrix_laplacian,GraphMatrix,determinant,(),FAIL,False,,,Determinant calculation will be implemented in Phase 5,0.0
+GraphMatrix_laplacian,GraphMatrix,dtype,(...),PASS,True,str,"""Float""",,0.0
+GraphMatrix_laplacian,GraphMatrix,elementwise_multiply,(other),FAIL,False,,,Missing arguments: GraphMatrix.elementwise_multiply() missing 1 required positional argument: 'other',0.0
+GraphMatrix_laplacian,GraphMatrix,from_graph_attributes,"(_graph, _attrs, _entities)",FAIL,False,,,argument '_entities': Can't extract `str` to `Vec`,0.0
+GraphMatrix_laplacian,GraphMatrix,get_cell,"(row, col)",PASS,True,float,2.0,,0.002
+GraphMatrix_laplacian,GraphMatrix,get_column,(col),PASS,True,GraphArray,GraphArray[5],,0.003
+GraphMatrix_laplacian,GraphMatrix,get_column_by_name,(name),FAIL,False,,,Missing arguments: GraphMatrix.get_column_by_name() missing 1 required positional argument: 'name',0.0
+GraphMatrix_laplacian,GraphMatrix,get_row,(row),PASS,True,GraphArray,GraphArray[5],,0.001
+GraphMatrix_laplacian,GraphMatrix,identity,(size),PASS,True,GraphMatrix,GraphMatrix,,0.003
+GraphMatrix_laplacian,GraphMatrix,inverse,(),FAIL,False,,,Matrix inverse will be implemented in Phase 5,0.0
+GraphMatrix_laplacian,GraphMatrix,is_numeric,(...),PASS,True,bool,True,,0.001
+GraphMatrix_laplacian,GraphMatrix,is_sparse,(...),PASS,True,bool,False,,0.0
+GraphMatrix_laplacian,GraphMatrix,is_square,(...),PASS,True,bool,True,,0.0
+GraphMatrix_laplacian,GraphMatrix,is_symmetric,(...),PASS,True,bool,False,,0.0
+GraphMatrix_laplacian,GraphMatrix,iter_columns,(),PASS,True,list,list[5],,0.002
+GraphMatrix_laplacian,GraphMatrix,iter_rows,(),PASS,True,list,list[5],,0.002
+GraphMatrix_laplacian,GraphMatrix,mean_axis,(axis),PASS,True,GraphArray,GraphArray[5],,0.002
+GraphMatrix_laplacian,GraphMatrix,multiply,(other),FAIL,False,,,Missing arguments: GraphMatrix.multiply() missing 1 required positional argument: 'other',0.0
+GraphMatrix_laplacian,GraphMatrix,power,(n),PASS,True,GraphMatrix,GraphMatrix,,0.008
+GraphMatrix_laplacian,GraphMatrix,preview,"(row_limit=None, col_limit=None)",PASS,True,list,list[5],,0.008
+GraphMatrix_laplacian,GraphMatrix,rich_display,(config=None),PASS,True,str,"""╭───────┬───────┬───────┬───────┬───────╮
+│ col_0 ...""",,0.018
+GraphMatrix_laplacian,GraphMatrix,shape,(...),PASS,True,tuple,tuple[2],,0.0
+GraphMatrix_laplacian,GraphMatrix,std_axis,(axis),PASS,True,GraphArray,GraphArray[5],,0.004
+GraphMatrix_laplacian,GraphMatrix,sum_axis,(axis),PASS,True,GraphArray,GraphArray[5],,0.001
+GraphMatrix_laplacian,GraphMatrix,summary,(),PASS,True,str,"""GraphMatrix(shape=(5, 5), dtype=Float, sparse=fals...""",,0.001
+GraphMatrix_laplacian,GraphMatrix,to_numpy,(),PASS,True,ndarray,ndarray[5],,0.011
+GraphMatrix_laplacian,GraphMatrix,to_pandas,(),PASS,True,DataFrame,DataFrame[5],,0.16
+GraphMatrix_laplacian,GraphMatrix,transpose,(),PASS,True,GraphMatrix,GraphMatrix,,0.005
+GraphMatrix_laplacian,GraphMatrix,zeros,"(rows, cols, dtype=None)",PASS,True,GraphMatrix,GraphMatrix,,0.002
+GraphTable,GraphTable,__getitem__,"(key, /)",FAIL,False,,,GraphTable indices must be strings (column names),0.0
+GraphTable,GraphTable,__len__,(),PASS,True,int,10,,0.0
+GraphTable,GraphTable,__repr__,(),PASS,True,str,"""GraphTable[
+  NodesTable: 5 rows × 7 cols
+  EdgesT...""",,0.002
+GraphTable,GraphTable,__str__,(),PASS,True,str,"""GraphTable[5 nodes, 5 edges]
+Validation Policy: St...""",,0.015
+GraphTable,GraphTable,edges,(...),PASS,True,EdgesTable,EdgesTable[5],,0.0
+GraphTable,GraphTable,from_federated_bundles,"(bundle_paths, domain_names=None)",FAIL,False,,,argument 'bundle_paths': Can't extract `str` to `Vec`,0.0
+GraphTable,GraphTable,head,(n=5),PASS,True,GraphTable,GraphTable[8],,0.007
+GraphTable,GraphTable,load_bundle,(path),FAIL,False,,,"InvalidInput(""Bundle path does not exist: test_path.bundle"")",0.0
+GraphTable,GraphTable,merge,(tables),FAIL,False,,,"InvalidInput(""Cannot merge empty list of tables"")",0.0
+GraphTable,GraphTable,merge_with,"(other, strategy)",FAIL,False,,,Missing arguments: GraphTable.merge_with() missing 2 required positional arguments: 'other' and 'strategy',0.0
+GraphTable,GraphTable,merge_with_strategy,"(tables, strategy)",FAIL,False,,,Unknown conflict resolution strategy: union,0.0
+GraphTable,GraphTable,ncols,(),PASS,True,int,13,,0.002
+GraphTable,GraphTable,nodes,(...),PASS,True,NodesTable,NodesTable[5],,0.003
+GraphTable,GraphTable,nrows,(),PASS,True,int,10,,0.0
+GraphTable,GraphTable,save_bundle,(path),PASS,True,NoneType,None,,2.773
+GraphTable,GraphTable,shape,(),PASS,True,tuple,tuple[2],,0.004
+GraphTable,GraphTable,stats,(),PASS,True,dict,dict[8],,0.01
+GraphTable,GraphTable,tail,(n=5),PASS,True,GraphTable,GraphTable[8],,0.007
+GraphTable,GraphTable,to_graph,(),PASS,True,Graph,Graph[5],,0.054
+GraphTable,GraphTable,validate,(),PASS,True,str,"""ValidationReport { errors: [], warnings: [], info:...""",,0.009
+Subgraph,Subgraph,__getitem__,"(key, /)",FAIL,False,,,Subgraph indexing only supports string attribute names. Example: subgraph['community'],0.0
+Subgraph,Subgraph,__len__,(),PASS,True,int,5,,0.003
+Subgraph,Subgraph,__repr__,(),PASS,True,str,"""Subgraph(nodes=5, edges=5)""",,0.014
+Subgraph,Subgraph,__str__,(),PASS,True,str,"""Subgraph with 5 nodes and 5 edges
+
+Edges:
+  ID    ...""",,0.004
+Subgraph,Subgraph,bfs,"(start, max_depth=None)",FAIL,False,,,Missing arguments: Subgraph.bfs() missing 1 required positional argument: 'start',0.0
+Subgraph,Subgraph,calculate_similarity,"(other, metric='jaccard')",PASS,True,float,1.0,,0.005
+Subgraph,Subgraph,child_meta_nodes,(),PASS,True,list,list[0],,0.001
+Subgraph,Subgraph,clustering_coefficient,(_node_id=None),FAIL,False,,,Clustering coefficient not yet implemented in core - coming in future version,0.0
+Subgraph,Subgraph,collapse,"(node_aggs=None, edge_aggs=None, edge_strategy='aggregate', node_strategy='extract', preset=None, include_edge_count=True, mark_entity_type=True, entity_type='meta', allow_missing_attributes=True)",PASS,True,MetaNode,MetaNode,,0.032
+Subgraph,Subgraph,collapse_to_node,(agg_functions),FAIL,False,,,Missing arguments: Subgraph.collapse_to_node() missing 1 required positional argument: 'agg_functions',0.0
+Subgraph,Subgraph,collapse_to_node_with_defaults,"(agg_functions, defaults=None)",FAIL,False,,,Missing arguments: Subgraph.collapse_to_node_with_defaults() missing 1 required positional argument: 'agg_functions',0.0
+Subgraph,Subgraph,connected_components,(),PASS,True,ComponentsArray,ComponentsArray[1],,0.026
+Subgraph,Subgraph,contains_edge,(edge_id),FAIL,False,,,Missing arguments: Subgraph.contains_edge() missing 1 required positional argument: 'edge_id',0.0
+Subgraph,Subgraph,contains_node,(node_id),FAIL,False,,,Missing arguments: Subgraph.contains_node() missing 1 required positional argument: 'node_id',0.0
+Subgraph,Subgraph,degree,"(nodes=None, *, full_graph=False)",PASS,True,GraphArray,GraphArray[5],,0.002
+Subgraph,Subgraph,density,(),PASS,True,float,0.5,,0.001
+Subgraph,Subgraph,dfs,"(start, max_depth=None)",FAIL,False,,,Missing arguments: Subgraph.dfs() missing 1 required positional argument: 'start',0.0
+Subgraph,Subgraph,edge_count,(),PASS,True,int,5,,0.001
+Subgraph,Subgraph,edge_endpoints,(edge_id),FAIL,False,,,Missing arguments: Subgraph.edge_endpoints() missing 1 required positional argument: 'edge_id',0.0
+Subgraph,Subgraph,edge_ids,(...),PASS,True,GraphArray,GraphArray[5],,0.002
+Subgraph,Subgraph,edges,(...),PASS,True,EdgesAccessor,EdgesAccessor[5],,0.0
+Subgraph,Subgraph,edges_table,(),PASS,True,EdgesTable,EdgesTable[5],,0.014
+Subgraph,Subgraph,entity_type,(),PASS,True,str,"""Subgraph""",,0.001
+Subgraph,Subgraph,filter_edges,(filter),FAIL,False,,,Skipped - complex method,0.0
+Subgraph,Subgraph,filter_nodes,(filter),FAIL,False,,,Skipped - complex method,0.0
+Subgraph,Subgraph,get_edge_attribute,"(edge_id, attr_name)",FAIL,False,,,Missing arguments: Subgraph.get_edge_attribute() missing 2 required positional arguments: 'edge_id' and 'attr_name',0.0
+Subgraph,Subgraph,get_node_attribute,"(node_id, attr_name)",FAIL,False,,,Missing arguments: Subgraph.get_node_attribute() missing 2 required positional arguments: 'node_id' and 'attr_name',0.0
+Subgraph,Subgraph,has_edge,(edge_id),FAIL,False,,,Missing arguments: Subgraph.has_edge() missing 1 required positional argument: 'edge_id',0.0
+Subgraph,Subgraph,has_edge_between,"(source, target)",FAIL,False,,,Missing arguments: Subgraph.has_edge_between() missing 2 required positional arguments: 'source' and 'target',0.0
+Subgraph,Subgraph,has_meta_nodes,(),PASS,True,bool,False,,0.004
+Subgraph,Subgraph,has_node,(node_id),FAIL,False,,,Missing arguments: Subgraph.has_node() missing 1 required positional argument: 'node_id',0.0
+Subgraph,Subgraph,has_path,"(node1_id, node2_id)",FAIL,False,,,Missing arguments: Subgraph.has_path() missing 2 required positional arguments: 'node1_id' and 'node2_id',0.0
+Subgraph,Subgraph,hierarchy_level,(...),PASS,True,int,0,,0.0
+Subgraph,Subgraph,in_degree,"(nodes=None, full_graph=False)",PASS,True,GraphArray,GraphArray[5],,0.001
+Subgraph,Subgraph,induced_subgraph,(nodes),FAIL,False,,,Missing arguments: Subgraph.induced_subgraph() missing 1 required positional argument: 'nodes',0.0
+Subgraph,Subgraph,intersect_with,(_other),FAIL,False,,,Subgraph set operations not yet implemented - requires subgraph algebra in core,0.0
+Subgraph,Subgraph,is_connected,(),PASS,True,bool,True,,0.005
+Subgraph,Subgraph,is_empty,(),PASS,True,bool,False,,0.001
+Subgraph,Subgraph,merge_with,(_other),FAIL,False,,,Subgraph set operations not yet implemented - requires subgraph algebra in core,0.0
+Subgraph,Subgraph,meta_nodes,(),PASS,True,list,list[0],,0.003
+Subgraph,Subgraph,neighborhood,"(central_nodes, hops)",FAIL,False,,,Missing arguments: Subgraph.neighborhood() missing 2 required positional arguments: 'central_nodes' and 'hops',0.0
+Subgraph,Subgraph,neighbors,(node_id),FAIL,False,,,Missing arguments: Subgraph.neighbors() missing 1 required positional argument: 'node_id',0.0
+Subgraph,Subgraph,node_count,(),PASS,True,int,5,,0.0
+Subgraph,Subgraph,node_ids,(...),PASS,True,GraphArray,GraphArray[5],,0.0
+Subgraph,Subgraph,nodes,(...),PASS,True,NodesAccessor,NodesAccessor[5],,0.0
+Subgraph,Subgraph,out_degree,"(nodes=None, full_graph=False)",PASS,True,GraphArray,GraphArray[5],,0.001
+Subgraph,Subgraph,parent_meta_node,(),PASS,True,NoneType,None,,0.001
+Subgraph,Subgraph,set_edge_attrs,(attrs_dict),FAIL,False,,,Missing arguments: Subgraph.set_edge_attrs() missing 1 required positional argument: 'attrs_dict',0.0
+Subgraph,Subgraph,set_node_attrs,(attrs_dict),FAIL,False,,,Missing arguments: Subgraph.set_node_attrs() missing 1 required positional argument: 'attrs_dict',0.0
+Subgraph,Subgraph,shortest_path_subgraph,"(source, target)",FAIL,False,,,Missing arguments: Subgraph.shortest_path_subgraph() missing 2 required positional arguments: 'source' and 'target',0.0
+Subgraph,Subgraph,subgraph_from_edges,(edges),FAIL,False,,,Missing arguments: Subgraph.subgraph_from_edges() missing 1 required positional argument: 'edges',0.0
+Subgraph,Subgraph,subtract_from,(_other),FAIL,False,,,Subgraph set operations not yet implemented - requires subgraph algebra in core,0.0
+Subgraph,Subgraph,summary,(),PASS,True,str,"""Subgraph: 5 nodes, 5 edges, density: 0.500""",,0.002
+Subgraph,Subgraph,table,(),PASS,True,NodesTable,NodesTable[5],,0.015
+Subgraph,Subgraph,to_graph,(),PASS,True,Graph,Graph[0],,0.005
+Subgraph,Subgraph,to_networkx,(),PASS,True,Graph,Graph[5],,0.06
+Subgraph,Subgraph,transitivity,(),FAIL,False,,,Transitivity not yet implemented in core - coming in future version,0.0
+NeighborhoodResult,NeighborhoodResult,__getitem__,"(key, /)",PASS,True,NeighborhoodSubgraph,NeighborhoodSubgraph,,0.002
+NeighborhoodResult,NeighborhoodResult,__iter__,(),PASS,True,PyNeighborhoodResultIterator,PyNeighborhoodResultIterator,,0.039
+NeighborhoodResult,NeighborhoodResult,__len__,(),PASS,True,int,1,,0.002
+NeighborhoodResult,NeighborhoodResult,__repr__,(),PASS,True,str,"""NeighborhoodResult(1 neighborhoods, largest_size=5...""",,0.003
+NeighborhoodResult,NeighborhoodResult,__str__,(),PASS,True,str,"""NeighborhoodResult(1 neighborhoods, largest_size=5...""",,0.001
+NeighborhoodResult,NeighborhoodResult,execution_time_ms,(...),PASS,True,float,0.0,,0.0
+NeighborhoodResult,NeighborhoodResult,largest_neighborhood_size,(...),PASS,True,int,5,,0.003
+NeighborhoodResult,NeighborhoodResult,neighborhoods,(...),PASS,True,list,list[1],,0.0
+NeighborhoodResult,NeighborhoodResult,total_neighborhoods,(...),PASS,True,int,1,,0.0
+BaseTable,BaseTable,__getitem__,"(key, /)",PASS,True,GraphArray,GraphArray[5],,0.008
+BaseTable,BaseTable,__iter__,(),PASS,True,BaseTableRowIterator,BaseTableRowIterator,,0.009
+BaseTable,BaseTable,__len__,(),PASS,True,int,5,,0.001
+BaseTable,BaseTable,__repr__,(),PASS,True,str,"""BaseTable[5 x 7]""",,0.001
+BaseTable,BaseTable,__str__,(),PASS,True,str,"""BaseTable[5 x 7]""",,0.0
+BaseTable,BaseTable,column_names,(),PASS,True,list,list[7],,0.002
+BaseTable,BaseTable,drop_columns,(columns),PASS,True,BaseTable,BaseTable[5],,0.005
+BaseTable,BaseTable,filter,(predicate),FAIL,False,,,Skipped - complex method,0.0
+BaseTable,BaseTable,group_by,(columns),FAIL,False,,,"NotImplemented { feature: ""group_by for BaseTable"", tracking_issue: None }",0.0
+BaseTable,BaseTable,has_column,(name),PASS,True,bool,True,,0.003
+BaseTable,BaseTable,head,(n=5),PASS,True,BaseTable,BaseTable[3],,0.008
+BaseTable,BaseTable,iter,(),PASS,True,BaseTableIterator,BaseTableIterator,,0.01
+BaseTable,BaseTable,ncols,(),PASS,True,int,7,,0.001
+BaseTable,BaseTable,nrows,(),PASS,True,int,5,,0.001
+BaseTable,BaseTable,rich_display,(config=None),PASS,True,str,"""⊖⊖ gr.table
+╭─────────┬───────────────┬───────────...""",,0.063
+BaseTable,BaseTable,select,(columns),PASS,True,BaseTable,BaseTable[5],,0.002
+BaseTable,BaseTable,shape,(),PASS,True,tuple,tuple[2],,0.001
+BaseTable,BaseTable,slice,"(start, end)",PASS,True,BaseTable,BaseTable[3],,0.003
+BaseTable,BaseTable,sort_by,"(column, ascending=True)",PASS,True,BaseTable,BaseTable[5],,0.003
+BaseTable,BaseTable,tail,(n=5),PASS,True,BaseTable,BaseTable[3],,0.001
+BaseTable,BaseTable,to_pandas,(),PASS,True,DataFrame,DataFrame[5],,0.297

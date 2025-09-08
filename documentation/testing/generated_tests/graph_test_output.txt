@@ -1,0 +1,154 @@
+# Graph Comprehensive Test Suite
+Generated: 2025-09-07 17:39:58
+Testing 71 methods
+
+🏗️ Creating test objects...
+## Testing Graph Methods
+
+  ✅ __len__() → int: 5
+  ✅ __repr__() → str: Graph(nodes=5, edges=5)
+  ✅ __str__() → str: Graph(nodes=5, edges=5)
+  ✅ add_edge() → int: 5
+  ✅ add_edges() → list: [6]
+  ⚠️ add_graph() → Skipped (needs argument fixes)
+  ✅ add_node() → int: 5
+  ✅ add_nodes() → list: [6, 7]
+  ✅ adjacency() → GraphMatrix: GraphMatrix(8 x 8, dtype=Float)
+  ✅ adjacency_matrix() → dict: {'size': 8, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(8 x 8, dtype=Float)}
+  ✅ aggregate() → AggregationResult: AggregationResult(0)
+  ✅ all_edge_attribute_names() → list: ['weight', 'type', 'strength']
+  ✅ all_node_attribute_names() → list: ['team', 'active', 'level', 'name', 'age', 'salary']
+  ✅ bfs() → Subgraph: Subgraph with 5 nodes and 4 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     4       1 → 4
+     6       0 → 1
+     3       0 → 3
+     2       2 → 3
+  ✅ branches() → list: [BranchInfo(name='main', head=0, current=true)]
+  ❌ checkout_branch() → Error: Branch 'test_branch' not found
+  ✅ commit() → int: 1
+  ✅ commit_history() → list: [Commit(id=1, message='Test commit', author='test@example.com')]
+  ✅ contains_edge() → bool: True
+  ✅ contains_node() → bool: True
+  ✅ create_branch() → NoneType: None
+  ✅ dense_adjacency_matrix() → GraphMatrix: GraphMatrix(8 x 8, dtype=Float)
+  ✅ density() → float: 0.25
+  ✅ dfs() → Subgraph: Subgraph with 5 nodes and 7 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     2       2 → 3
+     6       0 → 1
+     5       0 → 1
+     3       0 → 3
+     1       1 → 2
+     4       1 → 4
+     0       0 → 1
+  ✅ edge_attribute_keys() → list: ['type', 'weight', 'strength']
+  ✅ edge_count() → int: 7
+  ✅ edge_endpoints() → tuple: (0, 1)
+  ✅ edge_ids() → GraphArray: GraphArray(len=7, dtype=int64)
+  ✅ edges() → EdgesAccessor: EdgesAccessor(7 edges)
+  ⚠️ filter_edges() → Skipped (needs argument fixes)
+  ⚠️ filter_nodes() → Skipped (needs argument fixes)
+  ✅ get_edge_attr() → str: strong
+  ⚠️ get_edge_attrs() → Skipped (needs argument fixes)
+  ✅ get_node_attr() → str: Alice
+  ⚠️ get_node_attrs() → Skipped (needs argument fixes)
+  ⚠️ get_node_mapping() → Skipped (needs argument fixes)
+  ⚠️ group_by() → Skipped (needs argument fixes)
+  ⚠️ group_nodes_by_attribute() → Skipped (needs argument fixes)
+  ✅ has_edge() → bool: True
+  ✅ has_edge_attribute() → bool: True
+  ✅ has_node() → bool: True
+  ✅ has_node_attribute() → bool: True
+  ✅ has_uncommitted_changes() → bool: False
+  ⚠️ historical_view() → Skipped (needs argument fixes)
+  ✅ is_connected() → bool: False
+  ✅ is_directed() → bool: False
+  ✅ is_undirected() → bool: True
+  ✅ laplacian_matrix() → GraphMatrix: GraphMatrix(8 x 8, dtype=Float)
+  ✅ neighborhood() → NeighborhoodResult: NeighborhoodResult(1 neighborhoods, largest_size=5, time=0.00ms)
+  ✅ neighborhood_statistics() → NeighborhoodStats: NeighborhoodStats(neighborhoods=1, nodes=5, time=0.11ms, avg=5.0 nodes/nbh)
+  ✅ neighbors() → list: [3, 1, 1, 1]
+  ✅ node_attribute_keys() → list: ['salary', 'active', 'team', 'name', 'level', 'age']
+  ✅ node_count() → int: 8
+  ✅ node_ids() → GraphArray: GraphArray(len=8, dtype=int64)
+  ✅ nodes() → NodesAccessor: NodesAccessor(8 nodes)
+  ✅ remove_edge() → NoneType: None
+  ⚠️ remove_edges() → Skipped (needs argument fixes)
+  ✅ remove_node() → NoneType: None
+  ⚠️ remove_nodes() → Skipped (needs argument fixes)
+  ⚠️ resolve_string_id_to_node() → Skipped (needs argument fixes)
+  ❌ set_edge_attr() → Error: Edge 0 not found during set attribute. Check if edge exists with contains_edge()
+  ⚠️ set_edge_attrs() → Skipped (needs argument fixes)
+  ❌ set_node_attr() → Error: Node 0 not found during set attribute. Check that node 0 exists before trying to set attribute
+  ⚠️ set_node_attrs() → Skipped (needs argument fixes)
+  ✅ shortest_path() → NoneType: None
+  ✅ sparse_adjacency_matrix() → dict: {'size': 7, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(7 x 7, dtype=Float)}
+  ✅ table() → GraphTable: GraphTable[7 nodes, 3 edges]
+Validation Policy: Standard
+Nodes:
+NodesTable[7 x 7]
+BaseTable[7 x 7]
+|       team |       name |      level |     salary |    node_id |     active |        age | 
+|------------|------------|------------|------------|------------|------------|------------|
+|    Product |        Eve |    Manager |      90000 |          4 |       true |         32 | 
+|        nan |  test_node |        nan |        nan |          5 |        nan |         25 | 
+| Engineering |      Diana |     Senior |      80000 |          3 |       true |         28 | 
+|      Sales |        Bob |    Manager |      85000 |          1 |       true |         30 | 
+|        nan |      test2 |        nan |        nan |          7 |        nan |        nan | 
+... (2 more rows)
+Edges:
+EdgesTable[3 x 6]
+BaseTable[3 x 6]
+|       type |    edge_id |     weight |   strength |     target |     source | 
+|------------|------------|------------|------------|------------|------------|
+| reports_to |          1 |          2 |     formal |          2 |          1 | 
+|       peer |          2 |        0.8 |       weak |          3 |          2 | 
+| cross_team |          4 |        1.8 |     strong |          4 |          1 | 
+
+  ✅ to_networkx() → Graph: Graph with 7 nodes and 3 edges
+  ❌ transition_matrix() → Error: transition_matrix needs to be implemented in core first
+  ✅ view() → Subgraph: Subgraph with 7 nodes and 3 edges
+
+Edges:
+  ID    Source → Target
+  ----  ---------------
+     4       1 → 4
+     1       1 → 2
+     2       2 → 3
+  ✅ weighted_adjacency_matrix() → GraphMatrix: GraphMatrix(7 x 7, dtype=Float)
+
+# Graph Test Summary
+**Results**: 53/71 methods working (74.6%)
+
+**Working Methods (53):**
+  ✅ __len__
+  ✅ __repr__
+  ✅ __str__
+  ✅ add_edge
+  ✅ add_edges
+  ✅ add_node
+  ✅ add_nodes
+  ✅ adjacency
+  ✅ adjacency_matrix
+  ✅ aggregate
+  ... and 43 more
+
+**Failing Methods (18):**
+  ❌ add_graph: Skipped - needs argument fixes
+  ❌ checkout_branch: Branch 'test_branch' not found
+  ❌ filter_edges: Skipped - needs argument fixes
+  ❌ filter_nodes: Skipped - needs argument fixes
+  ❌ get_edge_attrs: Skipped - needs argument fixes
+  ❌ get_node_attrs: Skipped - needs argument fixes
+  ❌ get_node_mapping: Skipped - needs argument fixes
+  ❌ group_by: Skipped - needs argument fixes
+  ❌ group_nodes_by_attribute: Skipped - needs argument fixes
+  ❌ historical_view: Skipped - needs argument fixes
+  ... and 8 more

@@ -929,6 +929,441 @@ def test_integration_cross_feature(gr, g):
     except Exception as e:
         log_test("Cross-feature integration", success=False, error_msg=str(e))
 
+def get_test_args_for_method(obj, method_name, method_func):
+    """Intelligently determine test arguments for a method based on its name and signature"""
+    import inspect
+    
+    args = []
+    kwargs = {}
+    
+    try:
+        # Get method signature
+        sig = inspect.signature(method_func)
+        param_names = list(sig.parameters.keys())
+        
+        # Common argument patterns based on method names
+        if method_name in ['has_node', 'degree', 'neighbors', 'in_degree', 'out_degree']:
+            # Methods that need a node ID
+            if hasattr(obj, 'node_count') and obj.node_count() > 0:
+                args = [0]  # Use first node
+        elif method_name in ['get_node_attr', 'set_node_attr']:
+            # Methods that need node ID and attribute name
+            if hasattr(obj, 'node_count') and obj.node_count() > 0:
+                args = [0, "name"]  # Common attribute
+        elif method_name in ['has_edge', 'get_edge_attr', 'set_edge_attr']:
+            # Methods that need edge info
+            if hasattr(obj, 'edge_count') and obj.edge_count() > 0:
+                args = [0]  # Use first edge ID
+        elif method_name in ['head', 'tail']:
+            # Methods that take a count
+            args = [3]
+        elif method_name in ['sort_by']:
+            # Methods that need column names
+            if hasattr(obj, 'column_names'):
+                try:
+                    cols = obj.column_names()
+                    if cols:
+                        args = [cols[0]]
+                except:
+                    pass
+        elif method_name in ['select']:
+            # Methods that need column list
+            if hasattr(obj, 'column_names'):
+                try:
+                    cols = obj.column_names()
+                    if cols:
+                        args = [cols[:1]]  # First column as list
+                except:
+                    pass
+        elif method_name == '__getitem__':
+            # Indexing operations
+            if hasattr(obj, '__len__') and len(obj) > 0:
+                if hasattr(obj, 'ncols'):  # Matrix-like
+                    args = [0, 0]
+                else:  # Array-like or table column access
+                    try:
+                        if hasattr(obj, 'column_names'):
+                            cols = obj.column_names()
+                            if cols:
+                                args = [cols[0]]  # Column name
+                        else:
+                            args = [0]  # Index
+                    except:
+                        args = [0]
+        elif method_name in ['subgraph']:
+            # Methods that need node lists
+            if hasattr(obj, 'node_ids'):
+                try:
+                    node_ids = obj.node_ids()
+                    if node_ids:
+                        args = [node_ids[:2]]  # First two nodes
+                except:
+                    pass
+        elif method_name in ['add_node']:
+            # Add operations
+            kwargs = {"name": "test"}
+        elif method_name in ['add_edge']:
+            # Edge operations
+            if hasattr(obj, 'node_count') and obj.node_count() >= 2:
+                args = [0, 1]
+        
+    except Exception:
+        # If introspection fails, use no arguments
+        pass
+    
+    return args, kwargs
+
+def test_systematic_method_coverage(gr, g):
+    """Systematically test every method of every major object type"""
+    if not gr or not g:
+        return
+    
+    set_section("Systematic Method Coverage")
+    
+    print("🧪 SYSTEMATIC METHOD TESTING")
+    print("=" * 50)
+    print("Testing every method of every major object...")
+    print()
+    
+    # Create comprehensive test data first
+    try:
+        # Create nodes with diverse attributes
+        test_nodes = g.add_nodes([
+            {"name": "Alice", "age": 25, "salary": 75000, "active": True, "team": "Engineering"},
+            {"name": "Bob", "age": 30, "salary": 85000, "active": True, "team": "Sales"},
+            {"name": "Charlie", "age": 35, "salary": 95000, "active": False, "team": "Marketing"},
+            {"name": "Diana", "age": 28, "salary": 80000, "active": True, "team": "Engineering"},
+        ])
+        
+        # Create edges with attributes
+        test_edges = g.add_edges([
+            (test_nodes[0], test_nodes[1], {"weight": 1.5, "type": "collaboration"}),
+            (test_nodes[1], test_nodes[2], {"weight": 2.0, "type": "reports_to"}),
+            (test_nodes[2], test_nodes[3], {"weight": 0.8, "type": "peer"}),
+        ])
+        
+        log_test("Systematic: Setup comprehensive test data", success=True)
+        
+    except Exception as e:
+        log_test("Systematic: Setup test data", success=False, error_msg=str(e))
+        return
+
+    # Test Graph methods systematically
+    test_graph_methods_systematic(g)
+    
+    # Test Table methods systematically 
+    try:
+        nodes_table = g.nodes.table()
+        test_table_methods_systematic(nodes_table, "NodesTable")
+        
+        edges_table = g.edges.table()
+        test_table_methods_systematic(edges_table, "EdgesTable")
+        
+        base_table = nodes_table.base_table()
+        test_table_methods_systematic(base_table, "BaseTable")
+        
+    except Exception as e:
+        log_test("Systematic: Table creation", success=False, error_msg=str(e))
+    
+    # Test Array methods systematically
+    try:
+        if hasattr(nodes_table, '__getitem__'):
+            node_ids_array = nodes_table["node_id"]
+            test_array_methods_systematic(node_ids_array, "GraphArray")
+    except Exception as e:
+        log_test("Systematic: Array creation", success=False, error_msg=str(e))
+    
+    # Test Matrix methods systematically
+    try:
+        adj_matrix = g.adjacency_matrix()
+        test_matrix_methods_systematic(adj_matrix, "GraphMatrix")
+    except Exception as e:
+        log_test("Systematic: Matrix creation", success=False, error_msg=str(e))
+    
+    # Test Subgraph methods systematically
+    try:
+        subgraph = g.subgraph(test_nodes[:2])
+        test_subgraph_methods_systematic(subgraph, "Subgraph")
+    except Exception as e:
+        log_test("Systematic: Subgraph creation", success=False, error_msg=str(e))
+    
+    # Generate systematic method testing report
+    print("\n" + "=" * 50)
+    print("📋 SYSTEMATIC METHOD TESTING COMPLETE")
+    print("=" * 50)
+    print("All major object types have been tested systematically using Python introspection.")
+
+def test_graph_methods_systematic(graph):
+    """Test every Graph method systematically using introspection"""
+    print("📊 GRAPH METHODS")
+    print("-" * 20)
+    
+    # Discover all methods automatically
+    all_methods = []
+    
+    # Get all callable methods and properties
+    for name in dir(graph):
+        if not name.startswith('_') or name in ['__str__', '__repr__', '__len__']:
+            try:
+                attr = getattr(graph, name)
+                if callable(attr):
+                    # Try to determine appropriate test arguments
+                    args, kwargs = get_test_args_for_method(graph, name, attr)
+                    all_methods.append((name, args, kwargs))
+                elif not name.startswith('_'):  # Properties
+                    all_methods.append((name, [], {}))
+            except Exception:
+                # Skip methods we can't introspect
+                continue
+    
+    # Add some nested method calls that we know are important
+    nested_methods = [
+        ("nodes.table", [], {}),
+        ("edges.table", [], {}),
+    ]
+    all_methods.extend(nested_methods)
+    
+    methods_to_test = all_methods
+    
+    working_methods = []
+    failing_methods = []
+    
+    for method_name, args, kwargs in methods_to_test:
+        try:
+            # Handle nested method calls like "nodes.table"
+            if "." in method_name:
+                parts = method_name.split(".")
+                obj = graph
+                for part in parts[:-1]:
+                    obj = getattr(obj, part)
+                method = getattr(obj, parts[-1])
+                if callable(method):
+                    result, exec_time, _ = measure_performance(method, *args, **kwargs)
+                else:
+                    result = method
+                    exec_time = 0
+            else:
+                method = getattr(graph, method_name)
+                if callable(method):
+                    result, exec_time, _ = measure_performance(method, *args, **kwargs)
+                else:
+                    result = method
+                    exec_time = 0
+                    
+            working_methods.append(method_name)
+            print(f"  ✅ {method_name}")
+            log_test(f"Graph.{method_name}", success=True, execution_time=exec_time)
+            
+        except Exception as e:
+            failing_methods.append((method_name, str(e)))
+            print(f"  ❌ {method_name}: {str(e)}")
+            log_test(f"Graph.{method_name}", success=False, error_msg=str(e))
+    
+    print(f"\n  📈 Graph Results: {len(working_methods)} working, {len(failing_methods)} failing")
+    print()
+
+def test_table_methods_systematic(table, table_type):
+    """Test every Table method systematically using introspection"""
+    print(f"📋 {table_type.upper()} METHODS")
+    print("-" * 25)
+    
+    # Discover all methods automatically
+    methods_to_test = []
+    
+    # Get all callable methods and properties
+    for name in dir(table):
+        if not name.startswith('_') or name in ['__str__', '__repr__', '__len__', '__getitem__']:
+            try:
+                attr = getattr(table, name)
+                if callable(attr):
+                    # Try to determine appropriate test arguments
+                    args, kwargs = get_test_args_for_method(table, name, attr)
+                    methods_to_test.append((name, args, kwargs))
+                elif not name.startswith('_'):  # Properties
+                    methods_to_test.append((name, [], {}))
+            except Exception:
+                # Skip methods we can't introspect
+                continue
+    
+    working_methods = []
+    failing_methods = []
+    
+    for method_name, args, kwargs in methods_to_test:
+        try:
+            method = getattr(table, method_name)
+            if callable(method):
+                result, exec_time, _ = measure_performance(method, *args, **kwargs)
+            else:
+                result = method
+                exec_time = 0
+                
+            working_methods.append(method_name)
+            print(f"  ✅ {method_name}")
+            log_test(f"{table_type}.{method_name}", success=True, execution_time=exec_time)
+            
+        except Exception as e:
+            failing_methods.append((method_name, str(e)))
+            print(f"  ❌ {method_name}: {str(e)}")
+            log_test(f"{table_type}.{method_name}", success=False, error_msg=str(e))
+    
+    print(f"\n  📈 {table_type} Results: {len(working_methods)} working, {len(failing_methods)} failing")
+    print()
+
+def test_array_methods_systematic(array, array_type):
+    """Test every Array method systematically"""
+    print(f"🔢 {array_type.upper()} METHODS")
+    print("-" * 20)
+    
+    # Discover all methods automatically
+    methods_to_test = []
+    
+    # Get all callable methods and properties
+    for name in dir(array):
+        if not name.startswith('_') or name in ['__str__', '__repr__', '__len__', '__getitem__', '__iter__']:
+            try:
+                attr = getattr(array, name)
+                if callable(attr):
+                    # Try to determine appropriate test arguments
+                    args, kwargs = get_test_args_for_method(array, name, attr)
+                    methods_to_test.append((name, args, kwargs))
+                elif not name.startswith('_'):  # Properties
+                    methods_to_test.append((name, [], {}))
+            except Exception:
+                # Skip methods we can't introspect
+                continue
+    
+    working_methods = []
+    failing_methods = []
+    
+    for method_name, args, kwargs in methods_to_test:
+        try:
+            # Skip indexing if array is empty
+            if method_name == "__getitem__" and len(array) == 0:
+                failing_methods.append((method_name, "Array is empty"))
+                print(f"  ❌ {method_name}: Array is empty")
+                log_test(f"{array_type}.{method_name}", success=False, error_msg="Array is empty")
+                continue
+                
+            method = getattr(array, method_name)
+            if callable(method):
+                result, exec_time, _ = measure_performance(method, *args, **kwargs)
+            else:
+                result = method
+                exec_time = 0
+                
+            working_methods.append(method_name)
+            print(f"  ✅ {method_name}")
+            log_test(f"{array_type}.{method_name}", success=True, execution_time=exec_time)
+            
+        except Exception as e:
+            failing_methods.append((method_name, str(e)))
+            print(f"  ❌ {method_name}: {str(e)}")
+            log_test(f"{array_type}.{method_name}", success=False, error_msg=str(e))
+    
+    print(f"\n  📈 {array_type} Results: {len(working_methods)} working, {len(failing_methods)} failing")
+    print()
+
+def test_matrix_methods_systematic(matrix, matrix_type):
+    """Test every Matrix method systematically"""
+    print(f"🔲 {matrix_type.upper()} METHODS")
+    print("-" * 22)
+    
+    # Discover all methods automatically
+    methods_to_test = []
+    
+    # Get all callable methods and properties
+    for name in dir(matrix):
+        if not name.startswith('_') or name in ['__str__', '__repr__', '__getitem__']:
+            try:
+                attr = getattr(matrix, name)
+                if callable(attr):
+                    # Try to determine appropriate test arguments
+                    args, kwargs = get_test_args_for_method(matrix, name, attr)
+                    methods_to_test.append((name, args, kwargs))
+                elif not name.startswith('_'):  # Properties
+                    methods_to_test.append((name, [], {}))
+            except Exception:
+                # Skip methods we can't introspect
+                continue
+    
+    working_methods = []
+    failing_methods = []
+    
+    for method_name, args, kwargs in methods_to_test:
+        try:
+            # Skip indexing if matrix is empty
+            if method_name == "__getitem__" and (matrix.nrows() == 0 or matrix.ncols() == 0):
+                failing_methods.append((method_name, "Matrix is empty"))
+                print(f"  ❌ {method_name}: Matrix is empty")
+                log_test(f"{matrix_type}.{method_name}", success=False, error_msg="Matrix is empty")
+                continue
+                
+            method = getattr(matrix, method_name)
+            if callable(method):
+                result, exec_time, _ = measure_performance(method, *args, **kwargs)
+            else:
+                result = method
+                exec_time = 0
+                
+            working_methods.append(method_name)
+            print(f"  ✅ {method_name}")
+            log_test(f"{matrix_type}.{method_name}", success=True, execution_time=exec_time)
+            
+        except Exception as e:
+            failing_methods.append((method_name, str(e)))
+            print(f"  ❌ {method_name}: {str(e)}")
+            log_test(f"{matrix_type}.{method_name}", success=False, error_msg=str(e))
+    
+    print(f"\n  📈 {matrix_type} Results: {len(working_methods)} working, {len(failing_methods)} failing")
+    print()
+
+def test_subgraph_methods_systematic(subgraph, subgraph_type):
+    """Test every Subgraph method systematically"""
+    print(f"🌐 {subgraph_type.upper()} METHODS")
+    print("-" * 20)
+    
+    # Discover all methods automatically
+    methods_to_test = []
+    
+    # Get all callable methods and properties
+    for name in dir(subgraph):
+        if not name.startswith('_') or name in ['__str__', '__repr__', '__len__']:
+            try:
+                attr = getattr(subgraph, name)
+                if callable(attr):
+                    # Try to determine appropriate test arguments
+                    args, kwargs = get_test_args_for_method(subgraph, name, attr)
+                    methods_to_test.append((name, args, kwargs))
+                elif not name.startswith('_'):  # Properties
+                    methods_to_test.append((name, [], {}))
+            except Exception:
+                # Skip methods we can't introspect
+                continue
+    
+    working_methods = []
+    failing_methods = []
+    
+    for method_name, args, kwargs in methods_to_test:
+        try:
+            method = getattr(subgraph, method_name)
+            if callable(method):
+                result, exec_time, _ = measure_performance(method, *args, **kwargs)
+            else:
+                result = method
+                exec_time = 0
+                
+            working_methods.append(method_name)
+            print(f"  ✅ {method_name}")
+            log_test(f"{subgraph_type}.{method_name}", success=True, execution_time=exec_time)
+            
+        except Exception as e:
+            failing_methods.append((method_name, str(e)))
+            print(f"  ❌ {method_name}: {str(e)}")
+            log_test(f"{subgraph_type}.{method_name}", success=False, error_msg=str(e))
+    
+    print(f"\n  📈 {subgraph_type} Results: {len(working_methods)} working, {len(failing_methods)} failing")
+    print()
+
 def generate_comprehensive_report():
     """Generate a comprehensive test report with performance metrics"""
     
@@ -1126,6 +1561,10 @@ def main():
     
     # Test cross-feature integration
     test_integration_cross_feature(gr, gr.Graph())
+    
+    # Test systematic method coverage
+    print("\n🔍 SYSTEMATIC METHOD TESTING: Testing every method of every major object...")
+    test_systematic_method_coverage(gr, gr.Graph())
     
     # Generate comprehensive report
     print("\n" + "=" * 50)

@@ -1,8 +1,9 @@
 //! Python FFI for BaseTable system
 
 use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyList};
 use crate::ffi::storage::array::PyBaseArray;
-use groggy::storage::table::{BaseTable, NodesTable, EdgesTable, Table, TableIterator};
+use groggy::storage::{ArrayOps, table::{BaseTable, NodesTable, EdgesTable, Table, TableIterator}};
 use groggy::GraphArray;  // Correct import path
 use groggy::types::{NodeId, EdgeId};
 use std::collections::HashMap;
@@ -121,18 +122,60 @@ impl PyBaseTable {
         Ok(Self { table: new_table })
     }
     
-    /// Filter rows using a query expression
+    /// Filter rows using a query expression or Python function
     ///
     /// Args:
-    ///     predicate: Query expression to filter rows
+    ///     predicate: Either a string query expression (e.g. "age > 25") or a Python function
     ///
     /// Returns:
     ///     PyBaseTable: A new table with filtered rows
-    pub fn filter(&self, predicate: &str) -> PyResult<Self> {
-        let filtered_table = self.table.filter(predicate)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+    pub fn filter(&self, predicate: &PyAny) -> PyResult<Self> {
+        let filtered_table = if predicate.extract::<String>().is_ok() {
+            // String predicate
+            let pred_str = predicate.extract::<String>()?;
+            self.table.filter(&pred_str)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?
+        } else {
+            // Python function predicate
+            self.filter_by_python_function(predicate)?
+        };
         
         Ok(Self { table: filtered_table })
+    }
+    
+    /// Helper method to filter using Python function
+    fn filter_by_python_function(&self, func: &PyAny) -> PyResult<groggy::storage::table::BaseTable> {
+        use pyo3::types::PyDict;
+        let py = func.py();
+        let mut mask = Vec::new();
+        
+        // Apply function to each row
+        for i in 0..self.table.nrows() {
+            // Create row dict
+            let row_dict = PyDict::new(py);
+            for col_name in self.table.column_names() {
+                if let Some(column) = self.table.column(col_name) {
+                    if let Some(value) = column.get(i) {
+                        let py_attr = crate::ffi::types::PyAttrValue::new(value.clone());
+                        row_dict.set_item(col_name, py_attr.to_object(py))?;
+                    } else {
+                        row_dict.set_item(col_name, py.None())?;
+                    }
+                }
+            }
+            
+            // Call the function with the row
+            let result = func.call1((row_dict,))?;
+            let keep_row = result.extract::<bool>()
+                .map_err(|_| PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Filter function must return a boolean value"
+                ))?;
+            mask.push(keep_row);
+        }
+        
+        // Apply mask to create filtered table
+        self.table.filter_by_mask(&mask)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
     }
     
     /// Group by columns and return grouped tables
@@ -333,6 +376,48 @@ impl PyBaseTable {
         // Convert to HTML format for Jupyter
         Ok(format!("<pre>{}</pre>", html_escape::encode_text(&formatted)))
     }
+    
+    /// Export BaseTable to CSV file
+    pub fn to_csv(&self, path: &str) -> PyResult<()> {
+        self.table.to_csv(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+    
+    /// Import BaseTable from CSV file
+    #[staticmethod]
+    pub fn from_csv(path: &str) -> PyResult<PyBaseTable> {
+        let table = groggy::storage::table::BaseTable::from_csv(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyBaseTable { table })
+    }
+    
+    /// Export BaseTable to Parquet file 
+    pub fn to_parquet(&self, path: &str) -> PyResult<()> {
+        self.table.to_parquet(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+    
+    /// Import BaseTable from Parquet file
+    #[staticmethod]
+    pub fn from_parquet(path: &str) -> PyResult<PyBaseTable> {
+        let table = groggy::storage::table::BaseTable::from_parquet(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyBaseTable { table })
+    }
+    
+    /// Export BaseTable to JSON file
+    pub fn to_json(&self, path: &str) -> PyResult<()> {
+        self.table.to_json(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+    
+    /// Import BaseTable from JSON file
+    #[staticmethod]
+    pub fn from_json(path: &str) -> PyResult<PyBaseTable> {
+        let table = groggy::storage::table::BaseTable::from_json(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyBaseTable { table })
+    }
 }
 
 // Implement display data conversion for PyBaseTable
@@ -416,6 +501,210 @@ impl PyBaseTable {
         data.insert("index_type".to_string(), Value::String("int64".to_string()));
         
         data
+    }
+
+    // =============================================================================
+    // Phase 2 Features: Group By Operations
+    // =============================================================================
+
+    /// Group by columns and apply aggregations
+    /// 
+    /// # Arguments
+    /// * `group_cols` - List of column names to group by
+    /// * `agg_specs` - Dictionary mapping column names to aggregation functions
+    ///   Supported functions: "count", "sum", "avg", "mean", "min", "max"
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Group by 'category' and aggregate 'value' column
+    /// result = table.group_by_agg(['category'], {'value': 'sum', 'price': 'avg'})
+    /// 
+    /// # Multiple grouping columns
+    /// result = table.group_by_agg(['region', 'category'], {'sales': 'sum', 'items': 'count'})
+    /// ```
+    pub fn group_by_agg(&self, group_cols: Vec<String>, agg_specs: HashMap<String, String>) -> PyResult<Self> {
+        let result = self.table.group_by_agg(&group_cols, agg_specs)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Group by aggregation failed: {}", e)))?;
+        
+        Ok(Self { table: result })
+    }
+
+    /// Aggregate entire table without grouping
+    /// 
+    /// # Arguments
+    /// * `agg_specs` - Dictionary mapping column names to aggregation functions
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Calculate summary statistics
+    /// summary = table.aggregate({'sales': 'sum', 'price': 'avg', 'items': 'count'})
+    /// ```
+    pub fn aggregate(&self, agg_specs: HashMap<String, String>) -> PyResult<Self> {
+        let result = self.table.aggregate(agg_specs)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Aggregation failed: {}", e)))?;
+        
+        Ok(Self { table: result })
+    }
+
+    // =============================================================================
+    // Phase 2 Features: Multi-table Operations (Unified Join Interface)
+    // =============================================================================
+
+    /// Unified join method with pandas-style interface
+    /// 
+    /// # Arguments
+    /// * `other` - The table to join with
+    /// * `on` - Column name(s) to join on. Can be:
+    ///   - String: single column name (same in both tables)
+    ///   - List[str]: multiple column names (same in both tables)
+    ///   - Dict: {"left": "col1", "right": "col2"} for different column names
+    ///   - Dict: {"left": ["col1", "col2"], "right": ["col3", "col4"]} for multiple different columns
+    /// * `how` - Join type: "inner", "left", "right", "outer"
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Simple inner join on same column name
+    /// result = table1.join(table2, on="id", how="inner")
+    /// 
+    /// # Left join on different column names  
+    /// result = table1.join(table2, on={"left": "user_id", "right": "id"}, how="left")
+    /// 
+    /// # Multi-column join
+    /// result = table1.join(table2, on=["key1", "key2"], how="outer")
+    /// ```
+    pub fn join(&self, other: &Self, on: &PyAny, how: &str) -> PyResult<Self> {
+        // Parse the 'on' parameter
+        let (left_cols, right_cols) = self.parse_join_on(on)?;
+        
+        // Validate join type
+        let join_result = match how.to_lowercase().as_str() {
+            "inner" => {
+                if left_cols.len() == 1 {
+                    self.table.inner_join(&other.table, &left_cols[0], &right_cols[0])
+                } else {
+                    return Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                        "Multi-column joins not yet implemented"
+                    ));
+                }
+            }
+            "left" => {
+                if left_cols.len() == 1 {
+                    self.table.left_join(&other.table, &left_cols[0], &right_cols[0])
+                } else {
+                    return Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                        "Multi-column joins not yet implemented"
+                    ));
+                }
+            }
+            "right" => {
+                // Right join is just left join with tables swapped
+                if left_cols.len() == 1 {
+                    other.table.left_join(&self.table, &right_cols[0], &left_cols[0])
+                } else {
+                    return Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                        "Multi-column joins not yet implemented"
+                    ));
+                }
+            }
+            "outer" => {
+                return Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                    "Outer join not yet implemented"
+                ));
+            }
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    format!("Invalid join type '{}'. Must be one of: 'inner', 'left', 'right', 'outer'", how)
+                ));
+            }
+        };
+
+        let result = join_result
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Join failed: {}", e)))?;
+        
+        Ok(Self { table: result })
+    }
+
+    /// Union with another table (removes duplicates)
+    /// 
+    /// # Arguments
+    /// * `other` - The table to union with
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Combine two tables with same schema
+    /// combined = table1.union(table2)
+    /// ```
+    pub fn union(&self, other: &Self) -> PyResult<Self> {
+        let result = self.table.union(&other.table)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Union failed: {}", e)))?;
+        
+        Ok(Self { table: result })
+    }
+
+    /// Intersect with another table (returns common rows)
+    /// 
+    /// # Arguments
+    /// * `other` - The table to intersect with
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Find common rows between tables
+    /// common = table1.intersect(table2)
+    /// ```
+    pub fn intersect(&self, other: &Self) -> PyResult<Self> {
+        let result = self.table.intersect(&other.table)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Intersect failed: {}", e)))?;
+        
+        Ok(Self { table: result })
+    }
+
+    // =============================================================================
+    // Helper Methods for Join Parameter Parsing
+    // =============================================================================
+
+    /// Parse the 'on' parameter for join operations
+    fn parse_join_on(&self, on: &PyAny) -> PyResult<(Vec<String>, Vec<String>)> {
+        // Case 1: String - single column name (same in both tables)
+        if let Ok(col_name) = on.extract::<String>() {
+            return Ok((vec![col_name.clone()], vec![col_name]));
+        }
+        
+        // Case 2: List of strings - multiple column names (same in both tables)
+        if let Ok(col_names) = on.extract::<Vec<String>>() {
+            return Ok((col_names.clone(), col_names));
+        }
+        
+        // Case 3: Dictionary with left/right keys
+        if let Ok(dict) = on.extract::<&pyo3::types::PyDict>() {
+            if let (Some(left_item), Some(right_item)) = (dict.get_item("left")?, dict.get_item("right")?) {
+                // Try as single strings
+                if let (Ok(left_col), Ok(right_col)) = (left_item.extract::<String>(), right_item.extract::<String>()) {
+                    return Ok((vec![left_col], vec![right_col]));
+                }
+                
+                // Try as lists of strings
+                if let (Ok(left_cols), Ok(right_cols)) = (left_item.extract::<Vec<String>>(), right_item.extract::<Vec<String>>()) {
+                    if left_cols.len() != right_cols.len() {
+                        return Err(pyo3::exceptions::PyValueError::new_err(
+                            "Left and right column lists must have the same length"
+                        ));
+                    }
+                    return Ok((left_cols, right_cols));
+                }
+                
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "Dictionary values must be strings or lists of strings"
+                ));
+            } else {
+                return Err(pyo3::exceptions::PyKeyError::new_err(
+                    "Dictionary must have 'left' and 'right' keys"
+                ));
+            }
+        }
+        
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            "Join 'on' parameter must be a string, list of strings, or dict with 'left' and 'right' keys"
+        ))
     }
 }
 
@@ -517,18 +806,138 @@ impl PyNodesTable {
         Ok(crate::ffi::storage::array::PyGraphArray::from_graph_array(graph_array))
     }
     
-    /// Add node attributes from a HashMap
-    pub fn with_attributes(&self, attr_name: String, attributes: std::collections::HashMap<NodeId, crate::ffi::types::PyAttrValue>) -> PyResult<Self> {
-        // Convert PyAttrValue HashMap to AttrValue HashMap
-        let rust_attributes: std::collections::HashMap<NodeId, groggy::AttrValue> = attributes
-            .into_iter()
-            .map(|(k, v)| (k, v.inner))
-            .collect();
-            
-        let result = self.table.clone().with_attributes(attr_name, rust_attributes)
+    /// Add node attributes - flexible input format
+    ///
+    /// Args:
+    ///     attr_name: Name of the attribute column to add  
+    ///     attributes: Can be:
+    ///         - Dictionary mapping node_id to value: {0: "Alice", 1: "Bob"}
+    ///         - List of {"id": node_id, "value": value} dicts: [{"id": 0, "value": "Alice"}]
+    ///         - HashMap<NodeId, PyAttrValue> (advanced usage)
+    ///
+    /// Returns:
+    ///     PyNodesTable: A new table with the attributes added
+    pub fn with_attributes(&self, attr_name: &PyAny, attributes: &PyAny) -> PyResult<Self> {
+        use pyo3::types::{PyDict, PyList};
+        
+        // Handle attr_name (can be string or other types)
+        let attr_name_str = if let Ok(name) = attr_name.extract::<String>() {
+            name
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Attribute name must be a string"
+            ));
+        };
+        
+        let rust_attributes = if let Ok(dict) = attributes.downcast::<PyDict>() {
+            // Handle dictionary format: {node_id: value}
+            self.convert_dict_to_attributes(dict)?
+        } else if let Ok(list) = attributes.downcast::<PyList>() {
+            // Handle list format: [{"id": node_id, "value": value}, ...]
+            self.convert_list_to_attributes(list)?
+        } else {
+            return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "Attributes must be either a dictionary {node_id: value} or list of dicts [{'id': node_id, 'value': value}]"
+            ));
+        };
+
+        let result = self.table.clone().with_attributes(attr_name_str, rust_attributes)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
         Ok(Self { table: result })
+    }
+    
+    /// Helper to convert dictionary to attributes
+    fn convert_dict_to_attributes(&self, dict: &PyDict) -> PyResult<std::collections::HashMap<NodeId, groggy::AttrValue>> {
+        let mut rust_attributes = std::collections::HashMap::new();
+        
+        for (key, value) in dict.iter() {
+            // Convert key to NodeId (handle both int and string keys)
+            let node_id: NodeId = if let Ok(id) = key.extract::<i64>() {
+                id
+            } else if let Ok(id_str) = key.extract::<String>() {
+                id_str.parse().map_err(|_| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    format!("Cannot convert '{}' to node ID", id_str)
+                ))?
+            } else {
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Dictionary keys must be integers or integer strings"
+                ));
+            };
+            
+            // Convert value to AttrValue  
+            let attr_value = self.convert_py_value_to_attr_value(value)?;
+            rust_attributes.insert(node_id, attr_value);
+        }
+        
+        Ok(rust_attributes)
+    }
+    
+    /// Helper to convert list to attributes  
+    fn convert_list_to_attributes(&self, list: &PyList) -> PyResult<std::collections::HashMap<NodeId, groggy::AttrValue>> {
+        use pyo3::types::PyDict;
+        let mut rust_attributes = std::collections::HashMap::new();
+        
+        for item in list.iter() {
+            let item_dict = item.downcast::<PyDict>()
+                .map_err(|_| PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "List items must be dictionaries with 'id' and 'value' keys"
+                ))?;
+                
+            // Extract id
+            let node_id: NodeId = if let Some(id_val) = item_dict.get_item("id")? {
+                if let Ok(id) = id_val.extract::<i64>() {
+                    id
+                } else if let Ok(id_str) = id_val.extract::<String>() {
+                    id_str.parse().map_err(|_| PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        format!("Cannot convert '{}' to node ID", id_str)
+                    ))?
+                } else {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Dictionary 'id' must be an integer or integer string"
+                    ));
+                }
+            } else {
+                return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                    "Dictionary must have 'id' key"
+                ));
+            };
+            
+            // Extract value  
+            let attr_value = if let Some(value) = item_dict.get_item("value")? {
+                self.convert_py_value_to_attr_value(value)?
+            } else {
+                return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                    "Dictionary must have 'value' key"
+                ));
+            };
+            
+            rust_attributes.insert(node_id, attr_value);
+        }
+        
+        Ok(rust_attributes)
+    }
+    
+    /// Helper to convert Python value to AttrValue
+    fn convert_py_value_to_attr_value(&self, value: &PyAny) -> PyResult<groggy::AttrValue> {
+        use groggy::AttrValue;
+        
+        if value.is_none() {
+            Ok(AttrValue::Null)
+        } else if let Ok(b) = value.extract::<bool>() {
+            Ok(AttrValue::Bool(b))
+        } else if let Ok(i) = value.extract::<i64>() {
+            Ok(AttrValue::Int(i))
+        } else if let Ok(f) = value.extract::<f64>() {
+            Ok(AttrValue::Float(f as f32))
+        } else if let Ok(s) = value.extract::<String>() {
+            Ok(AttrValue::Text(s))
+        } else if let Ok(float_list) = value.extract::<Vec<f32>>() {
+            Ok(AttrValue::FloatVec(float_list))
+        } else {
+            // Fallback: convert to string representation
+            Ok(AttrValue::Text(format!("{}", value)))
+        }
     }
     
     /// Filter nodes by attribute value
@@ -688,17 +1097,19 @@ impl PyNodesTable {
         Ok(Self { table: new_nodes })
     }
     
-    /// Filter rows using a query expression
+    /// Filter rows using a query expression or Python function
     ///
     /// Args:
-    ///     predicate: Query expression to filter rows
+    ///     predicate: Either a string query expression (e.g. "age > 25") or a Python function
     ///
     /// Returns:
     ///     PyNodesTable: A new table with filtered rows
-    pub fn filter(&self, predicate: &str) -> PyResult<Self> {
-        let filtered_base = self.table.base_table().filter(predicate)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        let filtered_nodes = groggy::storage::table::NodesTable::from_base_table(filtered_base)
+    pub fn filter(&self, predicate: &PyAny) -> PyResult<Self> {
+        // Use base table's filter method (which handles both string and function predicates)
+        let base_table_py = PyBaseTable { table: self.table.base_table().clone() };
+        let filtered_base_py = base_table_py.filter(predicate)?;
+        
+        let filtered_nodes = groggy::storage::table::NodesTable::from_base_table(filtered_base_py.table)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
         Ok(Self { table: filtered_nodes })
@@ -937,6 +1348,54 @@ impl PyNodesTable {
         let base_table = self.base_table();
         let base_obj = base_table.into_py(py);
         base_obj.getattr(py, name)
+    }
+    
+    /// Export NodesTable to CSV file
+    pub fn to_csv(&self, path: &str) -> PyResult<()> {
+        self.table.base_table().to_csv(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+    
+    /// Import NodesTable from CSV file (must contain node_id column)
+    #[staticmethod]
+    pub fn from_csv(path: &str) -> PyResult<PyNodesTable> {
+        let base_table = groggy::storage::table::BaseTable::from_csv(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let nodes_table = groggy::storage::table::NodesTable::from_base_table(base_table)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyNodesTable { table: nodes_table })
+    }
+    
+    /// Export NodesTable to Parquet file 
+    pub fn to_parquet(&self, path: &str) -> PyResult<()> {
+        self.table.base_table().to_parquet(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+    
+    /// Import NodesTable from Parquet file (must contain node_id column)
+    #[staticmethod]
+    pub fn from_parquet(path: &str) -> PyResult<PyNodesTable> {
+        let base_table = groggy::storage::table::BaseTable::from_parquet(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let nodes_table = groggy::storage::table::NodesTable::from_base_table(base_table)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyNodesTable { table: nodes_table })
+    }
+    
+    /// Export NodesTable to JSON file
+    pub fn to_json(&self, path: &str) -> PyResult<()> {
+        self.table.base_table().to_json(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+    
+    /// Import NodesTable from JSON file (must contain node_id column)
+    #[staticmethod]
+    pub fn from_json(path: &str) -> PyResult<PyNodesTable> {
+        let base_table = groggy::storage::table::BaseTable::from_json(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let nodes_table = groggy::storage::table::NodesTable::from_base_table(base_table)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyNodesTable { table: nodes_table })
     }
 }
 
@@ -1249,17 +1708,19 @@ impl PyEdgesTable {
         Ok(Self { table: new_edges })
     }
     
-    /// Filter rows using a query expression
+    /// Filter rows using a query expression or Python function
     ///
     /// Args:
-    ///     predicate: Query expression to filter rows
+    ///     predicate: Either a string query expression (e.g. "weight > 0.5") or a Python function
     ///
     /// Returns:
     ///     PyEdgesTable: A new table with filtered rows
-    pub fn filter(&self, predicate: &str) -> PyResult<Self> {
-        let filtered_base = self.table.base_table().filter(predicate)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        let filtered_edges = groggy::storage::table::EdgesTable::from_base_table(filtered_base)
+    pub fn filter(&self, predicate: &PyAny) -> PyResult<Self> {
+        // Use base table's filter method (which handles both string and function predicates)
+        let base_table_py = PyBaseTable { table: self.table.base_table().clone() };
+        let filtered_base_py = base_table_py.filter(predicate)?;
+        
+        let filtered_edges = groggy::storage::table::EdgesTable::from_base_table(filtered_base_py.table)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
         Ok(Self { table: filtered_edges })
@@ -1498,6 +1959,54 @@ impl PyEdgesTable {
         let base_table = self.base_table();
         let base_obj = base_table.into_py(py);
         base_obj.getattr(py, name)
+    }
+    
+    /// Export EdgesTable to CSV file
+    pub fn to_csv(&self, path: &str) -> PyResult<()> {
+        self.table.base_table().to_csv(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+    
+    /// Import EdgesTable from CSV file (must contain edge_id, source, target columns)
+    #[staticmethod]
+    pub fn from_csv(path: &str) -> PyResult<PyEdgesTable> {
+        let base_table = groggy::storage::table::BaseTable::from_csv(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let edges_table = groggy::storage::table::EdgesTable::from_base_table(base_table)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyEdgesTable { table: edges_table })
+    }
+    
+    /// Export EdgesTable to Parquet file 
+    pub fn to_parquet(&self, path: &str) -> PyResult<()> {
+        self.table.base_table().to_parquet(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+    
+    /// Import EdgesTable from Parquet file (must contain edge_id, source, target columns)
+    #[staticmethod]
+    pub fn from_parquet(path: &str) -> PyResult<PyEdgesTable> {
+        let base_table = groggy::storage::table::BaseTable::from_parquet(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let edges_table = groggy::storage::table::EdgesTable::from_base_table(base_table)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyEdgesTable { table: edges_table })
+    }
+    
+    /// Export EdgesTable to JSON file
+    pub fn to_json(&self, path: &str) -> PyResult<()> {
+        self.table.base_table().to_json(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+    
+    /// Import EdgesTable from JSON file (must contain edge_id, source, target columns)
+    #[staticmethod]
+    pub fn from_json(path: &str) -> PyResult<PyEdgesTable> {
+        let base_table = groggy::storage::table::BaseTable::from_json(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        let edges_table = groggy::storage::table::EdgesTable::from_base_table(base_table)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        Ok(PyEdgesTable { table: edges_table })
     }
 }
 
@@ -1872,6 +2381,249 @@ impl PyGraphTable {
         dict.set_item("table_type", "GraphTable")?;
         
         Ok(dict.to_object(py))
+    }
+
+    // =============================================================================
+    // Phase 2 Features: Enhanced Bundle System
+    // =============================================================================
+
+    /// Save GraphTable as a v2.0 bundle with comprehensive metadata and checksums
+    /// 
+    /// # Arguments
+    /// * `bundle_path` - Directory path to save the bundle
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Save with comprehensive metadata and validation
+    /// graph_table.save_bundle("./graph_data_bundle")
+    /// 
+    /// # Bundle will contain:
+    /// # - metadata.json: Comprehensive metadata with checksums
+    /// # - MANIFEST.json: File integrity manifest
+    /// # - validation_report.json: Structured validation results
+    /// # - nodes.csv: Node data
+    /// # - edges.csv: Edge data
+    /// ```
+    pub fn save_bundle(&self, bundle_path: &str) -> PyResult<()> {
+        self.table.save_bundle(bundle_path)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to save bundle: {}", e)))
+    }
+
+    /// Load GraphTable from a bundle directory (supports both v1.0 and v2.0 formats)
+    /// 
+    /// # Arguments
+    /// * `bundle_path` - Directory path containing the bundle
+    /// 
+    /// # Returns
+    /// * `PyGraphTable` - Loaded graph table with validation policy restored
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Load from v2.0 bundle (with integrity verification)
+    /// graph_table = GraphTable.load_bundle("./graph_data_bundle")
+    /// 
+    /// # Also supports legacy v1.0 bundles
+    /// graph_table = GraphTable.load_bundle("./old_bundle")
+    /// ```
+    #[staticmethod]
+    pub fn load_bundle(bundle_path: &str) -> PyResult<Self> {
+        let table = groggy::storage::table::GraphTable::load_bundle(bundle_path)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to load bundle: {}", e)))?;
+        
+        Ok(Self { table })
+    }
+
+    /// Get bundle metadata information without loading the full bundle
+    /// 
+    /// # Arguments
+    /// * `bundle_path` - Directory path containing the bundle
+    /// 
+    /// # Returns
+    /// * `dict` - Bundle metadata information
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Inspect bundle metadata
+    /// metadata = GraphTable.get_bundle_info("./graph_data_bundle")
+    /// print(f"Bundle version: {metadata['version']}")
+    /// print(f"Nodes: {metadata['node_count']}, Edges: {metadata['edge_count']}")
+    /// print(f"Created: {metadata['created_at']}")
+    /// ```
+    #[staticmethod]
+    pub fn get_bundle_info(py: Python, bundle_path: &str) -> PyResult<PyObject> {
+        use std::path::Path;
+        
+        let bundle_path = Path::new(bundle_path);
+        
+        // Try v2.0 format first (JSON metadata)
+        let metadata_json_path = bundle_path.join("metadata.json");
+        if metadata_json_path.exists() {
+            let metadata_json = std::fs::read_to_string(&metadata_json_path)
+                .map_err(|e| pyo3::exceptions::PyIOError::new_err(format!("Failed to read metadata: {}", e)))?;
+            
+            // Parse JSON to Python dict
+            let metadata: serde_json::Value = serde_json::from_str(&metadata_json)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Failed to parse metadata JSON: {}", e)))?;
+            
+            // Convert to Python object
+            let py_dict = pyo3::types::PyDict::new(py);
+            Self::json_value_to_py_dict(py, &metadata, py_dict)?;
+            return Ok(py_dict.to_object(py));
+        }
+        
+        // Fall back to v1.0 format (text metadata)
+        let metadata_txt_path = bundle_path.join("metadata.txt");
+        if metadata_txt_path.exists() {
+            let metadata_text = std::fs::read_to_string(&metadata_txt_path)
+                .map_err(|e| pyo3::exceptions::PyIOError::new_err(format!("Failed to read metadata: {}", e)))?;
+            
+            // Parse simple key-value format
+            let py_dict = pyo3::types::PyDict::new(py);
+            py_dict.set_item("format_version", "1.0")?;
+            
+            for line in metadata_text.lines() {
+                if let Some((key, value)) = line.split_once(": ") {
+                    py_dict.set_item(key.trim(), value.trim())?;
+                }
+            }
+            
+            return Ok(py_dict.to_object(py));
+        }
+        
+        Err(pyo3::exceptions::PyFileNotFoundError::new_err(
+            format!("Bundle metadata not found at: {}", bundle_path.display())
+        ))
+    }
+
+    /// Verify bundle integrity without loading the full data
+    /// 
+    /// # Arguments
+    /// * `bundle_path` - Directory path containing the bundle
+    /// 
+    /// # Returns
+    /// * `dict` - Verification results with checksums and validation status
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Verify bundle integrity
+    /// verification = GraphTable.verify_bundle("./graph_data_bundle")
+    /// if verification['is_valid']:
+    ///     print("Bundle integrity verified!")
+    /// else:
+    ///     print(f"Issues found: {verification['errors']}")
+    /// ```
+    #[staticmethod]
+    pub fn verify_bundle(py: Python, bundle_path: &str) -> PyResult<PyObject> {
+        use std::path::Path;
+        
+        let bundle_path = Path::new(bundle_path);
+        let py_dict = pyo3::types::PyDict::new(py);
+        
+        // Check if bundle directory exists
+        if !bundle_path.exists() {
+            py_dict.set_item("is_valid", false)?;
+            py_dict.set_item("errors", vec!["Bundle directory does not exist"])?;
+            return Ok(py_dict.to_object(py));
+        }
+        
+        // For v2.0 bundles, verify checksums
+        let metadata_json_path = bundle_path.join("metadata.json");
+        let manifest_path = bundle_path.join("MANIFEST.json");
+        
+        if metadata_json_path.exists() && manifest_path.exists() {
+            // This would implement full checksum verification
+            // For now, just check file existence
+            let required_files = vec!["metadata.json", "MANIFEST.json", "nodes.csv", "edges.csv"];
+            let mut missing_files = Vec::new();
+            
+            for file_name in &required_files {
+                if !bundle_path.join(file_name).exists() {
+                    missing_files.push(file_name.to_string());
+                }
+            }
+            
+            py_dict.set_item("format_version", "2.0")?;
+            py_dict.set_item("is_valid", missing_files.is_empty())?;
+            py_dict.set_item("missing_files", missing_files)?;
+            py_dict.set_item("checksum_verified", false)?; // TODO: Implement full verification
+            
+        } else {
+            // v1.0 bundle format
+            let required_files = vec!["metadata.txt", "nodes.csv", "edges.csv"];
+            let mut missing_files = Vec::new();
+            
+            for file_name in &required_files {
+                if !bundle_path.join(file_name).exists() {
+                    missing_files.push(file_name.to_string());
+                }
+            }
+            
+            py_dict.set_item("format_version", "1.0")?;
+            py_dict.set_item("is_valid", missing_files.is_empty())?;
+            py_dict.set_item("missing_files", missing_files)?;
+        }
+        
+        Ok(py_dict.to_object(py))
+    }
+
+    // =============================================================================
+    // Helper Methods for Bundle System
+    // =============================================================================
+
+    /// Convert JSON value to Python dictionary recursively
+    fn json_value_to_py_dict(py: Python, value: &serde_json::Value, py_dict: &pyo3::types::PyDict) -> PyResult<()> {
+        match value {
+            serde_json::Value::Object(map) => {
+                for (key, val) in map {
+                    match val {
+                        serde_json::Value::Object(_) => {
+                            let nested_dict = pyo3::types::PyDict::new(py);
+                            Self::json_value_to_py_dict(py, val, nested_dict)?;
+                            py_dict.set_item(key, nested_dict)?;
+                        }
+                        serde_json::Value::Array(arr) => {
+                            let py_list = pyo3::types::PyList::new(py, arr.iter().map(|v| match v {
+                                serde_json::Value::String(s) => s.to_object(py),
+                                serde_json::Value::Number(n) => {
+                                    if let Some(i) = n.as_i64() {
+                                        i.to_object(py)
+                                    } else if let Some(f) = n.as_f64() {
+                                        f.to_object(py)
+                                    } else {
+                                        n.to_string().to_object(py)
+                                    }
+                                }
+                                serde_json::Value::Bool(b) => b.to_object(py),
+                                _ => py.None(),
+                            }));
+                            py_dict.set_item(key, py_list)?;
+                        }
+                        serde_json::Value::String(s) => {
+                            py_dict.set_item(key, s)?;
+                        }
+                        serde_json::Value::Number(n) => {
+                            if let Some(i) = n.as_i64() {
+                                py_dict.set_item(key, i)?;
+                            } else if let Some(f) = n.as_f64() {
+                                py_dict.set_item(key, f)?;
+                            } else {
+                                py_dict.set_item(key, n.to_string())?;
+                            }
+                        }
+                        serde_json::Value::Bool(b) => {
+                            py_dict.set_item(key, b)?;
+                        }
+                        serde_json::Value::Null => {
+                            py_dict.set_item(key, py.None())?;
+                        }
+                    }
+                }
+            }
+            _ => {
+                return Err(pyo3::exceptions::PyTypeError::new_err("Expected JSON object"));
+            }
+        }
+        Ok(())
     }
 }
 

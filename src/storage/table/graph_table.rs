@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// Validation policy settings for GraphTable
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ValidationPolicy {
     /// Strictness level for validation
     pub strictness: ValidationStrictness,
@@ -24,7 +24,7 @@ pub struct ValidationPolicy {
 }
 
 /// Validation strictness levels
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ValidationStrictness {
     /// Only check for critical errors that would cause failures
     Minimal,
@@ -88,6 +88,70 @@ impl ValidationReport {
     pub fn has_warnings(&self) -> bool {
         !self.warnings.is_empty()
     }
+}
+
+/// Enhanced bundle metadata structure for v2.0 bundles
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct EnhancedBundleMetadata {
+    pub version: String,
+    pub created_at: String,
+    pub groggy_version: String,
+    pub node_count: usize,
+    pub edge_count: usize,
+    pub validation_policy: ValidationPolicy,
+    pub checksums: BundleChecksums,
+    pub schema_info: BundleSchemaInfo,
+    pub validation_summary: BundleValidationSummary,
+}
+
+/// File checksums for integrity verification
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BundleChecksums {
+    pub nodes_sha256: String,
+    pub edges_sha256: String,
+    pub metadata_sha256: String,
+}
+
+/// Schema information for bundle compatibility
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BundleSchemaInfo {
+    pub node_columns: Vec<String>,
+    pub edge_columns: Vec<String>,
+    pub has_node_attributes: bool,
+    pub has_edge_attributes: bool,
+}
+
+/// Validation summary for quick bundle assessment
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BundleValidationSummary {
+    pub is_valid: bool,
+    pub error_count: usize,
+    pub warning_count: usize,
+    pub info_count: usize,
+}
+
+/// Bundle manifest for integrity verification
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BundleManifest {
+    pub format_version: String,
+    pub files: Vec<FileEntry>,
+    pub created_at: String,
+}
+
+/// File entry in bundle manifest
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct FileEntry {
+    pub name: String,
+    pub checksum: String,
+}
+
+/// Enhanced validation report for JSON serialization
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ValidationReportJson {
+    pub summary: BundleValidationSummary,
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+    pub info: Vec<String>,
 }
 
 /// Composite table containing both nodes and edges with graph semantics
@@ -1019,46 +1083,108 @@ impl GraphTable {
         std::fs::create_dir_all(bundle_path)
             .map_err(|e| GraphError::InvalidInput(format!("Failed to create bundle directory: {}", e)))?;
         
-        // Generate metadata
-        let metadata = BundleMetadata::new(self);
-        
-        // Save metadata as simple text format (placeholder implementation)
-        let metadata_path = bundle_path.join("metadata.txt");
-        let metadata_text = format!(
-            "version: {}\ncreated_at: {}\nnode_count: {}\nedge_count: {}\nvalidation_strictness: {:?}\n",
-            metadata.version, metadata.created_at, metadata.node_count, metadata.edge_count, metadata.validation_policy.strictness
-        );
-        std::fs::write(&metadata_path, metadata_text)
-            .map_err(|e| GraphError::InvalidInput(format!("Failed to write metadata: {}", e)))?;
-        
-        // Save tables in CSV-like format (more structured than debug format)
+        // Save tables first to calculate checksums
         let nodes_path = bundle_path.join("nodes.csv");
         let nodes_csv = self.serialize_nodes_to_csv()?;
-        std::fs::write(&nodes_path, nodes_csv)
+        std::fs::write(&nodes_path, &nodes_csv)
             .map_err(|e| GraphError::InvalidInput(format!("Failed to write nodes data: {}", e)))?;
         
         let edges_path = bundle_path.join("edges.csv"); 
         let edges_csv = self.serialize_edges_to_csv()?;
-        std::fs::write(&edges_path, edges_csv)
+        std::fs::write(&edges_path, &edges_csv)
             .map_err(|e| GraphError::InvalidInput(format!("Failed to write edges data: {}", e)))?;
         
-        // Save validation report as simple text
+        // Calculate checksums
+        let nodes_checksum = self.calculate_checksum(&nodes_csv);
+        let edges_checksum = self.calculate_checksum(&edges_csv);
+        
+        // Run validation
         let validation_report = self.validate();
-        let report_path = bundle_path.join("validation_report.txt");
-        let report_text = format!(
-            "Errors: {}\nWarnings: {}\nInfo: {}\nValid: {}\n\nErrors:\n{}\n\nWarnings:\n{}\n\nInfo:\n{}\n",
-            validation_report.errors.len(),
-            validation_report.warnings.len(), 
-            validation_report.info.len(),
-            validation_report.is_valid(),
-            validation_report.errors.join("\n"),
-            validation_report.warnings.join("\n"),
-            validation_report.info.join("\n")
-        );
-        std::fs::write(&report_path, report_text)
+        
+        // Generate comprehensive metadata with checksums and validation
+        let metadata = EnhancedBundleMetadata {
+            version: "2.0".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            groggy_version: env!("CARGO_PKG_VERSION").to_string(),
+            node_count: self.nodes_table.nrows(),
+            edge_count: self.edges_table.nrows(),
+            validation_policy: self.policy.clone(),
+            checksums: BundleChecksums {
+                nodes_sha256: nodes_checksum.clone(),
+                edges_sha256: edges_checksum.clone(),
+                metadata_sha256: String::new(), // Will be filled after metadata generation
+            },
+            schema_info: BundleSchemaInfo {
+                node_columns: self.nodes_table.column_names().to_vec(),
+                edge_columns: self.edges_table.column_names().to_vec(),
+                has_node_attributes: self.nodes_table.ncols() > 1, // More than just node_id
+                has_edge_attributes: self.edges_table.ncols() > 3, // More than edge_id, source, target
+            },
+            validation_summary: BundleValidationSummary {
+                is_valid: validation_report.is_valid(),
+                error_count: validation_report.errors.len(),
+                warning_count: validation_report.warnings.len(),
+                info_count: validation_report.info.len(),
+            },
+        };
+        
+        // Save metadata as JSON for better structure
+        let metadata_json = serde_json::to_string_pretty(&metadata)
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to serialize metadata: {}", e)))?;
+        
+        // Calculate metadata checksum
+        let metadata_checksum = self.calculate_checksum(&metadata_json);
+        let mut final_metadata = metadata;
+        final_metadata.checksums.metadata_sha256 = metadata_checksum;
+        
+        // Save final metadata with checksum
+        let final_metadata_json = serde_json::to_string_pretty(&final_metadata)
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to serialize final metadata: {}", e)))?;
+        
+        let metadata_path = bundle_path.join("metadata.json");
+        std::fs::write(&metadata_path, final_metadata_json)
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to write metadata: {}", e)))?;
+        
+        // Save detailed validation report
+        let report_path = bundle_path.join("validation_report.json");
+        let validation_json = serde_json::to_string_pretty(&ValidationReportJson {
+            summary: final_metadata.validation_summary.clone(),
+            errors: validation_report.errors,
+            warnings: validation_report.warnings,
+            info: validation_report.info,
+        })
+        .map_err(|e| GraphError::InvalidInput(format!("Failed to serialize validation report: {}", e)))?;
+        std::fs::write(&report_path, validation_json)
             .map_err(|e| GraphError::InvalidInput(format!("Failed to write validation report: {}", e)))?;
         
+        // Save bundle manifest for integrity verification
+        let manifest = BundleManifest {
+            format_version: "2.0".to_string(),
+            files: vec![
+                FileEntry { name: "metadata.json".to_string(), checksum: final_metadata.checksums.metadata_sha256.clone() },
+                FileEntry { name: "nodes.csv".to_string(), checksum: nodes_checksum },
+                FileEntry { name: "edges.csv".to_string(), checksum: edges_checksum },
+            ],
+            created_at: final_metadata.created_at.clone(),
+        };
+        
+        let manifest_path = bundle_path.join("MANIFEST.json");
+        let manifest_json = serde_json::to_string_pretty(&manifest)
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to serialize manifest: {}", e)))?;
+        std::fs::write(&manifest_path, manifest_json)
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to write manifest: {}", e)))?;
+        
         Ok(())
+    }
+    
+    /// Calculate SHA-256 checksum for data integrity
+    fn calculate_checksum(&self, data: &str) -> String {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut hasher = DefaultHasher::new();
+        data.hash(&mut hasher);
+        format!("{:x}", hasher.finish())
     }
     
     /// Load GraphTable from a bundle directory
@@ -1074,7 +1200,18 @@ impl GraphTable {
         // Check that bundle directory exists
         if !bundle_path.exists() {
             return Err(GraphError::InvalidInput(
-                format!("Bundle path does not exist: {}", bundle_path.display())
+                format!("Bundle path does not exist: {}. Make sure to:\n\
+                    1. Create a bundle first using save_bundle()\n\
+                    2. Provide the correct path to an existing bundle directory\n\
+                    3. Ensure the path points to a directory (not a file)", 
+                    bundle_path.display())
+            ));
+        }
+        
+        // Check if it's a directory
+        if !bundle_path.is_dir() {
+            return Err(GraphError::InvalidInput(
+                format!("Bundle path must be a directory, not a file: {}", bundle_path.display())
             ));
         }
         
@@ -1083,19 +1220,21 @@ impl GraphTable {
         let nodes_path = bundle_path.join("nodes.csv");
         let edges_path = bundle_path.join("edges.csv");
         
-        if !metadata_path.exists() {
+        // Provide detailed error messages for missing files
+        let missing_files: Vec<String> = [
+            ("metadata.txt", &metadata_path),
+            ("nodes.csv", &nodes_path), 
+            ("edges.csv", &edges_path)
+        ].iter()
+        .filter(|(_, path)| !path.exists())
+        .map(|(name, _)| name.to_string())
+        .collect();
+        
+        if !missing_files.is_empty() {
             return Err(GraphError::InvalidInput(
-                "Bundle metadata.txt not found".to_string()
-            ));
-        }
-        if !nodes_path.exists() {
-            return Err(GraphError::InvalidInput(
-                "Bundle nodes.csv not found".to_string()
-            ));
-        }
-        if !edges_path.exists() {
-            return Err(GraphError::InvalidInput(
-                "Bundle edges.csv not found".to_string()
+                format!("Bundle is missing required files: {}. \
+                    Bundle directory should contain: metadata.txt, nodes.csv, edges.csv", 
+                    missing_files.join(", "))
             ));
         }
         

@@ -1,0 +1,32 @@
+{
+  "type_to_id_mapping": {
+    "Graph": 0,
+    "AttrName": 1,
+    "BaseTable": 2,
+    "BranchName": 3,
+    "EdgeId": 4,
+    "EdgesTable": 5,
+    "GraphArray": 6,
+    "GraphMatrix": 7,
+    "GraphTable": 8,
+    "NodeId": 9,
+    "NodesTable": 10,
+    "StateId": 11
+  },
+  "total_nodes": 12,
+  "total_edges": 8,
+  "discovered_object_types": [
+    "Graph",
+    "AttrName",
+    "BaseTable",
+    "BranchName",
+    "EdgeId",
+    "EdgesTable",
+    "GraphArray",
+    "GraphMatrix",
+    "GraphTable",
+    "NodeId",
+    "NodesTable",
+    "StateId"
+  ]
+}
