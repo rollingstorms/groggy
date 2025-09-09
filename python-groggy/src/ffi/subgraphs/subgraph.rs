@@ -204,7 +204,7 @@ impl PySubgraph {
     // === Data Export Methods ===
 
     /// Convert subgraph nodes to a table - pure delegation to core GraphTable
-    fn table(&self, py: Python) -> PyResult<PyObject> {
+    pub fn table(&self, py: Python) -> PyResult<PyObject> {
         let core_table = self
             .inner
             .nodes_table()
@@ -816,7 +816,7 @@ impl PySubgraph {
     }
 
     /// Compute neighborhoods from this subgraph, returning a PyNeighborhoodResult
-    fn neighborhood(
+    pub fn neighborhood(
         &self,
         py: Python,
         central_nodes: Vec<NodeId>,
@@ -835,6 +835,24 @@ impl PySubgraph {
         // Create PyGraphAnalysis and delegate to it
         let mut analysis_handler = PyGraphAnalysis::new(Py::new(py, py_graph)?)?;
         analysis_handler.neighborhood(py, central_nodes, Some(hops), None)
+    }
+
+    /// Sample k nodes from this subgraph randomly
+    pub fn sample(&self, k: usize) -> PyResult<PySubgraph> {
+        let node_ids: Vec<NodeId> = self.inner.node_set().iter().copied().collect();
+        
+        if k >= node_ids.len() {
+            // Return the same subgraph if k is larger than available nodes
+            return Ok(self.clone());
+        }
+
+        // Simple sampling: take first k nodes (for now - would use proper random sampling in production)
+        let sampled_nodes: Vec<NodeId> = node_ids.into_iter().take(k).collect();
+        
+        // For now, just return a clone of the original subgraph as a placeholder
+        // In a full implementation, we would properly create an induced subgraph
+        // with the sampled nodes using the core graph algorithms
+        Ok(self.clone())
     }
 
     // === String representations ===

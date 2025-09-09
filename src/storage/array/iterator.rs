@@ -353,3 +353,4 @@ impl<T> ArrayOps<T> for CollectedArray<T> {
         ArrayIterator::new(self.elements.clone())
     }
 }
+

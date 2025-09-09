@@ -40,6 +40,30 @@ pub trait GraphOps {
     fn bfs(&self, start: NodeId) -> Subgraph;
     // ... more operations
 }
+
+// Separation: Basic array operations vs. statistical operations
+pub trait BaseArrayOps {
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn get(&self, index: usize) -> Option<&Self::Item>;
+    fn iter(&self) -> Box<dyn Iterator<Item = &Self::Item>>;
+    type Item;
+}
+
+pub trait StatsArrayOps {
+    fn mean(&self) -> Option<f64>;
+    fn sum(&self) -> f64;
+    fn min(&self) -> Option<f64>;
+    fn max(&self) -> Option<f64>;
+    fn std_dev(&self) -> Option<f64>;
+    fn median(&self) -> Option<f64>;
+    fn variance(&self) -> Option<f64>;
+    fn percentile(&self, p: f64) -> Option<f64>;
+    // Operators for numerical arrays
+    fn add(&self, other: &Self) -> Self;
+    fn multiply(&self, scalar: f64) -> Self;
+    fn correlate(&self, other: &Self) -> Option<f64>;
+}
 ```
 
 **Implementation**: Only on concrete types where optimized algorithms already exist:
@@ -48,6 +72,22 @@ impl SubgraphOps for Subgraph { /* existing optimized code */ }
 impl TableOps for NodesTable { /* existing optimized code */ }
 impl TableOps for EdgesTable { /* existing optimized code */ }
 impl GraphOps for Graph { /* existing optimized code */ }
+
+// BaseArray: implemented for all array types (SubgraphArray, NodesArray, etc.)
+impl<T> BaseArrayOps for BaseArray<T> {
+    type Item = T;
+    fn len(&self) -> usize { self.inner.len() }
+    fn is_empty(&self) -> bool { self.inner.is_empty() }
+    fn get(&self, index: usize) -> Option<&T> { self.inner.get(index) }
+    fn iter(&self) -> Box<dyn Iterator<Item = &T>> { Box::new(self.inner.iter()) }
+}
+
+// StatsArray: only implemented for numerical types (TableArray, MatrixArray)
+impl StatsArrayOps for StatsArray<f64> {
+    fn mean(&self) -> Option<f64> { /* optimized statistical implementation */ }
+    fn sum(&self) -> f64 { /* optimized statistical implementation */ }
+    // ... other statistical methods
+}
 ```
 
 ### 2. Generic Delegating Iterator
@@ -115,7 +155,7 @@ impl DelegatingIterator<NodesTable> {
 
 ### 4. Typed Array Carriers
 
-Thin wrappers around vectors that provide iterator access:
+Thin wrappers around vectors that provide iterator access and delegate to appropriate base arrays:
 
 ```rust
 pub struct SubgraphArray {
@@ -126,11 +166,39 @@ pub struct TableArray {
     inner: Arc<Vec<BaseTable>>,
 }
 
+// Base array with only basic operations
+pub struct BaseArray<T> {
+    inner: Arc<Vec<T>>,
+}
+
+// Statistical array inheriting from BaseArray + numerical operations
+pub struct StatsArray<T> {
+    base: BaseArray<T>,
+}
+
+impl<T> BaseArray<T> {
+    pub fn len(&self) -> usize { self.inner.len() }
+    pub fn is_empty(&self) -> bool { self.inner.is_empty() }
+    pub fn get(&self, index: usize) -> Option<&T> { self.inner.get(index) }
+    pub fn iter(&self) -> impl Iterator<Item = &T> { self.inner.iter() }
+}
+
+impl<T> StatsArray<T> 
+where T: num_traits::Num + Copy + PartialOrd {
+    pub fn mean(&self) -> Option<T> { /* statistical implementation */ }
+    pub fn sum(&self) -> T { /* statistical implementation */ }
+    pub fn min(&self) -> Option<T> { /* statistical implementation */ }
+    pub fn max(&self) -> Option<T> { /* statistical implementation */ }
+    pub fn std_dev(&self) -> Option<f64> { /* statistical implementation */ }
+    // ... other numerical/statistical operations
+}
+
 impl SubgraphArray {
     pub fn iter(&self) -> DelegatingIterator<Subgraph> {
         DelegatingIterator::new(self.inner.iter().cloned())
     }
     
+    // Delegates basic operations to BaseArray pattern
     pub fn len(&self) -> usize { self.inner.len() }
 }
 
@@ -138,11 +206,10 @@ impl TableArray {
     pub fn iter(&self) -> DelegatingIterator<BaseTable> {
         DelegatingIterator::new(self.inner.iter().cloned())
     }
-}
-
-impl From<Vec<BaseTable>> for TableArray {
-    fn from(tables: Vec<BaseTable>) -> Self {
-        Self { inner: Arc::new(tables) }
+    
+    // Tables and matrices delegate to StatsArray for numerical operations
+    pub fn stats(&self) -> StatsArray<f64> {
+        // Extract numerical columns and create StatsArray
     }
 }
 ```
