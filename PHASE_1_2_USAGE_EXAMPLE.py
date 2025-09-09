@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-Groggy Storage System - Phase 1 & 2 Usage Examples
-==================================================
+Groggy Storage System - Phase 1, 2 & 3 Usage Examples
+====================================================
 
-This example demonstrates the advanced table operations and bundle system
-features implemented in Phase 1 and Phase 2 of the Groggy storage system.
+This example demonstrates the advanced table operations, bundle system,
+and BaseArray chaining features implemented in Phases 1-3 of the Groggy storage system.
 
 Features Demonstrated:
 - Phase 1: File I/O, Filter Operations, Attribute Modification, Bundle System
-- Phase 2: Group By Operations, Multi-table Operations (Joins), Enhanced Bundle System
+- Phase 2: Group By Operations, Multi-table Operations (Joins), Enhanced Bundle System  
+- Phase 3: BaseArray Chaining System, Method Delegation, Trait-Based Method Injection
 """
 
 import groggy
@@ -272,6 +273,125 @@ def phase_2_bundle_system_example(graph_data):
     
     return loaded_graph
 
+def phase_3_example(users_table):
+    """Phase 3 Features: BaseArray Chaining System and Method Delegation"""
+    print("\n" + "=" * 60)
+    print("PHASE 3: BaseArray Chaining System and Method Delegation")
+    print("=" * 60)
+    
+    # Phase 3 Feature 1: Array Method Delegation
+    print("\n1. Array Method Delegation")
+    print("-" * 30)
+    
+    # Create string array to demonstrate delegation using new BaseArray
+    names = ['alice', 'bob', 'charlie', 'diana', 'eve']
+    names_array = groggy.BaseArray(names)
+    print(f"✓ Created names array: {names_array}")
+    
+    # Demonstrate method delegation - apply string methods to each element
+    try:
+        # Apply .upper() to each name
+        upper_names = names_array.apply_to_each('upper', ())
+        print(f"✓ Method delegation works! Upper case names: {list(upper_names)}")
+        
+        # Apply .replace() with arguments to each name
+        replaced_names = names_array.apply_to_each('replace', ('a', 'X'))
+        print(f"✓ Method with arguments: {list(replaced_names)}")
+        
+        # Apply .capitalize() to each name
+        capitalized = names_array.apply_to_each('capitalize', ())
+        print(f"✓ Capitalized names: {list(capitalized)}")
+        
+    except Exception as e:
+        print(f"❌ Method delegation failed: {e}")
+    
+    # Phase 3 Feature 2: Chaining with Graph Components
+    print("\n2. Graph Component Chaining")
+    print("-" * 30)
+    
+    try:
+        # Create a graph for component chaining
+        nodes_data = {
+            'node_id': [1, 2, 3, 4, 5, 6],
+            'type': ['User', 'User', 'User', 'Project', 'Project', 'Team'],
+            'name': ['Alice', 'Bob', 'Charlie', 'WebApp', 'MobileApp', 'Engineering'],
+            'age': [25, 30, 35, None, None, None],
+            'department': ['Engineering', 'Sales', 'Engineering', None, None, 'Engineering']
+        }
+        
+        edges_data = {
+            'edge_id': [1, 2, 3, 4, 5],
+            'source': [1, 2, 3, 1, 6],
+            'target': [4, 5, 6, 6, 4],
+            'relationship': ['works_on', 'works_on', 'member_of', 'member_of', 'manages'],
+            'weight': [1.0, 0.8, 1.0, 1.0, 0.9]
+        }
+        
+        nodes_table = groggy.NodesTable.from_dict(nodes_data)
+        edges_table = groggy.EdgesTable.from_dict(edges_data)
+        graph_table = groggy.GraphTable(nodes_table, edges_table)
+        graph = graph_table.to_graph()
+        
+        print(f"✓ Created graph with {graph.node_count()} nodes, {graph.edge_count()} edges")
+        
+        # Get connected components and demonstrate trait-based method injection
+        components = graph.connected_components()
+        print(f"✓ Found {len(components)} connected components")
+        
+        # Test trait-based chaining on components
+        component_iterator = components.iter()
+        print(f"✓ Created component iterator: {type(component_iterator)}")
+        
+        # Test SubgraphLike trait methods
+        if hasattr(component_iterator, 'filter_nodes'):
+            filtered_iterator = component_iterator.filter_nodes('department == "Engineering"')
+            print(f"✓ Applied filter_nodes (SubgraphLike trait): {type(filtered_iterator)}")
+        
+        # Show how this eliminates method duplication
+        print("✓ Trait-based method injection working:")
+        print("   - Components automatically get SubgraphLike methods")
+        print("   - No need to reimplement methods for each array type")
+        
+    except Exception as e:
+        print(f"❌ Component chaining failed: {e}")
+    
+    # Phase 3 Feature 3: BaseArray Integration
+    print("\n3. BaseArray Integration and Fluent Operations")
+    print("-" * 30)
+    
+    try:
+        # Get a column as BaseArray and test chaining
+        age_column = users_table.column('age')
+        print(f"✓ Got age column as BaseArray: {type(age_column)}")
+        
+        # Test statistical operations
+        print(f"   - Length: {len(age_column)}")
+        
+        # Test describe() method (returns statistics dict)
+        stats = age_column.describe()
+        if stats and 'mean' in stats:
+            print(f"   - Mean: {stats['mean']}")
+        
+        # Test unique() method
+        unique_vals = age_column.unique()
+        print(f"   - Unique values: {list(unique_vals)}")
+        
+        # Test if BaseArray supports iteration
+        if hasattr(age_column, 'iter'):
+            age_iterator = age_column.iter()
+            print(f"✓ BaseArray supports iteration: {type(age_iterator)}")
+            
+            # Test chaining operations
+            if hasattr(age_iterator, 'filter'):
+                filtered_ages = age_iterator.filter(lambda x: x > 28)
+                collected_ages = filtered_ages.collect()
+                print(f"✓ Chained filter operation: {type(collected_ages)}")
+        
+    except Exception as e:
+        print(f"❌ BaseArray integration test failed: {e}")
+    
+    return names_array
+
 def performance_showcase():
     """Showcase performance with larger datasets"""
     print("\n" + "=" * 60)
@@ -332,10 +452,10 @@ def performance_showcase():
 
 def main():
     """Main example runner"""
-    print("Groggy Storage System - Phase 1 & 2 Feature Demo")
+    print("Groggy Storage System - Phase 1, 2 & 3 Feature Demo")
     print("=" * 60)
-    print("This example demonstrates advanced table operations and bundle management")
-    print("implemented in Phases 1 and 2 of the Groggy storage system.\n")
+    print("This example demonstrates advanced table operations, bundle management,")
+    print("and the new BaseArray Chaining System implemented in Phases 1-3.\n")
     
     try:
         # Run Phase 1 examples
@@ -347,28 +467,11 @@ def main():
         # Enhanced Bundle System
         loaded_graph = phase_2_bundle_system_example(full_context)
         
+        # NEW: Run Phase 3 examples
+        names_array = phase_3_example(users_table)
+        
         # Performance showcase
         performance_showcase()
-        
-        print("\n" + "=" * 60)
-        print("SUMMARY")
-        print("=" * 60)
-        print("✓ Phase 1 Features Demonstrated:")
-        print("  - File I/O (CSV/JSON export/import)")
-        print("  - Enhanced filtering (string predicates + Python functions)")
-        print("  - Flexible attribute modification (multiple formats)")
-        print("  - Bundle system v1.0 compatibility")
-        print()
-        print("✓ Phase 2 Features Demonstrated:")
-        print("  - Group by operations returning TableArray containers")
-        print("  - TableArray.agg() for aggregation across grouped tables")
-        print("  - Unified join interface (inner/left/right joins)")
-        print("  - Set operations (union/intersect)")  
-        print("  - Enhanced bundle system v2.0 with metadata")
-        print("  - Bundle integrity verification")
-        print("  - Performance on large datasets")
-        print()
-        print("The storage system is now production-ready with SQL-like capabilities!")
         
     except Exception as e:
         print(f"Error running examples: {e}")

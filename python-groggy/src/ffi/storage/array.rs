@@ -5,14 +5,16 @@
 use groggy::storage::{legacy_array::{GraphArray, StatsSummary}, array::{BaseArray, ArrayOps, ArrayIterator, NodesArray, EdgesArray, MetaNodeArray, NodeIdLike, EdgeLike, MetaNodeLike}};
 use groggy::types::{AttrValue as RustAttrValue, AttrValueType, NodeId, EdgeId};
 use groggy::entities::meta_node::MetaNode;
-use pyo3::exceptions::{PyImportError, PyIndexError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyAttributeError, PyImportError, PyIndexError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyTuple};
 use std::collections::HashMap;
 
 // Use utility functions from utils module
 use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
 
 /// New BaseArray-powered array with chaining support
+#[derive(Clone)]
 #[pyclass(name = "BaseArray")]
 pub struct PyBaseArray {
     pub inner: BaseArray,
@@ -107,6 +109,46 @@ impl PyBaseArray {
         Ok(PyBaseArrayIterator {
             inner: array_iterator,
         })
+    }
+    
+    /// Delegation-based method application to each element 
+    /// This demonstrates the concept: apply a method to each element and return new array
+    fn apply_to_each(&self, py: Python, method_name: &str, args: &PyTuple) -> PyResult<Self> {
+        let mut results = Vec::new();
+        
+        // Apply the method to each element in the array
+        for value in self.inner.data() {
+            // Convert AttrValue to a Python object that might have the method
+            let py_value = attr_value_to_python_value(py, value)?;
+            
+            // Check if this value has the requested method
+            if py_value.as_ref(py).hasattr(method_name)? {
+                // Get the method and call it with the provided arguments
+                let method = py_value.as_ref(py).getattr(method_name)?;
+                let result = method.call1(args)?;
+                
+                // Convert result back to AttrValue
+                let attr_result = python_value_to_attr_value(result)?;
+                results.push(attr_result);
+            } else {
+                return Err(PyAttributeError::new_err(
+                    format!("Elements in array don't have method '{}'", method_name)
+                ));
+            }
+        }
+        
+        // Create new BaseArray with results
+        let result_array = BaseArray::from_attr_values(results);
+        Ok(PyBaseArray { inner: result_array })
+    }
+    
+    /// BaseArray __getattr__ delegation: automatically apply methods to each element
+    /// This enables: array.some_method() -> applies some_method to each element
+    pub fn __getattr__(&self, py: Python, name: &str) -> PyResult<PyObject> {
+        // Use apply_to_each internally to delegate to each element
+        let args = pyo3::types::PyTuple::empty(py);
+        let result = self.apply_to_each(py, name, args)?;
+        Ok(result.into_py(py))
     }
 }
 
@@ -1453,6 +1495,37 @@ impl PyGraphArray {
         }
 
         Ok(indices)
+    }
+    
+    /// Delegation-based method application to each element 
+    /// This demonstrates the concept: apply a method to each element and return new array
+    fn apply_to_each(&self, py: Python, method_name: &str, args: &PyTuple) -> PyResult<Self> {
+        let mut results = Vec::new();
+        
+        // Apply the method to each element in the array
+        for value in self.inner.iter() {
+            // Convert AttrValue to a Python object that might have the method
+            let py_value = attr_value_to_python_value(py, value)?;
+            
+            // Check if this value has the requested method
+            if py_value.as_ref(py).hasattr(method_name)? {
+                // Get the method and call it with the provided arguments
+                let method = py_value.as_ref(py).getattr(method_name)?;
+                let result = method.call1(args)?;
+                
+                // Convert result back to AttrValue
+                let attr_result = python_value_to_attr_value(result)?;
+                results.push(attr_result);
+            } else {
+                return Err(PyAttributeError::new_err(
+                    format!("Elements in array don't have method '{}'", method_name)
+                ));
+            }
+        }
+        
+        // Create new PyGraphArray with results
+        let result_array = GraphArray::from_vec(results);
+        Ok(PyGraphArray::from_graph_array(result_array))
     }
 }
 

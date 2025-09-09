@@ -6,7 +6,7 @@ use groggy::api::graph::Graph;
 use groggy::subgraphs::Subgraph;
 use groggy::{EdgeId, NodeId};
 use groggy::storage::array::{ArrayOps, ArrayIterator, SubgraphLike};
-use pyo3::exceptions::{PyIndexError, PyRuntimeError};
+use pyo3::exceptions::{PyAttributeError, PyIndexError, PyRuntimeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::cell::RefCell;
@@ -285,6 +285,28 @@ impl PyComponentsIterator {
         // Extract the elements from our ArrayIterator
         let inner = slf.inner.clone(); // Clone the inner ArrayIterator
         Ok(inner.into_vec())
+    }
+    
+    /// Delegation via BaseArray: automatically apply any method to each component
+    /// This enables: components.iter().table() -> BaseArray with table() applied to each
+    /// This enables: components.iter().node_count() -> BaseArray with node_count() applied to each
+    fn __getattr__(&self, py: Python, name: &str) -> PyResult<PyObject> {
+        // Convert components to BaseArray
+        let components = self.inner.clone().into_vec();
+        let mut py_objects = Vec::new();
+        
+        for component in components {
+            py_objects.push(component.into_py(py));
+        }
+        
+        // Create BaseArray from components (same approach as array() builder function)
+        let py_base_array_class = py.get_type::<crate::ffi::storage::array::PyBaseArray>();
+        let py_args = pyo3::types::PyTuple::new(py, &[py_objects.to_object(py)]);
+        let base_array_obj = py_base_array_class.call1(py_args)?;
+        let base_array = base_array_obj.extract::<crate::ffi::storage::array::PyBaseArray>()?;
+        
+        // Delegate to BaseArray's __getattr__ which uses apply_to_each internally
+        base_array.__getattr__(py, name)
     }
 }
 
