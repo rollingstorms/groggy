@@ -242,7 +242,26 @@ impl BaseArray {
     }
 }
 
-// Implement ArrayOps for BaseArray
+impl BaseArray {
+    /// Set a value at a specific index
+    pub fn set(&mut self, index: usize, value: AttrValue) -> crate::errors::GraphResult<()> {
+        if index >= self.data.len() {
+            return Err(crate::errors::GraphError::InvalidInput(
+                format!("Index {} out of bounds for array with length {}", index, self.data.len())
+            ));
+        }
+        
+        self.data[index] = value;
+        Ok(())
+    }
+    
+    /// Get mutable access to the data for batch operations
+    pub fn data_mut(&mut self) -> &mut Vec<AttrValue> {
+        &mut self.data
+    }
+}
+
+// Continue with ArrayOps implementation - remaining methods
 impl ArrayOps<AttrValue> for BaseArray {
     fn len(&self) -> usize {
         self.data.len()

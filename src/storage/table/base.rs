@@ -155,6 +155,226 @@ impl BaseTable {
         
         super::edges::EdgesTable::from_base_table(self)
     }
+    
+    // =============================================================================
+    // Setting Methods - Comprehensive assignment and modification operations
+    // =============================================================================
+    
+    /// Assign updates to multiple columns at once
+    /// 
+    /// # Arguments
+    /// * `updates` - HashMap mapping column names to new values
+    /// 
+    /// # Examples
+    /// ```
+    /// let mut updates = HashMap::new();
+    /// updates.insert("bonus".to_string(), vec![AttrValue::Float(1000.0), AttrValue::Float(1500.0)]);
+    /// table.assign(updates)?;
+    /// ```
+    pub fn assign(&mut self, updates: HashMap<String, Vec<crate::types::AttrValue>>) -> GraphResult<()> {
+        use crate::types::{AttrValue, AttrValueType};
+        
+        // Validate that all update vectors have the correct length
+        for (col_name, values) in &updates {
+            if values.len() != self.nrows {
+                return Err(crate::errors::GraphError::InvalidInput(
+                    format!("Column '{}' update has {} values but table has {} rows", col_name, values.len(), self.nrows)
+                ));
+            }
+        }
+        
+        // Apply updates
+        for (col_name, values) in updates {
+            // Infer dtype from the first non-null value
+            let dtype = values.iter()
+                .find(|v| !matches!(v, AttrValue::Null))
+                .map(|v| match v {
+                    AttrValue::Int(_) => AttrValueType::Int,
+                    AttrValue::SmallInt(_) => AttrValueType::SmallInt,
+                    AttrValue::Float(_) => AttrValueType::Float,
+                    AttrValue::Text(_) => AttrValueType::Text,
+                    AttrValue::CompactText(_) => AttrValueType::CompactText,
+                    AttrValue::Bool(_) => AttrValueType::Bool,
+                    AttrValue::FloatVec(_) => AttrValueType::FloatVec,
+                    AttrValue::Bytes(_) => AttrValueType::Bytes,
+                    AttrValue::Null => AttrValueType::Null,
+                    _ => AttrValueType::Text, // fallback for other types
+                })
+                .unwrap_or(AttrValueType::Text);
+            
+            let new_column = BaseArray::new(values, dtype);
+            
+            // Add to column order if it's a new column
+            if !self.columns.contains_key(&col_name) {
+                self.column_order.push(col_name.clone());
+            }
+            
+            self.columns.insert(col_name, new_column);
+        }
+        
+        Ok(())
+    }
+    
+    /// Set an entire column with new values
+    /// 
+    /// # Arguments
+    /// * `column_name` - Name of the column to set
+    /// * `values` - Vector of new values for the column
+    pub fn set_column(&mut self, column_name: &str, values: Vec<crate::types::AttrValue>) -> GraphResult<()> {
+        use crate::types::{AttrValue, AttrValueType};
+        
+        if values.len() != self.nrows {
+            return Err(crate::errors::GraphError::InvalidInput(
+                format!("Column '{}' has {} values but table has {} rows", column_name, values.len(), self.nrows)
+            ));
+        }
+        
+        // Infer dtype from the first non-null value
+        let dtype = values.iter()
+            .find(|v| !matches!(v, AttrValue::Null))
+            .map(|v| match v {
+                AttrValue::Int(_) => AttrValueType::Int,
+                AttrValue::SmallInt(_) => AttrValueType::SmallInt,
+                AttrValue::Float(_) => AttrValueType::Float,
+                AttrValue::Text(_) => AttrValueType::Text,
+                AttrValue::CompactText(_) => AttrValueType::CompactText,
+                AttrValue::Bool(_) => AttrValueType::Bool,
+                AttrValue::FloatVec(_) => AttrValueType::FloatVec,
+                AttrValue::Bytes(_) => AttrValueType::Bytes,
+                AttrValue::Null => AttrValueType::Null,
+                _ => AttrValueType::Text,
+            })
+            .unwrap_or(AttrValueType::Text);
+        
+        let new_column = BaseArray::new(values, dtype);
+        
+        // Add to column order if it's a new column
+        if !self.columns.contains_key(column_name) {
+            self.column_order.push(column_name.to_string());
+        }
+        
+        self.columns.insert(column_name.to_string(), new_column);
+        Ok(())
+    }
+    
+    /// Set a single value at a specific row and column
+    /// 
+    /// # Arguments
+    /// * `row` - Row index (0-based)
+    /// * `column_name` - Name of the column
+    /// * `value` - New value to set
+    pub fn set_value(&mut self, row: usize, column_name: &str, value: crate::types::AttrValue) -> GraphResult<()> {
+        if row >= self.nrows {
+            return Err(crate::errors::GraphError::InvalidInput(
+                format!("Row index {} out of bounds (table has {} rows)", row, self.nrows)
+            ));
+        }
+        
+        let column = self.columns.get_mut(column_name)
+            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
+                format!("Column '{}' not found in table", column_name)
+            ))?;
+        
+        column.set(row, value)?;
+        Ok(())
+    }
+    
+    /// Set values for multiple rows in a column using a boolean mask
+    /// 
+    /// # Arguments
+    /// * `mask` - Boolean vector indicating which rows to update
+    /// * `column_name` - Name of the column to update
+    /// * `value` - Value to set for all masked rows
+    pub fn set_values_by_mask(&mut self, mask: &[bool], column_name: &str, value: crate::types::AttrValue) -> GraphResult<()> {
+        if mask.len() != self.nrows {
+            return Err(crate::errors::GraphError::InvalidInput(
+                format!("Mask length {} does not match table rows {}", mask.len(), self.nrows)
+            ));
+        }
+        
+        let column = self.columns.get_mut(column_name)
+            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
+                format!("Column '{}' not found in table", column_name)
+            ))?;
+        
+        for (i, &should_update) in mask.iter().enumerate() {
+            if should_update {
+                column.set(i, value.clone())?;
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Set values for a range of rows in a column
+    /// 
+    /// # Arguments
+    /// * `start` - Starting row index (inclusive)
+    /// * `end` - Ending row index (exclusive)
+    /// * `step` - Step size (default 1 for consecutive rows)
+    /// * `column_name` - Name of the column to update
+    /// * `value` - Value to set for all rows in the range
+    pub fn set_values_by_range(&mut self, start: usize, end: usize, step: usize, column_name: &str, value: crate::types::AttrValue) -> GraphResult<()> {
+        if start >= self.nrows || end > self.nrows {
+            return Err(crate::errors::GraphError::InvalidInput(
+                format!("Range [{}, {}) is out of bounds for table with {} rows", start, end, self.nrows)
+            ));
+        }
+        
+        if step == 0 {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Step size must be greater than 0".to_string()
+            ));
+        }
+        
+        let column = self.columns.get_mut(column_name)
+            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
+                format!("Column '{}' not found in table", column_name)
+            ))?;
+        
+        let mut i = start;
+        while i < end {
+            column.set(i, value.clone())?;
+            i += step;
+        }
+        
+        Ok(())
+    }
+    
+    /// Set values for multiple columns and multiple rows simultaneously
+    /// 
+    /// # Arguments
+    /// * `row_indices` - Vector of row indices to update
+    /// * `column_updates` - HashMap mapping column names to values
+    pub fn set_multiple_values(&mut self, row_indices: &[usize], column_updates: &HashMap<String, crate::types::AttrValue>) -> GraphResult<()> {
+        // Validate row indices
+        for &row_idx in row_indices {
+            if row_idx >= self.nrows {
+                return Err(crate::errors::GraphError::InvalidInput(
+                    format!("Row index {} out of bounds (table has {} rows)", row_idx, self.nrows)
+                ));
+            }
+        }
+        
+        // Validate columns exist
+        for col_name in column_updates.keys() {
+            if !self.columns.contains_key(col_name) {
+                return Err(crate::errors::GraphError::InvalidInput(
+                    format!("Column '{}' not found in table", col_name)
+                ));
+            }
+        }
+        
+        // Apply updates
+        for &row_idx in row_indices {
+            for (col_name, value) in column_updates {
+                let column = self.columns.get_mut(col_name).unwrap(); // Safe due to validation above
+                column.set(row_idx, value.clone())?;
+            }
+        }
+        
+        Ok(())
+    }
 }
 
 impl Default for BaseTable {
@@ -267,9 +487,9 @@ impl Table for BaseTable {
         // Validate that all group columns exist
         for col_name in columns {
             if !self.columns.contains_key(col_name) {
-                return Err(crate::errors::GraphError::ColumnNotFound {
-                    column: col_name.clone(),
-                });
+                return Err(crate::errors::GraphError::InvalidInput(
+                    format!("Column '{}' not found in table", col_name)
+                ));
             }
         }
 
@@ -955,9 +1175,9 @@ impl BaseTable {
         // Validate group columns exist
         for col_name in group_cols {
             if !self.columns.contains_key(col_name) {
-                return Err(crate::errors::GraphError::ColumnNotFound {
-                    column: col_name.clone(),
-                });
+                return Err(crate::errors::GraphError::InvalidInput(
+                    format!("Group column '{}' not found in table", col_name)
+                ));
             }
         }
 
@@ -1006,13 +1226,13 @@ impl BaseTable {
                     } else {
                         // Parse key value back - simplified for now
                         if let Ok(int_val) = key_value.parse::<i64>() {
-                            column.push(crate::types::AttrValue::Integer(int_val));
+                            column.push(crate::types::AttrValue::Int(int_val));
                         } else if let Ok(float_val) = key_value.parse::<f64>() {
-                            column.push(crate::types::AttrValue::Float(float_val));
+                            column.push(crate::types::AttrValue::Float(float_val as f32));
                         } else {
                             // Remove quotes from debug format
                             let clean_str = key_value.trim_matches('"');
-                            column.push(crate::types::AttrValue::String(clean_str.to_string()));
+                            column.push(crate::types::AttrValue::Text(clean_str.to_string()));
                         }
                     }
                 }
@@ -1041,24 +1261,24 @@ impl BaseTable {
 
     /// Apply aggregation to a subset of rows
     fn apply_aggregation(&self, row_indices: &[usize], col_name: &str, agg_func: &str) -> GraphResult<crate::types::AttrValue> {
-        let column = self.columns.get(col_name).ok_or_else(|| crate::errors::GraphError::ColumnNotFound {
-            column: col_name.to_string(),
-        })?;
+        let column = self.columns.get(col_name).ok_or_else(|| crate::errors::GraphError::InvalidInput(
+            format!("Column '{}' not found for aggregation", col_name)
+        ))?;
 
         match agg_func.to_lowercase().as_str() {
-            "count" => Ok(crate::types::AttrValue::Integer(row_indices.len() as i64)),
+            "count" => Ok(crate::types::AttrValue::Int(row_indices.len() as i64)),
             "sum" => {
                 let mut sum = 0.0;
                 let mut count = 0;
                 for &idx in row_indices {
                     if let Some(value) = column.get(idx) {
                         match value {
-                            crate::types::AttrValue::Integer(i) => {
+                            crate::types::AttrValue::Int(i) => {
                                 sum += *i as f64;
                                 count += 1;
                             }
                             crate::types::AttrValue::Float(f) => {
-                                sum += f;
+                                sum += *f as f64;
                                 count += 1;
                             }
                             _ => {} // Skip non-numeric values
@@ -1068,9 +1288,9 @@ impl BaseTable {
                 if count == 0 {
                     Ok(crate::types::AttrValue::Null)
                 } else if sum.fract() == 0.0 && sum.abs() <= i64::MAX as f64 {
-                    Ok(crate::types::AttrValue::Integer(sum as i64))
+                    Ok(crate::types::AttrValue::Int(sum as i64))
                 } else {
-                    Ok(crate::types::AttrValue::Float(sum))
+                    Ok(crate::types::AttrValue::Float(sum as f32))
                 }
             }
             "avg" | "mean" => {
@@ -1079,22 +1299,25 @@ impl BaseTable {
                 for &idx in row_indices {
                     if let Some(value) = column.get(idx) {
                         match value {
-                            crate::types::AttrValue::Integer(i) => {
+                            crate::types::AttrValue::Int(i) => {
                                 sum += *i as f64;
                                 count += 1;
                             }
                             crate::types::AttrValue::Float(f) => {
-                                sum += f;
-                                count += 1;
+                                // Skip NaN values (common with meta nodes)
+                                if !f.is_nan() {
+                                    sum += *f as f64;
+                                    count += 1;
+                                }
                             }
-                            _ => {} // Skip non-numeric values
+                            _ => {} // Skip non-numeric values and nulls
                         }
                     }
                 }
                 if count == 0 {
                     Ok(crate::types::AttrValue::Null)
                 } else {
-                    Ok(crate::types::AttrValue::Float(sum / count as f64))
+                    Ok(crate::types::AttrValue::Float((sum / count as f64) as f32))
                 }
             }
             "min" => {
@@ -1102,12 +1325,20 @@ impl BaseTable {
                 for &idx in row_indices {
                     if let Some(value) = column.get(idx) {
                         match value {
-                            crate::types::AttrValue::Integer(_) | crate::types::AttrValue::Float(_) => {
+                            crate::types::AttrValue::Int(_) => {
                                 if min_val.is_none() || self.compare_values(value, min_val.as_ref().unwrap()) < 0 {
                                     min_val = Some(value.clone());
                                 }
                             }
-                            _ => {} // Skip non-numeric values for min/max
+                            crate::types::AttrValue::Float(f) => {
+                                // Skip NaN values (common with meta nodes)
+                                if !f.is_nan() {
+                                    if min_val.is_none() || self.compare_values(value, min_val.as_ref().unwrap()) < 0 {
+                                        min_val = Some(value.clone());
+                                    }
+                                }
+                            }
+                            _ => {} // Skip non-numeric values and nulls for min/max
                         }
                     }
                 }
@@ -1118,20 +1349,28 @@ impl BaseTable {
                 for &idx in row_indices {
                     if let Some(value) = column.get(idx) {
                         match value {
-                            crate::types::AttrValue::Integer(_) | crate::types::AttrValue::Float(_) => {
+                            crate::types::AttrValue::Int(_) => {
                                 if max_val.is_none() || self.compare_values(value, max_val.as_ref().unwrap()) > 0 {
                                     max_val = Some(value.clone());
                                 }
                             }
-                            _ => {} // Skip non-numeric values for min/max
+                            crate::types::AttrValue::Float(f) => {
+                                // Skip NaN values (common with meta nodes)
+                                if !f.is_nan() {
+                                    if max_val.is_none() || self.compare_values(value, max_val.as_ref().unwrap()) > 0 {
+                                        max_val = Some(value.clone());
+                                    }
+                                }
+                            }
+                            _ => {} // Skip non-numeric values and nulls for min/max
                         }
                     }
                 }
                 Ok(max_val.unwrap_or(crate::types::AttrValue::Null))
             }
-            _ => Err(crate::errors::GraphError::InvalidOperation {
-                operation: format!("Unknown aggregation function: {}", agg_func),
-            })
+            _ => Err(crate::errors::GraphError::InvalidInput(
+                format!("Unknown aggregation function: {}", agg_func)
+            ))
         }
     }
 
@@ -1160,10 +1399,10 @@ impl BaseTable {
     fn compare_values(&self, a: &crate::types::AttrValue, b: &crate::types::AttrValue) -> i32 {
         use crate::types::AttrValue;
         match (a, b) {
-            (AttrValue::Integer(a), AttrValue::Integer(b)) => a.cmp(b) as i32,
+            (AttrValue::Int(a), AttrValue::Int(b)) => a.cmp(b) as i32,
             (AttrValue::Float(a), AttrValue::Float(b)) => a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal) as i32,
-            (AttrValue::Integer(a), AttrValue::Float(b)) => (*a as f64).partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal) as i32,
-            (AttrValue::Float(a), AttrValue::Integer(b)) => a.partial_cmp(&(*b as f64)).unwrap_or(std::cmp::Ordering::Equal) as i32,
+            (AttrValue::Int(a), AttrValue::Float(b)) => (*a as f32).partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal) as i32,
+            (AttrValue::Float(a), AttrValue::Int(b)) => a.partial_cmp(&(*b as f32)).unwrap_or(std::cmp::Ordering::Equal) as i32,
             _ => 0, // Equal for non-comparable types
         }
     }
@@ -1199,14 +1438,14 @@ impl BaseTable {
     pub fn inner_join(&self, other: &Self, left_on: &str, right_on: &str) -> GraphResult<Self> {
         // Validate join columns exist
         if !self.has_column(left_on) {
-            return Err(crate::errors::GraphError::ColumnNotFound {
-                column: left_on.to_string(),
-            });
+            return Err(crate::errors::GraphError::InvalidInput(
+                format!("Left join column '{}' not found in table", left_on)
+            ));
         }
         if !other.has_column(right_on) {
-            return Err(crate::errors::GraphError::ColumnNotFound {
-                column: right_on.to_string(),
-            });
+            return Err(crate::errors::GraphError::InvalidInput(
+                format!("Right join column '{}' not found in other table", right_on)
+            ));
         }
 
         let left_col = self.column(left_on).unwrap();
@@ -1295,14 +1534,14 @@ impl BaseTable {
     pub fn left_join(&self, other: &Self, left_on: &str, right_on: &str) -> GraphResult<Self> {
         // Validate join columns exist
         if !self.has_column(left_on) {
-            return Err(crate::errors::GraphError::ColumnNotFound {
-                column: left_on.to_string(),
-            });
+            return Err(crate::errors::GraphError::InvalidInput(
+                format!("Left join column '{}' not found in table", left_on)
+            ));
         }
         if !other.has_column(right_on) {
-            return Err(crate::errors::GraphError::ColumnNotFound {
-                column: right_on.to_string(),
-            });
+            return Err(crate::errors::GraphError::InvalidInput(
+                format!("Right join column '{}' not found in other table", right_on)
+            ));
         }
 
         let left_col = self.column(left_on).unwrap();
@@ -1399,9 +1638,9 @@ impl BaseTable {
     pub fn union(&self, other: &Self) -> GraphResult<Self> {
         // Tables must have the same schema
         if self.column_order != other.column_order {
-            return Err(crate::errors::GraphError::InvalidOperation {
-                operation: "Union requires tables with identical column schemas".to_string(),
-            });
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Union requires tables with identical column schemas".to_string()
+            ));
         }
 
         let mut result_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
@@ -1487,9 +1726,9 @@ impl BaseTable {
     pub fn intersect(&self, other: &Self) -> GraphResult<Self> {
         // Tables must have the same schema
         if self.column_order != other.column_order {
-            return Err(crate::errors::GraphError::InvalidOperation {
-                operation: "Intersect requires tables with identical column schemas".to_string(),
-            });
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Intersect requires tables with identical column schemas".to_string()
+            ));
         }
 
         // Build set of rows from the other table

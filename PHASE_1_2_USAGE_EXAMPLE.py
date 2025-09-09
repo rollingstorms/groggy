@@ -94,28 +94,27 @@ def phase_1_example():
     # Add bonus column with different formats
     bonus_updates = {
         'bonus': {
-            1: 5000,    # Integer ID
-            '2': 4000,  # String ID (flexible conversion)
-            3: 6000,
-            '4': 5500,
-            5: 3500
+            0: 5000,    # Integer ID
+            1: 4000,  # String ID (flexible conversion)
+            2: 6000,
+            3: 5500,
+            4: 3500
         }
     }
-    users_table.set_node_attrs(bonus_updates)
+    users_table.assign(bonus_updates)
     print("✓ Added bonus column with flexible ID types")
     
     # Column-centric format update
     performance_updates = {
         'performance_rating': {
-            'nodes': [1, 2, 3, 4, 5],
-            'values': [4.2, 3.8, 4.5, 4.0, 3.9]
+            0:4.2, 1:3.8, 2:4.5, 3:4.0, 4:3.9
         }
     }
-    users_table.set_node_attrs(performance_updates)
+    users_table.assign(performance_updates)
     print("✓ Added performance ratings using column-centric format")
     
     print(f"Updated users table: {users_table.shape}")
-    print(f"Columns: {users_table.column_names()}")
+    print(f"Columns: {users_table.column_names}")
     
     return users_table, projects_table
 
@@ -129,22 +128,21 @@ def phase_2_example(users_table, projects_table):
     print("\n1. Group By Operations")
     print("-" * 30)
     
-    # Group by department and calculate statistics
-    dept_stats = users_table.group_by_agg(
-        ['department'], 
-        {
-            'salary': 'avg',
-            'age': 'mean', 
-            'bonus': 'sum',
-            'user_id': 'count'
-        }
-    )
+    # Group by department and calculate statistics using new pattern
+    grouped_depts = users_table.group_by(['department'])
+    dept_stats = grouped_depts.agg({
+        'salary': 'avg',
+        'age': 'mean', 
+        'bonus': 'sum',
+        'user_id': 'count'
+    })
     print("✓ Department statistics calculated:")
-    print(f"   Shape: {dept_stats.shape}")
-    print(f"   Columns: {dept_stats.column_names()}")
+    print(f"   Grouped into: {len(grouped_depts)} departments")
+    print(f"   Aggregated shape: {dept_stats.shape}")
+    print(f"   Aggregated columns: {dept_stats.column_names}")
     
     # Overall table aggregation
-    overall_stats = users_table.aggregate({
+    overall_stats = users_table.agg({
         'salary': 'avg',
         'age': 'min',
         'bonus': 'max',
@@ -233,7 +231,7 @@ def phase_2_bundle_system_example(graph_data):
     
     nodes_table = groggy.NodesTable.from_dict(nodes_data)
     edges_table = groggy.EdgesTable.from_dict(edges_data)
-    graph_table = groggy.GraphTable.new(nodes_table, edges_table)
+    graph_table = groggy.GraphTable(nodes_table, edges_table)
     
     print("✓ Created sample graph table")
     
@@ -308,20 +306,18 @@ def performance_showcase():
     filter_time = time.time() - start_time
     print(f"✓ Filtered {large_table.nrows} rows to {filtered.nrows} in {filter_time:.3f}s")
     
-    # Group by performance
+    # Group by performance using new pattern
     start_time = time.time()
-    dept_analysis = large_table.group_by_agg(
-        ['department'],
-        {
-            'salary': 'avg',
-            'performance': 'avg',
-            'years_exp': 'avg',
-            'user_id': 'count'
-        }
-    )
+    grouped_large = large_table.group_by(['department'])
+    dept_analysis = grouped_large.agg({
+        'salary': 'avg',
+        'performance': 'avg',
+        'years_exp': 'avg',
+        'user_id': 'count'
+    })
     groupby_time = time.time() - start_time
     print(f"✓ Group by analysis completed in {groupby_time:.3f}s")
-    print(f"   Result: {dept_analysis.shape}")
+    print(f"   Groups: {len(grouped_large)}, Result: {dept_analysis.shape}")
     
     # File I/O performance
     start_time = time.time()
@@ -364,7 +360,8 @@ def main():
         print("  - Bundle system v1.0 compatibility")
         print()
         print("✓ Phase 2 Features Demonstrated:")
-        print("  - Group by operations with aggregations")
+        print("  - Group by operations returning TableArray containers")
+        print("  - TableArray.agg() for aggregation across grouped tables")
         print("  - Unified join interface (inner/left/right joins)")
         print("  - Set operations (union/intersect)")  
         print("  - Enhanced bundle system v2.0 with metadata")
