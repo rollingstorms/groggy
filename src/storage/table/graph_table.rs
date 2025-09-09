@@ -714,37 +714,91 @@ impl GraphTable {
     
     /// Enhanced conversion to Graph with validation (Phase 4 method)
     pub fn to_graph(&self) -> GraphResult<crate::api::graph::Graph> {
-        // First validate the graph structure
-        let report = self.validate();
+        // Auto-fix common issues before validation (like missing edge IDs for meta nodes)
+        let mut fixed_table = self.clone();
+        
+        // Check if we have null edge IDs and auto-assign them if needed
+        let edge_id_column = fixed_table.edges.base().column("edge_id");
+        if let Some(column) = edge_id_column {
+            let has_nulls = (0..column.len()).any(|i| {
+                matches!(column.get(i), Some(crate::types::AttrValue::Null))
+            });
+            
+            if has_nulls {
+                // Auto-assign edge IDs to fix validation issues
+                fixed_table = fixed_table.auto_assign_edge_ids()?;
+            }
+        }
+        
+        // Now validate the fixed graph structure
+        let report = fixed_table.validate();
         if !report.is_valid() {
             return Err(GraphError::InvalidInput(
                 format!("Cannot convert invalid GraphTable to Graph. Errors: {:?}", report.errors)
             ));
         }
         
+        // Use the fixed table for conversion
+        let graph_table = &fixed_table;
+        
         // Create a new Graph
         let mut graph = crate::api::graph::Graph::new();
         
         // Add nodes
-        let node_ids = self.nodes.node_ids()
+        let node_ids = graph_table.nodes.node_ids()
             .map_err(|e| GraphError::InvalidInput(format!("Failed to get node IDs: {}", e)))?;
         
         // We need to maintain a mapping from table node IDs to actual graph node IDs
         let mut node_id_map = HashMap::new();
         
-        for table_node_id in &node_ids {
-            let graph_node_id = graph.add_node();
-            node_id_map.insert(*table_node_id, graph_node_id);
+        // First pass: Create nodes (base or meta) and map IDs
+        for &table_node_id in &node_ids {
+            if let Some(node_data) = graph_table.nodes.get_by_uid(table_node_id) {
+                // Check if this is a meta node
+                let is_meta = node_data.get("entity_type")
+                    .map(|v| matches!(v, crate::types::AttrValue::Text(s) if s == "meta"))
+                    .unwrap_or(false);
+                
+                let graph_node_id = if is_meta {
+                    // Extract subgraph ID for meta node creation
+                    let subgraph_id = node_data.get("contains_subgraph")
+                        .and_then(|v| match v {
+                            crate::types::AttrValue::SubgraphRef(id) => Some(*id),
+                            crate::types::AttrValue::Int(id) => Some(*id as usize),
+                            _ => None,
+                        })
+                        .unwrap_or(0); // Default to 0 if missing
+                    
+                    // Create meta node with subgraph reference
+                    match graph.create_meta_node(subgraph_id) {
+                        Ok(node_id) => node_id,
+                        Err(e) => {
+                            eprintln!("Warning: Failed to create meta node for table node {}: {}. Creating as base node instead.", table_node_id, e);
+                            graph.add_node()
+                        }
+                    }
+                } else {
+                    // Create regular base node
+                    graph.add_node()
+                };
+                
+                node_id_map.insert(table_node_id, graph_node_id);
+            } else {
+                // Fallback: create base node if no data found
+                let graph_node_id = graph.add_node();
+                node_id_map.insert(table_node_id, graph_node_id);
+            }
         }
         
-        // Add node attributes
+        // Second pass: Add remaining attributes (excluding system-managed ones)
         for &table_node_id in &node_ids {
-            if let Some(node_data) = self.nodes.get_by_uid(table_node_id) {
+            if let Some(node_data) = graph_table.nodes.get_by_uid(table_node_id) {
                 let graph_node_id = node_id_map[&table_node_id];
                 
-                // Add each attribute except node_id (that's the key)
+                // Add each attribute except system-managed ones
                 for (attr_name, attr_value) in node_data {
-                    if attr_name != "node_id" {
+                    // Skip system-managed attributes that are handled during node creation
+                    if !["node_id", "entity_type", "contains_subgraph"].contains(&attr_name.as_str()) {
                         if let Err(e) = graph.set_node_attr(graph_node_id, attr_name.clone(), attr_value.clone()) {
                             // Log warning but continue - non-critical for basic conversion
                             eprintln!("Warning: Failed to set node attribute {}: {}", attr_name, e);
@@ -755,7 +809,7 @@ impl GraphTable {
         }
         
         // Add edges
-        let edge_tuples = self.edges.as_tuples()
+        let edge_tuples = graph_table.edges.as_tuples()
             .map_err(|e| GraphError::InvalidInput(format!("Failed to get edge tuples: {}", e)))?;
         
         for (table_edge_id, table_source, table_target) in edge_tuples {
@@ -767,7 +821,7 @@ impl GraphTable {
                 match graph.add_edge(graph_source, graph_target) {
                     Ok(graph_edge_id) => {
                         // Add edge attributes if available
-                        if let Some(edge_data) = self.edges.get_by_edge_id(table_edge_id) {
+                        if let Some(edge_data) = graph_table.edges.get_by_edge_id(table_edge_id) {
                             for (attr_name, attr_value) in edge_data {
                                 if !["edge_id", "source", "target"].contains(&attr_name.as_str()) {
                                     if let Err(e) = graph.set_edge_attr(graph_edge_id, attr_name.clone(), attr_value.clone()) {
@@ -792,6 +846,13 @@ impl GraphTable {
         }
         
         Ok(graph)
+    }
+    
+    /// Auto-assign edge IDs for null values (useful for meta nodes and imported data)
+    pub fn auto_assign_edge_ids(mut self) -> GraphResult<Self> {
+        // Delegate to the edges table's auto_assign_edge_ids method
+        self.edges = self.edges.auto_assign_edge_ids()?;
+        Ok(self)
     }
     
     /// Convert GraphTable into separate BaseTable components
@@ -1106,8 +1167,8 @@ impl GraphTable {
             version: "2.0".to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
             groggy_version: env!("CARGO_PKG_VERSION").to_string(),
-            node_count: self.nodes_table.nrows(),
-            edge_count: self.edges_table.nrows(),
+            node_count: self.nodes.nrows(),
+            edge_count: self.edges.nrows(),
             validation_policy: self.policy.clone(),
             checksums: BundleChecksums {
                 nodes_sha256: nodes_checksum.clone(),
@@ -1115,10 +1176,10 @@ impl GraphTable {
                 metadata_sha256: String::new(), // Will be filled after metadata generation
             },
             schema_info: BundleSchemaInfo {
-                node_columns: self.nodes_table.column_names().to_vec(),
-                edge_columns: self.edges_table.column_names().to_vec(),
-                has_node_attributes: self.nodes_table.ncols() > 1, // More than just node_id
-                has_edge_attributes: self.edges_table.ncols() > 3, // More than edge_id, source, target
+                node_columns: self.nodes.column_names().to_vec(),
+                edge_columns: self.edges.column_names().to_vec(),
+                has_node_attributes: self.nodes.ncols() > 1, // More than just node_id
+                has_edge_attributes: self.edges.ncols() > 3, // More than edge_id, source, target
             },
             validation_summary: BundleValidationSummary {
                 is_valid: validation_report.is_valid(),
@@ -1216,13 +1277,13 @@ impl GraphTable {
         }
         
         // Check for required files
-        let metadata_path = bundle_path.join("metadata.txt");
+        let metadata_path = bundle_path.join("metadata.json");
         let nodes_path = bundle_path.join("nodes.csv");
         let edges_path = bundle_path.join("edges.csv");
         
         // Provide detailed error messages for missing files
         let missing_files: Vec<String> = [
-            ("metadata.txt", &metadata_path),
+            ("metadata.json", &metadata_path),
             ("nodes.csv", &nodes_path), 
             ("edges.csv", &edges_path)
         ].iter()
@@ -1233,7 +1294,7 @@ impl GraphTable {
         if !missing_files.is_empty() {
             return Err(GraphError::InvalidInput(
                 format!("Bundle is missing required files: {}. \
-                    Bundle directory should contain: metadata.txt, nodes.csv, edges.csv", 
+                    Bundle directory should contain: metadata.json, nodes.csv, edges.csv", 
                     missing_files.join(", "))
             ));
         }
@@ -1260,51 +1321,27 @@ impl GraphTable {
         let bundle_path = bundle_path.as_ref();
         
         // Load and parse metadata (simplified parsing)
-        let metadata_path = bundle_path.join("metadata.txt");
+        let metadata_path = bundle_path.join("metadata.json");
         let metadata_content = std::fs::read_to_string(&metadata_path)
             .map_err(|e| GraphError::InvalidInput(format!("Failed to read metadata: {}", e)))?;
         
-        // Simple parsing of key-value format
-        let mut version = "unknown".to_string();
-        let mut created_at = "unknown".to_string();
-        let mut node_count = 0;
-        let mut edge_count = 0;
-        let mut strictness = ValidationStrictness::Standard;
+        // Parse JSON metadata (v2.0 format)
+        let enhanced_metadata: EnhancedBundleMetadata = serde_json::from_str(&metadata_content)
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to parse metadata JSON: {}", e)))?;
         
-        for line in metadata_content.lines() {
-            let parts: Vec<&str> = line.splitn(2, ':').collect();
-            if parts.len() == 2 {
-                let key = parts[0].trim();
-                let value = parts[1].trim();
-                match key {
-                    "version" => version = value.to_string(),
-                    "created_at" => created_at = value.to_string(),
-                    "node_count" => node_count = value.parse().unwrap_or(0),
-                    "edge_count" => edge_count = value.parse().unwrap_or(0),
-                    "validation_strictness" => {
-                        strictness = match value {
-                            "Minimal" => ValidationStrictness::Minimal,
-                            "Strict" => ValidationStrictness::Strict,
-                            _ => ValidationStrictness::Standard,
-                        };
-                    },
-                    _ => {}
-                }
-            }
-        }
+        // Convert enhanced metadata to legacy BundleMetadata format
+        let mut checksums = HashMap::new();
+        checksums.insert("nodes_sha256".to_string(), enhanced_metadata.checksums.nodes_sha256.clone());
+        checksums.insert("edges_sha256".to_string(), enhanced_metadata.checksums.edges_sha256.clone());
+        checksums.insert("metadata_sha256".to_string(), enhanced_metadata.checksums.metadata_sha256.clone());
         
         let metadata = BundleMetadata {
-            version,
-            created_at,
-            node_count,
-            edge_count,
-            validation_policy: ValidationPolicy {
-                strictness,
-                validate_node_references: true,
-                edge_config: EdgeConfig::default(),
-                auto_repair: false,
-            },
-            checksums: HashMap::new(),
+            version: enhanced_metadata.version,
+            created_at: enhanced_metadata.created_at,
+            node_count: enhanced_metadata.node_count,
+            edge_count: enhanced_metadata.edge_count,
+            validation_policy: enhanced_metadata.validation_policy,
+            checksums,
         };
         
         // TODO: Verify checksums, file integrity, etc.

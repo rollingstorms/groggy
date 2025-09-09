@@ -8,7 +8,7 @@ use crate::errors::{GraphResult, GraphError};
 use std::collections::{HashMap, HashSet};
 
 /// Configuration for edge validation policies
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct EdgeConfig {
     /// Whether to allow self-loops (edges from a node to itself)
     pub allow_self_loops: bool,
@@ -195,6 +195,54 @@ impl EdgesTable {
     // Phase 3: Edge-specific validation and iteration methods  
     // =============================================================================
     
+    /// Auto-assign edge IDs for null values (useful for meta nodes)
+    pub fn auto_assign_edge_ids(mut self) -> GraphResult<Self> {
+        let edge_id_column = self.base.column("edge_id").ok_or_else(|| {
+            GraphError::InvalidInput("Missing edge_id column".to_string())
+        })?;
+        
+        // Find null edge_id values
+        let mut null_indices = Vec::new();
+        for i in 0..edge_id_column.len() {
+            if let Some(AttrValue::Null) = edge_id_column.get(i) {
+                null_indices.push(i);
+            }
+        }
+        
+        if null_indices.is_empty() {
+            return Ok(self); // No nulls to fix
+        }
+        
+        // Find the maximum existing edge_id to avoid conflicts
+        let mut max_edge_id = 0i64;
+        for i in 0..edge_id_column.len() {
+            if let Some(AttrValue::Int(id)) = edge_id_column.get(i) {
+                max_edge_id = max_edge_id.max(*id);
+            }
+        }
+        
+        // Create new column data with auto-assigned IDs
+        let mut new_edge_ids = Vec::new();
+        let mut next_id = max_edge_id + 1;
+        
+        for i in 0..edge_id_column.len() {
+            if null_indices.contains(&i) {
+                new_edge_ids.push(AttrValue::Int(next_id));
+                next_id += 1;
+            } else if let Some(value) = edge_id_column.get(i) {
+                new_edge_ids.push(value.clone());
+            } else {
+                new_edge_ids.push(AttrValue::Null);
+            }
+        }
+        
+        // Replace the edge_id column
+        let new_edge_id_array = crate::storage::array::BaseArray::from_attr_values(new_edge_ids);
+        self.base = self.base.with_column("edge_id".to_string(), new_edge_id_array)?;
+        
+        Ok(self)
+    }
+    
     /// Validate edge structure according to EdgeConfig policies
     pub fn validate_edges(&self, config: &EdgeConfig) -> GraphResult<()> {
         let edge_ids = self.edge_ids()?;
@@ -211,21 +259,35 @@ impl EdgesTable {
             }
         }
         
-        // Check for null values in required columns
+        // Check for null values in required columns and auto-fix edge_id nulls
         let edge_id_column = self.base.column("edge_id").unwrap();
         let source_column = self.base.column("source").unwrap();
         let target_column = self.base.column("target").unwrap();
         
+        // First pass: check for null edge_ids and collect them for auto-assignment
+        let mut null_edge_indices = Vec::new();
         for i in 0..edge_id_column.len() {
             if let Some(AttrValue::Null) = edge_id_column.get(i) {
-                return Err(GraphError::InvalidInput("Null edge_id found".to_string()));
+                null_edge_indices.push(i);
             }
+            // Source and target must not be null (these are critical)
             if let Some(AttrValue::Null) = source_column.get(i) {
                 return Err(GraphError::InvalidInput("Null source found".to_string()));
             }
             if let Some(AttrValue::Null) = target_column.get(i) {
                 return Err(GraphError::InvalidInput("Null target found".to_string()));
             }
+        }
+        
+        // If there are null edge_ids, auto-assign them (common with meta nodes)
+        if !null_edge_indices.is_empty() {
+            // This is a validation method, we can't modify the table here
+            // Instead, provide a more helpful error message for meta node scenarios
+            return Err(GraphError::InvalidInput(format!(
+                "Found {} edges with null edge_id values. This commonly occurs with meta nodes. \
+                Consider calling auto_assign_edge_ids() before converting to Graph.", 
+                null_edge_indices.len()
+            )));
         }
         
         // Policy-based validation
