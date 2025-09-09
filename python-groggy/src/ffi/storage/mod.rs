@@ -8,6 +8,8 @@ pub mod array;
 pub mod accessors; // Essential FFI - keep enabled
 pub mod views; // Essential FFI - keep enabled  
 pub mod components;
+pub mod subgraph_array; // Phase 2: Specialized arrays
+pub mod table_array; // Phase 2: Specialized arrays
 
 pub use matrix::*;
 pub use table::*; // Re-enabled NEW BaseTable FFI for Phase 5
@@ -15,3 +17,5 @@ pub use array::*;
 pub use accessors::*; // Essential FFI
 pub use views::*; // Essential FFI
 pub use components::*;
+pub use subgraph_array::*; // Phase 2: Specialized arrays
+pub use table_array::*; // Phase 2: Specialized arrays

@@ -15,6 +15,8 @@ pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
 // Re-enabled accessor exports for table integration
 pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
 pub use ffi::storage::array::{PyGraphArray, PyBaseArray, PyNodesArray, PyEdgesArray, PyMetaNodeArray};
+pub use ffi::storage::subgraph_array::{PySubgraphArray, PySubgraphArrayIterator, PySubgraphArrayChainIterator};
+pub use ffi::storage::table_array::{PyTableArray, PyTableArrayIterator, PyTableArrayChainIterator};
 pub use ffi::subgraphs::component::PyComponentSubgraph;
 pub use ffi::storage::components::PyComponentsArray;
 pub use ffi::storage::matrix::PyGraphMatrix;
@@ -84,7 +86,7 @@ fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
         }
 
         // Create core GraphMatrix directly
-        let matrix = groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
+        let matrix = ::groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                 "Failed to create matrix: {:?}",
                 e
@@ -100,7 +102,7 @@ fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
         let core_arrays = vec![py_array.inner];
 
         // Create core GraphMatrix directly
-        let matrix = groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
+        let matrix = ::groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                 "Failed to create matrix: {:?}",
                 e
@@ -112,13 +114,13 @@ fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
     // Check if data is a list of GraphArrays
     else if let Ok(array_list) = data.extract::<Vec<Py<PyGraphArray>>>(py) {
         // Convert PyGraphArrays to core GraphArrays
-        let core_arrays: Vec<groggy::storage::GraphArray> = array_list
+        let core_arrays: Vec<::groggy::storage::GraphArray> = array_list
             .iter()
             .map(|py_array| py_array.borrow(py).inner.clone())
             .collect();
 
         // Create core GraphMatrix
-        let matrix = groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
+        let matrix = ::groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                 "Failed to create matrix: {:?}",
                 e
@@ -161,7 +163,7 @@ fn table(py: Python, data: PyObject, columns: Option<Vec<String>>) -> PyResult<P
 
         // Create core GraphTable directly
         let table =
-            groggy::storage::GraphTable::from_arrays(core_arrays, Some(column_names), None)
+            ::groggy::storage::GraphTable::from_arrays(core_arrays, Some(column_names), None)
                 .map_err(|e| {
                     PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                         "Failed to create table: {:?}",
@@ -181,7 +183,7 @@ fn table(py: Python, data: PyObject, columns: Option<Vec<String>>) -> PyResult<P
         }
 
         // Create core GraphTable directly
-        let table = groggy::storage::GraphTable::from_arrays(core_arrays, columns, None)
+        let table = ::groggy::storage::GraphTable::from_arrays(core_arrays, columns, None)
             .map_err(|e| {
                 PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
                     "Failed to create table: {:?}",
@@ -217,7 +219,7 @@ fn merge(py: Python, graphs: Vec<Py<PyGraph>>) -> PyResult<PyObject> {
 
     // Create a new empty graph with the same directionality as the first graph
     let first_graph = graphs[0].borrow(py);
-    let directed = first_graph.inner.borrow().graph_type() == groggy::types::GraphType::Directed;
+    let directed = first_graph.inner.borrow().graph_type() == ::groggy::types::GraphType::Directed;
     drop(first_graph); // Release borrow
 
     // Use the constructor through Python class instantiation
@@ -242,10 +244,10 @@ fn merge(py: Python, graphs: Vec<Py<PyGraph>>) -> PyResult<PyObject> {
 #[pyfunction]
 fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
     use std::collections::HashMap;
-    use groggy::storage::array::BaseArray;
-    use groggy::storage::table::BaseTable;
+    use ::groggy::storage::array::BaseArray;
+    use ::groggy::storage::table::BaseTable;
     use pyo3::types::{PyDict, PyList};
-    use groggy::AttrValue;
+    use ::groggy::AttrValue;
     
     // Handle dict-like input: {"col1": [1, 2, 3], "col2": ["a", "b", "c"]}
     if let Ok(dict) = data.downcast::<PyDict>() {

@@ -111,7 +111,6 @@ __all__ = [
     "EdgeNotFoundError", 
     "InvalidInputError",
     "NotImplementedError",
-    # Phase 3 classes
     "NodeFilter",
     "EdgeFilter",
     "AttributeFilter", 
