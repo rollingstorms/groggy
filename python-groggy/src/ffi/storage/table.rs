@@ -104,6 +104,21 @@ impl PyBaseTable {
         self.table.column_names().to_vec()
     }
     
+    /// Get a specific column as BaseArray for chaining operations
+    /// This enables: table.column('age').iter().filter(...).collect()
+    pub fn column(&self, column_name: &str) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        match self.table.column(column_name) {
+            Some(base_array) => {
+                Ok(crate::ffi::storage::array::PyBaseArray {
+                    inner: base_array.clone()
+                })
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Column '{}' not found", column_name)
+            ))
+        }
+    }
+    
     /// Get shape as (rows, cols)
     #[getter]
     pub fn shape(&self) -> (usize, usize) {

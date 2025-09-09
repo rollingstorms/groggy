@@ -22,6 +22,11 @@ from ._groggy import (
     HistoricalView,
     # Statistical arrays and matrices
     GraphArray,
+    BaseArray,
+    NodesArray,
+    EdgesArray,
+    MetaNodeArray,
+    ComponentsArray,
     GraphMatrix,
     GraphTable,
     # Table classes
@@ -121,6 +126,11 @@ __all__ = [
     "HistoricalView",
     # Statistical arrays and matrices
     "GraphArray",
+    "BaseArray",
+    "NodesArray",
+    "EdgesArray",
+    "MetaNodeArray",
+    "ComponentsArray",
     "GraphMatrix",
     "GraphTable",
     # Table classes

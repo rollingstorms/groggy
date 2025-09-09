@@ -47,7 +47,7 @@ pub use ffi::display::{PyDisplayConfig, PyTableFormatter};
 // UNIFIED BUILDER PATTERNS
 // ====================================================================
 
-/// Create a GraphArray from a Python list or array-like object
+/// Create a BaseArray from a Python list or array-like object
 ///
 /// Examples:
 ///   gr.array([1, 2, 3, 4])
@@ -55,8 +55,14 @@ pub use ffi::display::{PyDisplayConfig, PyTableFormatter};
 ///   gr.array([1.0, 2.5, 3.7])
 #[pyfunction]
 #[pyo3(signature = (values))]
-fn array(values: Vec<PyObject>) -> PyResult<PyGraphArray> {
-    PyGraphArray::from_py_objects(values)
+fn array(values: Vec<PyObject>) -> PyResult<PyBaseArray> {
+    // Use Python::with_gil to create the BaseArray
+    Python::with_gil(|py| {
+        let py_base_array_class = py.get_type::<PyBaseArray>();
+        let py_args = pyo3::types::PyTuple::new(py, &[values.to_object(py)]);
+        let result = py_base_array_class.call1(py_args)?;
+        result.extract::<PyBaseArray>()
+    })
 }
 
 /// Create a GraphMatrix from arrays or nested lists
