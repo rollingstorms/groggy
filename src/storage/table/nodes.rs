@@ -25,14 +25,31 @@ impl NodesTable {
     }
     
     /// Create NodesTable from BaseTable (validates node_id column exists)
-    pub fn from_base_table(base: BaseTable) -> GraphResult<Self> {
-        if !base.has_column("node_id") {
-            return Err(crate::errors::GraphError::InvalidInput(
-                "NodesTable requires 'node_id' column".to_string()
-            ));
+    pub fn from_base_table(mut base: BaseTable) -> GraphResult<Self> {
+        // Map alternative column names to standard names
+        let column_mapping = [
+            ("node_ids", "node_id"),  // node_ids -> node_id
+            ("id", "node_id"),        // id -> node_id (for general CSV files)
+        ];
+        
+        // Apply column renaming for any alternative names found
+        for (alt_name, standard_name) in column_mapping.iter() {
+            if base.has_column(alt_name) && !base.has_column(standard_name) {
+                if let Some(column) = base.column(alt_name).cloned() {
+                    base = base.drop_columns(&[alt_name.to_string()])?;
+                    base = base.with_column(standard_name.to_string(), column)?;
+                }
+            }
         }
         
-        Ok(Self { base })
+        // Check if we now have the required column
+        if base.has_column("node_id") {
+            Ok(Self { base })
+        } else {
+            Err(crate::errors::GraphError::InvalidInput(
+                "NodesTable requires 'node_id' column (also accepts 'node_ids', 'id')".to_string()
+            ))
+        }
     }
     
     /// Get the node IDs as a typed array
@@ -236,11 +253,11 @@ impl Table for NodesTable {
         self.base.column_names()
     }
     
-    fn column(&self, name: &str) -> Option<&BaseArray> {
+    fn column(&self, name: &str) -> Option<&BaseArray<AttrValue>> {
         self.base.column(name)
     }
     
-    fn column_by_index(&self, index: usize) -> Option<&BaseArray> {
+    fn column_by_index(&self, index: usize) -> Option<&BaseArray<AttrValue>> {
         self.base.column_by_index(index)
     }
     
@@ -287,7 +304,7 @@ impl Table for NodesTable {
         Ok(Self { base: self.base.select(&cols)? })
     }
     
-    fn with_column(&self, name: String, column: BaseArray) -> GraphResult<Self> {
+    fn with_column(&self, name: String, column: BaseArray<AttrValue>) -> GraphResult<Self> {
         Ok(Self { base: self.base.with_column(name, column)? })
     }
     

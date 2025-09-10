@@ -17,7 +17,7 @@ use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
 #[derive(Clone)]
 #[pyclass(name = "BaseArray")]
 pub struct PyBaseArray {
-    pub inner: BaseArray,
+    pub inner: BaseArray<RustAttrValue>,
 }
 
 #[pymethods]
@@ -41,7 +41,7 @@ impl PyBaseArray {
                 .unwrap_or(AttrValueType::Text);
 
             Ok(PyBaseArray {
-                inner: BaseArray::new(attr_values, dtype),
+                inner: BaseArray::new(attr_values),
             })
         })
     }
@@ -68,35 +68,63 @@ impl PyBaseArray {
 
     /// String representation  
     fn __repr__(&self) -> String {
-        format!("BaseArray[{}] (dtype: {:?})", self.inner.len(), self.inner.dtype())
+        let dtype = self.dtype();
+        format!("BaseArray[{}] (dtype: {})", self.inner.len(), dtype)
     }
 
-    // Statistical operations (delegated to BaseArray)
+    /// Get the data type of the array based on the first non-null element
+    fn dtype(&self) -> String {
+        let dtype = self.inner.first()
+            .map(|v| v.dtype())
+            .unwrap_or(AttrValueType::Null);
+        format!("{:?}", dtype)
+    }
+
+    // Statistical operations
     fn head(&self, n: usize) -> Self {
+        let data: Vec<RustAttrValue> = self.inner.iter().take(n).cloned().collect();
         PyBaseArray {
-            inner: self.inner.head(n),
+            inner: BaseArray::new(data),
         }
     }
     
     fn tail(&self, n: usize) -> Self {
+        let len = self.inner.len();
+        let start = if len > n { len - n } else { 0 };
+        let data: Vec<RustAttrValue> = self.inner.iter().skip(start).cloned().collect();
         PyBaseArray {
-            inner: self.inner.tail(n),
+            inner: BaseArray::new(data),
         }
     }
     
     fn unique(&self) -> Self {
+        let mut unique_values: Vec<RustAttrValue> = Vec::new();
+        let mut seen: std::collections::HashSet<RustAttrValue> = std::collections::HashSet::new();
+        
+        for value in self.inner.iter() {
+            if seen.insert(value.clone()) {
+                unique_values.push(value.clone());
+            }
+        }
+        
         PyBaseArray {
-            inner: self.inner.unique(),
+            inner: BaseArray::new(unique_values),
         }
     }
 
     fn describe(&self, py: Python) -> PyResult<PyObject> {
-        let stats = self.inner.describe();
-        let dict = pyo3::types::PyDict::new(py);
+        // Basic descriptive statistics
+        let count = self.inner.len();
+        let non_null_count = self.inner.iter().filter(|v| !matches!(v, RustAttrValue::Null)).count();
+        let null_count = count - non_null_count;
+        let unique_count = self.unique().inner.len();
         
-        for (key, value) in stats {
-            dict.set_item(key, value)?;
-        }
+        let dict = PyDict::new(py);
+        dict.set_item("count", count)?;
+        dict.set_item("non_null", non_null_count)?;
+        dict.set_item("null", null_count)?;
+        dict.set_item("unique", unique_count)?;
+        dict.set_item("dtype", self.dtype())?;
         
         Ok(dict.into())
     }
@@ -234,7 +262,7 @@ impl PyBaseArrayIterator {
             .unwrap_or(AttrValueType::Text);
         
         Ok(PyBaseArray {
-            inner: BaseArray::new(elements, dtype),
+            inner: BaseArray::new(elements),
         })
     }
 }
@@ -584,6 +612,13 @@ impl PyGraphArray {
     #[new]
     fn new(values: Vec<PyObject>) -> PyResult<Self> {
         Python::with_gil(|py| {
+            // Emit deprecation warning
+            let _ = pyo3::PyErr::warn(
+                py,
+                pyo3::exceptions::PyDeprecationWarning::py_type(py),
+                "GraphArray is deprecated. Use BaseArray for generic data or StatsArray for numeric arrays.",
+                1,
+            );
             let mut attr_values = Vec::with_capacity(values.len());
 
             for value in values {
@@ -720,6 +755,13 @@ impl PyGraphArray {
 
     /// String representation
     fn __repr__(&self, py: Python) -> PyResult<String> {
+        // Also warn on repr to surface deprecation in interactive usage
+        let _ = pyo3::PyErr::warn(
+            py,
+            pyo3::exceptions::PyDeprecationWarning::py_type(py),
+            "GraphArray is deprecated. Use BaseArray or StatsArray.",
+            1,
+        );
         let len = self.inner.len();
         let dtype = self._get_dtype();
         Ok(format!("GraphArray(len={}, dtype={})", len, dtype))

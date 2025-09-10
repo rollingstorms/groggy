@@ -28,6 +28,9 @@ pub mod subgraphs;
 // Entity FFI bindings - Trait-based entity wrappers
 pub mod entities;
 
+// Phase 4: Delegation system - trait-based universal method availability
+pub mod delegation;
+
 // FFI Traits - Pure delegation to trait implementations
 pub mod traits;
 

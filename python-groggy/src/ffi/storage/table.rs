@@ -525,16 +525,16 @@ impl PyBaseTable {
         if let Ok(column_name) = key.extract::<String>() {
             // Column access: table['column_name']
             if let Some(column) = self.table.column(&column_name) {
-                // Convert BaseArray to PyGraphArray via AttrValues
                 let attr_values = column.data();
-                let py_objects: Vec<_> = attr_values.iter()
-                    .map(|attr| {
-                        let py_attr = crate::ffi::types::PyAttrValue::new(attr.clone());
-                        py_attr.to_object(py)
-                    })
-                    .collect();
-                let py_array = crate::ffi::storage::array::PyGraphArray::from_py_objects(py_objects)?;
-                Ok(py_array.into_py(py))
+                // Prefer StatsArray for numeric columns; fallback to GraphArray
+                if let Ok(stats) = crate::ffi::storage::num_array::PyNumArray::from_attr_values(attr_values.clone()) {
+                    Ok(stats.into_py(py))
+                } else {
+                    // Fallback to BaseArray for non-numeric columns (GraphArray deprecated)
+                    let base = groggy::storage::array::BaseArray::from_attr_values(attr_values.clone());
+                    let py_base = crate::ffi::storage::array::PyBaseArray { inner: base };
+                    Ok(py_base.into_py(py))
+                }
             } else {
                 Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                     format!("Column '{}' not found", column_name)
@@ -547,6 +547,24 @@ impl PyBaseTable {
                     format!("Failed to select columns: {}", e)
                 ))?;
             Ok(PyBaseTable { table: selected_table }.into_py(py))
+        } else if let Ok(row_index) = key.extract::<isize>() {
+            // Row access by integer: table[5] or table[-1]
+            let nrows = self.table.nrows() as isize;
+            let actual_index = if row_index < 0 {
+                (nrows + row_index) as usize
+            } else {
+                row_index as usize
+            };
+            
+            if actual_index >= self.table.nrows() {
+                return Err(PyErr::new::<pyo3::exceptions::PyIndexError, _>(
+                    format!("Row index {} out of range (0-{})", row_index, self.table.nrows() - 1)
+                ));
+            }
+            
+            // Return single row as a BaseTable with one row
+            let single_row_table = self.table.head(actual_index + 1).tail(1);
+            Ok(PyBaseTable { table: single_row_table }.into_py(py))
         } else if let Ok(slice) = key.downcast::<PySlice>() {
             // Slice access: table[start:end]
             let indices = slice.indices(self.table.nrows() as i64)?;
@@ -591,7 +609,7 @@ impl PyBaseTable {
             Ok(PyBaseTable { table: filtered_table }.into_py(py))
         } else {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Table indices must be strings (column names), lists of column names, slices, or boolean arrays"
+                "BaseTable indices must be strings (column names), integers (row indices), lists of column names, slices, or boolean arrays"
             ))
         }
     }
@@ -1555,17 +1573,15 @@ impl PyNodesTable {
         if let Ok(column_name) = key.extract::<String>() {
             // Column access: table['column_name'] 
             if let Some(column) = self.table.base_table().column(&column_name) {
-                // Convert BaseArray to GraphArray
-                // Convert BaseArray to PyGraphArray via AttrValues
                 let attr_values = column.data();
-                let py_objects: Vec<_> = attr_values.iter()
-                    .map(|attr| {
-                        let py_attr = crate::ffi::types::PyAttrValue::new(attr.clone());
-                        py_attr.to_object(py)
-                    })
-                    .collect();
-                let py_array = crate::ffi::storage::array::PyGraphArray::from_py_objects(py_objects)?;
-                Ok(py_array.into_py(py))
+                // Prefer StatsArray for numeric columns; fallback to GraphArray
+                if let Ok(stats) = crate::ffi::storage::num_array::PyNumArray::from_attr_values(attr_values.clone()) {
+                    Ok(stats.into_py(py))
+                } else {
+                    let base = groggy::storage::array::BaseArray::from_attr_values(attr_values.clone());
+                    let py_base = crate::ffi::storage::array::PyBaseArray { inner: base };
+                    Ok(py_base.into_py(py))
+                }
             } else {
                 Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                     format!("Column '{}' not found", column_name)
@@ -1591,6 +1607,26 @@ impl PyNodesTable {
             let nodes_selected = groggy::storage::table::NodesTable::from_base_table(selected_base)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             Ok(PyNodesTable { table: nodes_selected }.into_py(py))
+        } else if let Ok(row_index) = key.extract::<isize>() {
+            // Row access by integer: table[5] or table[-1]
+            let nrows = self.table.nrows() as isize;
+            let actual_index = if row_index < 0 {
+                (nrows + row_index) as usize
+            } else {
+                row_index as usize
+            };
+            
+            if actual_index >= self.table.nrows() {
+                return Err(PyErr::new::<pyo3::exceptions::PyIndexError, _>(
+                    format!("Row index {} out of range (0-{})", row_index, self.table.nrows() - 1)
+                ));
+            }
+            
+            // Return single row as a NodesTable with one row
+            let single_row_base = self.table.base_table().head(actual_index + 1).tail(1);
+            let single_row_nodes = groggy::storage::table::NodesTable::from_base_table(single_row_base)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            Ok(PyNodesTable { table: single_row_nodes }.into_py(py))
         } else if let Ok(slice) = key.downcast::<PySlice>() {
             // Slice access: table[start:end]
             let indices = slice.indices(self.table.nrows() as i64)?;
@@ -1648,7 +1684,7 @@ impl PyNodesTable {
             Ok(PyNodesTable { table: nodes_filtered }.into_py(py))
         } else {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Table indices must be strings (column names), lists of column names, slices, or boolean arrays"
+                "NodesTable indices must be strings (column names), integers (row indices), lists of column names, slices, or boolean arrays"
             ))
         }
     }
@@ -2191,17 +2227,15 @@ impl PyEdgesTable {
         if let Ok(column_name) = key.extract::<String>() {
             // Column access: table['column_name']
             if let Some(column) = self.table.base_table().column(&column_name) {
-                // Convert BaseArray to GraphArray  
-                // Convert BaseArray to PyGraphArray via AttrValues
                 let attr_values = column.data();
-                let py_objects: Vec<_> = attr_values.iter()
-                    .map(|attr| {
-                        let py_attr = crate::ffi::types::PyAttrValue::new(attr.clone());
-                        py_attr.to_object(py)
-                    })
-                    .collect();
-                let py_array = crate::ffi::storage::array::PyGraphArray::from_py_objects(py_objects)?;
-                Ok(py_array.into_py(py))
+                // Prefer StatsArray for numeric columns; fallback to GraphArray
+                if let Ok(stats) = crate::ffi::storage::num_array::PyNumArray::from_attr_values(attr_values.clone()) {
+                    Ok(stats.into_py(py))
+                } else {
+                    let base = groggy::storage::array::BaseArray::from_attr_values(attr_values.clone());
+                    let py_base = crate::ffi::storage::array::PyBaseArray { inner: base };
+                    Ok(py_base.into_py(py))
+                }
             } else {
                 Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                     format!("Column '{}' not found", column_name)
@@ -2688,29 +2722,30 @@ impl PyGraphTable {
             // Try nodes first, then edges
             let nodes_table = self.table.nodes();
             if let Some(column) = nodes_table.base_table().column(&column_name) {
-                // Convert BaseArray to PyGraphArray via AttrValues
                 let attr_values = column.data();
-                let py_objects: Vec<_> = attr_values.iter()
-                    .map(|attr| {
-                        let py_attr = crate::ffi::types::PyAttrValue::new(attr.clone());
-                        py_attr.to_object(py)
-                    })
-                    .collect();
-                let py_array = crate::ffi::storage::array::PyGraphArray::from_py_objects(py_objects)?;
-                Ok(py_array.into_py(py))
+                if let Ok(stats) = crate::ffi::storage::stats_array::PyStatsArray::from_attr_values(attr_values.clone()) {
+                    Ok(stats.into_py(py))
+                } else {
+                    let py_objects: Vec<_> = attr_values.iter()
+                        .map(|attr| {
+                            let py_attr = crate::ffi::types::PyAttrValue::new(attr.clone());
+                            py_attr.to_object(py)
+                        })
+                        .collect();
+                    let py_array = crate::ffi::storage::array::PyGraphArray::from_py_objects(py_objects)?;
+                    Ok(py_array.into_py(py))
+                }
             } else {
                 let edges_table = self.table.edges();
                 if let Some(column) = edges_table.base_table().column(&column_name) {
-                    // Convert BaseArray to PyGraphArray via AttrValues
-                let attr_values = column.data();
-                let py_objects: Vec<_> = attr_values.iter()
-                    .map(|attr| {
-                        let py_attr = crate::ffi::types::PyAttrValue::new(attr.clone());
-                        py_attr.to_object(py)
-                    })
-                    .collect();
-                let py_array = crate::ffi::storage::array::PyGraphArray::from_py_objects(py_objects)?;
-                    Ok(py_array.into_py(py))
+                    let attr_values = column.data();
+                    if let Ok(stats) = crate::ffi::storage::num_array::PyNumArray::from_attr_values(attr_values.clone()) {
+                        Ok(stats.into_py(py))
+                    } else {
+                        let base = groggy::storage::array::BaseArray::from_attr_values(attr_values.clone());
+                        let py_base = crate::ffi::storage::array::PyBaseArray { inner: base };
+                        Ok(py_base.into_py(py))
+                    }
                 } else {
                     Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                         format!("Column '{}' not found in nodes or edges", column_name)

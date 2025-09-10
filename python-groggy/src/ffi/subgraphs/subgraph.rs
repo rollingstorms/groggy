@@ -1446,6 +1446,70 @@ impl PySubgraph {
         
         result
     }
+    
+    // ========================================================================
+    // PHASE 3: Cross-Type Conversions - Enable unified delegation architecture
+    // ========================================================================
+    
+    /// Get nodes from this subgraph as a NodesAccessor
+    /// Enables chaining like: subgraph.to_nodes().table().stats()
+    pub fn to_nodes(&self) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
+        let node_ids: Vec<groggy::types::NodeId> = self.inner.node_set().iter().copied().collect();
+        
+        // Create a NodesAccessor using the same pattern as the getter method
+        Ok(crate::ffi::storage::accessors::PyNodesAccessor {
+            graph: self.inner.graph(),
+            constrained_nodes: Some(node_ids),
+        })
+    }
+    
+    /// Get edges from this subgraph as an EdgesAccessor  
+    /// Enables chaining like: subgraph.to_edges().to_nodes().connected_components()
+    pub fn to_edges(&self) -> PyResult<crate::ffi::storage::accessors::PyEdgesAccessor> {
+        let edge_ids: Vec<groggy::types::EdgeId> = self.inner.edge_set().iter().copied().collect();
+        
+        // Create an EdgesAccessor using the struct syntax
+        Ok(crate::ffi::storage::accessors::PyEdgesAccessor {
+            graph: self.inner.graph(),
+            constrained_edges: Some(edge_ids),
+        })
+    }
+    
+    /// Convert this subgraph to its adjacency matrix representation
+    /// Enables chaining like: subgraph.to_matrix().eigen().stats()
+    pub fn to_matrix(&self) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
+        // For now, create a placeholder matrix
+        // In full implementation, would convert subgraph to adjacency matrix
+        let graph_ref = self.inner.graph();
+        let graph_borrowed = graph_ref.borrow();
+        
+        // Get node IDs and create a mapping
+        let node_ids: Vec<groggy::types::NodeId> = self.inner.node_set().iter().copied().collect();
+        let n = node_ids.len();
+        
+        // Create adjacency matrix data (simplified - would be optimized in real implementation)
+        let mut matrix_data = vec![vec![0.0f32; n]; n];
+        
+        // Fill adjacency matrix
+        for (i, &node_i) in node_ids.iter().enumerate() {
+            for (j, &node_j) in node_ids.iter().enumerate() {
+                if i != j {
+                    // Check if there's an edge between these nodes
+                    if let Ok(has_edge) = graph_borrowed.has_edge_between(node_i, node_j) {
+                        if has_edge {
+                            matrix_data[i][j] = 1.0; // Unweighted for now
+                        }
+                    }
+                }
+            }
+        }
+        
+        // For now, return a placeholder error until proper matrix conversion is implemented
+        // TODO: Implement proper adjacency matrix conversion
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "Subgraph to matrix conversion not yet implemented"
+        ))
+    }
 }
 
 /// Parse enhanced aggregation specification from Python dict supporting three syntax forms

@@ -680,3 +680,88 @@ def social_network(n: int, communities: int = 3,
     g.add_edges(edge_data)
     
     return g
+
+def meta_api_graph() -> Graph:
+    """
+    Generate the Meta API Graph - a graph representation of Groggy's own API structure.
+    
+    This function loads the pre-generated API meta-graph that was created by the
+    Meta API Discovery and Testing System. The graph contains:
+    - Nodes: Groggy objects (Graph, BaseTable, etc.) + return types
+    - Edges: Methods connecting objects to their return types
+    
+    This serves as the ultimate meta-example: Groggy analyzing its own API structure!
+    
+    Returns:
+        Graph: The API meta-graph (35 nodes, 205 edges representing 205 methods)
+        
+    Example:
+        >>> api_graph = meta_api_graph()
+        >>> print(f"API Graph: {api_graph.node_count()} objects/types, {api_graph.edge_count()} methods")
+        API Graph: 35 objects/types, 205 methods
+        
+        # Analyze which objects have the most methods
+        >>> method_counts = api_graph.nodes.table().to_pandas()
+        >>> method_counts[method_counts['method_count'] > 0].sort_values('method_count', ascending=False)
+        
+        # Find most common return types
+        >>> edges = api_graph.edges.table().to_pandas()
+        >>> print(edges['return_type'].value_counts().head())
+        
+        # See all methods for a specific object
+        >>> graph_methods = edges[edges['method_name'].str.contains('graph', case=False)]
+    """
+    try:
+        from . import GraphTable
+        
+        # Try to load the pre-generated meta-graph bundle
+        import os
+        bundle_path = os.path.join(os.path.dirname(__file__), "../../../documentation/meta_api_discovery/groggy_api_meta_graph")
+        
+        if not os.path.exists(bundle_path):
+            # Fallback: create a minimal example if bundle doesn't exist
+            print("⚠️  Meta-graph bundle not found. Creating minimal example.")
+            return _create_minimal_meta_api_graph()
+        
+        # Load the actual meta-graph
+        graph_table = GraphTable.load_bundle(bundle_path)
+        api_graph = graph_table.to_graph()
+        
+        print(f"✅ Loaded Meta API Graph: {api_graph.node_count()} nodes, {api_graph.edge_count()} edges")
+        print("   This graph represents Groggy's complete API structure!")
+        
+        return api_graph
+        
+    except Exception as e:
+        print(f"⚠️  Could not load meta-graph: {e}")
+        return _create_minimal_meta_api_graph()
+
+def _create_minimal_meta_api_graph() -> Graph:
+    """Create a minimal version of the API meta-graph for demonstration"""
+    
+    g = Graph()
+    
+    # Create nodes for core object types
+    core_objects = [
+        {"name": "Graph", "type": "core", "method_count": 62},
+        {"name": "BaseTable", "type": "table", "method_count": 30},
+        {"name": "NodesTable", "type": "table", "method_count": 27},
+        {"name": "EdgesTable", "type": "table", "method_count": 32},
+        {"name": "BaseArray", "type": "array", "method_count": 7},
+    ]
+    
+    nodes = g.add_nodes(core_objects)
+    
+    # Create sample method edges
+    method_edges = [
+        (nodes[0], nodes[1], {"method": "table", "returns": "BaseTable"}),
+        (nodes[1], nodes[4], {"method": "column", "returns": "BaseArray"}),
+        (nodes[2], nodes[1], {"method": "base_table", "returns": "BaseTable"}),
+        (nodes[3], nodes[1], {"method": "base_table", "returns": "BaseTable"}),
+        (nodes[4], nodes[4], {"method": "unique", "returns": "BaseArray"}),
+    ]
+    
+    g.add_edges(method_edges)
+    
+    print("✅ Created minimal Meta API Graph demonstration")
+    return g

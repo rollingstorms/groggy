@@ -65,12 +65,35 @@ impl EdgesTable {
     }
     
     /// Create EdgesTable from BaseTable (validates required columns exist)
-    pub fn from_base_table(base: BaseTable) -> GraphResult<Self> {
+    pub fn from_base_table(mut base: BaseTable) -> GraphResult<Self> {
+        // Map alternative column names to standard names
+        let column_mapping = [
+            ("edge_ids", "edge_id"),      // edge_ids -> edge_id
+            ("src", "source"),            // src -> source  
+            ("source_id", "source"),      // source_id -> source
+            ("source_node", "source"),    // source_node -> source
+            ("tgt", "target"),            // tgt -> target
+            ("target_id", "target"),      // target_id -> target
+            ("target_node", "target"),    // target_node -> target
+            ("dst", "target"),            // dst -> target
+        ];
+        
+        // Apply column renaming for any alternative names found
+        for (alt_name, standard_name) in column_mapping.iter() {
+            if base.has_column(alt_name) && !base.has_column(standard_name) {
+                if let Some(column) = base.column(alt_name).cloned() {
+                    base = base.drop_columns(&[alt_name.to_string()])?;
+                    base = base.with_column(standard_name.to_string(), column)?;
+                }
+            }
+        }
+        
+        // Check for required columns after mapping
         let required_cols = ["edge_id", "source", "target"];
         for col in &required_cols {
             if !base.has_column(col) {
                 return Err(crate::errors::GraphError::InvalidInput(
-                    format!("EdgesTable requires '{}' column", col)
+                    format!("EdgesTable requires '{}' column (also accepts alternative names like 'edge_ids', 'src', 'tgt', etc.)", col)
                 ));
             }
         }
@@ -496,11 +519,11 @@ impl Table for EdgesTable {
         self.base.column_names()
     }
     
-    fn column(&self, name: &str) -> Option<&BaseArray> {
+    fn column(&self, name: &str) -> Option<&BaseArray<AttrValue>> {
         self.base.column(name)
     }
     
-    fn column_by_index(&self, index: usize) -> Option<&BaseArray> {
+    fn column_by_index(&self, index: usize) -> Option<&BaseArray<AttrValue>> {
         self.base.column_by_index(index)
     }
     
@@ -547,7 +570,7 @@ impl Table for EdgesTable {
         Ok(Self { base: self.base.select(&cols)? })
     }
     
-    fn with_column(&self, name: String, column: BaseArray) -> GraphResult<Self> {
+    fn with_column(&self, name: String, column: BaseArray<AttrValue>) -> GraphResult<Self> {
         Ok(Self { base: self.base.with_column(name, column)? })
     }
     

@@ -1,6 +1,7 @@
 //! Core table traits for the unified table system
 
 use crate::storage::array::BaseArray;
+use crate::types::AttrValue;
 use crate::errors::GraphResult;
 
 /// Core table operations trait - foundation for all table types
@@ -29,10 +30,10 @@ pub trait Table {
     // =================================================================
     
     /// Get a column by name
-    fn column(&self, name: &str) -> Option<&BaseArray>;
+    fn column(&self, name: &str) -> Option<&BaseArray<AttrValue>>;
     
     /// Get a column by index
-    fn column_by_index(&self, index: usize) -> Option<&BaseArray>;
+    fn column_by_index(&self, index: usize) -> Option<&BaseArray<AttrValue>>;
     
     /// Check if a column exists
     fn has_column(&self, name: &str) -> bool;
@@ -67,7 +68,7 @@ pub trait Table {
     fn select(&self, column_names: &[String]) -> GraphResult<Self> where Self: Sized;
     
     /// Add a new column to the table
-    fn with_column(&self, name: String, column: BaseArray) -> GraphResult<Self> where Self: Sized;
+    fn with_column(&self, name: String, column: BaseArray<AttrValue>) -> GraphResult<Self> where Self: Sized;
     
     /// Drop columns from the table
     fn drop_columns(&self, column_names: &[String]) -> GraphResult<Self> where Self: Sized;
