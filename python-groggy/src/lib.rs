@@ -17,6 +17,9 @@ pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
 pub use ffi::storage::array::{PyGraphArray, PyBaseArray, PyNodesArray, PyEdgesArray, PyMetaNodeArray};
 pub use ffi::storage::subgraph_array::{PySubgraphArray, PySubgraphArrayIterator, PySubgraphArrayChainIterator};
 pub use ffi::storage::table_array::{PyTableArray, PyTableArrayIterator, PyTableArrayChainIterator};
+pub use ffi::storage::nodes_array::{PyNodesArray as PyNodesArrayNew, PyNodesArrayIterator};
+pub use ffi::storage::edges_array::{PyEdgesArray as PyEdgesArrayNew, PyEdgesArrayIterator};
+pub use ffi::storage::matrix_array::{PyMatrixArray, PyMatrixArrayIterator};
 pub use ffi::subgraphs::component::PyComponentSubgraph;
 pub use ffi::storage::components::PyComponentsArray;
 pub use ffi::storage::matrix::PyGraphMatrix;
@@ -336,7 +339,7 @@ fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
+fn groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Register core graph components
     m.add_class::<PyGraph>()?;
     m.add_class::<PySubgraph>()?;
@@ -350,6 +353,20 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyComponentsArray>()?;
     m.add_class::<ffi::storage::components::PyComponentsArrayIterator>()?;
     m.add_class::<PyGraphMatrix>()?;
+    
+    // Register specialized arrays (Phase 2 - Unified Delegation Architecture)
+    m.add_class::<PySubgraphArray>()?;
+    m.add_class::<PySubgraphArrayIterator>()?;
+    m.add_class::<PySubgraphArrayChainIterator>()?;
+    m.add_class::<PyTableArray>()?;
+    m.add_class::<PyTableArrayIterator>()?;
+    m.add_class::<PyTableArrayChainIterator>()?;
+    m.add_class::<PyNodesArrayNew>()?;
+    m.add_class::<PyNodesArrayIterator>()?;
+    m.add_class::<PyEdgesArrayNew>()?;
+    m.add_class::<PyEdgesArrayIterator>()?;
+    m.add_class::<PyMatrixArray>()?;
+    m.add_class::<PyMatrixArrayIterator>()?;
     // m.add_class::<PyPathResult>()?; // Unused
     m.add_class::<PyGraphTable>()?; // Re-enabled for Phase 5 completion
     // m.add_class::<PyGroupBy>()?; // Still disabled  

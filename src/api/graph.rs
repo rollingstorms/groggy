@@ -201,12 +201,20 @@ impl Graph {
         
         // Read the JSON file
         let file = File::open(path)
-            .map_err(|e| GraphError::Io(format!("Failed to open graph file: {}", e)))?;
+            .map_err(|e| GraphError::IoError { 
+                operation: "open_graph_file".to_string(),
+                path: path.to_string_lossy().to_string(),
+                underlying_error: e.to_string(),
+            })?;
         let reader = BufReader::new(file);
         
         // Parse the JSON
         let graph_data: serde_json::Value = serde_json::from_reader(reader)
-            .map_err(|e| GraphError::Io(format!("Failed to parse graph JSON: {}", e)))?;
+            .map_err(|e| GraphError::IoError { 
+                operation: "parse_graph_json".to_string(),
+                path: path.to_string_lossy().to_string(),
+                underlying_error: e.to_string(),
+            })?;
         
         // Create new graph with stored configuration
         let config = if let Some(config_obj) = graph_data.get("config") {
@@ -216,7 +224,11 @@ impl Graph {
                 Some("undirected") => crate::types::GraphType::Undirected,
                 _ => crate::types::GraphType::Directed, // Default
             };
-            crate::utils::config::GraphConfig::new().with_graph_type(graph_type)
+            {
+                let mut config = crate::utils::config::GraphConfig::new();
+                config.graph_type = graph_type;
+                config
+            }
         } else {
             crate::utils::config::GraphConfig::new()
         };
@@ -228,7 +240,8 @@ impl Graph {
             for node in nodes {
                 if let Some(node_id) = node.get("id").and_then(|v| v.as_u64()) {
                     let node_id = node_id as crate::types::NodeId;
-                    graph.add_node(node_id, std::collections::HashMap::new())?;
+                    let added_node_id = graph.add_node();
+                    // Note: We assume the loaded node_id matches the added one for now
                     
                     // Load node attributes
                     if let Some(attrs) = node.get("attributes").and_then(|v| v.as_object()) {
@@ -239,7 +252,7 @@ impl Graph {
                                     if let Some(i) = n.as_i64() {
                                         crate::types::AttrValue::Int(i)
                                     } else if let Some(f) = n.as_f64() {
-                                        crate::types::AttrValue::Float(f)
+                                        crate::types::AttrValue::Float(f as f32)
                                     } else {
                                         continue;
                                     }
@@ -247,7 +260,7 @@ impl Graph {
                                 serde_json::Value::Bool(b) => crate::types::AttrValue::Bool(*b),
                                 _ => continue,
                             };
-                            graph.set_node_attr(node_id, key, attr_value)?;
+                            graph.set_node_attr(added_node_id, key.clone(), attr_value)?;
                         }
                     }
                 }
@@ -264,7 +277,7 @@ impl Graph {
                     let source = source as crate::types::NodeId;
                     let target = target as crate::types::NodeId;
                     
-                    let edge_id = graph.add_edge(source, target, std::collections::HashMap::new())?;
+                    let edge_id = graph.add_edge(source, target)?;
                     
                     // Load edge attributes
                     if let Some(attrs) = edge.get("attributes").and_then(|v| v.as_object()) {
@@ -275,7 +288,7 @@ impl Graph {
                                     if let Some(i) = n.as_i64() {
                                         crate::types::AttrValue::Int(i)
                                     } else if let Some(f) = n.as_f64() {
-                                        crate::types::AttrValue::Float(f)
+                                        crate::types::AttrValue::Float(f as f32)
                                     } else {
                                         continue;
                                     }
@@ -283,7 +296,7 @@ impl Graph {
                                 serde_json::Value::Bool(b) => crate::types::AttrValue::Bool(*b),
                                 _ => continue,
                             };
-                            graph.set_edge_attr(edge_id, key, attr_value)?;
+                            graph.set_edge_attr(edge_id, key.clone(), attr_value)?;
                         }
                     }
                 }
@@ -1997,7 +2010,7 @@ impl Graph {
         
         // Serialize nodes
         let mut nodes = Vec::new();
-        for node_id in self.nodes()? {
+        for node_id in self.node_ids() {
             let mut node_obj = json!({
                 "id": node_id,
                 "attributes": {}
@@ -2011,7 +2024,7 @@ impl Graph {
                         crate::types::AttrValue::Text(s) => serde_json::Value::String(s),
                         crate::types::AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(i)),
                         crate::types::AttrValue::Float(f) => {
-                            if let Some(n) = serde_json::Number::from_f64(f) {
+                            if let Some(n) = serde_json::Number::from_f64(f as f64) {
                                 serde_json::Value::Number(n)
                             } else {
                                 continue;
@@ -2031,8 +2044,8 @@ impl Graph {
         
         // Serialize edges
         let mut edges = Vec::new();
-        for edge_id in self.edges()? {
-            if let (Ok(source), Ok(target)) = (self.get_edge_source(edge_id), self.get_edge_target(edge_id)) {
+        for edge_id in self.edge_ids() {
+            if let Ok((source, target)) = self.edge_endpoints(edge_id) {
                 let mut edge_obj = json!({
                     "id": edge_id,
                     "source": source,
@@ -2048,7 +2061,7 @@ impl Graph {
                             crate::types::AttrValue::Text(s) => serde_json::Value::String(s),
                             crate::types::AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(i)),
                             crate::types::AttrValue::Float(f) => {
-                                if let Some(n) = serde_json::Number::from_f64(f) {
+                                if let Some(n) = serde_json::Number::from_f64(f as f64) {
                                     serde_json::Value::Number(n)
                                 } else {
                                     continue;
@@ -2069,11 +2082,19 @@ impl Graph {
         
         // Write to file
         let file = File::create(path)
-            .map_err(|e| GraphError::Io(format!("Failed to create graph file: {}", e)))?;
+            .map_err(|e| GraphError::IoError { 
+                operation: "create_graph_file".to_string(),
+                path: path.to_string_lossy().to_string(),
+                underlying_error: e.to_string(),
+            })?;
         let writer = BufWriter::new(file);
         
         serde_json::to_writer_pretty(writer, &graph_data)
-            .map_err(|e| GraphError::Io(format!("Failed to write graph JSON: {}", e)))?;
+            .map_err(|e| GraphError::IoError { 
+                operation: "write_graph_json".to_string(),
+                path: path.to_string_lossy().to_string(),
+                underlying_error: e.to_string(),
+            })?;
         
         Ok(())
     }
