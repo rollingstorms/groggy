@@ -17,6 +17,7 @@ use crate::ffi::storage::array::PyGraphArray;
 use crate::ffi::utils::attr_value_to_python_value;
 
 /// Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays
+#[derive(Clone)]
 #[pyclass(name = "GraphMatrix", unsendable)]
 pub struct PyGraphMatrix {
     /// Core GraphMatrix
@@ -95,7 +96,7 @@ impl PyGraphMatrix {
 
     /// Get matrix dimensions as (rows, columns) tuple
     #[getter]
-    fn shape(&self) -> (usize, usize) {
+    pub fn shape(&self) -> (usize, usize) {
         self.inner.shape()
     }
 
@@ -110,6 +111,7 @@ impl PyGraphMatrix {
     fn columns(&self) -> Vec<String> {
         self.inner.column_names().to_vec()
     }
+
 
     /// Check if matrix is square
     #[getter]
@@ -713,5 +715,14 @@ impl PyGraphMatrix {
     /// Create PyGraphMatrix from core GraphMatrix
     pub fn from_graph_matrix(matrix: GraphMatrix) -> Self {
         Self { inner: matrix }
+    }
+
+    /// Convert matrix to table representation (placeholder implementation)
+    pub fn to_table(&self, _py: Python) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        // TODO: Implement proper matrix-to-table conversion
+        // This would typically convert a matrix to a tabular format
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "Matrix to table conversion not yet implemented."
+        ))
     }
 }

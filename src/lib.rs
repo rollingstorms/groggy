@@ -173,7 +173,7 @@ pub use state::{StateMetadata, StateObject};
 // Re-export core types for advanced usage
 pub use storage::{
     AdjacencyMatrix, AdjacencyMatrixResult, IndexMapping, MatrixFormat, MatrixType,
-    SparseAdjacencyMatrix, GraphArray, StatsSummary, JoinType, Axis, GraphMatrix, 
+    SparseAdjacencyMatrix, GraphArray, StatsArray, StatsSummary, JoinType, Axis, GraphMatrix, 
     MatrixProperties, GraphPool, GraphTable
 };
 pub use storage::legacy_table::{AggregateOp, ConnectivityType, GroupBy, TableMetadata};

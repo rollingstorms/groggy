@@ -3,14 +3,15 @@
 use super::traits::{Table, TableIterator};
 use crate::storage::array::{BaseArray, ArrayOps};
 use crate::errors::GraphResult;
+use crate::types::AttrValue;
 use std::collections::HashMap;
 
 /// Unified table implementation using BaseArray columns
 /// This provides the foundation for all table types in the system
 #[derive(Clone, Debug)]
 pub struct BaseTable {
-    /// Columns stored as BaseArrays
-    columns: HashMap<String, BaseArray>,
+    /// Columns stored as BaseArrays with AttrValue type
+    columns: HashMap<String, BaseArray<AttrValue>>,
     /// Column order for consistent iteration
     column_order: Vec<String>,
     /// Number of rows (derived from first column)
@@ -28,7 +29,7 @@ impl BaseTable {
     }
     
     /// Create a BaseTable from columns
-    pub fn from_columns(columns: HashMap<String, BaseArray>) -> GraphResult<Self> {
+    pub fn from_columns(columns: HashMap<String, BaseArray<AttrValue>>) -> GraphResult<Self> {
         if columns.is_empty() {
             return Ok(Self::new());
         }
@@ -59,7 +60,7 @@ impl BaseTable {
     }
     
     /// Create a BaseTable with specific column order
-    pub fn with_column_order(columns: HashMap<String, BaseArray>, column_order: Vec<String>) -> GraphResult<Self> {
+    pub fn with_column_order(columns: HashMap<String, BaseArray<AttrValue>>, column_order: Vec<String>) -> GraphResult<Self> {
         // Validate column order matches available columns
         for col in &column_order {
             if !columns.contains_key(col) {
@@ -91,7 +92,7 @@ impl BaseTable {
     }
     
     /// Get internal columns reference (for advanced usage)
-    pub fn columns(&self) -> &HashMap<String, BaseArray> {
+    pub fn columns(&self) -> &HashMap<String, BaseArray<AttrValue>> {
         &self.columns
     }
     
@@ -202,7 +203,7 @@ impl BaseTable {
                 })
                 .unwrap_or(AttrValueType::Text);
             
-            let new_column = BaseArray::new(values, dtype);
+            let new_column = BaseArray::new(values);
             
             // Add to column order if it's a new column
             if !self.columns.contains_key(&col_name) {
@@ -246,7 +247,7 @@ impl BaseTable {
             })
             .unwrap_or(AttrValueType::Text);
         
-        let new_column = BaseArray::new(values, dtype);
+        let new_column = BaseArray::new(values);
         
         // Add to column order if it's a new column
         if !self.columns.contains_key(column_name) {
@@ -396,11 +397,11 @@ impl Table for BaseTable {
         &self.column_order
     }
     
-    fn column(&self, name: &str) -> Option<&BaseArray> {
+    fn column(&self, name: &str) -> Option<&BaseArray<AttrValue>> {
         self.columns.get(name)
     }
     
-    fn column_by_index(&self, index: usize) -> Option<&BaseArray> {
+    fn column_by_index(&self, index: usize) -> Option<&BaseArray<AttrValue>> {
         self.column_order.get(index)
             .and_then(|name| self.columns.get(name))
     }
@@ -543,7 +544,7 @@ impl Table for BaseTable {
         })
     }
     
-    fn with_column(&self, name: String, column: BaseArray) -> GraphResult<Self> {
+    fn with_column(&self, name: String, column: BaseArray<AttrValue>) -> GraphResult<Self> {
         if column.len() != self.nrows && self.nrows > 0 {
             return Err(crate::errors::GraphError::InvalidInput(
                 format!("New column has {} rows but table has {} rows", column.len(), self.nrows)

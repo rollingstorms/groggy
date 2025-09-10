@@ -176,6 +176,7 @@ impl NodesIterator {
 }
 
 /// Wrapper for g.nodes that supports indexing syntax: g.nodes[id] -> NodeView
+#[derive(Clone)]
 #[pyclass(name = "NodesAccessor", unsendable)]
 pub struct PyNodesAccessor {
     pub graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
@@ -1104,6 +1105,59 @@ impl PyNodesAccessor {
             })
         }
     }
+
+    /// Get the number of nodes accessible by this accessor
+    pub fn node_count(&self) -> usize {
+        if let Some(ref constrained) = self.constrained_nodes {
+            constrained.len()
+        } else {
+            let graph = self.graph.borrow();
+            graph.node_ids().len()
+        }
+    }
+
+    /// Convert nodes to SubgraphArray via connected components analysis
+    pub fn to_subgraphs(&self) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+        // TODO: Implement proper conversion from NodesAccessor to SubgraphArray
+        // This requires complex subgraph creation logic
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "NodesAccessor to SubgraphArray conversion not yet implemented."
+        ))
+    }
+
+    /// Convert nodes to EdgesAccessor showing all edges connected to these nodes
+    pub fn to_edges(&self) -> PyResult<crate::ffi::storage::accessors::PyEdgesAccessor> {
+        use std::collections::HashSet;
+        use groggy::types::{NodeId, EdgeId};
+        
+        let graph = self.graph.borrow();
+        let node_ids: Vec<NodeId> = if let Some(ref constraint) = self.constrained_nodes {
+            constraint.clone()
+        } else {
+            graph.node_ids()
+        };
+        
+        let node_set: HashSet<NodeId> = node_ids.into_iter().collect();
+        
+        // Find all edges connected to any of these nodes
+        let connected_edges: Vec<EdgeId> = graph.edge_ids().into_iter()
+            .filter(|&edge_id| {
+                if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
+                    node_set.contains(&source) || node_set.contains(&target)
+                } else {
+                    false
+                }
+            })
+            .collect();
+        
+        drop(graph); // Release the borrow before creating PyEdgesAccessor
+        
+        let edges_accessor = PyEdgesAccessor {
+            graph: self.graph.clone(),
+            constrained_edges: Some(connected_edges),
+        };
+        Ok(edges_accessor)
+    }
 }
 
 /// Iterator for edges that yields EdgeViews
@@ -1135,6 +1189,7 @@ impl EdgesIterator {
 }
 
 /// Wrapper for g.edges that supports indexing syntax: g.edges[id] -> EdgeView  
+#[derive(Clone)]
 #[pyclass(name = "EdgesAccessor", unsendable)]
 pub struct PyEdgesAccessor {
     pub graph: std::rc::Rc<std::cell::RefCell<groggy::Graph>>,
@@ -1961,5 +2016,86 @@ impl PyEdgesAccessor {
                 PyValueError::new_err(format!("Failed to slice table columns: {}", e))
             })
         }
+    }
+
+    /// Get the number of edges accessible by this accessor
+    pub fn edge_count(&self) -> usize {
+        if let Some(ref constrained) = self.constrained_edges {
+            constrained.len()
+        } else {
+            let graph = self.graph.borrow();
+            graph.edge_ids().len()
+        }
+    }
+
+    /// Convert edges to NodesAccessor containing all nodes connected to these edges
+    pub fn nodes(&self) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
+        use std::collections::HashSet;
+        
+        let graph = self.graph.borrow();
+        let edge_ids: Vec<EdgeId> = if let Some(ref constraint) = self.constrained_edges {
+            constraint.clone()
+        } else {
+            graph.edge_ids()
+        };
+        
+        // Collect all nodes connected to these edges
+        let mut connected_nodes: HashSet<NodeId> = HashSet::new();
+        
+        for &edge_id in &edge_ids {
+            if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
+                connected_nodes.insert(source);
+                connected_nodes.insert(target);
+            }
+        }
+        
+        let node_ids: Vec<NodeId> = connected_nodes.into_iter().collect();
+        
+        Ok(PyNodesAccessor {
+            graph: self.graph.clone(),
+            constrained_nodes: Some(node_ids),
+        })
+    }
+
+    /// Convert edges to NodesAccessor showing all nodes connected by these edges
+    pub fn to_nodes(&self) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
+        use std::collections::HashSet;
+        use groggy::types::{NodeId, EdgeId};
+        
+        let graph = self.graph.borrow();
+        let edge_ids: Vec<EdgeId> = if let Some(ref constraint) = self.constrained_edges {
+            constraint.clone()
+        } else {
+            graph.edge_ids()
+        };
+        
+        // Collect all nodes that are endpoints of these edges
+        let mut connected_nodes = HashSet::new();
+        
+        for &edge_id in &edge_ids {
+            if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
+                connected_nodes.insert(source);
+                connected_nodes.insert(target);
+            }
+        }
+        
+        let node_ids: Vec<NodeId> = connected_nodes.into_iter().collect();
+        
+        drop(graph); // Release the borrow before creating PyNodesAccessor
+        
+        let nodes_accessor = PyNodesAccessor {
+            graph: self.graph.clone(),
+            constrained_nodes: Some(node_ids),
+        };
+        Ok(nodes_accessor)
+    }
+
+    /// Convert edges to SubgraphArray by creating subgraphs for each edge  
+    pub fn to_subgraphs(&self) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+        // TODO: Implement proper conversion from EdgesAccessor to SubgraphArray
+        // This requires complex subgraph creation logic
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "EdgesAccessor to SubgraphArray conversion not yet implemented."
+        ))
     }
 }

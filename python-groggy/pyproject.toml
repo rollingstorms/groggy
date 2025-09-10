@@ -5,22 +5,28 @@ build-backend = "maturin"
 [project]
 name = "groggy"
 version = "0.4.0"
-description = "High-performance graph library with memory optimization and Git-like version control"
-authors = [{name = "Michael Roth"}]
+description = "High-performance graph analytics library with Rust core"
+authors = [
+    {name = "Groggy Team"}
+]
+license = {text = "MIT"}
 requires-python = ">=3.8"
 classifiers = [
-    "Development Status :: 4 - Beta",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Rust",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
 ]
+dynamic = ["description"]
 
 [tool.maturin]
 python-source = "python"
-module-name = "groggy._groggy"
+module-name = "groggy.groggy"
+features = ["pyo3/extension-module"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-benchmark",
+    "numpy",
+    "pandas"
+]

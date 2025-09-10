@@ -1,0 +1,340 @@
+use super::BaseArray;
+use std::ops::{Add, Mul};
+
+/// StatsArray extends BaseArray with statistical and numerical operations.
+/// This is used by TableArray and MatrixArray for numerical computations.
+#[derive(Debug, Clone)]
+pub struct StatsArray<T> {
+    pub base: BaseArray<T>,
+}
+
+impl<T> StatsArray<T> {
+    /// Create a new StatsArray from a vector
+    pub fn new(data: Vec<T>) -> Self {
+        Self { 
+            base: BaseArray::new(data) 
+        }
+    }
+    
+    /// Create a StatsArray from an existing BaseArray
+    pub fn from_base(base: BaseArray<T>) -> Self {
+        Self { base }
+    }
+    
+    // Delegate all basic operations to BaseArray
+    
+    /// Get the number of elements in the array
+    pub fn len(&self) -> usize { 
+        self.base.len() 
+    }
+    
+    /// Check if the array is empty
+    pub fn is_empty(&self) -> bool { 
+        self.base.is_empty() 
+    }
+    
+    /// Get a reference to an element at the given index
+    pub fn get(&self, index: usize) -> Option<&T> { 
+        self.base.get(index) 
+    }
+    
+    /// Get an iterator over the elements
+    pub fn iter(&self) -> impl Iterator<Item = &T> { 
+        self.base.iter() 
+    }
+    
+    /// Get the first element
+    pub fn first(&self) -> Option<&T> {
+        self.base.first()
+    }
+    
+    /// Get the last element
+    pub fn last(&self) -> Option<&T> {
+        self.base.last()
+    }
+}
+
+// Statistical operations - only available for numerical types
+impl<T> StatsArray<T> 
+where 
+    T: Copy + Add<Output = T> + Mul<f64, Output = T> + PartialOrd + Into<f64>
+{
+    /// Calculate the mean (average) of all elements
+    pub fn mean(&self) -> Option<f64> {
+        if self.is_empty() { 
+            return None; 
+        }
+        let sum: f64 = self.iter().map(|&x| x.into()).sum();
+        Some(sum / self.len() as f64)
+    }
+    
+    /// Calculate the sum of all elements
+    pub fn sum(&self) -> f64 {
+        self.iter().map(|&x| x.into()).sum()
+    }
+    
+    /// Find the minimum value
+    pub fn min(&self) -> Option<f64> {
+        self.iter()
+            .map(|&x| x.into())
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+    }
+    
+    /// Find the maximum value
+    pub fn max(&self) -> Option<f64> {
+        self.iter()
+            .map(|&x| x.into())
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+    }
+    
+    /// Calculate the standard deviation (sample standard deviation)
+    pub fn std_dev(&self) -> Option<f64> {
+        let mean = self.mean()?;
+        if self.len() <= 1 { 
+            return Some(0.0); 
+        }
+        
+        let variance = self.iter()
+            .map(|&x| {
+                let diff = x.into() - mean;
+                diff * diff
+            })
+            .sum::<f64>() / (self.len() - 1) as f64;
+        
+        Some(variance.sqrt())
+    }
+    
+    /// Calculate the variance (sample variance)
+    pub fn variance(&self) -> Option<f64> {
+        let mean = self.mean()?;
+        if self.len() <= 1 { 
+            return Some(0.0); 
+        }
+        
+        let variance = self.iter()
+            .map(|&x| {
+                let diff = x.into() - mean;
+                diff * diff
+            })
+            .sum::<f64>() / (self.len() - 1) as f64;
+        
+        Some(variance)
+    }
+    
+    /// Calculate the median value
+    pub fn median(&self) -> Option<f64> {
+        if self.is_empty() {
+            return None;
+        }
+        
+        let mut sorted: Vec<f64> = self.iter().map(|&x| x.into()).collect();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        
+        let mid = sorted.len() / 2;
+        if sorted.len() % 2 == 0 {
+            Some((sorted[mid - 1] + sorted[mid]) / 2.0)
+        } else {
+            Some(sorted[mid])
+        }
+    }
+    
+    /// Calculate the percentile (0.0 to 1.0)
+    pub fn percentile(&self, p: f64) -> Option<f64> {
+        if self.is_empty() || p < 0.0 || p > 1.0 {
+            return None;
+        }
+        
+        let mut sorted: Vec<f64> = self.iter().map(|&x| x.into()).collect();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        
+        if p == 0.0 {
+            return Some(sorted[0]);
+        }
+        if p == 1.0 {
+            return Some(sorted[sorted.len() - 1]);
+        }
+        
+        let index = p * (sorted.len() - 1) as f64;
+        let lower = index.floor() as usize;
+        let upper = index.ceil() as usize;
+        
+        if lower == upper {
+            Some(sorted[lower])
+        } else {
+            let weight = index - lower as f64;
+            Some(sorted[lower] * (1.0 - weight) + sorted[upper] * weight)
+        }
+    }
+    
+    /// Calculate correlation with another StatsArray
+    pub fn correlate(&self, other: &Self) -> Option<f64> {
+        if self.len() != other.len() || self.is_empty() { 
+            return None; 
+        }
+        
+        let self_mean = self.mean()?;
+        let other_mean = other.mean()?;
+        
+        let numerator: f64 = self.iter().zip(other.iter())
+            .map(|(&x, &y)| (x.into() - self_mean) * (y.into() - other_mean))
+            .sum();
+            
+        let self_var: f64 = self.iter()
+            .map(|&x| (x.into() - self_mean).powi(2))
+            .sum();
+            
+        let other_var: f64 = other.iter()
+            .map(|&y| (y.into() - other_mean).powi(2))
+            .sum();
+        
+        let denominator = (self_var * other_var).sqrt();
+        if denominator == 0.0 { 
+            None 
+        } else { 
+            Some(numerator / denominator) 
+        }
+    }
+    
+    /// Element-wise addition with another StatsArray
+    pub fn add(&self, other: &Self) -> Option<StatsArray<T>> 
+    where 
+        T: Add<Output = T>
+    {
+        if self.len() != other.len() {
+            return None;
+        }
+        
+        let result_data: Vec<T> = self.iter().zip(other.iter())
+            .map(|(&a, &b)| a + b)
+            .collect();
+            
+        Some(StatsArray::new(result_data))
+    }
+    
+    /// Multiply all elements by a scalar
+    pub fn multiply(&self, scalar: f64) -> StatsArray<T> 
+    where 
+        T: Mul<f64, Output = T>
+    {
+        let result_data: Vec<T> = self.iter()
+            .map(|&x| x * scalar)
+            .collect();
+            
+        StatsArray::new(result_data)
+    }
+    
+    /// Calculate descriptive statistics summary
+    pub fn describe(&self) -> StatsSummary {
+        StatsSummary {
+            count: self.len(),
+            mean: self.mean(),
+            std_dev: self.std_dev(),
+            min: self.min(),
+            percentile_25: self.percentile(0.25),
+            median: self.median(),
+            percentile_75: self.percentile(0.75),
+            max: self.max(),
+        }
+    }
+}
+
+/// Summary statistics structure
+#[derive(Debug, Clone)]
+pub struct StatsSummary {
+    pub count: usize,
+    pub mean: Option<f64>,
+    pub std_dev: Option<f64>,
+    pub min: Option<f64>,
+    pub percentile_25: Option<f64>,
+    pub median: Option<f64>,
+    pub percentile_75: Option<f64>,
+    pub max: Option<f64>,
+}
+
+impl StatsSummary {
+    pub fn is_valid(&self) -> bool {
+        self.count > 0
+    }
+}
+
+impl<T> From<Vec<T>> for StatsArray<T> {
+    fn from(data: Vec<T>) -> Self {
+        Self::new(data)
+    }
+}
+
+impl<T> From<BaseArray<T>> for StatsArray<T> {
+    fn from(base: BaseArray<T>) -> Self {
+        Self::from_base(base)
+    }
+}
+
+impl<T> From<StatsArray<T>> for BaseArray<T> {
+    fn from(stats_array: StatsArray<T>) -> Self {
+        stats_array.base
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_stats() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let stats_array = StatsArray::new(data);
+        
+        assert_eq!(stats_array.len(), 5);
+        assert_eq!(stats_array.mean(), Some(3.0));
+        assert_eq!(stats_array.sum(), 15.0);
+        assert_eq!(stats_array.min(), Some(1.0));
+        assert_eq!(stats_array.max(), Some(5.0));
+        assert_eq!(stats_array.median(), Some(3.0));
+    }
+    
+    #[test]
+    fn test_correlation() {
+        let x = StatsArray::new(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        let y = StatsArray::new(vec![2.0, 4.0, 6.0, 8.0, 10.0]);
+        
+        let correlation = x.correlate(&y);
+        assert!(correlation.is_some());
+        // Perfect positive correlation should be close to 1.0
+        assert!((correlation.unwrap() - 1.0).abs() < 0.001);
+    }
+    
+    #[test]
+    fn test_element_wise_operations() {
+        let a = StatsArray::new(vec![1.0, 2.0, 3.0]);
+        let b = StatsArray::new(vec![4.0, 5.0, 6.0]);
+        
+        let sum = a.add(&b);
+        assert!(sum.is_some());
+        assert_eq!(sum.unwrap().base.clone_vec(), vec![5.0, 7.0, 9.0]);
+        
+        let scaled = a.multiply(2.0);
+        assert_eq!(scaled.base.clone_vec(), vec![2.0, 4.0, 6.0]);
+    }
+    
+    #[test]
+    fn test_empty_stats_array() {
+        let empty: StatsArray<f64> = StatsArray::new(vec![]);
+        
+        assert!(empty.is_empty());
+        assert_eq!(empty.mean(), None);
+        assert_eq!(empty.min(), None);
+        assert_eq!(empty.max(), None);
+    }
+    
+    #[test]
+    fn test_describe() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let stats_array = StatsArray::new(data);
+        let summary = stats_array.describe();
+        
+        assert_eq!(summary.count, 5);
+        assert!(summary.is_valid());
+        assert_eq!(summary.mean, Some(3.0));
+        assert_eq!(summary.median, Some(3.0));
+    }
+}

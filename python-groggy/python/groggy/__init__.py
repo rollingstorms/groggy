@@ -7,6 +7,7 @@ This package provides a Pythonic interface to the high-performance Rust graph li
 # Import directly from Rust extension for Phase 3 functionality
 from ._groggy import (
     Graph,
+    Subgraph,
     AttrValue,
     NodeFilter,
     EdgeFilter, 
@@ -27,6 +28,7 @@ from ._groggy import (
     EdgesArray,
     MetaNodeArray,
     ComponentsArray,
+    SubgraphArray,
     GraphMatrix,
     GraphTable,
     # Table classes
@@ -100,6 +102,7 @@ except ImportError:
 __version__ = "0.3.1"
 __all__ = [
     "Graph",
+    "Subgraph",
     "AttrValue", 
     "NodeId",
     "EdgeId", 
@@ -130,6 +133,7 @@ __all__ = [
     "EdgesArray",
     "MetaNodeArray",
     "ComponentsArray",
+    "SubgraphArray",
     "GraphMatrix",
     "GraphTable",
     # Table classes

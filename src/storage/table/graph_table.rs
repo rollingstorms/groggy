@@ -889,12 +889,12 @@ impl Table for GraphTable {
         self.nodes.column_names()
     }
     
-    fn column(&self, name: &str) -> Option<&BaseArray> {
+    fn column(&self, name: &str) -> Option<&BaseArray<AttrValue>> {
         // Try nodes first, then edges
         self.nodes.column(name).or_else(|| self.edges.column(name))
     }
     
-    fn column_by_index(&self, index: usize) -> Option<&BaseArray> {
+    fn column_by_index(&self, index: usize) -> Option<&BaseArray<AttrValue>> {
         // Try nodes first, then edges with adjusted index
         let nodes_cols = self.nodes.ncols();
         if index < nodes_cols {
@@ -1038,7 +1038,7 @@ impl Table for GraphTable {
         })
     }
     
-    fn with_column(&self, name: String, column: BaseArray) -> GraphResult<Self> {
+    fn with_column(&self, name: String, column: BaseArray<AttrValue>) -> GraphResult<Self> {
         // Adding columns to composite table is ambiguous
         // For now, add to nodes table by default
         Ok(Self {
@@ -1439,77 +1439,131 @@ impl GraphTable {
     
     // Helper methods for CSV parsing (simplified - not production grade)
     fn parse_nodes_from_csv(csv_content: &str) -> GraphResult<NodesTable> {
-        let lines: Vec<&str> = csv_content.lines().collect();
-        if lines.is_empty() {
-            return Err(GraphError::InvalidInput("Empty nodes CSV".to_string()));
+        // Use robust CSV parsing to correctly handle quoted fields and commas
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(true)
+            .from_reader(csv_content.as_bytes());
+
+        // Capture headers and prepare column storage
+        let headers = reader
+            .headers()
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to read nodes CSV headers: {}", e)))?
+            .clone();
+
+        let column_names: Vec<String> = headers.iter().map(|h| h.to_string()).collect();
+        if !column_names.iter().any(|h| h == "node_id") {
+            return Err(GraphError::InvalidInput("node_id column not found in nodes CSV".to_string()));
         }
-        
-        let header = lines[0];
-        let column_names: Vec<&str> = header.split(',').collect();
-        
-        // Find node_id column
-        let node_id_index = column_names.iter()
-            .position(|&name| name == "node_id")
-            .ok_or_else(|| GraphError::InvalidInput("node_id column not found in CSV".to_string()))?;
-        
-        // Extract node IDs from all rows
-        let mut node_ids = Vec::new();
-        for line in lines.iter().skip(1) { // Skip header
-            let values: Vec<&str> = line.split(',').collect();
-            if values.len() > node_id_index {
-                let node_id_str = values[node_id_index].trim();
-                let node_id: NodeId = node_id_str.parse()
-                    .map_err(|_| GraphError::InvalidInput(format!("Invalid node_id: {}", node_id_str)))?;
-                node_ids.push(node_id);
+
+        let mut column_data: std::collections::HashMap<String, crate::storage::array::BaseArray<AttrValue>> = std::collections::HashMap::new();
+        let mut temp_vectors: std::collections::HashMap<String, Vec<AttrValue>> = column_names
+            .iter()
+            .map(|name| (name.clone(), Vec::new()))
+            .collect();
+
+        for (row_idx, rec) in reader.records().enumerate() {
+            let record = rec.map_err(|e| GraphError::InvalidInput(format!(
+                "Failed to read nodes CSV record at row {}: {}",
+                row_idx + 1,
+                e
+            )))?;
+
+            for (i, value) in record.iter().enumerate() {
+                if let Some(col_name) = column_names.get(i) {
+                    let attr = Self::parse_field_simple(value);
+                    if let Some(vec) = temp_vectors.get_mut(col_name) {
+                        vec.push(attr);
+                    }
+                }
             }
         }
-        
-        // For now, just create a basic NodesTable with node_ids
-        // TODO: Parse other attributes from CSV
-        Ok(NodesTable::new(node_ids))
+
+        for (name, data) in temp_vectors.into_iter() {
+            column_data.insert(name, crate::storage::array::BaseArray::from_attr_values(data));
+        }
+
+        // Build BaseTable with the captured column order, then convert to NodesTable
+        let base = crate::storage::table::BaseTable::with_column_order(column_data, column_names)
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to build nodes BaseTable: {}", e)))?;
+
+        let nodes = NodesTable::from_base_table(base)
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to build NodesTable from CSV: {}", e)))?;
+
+        Ok(nodes)
     }
-    
+
     fn parse_edges_from_csv(csv_content: &str) -> GraphResult<EdgesTable> {
-        let lines: Vec<&str> = csv_content.lines().collect();
-        if lines.is_empty() {
-            return Err(GraphError::InvalidInput("Empty edges CSV".to_string()));
-        }
-        
-        let header = lines[0];
-        let column_names: Vec<&str> = header.split(',').collect();
-        
-        // Find required columns
-        let edge_id_index = column_names.iter()
-            .position(|&name| name == "edge_id")
-            .ok_or_else(|| GraphError::InvalidInput("edge_id column not found in CSV".to_string()))?;
-        let source_index = column_names.iter()
-            .position(|&name| name == "source")
-            .ok_or_else(|| GraphError::InvalidInput("source column not found in CSV".to_string()))?;
-        let target_index = column_names.iter()
-            .position(|&name| name == "target")
-            .ok_or_else(|| GraphError::InvalidInput("target column not found in CSV".to_string()))?;
-        
-        // Extract edges from all rows
-        let mut edges = Vec::new();
-        for line in lines.iter().skip(1) { // Skip header
-            let values: Vec<&str> = line.split(',').collect();
-            if values.len() > edge_id_index && values.len() > source_index && values.len() > target_index {
-                let edge_id_str = values[edge_id_index].trim();
-                let source_str = values[source_index].trim();
-                let target_str = values[target_index].trim();
-                
-                let edge_id: EdgeId = edge_id_str.parse()
-                    .map_err(|_| GraphError::InvalidInput(format!("Invalid edge_id: {}", edge_id_str)))?;
-                let source: NodeId = source_str.parse()
-                    .map_err(|_| GraphError::InvalidInput(format!("Invalid source: {}", source_str)))?;
-                let target: NodeId = target_str.parse()
-                    .map_err(|_| GraphError::InvalidInput(format!("Invalid target: {}", target_str)))?;
-                
-                edges.push((edge_id, source, target));
+        // Use robust CSV parsing to correctly handle quoted fields and commas
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(true)
+            .from_reader(csv_content.as_bytes());
+
+        // Capture headers and prepare column storage
+        let headers = reader
+            .headers()
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to read edges CSV headers: {}", e)))?
+            .clone();
+
+        let column_names: Vec<String> = headers.iter().map(|h| h.to_string()).collect();
+        for required in ["edge_id", "source", "target"].iter() {
+            if !column_names.iter().any(|h| h == *required) {
+                return Err(GraphError::InvalidInput(format!("{} column not found in edges CSV", required)));
             }
         }
-        
-        // Create EdgesTable
-        Ok(EdgesTable::new(edges))
+
+        let mut column_data: std::collections::HashMap<String, crate::storage::array::BaseArray<AttrValue>> = std::collections::HashMap::new();
+        let mut temp_vectors: std::collections::HashMap<String, Vec<AttrValue>> = column_names
+            .iter()
+            .map(|name| (name.clone(), Vec::new()))
+            .collect();
+
+        for (row_idx, rec) in reader.records().enumerate() {
+            let record = rec.map_err(|e| GraphError::InvalidInput(format!(
+                "Failed to read edges CSV record at row {}: {}",
+                row_idx + 1,
+                e
+            )))?;
+
+            for (i, value) in record.iter().enumerate() {
+                if let Some(col_name) = column_names.get(i) {
+                    let attr = Self::parse_field_simple(value);
+                    if let Some(vec) = temp_vectors.get_mut(col_name) {
+                        vec.push(attr);
+                    }
+                }
+            }
+        }
+
+        for (name, data) in temp_vectors.into_iter() {
+            column_data.insert(name, crate::storage::array::BaseArray::from_attr_values(data));
+        }
+
+        // Build BaseTable with the captured column order, then convert to EdgesTable
+        let base = crate::storage::table::BaseTable::with_column_order(column_data, column_names)
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to build edges BaseTable: {}", e)))?;
+
+        let edges = EdgesTable::from_base_table(base)
+            .map_err(|e| GraphError::InvalidInput(format!("Failed to build EdgesTable from CSV: {}", e)))?;
+
+        Ok(edges)
+    }
+
+    /// Minimal CSV field-to-AttrValue conversion matching BaseTable behavior
+    fn parse_field_simple(field: &str) -> AttrValue {
+        if field.is_empty() {
+            return AttrValue::Null;
+        }
+        match field.to_lowercase().as_str() {
+            "true" => return AttrValue::Bool(true),
+            "false" => return AttrValue::Bool(false),
+            _ => {}
+        }
+        if let Ok(i) = field.parse::<i64>() {
+            return AttrValue::Int(i);
+        }
+        if let Ok(f) = field.parse::<f32>() {
+            return AttrValue::Float(f);
+        }
+        AttrValue::Text(field.to_string())
     }
 }
