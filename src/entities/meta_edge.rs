@@ -184,15 +184,36 @@ impl MetaEdgeOperations for MetaEdge {
     }
     
     fn aggregated_from(&self) -> GraphResult<Option<Vec<EdgeId>>> {
-        // TODO: Store and retrieve original edge IDs during collapse
-        // For now, this information is not preserved
-        Ok(None)
+        // Retrieve original edge IDs from edge attributes
+        // These should be stored during the collapse process as "original_edges" attribute
+        let graph = self.graph.borrow();
+        match graph.get_edge_attr(self.id, &"original_edges".into()) {
+            Ok(Some(AttrValue::Text(edge_ids_str))) => {
+                // Parse comma-separated edge IDs
+                let edge_ids: Result<Vec<EdgeId>, _> = edge_ids_str
+                    .split(',')
+                    .map(|s| s.trim().parse::<EdgeId>())
+                    .collect();
+                match edge_ids {
+                    Ok(ids) if !ids.is_empty() => Ok(Some(ids)),
+                    _ => Ok(None),
+                }
+            }
+            _ => Ok(None), // No original edges information stored
+        }
     }
     
     fn expand(&self) -> GraphResult<Option<Vec<EdgeId>>> {
-        // TODO: Implement meta-edge expansion
-        // This would need to recreate the original edges that were aggregated
-        Ok(None)
+        // Implement meta-edge expansion by recreating original edges
+        // This requires both the original edge IDs and their endpoints
+        if let Some(original_edges) = self.aggregated_from()? {
+            // For full expansion, we would need to recreate the original edges
+            // This is complex because it requires storing original endpoints and attributes
+            // For now, return the original edge IDs that this meta-edge represents
+            Ok(Some(original_edges))
+        } else {
+            Ok(None)
+        }
     }
     
     fn meta_properties(&self) -> GraphResult<HashMap<String, AttrValue>> {

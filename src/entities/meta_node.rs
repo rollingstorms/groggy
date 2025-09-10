@@ -140,8 +140,13 @@ impl GraphEntity for MetaNode {
             }
         }
         
-        // TODO: Add contained subgraph entities when expanded
-        // This would require expanding the subgraph and getting its entities
+        // Add contained subgraph entities when expanded
+        if let Ok(Some(subgraph)) = self.subgraph() {
+            // Get entities from the expanded subgraph
+            if let Ok(subgraph_entities) = subgraph.related_entities() {
+                entities.extend(subgraph_entities);
+            }
+        }
         
         Ok(entities)
     }
