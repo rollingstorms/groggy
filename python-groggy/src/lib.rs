@@ -339,7 +339,7 @@ fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn groggy(py: Python, m: &PyModule) -> PyResult<()> {
+fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Register core graph components
     m.add_class::<PyGraph>()?;
     m.add_class::<PySubgraph>()?;
