@@ -77,7 +77,7 @@ impl PyBaseTable {
                 })
                 .unwrap_or(AttrValueType::Text);
             
-            columns.insert(col_name, BaseArray::new(attr_values, dtype));
+            columns.insert(col_name, BaseArray::new(attr_values));
         }
         
         let table = BaseTable::from_columns(columns)
@@ -102,6 +102,12 @@ impl PyBaseTable {
     #[getter]
     pub fn column_names(&self) -> Vec<String> {
         self.table.column_names().to_vec()
+    }
+    
+    /// Get column names (alias for column_names)
+    #[getter]
+    pub fn columns(&self) -> Vec<String> {
+        self.column_names()
     }
     
     /// Get a specific column as BaseArray for chaining operations
@@ -2978,6 +2984,37 @@ impl PyGraphTable {
     // =============================================================================
     // Helper Methods for Bundle System
     // =============================================================================
+
+    // =============================================================================
+    // Cross-Type Conversions for Phase 3 Delegation Architecture
+    // =============================================================================
+
+    /// Convert table to NodesAccessor by extracting node IDs from the table
+    pub fn to_nodes(&self) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
+        // TODO: Implement proper conversion from GraphTable to NodesAccessor
+        // This requires understanding the graph context and creating appropriate accessors
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "GraphTable to NodesAccessor conversion not yet implemented. Use .nodes() property instead."
+        ))
+    }
+
+    /// Convert table to EdgesAccessor by extracting edge IDs from the table
+    pub fn to_edges(&self) -> PyResult<crate::ffi::storage::accessors::PyEdgesAccessor> {
+        // TODO: Implement proper conversion from GraphTable to EdgesAccessor
+        // This requires understanding the graph context and creating appropriate accessors
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "GraphTable to EdgesAccessor conversion not yet implemented. Use .edges() property instead."
+        ))
+    }
+
+    /// Convert table to SubgraphArray by creating subgraphs from table rows
+    pub fn to_subgraphs(&self) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+        // TODO: Implement proper conversion from GraphTable to SubgraphArray
+        // This requires understanding the graph context and creating appropriate subgraphs
+        Err(pyo3::exceptions::PyNotImplementedError::new_err(
+            "GraphTable to SubgraphArray conversion not yet implemented."
+        ))
+    }
 }
 
 /// Convert JSON value to Python dictionary recursively (helper function)

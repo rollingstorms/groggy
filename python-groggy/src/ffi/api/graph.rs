@@ -165,9 +165,23 @@ impl PyGraph {
 
     // === CORE GRAPH OPERATIONS ===
 
-    #[pyo3(signature = (**kwargs))]
-    fn add_node(&mut self, kwargs: Option<&PyDict>) -> PyResult<NodeId> {
-        let node_id = self.inner.borrow_mut().add_node();
+    #[pyo3(signature = (node_id = None, **kwargs))]
+    fn add_node(&mut self, node_id: Option<NodeId>, kwargs: Option<&PyDict>) -> PyResult<NodeId> {
+        // If node_id provided, validate it's not already taken, otherwise auto-generate
+        let actual_node_id = if let Some(id) = node_id {
+            // TODO: We should validate that this ID doesn't already exist
+            // For now, use the auto-generated approach since the core Graph.add_node() doesn't support custom IDs
+            // This is a limitation we'll need to address in the core Rust API
+            let generated_id = self.inner.borrow_mut().add_node();
+            if id != generated_id {
+                // For now, warn that we can't use custom IDs
+                // In a future version, we should add support to the core Graph API
+                eprintln!("Warning: Custom node IDs not yet supported, using auto-generated ID {} instead of {}", generated_id, id);
+            }
+            generated_id
+        } else {
+            self.inner.borrow_mut().add_node()
+        };
 
         // Fast path: if no kwargs, just return the node_id
         if let Some(attrs) = kwargs {
@@ -179,13 +193,13 @@ impl PyGraph {
 
                     self.inner
                         .borrow_mut()
-                        .set_node_attr(node_id, attr_name, attr_value?)
+                        .set_node_attr(actual_node_id, attr_name, attr_value?)
                         .map_err(graph_error_to_py_err)?;
                 }
             }
         }
 
-        Ok(node_id)
+        Ok(actual_node_id)
     }
 
     #[pyo3(signature = (data, uid_key = None))]
@@ -1023,12 +1037,29 @@ impl PyGraph {
     fn neighborhood(
         &mut self,
         py: Python,
-        center_nodes: Vec<NodeId>,
+        center_nodes: &PyAny,
         radius: Option<usize>,
         max_nodes: Option<usize>,
     ) -> PyResult<crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult> {
+        // Convert center_nodes to Vec<NodeId> - accept both single node and sequence
+        let center_nodes_vec = if let Ok(single_node) = center_nodes.extract::<NodeId>() {
+            // Single node passed
+            vec![single_node]
+        } else if let Ok(nodes_vec) = center_nodes.extract::<Vec<NodeId>>() {
+            // Vector of nodes passed
+            nodes_vec
+        } else {
+            // Try to extract as sequence
+            let seq = center_nodes.iter()?;
+            let mut nodes = Vec::new();
+            for item in seq {
+                nodes.push(item?.extract::<NodeId>()?);
+            }
+            nodes
+        };
+        
         let mut analysis_handler = PyGraphAnalysis::new(Py::new(py, self.clone())?)?;
-        analysis_handler.neighborhood(py, center_nodes, radius, max_nodes)
+        analysis_handler.neighborhood(py, center_nodes_vec, radius, max_nodes)
     }
 
     /// Get shortest path - delegates to PyGraphAnalysis helper
