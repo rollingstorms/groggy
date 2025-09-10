@@ -79,27 +79,28 @@ impl Subgraph {
         edges: HashSet<EdgeId>,
         subgraph_type: String,
     ) -> Self {
-        // TODO: Generate proper subgraph ID through GraphPool
-        // For now, use a simple hash-based ID
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-        let mut hasher = DefaultHasher::new();
-
-        // Hash the node and edge sets by iterating over them in sorted order
-        let mut sorted_nodes: Vec<_> = nodes.iter().collect();
-        sorted_nodes.sort();
-        for node in sorted_nodes {
-            node.hash(&mut hasher);
-        }
-
-        let mut sorted_edges: Vec<_> = edges.iter().collect();
-        sorted_edges.sort();
-        for edge in sorted_edges {
-            edge.hash(&mut hasher);
-        }
-
-        subgraph_type.hash(&mut hasher);
-        let subgraph_id = hasher.finish() as SubgraphId;
+        // Generate proper subgraph ID through GraphPool storage
+        let subgraph_id = graph.borrow_mut()
+            .pool_mut()
+            .store_subgraph(nodes.clone(), edges.clone(), subgraph_type.clone())
+            .unwrap_or_else(|_| {
+                // Fallback to hash-based ID if pool storage fails
+                use std::collections::hash_map::DefaultHasher;
+                use std::hash::{Hash, Hasher};
+                let mut hasher = DefaultHasher::new();
+                let mut sorted_nodes: Vec<_> = nodes.iter().collect();
+                sorted_nodes.sort();
+                for node in sorted_nodes {
+                    node.hash(&mut hasher);
+                }
+                let mut sorted_edges: Vec<_> = edges.iter().collect();
+                sorted_edges.sort();
+                for edge in sorted_edges {
+                    edge.hash(&mut hasher);
+                }
+                subgraph_type.hash(&mut hasher);
+                hasher.finish() as SubgraphId
+            });
 
         Self {
             graph,

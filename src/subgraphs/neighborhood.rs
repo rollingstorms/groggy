@@ -541,7 +541,22 @@ impl NeighborhoodSampler {
         // TODO: Fix graph_ref creation - temporary workaround
         // This is a simplified version to get compilation working
         let graph_ref = Rc::new(RefCell::new(Graph::new()));
-        let subgraph_id = 0; // TODO: Generate proper SubgraphId
+        
+        // Generate proper SubgraphId using hash of content
+        let subgraph_id = {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut hasher = DefaultHasher::new();
+            let mut sorted_nodes: Vec<NodeId> = nodes_vec.iter().copied().collect();
+            sorted_nodes.sort();
+            sorted_nodes.hash(&mut hasher);
+            let mut sorted_edges: Vec<EdgeId> = induced_edges.iter().copied().collect();
+            sorted_edges.sort();
+            sorted_edges.hash(&mut hasher);
+            "neighborhood".hash(&mut hasher);
+            node_id.hash(&mut hasher); // Include central node for uniqueness
+            (hasher.finish() as usize) as SubgraphId
+        };
         Ok(NeighborhoodSubgraph {
             graph_ref,
             nodes: nodes_vec.into_iter().collect(),
