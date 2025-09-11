@@ -3,7 +3,7 @@
 //! This module shows how the delegation architecture enables infinite
 //! method chaining and universal operation availability.
 
-use super::traits::{SubgraphOps, TableOps, BaseArrayOps, StatsArrayOps, DelegatingIterator};
+use super::traits::{SubgraphOps, TableOps, BaseArrayOps, NumArrayOps, DelegatingIterator};
 use super::forwarding::ForwardingArray;
 use super::error_handling::{DelegationResult, TryMapOps};
 use pyo3::PyResult;
@@ -28,33 +28,33 @@ pub fn example_subgraph_operations() -> PyResult<()> {
 }
 
 /// Example demonstrating array operations with statistical capabilities
-pub fn example_stats_array_operations() -> PyResult<()> {
+pub fn example_num_array_operations() -> PyResult<()> {
     println!("=== Statistical Array Operations Example ===");
     
     // Create a numerical array with statistical capabilities
     let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-    let stats_array = ForwardingArray::new(data);
+    let num_array = ForwardingArray::new(data);
     
     // Basic array operations
-    println!("Array length: {}", stats_array.len());
-    println!("Is empty: {}", stats_array.is_empty());
-    println!("First element: {:?}", stats_array.get(0));
+    println!("Array length: {}", num_array.len());
+    println!("Is empty: {}", num_array.is_empty());
+    println!("First element: {:?}", num_array.get(0));
     
     // Statistical operations
-    if let Ok(Some(mean)) = stats_array.mean() {
+    if let Ok(Some(mean)) = num_array.mean() {
         println!("Mean: {:.2}", mean);
     }
     
-    if let Ok(Some(std_dev)) = stats_array.std_dev() {
+    if let Ok(Some(std_dev)) = num_array.std_dev() {
         println!("Standard deviation: {:.2}", std_dev);
     }
     
-    if let Ok(Some(median)) = stats_array.median() {
+    if let Ok(Some(median)) = num_array.median() {
         println!("Median: {:.2}", median);
     }
     
     // Array transformations
-    if let Ok(doubled) = stats_array.multiply(2.0) {
+    if let Ok(doubled) = num_array.multiply(2.0) {
         println!("Doubled array length: {}", doubled.len());
         if let Ok(Some(doubled_mean)) = doubled.mean() {
             println!("Doubled array mean: {:.2}", doubled_mean);
@@ -120,8 +120,8 @@ pub fn example_complex_chaining_pattern() -> PyResult<()> {
     println!("  .filter(\"age > 25\")        // TableOps -> DelegatingIterator<NodesTable>");
     println!("  .agg(\"mean\")               // TableOps -> DelegatingIterator<BaseTable>");
     println!("  .collect()                 // -> TableArray");
-    println!("  .stats()                   // -> StatsArray");
-    println!("  .mean()                    // StatsArrayOps -> f64");
+    println!("  .stats()                   // -> NumArray");
+    println!("  .mean()                    // NumArrayOps -> f64");
     
     println!("\nThis creates infinite composability where any valid sequence works!");
     
@@ -165,7 +165,7 @@ pub fn run_all_examples() -> PyResult<()> {
     example_subgraph_operations()?;
     println!();
     
-    example_stats_array_operations()?;
+    example_num_array_operations()?;
     println!();
     
     example_delegating_iterator()?;
@@ -187,7 +187,7 @@ mod tests {
     use super::*;
     
     #[test]
-    fn test_stats_array_operations() {
+    fn test_num_array_operations() {
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let array = ForwardingArray::new(data);
         

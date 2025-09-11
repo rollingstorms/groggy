@@ -15,8 +15,7 @@ pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
 // Re-enabled accessor exports for table integration
 pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
 pub use ffi::storage::array::{PyGraphArray, PyBaseArray, PyNodesArray, PyEdgesArray, PyMetaNodeArray};
-pub use ffi::storage::stats_array::{PyStatsArray, PyStatsArrayIterator};
-pub use ffi::storage::num_array::{PyNumArray, PyNumArrayIterator};
+pub use ffi::storage::num_array::{PyNumArray, PyNumArrayIterator, PyStatsArray, PyStatsArrayIterator};
 pub use ffi::storage::simple_stats_array::PySimpleStatsArray;
 pub use ffi::storage::subgraph_array::{PySubgraphArray, PySubgraphArrayIterator, PySubgraphArrayChainIterator};
 pub use ffi::storage::table_array::{PyTableArray, PyTableArrayIterator, PyTableArrayChainIterator};
@@ -365,8 +364,8 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<crate::ffi::storage::num_array::PyNumArray>()?;
     m.add_class::<crate::ffi::storage::num_array::PyNumArrayIterator>()?;
     // Back-compat StatsArray (to be deprecated)
-    m.add_class::<PyStatsArray>()?;
-    m.add_class::<PyStatsArrayIterator>()?;
+    m.add_class::<PyNumArray>()?;
+    m.add_class::<PyNumArrayIterator>()?;
     m.add_class::<PySimpleStatsArray>()?;
     m.add_class::<PyTableArray>()?;
     m.add_class::<PyTableArrayIterator>()?;

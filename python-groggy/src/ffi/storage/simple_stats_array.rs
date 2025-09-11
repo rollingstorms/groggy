@@ -1,19 +1,19 @@
-//! Minimal StatsArray for testing
+//! Minimal NumArray for testing
 
 use pyo3::prelude::*;
-use groggy::storage::array::StatsArray;
+use groggy::storage::array::NumArray;
 
 /// Minimal statistical array for testing
 #[pyclass(name = "SimpleStatsArray", unsendable)]
 #[derive(Clone)]
 pub struct PySimpleStatsArray {
-    inner: StatsArray<f64>,
+    inner: NumArray<f64>,
 }
 
 impl PySimpleStatsArray {
     pub fn new(values: Vec<f64>) -> Self {
         Self {
-            inner: StatsArray::new(values),
+            inner: NumArray::new(values),
         }
     }
 }

@@ -1,0 +1,3662 @@
+{
+  "test_metadata": {
+    "total_tests": 281,
+    "successful_tests": 139,
+    "failed_tests": 9,
+    "skipped_tests": 133,
+    "success_rate": 49.46619217081851
+  },
+  "test_results": [
+    {
+      "object": "BaseTable",
+      "method": "agg",
+      "signature": "(agg_specs)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['agg_specs']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "aggregate",
+      "signature": "(agg_specs)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['agg_specs']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "assign",
+      "signature": "(updates)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['updates']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "column",
+      "signature": "(column_name)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "BaseArray[3] (dtype: Int)",
+      "error": null,
+      "return_type": "BaseArray",
+      "test_params": "node_id"
+    },
+    {
+      "object": "BaseTable",
+      "method": "drop_columns",
+      "signature": "(columns)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['columns']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "filter",
+      "signature": "(predicate)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "BaseTable[3 x 3]",
+      "error": null,
+      "return_type": "BaseTable",
+      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x10494f0d0>"
+    },
+    {
+      "object": "BaseTable",
+      "method": "from_csv",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "from_dict",
+      "signature": "(data)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['data']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "from_json",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "from_parquet",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "group_by",
+      "signature": "(columns)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['columns']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "has_column",
+      "signature": "(name)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "True",
+      "error": null,
+      "return_type": "bool",
+      "test_params": "node_id"
+    },
+    {
+      "object": "BaseTable",
+      "method": "head",
+      "signature": "(n=5)",
+      "requires_params": false,
+      "status": "success",
+      "result": "BaseTable[3 x 3]",
+      "error": null,
+      "return_type": "BaseTable"
+    },
+    {
+      "object": "BaseTable",
+      "method": "intersect",
+      "signature": "(other)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['other']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "iter",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "<groggy.BaseTableIterator object at 0x104a6a0b0>",
+      "error": null,
+      "return_type": "BaseTableIterator"
+    },
+    {
+      "object": "BaseTable",
+      "method": "join",
+      "signature": "(other, on, how)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['other', 'on', 'how']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "rich_display",
+      "signature": "(config=None)",
+      "requires_params": false,
+      "status": "success",
+      "result": "\u2296\u2296 gr.table\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502                      # \u2502 name                            \u2502 type  ",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "BaseTable",
+      "method": "select",
+      "signature": "(columns)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['columns']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "set_column",
+      "signature": "(column_name, values)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['column_name', 'values']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "set_value",
+      "signature": "(row, column_name, value)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['row', 'column_name', 'value']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "set_values_by_mask",
+      "signature": "(mask, column_name, value)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['mask', 'column_name', 'value']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "set_values_by_range",
+      "signature": "(start, end, column_name, value, step=1)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['start', 'end', 'column_name', 'value']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "slice",
+      "signature": "(start, end)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['start', 'end']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "sort_by",
+      "signature": "(column, ascending=True)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['column']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "tail",
+      "signature": "(n=5)",
+      "requires_params": false,
+      "status": "success",
+      "result": "BaseTable[3 x 3]",
+      "error": null,
+      "return_type": "BaseTable"
+    },
+    {
+      "object": "BaseTable",
+      "method": "to_csv",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "None",
+      "error": null,
+      "return_type": "NoneType",
+      "test_params": "test_output.csv"
+    },
+    {
+      "object": "BaseTable",
+      "method": "to_json",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "None",
+      "error": null,
+      "return_type": "NoneType",
+      "test_params": "test_output.json"
+    },
+    {
+      "object": "BaseTable",
+      "method": "to_pandas",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "    type        name  node_id\n0   core       Graph        1\n1  table   BaseTable        2\n2  table  NodesTable        3",
+      "error": null,
+      "return_type": "DataFrame"
+    },
+    {
+      "object": "BaseTable",
+      "method": "to_parquet",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "union",
+      "signature": "(other)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['other']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "base_table",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "BaseTable[3 x 3]",
+      "error": null,
+      "return_type": "BaseTable"
+    },
+    {
+      "object": "NodesTable",
+      "method": "drop_columns",
+      "signature": "(columns)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['columns']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "filter",
+      "signature": "(predicate)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "NodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |       core |          1 | \n|  BaseTable |      table |          2 |",
+      "error": null,
+      "return_type": "NodesTable",
+      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x1096510d0>"
+    },
+    {
+      "object": "NodesTable",
+      "method": "filter_by_attr",
+      "signature": "(attr_name, value)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attr_name', 'value']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "from_csv",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "from_dict",
+      "signature": "(data)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['data']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "from_json",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "from_parquet",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "group_by",
+      "signature": "(columns)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['columns']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "head",
+      "signature": "(n=5)",
+      "requires_params": false,
+      "status": "success",
+      "result": "NodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |       core |          1 | \n|  BaseTable |      table |          2 |",
+      "error": null,
+      "return_type": "NodesTable"
+    },
+    {
+      "object": "NodesTable",
+      "method": "into_base_table",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "BaseTable[3 x 3]",
+      "error": null,
+      "return_type": "BaseTable"
+    },
+    {
+      "object": "NodesTable",
+      "method": "iter",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "<groggy.NodesTableIterator object at 0x10961fa30>",
+      "error": null,
+      "return_type": "NodesTableIterator"
+    },
+    {
+      "object": "NodesTable",
+      "method": "ncols",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "3",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "NodesTable",
+      "method": "node_ids",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray(len=3, dtype=int64)",
+      "error": null,
+      "return_type": "GraphArray"
+    },
+    {
+      "object": "NodesTable",
+      "method": "nrows",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "3",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "NodesTable",
+      "method": "rich_display",
+      "signature": "(config=None)",
+      "requires_params": false,
+      "status": "success",
+      "result": "\u2296\u2296 gr.table\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502                      # \u2502 name                            \u2502 type  ",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "NodesTable",
+      "method": "select",
+      "signature": "(columns)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['columns']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "shape",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "(3, 3)",
+      "error": null,
+      "return_type": "tuple"
+    },
+    {
+      "object": "NodesTable",
+      "method": "slice",
+      "signature": "(start, end)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['start', 'end']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "sort_by",
+      "signature": "(column, ascending=True)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['column']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "tail",
+      "signature": "(n=5)",
+      "requires_params": false,
+      "status": "success",
+      "result": "NodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |       core |          1 | \n|  BaseTable |      table |          2 |",
+      "error": null,
+      "return_type": "NodesTable"
+    },
+    {
+      "object": "NodesTable",
+      "method": "to_csv",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "None",
+      "error": null,
+      "return_type": "NoneType",
+      "test_params": "test_output.csv"
+    },
+    {
+      "object": "NodesTable",
+      "method": "to_json",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "None",
+      "error": null,
+      "return_type": "NoneType",
+      "test_params": "test_output.json"
+    },
+    {
+      "object": "NodesTable",
+      "method": "to_pandas",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "   node_id   type        name\n0        1   core       Graph\n1        2  table   BaseTable\n2        3  table  NodesTable",
+      "error": null,
+      "return_type": "DataFrame"
+    },
+    {
+      "object": "NodesTable",
+      "method": "to_parquet",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "unique_attr_values",
+      "signature": "(attr_name)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attr_name']",
+      "return_type": null
+    },
+    {
+      "object": "NodesTable",
+      "method": "with_attributes",
+      "signature": "(attr_name, attributes)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attr_name', 'attributes']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "as_tuples",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[(1, 1, 2), (2, 2, 3)]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "auto_assign_edge_ids",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|     method |     source |     target |    edge_id | \n|------------|------------|------------|------------|\n|      table |          1 |          2 |          1 | \n|",
+      "error": null,
+      "return_type": "EdgesTable"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "base_table",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "BaseTable[2 x 4]",
+      "error": null,
+      "return_type": "BaseTable"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "drop_columns",
+      "signature": "(columns)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['columns']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "edge_ids",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray(len=2, dtype=int64)",
+      "error": null,
+      "return_type": "GraphArray"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "filter",
+      "signature": "(predicate)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|     method |     source |     target |    edge_id | \n|------------|------------|------------|------------|\n|      table |          1 |          2 |          1 | \n|",
+      "error": null,
+      "return_type": "EdgesTable",
+      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x1096510d0>"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "filter_by_attr",
+      "signature": "(attr_name, value)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attr_name', 'value']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "filter_by_sources",
+      "signature": "(source_nodes)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['source_nodes']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "filter_by_targets",
+      "signature": "(target_nodes)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['target_nodes']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "from_csv",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "from_dict",
+      "signature": "(data)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['data']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "from_json",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "from_parquet",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "group_by",
+      "signature": "(columns)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['columns']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "head",
+      "signature": "(n=5)",
+      "requires_params": false,
+      "status": "success",
+      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|     method |     source |     target |    edge_id | \n|------------|------------|------------|------------|\n|      table |          1 |          2 |          1 | \n|",
+      "error": null,
+      "return_type": "EdgesTable"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "into_base_table",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "BaseTable[2 x 4]",
+      "error": null,
+      "return_type": "BaseTable"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "iter",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "<groggy.EdgesTableIterator object at 0x10961fa30>",
+      "error": null,
+      "return_type": "EdgesTableIterator"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "ncols",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "4",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "nrows",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "2",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "rich_display",
+      "signature": "(config=None)",
+      "requires_params": false,
+      "status": "success",
+      "result": "\u2296\u2296 gr.table\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502                 # \u2502 method                 \u2502 source              ",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "select",
+      "signature": "(columns)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['columns']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "shape",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "(2, 4)",
+      "error": null,
+      "return_type": "tuple"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "slice",
+      "signature": "(start, end)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['start', 'end']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "sort_by",
+      "signature": "(column, ascending=True)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['column']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "sources",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray(len=2, dtype=int64)",
+      "error": null,
+      "return_type": "GraphArray"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "tail",
+      "signature": "(n=5)",
+      "requires_params": false,
+      "status": "success",
+      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|     method |     source |     target |    edge_id | \n|------------|------------|------------|------------|\n|      table |          1 |          2 |          1 | \n|",
+      "error": null,
+      "return_type": "EdgesTable"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "targets",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray(len=2, dtype=int64)",
+      "error": null,
+      "return_type": "GraphArray"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "to_csv",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "None",
+      "error": null,
+      "return_type": "NoneType",
+      "test_params": "test_output.csv"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "to_json",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "None",
+      "error": null,
+      "return_type": "NoneType",
+      "test_params": "test_output.json"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "to_pandas",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "  method  edge_id  target  source\n0  table        1       2       1\n1   head        2       3       2",
+      "error": null,
+      "return_type": "DataFrame"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "to_parquet",
+      "signature": "(path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['path']",
+      "return_type": null
+    },
+    {
+      "object": "EdgesTable",
+      "method": "unique_attr_values",
+      "signature": "(attr_name)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attr_name']",
+      "return_type": null
+    },
+    {
+      "object": "GraphTable",
+      "method": "auto_assign_edge_ids",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |    ",
+      "error": null,
+      "return_type": "GraphTable"
+    },
+    {
+      "object": "GraphTable",
+      "method": "from_federated_bundles",
+      "signature": "(bundle_paths, domain_names=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['bundle_paths']",
+      "return_type": null
+    },
+    {
+      "object": "GraphTable",
+      "method": "get_bundle_info",
+      "signature": "(bundle_path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['bundle_path']",
+      "return_type": null
+    },
+    {
+      "object": "GraphTable",
+      "method": "head",
+      "signature": "(n=5)",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |    ",
+      "error": null,
+      "return_type": "GraphTable"
+    },
+    {
+      "object": "GraphTable",
+      "method": "load_bundle",
+      "signature": "(bundle_path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['bundle_path']",
+      "return_type": null
+    },
+    {
+      "object": "GraphTable",
+      "method": "merge",
+      "signature": "(tables)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['tables']",
+      "return_type": null
+    },
+    {
+      "object": "GraphTable",
+      "method": "merge_with",
+      "signature": "(other, strategy)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['other', 'strategy']",
+      "return_type": null
+    },
+    {
+      "object": "GraphTable",
+      "method": "merge_with_strategy",
+      "signature": "(tables, strategy)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['tables', 'strategy']",
+      "return_type": null
+    },
+    {
+      "object": "GraphTable",
+      "method": "ncols",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "7",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "GraphTable",
+      "method": "nrows",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "5",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "GraphTable",
+      "method": "save_bundle",
+      "signature": "(bundle_path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['bundle_path']",
+      "return_type": null
+    },
+    {
+      "object": "GraphTable",
+      "method": "shape",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "(5, 7)",
+      "error": null,
+      "return_type": "tuple"
+    },
+    {
+      "object": "GraphTable",
+      "method": "stats",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "{'unique_targets': 2, 'edge_columns': 4, 'total_nodes': 3, 'node_columns': 3, 'total_columns': 4, 'total_edges': 2, 'unique_sources': 2, 'self_loops': 0}",
+      "error": null,
+      "return_type": "dict"
+    },
+    {
+      "object": "GraphTable",
+      "method": "tail",
+      "signature": "(n=5)",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |    ",
+      "error": null,
+      "return_type": "GraphTable"
+    },
+    {
+      "object": "GraphTable",
+      "method": "to_edges",
+      "signature": "()",
+      "requires_params": false,
+      "status": "error",
+      "result": null,
+      "error": "GraphTable to EdgesAccessor conversion not yet implemented. Use .edges() property instead.",
+      "return_type": null
+    },
+    {
+      "object": "GraphTable",
+      "method": "to_graph",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Graph(nodes=3, edges=2)",
+      "error": null,
+      "return_type": "Graph"
+    },
+    {
+      "object": "GraphTable",
+      "method": "to_nodes",
+      "signature": "()",
+      "requires_params": false,
+      "status": "error",
+      "result": null,
+      "error": "GraphTable to NodesAccessor conversion not yet implemented. Use .nodes() property instead.",
+      "return_type": null
+    },
+    {
+      "object": "GraphTable",
+      "method": "to_subgraphs",
+      "signature": "()",
+      "requires_params": false,
+      "status": "error",
+      "result": null,
+      "error": "GraphTable to SubgraphArray conversion not yet implemented.",
+      "return_type": null
+    },
+    {
+      "object": "GraphTable",
+      "method": "validate",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "ValidationReport { errors: [], warnings: [], info: [\"Node UIDs validation passed\", \"Edge validation passed\", \"Edge node reference validation passed\"], stats: {\"total_nodes\": 3, \"total_edges\": 2} }",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "GraphTable",
+      "method": "verify_bundle",
+      "signature": "(bundle_path)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['bundle_path']",
+      "return_type": null
+    },
+    {
+      "object": "BaseArray",
+      "method": "apply_to_each",
+      "signature": "(method_name, args)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['method_name', 'args']",
+      "return_type": null
+    },
+    {
+      "object": "BaseArray",
+      "method": "describe",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "{'count': 5, 'non_null': 5, 'null': 0, 'unique': 5, 'dtype': 'Int'}",
+      "error": null,
+      "return_type": "dict"
+    },
+    {
+      "object": "BaseArray",
+      "method": "dtype",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Int",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "BaseArray",
+      "method": "head",
+      "signature": "(n)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "BaseArray[5] (dtype: Int)",
+      "error": null,
+      "return_type": "BaseArray",
+      "test_params": "5"
+    },
+    {
+      "object": "BaseArray",
+      "method": "iter",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "<builtins.BaseArrayIterator object at 0x10967d730>",
+      "error": null,
+      "return_type": "BaseArrayIterator"
+    },
+    {
+      "object": "BaseArray",
+      "method": "tail",
+      "signature": "(n)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "BaseArray[5] (dtype: Int)",
+      "error": null,
+      "return_type": "BaseArray",
+      "test_params": "5"
+    },
+    {
+      "object": "BaseArray",
+      "method": "unique",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "BaseArray[5] (dtype: Int)",
+      "error": null,
+      "return_type": "BaseArray"
+    },
+    {
+      "object": "Graph",
+      "method": "add_edge",
+      "signature": "(source, target, uid_key=None, **kwargs)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['source', 'target', 'kwargs']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "add_edges",
+      "signature": "(edges, node_mapping=None, _uid_key=None, warm_cache=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edges']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "add_graph",
+      "signature": "(other)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['other']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "add_node",
+      "signature": "(node_id=None, **kwargs)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['kwargs']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "add_nodes",
+      "signature": "(data, uid_key=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['data']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "adjacency",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(3 x 3, dtype=Float)",
+      "error": null,
+      "return_type": "GraphMatrix"
+    },
+    {
+      "object": "Graph",
+      "method": "adjacency_matrix",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "{'size': 3, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(3 x 3, dtype=Float)}",
+      "error": null,
+      "return_type": "dict"
+    },
+    {
+      "object": "Graph",
+      "method": "aggregate",
+      "signature": "(attribute, operation, target=None, _node_ids=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attribute', 'operation']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "all_edge_attribute_names",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "['method']",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "Graph",
+      "method": "all_node_attribute_names",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "['name', 'type']",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "Graph",
+      "method": "bfs",
+      "signature": "(start, max_depth=None, inplace=None, attr_name=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['start']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "branches",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[BranchInfo(name='main', head=0, current=true)]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "Graph",
+      "method": "checkout_branch",
+      "signature": "(branch_name)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['branch_name']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "commit",
+      "signature": "(message, author)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['message', 'author']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "commit_history",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "Graph",
+      "method": "contains_edge",
+      "signature": "(edge)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "contains_node",
+      "signature": "(node)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "create_branch",
+      "signature": "(branch_name)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['branch_name']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "dense_adjacency_matrix",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(3 x 3, dtype=Float)",
+      "error": null,
+      "return_type": "GraphMatrix"
+    },
+    {
+      "object": "Graph",
+      "method": "density",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "0.6666666666666666",
+      "error": null,
+      "return_type": "float"
+    },
+    {
+      "object": "Graph",
+      "method": "dfs",
+      "signature": "(start, max_depth=None, inplace=None, attr_name=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['start']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "edge_attribute_keys",
+      "signature": "(edge_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge_id']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "edge_count",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "2",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "Graph",
+      "method": "edge_endpoints",
+      "signature": "(edge)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "filter_edges",
+      "signature": "(filter)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['filter']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "filter_nodes",
+      "signature": "(filter)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['filter']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "get_edge_attr",
+      "signature": "(edge, attr, default=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge', 'attr']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "get_edge_attrs",
+      "signature": "(edges, attrs)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edges', 'attrs']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "get_node_attr",
+      "signature": "(node, attr, default=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node', 'attr']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "get_node_attrs",
+      "signature": "(nodes, attrs)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['nodes', 'attrs']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "get_node_mapping",
+      "signature": "(uid_key, return_inverse=False)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['uid_key']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "group_by",
+      "signature": "(attribute, aggregation_attr, operation)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attribute', 'aggregation_attr', 'operation']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "group_nodes_by_attribute",
+      "signature": "(attribute, aggregation_attr, operation)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attribute', 'aggregation_attr', 'operation']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "has_edge",
+      "signature": "(edge_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge_id']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "has_edge_attribute",
+      "signature": "(edge_id, attr_name)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge_id', 'attr_name']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "has_node",
+      "signature": "(node_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node_id']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "has_node_attribute",
+      "signature": "(node_id, attr_name)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node_id', 'attr_name']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "has_uncommitted_changes",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "True",
+      "error": null,
+      "return_type": "bool"
+    },
+    {
+      "object": "Graph",
+      "method": "historical_view",
+      "signature": "(commit_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['commit_id']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "is_connected",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "True",
+      "error": null,
+      "return_type": "bool"
+    },
+    {
+      "object": "Graph",
+      "method": "laplacian_matrix",
+      "signature": "(normalized=None)",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(3 x 3, dtype=Float)",
+      "error": null,
+      "return_type": "GraphMatrix"
+    },
+    {
+      "object": "Graph",
+      "method": "neighborhood",
+      "signature": "(center_nodes, radius=None, max_nodes=None)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "NeighborhoodResult(1 neighborhoods, largest_size=3, time=0.00ms)",
+      "error": null,
+      "return_type": "NeighborhoodResult",
+      "test_params": "1"
+    },
+    {
+      "object": "Graph",
+      "method": "neighborhood_statistics",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "NeighborhoodStats(neighborhoods=1, nodes=3, time=0.01ms, avg=3.0 nodes/nbh)",
+      "error": null,
+      "return_type": "NeighborhoodStats"
+    },
+    {
+      "object": "Graph",
+      "method": "neighbors",
+      "signature": "(nodes=None)",
+      "requires_params": false,
+      "status": "error",
+      "result": null,
+      "error": "nodes parameter is required",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "node_attribute_keys",
+      "signature": "(node_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node_id']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "node_count",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "3",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "Graph",
+      "method": "remove_edge",
+      "signature": "(edge)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "remove_edges",
+      "signature": "(edges)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edges']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "remove_node",
+      "signature": "(node)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "remove_nodes",
+      "signature": "(nodes)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['nodes']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "resolve_string_id_to_node",
+      "signature": "(string_id, uid_key)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['string_id', 'uid_key']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "set_edge_attr",
+      "signature": "(edge, attr, value)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge', 'attr', 'value']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "set_edge_attrs",
+      "signature": "(attrs_dict)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attrs_dict']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "set_node_attr",
+      "signature": "(node, attr, value)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node', 'attr', 'value']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "set_node_attrs",
+      "signature": "(attrs_dict)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attrs_dict']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "shortest_path",
+      "signature": "(source, target, weight_attribute=None, inplace=None, attr_name=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['source', 'target']",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "sparse_adjacency_matrix",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "{'size': 3, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(3 x 3, dtype=Float)}",
+      "error": null,
+      "return_type": "dict"
+    },
+    {
+      "object": "Graph",
+      "method": "table",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|  BaseTable |    ",
+      "error": null,
+      "return_type": "GraphTable"
+    },
+    {
+      "object": "Graph",
+      "method": "to_networkx",
+      "signature": "(directed: bool = False, include_attributes: bool = True)",
+      "requires_params": false,
+      "status": "success",
+      "result": "Graph with 3 nodes and 2 edges",
+      "error": null,
+      "return_type": "Graph"
+    },
+    {
+      "object": "Graph",
+      "method": "transition_matrix",
+      "signature": "()",
+      "requires_params": false,
+      "status": "error",
+      "result": null,
+      "error": "transition_matrix needs to be implemented in core first",
+      "return_type": null
+    },
+    {
+      "object": "Graph",
+      "method": "view",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     1       1 \u2192 2\n     0       0 \u2192 1",
+      "error": null,
+      "return_type": "Subgraph"
+    },
+    {
+      "object": "Graph",
+      "method": "weighted_adjacency_matrix",
+      "signature": "(weight_attr)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['weight_attr']",
+      "return_type": null
+    },
+    {
+      "object": "Nodes",
+      "method": "all",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     0       0 \u2192 1\n     1       1 \u2192 2",
+      "error": null,
+      "return_type": "Subgraph"
+    },
+    {
+      "object": "Nodes",
+      "method": "get_meta_node",
+      "signature": "(node_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node_id']",
+      "return_type": null
+    },
+    {
+      "object": "Nodes",
+      "method": "ids",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray(len=3, dtype=int64)",
+      "error": null,
+      "return_type": "GraphArray"
+    },
+    {
+      "object": "Nodes",
+      "method": "set_attrs",
+      "signature": "(attrs_dict)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attrs_dict']",
+      "return_type": null
+    },
+    {
+      "object": "Nodes",
+      "method": "table",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "NodesTable[3 x 3]\nBaseTable[3 x 3]\n|       type |    node_id |       name | \n|------------|------------|------------|\n|      table |          1 |  BaseTable | \n|       core |          0 |      Graph |",
+      "error": null,
+      "return_type": "NodesTable"
+    },
+    {
+      "object": "Edges",
+      "method": "all",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     0       0 \u2192 1\n     1       1 \u2192 2",
+      "error": null,
+      "return_type": "Subgraph"
+    },
+    {
+      "object": "Edges",
+      "method": "ids",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray(len=2, dtype=int64)",
+      "error": null,
+      "return_type": "GraphArray"
+    },
+    {
+      "object": "Edges",
+      "method": "set_attrs",
+      "signature": "(attrs_dict)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attrs_dict']",
+      "return_type": null
+    },
+    {
+      "object": "Edges",
+      "method": "table",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|     source |     target |     method |    edge_id | \n|------------|------------|------------|------------|\n|          1 |          2 |       head |          1 | \n|",
+      "error": null,
+      "return_type": "EdgesTable"
+    },
+    {
+      "object": "ComponentsArray",
+      "method": "filter",
+      "signature": "(predicate)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "ComponentsArray(1 components)",
+      "error": null,
+      "return_type": "ComponentsArray",
+      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x109651310>"
+    },
+    {
+      "object": "ComponentsArray",
+      "method": "largest_component",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     0       0 \u2192 1\n     1       1 \u2192 2",
+      "error": null,
+      "return_type": "Subgraph"
+    },
+    {
+      "object": "ComponentsArray",
+      "method": "neighborhood",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "SubgraphArray(1 subgraphs)",
+      "error": null,
+      "return_type": "SubgraphArray"
+    },
+    {
+      "object": "ComponentsArray",
+      "method": "sample",
+      "signature": "(k)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "SubgraphArray(1 subgraphs)",
+      "error": null,
+      "return_type": "SubgraphArray",
+      "test_params": "3"
+    },
+    {
+      "object": "ComponentsArray",
+      "method": "sizes",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[(3, 2)]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "ComponentsArray",
+      "method": "table",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "TableArray(1 tables)",
+      "error": null,
+      "return_type": "TableArray"
+    },
+    {
+      "object": "ComponentsArray",
+      "method": "to_list",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[Subgraph(nodes=3, edges=2)]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "Subgraph",
+      "method": "bfs",
+      "signature": "(start, max_depth=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['start']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "calculate_similarity",
+      "signature": "(other, metric='jaccard')",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['other']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "child_meta_nodes",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "Subgraph",
+      "method": "clustering_coefficient",
+      "signature": "(_node_id=None)",
+      "requires_params": false,
+      "status": "error",
+      "result": null,
+      "error": "Clustering coefficient not yet implemented in core - coming in future version",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "collapse",
+      "signature": "(node_aggs=None, edge_aggs=None, edge_strategy='aggregate', node_strategy='extract', preset=None, include_edge_count=True, mark_entity_type=True, entity_type='meta', allow_missing_attributes=True)",
+      "requires_params": false,
+      "status": "success",
+      "result": "MetaNode(id=3, degree=0, subgraph_id=Some(7283313709374817673)) ",
+      "error": null,
+      "return_type": "MetaNode"
+    },
+    {
+      "object": "Subgraph",
+      "method": "collapse_to_node",
+      "signature": "(agg_functions)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['agg_functions']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "collapse_to_node_with_defaults",
+      "signature": "(agg_functions, defaults=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['agg_functions']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "connected_components",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "ComponentsArray(1 components)",
+      "error": null,
+      "return_type": "ComponentsArray"
+    },
+    {
+      "object": "Subgraph",
+      "method": "contains_edge",
+      "signature": "(edge_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge_id']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "contains_node",
+      "signature": "(node_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node_id']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "degree",
+      "signature": "(nodes=None, *, full_graph=False)",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray(len=3, dtype=int64)",
+      "error": null,
+      "return_type": "GraphArray"
+    },
+    {
+      "object": "Subgraph",
+      "method": "density",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "0.6666666666666666",
+      "error": null,
+      "return_type": "float"
+    },
+    {
+      "object": "Subgraph",
+      "method": "dfs",
+      "signature": "(start, max_depth=None)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['start']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "edge_count",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "2",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "Subgraph",
+      "method": "edge_endpoints",
+      "signature": "(edge_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge_id']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "edges_table",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|    edge_id |     source |     target |     method | \n|------------|------------|------------|------------|\n|          1 |          1 |          2 |       head | \n|",
+      "error": null,
+      "return_type": "EdgesTable"
+    },
+    {
+      "object": "Subgraph",
+      "method": "entity_type",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Subgraph",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "Subgraph",
+      "method": "filter_edges",
+      "signature": "(filter)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['filter']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "filter_nodes",
+      "signature": "(filter)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['filter']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "get_edge_attribute",
+      "signature": "(edge_id, attr_name)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge_id', 'attr_name']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "get_node_attribute",
+      "signature": "(node_id, attr_name)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node_id', 'attr_name']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "has_edge",
+      "signature": "(edge_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edge_id']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "has_edge_between",
+      "signature": "(source, target)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['source', 'target']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "has_meta_nodes",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "False",
+      "error": null,
+      "return_type": "bool"
+    },
+    {
+      "object": "Subgraph",
+      "method": "has_node",
+      "signature": "(node_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node_id']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "has_path",
+      "signature": "(node1_id, node2_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node1_id', 'node2_id']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "in_degree",
+      "signature": "(nodes=None, full_graph=False)",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray(len=3, dtype=int64)",
+      "error": null,
+      "return_type": "GraphArray"
+    },
+    {
+      "object": "Subgraph",
+      "method": "induced_subgraph",
+      "signature": "(nodes)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['nodes']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "intersect_with",
+      "signature": "(_other)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['_other']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "is_connected",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "True",
+      "error": null,
+      "return_type": "bool"
+    },
+    {
+      "object": "Subgraph",
+      "method": "is_empty",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "False",
+      "error": null,
+      "return_type": "bool"
+    },
+    {
+      "object": "Subgraph",
+      "method": "merge_with",
+      "signature": "(_other)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['_other']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "meta_nodes",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "Subgraph",
+      "method": "neighborhood",
+      "signature": "(central_nodes, hops)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['central_nodes', 'hops']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "neighbors",
+      "signature": "(node_id)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['node_id']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "node_count",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "3",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "Subgraph",
+      "method": "out_degree",
+      "signature": "(nodes=None, full_graph=False)",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray(len=3, dtype=int64)",
+      "error": null,
+      "return_type": "GraphArray"
+    },
+    {
+      "object": "Subgraph",
+      "method": "parent_meta_node",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "None",
+      "error": null,
+      "return_type": "NoneType"
+    },
+    {
+      "object": "Subgraph",
+      "method": "sample",
+      "signature": "(k)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     1       1 \u2192 2\n     0       0 \u2192 1",
+      "error": null,
+      "return_type": "Subgraph",
+      "test_params": "3"
+    },
+    {
+      "object": "Subgraph",
+      "method": "set_edge_attrs",
+      "signature": "(attrs_dict)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attrs_dict']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "set_node_attrs",
+      "signature": "(attrs_dict)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['attrs_dict']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "shortest_path_subgraph",
+      "signature": "(source, target)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['source', 'target']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "subgraph_from_edges",
+      "signature": "(edges)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['edges']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "subtract_from",
+      "signature": "(_other)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['_other']",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "summary",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Subgraph: 3 nodes, 2 edges, density: 0.667",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "Subgraph",
+      "method": "table",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "NodesTable[3 x 4]\nBaseTable[3 x 4]\n| entity_type |       type |    node_id |       name | \n|------------|------------|------------|------------|\n|       base |      table |          1 |  BaseTable | \n",
+      "error": null,
+      "return_type": "NodesTable"
+    },
+    {
+      "object": "Subgraph",
+      "method": "to_edges",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "EdgesAccessor(2 edges)",
+      "error": null,
+      "return_type": "EdgesAccessor"
+    },
+    {
+      "object": "Subgraph",
+      "method": "to_graph",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Graph(nodes=0, edges=0)",
+      "error": null,
+      "return_type": "Graph"
+    },
+    {
+      "object": "Subgraph",
+      "method": "to_matrix",
+      "signature": "()",
+      "requires_params": false,
+      "status": "error",
+      "result": null,
+      "error": "Subgraph to matrix conversion not yet implemented",
+      "return_type": null
+    },
+    {
+      "object": "Subgraph",
+      "method": "to_networkx",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Graph with 3 nodes and 2 edges",
+      "error": null,
+      "return_type": "Graph"
+    },
+    {
+      "object": "Subgraph",
+      "method": "to_nodes",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "NodesAccessor(4 nodes)",
+      "error": null,
+      "return_type": "NodesAccessor"
+    },
+    {
+      "object": "Subgraph",
+      "method": "transitivity",
+      "signature": "()",
+      "requires_params": false,
+      "status": "error",
+      "result": null,
+      "error": "Transitivity not yet implemented in core - coming in future version",
+      "return_type": null
+    },
+    {
+      "object": "GraphArray",
+      "method": "apply_to_each",
+      "signature": "(method_name, args)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['method_name', 'args']",
+      "return_type": null
+    },
+    {
+      "object": "GraphArray",
+      "method": "count",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "3",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "GraphArray",
+      "method": "describe",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Statistical Summary:\n  Count: 3\n  Mean:  1.00\n  Std:   1.00\n  Min:   Int(0)\n  25%:   1.00\n  50%:   1.00\n  75%:   2.00\n  Max:   Int(2)\n",
+      "error": null,
+      "return_type": "StatsSummary"
+    },
+    {
+      "object": "GraphArray",
+      "method": "drop_na",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray(len=3, dtype=int64)",
+      "error": null,
+      "return_type": "GraphArray"
+    },
+    {
+      "object": "GraphArray",
+      "method": "fill_na",
+      "signature": "(fill_value)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['fill_value']",
+      "return_type": null
+    },
+    {
+      "object": "GraphArray",
+      "method": "has_null",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "False",
+      "error": null,
+      "return_type": "bool"
+    },
+    {
+      "object": "GraphArray",
+      "method": "items",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[(0, 1), (1, 0), (2, 2)]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "GraphArray",
+      "method": "max",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "2",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "GraphArray",
+      "method": "mean",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "1.0",
+      "error": null,
+      "return_type": "float"
+    },
+    {
+      "object": "GraphArray",
+      "method": "median",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "1.0",
+      "error": null,
+      "return_type": "float"
+    },
+    {
+      "object": "GraphArray",
+      "method": "min",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "0",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "GraphArray",
+      "method": "null_count",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "0",
+      "error": null,
+      "return_type": "int"
+    },
+    {
+      "object": "GraphArray",
+      "method": "percentile",
+      "signature": "(p)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['p']",
+      "return_type": null
+    },
+    {
+      "object": "GraphArray",
+      "method": "preview",
+      "signature": "(limit=None)",
+      "requires_params": false,
+      "status": "success",
+      "result": "[1, 0, 2]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "GraphArray",
+      "method": "quantile",
+      "signature": "(q)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['q']",
+      "return_type": null
+    },
+    {
+      "object": "GraphArray",
+      "method": "rich_display",
+      "signature": "(config=None)",
+      "requires_params": false,
+      "status": "success",
+      "result": "\u256d\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 # \u2502 value \u2502\n\u2502   \u2502 obj   \u2502\n\u251c\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 0 \u2502 1     \u2502\n\u2502 1 \u2502 0     \u2502\n\u2502 2 \u2502 2     \u2502\n\u2570\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\nrows: 3 \u2022 type: GraphArray \u2022 dtype: int64",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "GraphArray",
+      "method": "std",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "1.0",
+      "error": null,
+      "return_type": "float"
+    },
+    {
+      "object": "GraphArray",
+      "method": "summary",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray('unnamed', length=3, dtype=Int, sparse=false)",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "GraphArray",
+      "method": "to_list",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[1, 0, 2]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "GraphArray",
+      "method": "to_numpy",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[1 0 2]",
+      "error": null,
+      "return_type": "ndarray"
+    },
+    {
+      "object": "GraphArray",
+      "method": "to_pandas",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "0    1\n1    0\n2    2\ndtype: int64",
+      "error": null,
+      "return_type": "Series"
+    },
+    {
+      "object": "GraphArray",
+      "method": "to_scipy_sparse",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "  (np.int32(0), np.int32(0))\t1\n  (np.int32(0), np.int32(2))\t2",
+      "error": null,
+      "return_type": "csr_matrix"
+    },
+    {
+      "object": "GraphArray",
+      "method": "true_indices",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "GraphArray",
+      "method": "unique",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphArray(len=3, dtype=int64)",
+      "error": null,
+      "return_type": "GraphArray"
+    },
+    {
+      "object": "GraphArray",
+      "method": "value_counts",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "{2: 1, 1: 1, 0: 1}",
+      "error": null,
+      "return_type": "dict"
+    },
+    {
+      "object": "Matrix",
+      "method": "copy",
+      "signature": "signature_unavailable",
+      "requires_params": false,
+      "status": "success",
+      "result": "{'size': 3, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(3 x 3, dtype=Float)}",
+      "error": null,
+      "return_type": "dict"
+    },
+    {
+      "object": "Matrix",
+      "method": "fromkeys",
+      "signature": "(iterable, value=None, /)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['iterable']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "get",
+      "signature": "(key, default=None, /)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['key']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "items",
+      "signature": "signature_unavailable",
+      "requires_params": false,
+      "status": "success",
+      "result": "dict_items([('size', 3), ('is_sparse', True), ('type', 'adjacency_matrix'), ('matrix', GraphMatrix(3 x 3, dtype=Float))])",
+      "error": null,
+      "return_type": "dict_items"
+    },
+    {
+      "object": "Matrix",
+      "method": "keys",
+      "signature": "signature_unavailable",
+      "requires_params": false,
+      "status": "success",
+      "result": "dict_keys(['size', 'is_sparse', 'type', 'matrix'])",
+      "error": null,
+      "return_type": "dict_keys"
+    },
+    {
+      "object": "Matrix",
+      "method": "pop",
+      "signature": "signature_unavailable",
+      "requires_params": false,
+      "status": "error",
+      "result": null,
+      "error": "pop expected at least 1 argument, got 0",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "popitem",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "('matrix', GraphMatrix(3 x 3, dtype=Float))",
+      "error": null,
+      "return_type": "tuple"
+    },
+    {
+      "object": "Matrix",
+      "method": "setdefault",
+      "signature": "(key, default=None, /)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['key']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "update",
+      "signature": "signature_unavailable",
+      "requires_params": false,
+      "status": "success",
+      "result": "None",
+      "error": null,
+      "return_type": "NoneType"
+    },
+    {
+      "object": "Matrix",
+      "method": "values",
+      "signature": "signature_unavailable",
+      "requires_params": false,
+      "status": "success",
+      "result": "dict_values([3, True, 'adjacency_matrix'])",
+      "error": null,
+      "return_type": "dict_values"
+    }
+  ],
+  "coverage_analysis": {
+    "BaseTable": {
+      "total": 30,
+      "successful": 10,
+      "failed": 0,
+      "skipped": 20
+    },
+    "NodesTable": {
+      "total": 27,
+      "successful": 14,
+      "failed": 0,
+      "skipped": 13
+    },
+    "EdgesTable": {
+      "total": 32,
+      "successful": 18,
+      "failed": 0,
+      "skipped": 14
+    },
+    "GraphTable": {
+      "total": 20,
+      "successful": 9,
+      "failed": 3,
+      "skipped": 8
+    },
+    "BaseArray": {
+      "total": 7,
+      "successful": 6,
+      "failed": 0,
+      "skipped": 1
+    },
+    "Graph": {
+      "total": 62,
+      "successful": 19,
+      "failed": 2,
+      "skipped": 41
+    },
+    "Nodes": {
+      "total": 5,
+      "successful": 3,
+      "failed": 0,
+      "skipped": 2
+    },
+    "Edges": {
+      "total": 4,
+      "successful": 3,
+      "failed": 0,
+      "skipped": 1
+    },
+    "ComponentsArray": {
+      "total": 7,
+      "successful": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "Subgraph": {
+      "total": 52,
+      "successful": 23,
+      "failed": 3,
+      "skipped": 26
+    },
+    "GraphArray": {
+      "total": 25,
+      "successful": 21,
+      "failed": 0,
+      "skipped": 4
+    },
+    "Matrix": {
+      "total": 10,
+      "successful": 6,
+      "failed": 1,
+      "skipped": 3
+    }
+  },
+  "method_success_patterns": {
+    "agg": {
+      "total": 1,
+      "successful": 0
+    },
+    "aggregate": {
+      "total": 2,
+      "successful": 0
+    },
+    "assign": {
+      "total": 1,
+      "successful": 0
+    },
+    "column": {
+      "total": 1,
+      "successful": 1
+    },
+    "drop_columns": {
+      "total": 3,
+      "successful": 0
+    },
+    "filter": {
+      "total": 4,
+      "successful": 4
+    },
+    "from_csv": {
+      "total": 3,
+      "successful": 0
+    },
+    "from_dict": {
+      "total": 3,
+      "successful": 0
+    },
+    "from_json": {
+      "total": 3,
+      "successful": 0
+    },
+    "from_parquet": {
+      "total": 3,
+      "successful": 0
+    },
+    "group_by": {
+      "total": 4,
+      "successful": 0
+    },
+    "has_column": {
+      "total": 1,
+      "successful": 1
+    },
+    "head": {
+      "total": 5,
+      "successful": 5
+    },
+    "intersect": {
+      "total": 1,
+      "successful": 0
+    },
+    "iter": {
+      "total": 4,
+      "successful": 4
+    },
+    "join": {
+      "total": 1,
+      "successful": 0
+    },
+    "rich_display": {
+      "total": 4,
+      "successful": 4
+    },
+    "select": {
+      "total": 3,
+      "successful": 0
+    },
+    "set_column": {
+      "total": 1,
+      "successful": 0
+    },
+    "set_value": {
+      "total": 1,
+      "successful": 0
+    },
+    "set_values_by_mask": {
+      "total": 1,
+      "successful": 0
+    },
+    "set_values_by_range": {
+      "total": 1,
+      "successful": 0
+    },
+    "slice": {
+      "total": 3,
+      "successful": 0
+    },
+    "sort_by": {
+      "total": 3,
+      "successful": 0
+    },
+    "tail": {
+      "total": 5,
+      "successful": 5
+    },
+    "to_csv": {
+      "total": 3,
+      "successful": 3
+    },
+    "to_json": {
+      "total": 3,
+      "successful": 3
+    },
+    "to_pandas": {
+      "total": 4,
+      "successful": 4
+    },
+    "to_parquet": {
+      "total": 3,
+      "successful": 0
+    },
+    "union": {
+      "total": 1,
+      "successful": 0
+    },
+    "base_table": {
+      "total": 2,
+      "successful": 2
+    },
+    "filter_by_attr": {
+      "total": 2,
+      "successful": 0
+    },
+    "into_base_table": {
+      "total": 2,
+      "successful": 2
+    },
+    "ncols": {
+      "total": 3,
+      "successful": 3
+    },
+    "node_ids": {
+      "total": 1,
+      "successful": 1
+    },
+    "nrows": {
+      "total": 3,
+      "successful": 3
+    },
+    "shape": {
+      "total": 3,
+      "successful": 3
+    },
+    "unique_attr_values": {
+      "total": 2,
+      "successful": 0
+    },
+    "with_attributes": {
+      "total": 1,
+      "successful": 0
+    },
+    "as_tuples": {
+      "total": 1,
+      "successful": 1
+    },
+    "auto_assign_edge_ids": {
+      "total": 2,
+      "successful": 2
+    },
+    "edge_ids": {
+      "total": 1,
+      "successful": 1
+    },
+    "filter_by_sources": {
+      "total": 1,
+      "successful": 0
+    },
+    "filter_by_targets": {
+      "total": 1,
+      "successful": 0
+    },
+    "sources": {
+      "total": 1,
+      "successful": 1
+    },
+    "targets": {
+      "total": 1,
+      "successful": 1
+    },
+    "from_federated_bundles": {
+      "total": 1,
+      "successful": 0
+    },
+    "get_bundle_info": {
+      "total": 1,
+      "successful": 0
+    },
+    "load_bundle": {
+      "total": 1,
+      "successful": 0
+    },
+    "merge": {
+      "total": 1,
+      "successful": 0
+    },
+    "merge_with": {
+      "total": 2,
+      "successful": 0
+    },
+    "merge_with_strategy": {
+      "total": 1,
+      "successful": 0
+    },
+    "save_bundle": {
+      "total": 1,
+      "successful": 0
+    },
+    "stats": {
+      "total": 1,
+      "successful": 1
+    },
+    "to_edges": {
+      "total": 2,
+      "successful": 1
+    },
+    "to_graph": {
+      "total": 2,
+      "successful": 2
+    },
+    "to_nodes": {
+      "total": 2,
+      "successful": 1
+    },
+    "to_subgraphs": {
+      "total": 1,
+      "successful": 0
+    },
+    "validate": {
+      "total": 1,
+      "successful": 1
+    },
+    "verify_bundle": {
+      "total": 1,
+      "successful": 0
+    },
+    "apply_to_each": {
+      "total": 2,
+      "successful": 0
+    },
+    "describe": {
+      "total": 2,
+      "successful": 2
+    },
+    "dtype": {
+      "total": 1,
+      "successful": 1
+    },
+    "unique": {
+      "total": 2,
+      "successful": 2
+    },
+    "add_edge": {
+      "total": 1,
+      "successful": 0
+    },
+    "add_edges": {
+      "total": 1,
+      "successful": 0
+    },
+    "add_graph": {
+      "total": 1,
+      "successful": 0
+    },
+    "add_node": {
+      "total": 1,
+      "successful": 0
+    },
+    "add_nodes": {
+      "total": 1,
+      "successful": 0
+    },
+    "adjacency": {
+      "total": 1,
+      "successful": 1
+    },
+    "adjacency_matrix": {
+      "total": 1,
+      "successful": 1
+    },
+    "all_edge_attribute_names": {
+      "total": 1,
+      "successful": 1
+    },
+    "all_node_attribute_names": {
+      "total": 1,
+      "successful": 1
+    },
+    "bfs": {
+      "total": 2,
+      "successful": 0
+    },
+    "branches": {
+      "total": 1,
+      "successful": 1
+    },
+    "checkout_branch": {
+      "total": 1,
+      "successful": 0
+    },
+    "commit": {
+      "total": 1,
+      "successful": 0
+    },
+    "commit_history": {
+      "total": 1,
+      "successful": 1
+    },
+    "contains_edge": {
+      "total": 2,
+      "successful": 0
+    },
+    "contains_node": {
+      "total": 2,
+      "successful": 0
+    },
+    "create_branch": {
+      "total": 1,
+      "successful": 0
+    },
+    "dense_adjacency_matrix": {
+      "total": 1,
+      "successful": 1
+    },
+    "density": {
+      "total": 2,
+      "successful": 2
+    },
+    "dfs": {
+      "total": 2,
+      "successful": 0
+    },
+    "edge_attribute_keys": {
+      "total": 1,
+      "successful": 0
+    },
+    "edge_count": {
+      "total": 2,
+      "successful": 2
+    },
+    "edge_endpoints": {
+      "total": 2,
+      "successful": 0
+    },
+    "filter_edges": {
+      "total": 2,
+      "successful": 0
+    },
+    "filter_nodes": {
+      "total": 2,
+      "successful": 0
+    },
+    "get_edge_attr": {
+      "total": 1,
+      "successful": 0
+    },
+    "get_edge_attrs": {
+      "total": 1,
+      "successful": 0
+    },
+    "get_node_attr": {
+      "total": 1,
+      "successful": 0
+    },
+    "get_node_attrs": {
+      "total": 1,
+      "successful": 0
+    },
+    "get_node_mapping": {
+      "total": 1,
+      "successful": 0
+    },
+    "group_nodes_by_attribute": {
+      "total": 1,
+      "successful": 0
+    },
+    "has_edge": {
+      "total": 2,
+      "successful": 0
+    },
+    "has_edge_attribute": {
+      "total": 1,
+      "successful": 0
+    },
+    "has_node": {
+      "total": 2,
+      "successful": 0
+    },
+    "has_node_attribute": {
+      "total": 1,
+      "successful": 0
+    },
+    "has_uncommitted_changes": {
+      "total": 1,
+      "successful": 1
+    },
+    "historical_view": {
+      "total": 1,
+      "successful": 0
+    },
+    "is_connected": {
+      "total": 2,
+      "successful": 2
+    },
+    "laplacian_matrix": {
+      "total": 1,
+      "successful": 1
+    },
+    "neighborhood": {
+      "total": 3,
+      "successful": 2
+    },
+    "neighborhood_statistics": {
+      "total": 1,
+      "successful": 1
+    },
+    "neighbors": {
+      "total": 2,
+      "successful": 0
+    },
+    "node_attribute_keys": {
+      "total": 1,
+      "successful": 0
+    },
+    "node_count": {
+      "total": 2,
+      "successful": 2
+    },
+    "remove_edge": {
+      "total": 1,
+      "successful": 0
+    },
+    "remove_edges": {
+      "total": 1,
+      "successful": 0
+    },
+    "remove_node": {
+      "total": 1,
+      "successful": 0
+    },
+    "remove_nodes": {
+      "total": 1,
+      "successful": 0
+    },
+    "resolve_string_id_to_node": {
+      "total": 1,
+      "successful": 0
+    },
+    "set_edge_attr": {
+      "total": 1,
+      "successful": 0
+    },
+    "set_edge_attrs": {
+      "total": 2,
+      "successful": 0
+    },
+    "set_node_attr": {
+      "total": 1,
+      "successful": 0
+    },
+    "set_node_attrs": {
+      "total": 2,
+      "successful": 0
+    },
+    "shortest_path": {
+      "total": 1,
+      "successful": 0
+    },
+    "sparse_adjacency_matrix": {
+      "total": 1,
+      "successful": 1
+    },
+    "table": {
+      "total": 5,
+      "successful": 5
+    },
+    "to_networkx": {
+      "total": 2,
+      "successful": 2
+    },
+    "transition_matrix": {
+      "total": 1,
+      "successful": 0
+    },
+    "view": {
+      "total": 1,
+      "successful": 1
+    },
+    "weighted_adjacency_matrix": {
+      "total": 1,
+      "successful": 0
+    },
+    "all": {
+      "total": 2,
+      "successful": 2
+    },
+    "get_meta_node": {
+      "total": 1,
+      "successful": 0
+    },
+    "ids": {
+      "total": 2,
+      "successful": 2
+    },
+    "set_attrs": {
+      "total": 2,
+      "successful": 0
+    },
+    "largest_component": {
+      "total": 1,
+      "successful": 1
+    },
+    "sample": {
+      "total": 2,
+      "successful": 2
+    },
+    "sizes": {
+      "total": 1,
+      "successful": 1
+    },
+    "to_list": {
+      "total": 2,
+      "successful": 2
+    },
+    "calculate_similarity": {
+      "total": 1,
+      "successful": 0
+    },
+    "child_meta_nodes": {
+      "total": 1,
+      "successful": 1
+    },
+    "clustering_coefficient": {
+      "total": 1,
+      "successful": 0
+    },
+    "collapse": {
+      "total": 1,
+      "successful": 1
+    },
+    "collapse_to_node": {
+      "total": 1,
+      "successful": 0
+    },
+    "collapse_to_node_with_defaults": {
+      "total": 1,
+      "successful": 0
+    },
+    "connected_components": {
+      "total": 1,
+      "successful": 1
+    },
+    "degree": {
+      "total": 1,
+      "successful": 1
+    },
+    "edges_table": {
+      "total": 1,
+      "successful": 1
+    },
+    "entity_type": {
+      "total": 1,
+      "successful": 1
+    },
+    "get_edge_attribute": {
+      "total": 1,
+      "successful": 0
+    },
+    "get_node_attribute": {
+      "total": 1,
+      "successful": 0
+    },
+    "has_edge_between": {
+      "total": 1,
+      "successful": 0
+    },
+    "has_meta_nodes": {
+      "total": 1,
+      "successful": 1
+    },
+    "has_path": {
+      "total": 1,
+      "successful": 0
+    },
+    "in_degree": {
+      "total": 1,
+      "successful": 1
+    },
+    "induced_subgraph": {
+      "total": 1,
+      "successful": 0
+    },
+    "intersect_with": {
+      "total": 1,
+      "successful": 0
+    },
+    "is_empty": {
+      "total": 1,
+      "successful": 1
+    },
+    "meta_nodes": {
+      "total": 1,
+      "successful": 1
+    },
+    "out_degree": {
+      "total": 1,
+      "successful": 1
+    },
+    "parent_meta_node": {
+      "total": 1,
+      "successful": 1
+    },
+    "shortest_path_subgraph": {
+      "total": 1,
+      "successful": 0
+    },
+    "subgraph_from_edges": {
+      "total": 1,
+      "successful": 0
+    },
+    "subtract_from": {
+      "total": 1,
+      "successful": 0
+    },
+    "summary": {
+      "total": 2,
+      "successful": 2
+    },
+    "to_matrix": {
+      "total": 1,
+      "successful": 0
+    },
+    "transitivity": {
+      "total": 1,
+      "successful": 0
+    },
+    "count": {
+      "total": 1,
+      "successful": 1
+    },
+    "drop_na": {
+      "total": 1,
+      "successful": 1
+    },
+    "fill_na": {
+      "total": 1,
+      "successful": 0
+    },
+    "has_null": {
+      "total": 1,
+      "successful": 1
+    },
+    "items": {
+      "total": 2,
+      "successful": 2
+    },
+    "max": {
+      "total": 1,
+      "successful": 1
+    },
+    "mean": {
+      "total": 1,
+      "successful": 1
+    },
+    "median": {
+      "total": 1,
+      "successful": 1
+    },
+    "min": {
+      "total": 1,
+      "successful": 1
+    },
+    "null_count": {
+      "total": 1,
+      "successful": 1
+    },
+    "percentile": {
+      "total": 1,
+      "successful": 0
+    },
+    "preview": {
+      "total": 1,
+      "successful": 1
+    },
+    "quantile": {
+      "total": 1,
+      "successful": 0
+    },
+    "std": {
+      "total": 1,
+      "successful": 1
+    },
+    "to_numpy": {
+      "total": 1,
+      "successful": 1
+    },
+    "to_scipy_sparse": {
+      "total": 1,
+      "successful": 1
+    },
+    "true_indices": {
+      "total": 1,
+      "successful": 1
+    },
+    "value_counts": {
+      "total": 1,
+      "successful": 1
+    },
+    "copy": {
+      "total": 1,
+      "successful": 1
+    },
+    "fromkeys": {
+      "total": 1,
+      "successful": 0
+    },
+    "get": {
+      "total": 1,
+      "successful": 0
+    },
+    "keys": {
+      "total": 1,
+      "successful": 1
+    },
+    "pop": {
+      "total": 1,
+      "successful": 0
+    },
+    "popitem": {
+      "total": 1,
+      "successful": 1
+    },
+    "setdefault": {
+      "total": 1,
+      "successful": 0
+    },
+    "update": {
+      "total": 1,
+      "successful": 1
+    },
+    "values": {
+      "total": 1,
+      "successful": 1
+    }
+  }
+}

@@ -1,0 +1,135 @@
+target_node,method_name,edge_id,source_node,source_type,return_type,target_type
+2,auto_assign_edge_ids,37,2,BaseTable,GraphTable,BaseTable
+1,data (property),45,3,Matrix,list,BaseArray
+9,filter_by_sources,118,9,EdgesTable,EdgesTable,EdgesTable
+3,adjacency,4,0,Graph,GraphMatrix,Matrix
+1,to_numpy,96,6,EdgesArray,ndarray,BaseArray
+9,head,120,9,EdgesTable,EdgesTable,EdgesTable
+1,preview,84,5,NodesArray,list,BaseArray
+1,columns (property),44,3,Matrix,list,BaseArray
+3,zeros,59,3,Matrix,GraphMatrix,Matrix
+3,laplacian_matrix,16,0,Graph,GraphMatrix,Matrix
+9,tail,125,9,EdgesTable,EdgesTable,EdgesTable
+8,nodes (property),36,2,BaseTable,NodesTable,NodesTable
+3,dense,46,3,Matrix,GraphMatrix,Matrix
+4,filter_edges,68,4,Subgraph,Subgraph,Subgraph
+11,neighborhood,17,0,Graph,NeighborhoodResult,NeighborhoodResult
+10,connected_components,64,4,Subgraph,ComponentsArray,ComponentsArray
+9,select,122,9,EdgesTable,EdgesTable,EdgesTable
+1,drop_na,91,6,EdgesArray,GraphArray,BaseArray
+9,auto_assign_edge_ids,114,9,EdgesTable,EdgesTable,EdgesTable
+1,true_indices,32,1,BaseArray,list,BaseArray
+1,iter_columns,50,3,Matrix,list,BaseArray
+1,iter_rows,51,3,Matrix,list,BaseArray
+1,mean_axis,52,3,Matrix,GraphArray,BaseArray
+1,preview,94,6,EdgesArray,list,BaseArray
+1,values (property),90,6,EdgesArray,list,BaseArray
+3,transpose,58,3,Matrix,GraphMatrix,Matrix
+1,node_ids,107,8,NodesTable,GraphArray,BaseArray
+9,slice,123,9,EdgesTable,EdgesTable,EdgesTable
+4,largest_component,128,10,ComponentsArray,Subgraph,Subgraph
+1,neighborhoods (property),133,11,NeighborhoodResult,list,BaseArray
+1,get_row,48,3,Matrix,GraphArray,BaseArray
+1,edge_ids (property),60,4,Subgraph,GraphArray,BaseArray
+1,true_indices,97,6,EdgesArray,list,BaseArray
+1,drop_na,26,1,BaseArray,GraphArray,BaseArray
+1,adjacency_matrix,5,0,Graph,dict,BaseArray
+2,base_table,103,8,NodesTable,BaseTable,BaseTable
+1,value_counts,89,5,NodesArray,dict,BaseArray
+1,unique_attr_values,112,8,NodesTable,list,BaseArray
+1,drop_na,81,5,NodesArray,GraphArray,BaseArray
+4,subgraph_from_edges,77,4,Subgraph,Subgraph,Subgraph
+1,targets,126,9,EdgesTable,GraphArray,BaseArray
+1,unique,98,6,EdgesArray,GraphArray,BaseArray
+1,add_edges,2,0,Graph,list,BaseArray
+1,collect,100,7,SubgraphArray,list,BaseArray
+1,preview,29,1,BaseArray,list,BaseArray
+1,child_meta_nodes,63,4,Subgraph,list,BaseArray
+0,to_networkx,22,0,Graph,Graph,Graph
+1,sum_axis,56,3,Matrix,GraphArray,BaseArray
+1,preview,54,3,Matrix,list,BaseArray
+1,out_degree,75,4,Subgraph,GraphArray,BaseArray
+1,commit_history,10,0,Graph,list,BaseArray
+1,items,83,5,NodesArray,list,BaseArray
+4,bfs,8,0,Graph,Subgraph,Subgraph
+1,to_list,95,6,EdgesArray,list,BaseArray
+4,induced_subgraph,71,4,Subgraph,Subgraph,Subgraph
+9,edges (property),35,2,BaseTable,EdgesTable,EdgesTable
+1,meta_nodes,72,4,Subgraph,list,BaseArray
+1,all_edge_attribute_names,6,0,Graph,list,BaseArray
+1,value_counts,99,6,EdgesArray,dict,BaseArray
+2,into_base_table,121,9,EdgesTable,BaseTable,BaseTable
+1,get_node_mapping,15,0,Graph,dict,BaseArray
+0,to_graph,79,4,Subgraph,Graph,Graph
+8,head,105,8,NodesTable,NodesTable,NodesTable
+1,all_node_attribute_names,7,0,Graph,list,BaseArray
+2,into_base_table,106,8,NodesTable,BaseTable,BaseTable
+2,head,39,2,BaseTable,GraphTable,BaseTable
+1,fill_na,82,5,NodesArray,GraphArray,BaseArray
+7,sample,101,7,SubgraphArray,SubgraphArray,SubgraphArray
+9,drop_columns,116,9,EdgesTable,EdgesTable,EdgesTable
+10,filter,127,10,ComponentsArray,ComponentsArray,ComponentsArray
+1,as_tuples,113,9,EdgesTable,list,BaseArray
+1,unique,88,5,NodesArray,GraphArray,BaseArray
+8,drop_columns,104,8,NodesTable,NodesTable,NodesTable
+8,tail,111,8,NodesTable,NodesTable,NodesTable
+4,bfs,62,4,Subgraph,Subgraph,Subgraph
+4,dfs,12,0,Graph,Subgraph,Subgraph
+1,node_ids (property),61,4,Subgraph,GraphArray,BaseArray
+1,to_numpy,57,3,Matrix,ndarray,BaseArray
+11,neighborhood,73,4,Subgraph,NeighborhoodResult,NeighborhoodResult
+1,node_attribute_keys,19,0,Graph,list,BaseArray
+1,std_axis,55,3,Matrix,GraphArray,BaseArray
+8,slice,109,8,NodesTable,NodesTable,NodesTable
+4,filter_nodes,69,4,Subgraph,Subgraph,Subgraph
+1,to_list,85,5,NodesArray,list,BaseArray
+1,edge_ids,117,9,EdgesTable,GraphArray,BaseArray
+3,weighted_adjacency_matrix,24,0,Graph,GraphMatrix,Matrix
+1,add_nodes,3,0,Graph,list,BaseArray
+1,true_indices,87,5,NodesArray,list,BaseArray
+1,value_counts,34,1,BaseArray,dict,BaseArray
+4,dfs,66,4,Subgraph,Subgraph,Subgraph
+9,filter_by_targets,119,9,EdgesTable,EdgesTable,EdgesTable
+1,to_list,132,10,ComponentsArray,list,BaseArray
+1,items,28,1,BaseArray,list,BaseArray
+1,to_numpy,86,5,NodesArray,ndarray,BaseArray
+8,sort_by,110,8,NodesTable,NodesTable,NodesTable
+1,sizes,131,10,ComponentsArray,list,BaseArray
+1,edge_ids (property),0,0,Graph,GraphArray,BaseArray
+1,get_bundle_info,38,2,BaseTable,dict,BaseArray
+1,get_column,47,3,Matrix,GraphArray,BaseArray
+1,neighbors,18,0,Graph,list,BaseArray
+2,table,21,0,Graph,GraphTable,BaseTable
+1,to_list,30,1,BaseArray,list,BaseArray
+1,degree,65,4,Subgraph,GraphArray,BaseArray
+1,fill_na,27,1,BaseArray,GraphArray,BaseArray
+1,in_degree,70,4,Subgraph,GraphArray,BaseArray
+7,neighborhood,129,10,ComponentsArray,SubgraphArray,SubgraphArray
+1,branches,9,0,Graph,list,BaseArray
+1,sparse_adjacency_matrix,20,0,Graph,dict,BaseArray
+8,table,78,4,Subgraph,NodesTable,NodesTable
+1,values (property),80,5,NodesArray,list,BaseArray
+3,dense_adjacency_matrix,11,0,Graph,GraphMatrix,Matrix
+3,identity,49,3,Matrix,GraphMatrix,Matrix
+1,unique,33,1,BaseArray,GraphArray,BaseArray
+1,sources,124,9,EdgesTable,GraphArray,BaseArray
+7,sample,130,10,ComponentsArray,SubgraphArray,SubgraphArray
+4,sample,76,4,Subgraph,Subgraph,Subgraph
+0,to_graph,42,2,BaseTable,Graph,Graph
+1,items,93,6,EdgesArray,list,BaseArray
+1,values (property),25,1,BaseArray,list,BaseArray
+9,edges_table,67,4,Subgraph,EdgesTable,EdgesTable
+1,verify_bundle,43,2,BaseTable,dict,BaseArray
+2,base_table,115,9,EdgesTable,BaseTable,BaseTable
+1,edge_attribute_keys,13,0,Graph,list,BaseArray
+2,tail,41,2,BaseTable,GraphTable,BaseTable
+1,fill_na,92,6,EdgesArray,GraphArray,BaseArray
+8,select,108,8,NodesTable,NodesTable,NodesTable
+1,neighbors,74,4,Subgraph,GraphArray,BaseArray
+1,node_ids (property),1,0,Graph,GraphArray,BaseArray
+3,power,53,3,Matrix,GraphMatrix,Matrix
+4,view,23,0,Graph,Subgraph,Subgraph
+1,to_numpy,31,1,BaseArray,ndarray,BaseArray
+1,to_list,102,7,SubgraphArray,list,BaseArray
+1,stats,40,2,BaseTable,dict,BaseArray
+4,filter_nodes,14,0,Graph,Subgraph,Subgraph

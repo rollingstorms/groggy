@@ -1,0 +1,13 @@
+object_name,node_id,module,method_count,object_type
+"BaseTable",1,"groggy",30,"BaseTable"
+"NodesTable",2,"groggy",27,"NodesTable"
+"EdgesTable",3,"groggy",32,"EdgesTable"
+"GraphTable",4,"groggy",20,"GraphTable"
+"BaseArray",5,"builtins",7,"BaseArray"
+"Graph",6,"builtins",62,"Graph"
+"Nodes",7,"builtins",5,"NodesAccessor"
+"Edges",8,"builtins",4,"EdgesAccessor"
+"ComponentsArray",9,"builtins",7,"ComponentsArray"
+"Subgraph",10,"builtins",52,"Subgraph"
+"GraphArray",11,"builtins",25,"GraphArray"
+"Matrix",12,"builtins",11,"dict"

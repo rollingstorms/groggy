@@ -119,7 +119,7 @@ pub trait BaseArrayOps {
 }
 
 /// Statistical operations (for numerical array types)
-pub trait StatsArrayOps: BaseArrayOps {
+pub trait NumArrayOps: BaseArrayOps {
     /// Calculate mean of numerical values
     fn mean(&self) -> PyResult<Option<f64>>;
     

@@ -2723,7 +2723,7 @@ impl PyGraphTable {
             let nodes_table = self.table.nodes();
             if let Some(column) = nodes_table.base_table().column(&column_name) {
                 let attr_values = column.data();
-                if let Ok(stats) = crate::ffi::storage::stats_array::PyStatsArray::from_attr_values(attr_values.clone()) {
+                if let Ok(stats) = crate::ffi::storage::num_array::PyNumArray::from_attr_values(attr_values.clone()) {
                     Ok(stats.into_py(py))
                 } else {
                     let py_objects: Vec<_> = attr_values.iter()
