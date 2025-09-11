@@ -179,7 +179,6 @@ pub use storage::{
 
 // Backward compatibility alias
 pub use storage::array::NumArray as StatsArray;
-};
 pub use storage::legacy_table::{AggregateOp, ConnectivityType, GroupBy, TableMetadata};
 pub use state::{ChangeTracker, ColumnDelta, DeltaObject, GraphSpace};
 pub use subgraphs::{FilteredSubgraph, AggregationFunction, HierarchicalOperations, MetaNode, 
