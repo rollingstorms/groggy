@@ -1,22 +1,22 @@
 use super::BaseArray;
 use std::ops::{Add, Mul};
 
-/// StatsArray extends BaseArray with statistical and numerical operations.
+/// NumArray extends BaseArray with statistical and numerical operations.
 /// This is used by TableArray and MatrixArray for numerical computations.
 #[derive(Debug, Clone)]
-pub struct StatsArray<T> {
+pub struct NumArray<T> {
     pub base: BaseArray<T>,
 }
 
-impl<T> StatsArray<T> {
-    /// Create a new StatsArray from a vector
+impl<T> NumArray<T> {
+    /// Create a new NumArray from a vector
     pub fn new(data: Vec<T>) -> Self {
         Self { 
             base: BaseArray::new(data) 
         }
     }
     
-    /// Create a StatsArray from an existing BaseArray
+    /// Create a NumArray from an existing BaseArray
     pub fn from_base(base: BaseArray<T>) -> Self {
         Self { base }
     }
@@ -55,7 +55,7 @@ impl<T> StatsArray<T> {
 }
 
 // Statistical operations - only available for numerical types
-impl<T> StatsArray<T> 
+impl<T> NumArray<T> 
 where 
     T: Copy + Add<Output = T> + Mul<f64, Output = T> + PartialOrd + Into<f64>
 {
@@ -166,7 +166,7 @@ where
         }
     }
     
-    /// Calculate correlation with another StatsArray
+    /// Calculate correlation with another NumArray
     pub fn correlate(&self, other: &Self) -> Option<f64> {
         if self.len() != other.len() || self.is_empty() { 
             return None; 
@@ -195,8 +195,8 @@ where
         }
     }
     
-    /// Element-wise addition with another StatsArray
-    pub fn add(&self, other: &Self) -> Option<StatsArray<T>> 
+    /// Element-wise addition with another NumArray
+    pub fn add(&self, other: &Self) -> Option<NumArray<T>> 
     where 
         T: Add<Output = T>
     {
@@ -208,11 +208,11 @@ where
             .map(|(&a, &b)| a + b)
             .collect();
             
-        Some(StatsArray::new(result_data))
+        Some(NumArray::new(result_data))
     }
     
     /// Multiply all elements by a scalar
-    pub fn multiply(&self, scalar: f64) -> StatsArray<T> 
+    pub fn multiply(&self, scalar: f64) -> NumArray<T> 
     where 
         T: Mul<f64, Output = T>
     {
@@ -220,7 +220,7 @@ where
             .map(|&x| x * scalar)
             .collect();
             
-        StatsArray::new(result_data)
+        NumArray::new(result_data)
     }
     
     /// Calculate descriptive statistics summary
@@ -257,21 +257,21 @@ impl StatsSummary {
     }
 }
 
-impl<T> From<Vec<T>> for StatsArray<T> {
+impl<T> From<Vec<T>> for NumArray<T> {
     fn from(data: Vec<T>) -> Self {
         Self::new(data)
     }
 }
 
-impl<T> From<BaseArray<T>> for StatsArray<T> {
+impl<T> From<BaseArray<T>> for NumArray<T> {
     fn from(base: BaseArray<T>) -> Self {
         Self::from_base(base)
     }
 }
 
-impl<T> From<StatsArray<T>> for BaseArray<T> {
-    fn from(stats_array: StatsArray<T>) -> Self {
-        stats_array.base
+impl<T> From<NumArray<T>> for BaseArray<T> {
+    fn from(num_array: NumArray<T>) -> Self {
+        num_array.base
     }
 }
 
@@ -282,20 +282,20 @@ mod tests {
     #[test]
     fn test_basic_stats() {
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let stats_array = StatsArray::new(data);
+        let num_array = NumArray::new(data);
         
-        assert_eq!(stats_array.len(), 5);
-        assert_eq!(stats_array.mean(), Some(3.0));
-        assert_eq!(stats_array.sum(), 15.0);
-        assert_eq!(stats_array.min(), Some(1.0));
-        assert_eq!(stats_array.max(), Some(5.0));
-        assert_eq!(stats_array.median(), Some(3.0));
+        assert_eq!(num_array.len(), 5);
+        assert_eq!(num_array.mean(), Some(3.0));
+        assert_eq!(num_array.sum(), 15.0);
+        assert_eq!(num_array.min(), Some(1.0));
+        assert_eq!(num_array.max(), Some(5.0));
+        assert_eq!(num_array.median(), Some(3.0));
     }
     
     #[test]
     fn test_correlation() {
-        let x = StatsArray::new(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
-        let y = StatsArray::new(vec![2.0, 4.0, 6.0, 8.0, 10.0]);
+        let x = NumArray::new(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        let y = NumArray::new(vec![2.0, 4.0, 6.0, 8.0, 10.0]);
         
         let correlation = x.correlate(&y);
         assert!(correlation.is_some());
@@ -305,8 +305,8 @@ mod tests {
     
     #[test]
     fn test_element_wise_operations() {
-        let a = StatsArray::new(vec![1.0, 2.0, 3.0]);
-        let b = StatsArray::new(vec![4.0, 5.0, 6.0]);
+        let a = NumArray::new(vec![1.0, 2.0, 3.0]);
+        let b = NumArray::new(vec![4.0, 5.0, 6.0]);
         
         let sum = a.add(&b);
         assert!(sum.is_some());
@@ -317,8 +317,8 @@ mod tests {
     }
     
     #[test]
-    fn test_empty_stats_array() {
-        let empty: StatsArray<f64> = StatsArray::new(vec![]);
+    fn test_empty_num_array() {
+        let empty: NumArray<f64> = NumArray::new(vec![]);
         
         assert!(empty.is_empty());
         assert_eq!(empty.mean(), None);
@@ -329,8 +329,8 @@ mod tests {
     #[test]
     fn test_describe() {
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let stats_array = StatsArray::new(data);
-        let summary = stats_array.describe();
+        let num_array = NumArray::new(data);
+        let summary = num_array.describe();
         
         assert_eq!(summary.count, 5);
         assert!(summary.is_valid());

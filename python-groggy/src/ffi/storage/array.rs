@@ -615,8 +615,8 @@ impl PyGraphArray {
             // Emit deprecation warning
             let _ = pyo3::PyErr::warn(
                 py,
-                pyo3::exceptions::PyDeprecationWarning::py_type(py),
-                "GraphArray is deprecated. Use BaseArray for generic data or StatsArray for numeric arrays.",
+                py.get_type::<pyo3::exceptions::PyDeprecationWarning>(),
+                "GraphArray is deprecated. Use BaseArray for generic data or NumArray for numeric arrays.",
                 1,
             );
             let mut attr_values = Vec::with_capacity(values.len());
@@ -758,8 +758,8 @@ impl PyGraphArray {
         // Also warn on repr to surface deprecation in interactive usage
         let _ = pyo3::PyErr::warn(
             py,
-            pyo3::exceptions::PyDeprecationWarning::py_type(py),
-            "GraphArray is deprecated. Use BaseArray or StatsArray.",
+            py.get_type::<pyo3::exceptions::PyDeprecationWarning>(),
+            "GraphArray is deprecated. Use BaseArray or NumArray.",
             1,
         );
         let len = self.inner.len();

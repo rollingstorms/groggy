@@ -1,4 +1,4 @@
-use groggy::storage::array::{BaseArray, StatsArray, ArrayIterator, ArrayOps};
+use groggy::storage::array::{BaseArray, NumArray, ArrayIterator, ArrayOps};
 use pyo3::prelude::*;
 use pyo3::types::PyFunction;
 use std::sync::Arc;
@@ -6,12 +6,12 @@ use crate::ffi::storage::matrix::PyGraphMatrix;
 use crate::ffi::storage::subgraph_array::PySubgraphArray;
 use crate::ffi::storage::table_array::PyTableArray;
 
-/// MatrixArray: Collection of GraphMatrix objects with delegation to StatsArray
+/// MatrixArray: Collection of GraphMatrix objects with delegation to NumArray
 /// Provides basic array operations plus statistical operations on matrix collections
 #[pyclass(name = "MatrixArray", unsendable)]
 pub struct PyMatrixArray {
-    // Delegates to StatsArray for numerical operations
-    // Note: StatsArray contains BaseArray internally
+    // Delegates to NumArray for numerical operations
+    // Note: NumArray contains BaseArray internally
     matrices: Vec<PyGraphMatrix>,
 }
 
@@ -80,7 +80,7 @@ impl PyMatrixArray {
         self.matrices.clone()
     }
     
-    // StatsArray delegation - statistical operations on matrix collections
+    // NumArray delegation - statistical operations on matrix collections
     
     /// Calculate mean eigenvalue across all matrices
     fn mean_eigenvalue(&self) -> PyResult<f64> {
@@ -97,8 +97,8 @@ impl PyMatrixArray {
             eigenvalues.push(placeholder_eigenvalue);
         }
         
-        let stats_array = StatsArray::new(eigenvalues);
-        Ok(stats_array.mean().unwrap_or(0.0))
+        let num_array = NumArray::new(eigenvalues);
+        Ok(num_array.mean().unwrap_or(0.0))
     }
     
     /// Calculate statistics on matrix dimensions
@@ -116,8 +116,8 @@ impl PyMatrixArray {
                 return Ok(empty_dict.into());
             }
             
-            let stats_array = StatsArray::new(dimensions);
-            let summary = stats_array.describe();
+                    let array = NumArray::new(dimensions);
+            let summary = array.describe();
             
             let stats_dict = pyo3::types::PyDict::new(py);
             stats_dict.set_item("count", summary.count)?;
@@ -147,8 +147,8 @@ impl PyMatrixArray {
             .map(|matrix| matrix.shape().1 as f64)
             .collect();
         
-        let stats_a = StatsArray::new(dimensions_a);
-        let stats_b = StatsArray::new(dimensions_b);
+        let stats_a = NumArray::new(dimensions_a);
+        let stats_b = NumArray::new(dimensions_b);
         
         Ok(stats_a.correlate(&stats_b))
     }
@@ -168,7 +168,7 @@ impl PyMatrixArray {
                 return Ok(empty_dict.into());
             }
             
-            let stats_array = StatsArray::new(sizes);
+            let stats_array = NumArray::new(sizes);
             let summary = stats_array.describe();
             
             let stats_dict = pyo3::types::PyDict::new(py);

@@ -1,0 +1,43 @@
+{
+  "version": "2.0",
+  "created_at": "2025-09-10T02:08:59.435743+00:00",
+  "groggy_version": "0.3.1",
+  "node_count": 34,
+  "edge_count": 78,
+  "validation_policy": {
+    "strictness": "Standard",
+    "validate_node_references": true,
+    "edge_config": {
+      "allow_self_loops": true,
+      "allow_multi_edges": true,
+      "validate_node_references": false
+    },
+    "auto_repair": false
+  },
+  "checksums": {
+    "nodes_sha256": "57b4144db2cf25e9",
+    "edges_sha256": "ef58479a67136a59",
+    "metadata_sha256": "a179d55cf12b59c2"
+  },
+  "schema_info": {
+    "node_columns": [
+      "index",
+      "name",
+      "node_id"
+    ],
+    "edge_columns": [
+      "source",
+      "target",
+      "relationship",
+      "edge_id"
+    ],
+    "has_node_attributes": true,
+    "has_edge_attributes": true
+  },
+  "validation_summary": {
+    "is_valid": true,
+    "error_count": 0,
+    "warning_count": 0,
+    "info_count": 3
+  }
+}

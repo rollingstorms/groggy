@@ -6,7 +6,7 @@
 //!
 //! ## Architecture:
 //! - `BaseArray<T>`: Fundamental array operations (len, get, iter)
-//! - `StatsArray<T>`: Statistical operations layer on top of BaseArray
+//! - `NumArray<T>`: Statistical operations layer on top of BaseArray
 //! - Specialized arrays delegate to appropriate base classes
 
 pub mod traits;
@@ -17,7 +17,7 @@ pub mod query;
 pub mod base;
 pub mod specialized;
 pub mod base_array;
-pub mod stats_array;
+pub mod num_array;
 
 pub use traits::*;
 pub use iterator::*;
@@ -27,4 +27,4 @@ pub use query::{QueryEvaluator, BatchQueryEvaluator};
 pub use base::*;
 pub use specialized::*;
 pub use base_array::BaseArray;
-pub use stats_array::{StatsArray, StatsSummary};
+pub use num_array::{NumArray, StatsSummary};

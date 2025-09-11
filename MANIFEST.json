@@ -1,0 +1,18 @@
+{
+  "format_version": "2.0",
+  "files": [
+    {
+      "name": "metadata.json",
+      "checksum": "a179d55cf12b59c2"
+    },
+    {
+      "name": "nodes.csv",
+      "checksum": "57b4144db2cf25e9"
+    },
+    {
+      "name": "edges.csv",
+      "checksum": "ef58479a67136a59"
+    }
+  ],
+  "created_at": "2025-09-10T02:08:59.435743+00:00"
+}

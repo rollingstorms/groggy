@@ -4,7 +4,7 @@
 //! enabling universal method availability across the delegation system.
 
 use super::traits::{
-    SubgraphOps, TableOps, GraphOps, BaseArrayOps, StatsArrayOps, DelegatingIterator
+    SubgraphOps, TableOps, GraphOps, BaseArrayOps, NumArrayOps, DelegatingIterator
 };
 use groggy::types::{NodeId, EdgeId, AttrValue};
 use pyo3::PyResult;
@@ -100,7 +100,7 @@ impl<T> BaseArrayOps for ForwardingArray<T> {
 }
 
 // Implement statistical operations for numerical array types
-impl StatsArrayOps for ForwardingArray<f64> {
+impl NumArrayOps for ForwardingArray<f64> {
     fn mean(&self) -> PyResult<Option<f64>> {
         if self.items.is_empty() {
             return Ok(None);

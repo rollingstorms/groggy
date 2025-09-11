@@ -1,0 +1,13 @@
+object_type,category,method_count,sample_methods
+Graph,Core,68,"add_edge; add_edges; add_graph; add_node; add_nodes"
+BaseArray,Base,27,"apply_to_each; count; describe; drop_na; fill_na"
+BaseTable,Base,19,"auto_assign_edge_ids; edges (property); from_federated_bundles; get_bundle_info; head"
+Matrix,Base,32,"columns (property); data (property); dense; determinant; dtype (property)"
+Subgraph,Base,54,"bfs; calculate_similarity; child_meta_nodes; clustering_coefficient; collapse"
+NodesArray,Array,27,"apply_to_each; count; describe; drop_na; fill_na"
+EdgesArray,Array,27,"apply_to_each; count; describe; drop_na; fill_na"
+SubgraphArray,Array,6,"collect; is_empty; iter; sample; table"
+NodesTable,Table,27,"base_table; drop_columns; filter; filter_by_attr; from_csv"
+EdgesTable,Table,32,"as_tuples; auto_assign_edge_ids; base_table; drop_columns; edge_ids"
+ComponentsArray,Array,7,"filter; largest_component; neighborhood; sample; sizes"
+NeighborhoodResult,Specialized,4,"execution_time_ms (property); largest_neighborhood_size (property); neighborhoods (property); total_neighborhoods (property)"

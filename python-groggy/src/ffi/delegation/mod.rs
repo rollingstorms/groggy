@@ -12,7 +12,7 @@ pub mod examples;
 // Re-export the main traits for easy access
 pub use traits::{
     SubgraphOps, TableOps, GraphOps, 
-    BaseArrayOps, StatsArrayOps,
+    BaseArrayOps, NumArrayOps,
     DelegatingIterator
 };
 

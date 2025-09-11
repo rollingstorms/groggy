@@ -1,0 +1,5371 @@
+{
+  "discovery_metadata": {
+    "total_objects": 12,
+    "total_methods": 282,
+    "total_errors": 0,
+    "objects_discovered": [
+      "BaseTable",
+      "NodesTable",
+      "EdgesTable",
+      "GraphTable",
+      "BaseArray",
+      "Graph",
+      "Nodes",
+      "Edges",
+      "ComponentsArray",
+      "Subgraph",
+      "GraphArray",
+      "Matrix"
+    ]
+  },
+  "objects": {
+    "BaseTable": {
+      "type": "BaseTable",
+      "method_count": 30,
+      "methods": [
+        {
+          "name": "agg",
+          "signature": "(agg_specs)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Alias for aggregate method (more concise)\n\n# Arguments\n* `agg_specs` - Dictionary mapping column names to aggregation functions\n\n# Returns\nPyBaseTable: A single table with aggregated results\n\n# Example\n```python\n# Aggregate the entire table\nsummary = table.agg({'sales': 'sum', 'price': 'avg', 'items': 'count'})\n```",
+          "requires_parameters": [
+            "agg_specs"
+          ]
+        },
+        {
+          "name": "aggregate",
+          "signature": "(agg_specs)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Aggregate entire table without grouping\n\n# Arguments\n* `agg_specs` - Dictionary mapping column names to aggregation functions\n\n# Examples\n```python\n# Calculate summary statistics\nsummary = table.aggregate({'sales': 'sum', 'price': 'avg', 'items': 'count'})\n```",
+          "requires_parameters": [
+            "agg_specs"
+          ]
+        },
+        {
+          "name": "assign",
+          "signature": "(updates)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Assign updates to multiple columns at once\n\nArgs:\n    updates: Dictionary mapping column names to values. Values can be:\n             - Lists: ['value1', 'value2', ...]  \n             - Dictionaries with integer keys: {0: 'value1', 1: 'value2', ...}\n    \nExamples:\n    # Using lists (updates entire columns)\n    updates = {\"bonus\": [1000, 1500], \"status\": [\"active\", \"inactive\"]}\n    table.assign(updates)\n    \n    # Using dictionaries with integer keys (sparse updates)\n    updates = {\"bonus\": {0: 1000, 3: 1500}, \"status\": {1: \"active\", 2: \"inactive\"}}\n    table.assign(updates)",
+          "requires_parameters": [
+            "updates"
+          ]
+        },
+        {
+          "name": "column",
+          "signature": "(column_name)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Get a specific column as BaseArray for chaining operations\nThis enables: table.column('age').iter().filter(...).collect()",
+          "requires_parameters": [
+            "column_name"
+          ]
+        },
+        {
+          "name": "drop_columns",
+          "signature": "(columns)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Drop columns from the table\n\nArgs:\n    columns: List of column names to drop\n\nReturns:\n    PyBaseTable: A new table without the specified columns",
+          "requires_parameters": [
+            "columns"
+          ]
+        },
+        {
+          "name": "filter",
+          "signature": "(predicate)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Filter rows using a query expression or Python function\n\nArgs:\n    predicate: Either a string query expression (e.g. \"age > 25\") or a Python function\n\nReturns:\n    PyBaseTable: A new table with filtered rows",
+          "requires_parameters": [
+            "predicate"
+          ]
+        },
+        {
+          "name": "from_csv",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Import BaseTable from CSV file",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "from_dict",
+          "signature": "(data)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Create BaseTable from a Python dictionary\n\n# Arguments\n* `data` - Dictionary mapping column names to lists of values\n\n# Examples\n```python\ndata = {\n    'id': [1, 2, 3],\n    'name': ['Alice', 'Bob', 'Charlie'],\n    'age': [25, 30, 35]\n}\ntable = BaseTable.from_dict(data)\n```",
+          "requires_parameters": [
+            "data"
+          ]
+        },
+        {
+          "name": "from_json",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Import BaseTable from JSON file",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "from_parquet",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Import BaseTable from Parquet file",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "group_by",
+          "signature": "(columns)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Group by columns and return grouped tables\n\nArgs:\n    columns: List of column names to group by\n\nReturns:\n    PyTableArray: Array-like container holding the grouped tables",
+          "requires_parameters": [
+            "columns"
+          ]
+        },
+        {
+          "name": "has_column",
+          "signature": "(name)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Check if column exists",
+          "requires_parameters": [
+            "name"
+          ]
+        },
+        {
+          "name": "head",
+          "signature": "(n=5)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Get first n rows (default 5)",
+          "actual_return_type": "BaseTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "BaseTable"
+        },
+        {
+          "name": "intersect",
+          "signature": "(other)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Intersect with another table (returns common rows)\n\n# Arguments\n* `other` - The table to intersect with\n\n# Examples\n```python\n# Find common rows between tables\ncommon = table1.intersect(table2)\n```",
+          "requires_parameters": [
+            "other"
+          ]
+        },
+        {
+          "name": "iter",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Get table iterator for chaining",
+          "actual_return_type": "BaseTableIterator",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "BaseTableIterator"
+        },
+        {
+          "name": "join",
+          "signature": "(other, on, how)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Unified join method with pandas-style interface\n\n# Arguments\n* `other` - The table to join with\n* `on` - Column name(s) to join on. Can be:\n  - String: single column name (same in both tables)\n  - List[str]: multiple column names (same in both tables)\n  - Dict: {\"left\": \"col1\", \"right\": \"col2\"} for different column names\n  - Dict: {\"left\": [\"col1\", \"col2\"], \"right\": [\"col3\", \"col4\"]} for multiple different columns\n* `how` - Join type: \"inner\", \"left\", \"right\", \"outer\"\n\n# Examples\n```python\n# Simple inner join on same column name\nresult = table1.join(table2, on=\"id\", how=\"inner\")\n\n# Left join on different column names  \nresult = table1.join(table2, on={\"left\": \"user_id\", \"right\": \"id\"}, how=\"left\")\n\n# Multi-column join\nresult = table1.join(table2, on=[\"key1\", \"key2\"], how=\"outer\")\n```",
+          "requires_parameters": [
+            "other",
+            "on",
+            "how"
+          ]
+        },
+        {
+          "name": "rich_display",
+          "signature": "(config=None)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Get rich display representation using Rust formatter",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "select",
+          "signature": "(columns)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Select specific columns to create a new table\n\nArgs:\n    columns: List of column names to select\n\nReturns:\n    PyBaseTable: A new table with only the selected columns",
+          "requires_parameters": [
+            "columns"
+          ]
+        },
+        {
+          "name": "set_column",
+          "signature": "(column_name, values)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Set an entire column with new values\n\nArgs:\n    column_name: Name of the column to set\n    values: List of new values for the column\n    \nExample:\n    table.set_column(\"score\", [95, 87, 92, 88])",
+          "requires_parameters": [
+            "column_name",
+            "values"
+          ]
+        },
+        {
+          "name": "set_value",
+          "signature": "(row, column_name, value)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Set a single value at a specific row and column\n\nArgs:\n    row: Row index (0-based)\n    column_name: Name of the column\n    value: New value to set\n    \nExample:\n    table.set_value(0, \"name\", \"Alice Updated\")",
+          "requires_parameters": [
+            "row",
+            "column_name",
+            "value"
+          ]
+        },
+        {
+          "name": "set_values_by_mask",
+          "signature": "(mask, column_name, value)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Set values for multiple rows in a column using a boolean mask\n\nArgs:\n    mask: List of booleans indicating which rows to update\n    column_name: Name of the column to update\n    value: Value to set for all masked rows\n    \nExample:\n    table.set_values_by_mask([True, False, True], \"flag\", \"updated\")",
+          "requires_parameters": [
+            "mask",
+            "column_name",
+            "value"
+          ]
+        },
+        {
+          "name": "set_values_by_range",
+          "signature": "(start, end, column_name, value, step=1)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Set values for a range of rows in a column\n\nArgs:\n    start: Starting row index (inclusive)\n    end: Ending row index (exclusive)\n    step: Step size (default 1 for consecutive rows)\n    column_name: Name of the column to update\n    value: Value to set for all rows in the range\n    \nExample:\n    table.set_values_by_range(10, 20, 1, \"score\", 0.0)  # rows 10-19\n    table.set_values_by_range(0, 10, 2, \"flag\", True)   # rows 0,2,4,6,8",
+          "requires_parameters": [
+            "start",
+            "end",
+            "column_name",
+            "value"
+          ]
+        },
+        {
+          "name": "slice",
+          "signature": "(start, end)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Get a slice of rows [start, end)\n\nArgs:\n    start: Starting row index (inclusive)\n    end: Ending row index (exclusive)\n\nReturns:\n    PyBaseTable: A new table with the specified row slice",
+          "requires_parameters": [
+            "start",
+            "end"
+          ]
+        },
+        {
+          "name": "sort_by",
+          "signature": "(column, ascending=True)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Sort table by column\n\nArgs:\n    column: Name of the column to sort by\n    ascending: If True, sort in ascending order; if False, descending\n\nReturns:\n    PyBaseTable: A new sorted table",
+          "requires_parameters": [
+            "column"
+          ]
+        },
+        {
+          "name": "tail",
+          "signature": "(n=5)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Get last n rows (default 5)",
+          "actual_return_type": "BaseTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "BaseTable"
+        },
+        {
+          "name": "to_csv",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Export BaseTable to CSV file",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "to_json",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Export BaseTable to JSON file",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "to_pandas",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Convert to pandas DataFrame",
+          "actual_return_type": "DataFrame",
+          "test_successful": true
+        },
+        {
+          "name": "to_parquet",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Export BaseTable to Parquet file ",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "union",
+          "signature": "(other)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Union with another table (removes duplicates)\n\n# Arguments\n* `other` - The table to union with\n\n# Examples\n```python\n# Combine two tables with same schema\ncombined = table1.union(table2)\n```",
+          "requires_parameters": [
+            "other"
+          ]
+        }
+      ]
+    },
+    "NodesTable": {
+      "type": "NodesTable",
+      "method_count": 27,
+      "methods": [
+        {
+          "name": "base_table",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Get reference to underlying BaseTable",
+          "actual_return_type": "BaseTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "BaseTable"
+        },
+        {
+          "name": "drop_columns",
+          "signature": "(columns)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Drop columns from the table (cannot drop node_id)\n\nArgs:\n    columns: List of column names to drop\n\nReturns:\n    PyNodesTable: A new table without the specified columns",
+          "requires_parameters": [
+            "columns"
+          ]
+        },
+        {
+          "name": "filter",
+          "signature": "(predicate)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Filter rows using a query expression or Python function\n\nArgs:\n    predicate: Either a string query expression (e.g. \"age > 25\") or a Python function\n\nReturns:\n    PyNodesTable: A new table with filtered rows",
+          "requires_parameters": [
+            "predicate"
+          ]
+        },
+        {
+          "name": "filter_by_attr",
+          "signature": "(attr_name, value)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Filter nodes by attribute value",
+          "requires_parameters": [
+            "attr_name",
+            "value"
+          ]
+        },
+        {
+          "name": "from_csv",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Import NodesTable from CSV file (must contain node_id column)",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "from_dict",
+          "signature": "(data)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Create NodesTable from a Python dictionary (must contain 'node_id' column)",
+          "requires_parameters": [
+            "data"
+          ]
+        },
+        {
+          "name": "from_json",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Import NodesTable from JSON file (must contain node_id column)",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "from_parquet",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Import NodesTable from Parquet file (must contain node_id column)",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "group_by",
+          "signature": "(columns)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Group by columns and return grouped tables\n\nArgs:\n    columns: List of column names to group by\n\nReturns:\n    PyNodesTableArray: Array-like container holding the grouped node tables",
+          "requires_parameters": [
+            "columns"
+          ]
+        },
+        {
+          "name": "head",
+          "signature": "(n=5)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Get first n rows (default 5)",
+          "actual_return_type": "NodesTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "NodesTable"
+        },
+        {
+          "name": "into_base_table",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Convert to BaseTable (loses node-specific typing)",
+          "actual_return_type": "BaseTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "BaseTable"
+        },
+        {
+          "name": "iter",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Get table iterator for chaining",
+          "actual_return_type": "NodesTableIterator",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "NodesTableIterator"
+        },
+        {
+          "name": "ncols",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Get number of columns",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "node_ids",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Get node IDs",
+          "actual_return_type": "GraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "nrows",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Get number of rows",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "rich_display",
+          "signature": "(config=None)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Get rich display representation with NodesTable type",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "select",
+          "signature": "(columns)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Select specific columns to create a new table\n\nArgs:\n    columns: List of column names to select\n\nReturns:\n    PyNodesTable: A new table with only the selected columns",
+          "requires_parameters": [
+            "columns"
+          ]
+        },
+        {
+          "name": "shape",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Get shape as (rows, cols)",
+          "actual_return_type": "tuple",
+          "test_successful": true
+        },
+        {
+          "name": "slice",
+          "signature": "(start, end)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Get a slice of rows [start, end)\n\nArgs:\n    start: Starting row index (inclusive)\n    end: Ending row index (exclusive)\n\nReturns:\n    PyNodesTable: A new table with the specified row slice",
+          "requires_parameters": [
+            "start",
+            "end"
+          ]
+        },
+        {
+          "name": "sort_by",
+          "signature": "(column, ascending=True)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Sort table by column\n\nArgs:\n    column: Name of the column to sort by\n    ascending: If True, sort in ascending order; if False, descending\n\nReturns:\n    PyNodesTable: A new sorted table",
+          "requires_parameters": [
+            "column"
+          ]
+        },
+        {
+          "name": "tail",
+          "signature": "(n=5)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Get last n rows (default 5)",
+          "actual_return_type": "NodesTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "NodesTable"
+        },
+        {
+          "name": "to_csv",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Export NodesTable to CSV file",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "to_json",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Export NodesTable to JSON file",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "to_pandas",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Convert to pandas DataFrame",
+          "actual_return_type": "DataFrame",
+          "test_successful": true
+        },
+        {
+          "name": "to_parquet",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Export NodesTable to Parquet file ",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "unique_attr_values",
+          "signature": "(attr_name)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Get unique values for an attribute",
+          "requires_parameters": [
+            "attr_name"
+          ]
+        },
+        {
+          "name": "with_attributes",
+          "signature": "(attr_name, attributes)",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Add node attributes - flexible input format\n\nArgs:\n    attr_name: Name of the attribute column to add  \n    attributes: Can be:\n        - Dictionary mapping node_id to value: {0: \"Alice\", 1: \"Bob\"}\n        - List of {\"id\": node_id, \"value\": value} dicts: [{\"id\": 0, \"value\": \"Alice\"}]\n        - HashMap<NodeId, PyAttrValue> (advanced usage)\n\nReturns:\n    PyNodesTable: A new table with the attributes added",
+          "requires_parameters": [
+            "attr_name",
+            "attributes"
+          ]
+        }
+      ]
+    },
+    "EdgesTable": {
+      "type": "EdgesTable",
+      "method_count": 32,
+      "methods": [
+        {
+          "name": "as_tuples",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get edges as tuples (edge_id, source, target)",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "auto_assign_edge_ids",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Auto-assign edge IDs for null values (useful for meta nodes)",
+          "actual_return_type": "EdgesTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "EdgesTable"
+        },
+        {
+          "name": "base_table",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get reference to underlying BaseTable",
+          "actual_return_type": "BaseTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "BaseTable"
+        },
+        {
+          "name": "drop_columns",
+          "signature": "(columns)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Drop columns from the table (cannot drop edge_id, source, or target)\n\nArgs:\n    columns: List of column names to drop\n\nReturns:\n    PyEdgesTable: A new table without the specified columns",
+          "requires_parameters": [
+            "columns"
+          ]
+        },
+        {
+          "name": "edge_ids",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get edge IDs",
+          "actual_return_type": "GraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "filter",
+          "signature": "(predicate)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Filter rows using a query expression or Python function\n\nArgs:\n    predicate: Either a string query expression (e.g. \"weight > 0.5\") or a Python function\n\nReturns:\n    PyEdgesTable: A new table with filtered rows",
+          "requires_parameters": [
+            "predicate"
+          ]
+        },
+        {
+          "name": "filter_by_attr",
+          "signature": "(attr_name, value)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Filter edges by attribute value",
+          "requires_parameters": [
+            "attr_name",
+            "value"
+          ]
+        },
+        {
+          "name": "filter_by_sources",
+          "signature": "(source_nodes)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Filter edges by source nodes",
+          "requires_parameters": [
+            "source_nodes"
+          ]
+        },
+        {
+          "name": "filter_by_targets",
+          "signature": "(target_nodes)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Filter edges by target nodes",
+          "requires_parameters": [
+            "target_nodes"
+          ]
+        },
+        {
+          "name": "from_csv",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Import EdgesTable from CSV file (must contain edge_id, source, target columns)",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "from_dict",
+          "signature": "(data)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Create EdgesTable from a Python dictionary (must contain 'edge_id', 'source', 'target' columns)",
+          "requires_parameters": [
+            "data"
+          ]
+        },
+        {
+          "name": "from_json",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Import EdgesTable from JSON file (must contain edge_id, source, target columns)",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "from_parquet",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Import EdgesTable from Parquet file (must contain edge_id, source, target columns)",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "group_by",
+          "signature": "(columns)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Group by columns and return grouped tables\n\nArgs:\n    columns: List of column names to group by\n\nReturns:\n    PyEdgesTableArray: Array-like container holding the grouped edge tables",
+          "requires_parameters": [
+            "columns"
+          ]
+        },
+        {
+          "name": "head",
+          "signature": "(n=5)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get first n rows (default 5)",
+          "actual_return_type": "EdgesTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "EdgesTable"
+        },
+        {
+          "name": "into_base_table",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Convert to BaseTable (loses edge-specific typing)",
+          "actual_return_type": "BaseTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "BaseTable"
+        },
+        {
+          "name": "iter",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get table iterator for chaining",
+          "actual_return_type": "EdgesTableIterator",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "EdgesTableIterator"
+        },
+        {
+          "name": "ncols",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get number of columns",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "nrows",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get number of rows",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "rich_display",
+          "signature": "(config=None)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get rich display representation with EdgesTable type",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "select",
+          "signature": "(columns)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Select specific columns to create a new table\n\nArgs:\n    columns: List of column names to select\n\nReturns:\n    PyEdgesTable: A new table with only the selected columns",
+          "requires_parameters": [
+            "columns"
+          ]
+        },
+        {
+          "name": "shape",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get shape as (rows, cols)",
+          "actual_return_type": "tuple",
+          "test_successful": true
+        },
+        {
+          "name": "slice",
+          "signature": "(start, end)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get a slice of rows [start, end)\n\nArgs:\n    start: Starting row index (inclusive)\n    end: Ending row index (exclusive)\n\nReturns:\n    PyEdgesTable: A new table with the specified row slice",
+          "requires_parameters": [
+            "start",
+            "end"
+          ]
+        },
+        {
+          "name": "sort_by",
+          "signature": "(column, ascending=True)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Sort table by column\n\nArgs:\n    column: Name of the column to sort by\n    ascending: If True, sort in ascending order; if False, descending\n\nReturns:\n    PyEdgesTable: A new sorted table",
+          "requires_parameters": [
+            "column"
+          ]
+        },
+        {
+          "name": "sources",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get source node IDs",
+          "actual_return_type": "GraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "tail",
+          "signature": "(n=5)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get last n rows (default 5)",
+          "actual_return_type": "EdgesTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "EdgesTable"
+        },
+        {
+          "name": "targets",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get target node IDs  ",
+          "actual_return_type": "GraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "to_csv",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Export EdgesTable to CSV file",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "to_json",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Export EdgesTable to JSON file",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "to_pandas",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Convert to pandas DataFrame",
+          "actual_return_type": "DataFrame",
+          "test_successful": true
+        },
+        {
+          "name": "to_parquet",
+          "signature": "(path)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Export EdgesTable to Parquet file ",
+          "requires_parameters": [
+            "path"
+          ]
+        },
+        {
+          "name": "unique_attr_values",
+          "signature": "(attr_name)",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Get unique values for an attribute",
+          "requires_parameters": [
+            "attr_name"
+          ]
+        }
+      ]
+    },
+    "GraphTable": {
+      "type": "GraphTable",
+      "method_count": 20,
+      "methods": [
+        {
+          "name": "auto_assign_edge_ids",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Auto-assign edge IDs for null values (useful for meta nodes and imported data)",
+          "actual_return_type": "GraphTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "GraphTable"
+        },
+        {
+          "name": "from_federated_bundles",
+          "signature": "(bundle_paths, domain_names=None)",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Create federated GraphTable from multiple bundle paths",
+          "requires_parameters": [
+            "bundle_paths"
+          ]
+        },
+        {
+          "name": "get_bundle_info",
+          "signature": "(bundle_path)",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Get bundle metadata information without loading the full bundle\n\n# Arguments\n* `bundle_path` - Directory path containing the bundle\n\n# Returns\n* `dict` - Bundle metadata information\n\n# Examples\n```python\n# Inspect bundle metadata\nmetadata = GraphTable.get_bundle_info(\"./graph_data_bundle\")\nprint(f\"Bundle version: {metadata['version']}\")\nprint(f\"Nodes: {metadata['node_count']}, Edges: {metadata['edge_count']}\")\nprint(f\"Created: {metadata['created_at']}\")\n```",
+          "requires_parameters": [
+            "bundle_path"
+          ]
+        },
+        {
+          "name": "head",
+          "signature": "(n=5)",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Get first n rows (primarily from nodes table, default 5)",
+          "actual_return_type": "GraphTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "GraphTable"
+        },
+        {
+          "name": "load_bundle",
+          "signature": "(bundle_path)",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Load GraphTable from a bundle directory (supports both v1.0 and v2.0 formats)\n\n# Arguments\n* `bundle_path` - Directory path containing the bundle\n\n# Returns\n* `PyGraphTable` - Loaded graph table with validation policy restored\n\n# Examples\n```python\n# Load from v2.0 bundle (with integrity verification)\ngraph_table = GraphTable.load_bundle(\"./graph_data_bundle\")\n\n# Also supports legacy v1.0 bundles\ngraph_table = GraphTable.load_bundle(\"./old_bundle\")\n```",
+          "requires_parameters": [
+            "bundle_path"
+          ]
+        },
+        {
+          "name": "merge",
+          "signature": "(tables)",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Merge multiple GraphTables into one",
+          "requires_parameters": [
+            "tables"
+          ]
+        },
+        {
+          "name": "merge_with",
+          "signature": "(other, strategy)",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Merge with another GraphTable",
+          "requires_parameters": [
+            "other",
+            "strategy"
+          ]
+        },
+        {
+          "name": "merge_with_strategy",
+          "signature": "(tables, strategy)",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Merge with conflict resolution strategy",
+          "requires_parameters": [
+            "tables",
+            "strategy"
+          ]
+        },
+        {
+          "name": "ncols",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Get number of columns (max of nodes and edges)",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "nrows",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Get number of total rows (nodes + edges)",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "save_bundle",
+          "signature": "(bundle_path)",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Save GraphTable as a v2.0 bundle with comprehensive metadata and checksums\n\n# Arguments\n* `bundle_path` - Directory path to save the bundle\n\n# Examples\n```python\n# Save with comprehensive metadata and validation\ngraph_table.save_bundle(\"./graph_data_bundle\")\n\n# Bundle will contain:\n# - metadata.json: Comprehensive metadata with checksums\n# - MANIFEST.json: File integrity manifest\n# - validation_report.json: Structured validation results\n# - nodes.csv: Node data\n# - edges.csv: Edge data\n```",
+          "requires_parameters": [
+            "bundle_path"
+          ]
+        },
+        {
+          "name": "shape",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Get shape as (rows, cols)",
+          "actual_return_type": "tuple",
+          "test_successful": true
+        },
+        {
+          "name": "stats",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Get graph statistics  ",
+          "actual_return_type": "dict",
+          "test_successful": true
+        },
+        {
+          "name": "tail",
+          "signature": "(n=5)",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Get last n rows (primarily from nodes table, default 5) ",
+          "actual_return_type": "GraphTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "GraphTable"
+        },
+        {
+          "name": "to_edges",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Convert table to EdgesAccessor by extracting edge IDs from the table",
+          "test_error": "GraphTable to EdgesAccessor conversion not yet implemented. Use .edges() property instead.",
+          "test_successful": false
+        },
+        {
+          "name": "to_graph",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Convert back to Graph",
+          "actual_return_type": "Graph",
+          "test_successful": true
+        },
+        {
+          "name": "to_nodes",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Convert table to NodesAccessor by extracting node IDs from the table",
+          "test_error": "GraphTable to NodesAccessor conversion not yet implemented. Use .nodes() property instead.",
+          "test_successful": false
+        },
+        {
+          "name": "to_subgraphs",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Convert table to SubgraphArray by creating subgraphs from table rows",
+          "test_error": "GraphTable to SubgraphArray conversion not yet implemented.",
+          "test_successful": false
+        },
+        {
+          "name": "validate",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Validate the GraphTable and return report",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "verify_bundle",
+          "signature": "(bundle_path)",
+          "return_type": "unknown",
+          "source_object": "GraphTable",
+          "source_type": "GraphTable",
+          "is_property": false,
+          "doc": "Verify bundle integrity without loading the full data\n\n# Arguments\n* `bundle_path` - Directory path containing the bundle\n\n# Returns\n* `dict` - Verification results with checksums and validation status\n\n# Examples\n```python\n# Verify bundle integrity\nverification = GraphTable.verify_bundle(\"./graph_data_bundle\")\nif verification['is_valid']:\n    print(\"Bundle integrity verified!\")\nelse:\n    print(f\"Issues found: {verification['errors']}\")\n```",
+          "requires_parameters": [
+            "bundle_path"
+          ]
+        }
+      ]
+    },
+    "BaseArray": {
+      "type": "BaseArray",
+      "method_count": 7,
+      "methods": [
+        {
+          "name": "apply_to_each",
+          "signature": "(method_name, args)",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": "Delegation-based method application to each element \nThis demonstrates the concept: apply a method to each element and return new array",
+          "requires_parameters": [
+            "method_name",
+            "args"
+          ]
+        },
+        {
+          "name": "describe",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": null,
+          "actual_return_type": "dict",
+          "test_successful": true
+        },
+        {
+          "name": "dtype",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": "Get the data type of the array based on the first non-null element",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "head",
+          "signature": "(n)",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": null,
+          "requires_parameters": [
+            "n"
+          ]
+        },
+        {
+          "name": "iter",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": "NEW: Enable fluent chaining with .iter() method",
+          "actual_return_type": "BaseArrayIterator",
+          "test_successful": true
+        },
+        {
+          "name": "tail",
+          "signature": "(n)",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": null,
+          "requires_parameters": [
+            "n"
+          ]
+        },
+        {
+          "name": "unique",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": null,
+          "actual_return_type": "BaseArray",
+          "test_successful": true
+        }
+      ]
+    },
+    "Graph": {
+      "type": "Graph",
+      "method_count": 62,
+      "methods": [
+        {
+          "name": "add_edge",
+          "signature": "(source, target, uid_key=None, **kwargs)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Add a single edge to the graph with support for string IDs and attributes",
+          "requires_parameters": [
+            "source",
+            "target",
+            "kwargs"
+          ]
+        },
+        {
+          "name": "add_edges",
+          "signature": "(edges, node_mapping=None, _uid_key=None, warm_cache=None)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Add multiple edges at once",
+          "requires_parameters": [
+            "edges"
+          ]
+        },
+        {
+          "name": "add_graph",
+          "signature": "(other)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Add another graph to this graph (merge nodes and edges)\n\nAll nodes and edges from the other graph will be added to this graph.\nNode and edge IDs may be remapped to avoid conflicts.\nAttributes are preserved during the merge.",
+          "requires_parameters": [
+            "other"
+          ]
+        },
+        {
+          "name": "add_node",
+          "signature": "(node_id=None, **kwargs)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": null,
+          "requires_parameters": [
+            "kwargs"
+          ]
+        },
+        {
+          "name": "add_nodes",
+          "signature": "(data, uid_key=None)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": null,
+          "requires_parameters": [
+            "data"
+          ]
+        },
+        {
+          "name": "adjacency",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Simple adjacency matrix (alias) - delegates to PyGraphMatrixHelper",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "adjacency_matrix",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get adjacency matrix - delegates to PyGraphMatrixHelper",
+          "actual_return_type": "dict",
+          "test_successful": true
+        },
+        {
+          "name": "aggregate",
+          "signature": "(attribute, operation, target=None, _node_ids=None)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Aggregate attribute values across nodes or edges",
+          "requires_parameters": [
+            "attribute",
+            "operation"
+          ]
+        },
+        {
+          "name": "all_edge_attribute_names",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get all unique edge attribute names across the entire graph",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "all_node_attribute_names",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get all unique node attribute names across the entire graph",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "bfs",
+          "signature": "(start, max_depth=None, inplace=None, attr_name=None)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "BFS traversal - delegates to PyGraphAnalysis helper",
+          "requires_parameters": [
+            "start"
+          ]
+        },
+        {
+          "name": "branches",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "List all branches (FFI wrapper around core history system)",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "checkout_branch",
+          "signature": "(branch_name)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Checkout a branch (FFI wrapper around core history system)",
+          "requires_parameters": [
+            "branch_name"
+          ]
+        },
+        {
+          "name": "commit",
+          "signature": "(message, author)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Commit current state of the graph (FFI wrapper around core history system)",
+          "requires_parameters": [
+            "message",
+            "author"
+          ]
+        },
+        {
+          "name": "commit_history",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get commit history (FFI wrapper around core history system)",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "contains_edge",
+          "signature": "(edge)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Check if edge exists - DELEGATED (same as has_edge)  ",
+          "requires_parameters": [
+            "edge"
+          ]
+        },
+        {
+          "name": "contains_node",
+          "signature": "(node)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Check if node exists - DELEGATED (same as has_node)",
+          "requires_parameters": [
+            "node"
+          ]
+        },
+        {
+          "name": "create_branch",
+          "signature": "(branch_name)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Create a new branch (FFI wrapper around core history system)",
+          "requires_parameters": [
+            "branch_name"
+          ]
+        },
+        {
+          "name": "dense_adjacency_matrix",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get dense adjacency matrix - delegates to PyGraphMatrixHelper",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "density",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Calculate graph density (number of edges / number of possible edges) - PURE DELEGATION",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
+          "name": "dfs",
+          "signature": "(start, max_depth=None, inplace=None, attr_name=None)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "DFS traversal - delegates to PyGraphAnalysis helper  ",
+          "requires_parameters": [
+            "start"
+          ]
+        },
+        {
+          "name": "edge_attribute_keys",
+          "signature": "(edge_id)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get all attribute keys for an edge - delegates to PyGraphAttr",
+          "requires_parameters": [
+            "edge_id"
+          ]
+        },
+        {
+          "name": "edge_count",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get the number of edges in the graph - DELEGATED",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "edge_endpoints",
+          "signature": "(edge)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": null,
+          "requires_parameters": [
+            "edge"
+          ]
+        },
+        {
+          "name": "filter_edges",
+          "signature": "(filter)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Filter edges using EdgeFilter object or string query\n\nOPTIMIZED: Direct implementation avoiding expensive view() creation overhead",
+          "requires_parameters": [
+            "filter"
+          ]
+        },
+        {
+          "name": "filter_nodes",
+          "signature": "(filter)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Filter nodes using NodeFilter object or string query\n\nOPTIMIZED: Direct implementation avoiding expensive view() creation overhead",
+          "requires_parameters": [
+            "filter"
+          ]
+        },
+        {
+          "name": "get_edge_attr",
+          "signature": "(edge, attr, default=None)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get single edge attribute - delegates to PyGraphAttr",
+          "requires_parameters": [
+            "edge",
+            "attr"
+          ]
+        },
+        {
+          "name": "get_edge_attrs",
+          "signature": "(edges, attrs)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get bulk edge attributes - delegates to PyGraphAttr",
+          "requires_parameters": [
+            "edges",
+            "attrs"
+          ]
+        },
+        {
+          "name": "get_node_attr",
+          "signature": "(node, attr, default=None)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get single node attribute - delegates to PyGraphAttr",
+          "requires_parameters": [
+            "node",
+            "attr"
+          ]
+        },
+        {
+          "name": "get_node_attrs",
+          "signature": "(nodes, attrs)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get bulk node attributes - delegates to PyGraphAttr",
+          "requires_parameters": [
+            "nodes",
+            "attrs"
+          ]
+        },
+        {
+          "name": "get_node_mapping",
+          "signature": "(uid_key, return_inverse=False)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get node mapping for a specific attribute (FFI wrapper around core operations)",
+          "requires_parameters": [
+            "uid_key"
+          ]
+        },
+        {
+          "name": "group_by",
+          "signature": "(attribute, aggregation_attr, operation)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Group nodes by attribute value and compute aggregates (public method for benchmarks)",
+          "requires_parameters": [
+            "attribute",
+            "aggregation_attr",
+            "operation"
+          ]
+        },
+        {
+          "name": "group_nodes_by_attribute",
+          "signature": "(attribute, aggregation_attr, operation)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get analytics module for this graph\nGroup nodes by attribute value and compute aggregates for each group",
+          "requires_parameters": [
+            "attribute",
+            "aggregation_attr",
+            "operation"
+          ]
+        },
+        {
+          "name": "has_edge",
+          "signature": "(edge_id)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Check if an edge exists in the graph - DELEGATED  ",
+          "requires_parameters": [
+            "edge_id"
+          ]
+        },
+        {
+          "name": "has_edge_attribute",
+          "signature": "(edge_id, attr_name)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Check if edge has specific attribute - delegates to PyGraphAttr",
+          "requires_parameters": [
+            "edge_id",
+            "attr_name"
+          ]
+        },
+        {
+          "name": "has_node",
+          "signature": "(node_id)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Check if a node exists in the graph - DELEGATED",
+          "requires_parameters": [
+            "node_id"
+          ]
+        },
+        {
+          "name": "has_node_attribute",
+          "signature": "(node_id, attr_name)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Check if node has specific attribute - delegates to PyGraphAttr",
+          "requires_parameters": [
+            "node_id",
+            "attr_name"
+          ]
+        },
+        {
+          "name": "has_uncommitted_changes",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Check if there are uncommitted changes (FFI wrapper around core history system)",
+          "actual_return_type": "bool",
+          "test_successful": true
+        },
+        {
+          "name": "historical_view",
+          "signature": "(commit_id)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get historical view at specific commit (FFI wrapper around core history system)",
+          "requires_parameters": [
+            "commit_id"
+          ]
+        },
+        {
+          "name": "is_connected",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Check if the graph is connected (delegates to subgraph implementation)",
+          "actual_return_type": "bool",
+          "test_successful": true
+        },
+        {
+          "name": "laplacian_matrix",
+          "signature": "(normalized=None)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get Laplacian matrix - delegates to PyGraphMatrixHelper",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "neighborhood",
+          "signature": "(center_nodes, radius=None, max_nodes=None)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get neighborhood sampling - delegates to PyGraphAnalysis helper",
+          "requires_parameters": [
+            "center_nodes"
+          ]
+        },
+        {
+          "name": "neighborhood_statistics",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get neighborhood sampling performance statistics",
+          "actual_return_type": "NeighborhoodStats",
+          "test_successful": true
+        },
+        {
+          "name": "neighbors",
+          "signature": "(nodes=None)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get neighbors of nodes - delegates to PyGraphAnalysis helper",
+          "test_error": "nodes parameter is required",
+          "test_successful": false
+        },
+        {
+          "name": "node_attribute_keys",
+          "signature": "(node_id)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get all attribute keys for a node - delegates to PyGraphAttr",
+          "requires_parameters": [
+            "node_id"
+          ]
+        },
+        {
+          "name": "node_count",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get the number of nodes in the graph - DELEGATED",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "remove_edge",
+          "signature": "(edge)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Remove a single edge from the graph",
+          "requires_parameters": [
+            "edge"
+          ]
+        },
+        {
+          "name": "remove_edges",
+          "signature": "(edges)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Remove multiple edges from the graph",
+          "requires_parameters": [
+            "edges"
+          ]
+        },
+        {
+          "name": "remove_node",
+          "signature": "(node)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Remove a single node from the graph",
+          "requires_parameters": [
+            "node"
+          ]
+        },
+        {
+          "name": "remove_nodes",
+          "signature": "(nodes)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Remove multiple nodes from the graph",
+          "requires_parameters": [
+            "nodes"
+          ]
+        },
+        {
+          "name": "resolve_string_id_to_node",
+          "signature": "(string_id, uid_key)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Helper method to resolve string ID to NodeId using uid_key attribute",
+          "requires_parameters": [
+            "string_id",
+            "uid_key"
+          ]
+        },
+        {
+          "name": "set_edge_attr",
+          "signature": "(edge, attr, value)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Set single edge attribute - delegates to PyGraphAttrMut",
+          "requires_parameters": [
+            "edge",
+            "attr",
+            "value"
+          ]
+        },
+        {
+          "name": "set_edge_attrs",
+          "signature": "(attrs_dict)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Set bulk edge attributes - delegates to PyGraphAttrMut",
+          "requires_parameters": [
+            "attrs_dict"
+          ]
+        },
+        {
+          "name": "set_node_attr",
+          "signature": "(node, attr, value)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Set single node attribute - delegates to PyGraphAttrMut",
+          "requires_parameters": [
+            "node",
+            "attr",
+            "value"
+          ]
+        },
+        {
+          "name": "set_node_attrs",
+          "signature": "(attrs_dict)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Set bulk node attributes - delegates to PyGraphAttrMut",
+          "requires_parameters": [
+            "attrs_dict"
+          ]
+        },
+        {
+          "name": "shortest_path",
+          "signature": "(source, target, weight_attribute=None, inplace=None, attr_name=None)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get shortest path - delegates to PyGraphAnalysis helper",
+          "requires_parameters": [
+            "source",
+            "target"
+          ]
+        },
+        {
+          "name": "sparse_adjacency_matrix",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get sparse adjacency matrix - delegates to PyGraphMatrixHelper",
+          "actual_return_type": "dict",
+          "test_successful": true
+        },
+        {
+          "name": "table",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get a GraphTable representation of this graph\nImplements: g.table()",
+          "actual_return_type": "GraphTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "GraphTable"
+        },
+        {
+          "name": "to_networkx",
+          "signature": "(directed: bool = False, include_attributes: bool = True)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Convert this graph to a NetworkX graph.",
+          "actual_return_type": "Graph",
+          "test_successful": true
+        },
+        {
+          "name": "transition_matrix",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Generate transition matrix - delegates to PyGraphMatrixHelper",
+          "test_error": "transition_matrix needs to be implemented in core first",
+          "test_successful": false
+        },
+        {
+          "name": "view",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Return a full-view Subgraph (whole graph as a subgraph).\nDownstream code can always resolve parent graph from this object.",
+          "actual_return_type": "Subgraph",
+          "test_successful": true
+        },
+        {
+          "name": "weighted_adjacency_matrix",
+          "signature": "(weight_attr)",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Get weighted adjacency matrix - delegates to PyGraphMatrixHelper",
+          "requires_parameters": [
+            "weight_attr"
+          ]
+        }
+      ]
+    },
+    "Nodes": {
+      "type": "NodesAccessor",
+      "method_count": 5,
+      "methods": [
+        {
+          "name": "all",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Nodes",
+          "source_type": "NodesAccessor",
+          "is_property": false,
+          "doc": "Get all nodes as a subgraph (equivalent to g.nodes[:]) - DELEGATED to SubgraphOperations  \nReturns a subgraph containing all nodes and all induced edges",
+          "actual_return_type": "Subgraph",
+          "test_successful": true
+        },
+        {
+          "name": "get_meta_node",
+          "signature": "(node_id)",
+          "return_type": "unknown",
+          "source_object": "Nodes",
+          "source_type": "NodesAccessor",
+          "is_property": false,
+          "doc": "Get a MetaNode object if the specified node is a meta-node\n\nArgs:\n    node_id: The node ID to check\n\nReturns:\n    PyMetaNode if the node is a meta-node, None otherwise\n\nExample:\n    meta_node = g.nodes.get_meta_node(3)\n    if meta_node:\n        subgraph = meta_node.subgraph",
+          "requires_parameters": [
+            "node_id"
+          ]
+        },
+        {
+          "name": "ids",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Nodes",
+          "source_type": "NodesAccessor",
+          "is_property": false,
+          "doc": "Get node IDs as a GraphArray\nImplements: g.nodes.ids()",
+          "actual_return_type": "GraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "set_attrs",
+          "signature": "(attrs_dict)",
+          "return_type": "unknown",
+          "source_object": "Nodes",
+          "source_type": "NodesAccessor",
+          "is_property": false,
+          "doc": "Set attributes for multiple nodes (bulk operation)\nSupports the same formats as the main graph: node-centric, column-centric, etc.",
+          "requires_parameters": [
+            "attrs_dict"
+          ]
+        },
+        {
+          "name": "table",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Nodes",
+          "source_type": "NodesAccessor",
+          "is_property": false,
+          "doc": "Get a NodesTable representation of accessible nodes  \nImplements: g.nodes.table()",
+          "actual_return_type": "NodesTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "NodesTable"
+        }
+      ]
+    },
+    "Edges": {
+      "type": "EdgesAccessor",
+      "method_count": 4,
+      "methods": [
+        {
+          "name": "all",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Edges",
+          "source_type": "EdgesAccessor",
+          "is_property": false,
+          "doc": "Get all edges as a subgraph (equivalent to g.edges[:]) - DELEGATED to SubgraphOperations\nReturns a subgraph containing all nodes that are connected by the edges and all edges",
+          "actual_return_type": "Subgraph",
+          "test_successful": true
+        },
+        {
+          "name": "ids",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Edges",
+          "source_type": "EdgesAccessor",
+          "is_property": false,
+          "doc": "Get edge IDs as a GraphArray\nImplements: g.edges.ids()",
+          "actual_return_type": "GraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "set_attrs",
+          "signature": "(attrs_dict)",
+          "return_type": "unknown",
+          "source_object": "Edges",
+          "source_type": "EdgesAccessor",
+          "is_property": false,
+          "doc": "Set attributes for multiple edges (bulk operation)\nSupports the same formats as the main graph: edge-centric, column-centric, etc.",
+          "requires_parameters": [
+            "attrs_dict"
+          ]
+        },
+        {
+          "name": "table",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Edges",
+          "source_type": "EdgesAccessor",
+          "is_property": false,
+          "doc": "Get an EdgesTable representation of accessible edges\nImplements: g.edges.table()  ",
+          "actual_return_type": "EdgesTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "EdgesTable"
+        }
+      ]
+    },
+    "ComponentsArray": {
+      "type": "ComponentsArray",
+      "method_count": 7,
+      "methods": [
+        {
+          "name": "filter",
+          "signature": "(predicate)",
+          "return_type": "unknown",
+          "source_object": "ComponentsArray",
+          "source_type": "ComponentsArray",
+          "is_property": false,
+          "doc": "Direct delegation: Apply filter to components",
+          "requires_parameters": [
+            "predicate"
+          ]
+        },
+        {
+          "name": "largest_component",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "ComponentsArray",
+          "source_type": "ComponentsArray",
+          "is_property": false,
+          "doc": "Get largest component without materializing others",
+          "actual_return_type": "Subgraph",
+          "test_successful": true
+        },
+        {
+          "name": "neighborhood",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "ComponentsArray",
+          "source_type": "ComponentsArray",
+          "is_property": false,
+          "doc": "Direct delegation: Apply neighborhood() to each component and return PySubgraphArray",
+          "actual_return_type": "SubgraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "sample",
+          "signature": "(k)",
+          "return_type": "unknown",
+          "source_object": "ComponentsArray",
+          "source_type": "ComponentsArray",
+          "is_property": false,
+          "doc": "Direct delegation: Apply sample(k) to each component and return PySubgraphArray",
+          "requires_parameters": [
+            "k"
+          ]
+        },
+        {
+          "name": "sizes",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "ComponentsArray",
+          "source_type": "ComponentsArray",
+          "is_property": false,
+          "doc": "Get component sizes without materializing subgraphs",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "table",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "ComponentsArray",
+          "source_type": "ComponentsArray",
+          "is_property": false,
+          "doc": "Direct delegation: Apply table() to each component and return PyTableArray",
+          "actual_return_type": "TableArray",
+          "test_successful": true
+        },
+        {
+          "name": "to_list",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "ComponentsArray",
+          "source_type": "ComponentsArray",
+          "is_property": false,
+          "doc": "Convert to regular Python list (materializes all components)",
+          "actual_return_type": "list",
+          "test_successful": true
+        }
+      ]
+    },
+    "Subgraph": {
+      "type": "Subgraph",
+      "method_count": 52,
+      "methods": [
+        {
+          "name": "bfs",
+          "signature": "(start, max_depth=None)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "BFS traversal - returns subgraph result",
+          "requires_parameters": [
+            "start"
+          ]
+        },
+        {
+          "name": "calculate_similarity",
+          "signature": "(other, metric='jaccard')",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Calculate similarity between subgraphs using various metrics",
+          "requires_parameters": [
+            "other"
+          ]
+        },
+        {
+          "name": "child_meta_nodes",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get child meta-nodes if this subgraph contains them\nNOTE: This feature is not yet implemented - always returns empty list",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "clustering_coefficient",
+          "signature": "(_node_id=None)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Calculate clustering coefficient for a node or entire subgraph",
+          "test_error": "Clustering coefficient not yet implemented in core - coming in future version",
+          "test_successful": false
+        },
+        {
+          "name": "collapse",
+          "signature": "(node_aggs=None, edge_aggs=None, edge_strategy='aggregate', node_strategy='extract', preset=None, include_edge_count=True, mark_entity_type=True, entity_type='meta', allow_missing_attributes=True)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Modern MetaGraph Composer API - Clean interface for meta-node creation\n\nThis is the new, intuitive way to create meta-nodes with flexible configuration.\nReturns a MetaNodePlan that can be previewed, modified, and executed.\n\n# Arguments\n* `node_aggs` - Node aggregation specifications (dict or list format)\n* `edge_aggs` - Edge aggregation specifications (dict format)\n* `edge_strategy` - Edge handling strategy (\"aggregate\", \"keep_external\", \"drop_all\", \"contract_all\")\n* `node_strategy` - Node handling strategy (\"extract\", \"collapse\")\n* `preset` - Optional preset name (\"social_network\", \"org_hierarchy\", \"flow_network\")\n* `include_edge_count` - Include edge_count attribute in meta-edges\n* `mark_entity_type` - Mark meta-nodes/edges with entity_type\n* `entity_type` - Entity type for marking\n\n# Examples\n```python\n# Dict format for node aggregations\nplan = subgraph.collapse(\n    node_aggs={\"avg_salary\": (\"mean\", \"salary\"), \"size\": \"count\"},\n    edge_aggs={\"weight\": \"mean\"},\n    edge_strategy=\"aggregate\",\n    node_strategy=\"extract\"\n)\nmeta_node = plan.add_to_graph()\n\n# With preset\nplan = subgraph.collapse(preset=\"social_network\")\nmeta_node = plan.add_to_graph()\n```",
+          "actual_return_type": "MetaNode",
+          "test_successful": true
+        },
+        {
+          "name": "collapse_to_node",
+          "signature": "(agg_functions)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Collapse subgraph to a single node with aggregated attributes",
+          "requires_parameters": [
+            "agg_functions"
+          ]
+        },
+        {
+          "name": "collapse_to_node_with_defaults",
+          "signature": "(agg_functions, defaults=None)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Collapse subgraph to a single node with enhanced missing attribute handling\n\n# Arguments\n* `agg_functions` - Dictionary of {attribute_name: aggregation_function}\n* `defaults` - Optional dictionary of {attribute_name: default_value} for missing attributes\n\n# Behavior  \n* Errors by default when aggregating non-existent attributes (strict validation)\n* Uses provided defaults for missing attributes when specified\n* Count aggregation always works regardless of attribute existence",
+          "requires_parameters": [
+            "agg_functions"
+          ]
+        },
+        {
+          "name": "connected_components",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get connected components within this subgraph (lazy array)",
+          "actual_return_type": "ComponentsArray",
+          "test_successful": true
+        },
+        {
+          "name": "contains_edge",
+          "signature": "(edge_id)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Check if subgraph contains a specific edge (alias for has_edge)  ",
+          "requires_parameters": [
+            "edge_id"
+          ]
+        },
+        {
+          "name": "contains_node",
+          "signature": "(node_id)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Check if subgraph contains a specific node (alias for has_node)",
+          "requires_parameters": [
+            "node_id"
+          ]
+        },
+        {
+          "name": "degree",
+          "signature": "(nodes=None, *, full_graph=False)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get degree of nodes in subgraph as GraphArray\n\nUsage:\n- degree(node_id, full_graph=False) -> int: degree of single node (local or full graph)\n- degree(node_ids, full_graph=False) -> GraphArray: degrees for list of nodes\n- degree(full_graph=False) -> GraphArray: degrees for all nodes in subgraph\n\nParameters:\n- nodes: Optional node ID, list of node IDs, or None for all nodes\n- full_graph: If False (default), compute degrees within subgraph only.\n              If True, compute degrees from the original full graph.",
+          "actual_return_type": "GraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "density",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Calculate density of this subgraph",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
+          "name": "dfs",
+          "signature": "(start, max_depth=None)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "DFS traversal - returns subgraph result",
+          "requires_parameters": [
+            "start"
+          ]
+        },
+        {
+          "name": "edge_count",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Edge count property",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "edge_endpoints",
+          "signature": "(edge_id)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get edge endpoints (source, target)",
+          "requires_parameters": [
+            "edge_id"
+          ]
+        },
+        {
+          "name": "edges_table",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Convert subgraph edges to a table - pure delegation to core GraphTable",
+          "actual_return_type": "EdgesTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "EdgesTable"
+        },
+        {
+          "name": "entity_type",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Return the entity type string",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "filter_edges",
+          "signature": "(filter)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Filter edges and return new subgraph",
+          "requires_parameters": [
+            "filter"
+          ]
+        },
+        {
+          "name": "filter_nodes",
+          "signature": "(filter)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Filter nodes and return new subgraph  ",
+          "requires_parameters": [
+            "filter"
+          ]
+        },
+        {
+          "name": "get_edge_attribute",
+          "signature": "(edge_id, attr_name)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get a single edge attribute value",
+          "requires_parameters": [
+            "edge_id",
+            "attr_name"
+          ]
+        },
+        {
+          "name": "get_node_attribute",
+          "signature": "(node_id, attr_name)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get a single node attribute value",
+          "requires_parameters": [
+            "node_id",
+            "attr_name"
+          ]
+        },
+        {
+          "name": "has_edge",
+          "signature": "(edge_id)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Check if an edge exists in this subgraph",
+          "requires_parameters": [
+            "edge_id"
+          ]
+        },
+        {
+          "name": "has_edge_between",
+          "signature": "(source, target)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Check if edge exists between two nodes",
+          "requires_parameters": [
+            "source",
+            "target"
+          ]
+        },
+        {
+          "name": "has_meta_nodes",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Check if this subgraph contains nodes that are meta-nodes",
+          "actual_return_type": "bool",
+          "test_successful": true
+        },
+        {
+          "name": "has_node",
+          "signature": "(node_id)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Check if a node exists in this subgraph",
+          "requires_parameters": [
+            "node_id"
+          ]
+        },
+        {
+          "name": "has_path",
+          "signature": "(node1_id, node2_id)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Check if there is a path between two nodes within this subgraph\n\nThis is more efficient than `shortest_path_subgraph` when you only need\nto know if a path exists, not the actual path.\n\n# Arguments\n* `node1_id` - The starting node ID\n* `node2_id` - The destination node ID\n\n# Returns\n* `True` if a path exists between the nodes within this subgraph\n* `False` if no path exists or either node is not in this subgraph\n\n# Example\n```python\n# Check if there's a path between node 1 and node 5 in the subgraph\npath_exists = subgraph.has_path(1, 5)\n```",
+          "requires_parameters": [
+            "node1_id",
+            "node2_id"
+          ]
+        },
+        {
+          "name": "in_degree",
+          "signature": "(nodes=None, full_graph=False)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get in-degree of nodes within subgraph",
+          "actual_return_type": "GraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "induced_subgraph",
+          "signature": "(nodes)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Create induced subgraph from list of nodes",
+          "requires_parameters": [
+            "nodes"
+          ]
+        },
+        {
+          "name": "intersect_with",
+          "signature": "(_other)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": null,
+          "requires_parameters": [
+            "_other"
+          ]
+        },
+        {
+          "name": "is_connected",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Check if this subgraph is connected",
+          "actual_return_type": "bool",
+          "test_successful": true
+        },
+        {
+          "name": "is_empty",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Check if subgraph is empty",
+          "actual_return_type": "bool",
+          "test_successful": true
+        },
+        {
+          "name": "merge_with",
+          "signature": "(_other)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Set operations - merge, intersect, subtract (placeholders)",
+          "requires_parameters": [
+            "_other"
+          ]
+        },
+        {
+          "name": "meta_nodes",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get all meta-nodes within this subgraph",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "neighborhood",
+          "signature": "(central_nodes, hops)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Compute neighborhoods from this subgraph, returning a PyNeighborhoodResult",
+          "requires_parameters": [
+            "central_nodes",
+            "hops"
+          ]
+        },
+        {
+          "name": "neighbors",
+          "signature": "(node_id)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get neighbors of a node within the subgraph",
+          "requires_parameters": [
+            "node_id"
+          ]
+        },
+        {
+          "name": "node_count",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Node count property",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "out_degree",
+          "signature": "(nodes=None, full_graph=False)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get out-degree of nodes within subgraph",
+          "actual_return_type": "GraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "parent_meta_node",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Enhanced collapse supporting three syntax forms for flexible aggregation\n\n# Supported Syntax Forms:\n\n## Form 1: Simple (backward compatible)\n```python\nsubgraph.add_to_graph({\"age\": \"mean\", \"salary\": \"sum\"})\n```\n\n## Form 2: Tuple (custom attribute names)\n```python\nsubgraph.add_to_graph({\n    \"avg_age\": (\"mean\", \"age\"),\n    \"total_salary\": (\"sum\", \"salary\"),\n    \"person_count\": (\"count\", None)\n})\n```\n\n## Form 3: Dict-of-dicts (advanced with defaults)\n```python\nsubgraph.add_to_graph({\n    \"avg_age\": {\"func\": \"mean\", \"source\": \"age\"},\n    \"total_salary\": {\"func\": \"sum\", \"source\": \"salary\", \"default\": 0}\n})\n```\nGet parent meta-node if this subgraph is contained within one\nNOTE: This feature is not yet implemented - always returns None",
+          "actual_return_type": "NoneType",
+          "test_successful": true
+        },
+        {
+          "name": "sample",
+          "signature": "(k)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Sample k nodes from this subgraph randomly",
+          "requires_parameters": [
+            "k"
+          ]
+        },
+        {
+          "name": "set_edge_attrs",
+          "signature": "(attrs_dict)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Set multiple edge attributes (bulk operation) - delegates to accessor  ",
+          "requires_parameters": [
+            "attrs_dict"
+          ]
+        },
+        {
+          "name": "set_node_attrs",
+          "signature": "(attrs_dict)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Set multiple node attributes (bulk operation) - delegates to accessor",
+          "requires_parameters": [
+            "attrs_dict"
+          ]
+        },
+        {
+          "name": "shortest_path_subgraph",
+          "signature": "(source, target)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Create subgraph representing shortest path between two nodes",
+          "requires_parameters": [
+            "source",
+            "target"
+          ]
+        },
+        {
+          "name": "subgraph_from_edges",
+          "signature": "(edges)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Create subgraph from list of edges",
+          "requires_parameters": [
+            "edges"
+          ]
+        },
+        {
+          "name": "subtract_from",
+          "signature": "(_other)",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": null,
+          "requires_parameters": [
+            "_other"
+          ]
+        },
+        {
+          "name": "summary",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get text summary of subgraph",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "table",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Convert subgraph nodes to a table - pure delegation to core GraphTable",
+          "actual_return_type": "NodesTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "NodesTable"
+        },
+        {
+          "name": "to_edges",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get edges from this subgraph as an EdgesAccessor  \nEnables chaining like: subgraph.to_edges().to_nodes().connected_components()",
+          "actual_return_type": "EdgesAccessor",
+          "test_successful": true
+        },
+        {
+          "name": "to_graph",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Convert to a new independent graph",
+          "actual_return_type": "Graph",
+          "test_successful": true
+        },
+        {
+          "name": "to_matrix",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Convert this subgraph to its adjacency matrix representation\nEnables chaining like: subgraph.to_matrix().eigen().stats()",
+          "test_error": "Subgraph to matrix conversion not yet implemented",
+          "test_successful": false
+        },
+        {
+          "name": "to_networkx",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Convert to NetworkX graph (if available)\n\nReturns a NetworkX Graph or DiGraph (depending on the parent graph type)\ncontaining only the nodes and edges from this subgraph, with all attributes preserved.\n\n# Returns\n* `PyObject` - A NetworkX graph object containing only this subgraph\n\n# Raises\n* `ImportError` - If NetworkX is not installed\n* `RuntimeError` - If conversion fails\n\n# Examples\n```python\nimport groggy\nimport networkx as nx\n\ng = groggy.Graph()\n# ... add nodes and edges ...\nsubgraph = g.filter_nodes(\"age > 25\")\nnx_subgraph = subgraph.to_networkx()\n```",
+          "actual_return_type": "Graph",
+          "test_successful": true
+        },
+        {
+          "name": "to_nodes",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get nodes from this subgraph as a NodesAccessor\nEnables chaining like: subgraph.to_nodes().table().stats()",
+          "actual_return_type": "NodesAccessor",
+          "test_successful": true
+        },
+        {
+          "name": "transitivity",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Calculate transitivity of the subgraph",
+          "test_error": "Transitivity not yet implemented in core - coming in future version",
+          "test_successful": false
+        }
+      ]
+    },
+    "GraphArray": {
+      "type": "GraphArray",
+      "method_count": 25,
+      "methods": [
+        {
+          "name": "apply_to_each",
+          "signature": "(method_name, args)",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Delegation-based method application to each element \nThis demonstrates the concept: apply a method to each element and return new array",
+          "requires_parameters": [
+            "method_name",
+            "args"
+          ]
+        },
+        {
+          "name": "count",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Count non-null values",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "describe",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Get comprehensive statistical summary",
+          "actual_return_type": "StatsSummary",
+          "test_successful": true
+        },
+        {
+          "name": "drop_na",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Drop null values, returning a new array",
+          "actual_return_type": "GraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "fill_na",
+          "signature": "(fill_value)",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Fill null values with a specified value, returning a new array",
+          "requires_parameters": [
+            "fill_value"
+          ]
+        },
+        {
+          "name": "has_null",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Check if array contains any null values",
+          "actual_return_type": "bool",
+          "test_successful": true
+        },
+        {
+          "name": "items",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Return iterator over array items (compatibility with pandas/numpy)\nReturns iterator of (index, value) tuples",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "max",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Get maximum value",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "mean",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Calculate mean (average) of numeric values",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
+          "name": "median",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Calculate median (50th percentile)",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
+          "name": "min",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Get minimum value",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "null_count",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Count null values",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
+          "name": "percentile",
+          "signature": "(p)",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Calculate percentile (user-friendly wrapper for quantile)\npercentile: 0-100 (e.g., 25 for 25th percentile, 90 for 90th percentile)",
+          "requires_parameters": [
+            "p"
+          ]
+        },
+        {
+          "name": "preview",
+          "signature": "(limit=None)",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Get preview of array for display (first 10 elements by default)",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "quantile",
+          "signature": "(q)",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Calculate quantile (percentile)",
+          "requires_parameters": [
+            "q"
+          ]
+        },
+        {
+          "name": "rich_display",
+          "signature": "(config=None)",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Get rich display representation using Rust formatter",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "std",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Calculate standard deviation of numeric values",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
+          "name": "summary",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Get summary information without materializing data",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "to_list",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Convert to plain Python list",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "to_numpy",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Convert to NumPy array (when numpy available)\nUses .values property to materialize data",
+          "actual_return_type": "ndarray",
+          "test_successful": true
+        },
+        {
+          "name": "to_pandas",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Convert to Pandas Series (when pandas available)",
+          "actual_return_type": "Series",
+          "test_successful": true
+        },
+        {
+          "name": "to_scipy_sparse",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Convert to SciPy sparse array (for compatibility - GraphArray is dense by nature)",
+          "actual_return_type": "csr_matrix",
+          "test_successful": true
+        },
+        {
+          "name": "true_indices",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Extract indices where boolean array is True\nThis is used for efficient boolean indexing with node/edge accessors",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "unique",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Get unique values as a new GraphArray",
+          "actual_return_type": "GraphArray",
+          "test_successful": true
+        },
+        {
+          "name": "value_counts",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "GraphArray",
+          "is_property": false,
+          "doc": "Get value counts (frequency of each unique value) as Python dict",
+          "actual_return_type": "dict",
+          "test_successful": true
+        }
+      ]
+    },
+    "Matrix": {
+      "type": "dict",
+      "method_count": 11,
+      "methods": [
+        {
+          "name": "clear",
+          "signature": "signature_unavailable",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "dict",
+          "is_property": false,
+          "doc": "D.clear() -> None.  Remove all items from D."
+        },
+        {
+          "name": "copy",
+          "signature": "signature_unavailable",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "dict",
+          "is_property": false,
+          "doc": "D.copy() -> a shallow copy of D",
+          "discovery_error": "no signature found for builtin <built-in method copy of dict object at 0x1050fd900>"
+        },
+        {
+          "name": "fromkeys",
+          "signature": "(iterable, value=None, /)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "dict",
+          "is_property": false,
+          "doc": "Create a new dictionary with keys from iterable and values set to value.",
+          "requires_parameters": [
+            "iterable"
+          ]
+        },
+        {
+          "name": "get",
+          "signature": "(key, default=None, /)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "dict",
+          "is_property": false,
+          "doc": "Return the value for key if key is in the dictionary, else default.",
+          "requires_parameters": [
+            "key"
+          ]
+        },
+        {
+          "name": "items",
+          "signature": "signature_unavailable",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "dict",
+          "is_property": false,
+          "doc": "D.items() -> a set-like object providing a view on D's items",
+          "discovery_error": "no signature found for builtin <built-in method items of dict object at 0x1050fd900>"
+        },
+        {
+          "name": "keys",
+          "signature": "signature_unavailable",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "dict",
+          "is_property": false,
+          "doc": "D.keys() -> a set-like object providing a view on D's keys",
+          "discovery_error": "no signature found for builtin <built-in method keys of dict object at 0x1050fd900>"
+        },
+        {
+          "name": "pop",
+          "signature": "signature_unavailable",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "dict",
+          "is_property": false,
+          "doc": "D.pop(k[,d]) -> v, remove specified key and return the corresponding value.\n\nIf key is not found, default is returned if given, otherwise KeyError is raised"
+        },
+        {
+          "name": "popitem",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "dict",
+          "is_property": false,
+          "doc": "Remove and return a (key, value) pair as a 2-tuple.\n\nPairs are returned in LIFO (last-in, first-out) order.\nRaises KeyError if the dict is empty.",
+          "actual_return_type": "tuple",
+          "test_successful": true
+        },
+        {
+          "name": "setdefault",
+          "signature": "(key, default=None, /)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "dict",
+          "is_property": false,
+          "doc": "Insert key with a value of default if key is not in the dictionary.\n\nReturn the value for key if key is in the dictionary, else default.",
+          "requires_parameters": [
+            "key"
+          ]
+        },
+        {
+          "name": "update",
+          "signature": "signature_unavailable",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "dict",
+          "is_property": false,
+          "doc": "D.update([E, ]**F) -> None.  Update D from dict/iterable E and F.\nIf E is present and has a .keys() method, then does:  for k in E: D[k] = E[k]\nIf E is present and lacks a .keys() method, then does:  for k, v in E: D[k] = v\nIn either case, this is followed by: for k in F:  D[k] = F[k]",
+          "discovery_error": "no signature found for builtin <built-in method update of dict object at 0x1050fd900>"
+        },
+        {
+          "name": "values",
+          "signature": "signature_unavailable",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "dict",
+          "is_property": false,
+          "doc": "D.values() -> an object providing a view on D's values",
+          "discovery_error": "no signature found for builtin <built-in method values of dict object at 0x1050fd900>"
+        }
+      ]
+    }
+  },
+  "delegation_patterns": {
+    "aggregate": [
+      {
+        "from": "BaseTable",
+        "to": "Graph",
+        "method": "aggregate"
+      },
+      {
+        "from": "Graph",
+        "to": "BaseTable",
+        "method": "aggregate"
+      }
+    ],
+    "drop_columns": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "drop_columns"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "drop_columns"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "drop_columns"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "drop_columns"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "drop_columns"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "drop_columns"
+      }
+    ],
+    "filter": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "filter"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "filter"
+      },
+      {
+        "from": "BaseTable",
+        "to": "ComponentsArray",
+        "method": "filter"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "filter"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "filter"
+      },
+      {
+        "from": "NodesTable",
+        "to": "ComponentsArray",
+        "method": "filter"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "filter"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "filter"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "ComponentsArray",
+        "method": "filter"
+      },
+      {
+        "from": "ComponentsArray",
+        "to": "BaseTable",
+        "method": "filter"
+      },
+      {
+        "from": "ComponentsArray",
+        "to": "NodesTable",
+        "method": "filter"
+      },
+      {
+        "from": "ComponentsArray",
+        "to": "EdgesTable",
+        "method": "filter"
+      }
+    ],
+    "from_csv": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "from_csv"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "from_csv"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "from_csv"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "from_csv"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "from_csv"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "from_csv"
+      }
+    ],
+    "from_dict": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "from_dict"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "from_dict"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "from_dict"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "from_dict"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "from_dict"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "from_dict"
+      }
+    ],
+    "from_json": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "from_json"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "from_json"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "from_json"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "from_json"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "from_json"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "from_json"
+      }
+    ],
+    "from_parquet": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "from_parquet"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "from_parquet"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "from_parquet"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "from_parquet"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "from_parquet"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "from_parquet"
+      }
+    ],
+    "group_by": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "group_by"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "group_by"
+      },
+      {
+        "from": "BaseTable",
+        "to": "Graph",
+        "method": "group_by"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "group_by"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "group_by"
+      },
+      {
+        "from": "NodesTable",
+        "to": "Graph",
+        "method": "group_by"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "group_by"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "group_by"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "Graph",
+        "method": "group_by"
+      },
+      {
+        "from": "Graph",
+        "to": "BaseTable",
+        "method": "group_by"
+      },
+      {
+        "from": "Graph",
+        "to": "NodesTable",
+        "method": "group_by"
+      },
+      {
+        "from": "Graph",
+        "to": "EdgesTable",
+        "method": "group_by"
+      }
+    ],
+    "head": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "head"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "head"
+      },
+      {
+        "from": "BaseTable",
+        "to": "GraphTable",
+        "method": "head"
+      },
+      {
+        "from": "BaseTable",
+        "to": "BaseArray",
+        "method": "head"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "head"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "head"
+      },
+      {
+        "from": "NodesTable",
+        "to": "GraphTable",
+        "method": "head"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseArray",
+        "method": "head"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "head"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "head"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "GraphTable",
+        "method": "head"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseArray",
+        "method": "head"
+      },
+      {
+        "from": "GraphTable",
+        "to": "BaseTable",
+        "method": "head"
+      },
+      {
+        "from": "GraphTable",
+        "to": "NodesTable",
+        "method": "head"
+      },
+      {
+        "from": "GraphTable",
+        "to": "EdgesTable",
+        "method": "head"
+      },
+      {
+        "from": "GraphTable",
+        "to": "BaseArray",
+        "method": "head"
+      },
+      {
+        "from": "BaseArray",
+        "to": "BaseTable",
+        "method": "head"
+      },
+      {
+        "from": "BaseArray",
+        "to": "NodesTable",
+        "method": "head"
+      },
+      {
+        "from": "BaseArray",
+        "to": "EdgesTable",
+        "method": "head"
+      },
+      {
+        "from": "BaseArray",
+        "to": "GraphTable",
+        "method": "head"
+      }
+    ],
+    "iter": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "iter"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "iter"
+      },
+      {
+        "from": "BaseTable",
+        "to": "BaseArray",
+        "method": "iter"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "iter"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "iter"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseArray",
+        "method": "iter"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "iter"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "iter"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseArray",
+        "method": "iter"
+      },
+      {
+        "from": "BaseArray",
+        "to": "BaseTable",
+        "method": "iter"
+      },
+      {
+        "from": "BaseArray",
+        "to": "NodesTable",
+        "method": "iter"
+      },
+      {
+        "from": "BaseArray",
+        "to": "EdgesTable",
+        "method": "iter"
+      }
+    ],
+    "rich_display": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "rich_display"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "rich_display"
+      },
+      {
+        "from": "BaseTable",
+        "to": "GraphArray",
+        "method": "rich_display"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "rich_display"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "rich_display"
+      },
+      {
+        "from": "NodesTable",
+        "to": "GraphArray",
+        "method": "rich_display"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "rich_display"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "rich_display"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "GraphArray",
+        "method": "rich_display"
+      },
+      {
+        "from": "GraphArray",
+        "to": "BaseTable",
+        "method": "rich_display"
+      },
+      {
+        "from": "GraphArray",
+        "to": "NodesTable",
+        "method": "rich_display"
+      },
+      {
+        "from": "GraphArray",
+        "to": "EdgesTable",
+        "method": "rich_display"
+      }
+    ],
+    "select": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "select"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "select"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "select"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "select"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "select"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "select"
+      }
+    ],
+    "slice": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "slice"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "slice"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "slice"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "slice"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "slice"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "slice"
+      }
+    ],
+    "sort_by": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "sort_by"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "sort_by"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "sort_by"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "sort_by"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "sort_by"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "sort_by"
+      }
+    ],
+    "tail": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "tail"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "tail"
+      },
+      {
+        "from": "BaseTable",
+        "to": "GraphTable",
+        "method": "tail"
+      },
+      {
+        "from": "BaseTable",
+        "to": "BaseArray",
+        "method": "tail"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "tail"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "tail"
+      },
+      {
+        "from": "NodesTable",
+        "to": "GraphTable",
+        "method": "tail"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseArray",
+        "method": "tail"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "tail"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "tail"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "GraphTable",
+        "method": "tail"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseArray",
+        "method": "tail"
+      },
+      {
+        "from": "GraphTable",
+        "to": "BaseTable",
+        "method": "tail"
+      },
+      {
+        "from": "GraphTable",
+        "to": "NodesTable",
+        "method": "tail"
+      },
+      {
+        "from": "GraphTable",
+        "to": "EdgesTable",
+        "method": "tail"
+      },
+      {
+        "from": "GraphTable",
+        "to": "BaseArray",
+        "method": "tail"
+      },
+      {
+        "from": "BaseArray",
+        "to": "BaseTable",
+        "method": "tail"
+      },
+      {
+        "from": "BaseArray",
+        "to": "NodesTable",
+        "method": "tail"
+      },
+      {
+        "from": "BaseArray",
+        "to": "EdgesTable",
+        "method": "tail"
+      },
+      {
+        "from": "BaseArray",
+        "to": "GraphTable",
+        "method": "tail"
+      }
+    ],
+    "to_csv": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "to_csv"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "to_csv"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "to_csv"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "to_csv"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "to_csv"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "to_csv"
+      }
+    ],
+    "to_json": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "to_json"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "to_json"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "to_json"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "to_json"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "to_json"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "to_json"
+      }
+    ],
+    "to_pandas": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "to_pandas"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "to_pandas"
+      },
+      {
+        "from": "BaseTable",
+        "to": "GraphArray",
+        "method": "to_pandas"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "to_pandas"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "to_pandas"
+      },
+      {
+        "from": "NodesTable",
+        "to": "GraphArray",
+        "method": "to_pandas"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "to_pandas"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "to_pandas"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "GraphArray",
+        "method": "to_pandas"
+      },
+      {
+        "from": "GraphArray",
+        "to": "BaseTable",
+        "method": "to_pandas"
+      },
+      {
+        "from": "GraphArray",
+        "to": "NodesTable",
+        "method": "to_pandas"
+      },
+      {
+        "from": "GraphArray",
+        "to": "EdgesTable",
+        "method": "to_pandas"
+      }
+    ],
+    "to_parquet": [
+      {
+        "from": "BaseTable",
+        "to": "NodesTable",
+        "method": "to_parquet"
+      },
+      {
+        "from": "BaseTable",
+        "to": "EdgesTable",
+        "method": "to_parquet"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseTable",
+        "method": "to_parquet"
+      },
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "to_parquet"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseTable",
+        "method": "to_parquet"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "to_parquet"
+      }
+    ],
+    "base_table": [
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "base_table"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "base_table"
+      }
+    ],
+    "filter_by_attr": [
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "filter_by_attr"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "filter_by_attr"
+      }
+    ],
+    "into_base_table": [
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "into_base_table"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "into_base_table"
+      }
+    ],
+    "ncols": [
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "ncols"
+      },
+      {
+        "from": "NodesTable",
+        "to": "GraphTable",
+        "method": "ncols"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "ncols"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "GraphTable",
+        "method": "ncols"
+      },
+      {
+        "from": "GraphTable",
+        "to": "NodesTable",
+        "method": "ncols"
+      },
+      {
+        "from": "GraphTable",
+        "to": "EdgesTable",
+        "method": "ncols"
+      }
+    ],
+    "nrows": [
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "nrows"
+      },
+      {
+        "from": "NodesTable",
+        "to": "GraphTable",
+        "method": "nrows"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "nrows"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "GraphTable",
+        "method": "nrows"
+      },
+      {
+        "from": "GraphTable",
+        "to": "NodesTable",
+        "method": "nrows"
+      },
+      {
+        "from": "GraphTable",
+        "to": "EdgesTable",
+        "method": "nrows"
+      }
+    ],
+    "shape": [
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "shape"
+      },
+      {
+        "from": "NodesTable",
+        "to": "GraphTable",
+        "method": "shape"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "shape"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "GraphTable",
+        "method": "shape"
+      },
+      {
+        "from": "GraphTable",
+        "to": "NodesTable",
+        "method": "shape"
+      },
+      {
+        "from": "GraphTable",
+        "to": "EdgesTable",
+        "method": "shape"
+      }
+    ],
+    "unique_attr_values": [
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "unique_attr_values"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "unique_attr_values"
+      }
+    ],
+    "auto_assign_edge_ids": [
+      {
+        "from": "EdgesTable",
+        "to": "GraphTable",
+        "method": "auto_assign_edge_ids"
+      },
+      {
+        "from": "GraphTable",
+        "to": "EdgesTable",
+        "method": "auto_assign_edge_ids"
+      }
+    ],
+    "merge_with": [
+      {
+        "from": "GraphTable",
+        "to": "Subgraph",
+        "method": "merge_with"
+      },
+      {
+        "from": "Subgraph",
+        "to": "GraphTable",
+        "method": "merge_with"
+      }
+    ],
+    "to_edges": [
+      {
+        "from": "GraphTable",
+        "to": "Subgraph",
+        "method": "to_edges"
+      },
+      {
+        "from": "Subgraph",
+        "to": "GraphTable",
+        "method": "to_edges"
+      }
+    ],
+    "to_graph": [
+      {
+        "from": "GraphTable",
+        "to": "Subgraph",
+        "method": "to_graph"
+      },
+      {
+        "from": "Subgraph",
+        "to": "GraphTable",
+        "method": "to_graph"
+      }
+    ],
+    "to_nodes": [
+      {
+        "from": "GraphTable",
+        "to": "Subgraph",
+        "method": "to_nodes"
+      },
+      {
+        "from": "Subgraph",
+        "to": "GraphTable",
+        "method": "to_nodes"
+      }
+    ],
+    "apply_to_each": [
+      {
+        "from": "BaseArray",
+        "to": "GraphArray",
+        "method": "apply_to_each"
+      },
+      {
+        "from": "GraphArray",
+        "to": "BaseArray",
+        "method": "apply_to_each"
+      }
+    ],
+    "describe": [
+      {
+        "from": "BaseArray",
+        "to": "GraphArray",
+        "method": "describe"
+      },
+      {
+        "from": "GraphArray",
+        "to": "BaseArray",
+        "method": "describe"
+      }
+    ],
+    "unique": [
+      {
+        "from": "BaseArray",
+        "to": "GraphArray",
+        "method": "unique"
+      },
+      {
+        "from": "GraphArray",
+        "to": "BaseArray",
+        "method": "unique"
+      }
+    ],
+    "bfs": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "bfs"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "bfs"
+      }
+    ],
+    "contains_edge": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "contains_edge"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "contains_edge"
+      }
+    ],
+    "contains_node": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "contains_node"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "contains_node"
+      }
+    ],
+    "density": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "density"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "density"
+      }
+    ],
+    "dfs": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "dfs"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "dfs"
+      }
+    ],
+    "edge_count": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "edge_count"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "edge_count"
+      }
+    ],
+    "edge_endpoints": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "edge_endpoints"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "edge_endpoints"
+      }
+    ],
+    "filter_edges": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "filter_edges"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "filter_edges"
+      }
+    ],
+    "filter_nodes": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "filter_nodes"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "filter_nodes"
+      }
+    ],
+    "has_edge": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "has_edge"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "has_edge"
+      }
+    ],
+    "has_node": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "has_node"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "has_node"
+      }
+    ],
+    "is_connected": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "is_connected"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "is_connected"
+      }
+    ],
+    "neighborhood": [
+      {
+        "from": "Graph",
+        "to": "ComponentsArray",
+        "method": "neighborhood"
+      },
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "neighborhood"
+      },
+      {
+        "from": "ComponentsArray",
+        "to": "Graph",
+        "method": "neighborhood"
+      },
+      {
+        "from": "ComponentsArray",
+        "to": "Subgraph",
+        "method": "neighborhood"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "neighborhood"
+      },
+      {
+        "from": "Subgraph",
+        "to": "ComponentsArray",
+        "method": "neighborhood"
+      }
+    ],
+    "neighbors": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "neighbors"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "neighbors"
+      }
+    ],
+    "node_count": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "node_count"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "node_count"
+      }
+    ],
+    "set_edge_attrs": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "set_edge_attrs"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "set_edge_attrs"
+      }
+    ],
+    "set_node_attrs": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "set_node_attrs"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "set_node_attrs"
+      }
+    ],
+    "table": [
+      {
+        "from": "Graph",
+        "to": "Nodes",
+        "method": "table"
+      },
+      {
+        "from": "Graph",
+        "to": "Edges",
+        "method": "table"
+      },
+      {
+        "from": "Graph",
+        "to": "ComponentsArray",
+        "method": "table"
+      },
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "table"
+      },
+      {
+        "from": "Nodes",
+        "to": "Graph",
+        "method": "table"
+      },
+      {
+        "from": "Nodes",
+        "to": "Edges",
+        "method": "table"
+      },
+      {
+        "from": "Nodes",
+        "to": "ComponentsArray",
+        "method": "table"
+      },
+      {
+        "from": "Nodes",
+        "to": "Subgraph",
+        "method": "table"
+      },
+      {
+        "from": "Edges",
+        "to": "Graph",
+        "method": "table"
+      },
+      {
+        "from": "Edges",
+        "to": "Nodes",
+        "method": "table"
+      },
+      {
+        "from": "Edges",
+        "to": "ComponentsArray",
+        "method": "table"
+      },
+      {
+        "from": "Edges",
+        "to": "Subgraph",
+        "method": "table"
+      },
+      {
+        "from": "ComponentsArray",
+        "to": "Graph",
+        "method": "table"
+      },
+      {
+        "from": "ComponentsArray",
+        "to": "Nodes",
+        "method": "table"
+      },
+      {
+        "from": "ComponentsArray",
+        "to": "Edges",
+        "method": "table"
+      },
+      {
+        "from": "ComponentsArray",
+        "to": "Subgraph",
+        "method": "table"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "table"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Nodes",
+        "method": "table"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Edges",
+        "method": "table"
+      },
+      {
+        "from": "Subgraph",
+        "to": "ComponentsArray",
+        "method": "table"
+      }
+    ],
+    "to_networkx": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "to_networkx"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "to_networkx"
+      }
+    ],
+    "all": [
+      {
+        "from": "Nodes",
+        "to": "Edges",
+        "method": "all"
+      },
+      {
+        "from": "Edges",
+        "to": "Nodes",
+        "method": "all"
+      }
+    ],
+    "ids": [
+      {
+        "from": "Nodes",
+        "to": "Edges",
+        "method": "ids"
+      },
+      {
+        "from": "Edges",
+        "to": "Nodes",
+        "method": "ids"
+      }
+    ],
+    "set_attrs": [
+      {
+        "from": "Nodes",
+        "to": "Edges",
+        "method": "set_attrs"
+      },
+      {
+        "from": "Edges",
+        "to": "Nodes",
+        "method": "set_attrs"
+      }
+    ],
+    "sample": [
+      {
+        "from": "ComponentsArray",
+        "to": "Subgraph",
+        "method": "sample"
+      },
+      {
+        "from": "Subgraph",
+        "to": "ComponentsArray",
+        "method": "sample"
+      }
+    ],
+    "to_list": [
+      {
+        "from": "ComponentsArray",
+        "to": "GraphArray",
+        "method": "to_list"
+      },
+      {
+        "from": "GraphArray",
+        "to": "ComponentsArray",
+        "method": "to_list"
+      }
+    ],
+    "summary": [
+      {
+        "from": "Subgraph",
+        "to": "GraphArray",
+        "method": "summary"
+      },
+      {
+        "from": "GraphArray",
+        "to": "Subgraph",
+        "method": "summary"
+      }
+    ],
+    "items": [
+      {
+        "from": "GraphArray",
+        "to": "Matrix",
+        "method": "items"
+      },
+      {
+        "from": "Matrix",
+        "to": "GraphArray",
+        "method": "items"
+      }
+    ]
+  },
+  "errors": [],
+  "meta_graph": {
+    "meta_graph": "Graph(nodes=12, edges=47)",
+    "meta_graph_table": "GraphTable[12 nodes, 47 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[12 x 5]\nBaseTable[12 x 5]\n| object_name |    node_id |     module | method_count | object_type | \n|------------|------------|------------|------------|------------|\n|  BaseTable |          1 |     groggy |         30 |  BaseTable | \n| NodesTable |          2 |     groggy |         27 | NodesTable | \n| EdgesTable |          3 |     groggy |         32 | EdgesTable | \n| GraphTable |          4 |     groggy |         20 | GraphTable | \n|  BaseArray |          5 |   builtins |          7 |  BaseArray | \n... (7 more rows)\nEdges:\nEdgesTable[47 x 6]\nBaseTable[47 x 6]\n| method_signature |     source | method_name | return_type |    edge_id |     target | \n|------------|------------|------------|------------|------------|------------|\n|      (n=5) |          1 |       head |  BaseTable |          1 |          1 | \n|      (n=5) |          1 |       tail |  BaseTable |          2 |          1 | \n|         () |          2 | base_table |  BaseTable |          3 |          1 | \n|      (n=5) |          2 |       head | NodesTable |          4 |          2 | \n|         () |          2 | into_base_table |  BaseTable |          5 |          1 | \n... (42 more rows)\n",
+    "object_name_to_node_id": {
+      "BaseTable": 1,
+      "NodesTable": 2,
+      "EdgesTable": 3,
+      "GraphTable": 4,
+      "BaseArray": 5,
+      "Graph": 6,
+      "Nodes": 7,
+      "Edges": 8,
+      "ComponentsArray": 9,
+      "Subgraph": 10,
+      "GraphArray": 11,
+      "Matrix": 12
+    },
+    "return_type_to_object_name": {
+      "BaseTable": "BaseTable",
+      "NodesTable": "NodesTable",
+      "EdgesTable": "EdgesTable",
+      "GraphTable": "GraphTable",
+      "BaseArray": "BaseArray",
+      "Graph": "Graph",
+      "NodesAccessor": "Nodes",
+      "EdgesAccessor": "Edges",
+      "ComponentsArray": "ComponentsArray",
+      "Subgraph": "Subgraph",
+      "GraphArray": "GraphArray",
+      "dict": "Matrix"
+    },
+    "nodes_data": {
+      "node_id": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "object_name": [
+        "BaseTable",
+        "NodesTable",
+        "EdgesTable",
+        "GraphTable",
+        "BaseArray",
+        "Graph",
+        "Nodes",
+        "Edges",
+        "ComponentsArray",
+        "Subgraph",
+        "GraphArray",
+        "Matrix"
+      ],
+      "object_type": [
+        "BaseTable",
+        "NodesTable",
+        "EdgesTable",
+        "GraphTable",
+        "BaseArray",
+        "Graph",
+        "NodesAccessor",
+        "EdgesAccessor",
+        "ComponentsArray",
+        "Subgraph",
+        "GraphArray",
+        "dict"
+      ],
+      "method_count": [
+        30,
+        27,
+        32,
+        20,
+        7,
+        62,
+        5,
+        4,
+        7,
+        52,
+        25,
+        11
+      ],
+      "module": [
+        "groggy",
+        "groggy",
+        "groggy",
+        "groggy",
+        "builtins",
+        "builtins",
+        "builtins",
+        "builtins",
+        "builtins",
+        "builtins",
+        "builtins",
+        "builtins"
+      ]
+    },
+    "edges_data": {
+      "edge_id": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47
+      ],
+      "source": [
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        4,
+        4,
+        4,
+        4,
+        4,
+        5,
+        5,
+        6,
+        6,
+        6,
+        6,
+        6,
+        7,
+        7,
+        7,
+        8,
+        8,
+        8,
+        9,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        11,
+        11,
+        11
+      ],
+      "target": [
+        1,
+        1,
+        1,
+        2,
+        1,
+        11,
+        2,
+        3,
+        1,
+        11,
+        3,
+        1,
+        11,
+        3,
+        11,
+        4,
+        4,
+        12,
+        4,
+        6,
+        12,
+        5,
+        12,
+        12,
+        4,
+        6,
+        10,
+        10,
+        11,
+        2,
+        10,
+        11,
+        3,
+        10,
+        9,
+        11,
+        3,
+        11,
+        11,
+        2,
+        8,
+        6,
+        6,
+        7,
+        11,
+        11,
+        12
+      ],
+      "method_name": [
+        "head",
+        "tail",
+        "base_table",
+        "head",
+        "into_base_table",
+        "node_ids",
+        "tail",
+        "auto_assign_edge_ids",
+        "base_table",
+        "edge_ids",
+        "head",
+        "into_base_table",
+        "sources",
+        "tail",
+        "targets",
+        "auto_assign_edge_ids",
+        "head",
+        "stats",
+        "tail",
+        "to_graph",
+        "describe",
+        "unique",
+        "adjacency_matrix",
+        "sparse_adjacency_matrix",
+        "table",
+        "to_networkx",
+        "view",
+        "all",
+        "ids",
+        "table",
+        "all",
+        "ids",
+        "table",
+        "largest_component",
+        "connected_components",
+        "degree",
+        "edges_table",
+        "in_degree",
+        "out_degree",
+        "table",
+        "to_edges",
+        "to_graph",
+        "to_networkx",
+        "to_nodes",
+        "drop_na",
+        "unique",
+        "value_counts"
+      ],
+      "method_signature": [
+        "(n=5)",
+        "(n=5)",
+        "()",
+        "(n=5)",
+        "()",
+        "()",
+        "(n=5)",
+        "()",
+        "()",
+        "()",
+        "(n=5)",
+        "()",
+        "()",
+        "(n=5)",
+        "()",
+        "()",
+        "(n=5)",
+        "()",
+        "(n=5)",
+        "()",
+        "()",
+        "()",
+        "()",
+        "()",
+        "()",
+        "(directed: bool = False, include_attributes: bool = True)",
+        "()",
+        "()",
+        "()",
+        "()",
+        "()",
+        "()",
+        "()",
+        "()",
+        "()",
+        "(nodes=None, *, full_graph=False)",
+        "()",
+        "(nodes=None, full_graph=False)",
+        "(nodes=None, full_graph=False)",
+        "()",
+        "()",
+        "()",
+        "()",
+        "()",
+        "()",
+        "()",
+        "()"
+      ],
+      "return_type": [
+        "BaseTable",
+        "BaseTable",
+        "BaseTable",
+        "NodesTable",
+        "BaseTable",
+        "GraphArray",
+        "NodesTable",
+        "EdgesTable",
+        "BaseTable",
+        "GraphArray",
+        "EdgesTable",
+        "BaseTable",
+        "GraphArray",
+        "EdgesTable",
+        "GraphArray",
+        "GraphTable",
+        "GraphTable",
+        "dict",
+        "GraphTable",
+        "Graph",
+        "dict",
+        "BaseArray",
+        "dict",
+        "dict",
+        "GraphTable",
+        "Graph",
+        "Subgraph",
+        "Subgraph",
+        "GraphArray",
+        "NodesTable",
+        "Subgraph",
+        "GraphArray",
+        "EdgesTable",
+        "Subgraph",
+        "ComponentsArray",
+        "GraphArray",
+        "EdgesTable",
+        "GraphArray",
+        "GraphArray",
+        "NodesTable",
+        "EdgesAccessor",
+        "Graph",
+        "Graph",
+        "NodesAccessor",
+        "GraphArray",
+        "GraphArray",
+        "dict"
+      ]
+    }
+  }
+}
