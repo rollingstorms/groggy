@@ -139,6 +139,9 @@
 pub mod errors;
 pub mod types;
 
+// Core functionality
+pub mod core;        // Core data structures and algorithms
+
 // Reorganized module structure
 pub mod entities;    // Concrete entity implementations (Node, MetaNode, Edge, MetaEdge)
 pub mod subgraphs;   // Subgraph types and operations
@@ -148,7 +151,7 @@ pub mod state;       // State management
 pub mod utils;       // Utilities and configuration
 pub mod traits;      // Graph entity traits
 
-// Display formatting
+// Display formatting (legacy - being replaced by core::display)
 pub mod display;
 
 // Public API

@@ -29,6 +29,8 @@ from ._groggy import (
     MetaNodeArray,
     ComponentsArray,
     SubgraphArray,
+    NumArray,
+    StatsArray,  # Backward compatibility alias for NumArray
     GraphMatrix,
     GraphTable,
     # Table classes
@@ -99,7 +101,7 @@ except ImportError:
         shape = data.get('shape', (0, 0))
         return f"GraphTable(shape={shape})"
 
-__version__ = "0.3.1"
+__version__ = "0.4.1"
 __all__ = [
     "Graph",
     "Subgraph",
@@ -134,6 +136,8 @@ __all__ = [
     "MetaNodeArray",
     "ComponentsArray",
     "SubgraphArray",
+    "NumArray",
+    "StatsArray",  # Backward compatibility
     "GraphMatrix",
     "GraphTable",
     # Table classes

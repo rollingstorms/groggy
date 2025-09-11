@@ -1,0 +1,244 @@
+/* Minimal theme CSS - ultra-clean design */
+
+.groggy-display-container[data-theme="minimal"] {
+    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #fefefe;
+    color: #333333;
+    border-radius: 6px;
+    overflow-x: auto;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e0e0e0;
+}
+
+.groggy-table.theme-minimal {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 14px;
+    width: auto;
+    min-width: fit-content;
+    margin: 0;
+    background-color: #fefefe;
+    border: none;
+}
+
+.groggy-table.theme-minimal th {
+    background-color: #fafafa;
+    border: none;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 500;
+    color: #333333;
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+    letter-spacing: -0.01em;
+}
+
+.groggy-table.theme-minimal th:first-child {
+    border-top-left-radius: 6px;
+}
+
+.groggy-table.theme-minimal th:last-child {
+    border-top-right-radius: 6px;
+}
+
+.groggy-table.theme-minimal td {
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 10px 16px;
+    color: #333333;
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.groggy-table.theme-minimal tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 6px;
+}
+
+.groggy-table.theme-minimal tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 6px;
+}
+
+.groggy-table.theme-minimal tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* No alternating rows for minimal design */
+.groggy-table.theme-minimal tr:nth-child(even) {
+    background-color: #fefefe;
+}
+
+.groggy-table.theme-minimal tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Data type specific styling - subtle differences */
+.groggy-table.theme-minimal .cell-float,
+.groggy-table.theme-minimal .cell-integer {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #333333;
+    font-weight: 500;
+}
+
+.groggy-table.theme-minimal .cell-string {
+    text-align: left;
+    color: #333333;
+}
+
+.groggy-table.theme-minimal .cell-boolean {
+    text-align: center;
+    color: #333333;
+    font-weight: 500;
+}
+
+.groggy-table.theme-minimal .cell-datetime {
+    text-align: left;
+    color: #333333;
+    font-variant-numeric: tabular-nums;
+}
+
+.groggy-table.theme-minimal .cell-unknown {
+    text-align: left;
+    color: #999999;
+    font-style: italic;
+}
+
+/* Table info section - very minimal */
+.groggy-display-container[data-theme="minimal"] .table-info {
+    margin-top: 12px;
+    padding: 8px 16px;
+    background-color: #fafafa;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #666666;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.groggy-display-container[data-theme="minimal"] .table-info .interactive-btn {
+    background-color: #333333;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.groggy-display-container[data-theme="minimal"] .table-info .interactive-btn:hover {
+    background-color: #555555;
+    transform: translateY(-1px);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .groggy-table.theme-minimal {
+        font-size: 13px;
+    }
+    
+    .groggy-table.theme-minimal th,
+    .groggy-table.theme-minimal td {
+        padding: 8px 12px;
+    }
+    
+    .groggy-display-container[data-theme="minimal"] {
+        border-radius: 4px;
+    }
+    
+    .groggy-table.theme-minimal th:first-child {
+        border-top-left-radius: 4px;
+    }
+    
+    .groggy-table.theme-minimal th:last-child {
+        border-top-right-radius: 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    .groggy-table.theme-minimal {
+        font-size: 12px;
+    }
+    
+    .groggy-table.theme-minimal th,
+    .groggy-table.theme-minimal td {
+        padding: 6px 10px;
+    }
+}
+
+/* Print styles */
+@media print {
+    .groggy-display-container[data-theme="minimal"] {
+        box-shadow: none;
+        border: 1px solid #ccc;
+        border-radius: 0;
+        background-color: #fff !important;
+        color: #000 !important;
+    }
+    
+    .groggy-table.theme-minimal {
+        background-color: #fff !important;
+        border-collapse: collapse;
+    }
+    
+    .groggy-table.theme-minimal th,
+    .groggy-table.theme-minimal td {
+        border: 1px solid #ccc;
+        background-color: #fff !important;
+        color: #000 !important;
+        border-radius: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .table-info,
+    .interactive-btn {
+        display: none;
+    }
+}
+
+/* Accessibility improvements */
+.groggy-table.theme-minimal:focus-within {
+    outline: 2px solid #333333;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+.groggy-table.theme-minimal th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Truncated content indicator */
+.groggy-table.theme-minimal .cell-truncated::after {
+    content: "…";
+    color: #999999;
+    font-weight: normal;
+}
+
+/* Minimal theme specific animations */
+.groggy-table.theme-minimal tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+.groggy-display-container[data-theme="minimal"] {
+    transition: box-shadow 0.2s ease;
+}
+
+.groggy-display-container[data-theme="minimal"]:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Typography refinements */
+.groggy-table.theme-minimal {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}

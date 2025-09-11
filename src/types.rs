@@ -121,7 +121,7 @@ This is the heart of the flexible attribute system. Should support:
 
 /// Efficient storage for attribute values supporting multiple data types
 /// DESIGN: Enum dispatch is fast, Hash implementation handles f32 properly
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AttrValue {
     /// 32-bit float (embeddings, coordinates, ML features)
     Float(f32),
@@ -241,7 +241,7 @@ impl PartialEq for AttrValue {
 
 /// Memory-efficient string storage that avoids heap allocation for short strings
 /// MEMORY OPTIMIZATION: Stores strings <= 15 bytes inline, larger ones on heap
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CompactString {
     /// Inline storage for strings up to 15 bytes (fits in 16 bytes total)
     Inline { data: [u8; 15], len: u8 },
@@ -426,7 +426,7 @@ impl AttrValue {
 
 /// Compressed data storage for large values (Memory Optimization 3)
 /// Uses simple run-length encoding and basic compression
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CompressedData {
     /// Compressed bytes
     pub data: Vec<u8>,
@@ -436,7 +436,7 @@ pub struct CompressedData {
     algorithm: CompressionAlgorithm,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CompressionAlgorithm {
     /// No compression (passthrough)
     None,
@@ -879,7 +879,7 @@ pub struct MemoryEfficiency {
 }
 
 /// Data compression statistics
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompressionStatistics {
     /// Number of compressed attributes
     pub compressed_attributes: usize,

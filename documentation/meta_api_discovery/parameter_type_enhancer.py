@@ -228,8 +228,8 @@ def main():
     """Main execution function."""
     inferencer = ParameterTypeInferencer()
     
-    input_file = "api_discovery_results.json"
-    output_file = "api_discovery_results_enhanced.json"
+    input_file = "documentation/meta_api_discovery/api_discovery_results.json"
+    output_file = "documentation/meta_api_discovery/api_discovery_results_enhanced_v2.json"
     
     enhanced_data = inferencer.process_discovery_file(input_file, output_file)
     
