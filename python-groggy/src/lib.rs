@@ -54,6 +54,17 @@ pub use ffi::display::{PyDisplayConfig, PyTableFormatter};
 // UNIFIED BUILDER PATTERNS
 // ====================================================================
 
+/// Create a NumArray for numerical operations from a Python list
+///
+/// Examples:
+///   gr.num_array([1, 2, 3, 4])
+///   gr.num_array([1.0, 2.5, 3.7])
+#[pyfunction]
+#[pyo3(signature = (values))]
+fn num_array(values: Vec<f64>) -> PyResult<PyNumArray> {
+    Ok(PyNumArray::new(values))
+}
+
 /// Create a BaseArray from a Python list or array-like object
 ///
 /// Examples:
@@ -360,13 +371,10 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PySubgraphArray>()?;
     m.add_class::<PySubgraphArrayIterator>()?;
     m.add_class::<PySubgraphArrayChainIterator>()?;
-    // Preferred numerical array API
-    m.add_class::<crate::ffi::storage::num_array::PyNumArray>()?;
-    m.add_class::<crate::ffi::storage::num_array::PyNumArrayIterator>()?;
-    // Back-compat StatsArray (to be deprecated)
+    // Numerical array API
     m.add_class::<PyNumArray>()?;
     m.add_class::<PyNumArrayIterator>()?;
-    m.add_class::<PySimpleStatsArray>()?;
+    // m.add_class::<PySimpleStatsArray>()?;
     m.add_class::<PyTableArray>()?;
     m.add_class::<PyTableArrayIterator>()?;
     m.add_class::<PyTableArrayChainIterator>()?;
@@ -447,14 +455,19 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Register display functions
     ffi::display::register_display_functions(py, m)?;
 
+    // Add explicit aliases for NumArray registration
+    m.add("NumArray", py.get_type::<PyNumArray>())?;
+    m.add("StatsArray", py.get_type::<PyNumArray>())?;
+
     // Add unified builder functions
+    m.add_function(wrap_pyfunction!(num_array, m)?)?;
     m.add_function(wrap_pyfunction!(array, m)?)?;
     m.add_function(wrap_pyfunction!(matrix, m)?)?;
     m.add_function(wrap_pyfunction!(table, m)?)?; // Re-enabled for Phase 5 completion
     m.add_function(wrap_pyfunction!(merge, m)?)?;
 
-    // Use the module registration function
-    module::register_classes(py, m)?;
+    // Use the module registration function (currently empty)
+    // module::register_classes(py, m)?;
 
     Ok(())
 }

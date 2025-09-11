@@ -467,7 +467,8 @@ impl PyBaseTable {
     
     /// String representation
     pub fn __repr__(&self) -> String {
-        format!("BaseTable[{} x {}]", self.table.nrows(), self.table.ncols())
+        // Use the new unified display system
+        self.table.__repr__()
     }
     
     
@@ -526,7 +527,14 @@ impl PyBaseTable {
             // Column access: table['column_name']
             if let Some(column) = self.table.column(&column_name) {
                 let attr_values = column.data();
-                // Prefer StatsArray for numeric columns; fallback to GraphArray
+                
+                // For single-row tables, return the Python value directly (not wrapped in AttrValue)
+                if self.table.nrows() == 1 && !attr_values.is_empty() {
+                    let py_attr_value = crate::ffi::types::PyAttrValue { inner: attr_values[0].clone() };
+                    return Ok(py_attr_value.to_python_value(py));
+                }
+                
+                // For multi-row tables, prefer StatsArray for numeric columns; fallback to BaseArray
                 if let Ok(stats) = crate::ffi::storage::num_array::PyNumArray::from_attr_values(attr_values.clone()) {
                     Ok(stats.into_py(py))
                 } else {
@@ -639,11 +647,8 @@ impl PyBaseTable {
     
     /// Rich HTML representation for Jupyter notebooks
     fn _repr_html_(&self, _py: Python) -> PyResult<String> {
-        let display_data = self.to_display_data();
-        let config = groggy::display::DisplayConfig::default();
-        let formatted = groggy::display::format_table(display_data, &config);
-        // Convert to HTML format for Jupyter
-        Ok(format!("<pre>{}</pre>", html_escape::encode_text(&formatted)))
+        // Use the new unified display system for semantic HTML
+        Ok(self.table._repr_html_())
     }
     
     /// Export BaseTable to CSV file
@@ -1574,7 +1579,14 @@ impl PyNodesTable {
             // Column access: table['column_name'] 
             if let Some(column) = self.table.base_table().column(&column_name) {
                 let attr_values = column.data();
-                // Prefer StatsArray for numeric columns; fallback to GraphArray
+                
+                // For single-row tables, return the Python value directly (not wrapped in AttrValue)
+                if self.table.nrows() == 1 && !attr_values.is_empty() {
+                    let py_attr_value = crate::ffi::types::PyAttrValue { inner: attr_values[0].clone() };
+                    return Ok(py_attr_value.to_python_value(py));
+                }
+                
+                // For multi-row tables, prefer StatsArray for numeric columns; fallback to BaseArray
                 if let Ok(stats) = crate::ffi::storage::num_array::PyNumArray::from_attr_values(attr_values.clone()) {
                     Ok(stats.into_py(py))
                 } else {
@@ -2228,7 +2240,14 @@ impl PyEdgesTable {
             // Column access: table['column_name']
             if let Some(column) = self.table.base_table().column(&column_name) {
                 let attr_values = column.data();
-                // Prefer StatsArray for numeric columns; fallback to GraphArray
+                
+                // For single-row tables, return the Python value directly (not wrapped in AttrValue)
+                if self.table.nrows() == 1 && !attr_values.is_empty() {
+                    let py_attr_value = crate::ffi::types::PyAttrValue { inner: attr_values[0].clone() };
+                    return Ok(py_attr_value.to_python_value(py));
+                }
+                
+                // For multi-row tables, prefer StatsArray for numeric columns; fallback to GraphArray
                 if let Ok(stats) = crate::ffi::storage::num_array::PyNumArray::from_attr_values(attr_values.clone()) {
                     Ok(stats.into_py(py))
                 } else {
@@ -2316,9 +2335,27 @@ impl PyEdgesTable {
             let edges_filtered = groggy::storage::table::EdgesTable::from_base_table(filtered_base)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             Ok(PyEdgesTable { table: edges_filtered }.into_py(py))
+        } else if let Ok(row_index) = key.extract::<isize>() {
+            // Row access by integer: edges_table[5] or edges_table[-1]
+            let nrows = self.table.nrows() as isize;
+            let actual_index = if row_index < 0 {
+                (nrows + row_index) as usize
+            } else {
+                row_index as usize
+            };
+            
+            if actual_index >= self.table.nrows() {
+                return Err(PyErr::new::<pyo3::exceptions::PyIndexError, _>(
+                    format!("EdgesTable row index {} out of range (0-{})", row_index, self.table.nrows() - 1)
+                ));
+            }
+            
+            // Return single row as a BaseTable with one row
+            let single_row_table = self.table.base_table().head(actual_index + 1).tail(1);
+            Ok(PyBaseTable { table: single_row_table }.into_py(py))
         } else {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "Table indices must be strings (column names), lists of column names, slices, or boolean arrays"
+                "EdgesTable indices must be strings (column names), integers (row indices), lists of column names, slices, or boolean arrays"
             ))
         }
     }

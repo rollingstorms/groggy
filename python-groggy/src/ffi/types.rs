@@ -29,6 +29,34 @@ impl PyAttrValue {
         self.inner.clone()
     }
 
+    /// Get the raw Python value for internal FFI usage
+    pub fn to_python_value(&self, py: Python) -> PyObject {
+        match &self.inner {
+            RustAttrValue::Int(i) => i.to_object(py),
+            RustAttrValue::Float(f) => f.to_object(py),
+            RustAttrValue::Text(s) => s.to_object(py),
+            RustAttrValue::Bool(b) => b.to_object(py),
+            RustAttrValue::FloatVec(v) => v.to_object(py),
+            RustAttrValue::Bytes(b) => b.to_object(py),
+            // Handle optimized variants by extracting their underlying value
+            RustAttrValue::CompactText(cs) => cs.as_str().to_object(py),
+            RustAttrValue::SmallInt(i) => i.to_object(py),
+            RustAttrValue::CompressedText(cd) => match cd.decompress_text() {
+                Ok(data) => data.to_object(py),
+                Err(_) => py.None(),
+            },
+            RustAttrValue::CompressedFloatVec(cd) => match cd.decompress_float_vec() {
+                Ok(data) => data.to_object(py),
+                Err(_) => py.None(),
+            },
+            // Handle additional variants
+            RustAttrValue::Null => py.None(),
+            RustAttrValue::SubgraphRef(id) => id.to_object(py),
+            RustAttrValue::NodeArray(nodes) => nodes.to_object(py),
+            RustAttrValue::EdgeArray(edges) => edges.to_object(py),
+        }
+    }
+
     /// Create PyAttrValue from Python value (public constructor)
     pub fn from_py_value(value: &PyAny) -> PyResult<Self> {
         let rust_value = if let Ok(b) = value.extract::<bool>() {

@@ -4,11 +4,14 @@ use super::traits::{Table, TableIterator};
 use crate::storage::array::{BaseArray, ArrayOps};
 use crate::errors::GraphResult;
 use crate::types::AttrValue;
+use crate::core::display::{DisplayEngine, DisplayConfig, ColumnSchema, DataType, OutputFormat};
+use crate::core::{DisplayDataWindow, DisplayDataSchema, StreamingDataWindow, StreamingDataSchema};
+use crate::core::streaming::{DataSource, StreamingServer, StreamingConfig};
 use std::collections::HashMap;
 
 /// Unified table implementation using BaseArray columns
 /// This provides the foundation for all table types in the system
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct BaseTable {
     /// Columns stored as BaseArrays with AttrValue type
     columns: HashMap<String, BaseArray<AttrValue>>,
@@ -16,15 +19,48 @@ pub struct BaseTable {
     column_order: Vec<String>,
     /// Number of rows (derived from first column)
     nrows: usize,
+    /// Display engine for unified formatting (FOUNDATION ONLY - specialized types delegate)
+    display_engine: DisplayEngine,
+    /// Streaming server for real-time updates (FOUNDATION ONLY - Phase 2)
+    streaming_server: Option<StreamingServer>,
+    /// Streaming configuration
+    streaming_config: StreamingConfig,
+    /// Source ID for caching
+    source_id: String,
+    /// Version for cache invalidation
+    version: u64,
+}
+
+impl Clone for BaseTable {
+    fn clone(&self) -> Self {
+        Self {
+            columns: self.columns.clone(),
+            column_order: self.column_order.clone(),
+            nrows: self.nrows,
+            display_engine: self.display_engine.clone(),
+            streaming_server: None, // Don't clone server, create new instance when needed
+            streaming_config: self.streaming_config.clone(),
+            source_id: self.source_id.clone(),
+            version: self.version,
+        }
+    }
 }
 
 impl BaseTable {
     /// Create a new empty BaseTable
     pub fn new() -> Self {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        
         Self {
             columns: HashMap::new(),
             column_order: Vec::new(),
             nrows: 0,
+            display_engine: DisplayEngine::new(),
+            streaming_server: None,
+            streaming_config: StreamingConfig::default(),
+            source_id: format!("basetable_{}", timestamp),
+            version: 1,
         }
     }
     
@@ -52,10 +88,18 @@ impl BaseTable {
         
         let column_order: Vec<String> = normalized_columns.keys().cloned().collect();
         
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        
         Ok(Self {
             columns: normalized_columns,
             column_order,
             nrows: max_len,
+            display_engine: DisplayEngine::new(),
+            streaming_server: None,
+            streaming_config: StreamingConfig::default(),
+            source_id: format!("basetable_{}", timestamp),
+            version: 1,
         })
     }
     
@@ -84,10 +128,18 @@ impl BaseTable {
             }
         }
         
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        
         Ok(Self {
             columns,
             column_order,
             nrows: first_len,
+            display_engine: DisplayEngine::new(),
+            streaming_server: None,
+            streaming_config: StreamingConfig::default(),
+            source_id: format!("basetable_{}", timestamp),
+            version: 1,
         })
     }
     
@@ -436,6 +488,11 @@ impl Table for BaseTable {
             columns: new_columns,
             column_order: self.column_order.clone(),
             nrows: actual_end - start,
+            display_engine: self.display_engine.clone(),
+            streaming_server: None,
+            streaming_config: self.streaming_config.clone(),
+            source_id: self.source_id.clone(),
+            version: self.version + 1, // Increment version for new slice
         }
     }
     
@@ -458,6 +515,11 @@ impl Table for BaseTable {
             columns: new_columns,
             column_order: self.column_order.clone(),
             nrows: self.nrows,
+            display_engine: self.display_engine.clone(),
+            streaming_server: None,
+            streaming_config: self.streaming_config.clone(),
+            source_id: self.source_id.clone(),
+            version: self.version + 1,
         })
     }
     
@@ -477,6 +539,11 @@ impl Table for BaseTable {
             columns: new_columns,
             column_order: self.column_order.clone(),
             nrows: new_nrows,
+            display_engine: self.display_engine.clone(),
+            streaming_server: None,
+            streaming_config: self.streaming_config.clone(),
+            source_id: self.source_id.clone(),
+            version: self.version + 1,
         })
     }
     
@@ -541,6 +608,11 @@ impl Table for BaseTable {
             columns: new_columns,
             column_order: column_names.to_vec(),
             nrows: self.nrows,
+            display_engine: self.display_engine.clone(),
+            streaming_server: None,
+            streaming_config: self.streaming_config.clone(),
+            source_id: self.source_id.clone(),
+            version: self.version + 1,
         })
     }
     
@@ -564,6 +636,11 @@ impl Table for BaseTable {
             columns: new_columns,
             column_order: new_order,
             nrows: if self.nrows == 0 { column.len() } else { self.nrows },
+            display_engine: self.display_engine.clone(),
+            streaming_server: None,
+            streaming_config: self.streaming_config.clone(),
+            source_id: self.source_id.clone(),
+            version: self.version + 1,
         })
     }
     
@@ -580,6 +657,11 @@ impl Table for BaseTable {
             columns: new_columns,
             column_order: new_order,
             nrows: self.nrows,
+            display_engine: self.display_engine.clone(),
+            streaming_server: None,
+            streaming_config: self.streaming_config.clone(),
+            source_id: self.source_id.clone(),
+            version: self.version + 1,
         })
     }
     
@@ -609,56 +691,156 @@ impl BaseTable {
             columns: new_columns,
             column_order: self.column_order.clone(),
             nrows: new_nrows,
+            display_engine: self.display_engine.clone(),
+            streaming_server: None,
+            streaming_config: self.streaming_config.clone(),
+            source_id: self.source_id.clone(),
+            version: self.version + 1,
         })
     }
 }
 
-impl std::fmt::Display for BaseTable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "BaseTable[{} x {}]", self.nrows, self.ncols())?;
+/// Foundation display methods - ONLY implemented here, all other types delegate
+impl BaseTable {
+    /// Convert BaseTable data to unified DataWindow format
+    fn to_data_window(&self, config: &DisplayConfig) -> DisplayDataWindow {
+        // Determine how many rows to include
+        let max_rows = config.max_rows.min(self.nrows);
+        let max_cols = config.max_cols.min(self.column_order.len());
         
-        if self.nrows == 0 {
-            return Ok(());
-        }
+        // Extract headers (limited by max_cols)
+        let headers: Vec<String> = self.column_order.iter()
+            .take(max_cols)
+            .cloned()
+            .collect();
         
-        // Show column headers
-        write!(f, "| ")?;
-        for col_name in &self.column_order {
-            write!(f, "{:>10} | ", col_name)?;
-        }
-        writeln!(f)?;
-        
-        // Show separator
-        write!(f, "|")?;
-        for _ in &self.column_order {
-            write!(f, "------------|")?;
-        }
-        writeln!(f)?;
-        
-        // Show first few rows
-        let display_rows = std::cmp::min(5, self.nrows);
-        for i in 0..display_rows {
-            write!(f, "| ")?;
-            for col_name in &self.column_order {
+        // Extract rows data
+        let mut rows = Vec::with_capacity(max_rows);
+        for row_idx in 0..max_rows {
+            let mut row = Vec::with_capacity(headers.len());
+            for col_name in &headers {
                 if let Some(column) = self.columns.get(col_name) {
-                    let value_str = if let Some(value) = column.get(i) {
-                        format!("{}", value)
+                    let value_str = if let Some(value) = column.get(row_idx) {
+                        value.to_string()
                     } else {
-                        "None".to_string()
+                        "".to_string()
                     };
-                    write!(f, "{:>10} | ", value_str)?;
+                    row.push(value_str);
                 } else {
-                    write!(f, "{:>10} | ", "ERROR")?;
+                    row.push("ERROR".to_string());
                 }
             }
-            writeln!(f)?;
+            rows.push(row);
         }
         
-        if self.nrows > display_rows {
-            writeln!(f, "... ({} more rows)", self.nrows - display_rows)?;
+        // Create schema with inferred data types
+        let mut columns_schema = Vec::with_capacity(headers.len());
+        for col_name in &headers {
+            let data_type = if let Some(column) = self.columns.get(col_name) {
+                // Infer data type from first non-null value
+                self.infer_column_data_type(column)
+            } else {
+                DataType::Unknown
+            };
+            
+            columns_schema.push(ColumnSchema {
+                name: col_name.clone(),
+                data_type,
+            });
         }
         
-        Ok(())
+        let schema = DisplayDataSchema::new(columns_schema);
+        
+        // Create DataWindow with full dataset info
+        DisplayDataWindow::with_window_info(
+            headers,
+            rows,
+            schema,
+            self.nrows,          // total_rows
+            self.column_order.len(), // total_cols
+            0                    // start_offset
+        )
+    }
+    
+    /// Infer data type from AttrValue column
+    fn infer_column_data_type(&self, column: &BaseArray<AttrValue>) -> DataType {
+        // Look at first few non-null values to infer type
+        for i in 0..std::cmp::min(10, column.len()) {
+            if let Some(value) = column.get(i) {
+                match value {
+                    crate::types::AttrValue::Int(_) => return DataType::Integer,
+                    crate::types::AttrValue::SmallInt(_) => return DataType::Integer,
+                    crate::types::AttrValue::Float(_) => return DataType::Float,
+                    crate::types::AttrValue::Bool(_) => return DataType::Boolean,
+                    crate::types::AttrValue::Text(_) => return DataType::String,
+                    crate::types::AttrValue::CompactText(_) => return DataType::String,
+                    crate::types::AttrValue::Bytes(_) => return DataType::String,
+                    crate::types::AttrValue::Null => continue,
+                    _ => return DataType::Unknown,
+                }
+            }
+        }
+        DataType::Unknown
+    }
+    
+    /// Main display method using new unified system (__repr__ equivalent)
+    pub fn __repr__(&self) -> String {
+        let data_window = self.to_data_window(&self.display_engine.config);
+        self.display_engine.format_unicode(&data_window)
+    }
+    
+    /// HTML display method (_repr_html_ equivalent) 
+    pub fn _repr_html_(&self) -> String {
+        let data_window = self.to_data_window(&self.display_engine.config);
+        self.display_engine.format_html(&data_window)
+    }
+    
+    /// Rich display with configurable output format
+    pub fn rich_display(&self, config: Option<DisplayConfig>) -> String {
+        let config = config.unwrap_or(self.display_engine.config.clone());
+        let data_window = self.to_data_window(&config);
+        
+        match config.output_format {
+            OutputFormat::Unicode => {
+                let mut engine = self.display_engine.clone();
+                engine.set_config(config);
+                engine.format_unicode(&data_window)
+            },
+            OutputFormat::Html => {
+                let mut engine = self.display_engine.clone();
+                engine.set_config(config);
+                engine.format_html(&data_window)
+            },
+            OutputFormat::Interactive => {
+                let mut engine = self.display_engine.clone();
+                engine.set_config(config);
+                engine.rich_display(&data_window, OutputFormat::Interactive)
+            },
+        }
+    }
+    
+    /// Interactive display method (placeholder for Phase 3)
+    pub fn interactive_display(&self, config: Option<DisplayConfig>) -> String {
+        let config = config.unwrap_or_else(|| DisplayConfig::interactive());
+        self.rich_display(Some(config))
+    }
+    
+    /// Get display configuration
+    pub fn get_display_config(&self) -> &DisplayConfig {
+        &self.display_engine.config
+    }
+    
+    /// Set display configuration
+    pub fn set_display_config(&mut self, config: DisplayConfig) {
+        self.display_engine.set_config(config);
+    }
+}
+
+/// Standard Display trait implementation using new unified system
+impl std::fmt::Display for BaseTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Use our new unified display system
+        write!(f, "{}", self.__repr__())
     }
 }
 
@@ -1432,6 +1614,11 @@ impl BaseTable {
             columns: new_columns,
             column_order: self.column_order.clone(),
             nrows: row_indices.len(),
+            display_engine: self.display_engine.clone(),
+            streaming_server: None,
+            streaming_config: self.streaming_config.clone(),
+            source_id: self.source_id.clone(),
+            version: self.version + 1,
         })
     }
 
@@ -1723,6 +1910,120 @@ impl BaseTable {
         Ok(result)
     }
 
+    /// Stack tables vertically (concatenate rows) - similar to pandas.concat(axis=0)
+    /// TODO: Implement vertical stacking/concatenation for tables
+    /// This should append rows from other table to this table, handling schema differences
+    pub fn stack(&self, other: &Self) -> GraphResult<Self> {
+        // TODO: Allow stacking tables with different schemas by:
+        // 1. Create union of all column names from both tables
+        // 2. Fill missing columns with AttrValue::Null
+        // 3. Concatenate all rows maintaining original order
+        // 4. Return new table with combined schema and all rows
+        
+        // For now, require same schema like union but without deduplication
+        if self.column_order != other.column_order {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Stack requires tables with identical column schemas (TODO: support different schemas)".to_string()
+            ));
+        }
+
+        let mut result_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
+        for col_name in &self.column_order {
+            result_columns.insert(col_name.clone(), Vec::new());
+        }
+
+        // Add all rows from first table (no deduplication)
+        for row_idx in 0..self.nrows {
+            for col_name in &self.column_order {
+                if let Some(column) = self.columns.get(col_name) {
+                    if let Some(values) = result_columns.get_mut(col_name) {
+                        if let Some(value) = column.get(row_idx) {
+                            values.push(value.clone());
+                        } else {
+                            values.push(crate::types::AttrValue::Null);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add all rows from second table (no deduplication)
+        for row_idx in 0..other.nrows {
+            for col_name in &other.column_order {
+                if let Some(column) = other.columns.get(col_name) {
+                    if let Some(values) = result_columns.get_mut(col_name) {
+                        if let Some(value) = column.get(row_idx) {
+                            values.push(value.clone());
+                        } else {
+                            values.push(crate::types::AttrValue::Null);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Convert to BaseArray columns
+        let mut base_columns = HashMap::new();
+        for (name, values) in result_columns {
+            base_columns.insert(name, BaseArray::from_attr_values(values));
+        }
+
+        let mut result = BaseTable::from_columns(base_columns)?;
+        result.column_order = self.column_order.clone();
+        Ok(result)
+    }
+
+    /// Concatenate tables horizontally (add columns) - similar to pandas.concat(axis=1)
+    /// TODO: Implement horizontal concatenation for tables
+    pub fn concat(&self, other: &Self) -> GraphResult<Self> {
+        // TODO: Implement horizontal concatenation by:
+        // 1. Combine column sets from both tables
+        // 2. Handle column name conflicts (add suffix like _x, _y)
+        // 3. Align rows by index (pad shorter table with nulls)
+        // 4. Return new table with combined columns
+        
+        // Basic implementation for now
+        let mut result_columns = self.columns.clone();
+        let target_rows = std::cmp::max(self.nrows, other.nrows);
+        
+        // Add columns from other table, handling conflicts
+        for (col_name, column) in &other.columns {
+            let final_col_name = if result_columns.contains_key(col_name) {
+                format!("{}_y", col_name) // TODO: Better conflict resolution
+            } else {
+                col_name.clone()
+            };
+            
+            // Pad column to match target row count
+            let mut values = column.data().clone();
+            while values.len() < target_rows {
+                values.push(crate::types::AttrValue::Null);
+            }
+            
+            result_columns.insert(final_col_name.clone(), BaseArray::from_attr_values(values));
+        }
+        
+        // Pad existing columns to match target row count
+        for column in result_columns.values_mut() {
+            let mut values = column.data().clone();
+            while values.len() < target_rows {
+                values.push(crate::types::AttrValue::Null);
+            }
+            *column = BaseArray::from_attr_values(values);
+        }
+
+        let mut result = BaseTable::from_columns(result_columns)?;
+        // TODO: Proper column order management for concatenated tables
+        result.column_order.extend(other.column_order.iter().map(|name| {
+            if self.column_order.contains(name) {
+                format!("{}_y", name)
+            } else {
+                name.clone()
+            }
+        }));
+        Ok(result)
+    }
+
     /// Intersect with another table (returns only common rows)
     pub fn intersect(&self, other: &Self) -> GraphResult<Self> {
         // Tables must have the same schema
@@ -1794,4 +2095,217 @@ impl BaseTable {
         result.column_order = self.column_order.clone();
         Ok(result)
     }
+
+    // ==================================================================================
+    // PHASE 2: STREAMING FUNCTIONALITY (FOUNDATION ONLY - specialized types delegate)
+    // ==================================================================================
+    
+    /// Launch interactive streaming table in browser (FOUNDATION ONLY)
+    pub fn interactive(&self, config: Option<InteractiveConfig>) -> GraphResult<BrowserInterface> {
+        use std::sync::Arc;
+        
+        let config = config.unwrap_or_default();
+        
+        // Create data source from self
+        let data_source: Arc<dyn DataSource> = Arc::new(self.clone());
+        
+        // Launch streaming server
+        let server = StreamingServer::new(data_source, config.streaming_config);
+        let server_handle = server.start(config.port)
+            .map_err(|e| crate::errors::GraphError::InvalidInput(
+                format!("Failed to start streaming server: {}", e)
+            ))?;
+        
+        // Create browser interface
+        let browser_interface = BrowserInterface {
+            server_handle,
+            url: format!("http://localhost:{}", config.port),
+            config: config.browser_config,
+        };
+        
+        // TODO: Open browser automatically if requested
+        println!("🚀 Interactive table launched at: {}", browser_interface.url);
+        println!("📊 Streaming {} rows × {} columns", self.total_rows(), self.total_cols());
+        
+        Ok(browser_interface)
+    }
+    
+    /// Increment version for cache invalidation
+    pub fn increment_version(&mut self) {
+        self.version += 1;
+    }
+    
+    /// Get streaming configuration
+    pub fn streaming_config(&self) -> &StreamingConfig {
+        &self.streaming_config
+    }
+    
+    /// Update streaming configuration
+    pub fn set_streaming_config(&mut self, config: StreamingConfig) {
+        self.streaming_config = config;
+    }
+}
+
+// ==================================================================================
+// DATASOURCE IMPLEMENTATION FOR BASETABLE (FOUNDATION ONLY)
+// ==================================================================================
+
+impl DataSource for BaseTable {
+    fn total_rows(&self) -> usize {
+        self.nrows
+    }
+    
+    fn total_cols(&self) -> usize {
+        self.column_order.len()
+    }
+    
+    fn get_window(&self, start: usize, count: usize) -> StreamingDataWindow {
+        let end = std::cmp::min(start + count, self.nrows);
+        let actual_count = end.saturating_sub(start);
+        
+        if actual_count == 0 || start >= self.nrows {
+            return StreamingDataWindow::new(
+                self.column_names().to_vec(),
+                vec![],
+                self.get_schema(),
+                self.nrows,
+                start,
+            );
+        }
+        
+        // Extract rows for the window
+        let mut rows = Vec::with_capacity(actual_count);
+        
+        for row_idx in start..end {
+            let mut row = Vec::with_capacity(self.column_order.len());
+            
+            for col_name in &self.column_order {
+                if let Some(column) = self.columns.get(col_name) {
+                    let value = column.get(row_idx).cloned().unwrap_or(AttrValue::Null);
+                    row.push(value);
+                } else {
+                    row.push(AttrValue::Null);
+                }
+            }
+            
+            rows.push(row);
+        }
+        
+        StreamingDataWindow::new(
+            self.column_names().to_vec(),
+            rows,
+            self.get_schema(),
+            self.nrows,
+            start,
+        )
+    }
+    
+    fn get_schema(&self) -> StreamingDataSchema {
+        let mut columns = Vec::new();
+        
+        for col_name in &self.column_order {
+            let data_type = if let Some(column) = self.columns.get(col_name) {
+                self.infer_column_data_type(column)
+            } else {
+                DataType::String
+            };
+            
+            columns.push(ColumnSchema {
+                name: col_name.clone(),
+                data_type,
+            });
+        }
+        
+        StreamingDataSchema {
+            columns,
+            primary_key: None, // BaseTable doesn't enforce primary keys
+            source_type: "BaseTable".to_string(),
+        }
+    }
+    
+    fn supports_streaming(&self) -> bool {
+        true // BaseTable supports real-time streaming
+    }
+    
+    fn get_column_types(&self) -> Vec<DataType> {
+        self.column_order.iter()
+            .map(|col_name| {
+                if let Some(column) = self.columns.get(col_name) {
+                    self.infer_column_data_type(column)
+                } else {
+                    DataType::String
+                }
+            })
+            .collect()
+    }
+    
+    fn get_column_names(&self) -> Vec<String> {
+        self.column_order.clone()
+    }
+    
+    fn get_source_id(&self) -> String {
+        self.source_id.clone()
+    }
+    
+    fn get_version(&self) -> u64 {
+        self.version
+    }
+}
+
+// ==================================================================================
+// PHASE 2 CONFIGURATION TYPES
+// ==================================================================================
+
+/// Configuration for interactive streaming tables
+#[derive(Debug, Clone)]
+pub struct InteractiveConfig {
+    /// WebSocket port for streaming server
+    pub port: u16,
+    
+    /// Streaming configuration
+    pub streaming_config: StreamingConfig,
+    
+    /// Browser configuration
+    pub browser_config: BrowserConfig,
+}
+
+impl Default for InteractiveConfig {
+    fn default() -> Self {
+        Self {
+            port: 8080,
+            streaming_config: StreamingConfig::default(),
+            browser_config: BrowserConfig::default(),
+        }
+    }
+}
+
+/// Browser interface configuration
+#[derive(Debug, Clone)]
+pub struct BrowserConfig {
+    /// Auto-open browser
+    pub auto_open: bool,
+    
+    /// Theme for interface
+    pub theme: String,
+    
+    /// Window title
+    pub title: String,
+}
+
+impl Default for BrowserConfig {
+    fn default() -> Self {
+        Self {
+            auto_open: true,
+            theme: "light".to_string(),
+            title: "Groggy Interactive Table".to_string(),
+        }
+    }
+}
+
+/// Browser interface handle
+#[derive(Debug)]
+pub struct BrowserInterface {
+    pub server_handle: crate::core::streaming::websocket_server::ServerHandle,
+    pub url: String,
+    pub config: BrowserConfig,
 }

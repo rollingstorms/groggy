@@ -43,6 +43,14 @@ impl PyNumArray {
 
 #[pymethods]
 impl PyNumArray {
+    /// Create new NumArray from a list of numbers
+    #[new]
+    fn __new__(values: Vec<f64>) -> Self {
+        Self {
+            inner: NumArray::new(values),
+        }
+    }
+    
     /// Get the number of elements
     fn __len__(&self) -> usize {
         self.inner.len()
@@ -154,28 +162,103 @@ impl PyNumArray {
     }
     
     /// Get descriptive statistics summary as a dictionary
-    fn describe(&self) -> PyResult<PyObject> {
-        let summary = self.inner.describe();
-        
-        Python::with_gil(|py| {
-            let dict = pyo3::types::PyDict::new(py);
-            dict.set_item("count", summary.count)?;
-            dict.set_item("mean", summary.mean)?;
-            dict.set_item("std", summary.std_dev)?;
-            dict.set_item("min", summary.min)?;
-            dict.set_item("25%", summary.percentile_25)?;
-            dict.set_item("50%", summary.median)?;
-            dict.set_item("75%", summary.percentile_75)?;
-            dict.set_item("max", summary.max)?;
-            Ok(dict.to_object(py))
-        })
-    }
+    // TODO: Fix linking issue with describe method
+    // fn describe(&self) -> PyResult<PyObject> {
+    //     let summary = self.inner.describe();
+    //     
+    //     Python::with_gil(|py| {
+    //         let dict = pyo3::types::PyDict::new(py);
+    //         dict.set_item("count", summary.count)?;
+    //         dict.set_item("mean", summary.mean)?;
+    //         dict.set_item("std", summary.std_dev)?;
+    //         dict.set_item("min", summary.min)?;
+    //         dict.set_item("25%", summary.percentile_25)?;
+    //         dict.set_item("50%", summary.median)?;
+    //         dict.set_item("75%", summary.percentile_75)?;
+    //         dict.set_item("max", summary.max)?;
+    //         Ok(dict.to_object(py))
+    //     })
+    // }
     
     /// Create iterator
     fn __iter__(slf: PyRef<Self>) -> PyNumArrayIterator {
         PyNumArrayIterator {
             array: slf.into(),
             index: 0,
+        }
+    }
+
+    // Comparison operators for boolean masking
+    
+    /// Greater than comparison (>) - returns Vec<bool> for boolean masking
+    fn __gt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
+        if let Ok(scalar) = other.extract::<f64>() {
+            let result: Vec<bool> = self.inner.iter().map(|&x| x > scalar).collect();
+            Ok(result.to_object(py))
+        } else {
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "NumArray comparison requires a numeric value"
+            ))
+        }
+    }
+
+    /// Less than comparison (<) - returns Vec<bool> for boolean masking
+    fn __lt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
+        if let Ok(scalar) = other.extract::<f64>() {
+            let result: Vec<bool> = self.inner.iter().map(|&x| x < scalar).collect();
+            Ok(result.to_object(py))
+        } else {
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "NumArray comparison requires a numeric value"
+            ))
+        }
+    }
+
+    /// Greater than or equal comparison (>=) - returns Vec<bool> for boolean masking
+    fn __ge__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
+        if let Ok(scalar) = other.extract::<f64>() {
+            let result: Vec<bool> = self.inner.iter().map(|&x| x >= scalar).collect();
+            Ok(result.to_object(py))
+        } else {
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "NumArray comparison requires a numeric value"
+            ))
+        }
+    }
+
+    /// Less than or equal comparison (<=) - returns Vec<bool> for boolean masking
+    fn __le__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
+        if let Ok(scalar) = other.extract::<f64>() {
+            let result: Vec<bool> = self.inner.iter().map(|&x| x <= scalar).collect();
+            Ok(result.to_object(py))
+        } else {
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "NumArray comparison requires a numeric value"
+            ))
+        }
+    }
+
+    /// Equality comparison (==) - returns Vec<bool> for boolean masking
+    fn __eq__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
+        if let Ok(scalar) = other.extract::<f64>() {
+            let result: Vec<bool> = self.inner.iter().map(|&x| (x - scalar).abs() < f64::EPSILON).collect();
+            Ok(result.to_object(py))
+        } else {
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "NumArray comparison requires a numeric value"
+            ))
+        }
+    }
+
+    /// Not equal comparison (!=) - returns Vec<bool> for boolean masking
+    fn __ne__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
+        if let Ok(scalar) = other.extract::<f64>() {
+            let result: Vec<bool> = self.inner.iter().map(|&x| (x - scalar).abs() >= f64::EPSILON).collect();
+            Ok(result.to_object(py))
+        } else {
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "NumArray comparison requires a numeric value"
+            ))
         }
     }
 }
