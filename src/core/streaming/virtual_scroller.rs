@@ -261,15 +261,21 @@ impl<K: Clone + std::hash::Hash + Eq, V: Clone> LRUCache<K, V> {
     }
     
     pub fn get(&mut self, key: &K) -> Option<V> {
-        if let Some(entry) = self.cache.get_mut(key) {
+        let value = if let Some(entry) = self.cache.get_mut(key) {
             entry.last_accessed = std::time::Instant::now();
-            self.update_access_order(key.clone());
-            self.hits += 1;
             Some(entry.value.clone())
         } else {
-            self.misses += 1;
             None
+        };
+        
+        if value.is_some() {
+            self.update_access_order(key.clone());
+            self.hits += 1;
+        } else {
+            self.misses += 1;
         }
+        
+        value
     }
     
     pub fn put(&mut self, key: K, value: V) {

@@ -122,7 +122,7 @@ impl DisplayConfig {
             max_rows: 10,
             max_cols: 8,
             precision: 2,
-            theme: "light".to_string(),
+            theme: "sleek".to_string(),
             output_format: OutputFormat::Unicode,
             truncation_strategy: TruncationStrategy::TypeAware,
             show_truncation_info: true,
@@ -139,7 +139,7 @@ impl DisplayConfig {
             max_rows: 10,
             max_cols: 8,
             precision: 2,
-            theme: "light".to_string(),
+            theme: "sleek".to_string(),
             output_format: OutputFormat::Unicode,
             truncation_strategy: TruncationStrategy::TypeAware,
             show_truncation_info: true,
@@ -242,7 +242,7 @@ mod tests {
         let engine = DisplayEngine::new();
         assert!(engine.config.compact_mode);
         assert_eq!(engine.config.max_cell_width, 20);
-        assert_eq!(engine.config.theme, "light");
+        assert_eq!(engine.config.theme, "sleek");
     }
 
     #[test]

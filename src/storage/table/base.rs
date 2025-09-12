@@ -23,6 +23,8 @@ pub struct BaseTable {
     display_engine: DisplayEngine,
     /// Streaming server for real-time updates (FOUNDATION ONLY - Phase 2)
     streaming_server: Option<StreamingServer>,
+    /// Active server handles to keep them alive
+    active_server_handles: Vec<crate::core::streaming::websocket_server::ServerHandle>,
     /// Streaming configuration
     streaming_config: StreamingConfig,
     /// Source ID for caching
@@ -39,6 +41,7 @@ impl Clone for BaseTable {
             nrows: self.nrows,
             display_engine: self.display_engine.clone(),
             streaming_server: None, // Don't clone server, create new instance when needed
+            active_server_handles: Vec::new(), // Don't clone server handles
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
             version: self.version,
@@ -58,6 +61,7 @@ impl BaseTable {
             nrows: 0,
             display_engine: DisplayEngine::new(),
             streaming_server: None,
+            active_server_handles: Vec::new(),
             streaming_config: StreamingConfig::default(),
             source_id: format!("basetable_{}", timestamp),
             version: 1,
@@ -97,6 +101,7 @@ impl BaseTable {
             nrows: max_len,
             display_engine: DisplayEngine::new(),
             streaming_server: None,
+            active_server_handles: Vec::new(),
             streaming_config: StreamingConfig::default(),
             source_id: format!("basetable_{}", timestamp),
             version: 1,
@@ -137,6 +142,7 @@ impl BaseTable {
             nrows: first_len,
             display_engine: DisplayEngine::new(),
             streaming_server: None,
+            active_server_handles: Vec::new(),
             streaming_config: StreamingConfig::default(),
             source_id: format!("basetable_{}", timestamp),
             version: 1,
@@ -490,6 +496,7 @@ impl Table for BaseTable {
             nrows: actual_end - start,
             display_engine: self.display_engine.clone(),
             streaming_server: None,
+            active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
             version: self.version + 1, // Increment version for new slice
@@ -517,6 +524,7 @@ impl Table for BaseTable {
             nrows: self.nrows,
             display_engine: self.display_engine.clone(),
             streaming_server: None,
+            active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
             version: self.version + 1,
@@ -541,6 +549,7 @@ impl Table for BaseTable {
             nrows: new_nrows,
             display_engine: self.display_engine.clone(),
             streaming_server: None,
+            active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
             version: self.version + 1,
@@ -610,6 +619,7 @@ impl Table for BaseTable {
             nrows: self.nrows,
             display_engine: self.display_engine.clone(),
             streaming_server: None,
+            active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
             version: self.version + 1,
@@ -638,6 +648,7 @@ impl Table for BaseTable {
             nrows: if self.nrows == 0 { column.len() } else { self.nrows },
             display_engine: self.display_engine.clone(),
             streaming_server: None,
+            active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
             version: self.version + 1,
@@ -659,6 +670,7 @@ impl Table for BaseTable {
             nrows: self.nrows,
             display_engine: self.display_engine.clone(),
             streaming_server: None,
+            active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
             version: self.version + 1,
@@ -693,6 +705,7 @@ impl BaseTable {
             nrows: new_nrows,
             display_engine: self.display_engine.clone(),
             streaming_server: None,
+            active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
             version: self.version + 1,
@@ -1616,6 +1629,7 @@ impl BaseTable {
             nrows: row_indices.len(),
             display_engine: self.display_engine.clone(),
             streaming_server: None,
+            active_server_handles: Vec::new(),
             streaming_config: self.streaming_config.clone(),
             source_id: self.source_id.clone(),
             version: self.version + 1,
@@ -2109,17 +2123,45 @@ impl BaseTable {
         // Create data source from self
         let data_source: Arc<dyn DataSource> = Arc::new(self.clone());
         
-        // Launch streaming server
+        // Launch streaming server asynchronously 
         let server = StreamingServer::new(data_source, config.streaming_config);
-        let server_handle = server.start(config.port)
+        let port = config.port;
+        
+        // Find an available port if port is 0
+        let actual_port = if port == 0 {
+            // Find an available port by binding to 0 and checking what we get
+            use std::net::{TcpListener, SocketAddr};
+            let listener = TcpListener::bind("127.0.0.1:0")
+                .map_err(|e| crate::errors::GraphError::InvalidInput(
+                    format!("Failed to find available port: {}", e)
+                ))?;
+            let port = listener.local_addr()
+                .map_err(|e| crate::errors::GraphError::InvalidInput(
+                    format!("Failed to get local address: {}", e)
+                ))?
+                .port();
+            drop(listener); // Release the port
+            port
+        } else {
+            port
+        };
+        
+        // Start server using the dedicated background runtime to avoid deadlocks
+        let port_hint = actual_port; // 0 for ephemeral or your chosen port
+        let server = StreamingServer::new(Arc::clone(&server.data_source), server.config.clone());
+        
+        // Always use the dedicated background runtime to avoid deadlocks
+        let server_handle = server
+            .start_background("127.0.0.1".parse().unwrap(), port_hint)
             .map_err(|e| crate::errors::GraphError::InvalidInput(
                 format!("Failed to start streaming server: {}", e)
             ))?;
         
-        // Create browser interface
+        // Create browser interface using the actual assigned port
+        let actual_port = server_handle.port;
         let browser_interface = BrowserInterface {
             server_handle,
-            url: format!("http://localhost:{}", config.port),
+            url: format!("http://127.0.0.1:{}", actual_port),
             config: config.browser_config,
         };
         
@@ -2128,6 +2170,35 @@ impl BaseTable {
         println!("📊 Streaming {} rows × {} columns", self.total_rows(), self.total_cols());
         
         Ok(browser_interface)
+    }
+    
+    /// Generate embedded iframe HTML for Jupyter notebooks
+    pub fn interactive_embed(&mut self, config: Option<InteractiveConfig>) -> GraphResult<String> {
+        // Start the streaming server
+        let browser_interface = self.interactive(config)?;
+        
+        // Store the server handle to keep it alive
+        self.active_server_handles.push(browser_interface.server_handle);
+        
+        // Generate iframe HTML that can be embedded in Jupyter
+        let iframe_html = format!(r#"
+            <iframe 
+                src="{}" 
+                width="100%" 
+                height="600px" 
+                frameborder="0" 
+                style="border: 1px solid #ddd; border-radius: 4px;">
+            </iframe>
+            <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                📊 Interactive streaming table: {} rows × {} columns
+            </p>
+        "#, 
+            browser_interface.url, 
+            self.total_rows(), 
+            self.total_cols()
+        );
+        
+        Ok(iframe_html)
     }
     
     /// Increment version for cache invalidation
@@ -2143,6 +2214,16 @@ impl BaseTable {
     /// Update streaming configuration
     pub fn set_streaming_config(&mut self, config: StreamingConfig) {
         self.streaming_config = config;
+    }
+    
+    /// Stop all active streaming servers
+    pub fn stop_all_servers(&mut self) {
+        self.active_server_handles.clear(); // Drop will handle cleanup
+    }
+    
+    /// Get number of active streaming servers
+    pub fn active_servers_count(&self) -> usize {
+        self.active_server_handles.len()
     }
 }
 
@@ -2252,6 +2333,7 @@ impl DataSource for BaseTable {
     }
 }
 
+
 // ==================================================================================
 // PHASE 2 CONFIGURATION TYPES
 // ==================================================================================
@@ -2272,10 +2354,29 @@ pub struct InteractiveConfig {
 impl Default for InteractiveConfig {
     fn default() -> Self {
         Self {
-            port: 8080,
+            port: 0,  // Use port 0 for automatic port assignment to avoid conflicts
             streaming_config: StreamingConfig::default(),
             browser_config: BrowserConfig::default(),
         }
+    }
+}
+
+impl InteractiveConfig {
+    /// Create InteractiveConfig with a specific port
+    /// 
+    /// Use port 0 for automatic port assignment (recommended)
+    /// or specify a custom port (e.g., 8080, 3000, etc.)
+    pub fn with_port(port: u16) -> Self {
+        Self {
+            port,
+            streaming_config: StreamingConfig::default(),
+            browser_config: BrowserConfig::default(),
+        }
+    }
+    
+    /// Create InteractiveConfig with automatic port assignment (same as default)
+    pub fn auto_port() -> Self {
+        Self::default()
     }
 }
 
@@ -2296,7 +2397,7 @@ impl Default for BrowserConfig {
     fn default() -> Self {
         Self {
             auto_open: true,
-            theme: "light".to_string(),
+            theme: "sleek".to_string(),
             title: "Groggy Interactive Table".to_string(),
         }
     }

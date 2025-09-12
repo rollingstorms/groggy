@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groggy CSS Playground</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: white;
+            padding: 15px 20px;
+            border-bottom: 1px solid #ddd;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #333;
+        }
+        
+        .controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .control-group label {
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .control-group select, .control-group button {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .control-group button {
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        
+        .control-group button:hover {
+            background: #0056b3;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            height: calc(100vh - 100px);
+        }
+        
+        .editor-panel {
+            width: 40%;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .editor-header {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 1px solid #ddd;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .editor {
+            flex: 1;
+            border: none;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 12px;
+            padding: 15px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            resize: none;
+            outline: none;
+        }
+        
+        .preview-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .preview-header {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 1px solid #ddd;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .preview-content {
+            flex: 1;
+            padding: 20px;
+            overflow: auto;
+            background: white;
+        }
+        
+        .status-bar {
+            background: #f8f9fa;
+            padding: 5px 15px;
+            border-top: 1px solid #ddd;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        /* Preview styles will be injected here */
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎨 Groggy CSS Playground</h1>
+        <div class="controls">
+            <div class="control-group">
+                <label for="theme-select">Base Theme:</label>
+                <select id="theme-select" onchange="loadTheme()">
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                    <option value="minimal">Minimal</option>
+                    <option value="publication">Publication</option>
+                    <option value="sleek">sleek</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <button onclick="applyCSS()">Apply Changes</button>
+            </div>
+            <div class="control-group">
+                <button onclick="resetCSS()">Reset</button>
+            </div>
+            <div class="control-group">
+                <button onclick="downloadCSS()">Download CSS</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="main-content">
+        <div class="editor-panel">
+            <div class="editor-header">
+                CSS Editor - Make your changes here
+            </div>
+            <textarea id="css-editor" class="editor" placeholder="/* Start editing CSS here... */"></textarea>
+        </div>
+        
+        <div class="preview-panel">
+            <div class="preview-header">
+                Live Preview
+            </div>
+            <div class="preview-content" id="preview-content">
+                <!-- Sample table will be inserted here -->
+            </div>
+        </div>
+    </div>
+    
+    <div class="status-bar">
+        Ready to edit • Changes apply automatically
+    </div>
+    
+    <style id="dynamic-styles"></style>
+    
+    <script>
+        // Sample table HTML
+        const sampleTableHTML = `
+            <div class="groggy-display-container" data-theme="light">
+                <table class="groggy-table theme-light">
+                    <thead>
+                        <tr>
+                            <th class="col-string" data-type="String" title="Column: name (String)">name</th>
+                            <th class="col-integer" data-type="Integer" title="Column: age (Integer)">age</th>
+                            <th class="col-float" data-type="Float" title="Column: score (Float)">score</th>
+                            <th class="col-boolean" data-type="Boolean" title="Column: active (Boolean)">active</th>
+                            <th class="col-integer" data-type="Integer" title="Column: salary (Integer)">salary</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="cell-string" data-type="String" title="String value">Alice Johnson</td>
+                            <td class="cell-integer" data-type="Integer" title="Integer value">25</td>
+                            <td class="cell-float" data-type="Float" title="Float value">91.50</td>
+                            <td class="cell-boolean" data-type="Boolean" title="Boolean value">✓</td>
+                            <td class="cell-integer" data-type="Integer" title="Integer value">75,000</td>
+                        </tr>
+                        <tr>
+                            <td class="cell-string" data-type="String" title="String value">Bob &amp; Associates</td>
+                            <td class="cell-integer" data-type="Integer" title="Integer value">30,000</td>
+                            <td class="cell-float" data-type="Float" title="Float value">87.00</td>
+                            <td class="cell-boolean" data-type="Boolean" title="Boolean value">✗</td>
+                            <td class="cell-integer" data-type="Integer" title="Integer value">125,000</td>
+                        </tr>
+                        <tr>
+                            <td class="cell-string" data-type="String" title="String value">Carol Smith</td>
+                            <td class="cell-integer" data-type="Integer" title="Integer value">28</td>
+                            <td class="cell-float" data-type="Float" title="Float value">95.75</td>
+                            <td class="cell-boolean" data-type="Boolean" title="Boolean value">✓</td>
+                            <td class="cell-integer" data-type="Integer" title="Integer value">82,000</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="table-info">
+                    <span>Showing 3 of 1003 rows (sample data)</span>
+                    <button class="interactive-btn" onclick="alert('Interactive view placeholder')" 
+                            title="Launch interactive view for full dataset">
+                        View All (1003 rows) →
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        let currentTheme = 'light';
+        let baseCSS = '';
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('preview-content').innerHTML = sampleTableHTML;
+            loadTheme();
+            
+            // Auto-apply CSS changes as user types
+            const editor = document.getElementById('css-editor');
+            editor.addEventListener('input', debounce(applyCSS, 300));
+        });
+        
+        // Load theme CSS
+        async function loadTheme() {
+            const select = document.getElementById('theme-select');
+            currentTheme = select.value;
+            
+            try {
+                const response = await fetch(`themes/${currentTheme}.css`);
+                baseCSS = await response.text();
+                
+                // Update editor with base CSS
+                document.getElementById('css-editor').value = baseCSS;
+                
+                // Update preview
+                updatePreview();
+                applyCSS();
+                
+                console.log(`Loaded ${currentTheme} theme`);
+            } catch (error) {
+                console.error('Error loading theme:', error);
+                alert(`Failed to load ${currentTheme} theme. Make sure the CSS files exist.`);
+            }
+        }
+        
+        // Apply CSS changes to preview
+        function applyCSS() {
+            const customCSS = document.getElementById('css-editor').value;
+            const dynamicStyles = document.getElementById('dynamic-styles');
+            
+            dynamicStyles.textContent = customCSS;
+            
+            updatePreview();
+        }
+        
+        // Update preview with current theme
+        function updatePreview() {
+            const container = document.querySelector('#preview-content .groggy-display-container');
+            const table = document.querySelector('#preview-content .groggy-table');
+            
+            if (container) {
+                container.setAttribute('data-theme', currentTheme);
+            }
+            
+            if (table) {
+                table.className = `groggy-table theme-${currentTheme}`;
+            }
+        }
+        
+        // Reset to base theme CSS
+        function resetCSS() {
+            document.getElementById('css-editor').value = baseCSS;
+            applyCSS();
+        }
+        
+        // Download current CSS
+        function downloadCSS() {
+            const css = document.getElementById('css-editor').value;
+            const blob = new Blob([css], { type: 'text/css' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `groggy-${currentTheme}-custom.css`;
+            a.click();
+            
+            URL.revokeObjectURL(url);
+        }
+        
+        // Debounce function for auto-apply
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
+        // CSS Inspector Tooltip
+        class CSSInspector {
+            constructor() {
+                this.tooltip = null;
+                this.isEnabled = true;
+                this.createTooltip();
+                this.attachEventListeners();
+            }
+            
+            createTooltip() {
+                this.tooltip = document.createElement('div');
+                this.tooltip.id = 'css-inspector-tooltip';
+                this.tooltip.style.cssText = `
+                    position: fixed;
+                    background: rgba(0, 0, 0, 0.9);
+                    color: white;
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    font-family: Monaco, monospace;
+                    font-size: 11px;
+                    line-height: 1.4;
+                    pointer-events: none;
+                    z-index: 10000;
+                    max-width: 300px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    border: 1px solid #444;
+                    display: none;
+                    white-space: pre-wrap;
+                `;
+                document.body.appendChild(this.tooltip);
+            }
+            
+            attachEventListeners() {
+                const previewContent = document.getElementById('preview-content');
+                
+                previewContent.addEventListener('mousemove', (e) => {
+                    if (!this.isEnabled) return;
+                    
+                    const target = e.target;
+                    
+                    // Only inspect table-related elements
+                    if (this.isTableElement(target)) {
+                        this.showTooltip(e, target);
+                    } else {
+                        this.hideTooltip();
+                    }
+                });
+                
+                previewContent.addEventListener('mouseleave', () => {
+                    this.hideTooltip();
+                });
+                
+                // Toggle inspector with Alt+I
+                document.addEventListener('keydown', (e) => {
+                    if (e.altKey && e.key === 'i') {
+                        this.toggle();
+                        e.preventDefault();
+                    }
+                });
+            }
+            
+            isTableElement(element) {
+                const tableElements = ['TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD', 'DIV'];
+                return tableElements.includes(element.tagName) && 
+                       (element.closest('.groggy-display-container') || 
+                        element.classList.contains('groggy-display-container'));
+            }
+            
+            showTooltip(event, element) {
+                const info = this.getElementInfo(element);
+                this.tooltip.innerHTML = info;
+                this.tooltip.style.display = 'block';
+                
+                // Position tooltip near mouse but avoid edges
+                const x = event.clientX + 15;
+                const y = event.clientY - 10;
+                const rect = this.tooltip.getBoundingClientRect();
+                
+                let finalX = x;
+                let finalY = y;
+                
+                // Adjust if tooltip would go off-screen
+                if (x + rect.width > window.innerWidth) {
+                    finalX = event.clientX - rect.width - 15;
+                }
+                if (y + rect.height > window.innerHeight) {
+                    finalY = event.clientY - rect.height - 10;
+                }
+                
+                this.tooltip.style.left = finalX + 'px';
+                this.tooltip.style.top = finalY + 'px';
+            }
+            
+            hideTooltip() {
+                this.tooltip.style.display = 'none';
+            }
+            
+            getElementInfo(element) {
+                const tagName = element.tagName.toLowerCase();
+                const classes = Array.from(element.classList);
+                const dataAttrs = this.getDataAttributes(element);
+                const cssRules = this.getAppliedCSSRules(element);
+                
+                let info = `<span style="color: #61dafb;">&lt;${tagName}</span>`;
+                
+                if (classes.length > 0) {
+                    info += ` <span style="color: #f7df1e;">class="${classes.join(' ')}"</span>`;
+                }
+                
+                if (dataAttrs.length > 0) {
+                    dataAttrs.forEach(attr => {
+                        info += ` <span style="color: #ff6b6b;">${attr.name}="${attr.value}"</span>`;
+                    });
+                }
+                
+                info += `<span style="color: #61dafb;">&gt;</span>\\n`;
+                
+                if (cssRules.length > 0) {
+                    info += `\\n<span style="color: #98fb98;">Applied CSS:</span>\\n`;
+                    cssRules.forEach(rule => {
+                        info += `<span style="color: #ddd;">${rule}</span>\\n`;
+                    });
+                }
+                
+                return info;
+            }
+            
+            getDataAttributes(element) {
+                const dataAttrs = [];
+                for (let attr of element.attributes) {
+                    if (attr.name.startsWith('data-')) {
+                        dataAttrs.push({ name: attr.name, value: attr.value });
+                    }
+                }
+                return dataAttrs;
+            }
+            
+            getAppliedCSSRules(element) {
+                const rules = [];
+                const computedStyle = window.getComputedStyle(element);
+                
+                // Key properties to show for table elements
+                const importantProps = [
+                    'background-color', 'color', 'border', 'padding', 'margin',
+                    'font-size', 'font-weight', 'text-align', 'width', 'height'
+                ];
+                
+                importantProps.forEach(prop => {
+                    const value = computedStyle.getPropertyValue(prop);
+                    if (value && value !== 'initial' && value !== 'normal') {
+                        rules.push(`${prop}: ${value}`);
+                    }
+                });
+                
+                return rules.slice(0, 6); // Limit to 6 rules to avoid overwhelming
+            }
+            
+            toggle() {
+                this.isEnabled = !this.isEnabled;
+                if (!this.isEnabled) {
+                    this.hideTooltip();
+                }
+                
+                // Show status message
+                const status = this.isEnabled ? 'enabled' : 'disabled';
+                console.log(`🔍 CSS Inspector ${status} (Alt+I to toggle)`);
+                
+                // Brief visual feedback
+                const feedback = document.createElement('div');
+                feedback.textContent = `CSS Inspector ${status}`;
+                feedback.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: ${this.isEnabled ? '#28a745' : '#dc3545'};
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    z-index: 10001;
+                    transition: opacity 0.3s;
+                `;
+                document.body.appendChild(feedback);
+                
+                setTimeout(() => {
+                    feedback.style.opacity = '0';
+                    setTimeout(() => feedback.remove(), 300);
+                }, 1500);
+            }
+        }
+        
+        // Initialize CSS Inspector when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const inspector = new CSSInspector();
+            
+            // Add instruction to the status bar
+            const statusBar = document.querySelector('.status-bar');
+            if (statusBar) {
+                statusBar.innerHTML += ' • <span style="color: #666;">🔍 CSS Inspector: Hover over table elements (Alt+I to toggle)</span>';
+            }
+        });
+    </script>
+</body>
+</html>

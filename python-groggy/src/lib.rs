@@ -290,7 +290,7 @@ fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
         let base_table = BaseTable::from_columns(columns)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
-        let py_table = PyBaseTable { table: base_table };
+        let py_table = PyBaseTable::from_table(base_table);
         return Ok(py_table.into_py(py));
     }
     
@@ -300,7 +300,7 @@ fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
             // Empty table
             let empty_table = BaseTable::from_columns(HashMap::new())
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-            let py_table = PyBaseTable { table: empty_table };
+            let py_table = PyBaseTable::from_table(empty_table);
             return Ok(py_table.into_py(py));
         }
         
@@ -340,7 +340,7 @@ fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
             let base_table = BaseTable::from_columns(columns)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             
-            let py_table = PyBaseTable { table: base_table };
+            let py_table = PyBaseTable::from_table(base_table);
             return Ok(py_table.into_py(py));
         }
     }

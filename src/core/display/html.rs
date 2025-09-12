@@ -328,7 +328,7 @@ mod tests {
     fn test_html_table_generation() {
         let renderer = HtmlRenderer::new();
         let data = create_test_data();
-        let theme = Theme::light();
+        let theme = Theme::sleek();
         let config = DisplayConfig::default();
 
         let html = renderer.render_semantic_table(&data, &theme, &config);
@@ -341,7 +341,7 @@ mod tests {
         assert!(html.contains("<td"));
 
         // Should contain theme class
-        assert!(html.contains("theme-light"));
+        assert!(html.contains("theme-sleek"));
 
         // Should contain data
         assert!(html.contains("Alice"));
@@ -358,7 +358,7 @@ mod tests {
     fn test_data_type_classes() {
         let renderer = HtmlRenderer::new();
         let data = create_test_data();
-        let theme = Theme::light();
+        let theme = Theme::sleek();
         let config = DisplayConfig::default();
 
         let html = renderer.render_semantic_table(&data, &theme, &config);
@@ -415,7 +415,7 @@ mod tests {
     #[test]
     fn test_empty_table() {
         let renderer = HtmlRenderer::new();
-        let theme = Theme::light();
+        let theme = Theme::sleek();
 
         let html = renderer.render_empty_table(&theme);
 

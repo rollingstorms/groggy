@@ -1,0 +1,188 @@
+/* Light theme CSS for Groggy display tables */
+
+.groggy-display-container[data-theme="light"] {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', 'Inconsolata', 'Liberation Mono', monospace;
+    background-color: #ffffff;
+    color: #212529;
+    border-radius: 4px;
+    overflow-x: auto;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.groggy-table.theme-light {
+    border-collapse: collapse;
+    font-size: 14px;
+    width: auto;
+    min-width: fit-content;
+    margin: 0;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+.groggy-table.theme-light th {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+    border-radius: 4px;
+}
+
+.groggy-table.theme-light td {
+    border: 1px solid #dee2e6;
+    padding: 6px 12px;
+    color: #212529;
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+    border-radius: 4px;
+}
+
+.groggy-table.theme-light tr:nth-child(even) {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.groggy-table.theme-light tr:hover {
+    background-color: #e9ecef;
+    border-radius: 4px;
+}
+
+/* Data type specific styling */
+.groggy-table.theme-light .cell-float,
+.groggy-table.theme-light .cell-integer {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #0066cc;
+    border-radius: 4px;
+}
+
+.groggy-table.theme-light .cell-string {
+    text-align: left;
+    color: #212529;
+    border-radius: 4px;
+}
+
+.groggy-table.theme-light .cell-boolean {
+    text-align: center;
+    color: #28a745;
+    font-weight: 500;
+}
+
+.groggy-table.theme-light .cell-datetime {
+    text-align: left;
+    color: #6f42c1;
+    font-variant-numeric: tabular-nums;
+}
+
+.groggy-table.theme-light .cell-unknown {
+    text-align: left;
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Table info section */
+.groggy-display-container .table-info {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #6c757d;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.table-info .interactive-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.table-info .interactive-btn:hover {
+    background-color: #0056b3;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .groggy-table.theme-light {
+        font-size: 12px;
+    }
+    
+    .groggy-table.theme-light th,
+    .groggy-table.theme-light td {
+        padding: 4px 8px;
+    }
+    
+    .groggy-display-container {
+        border-radius: 0;
+        box-shadow: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .groggy-table.theme-light {
+        font-size: 11px;
+    }
+    
+    .groggy-table.theme-light th,
+    .groggy-table.theme-light td {
+        padding: 3px 6px;
+    }
+}
+
+/* Print styles */
+@media print {
+    .groggy-display-container {
+        box-shadow: none;
+        border: 1px solid #000;
+    }
+    
+    .groggy-table.theme-light {
+        border: 1px solid #000;
+    }
+    
+    .groggy-table.theme-light th,
+    .groggy-table.theme-light td {
+        border: 1px solid #000;
+        background-color: transparent !important;
+        color: #000;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .table-info,
+    .interactive-btn {
+        display: none;
+    }
+}
+
+/* Accessibility improvements */
+.groggy-table.theme-light:focus-within {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+.groggy-table.theme-light th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Truncated content indicator */
+.cell-truncated::after {
+    content: "…";
+    color: #6c757d;
+    font-weight: normal;
+}

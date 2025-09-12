@@ -4,9 +4,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
 use crate::ffi::storage::array::PyBaseArray;
 use groggy::storage::{ArrayOps, array::BaseArray, table::{BaseTable, NodesTable, EdgesTable, Table, TableIterator}};
+use groggy::core::streaming::DataSource;  // Import DataSource trait for streaming methods
 use groggy::GraphArray;  // Correct import path
 use groggy::types::{NodeId, EdgeId, AttrValue, AttrValueType};
 use std::collections::HashMap;
+use std::cell::RefCell;
 use serde_json::{Map, Value};
 
 // =============================================================================
@@ -15,9 +17,16 @@ use serde_json::{Map, Value};
 
 /// Python wrapper for BaseTable
 #[pyclass(name = "BaseTable", module = "groggy")]
-#[derive(Clone)]
 pub struct PyBaseTable {
     pub(crate) table: BaseTable,
+    // Keep-alive guards for streaming servers spawned by this table
+    server_guards: RefCell<Vec<groggy::core::streaming::websocket_server::ServerHandle>>,
+}
+
+impl Clone for PyBaseTable {
+    fn clone(&self) -> Self {
+        Self::from_table(self.table.clone())
+    }
 }
 
 #[pymethods]
@@ -27,6 +36,7 @@ impl PyBaseTable {
     pub fn new() -> Self {
         Self {
             table: BaseTable::new(),
+            server_guards: RefCell::new(Vec::new()),
         }
     }
 
@@ -83,7 +93,10 @@ impl PyBaseTable {
         let table = BaseTable::from_columns(columns)
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create table: {}", e)))?;
         
-        Py::new(py, PyBaseTable { table })
+        Py::new(py, PyBaseTable { 
+            table,
+            server_guards: RefCell::new(Vec::new()),
+        })
     }
     
     /// Get number of rows
@@ -140,18 +153,14 @@ impl PyBaseTable {
     #[pyo3(signature = (n = 5))]
     pub fn head(&self, py: Python, n: usize) -> PyResult<Py<Self>> {
         let result_table = self.table.head(n);
-        Py::new(py, Self {
-            table: result_table,
-        })
+        Py::new(py, Self::from_table(result_table))
     }
     
     /// Get last n rows (default 5)
     #[pyo3(signature = (n = 5))]
     pub fn tail(&self, py: Python, n: usize) -> PyResult<Py<Self>> {
         let result_table = self.table.tail(n);
-        Py::new(py, Self {
-            table: result_table,
-        })
+        Py::new(py, Self::from_table(result_table))
     }
     
     /// Get table iterator for chaining
@@ -174,7 +183,7 @@ impl PyBaseTable {
         let sorted_table = self.table.sort_by(column, ascending)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
-        Py::new(py, Self { table: sorted_table })
+        Py::new(py, Self::from_table(sorted_table))
     }
     
     /// Select specific columns to create a new table
@@ -188,7 +197,7 @@ impl PyBaseTable {
         let selected_table = self.table.select(&columns)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
-        Py::new(py, Self { table: selected_table })
+        Py::new(py, Self::from_table(selected_table))
     }
     
     /// Drop columns from the table
@@ -202,7 +211,7 @@ impl PyBaseTable {
         let new_table = self.table.drop_columns(&columns)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
-        Py::new(py, Self { table: new_table })
+        Py::new(py, Self::from_table(new_table))
     }
     
     // =============================================================================
@@ -420,7 +429,7 @@ impl PyBaseTable {
             self.filter_by_python_function(predicate)?
         };
         
-        Ok(Self { table: filtered_table })
+        Ok(Self::from_table(filtered_table))
     }
     
     /// Group by columns and return grouped tables
@@ -436,7 +445,7 @@ impl PyBaseTable {
         
         // Convert to PyBaseTable objects
         let py_tables: Vec<PyBaseTable> = grouped_tables.into_iter()
-            .map(|table| PyBaseTable { table })
+            .map(|table| PyBaseTable::from_table(table))
             .collect();
         
         Ok(PyTableArray { 
@@ -454,9 +463,7 @@ impl PyBaseTable {
     /// Returns:
     ///     PyBaseTable: A new table with the specified row slice
     pub fn slice(&self, start: usize, end: usize) -> Self {
-        Self {
-            table: self.table.slice(start, end),
-        }
+        Self::from_table(self.table.slice(start, end))
     }
     
     /// String representation
@@ -554,7 +561,7 @@ impl PyBaseTable {
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyKeyError, _>(
                     format!("Failed to select columns: {}", e)
                 ))?;
-            Ok(PyBaseTable { table: selected_table }.into_py(py))
+            Ok(PyBaseTable::from_table(selected_table).into_py(py))
         } else if let Ok(row_index) = key.extract::<isize>() {
             // Row access by integer: table[5] or table[-1]
             let nrows = self.table.nrows() as isize;
@@ -572,7 +579,7 @@ impl PyBaseTable {
             
             // Return single row as a BaseTable with one row
             let single_row_table = self.table.head(actual_index + 1).tail(1);
-            Ok(PyBaseTable { table: single_row_table }.into_py(py))
+            Ok(PyBaseTable::from_table(single_row_table).into_py(py))
         } else if let Ok(slice) = key.downcast::<PySlice>() {
             // Slice access: table[start:end]
             let indices = slice.indices(self.table.nrows() as i64)?;
@@ -588,7 +595,7 @@ impl PyBaseTable {
             
             // Create a new BaseTable with the sliced rows
             let sliced_table = self.table.head(stop).tail(stop - start);
-            Ok(PyBaseTable { table: sliced_table }.into_py(py))
+            Ok(PyBaseTable::from_table(sliced_table).into_py(py))
         } else if let Ok(py_array) = key.extract::<crate::ffi::storage::array::PyGraphArray>() {
             // Boolean mask access: table[boolean_array]
             let mask_values = py_array.to_list(py)?;
@@ -614,7 +621,7 @@ impl PyBaseTable {
             // Apply boolean mask to filter rows
             let filtered_table = self.table.filter_by_mask(&boolean_mask)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-            Ok(PyBaseTable { table: filtered_table }.into_py(py))
+            Ok(PyBaseTable::from_table(filtered_table).into_py(py))
         } else {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "BaseTable indices must be strings (column names), integers (row indices), lists of column names, slices, or boolean arrays"
@@ -662,7 +669,7 @@ impl PyBaseTable {
     pub fn from_csv(path: &str) -> PyResult<PyBaseTable> {
         let table = groggy::storage::table::BaseTable::from_csv(path)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        Ok(PyBaseTable { table })
+        Ok(PyBaseTable::from_table(table))
     }
     
     /// Export BaseTable to Parquet file 
@@ -676,7 +683,7 @@ impl PyBaseTable {
     pub fn from_parquet(path: &str) -> PyResult<PyBaseTable> {
         let table = groggy::storage::table::BaseTable::from_parquet(path)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        Ok(PyBaseTable { table })
+        Ok(PyBaseTable::from_table(table))
     }
     
     /// Export BaseTable to JSON file
@@ -690,7 +697,7 @@ impl PyBaseTable {
     pub fn from_json(path: &str) -> PyResult<PyBaseTable> {
         let table = groggy::storage::table::BaseTable::from_json(path)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        Ok(PyBaseTable { table })
+        Ok(PyBaseTable::from_table(table))
     }
 
 
@@ -708,7 +715,7 @@ impl PyBaseTable {
         let result = self.table.aggregate(agg_specs)
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Aggregation failed: {}", e)))?;
         
-        Ok(Self { table: result })
+        Ok(Self::from_table(result))
     }
 
     /// Alias for aggregate method (more concise)
@@ -803,7 +810,7 @@ impl PyBaseTable {
         let result = join_result
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Join failed: {}", e)))?;
         
-        Ok(Self { table: result })
+        Ok(Self::from_table(result))
     }
 
     /// Union with another table (removes duplicates)
@@ -820,7 +827,7 @@ impl PyBaseTable {
         let result = self.table.union(&other.table)
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Union failed: {}", e)))?;
         
-        Ok(Self { table: result })
+        Ok(Self::from_table(result))
     }
 
     /// Intersect with another table (returns common rows)
@@ -837,7 +844,7 @@ impl PyBaseTable {
         let result = self.table.intersect(&other.table)
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Intersect failed: {}", e)))?;
         
-        Ok(Self { table: result })
+        Ok(Self::from_table(result))
     }
 
 }
@@ -948,7 +955,7 @@ impl PyBaseTable {
         let result = self.table.group_by_agg(&group_cols, agg_specs)
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Group by aggregation failed: {}", e)))?;
         
-        Ok(Self { table: result })
+        Ok(Self::from_table(result))
     }
 
     // =============================================================================
@@ -999,10 +1006,100 @@ impl PyBaseTable {
             "Join 'on' parameter must be a string, list of strings, or dict with 'left' and 'right' keys"
         ))
     }
+
+    /// Launch interactive streaming table in browser
+    /// 
+    /// Returns a URL where the interactive table can be accessed.
+    /// The server starts automatically and serves the table data via WebSocket.
+    /// 
+    /// # Examples
+    /// ```python
+    /// table = BaseTable.from_dict({'a': [1, 2, 3], 'b': [4, 5, 6]})
+    /// interface = table.interactive()
+    /// print(f"View table at: {interface}")
+    /// ```
+    pub fn interactive(&self) -> PyResult<String> {
+        match self.table.interactive(None) {
+            Ok(browser_interface) => {
+                println!("🚀 Interactive table launched at: {}", browser_interface.url);
+                println!("📊 Streaming {} rows × {} columns", 
+                        self.table.total_rows(), 
+                        self.table.total_cols());
+                Ok(browser_interface.url)
+            }
+            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(
+                format!("Failed to start interactive table: {}", e)
+            ))
+        }
+    }
+    
+    /// Generate embedded iframe HTML for Jupyter notebooks
+    /// 
+    /// Creates an interactive streaming table that can be embedded directly
+    /// in a Jupyter notebook cell, eliminating the need for a separate browser tab.
+    /// Use this with `IPython.display.HTML()` for best results.
+    /// 
+    /// Returns:
+    ///     str: HTML iframe code for embedding in Jupyter
+    /// 
+    /// Example:
+    /// ```python
+    /// from IPython.display import HTML, display
+    /// table = BaseTable.from_dict({'a': [1, 2, 3], 'b': [4, 5, 6]})
+    /// iframe_html = table.interactive_embed()
+    /// display(HTML(iframe_html))
+    /// ```
+    pub fn interactive_embed(&self) -> PyResult<String> {
+        // Create the streaming server
+        use groggy::core::streaming::{StreamingConfig, StreamingServer};
+        use std::sync::Arc;
+        
+        let data_source: Arc<dyn groggy::core::streaming::DataSource> = Arc::new(self.table.clone());
+        let config = StreamingConfig::default();
+        let server = StreamingServer::new(data_source, config);
+        
+        // Start the server on a background thread
+        let handle = server
+            .start_background("127.0.0.1".parse().unwrap(), 0) // Use port 0 for ephemeral port
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(
+                format!("Failed to start streaming server: {}", e)
+            ))?;
+        
+        let port = handle.port;
+        
+        // Store the handle to keep the server alive
+        self.server_guards.borrow_mut().push(handle);
+        
+        // Generate iframe HTML
+        let iframe_html = format!(
+            r#"<iframe src="http://127.0.0.1:{port}" width="100%" height="420" style="border:0;border-radius:12px;"></iframe>"#
+        );
+        
+        println!("🖼️  Interactive table iframe generated");
+        Ok(iframe_html)
+    }
+    
+    /// Close all streaming servers started by this table
+    /// 
+    /// This method allows manual cleanup of streaming servers. Servers are
+    /// automatically cleaned up when the table is dropped, but this method
+    /// can be used for explicit cleanup between tests or operations.
+    pub fn close_streaming(&self) {
+        self.server_guards.borrow_mut().clear(); // drops handles -> cancels/joins
+        println!("🛑 Closed all streaming servers for table");
+    }
 }
 
 // Internal helper methods (not exposed to Python)
 impl PyBaseTable {
+    /// Create PyBaseTable with empty server guards
+    pub fn from_table(table: BaseTable) -> Self {
+        Self {
+            table,
+            server_guards: RefCell::new(Vec::new()),
+        }
+    }
+    
     /// Parse column key from various formats (string, list of strings, etc.)
     fn parse_column_key(&self, col_key: &PyAny) -> PyResult<Vec<String>> {
         use pyo3::types::{PyString, PyList};
@@ -1271,7 +1368,7 @@ impl PyBaseTableIterator {
         let result = self.iterator.clone().collect()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
-        Ok(PyBaseTable { table: result })
+        Ok(PyBaseTable::from_table(result))
     }
 }
 
@@ -1392,12 +1489,12 @@ impl PyNodesTable {
     
     /// Get reference to underlying BaseTable
     pub fn base_table(&self) -> PyBaseTable {
-        PyBaseTable { table: self.table.base_table().clone() }
+        PyBaseTable::from_table(self.table.base_table().clone())
     }
     
     /// Convert to BaseTable (loses node-specific typing)
     pub fn into_base_table(&self) -> PyBaseTable {
-        PyBaseTable { table: self.table.clone().into_base_table() }
+        PyBaseTable::from_table(self.table.clone().into_base_table())
     }
     
     /// Convert to pandas DataFrame
@@ -1521,7 +1618,7 @@ impl PyNodesTable {
     ///     PyNodesTable: A new table with filtered rows
     pub fn filter(&self, predicate: &PyAny) -> PyResult<Self> {
         // Use base table's filter method (which handles both string and function predicates)
-        let base_table_py = PyBaseTable { table: self.table.base_table().clone() };
+        let base_table_py = PyBaseTable::from_table(self.table.base_table().clone());
         let filtered_base_py = base_table_py.filter(predicate)?;
         
         let filtered_nodes = groggy::storage::table::NodesTable::from_base_table(filtered_base_py.table)
@@ -1842,6 +1939,52 @@ impl PyNodesTable {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(PyNodesTable { table: nodes_table })
     }
+    
+    /// Launch interactive streaming table view in browser
+    /// 
+    /// Returns the URL where the interactive table can be viewed.
+    /// The table will be available for real-time exploration with virtual scrolling,
+    /// filtering, and other interactive features.
+    /// 
+    /// Returns:
+    ///     str: URL of the interactive table interface
+    pub fn interactive(&self) -> PyResult<String> {
+        // Get BaseTable from NodesTable for streaming
+        let base_table = self.table.base_table();
+        match base_table.interactive(None) {
+            Ok(browser_interface) => {
+                println!("🚀 Interactive nodes table launched at: {}", browser_interface.url);
+                println!("📊 Streaming {} rows × {} columns", 
+                        base_table.total_rows(), 
+                        base_table.total_cols());
+                Ok(browser_interface.url)
+            }
+            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(
+                format!("Failed to start interactive nodes table: {}", e)
+            ))
+        }
+    }
+    
+    /// Generate embedded iframe HTML for Jupyter notebooks
+    /// 
+    /// Creates an interactive streaming nodes table that can be embedded directly
+    /// in a Jupyter notebook cell, eliminating the need for a separate browser tab.
+    /// 
+    /// Returns:
+    ///     str: HTML iframe code for embedding in Jupyter
+    pub fn interactive_embed(&mut self) -> PyResult<String> {
+        // Get BaseTable from NodesTable for streaming
+        let base_table = self.table.base_table_mut();
+        match base_table.interactive_embed(None) {
+            Ok(iframe_html) => {
+                println!("🖼️  Interactive nodes table iframe generated");
+                Ok(iframe_html)
+            }
+            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(
+                format!("Failed to generate interactive nodes table embed: {}", e)
+            ))
+        }
+    }
 }
 
 // =============================================================================
@@ -2045,12 +2188,12 @@ impl PyEdgesTable {
     
     /// Get reference to underlying BaseTable
     pub fn base_table(&self) -> PyBaseTable {
-        PyBaseTable { table: self.table.base_table().clone() }
+        PyBaseTable::from_table(self.table.base_table().clone())
     }
     
     /// Convert to BaseTable (loses edge-specific typing)
     pub fn into_base_table(&self) -> PyBaseTable {
-        PyBaseTable { table: self.table.clone().into_base_table() }
+        PyBaseTable::from_table(self.table.clone().into_base_table())
     }
     
     /// Auto-assign edge IDs for null values (useful for meta nodes)
@@ -2185,7 +2328,7 @@ impl PyEdgesTable {
     ///     PyEdgesTable: A new table with filtered rows
     pub fn filter(&self, predicate: &PyAny) -> PyResult<Self> {
         // Use base table's filter method (which handles both string and function predicates)
-        let base_table_py = PyBaseTable { table: self.table.base_table().clone() };
+        let base_table_py = PyBaseTable::from_table(self.table.base_table().clone());
         let filtered_base_py = base_table_py.filter(predicate)?;
         
         let filtered_edges = groggy::storage::table::EdgesTable::from_base_table(filtered_base_py.table)
@@ -2352,7 +2495,7 @@ impl PyEdgesTable {
             
             // Return single row as a BaseTable with one row
             let single_row_table = self.table.base_table().head(actual_index + 1).tail(1);
-            Ok(PyBaseTable { table: single_row_table }.into_py(py))
+            Ok(PyBaseTable::from_table(single_row_table).into_py(py))
         } else {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
                 "EdgesTable indices must be strings (column names), integers (row indices), lists of column names, slices, or boolean arrays"
@@ -2500,6 +2643,52 @@ impl PyEdgesTable {
         let edges_table = groggy::storage::table::EdgesTable::from_base_table(base_table)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         Ok(PyEdgesTable { table: edges_table })
+    }
+    
+    /// Launch interactive streaming table view in browser
+    /// 
+    /// Returns the URL where the interactive table can be viewed.
+    /// The table will be available for real-time exploration with virtual scrolling,
+    /// filtering, and other interactive features.
+    /// 
+    /// Returns:
+    ///     str: URL of the interactive table interface
+    pub fn interactive(&self) -> PyResult<String> {
+        // Get BaseTable from EdgesTable for streaming
+        let base_table = self.table.base_table();
+        match base_table.interactive(None) {
+            Ok(browser_interface) => {
+                println!("🚀 Interactive edges table launched at: {}", browser_interface.url);
+                println!("📊 Streaming {} rows × {} columns", 
+                        base_table.total_rows(), 
+                        base_table.total_cols());
+                Ok(browser_interface.url)
+            }
+            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(
+                format!("Failed to start interactive edges table: {}", e)
+            ))
+        }
+    }
+    
+    /// Generate embedded iframe HTML for Jupyter notebooks
+    /// 
+    /// Creates an interactive streaming edges table that can be embedded directly
+    /// in a Jupyter notebook cell, eliminating the need for a separate browser tab.
+    /// 
+    /// Returns:
+    ///     str: HTML iframe code for embedding in Jupyter
+    pub fn interactive_embed(&mut self) -> PyResult<String> {
+        // Get BaseTable from EdgesTable for streaming
+        let base_table = self.table.base_table_mut();
+        match base_table.interactive_embed(None) {
+            Ok(iframe_html) => {
+                println!("🖼️  Interactive edges table iframe generated");
+                Ok(iframe_html)
+            }
+            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(
+                format!("Failed to generate interactive edges table embed: {}", e)
+            ))
+        }
     }
 }
 
@@ -3193,7 +3382,7 @@ impl PyTableArray {
                     .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
                         format!("Failed to slice columns: {}", e)
                     ))?;
-                sliced_tables.push(PyBaseTable { table: sliced_table });
+                sliced_tables.push(PyBaseTable::from_table(sliced_table));
             }
             sliced_tables
         } else {
@@ -3329,7 +3518,7 @@ impl PyTableArray {
                 format!("Failed to create aggregated table: {}", e)
             ))?;
             
-        Ok(PyBaseTable { table: result_table })
+        Ok(PyBaseTable::from_table(result_table))
     }
     
     /// Iterator-style aggregation - applies aggregation functions as if iterating
