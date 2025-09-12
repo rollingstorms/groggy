@@ -111,6 +111,11 @@ impl NodesTable {
         &self.base
     }
     
+    /// Get mutable reference to underlying BaseTable
+    pub fn base_table_mut(&mut self) -> &mut BaseTable {
+        &mut self.base
+    }
+    
     // =============================================================================
     // Phase 2: Node-specific validation and access methods  
     // =============================================================================

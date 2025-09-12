@@ -15,6 +15,7 @@ impl ThemeSystem {
         let mut themes = HashMap::new();
         
         // Built-in themes
+        themes.insert("sleek".to_string(), Theme::sleek());
         themes.insert("light".to_string(), Theme::light());
         themes.insert("dark".to_string(), Theme::dark());
         themes.insert("publication".to_string(), Theme::publication());
@@ -25,7 +26,7 @@ impl ThemeSystem {
 
     /// Get theme by name, fallback to light theme
     pub fn get_theme(&self, name: &str) -> &Theme {
-        self.themes.get(name).unwrap_or(&self.themes["light"])
+        self.themes.get(name).unwrap_or(&self.themes["sleek"])
     }
 
     /// Register a custom theme
@@ -64,6 +65,18 @@ pub struct Theme {
 }
 
 impl Theme {
+    /// Sleek theme (ultra-clean)
+    pub fn sleek() -> Self {
+        Self {
+            name: "sleek".to_string(),
+            display_name: "Sleek".to_string(),
+            description: "Ultra-clean sleek theme".to_string(),
+            table_class: "theme-sleek".to_string(),
+            css: include_str!("themes/sleek.css").to_string(),
+            unicode_style: UnicodeStyle::default(),
+            colors: ColorPalette::sleek(),
+        }
+    }
     /// Light theme (default)
     pub fn light() -> Self {
         Self {
@@ -227,11 +240,29 @@ impl ColorPalette {
             null_color: "#999999".to_string(),
         }
     }
+
+    pub fn sleek() -> Self {
+        Self {
+            background: "#ffffff".to_string(),
+            foreground: "#1f2328".to_string(),
+            border: "#eee".to_string(),
+            header_bg: "#fafafa".to_string(),
+            header_fg: "#1f2328".to_string(),
+            row_even_bg: "#fafafa".to_string(),
+            row_odd_bg: "#ffffff".to_string(),
+            cell_text: "#1f2328".to_string(),
+            numeric_color: "#1f2328".to_string(),
+            string_color: "#1f2328".to_string(),
+            boolean_color: "#1f2328".to_string(),
+            null_color: "#6a737d".to_string(),
+        }
+    }
 }
 
 /// Built-in theme enumeration
 #[derive(Debug, Clone, PartialEq)]
 pub enum BuiltInTheme {
+    Sleek,
     Light,
     Dark,
     Publication,
@@ -241,6 +272,7 @@ pub enum BuiltInTheme {
 impl BuiltInTheme {
     pub fn name(&self) -> &'static str {
         match self {
+            BuiltInTheme::Sleek => "sleek",
             BuiltInTheme::Light => "light",
             BuiltInTheme::Dark => "dark",
             BuiltInTheme::Publication => "publication",
@@ -250,6 +282,7 @@ impl BuiltInTheme {
 
     pub fn all() -> Vec<Self> {
         vec![
+            BuiltInTheme::Sleek,
             BuiltInTheme::Light,
             BuiltInTheme::Dark,
             BuiltInTheme::Publication,
@@ -267,6 +300,7 @@ mod tests {
         let theme_system = ThemeSystem::new();
         let theme_names = theme_system.theme_names();
         
+        assert!(theme_names.contains(&&"sleek".to_string()));
         assert!(theme_names.contains(&&"light".to_string()));
         assert!(theme_names.contains(&&"dark".to_string()));
         assert!(theme_names.contains(&&"publication".to_string()));
@@ -276,6 +310,9 @@ mod tests {
     #[test]
     fn test_get_theme() {
         let theme_system = ThemeSystem::new();
+
+        let sleek_theme = theme_system.get_theme("sleek");
+        assert_eq!(sleek_theme.name, "sleek");
         
         let light_theme = theme_system.get_theme("light");
         assert_eq!(light_theme.name, "light");

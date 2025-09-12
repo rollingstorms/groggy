@@ -1,0 +1,241 @@
+/* Publication theme CSS - black and white, print-ready */
+
+.groggy-display-container[data-theme="publication"] {
+    font-family: 'Times New Roman', Times, serif;
+    background-color: #ffffff;
+    color: #000000;
+    border-radius: 0;
+    overflow-x: auto;
+    box-shadow: none;
+    border: 1px solid #000000;
+}
+
+.groggy-table.theme-publication {
+    border-collapse: collapse;
+    font-size: 12px;
+    width: auto;
+    min-width: fit-content;
+    margin: 0;
+    background-color: #ffffff;
+    border: 2px solid #000000;
+}
+
+.groggy-table.theme-publication th {
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    border-top: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: bold;
+    color: #000000;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.groggy-table.theme-publication td {
+    border-left: 1px solid #000000;
+    border-right: 1px solid #000000;
+    border-top: none;
+    border-bottom: 1px solid #000000;
+    padding: 6px 12px;
+    color: #000000;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.groggy-table.theme-publication tr:last-child td {
+    border-bottom: 2px solid #000000;
+}
+
+/* No alternating row colors for publication */
+.groggy-table.theme-publication tr:nth-child(even) {
+    background-color: #ffffff;
+}
+
+.groggy-table.theme-publication tr:hover {
+    background-color: #ffffff; /* No hover effect for publication */
+}
+
+/* Data type specific styling - all black for publication */
+.groggy-table.theme-publication .cell-float,
+.groggy-table.theme-publication .cell-integer {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #000000;
+    font-weight: normal;
+}
+
+.groggy-table.theme-publication .cell-string {
+    text-align: left;
+    color: #000000;
+}
+
+.groggy-table.theme-publication .cell-boolean {
+    text-align: center;
+    color: #000000;
+    font-weight: normal;
+}
+
+.groggy-table.theme-publication .cell-datetime {
+    text-align: left;
+    color: #000000;
+    font-variant-numeric: tabular-nums;
+}
+
+.groggy-table.theme-publication .cell-unknown {
+    text-align: left;
+    color: #666666;
+    font-style: italic;
+}
+
+/* Table info section */
+.groggy-display-container[data-theme="publication"] .table-info {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    border-radius: 0;
+    font-size: 11px;
+    color: #666666;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Times New Roman', Times, serif;
+}
+
+.groggy-display-container[data-theme="publication"] .table-info .interactive-btn {
+    background-color: #ffffff;
+    color: #000000;
+    border: 1px solid #000000;
+    padding: 4px 8px;
+    border-radius: 0;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-family: 'Times New Roman', Times, serif;
+}
+
+.groggy-display-container[data-theme="publication"] .table-info .interactive-btn:hover {
+    background-color: #f0f0f0;
+}
+
+/* Responsive design - maintain publication quality */
+@media (max-width: 768px) {
+    .groggy-table.theme-publication {
+        font-size: 11px;
+    }
+    
+    .groggy-table.theme-publication th,
+    .groggy-table.theme-publication td {
+        padding: 4px 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .groggy-table.theme-publication {
+        font-size: 10px;
+    }
+    
+    .groggy-table.theme-publication th,
+    .groggy-table.theme-publication td {
+        padding: 3px 6px;
+    }
+}
+
+/* Print styles - optimized for publication */
+@media print {
+    .groggy-display-container[data-theme="publication"] {
+        box-shadow: none;
+        border: 2px solid #000;
+        background-color: #fff !important;
+        color: #000 !important;
+        page-break-inside: avoid;
+        orphans: 3;
+        widows: 3;
+    }
+    
+    .groggy-table.theme-publication {
+        border: 2px solid #000;
+        background-color: #fff !important;
+        page-break-inside: avoid;
+    }
+    
+    .groggy-table.theme-publication th {
+        border-top: 2px solid #000;
+        border-bottom: 2px solid #000;
+        background-color: #fff !important;
+        color: #000 !important;
+        font-weight: bold;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .groggy-table.theme-publication td {
+        background-color: #fff !important;
+        color: #000 !important;
+        border-bottom: 1px solid #000;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .groggy-table.theme-publication tr:last-child td {
+        border-bottom: 2px solid #000;
+    }
+    
+    .table-info,
+    .interactive-btn {
+        display: none;
+    }
+    
+    /* Ensure proper table breaking across pages */
+    .groggy-table.theme-publication thead {
+        display: table-header-group;
+    }
+    
+    .groggy-table.theme-publication tbody {
+        display: table-row-group;
+    }
+}
+
+/* Accessibility improvements */
+.groggy-table.theme-publication:focus-within {
+    outline: 2px solid #000;
+    outline-offset: 2px;
+}
+
+.groggy-table.theme-publication th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Truncated content indicator */
+.groggy-table.theme-publication .cell-truncated::after {
+    content: "…";
+    color: #666666;
+    font-weight: normal;
+}
+
+/* Publication-specific typography improvements */
+.groggy-table.theme-publication {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Figure caption styling for publications */
+.groggy-display-container[data-theme="publication"] .table-caption {
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    text-align: left;
+    color: #000000;
+    font-family: 'Times New Roman', Times, serif;
+}
+
+.groggy-display-container[data-theme="publication"] .table-caption-number {
+    font-weight: bold;
+}

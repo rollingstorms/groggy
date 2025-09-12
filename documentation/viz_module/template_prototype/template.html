@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groggy Display Template</title>
+    <link rel="stylesheet" href="themes/light.css">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .template-controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .theme-selector {
+            margin-bottom: 10px;
+        }
+        
+        .theme-selector label {
+            font-weight: 500;
+            margin-right: 10px;
+        }
+        
+        .theme-selector select {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .sample-section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .section-description {
+            color: #666;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🐸 Groggy Display Template Prototype</h1>
+    
+    <div class="template-controls">
+        <div class="theme-selector">
+            <label for="theme-select">Theme:</label>
+            <select id="theme-select" onchange="changeTheme()">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="minimal">Minimal</option>
+                <option value="publication">Publication</option>
+                <option value="sleek">Sleek</option>
+            </select>
+        </div>
+        <p>Use this template to prototype new styles and themes for Groggy tables.</p>
+    </div>
+
+
+    <div class="sample-section">
+        <h2 class="section-title">Basic Data Types</h2>
+        <p class="section-description">Demonstrates styling for different data types: strings, numbers, booleans, etc.</p>
+        
+        <div class="groggy-display-container" data-theme="light">
+            <table class="groggy-table theme-light">
+                <thead>
+                    <tr>
+            <th class="col-string" data-type="String" title="Column: name (String)">
+                name
+            </th>
+            <th class="col-integer" data-type="Integer" title="Column: age (Integer)">
+                age
+            </th>
+            <th class="col-float" data-type="Float" title="Column: score (Float)">
+                score
+            </th>
+            <th class="col-boolean" data-type="Boolean" title="Column: active (Boolean)">
+                active
+            </th>
+            <th class="col-integer" data-type="Integer" title="Column: salary (Integer)">
+                salary
+            </th>
+            <th class="col-datetime" data-type="DateTime" title="Column: join_date (DateTime)">
+                join_date
+            </th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    Alice Johnson
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    25
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    91.50
+                </td>
+                <td class="cell-boolean" data-type="Boolean" title="Boolean value">
+                    ✓
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    75,000
+                </td>
+                <td class="cell-datetime" data-type="DateTime" title="DateTime value">
+                    2023-01-15
+                </td></tr>
+<tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    Bob &amp; Associates LLC
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    30,000
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    87.00
+                </td>
+                <td class="cell-boolean" data-type="Boolean" title="Boolean value">
+                    ✗
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    125,000
+                </td>
+                <td class="cell-datetime" data-type="DateTime" title="DateTime value">
+                    2022-03-22
+                </td></tr>
+<tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    Carol Smith
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    28
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    95.75
+                </td>
+                <td class="cell-boolean" data-type="Boolean" title="Boolean value">
+                    ✓
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    82,000
+                </td>
+                <td class="cell-datetime" data-type="DateTime" title="DateTime value">
+                    2023-06-10
+                </td></tr>
+<tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    David &lt;Test&gt; User
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    35
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    88.25
+                </td>
+                <td class="cell-boolean" data-type="Boolean" title="Boolean value">
+                    ✓
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    95,000
+                </td>
+                <td class="cell-datetime" data-type="DateTime" title="DateTime value">
+                    2021-11-30
+                </td></tr>
+<tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    Eve &#39;Quotes&#39; Wilson
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    42
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    92.00
+                </td>
+                <td class="cell-boolean" data-type="Boolean" title="Boolean value">
+                    ✗
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    110,000
+                </td>
+                <td class="cell-datetime" data-type="DateTime" title="DateTime value">
+                    2020-08-15
+                </td></tr>
+                </tbody>
+            </table>
+            
+        <div class="table-info">
+            <span>Showing 5 of 1005 rows (sample data)</span>
+            <button class="interactive-btn" onclick="launchInteractive()" 
+                    title="Launch interactive view for full dataset">
+                View All (1005 rows) →
+            </button>
+        </div>
+        </div>
+    </div>
+
+    <div class="sample-section">
+        <h2 class="section-title">Large Numbers & Scientific Notation</h2>
+        <p class="section-description">Tests number formatting with large values, scientific notation, and precision.</p>
+        
+        <div class="groggy-display-container" data-theme="light">
+            <table class="groggy-table theme-light">
+                <thead>
+                    <tr>
+            <th class="col-string" data-type="String" title="Column: metric (String)">
+                metric
+            </th>
+            <th class="col-float" data-type="Float" title="Column: small_value (Float)">
+                small_value
+            </th>
+            <th class="col-integer" data-type="Integer" title="Column: large_value (Integer)">
+                large_value
+            </th>
+            <th class="col-float" data-type="Float" title="Column: scientific (Float)">
+                scientific
+            </th>
+            <th class="col-float" data-type="Float" title="Column: percentage (Float)">
+                percentage
+            </th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    Revenue
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    1.20e-04
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    1,250,000
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    1.23e-08
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    15.75
+                </td></tr>
+<tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    Users
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    0.00
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    50,000,000
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    601999999999999995805696.00
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    99.99
+                </td></tr>
+<tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    Storage (TB)
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    1.00e-04
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    987,654,321
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    3.14
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    0.01
+                </td></tr>
+<tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    Throughput
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    1.00e-06
+                </td>
+                <td class="cell-integer" data-type="Integer" title="Integer value">
+                    1,000,000,000
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    2.72
+                </td>
+                <td class="cell-float" data-type="Float" title="Float value">
+                    100.00
+                </td></tr>
+                </tbody>
+            </table>
+            
+        <div class="table-info">
+            <span>Showing 4 of 1004 rows (sample data)</span>
+            <button class="interactive-btn" onclick="launchInteractive()" 
+                    title="Launch interactive view for full dataset">
+                View All (1004 rows) →
+            </button>
+        </div>
+        </div>
+    </div>
+
+    <div class="sample-section">
+        <h2 class="section-title">Edge Cases & Truncation</h2>
+        <p class="section-description">Tests truncation, special characters, and edge cases in data display.</p>
+        
+        <div class="groggy-display-container" data-theme="light">
+            <table class="groggy-table theme-light">
+                <thead>
+                    <tr>
+            <th class="col-string" data-type="String" title="Column: type (String)">
+                type
+            </th>
+            <th class="col-string" data-type="String" title="Column: short (String)">
+                short
+            </th>
+            <th class="col-string" data-type="String" title="Column: very_long_content (String)">
+                very_long_content
+            </th>
+            <th class="col-string" data-type="String" title="Column: special_chars (String)">
+                special_chars
+            </th>
+            <th class="col-json" data-type="Json" title="Column: json_data (Json)">
+                json_data
+            </th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    Normal
+                </td>
+                <td class="cell-string" data-type="String" title="String value">
+                    Short
+                </td>
+                <td class="cell-string cell-truncated" data-type="String" title="Full value: This is a very long piece of content that should be truncated when displayed in the table to prevent very wide cells">
+                    This is a very long piece of …
+                </td>
+                <td class="cell-string" data-type="String" title="String value">
+                    Normal text
+                </td>
+                <td class="cell-json" data-type="Json" title="Json value">
+                    {&quot;key&quot;: &quot;value&quot;, &quot;number&quot;: 42}
+                </td></tr>
+<tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    HTML
+                </td>
+                <td class="cell-string" data-type="String" title="String value">
+                    Test
+                </td>
+                <td class="cell-string cell-truncated" data-type="String" title="Full value: Content with &lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt; and other HTML">
+                    Content with &lt;script&gt;alert(&#39;x…
+                </td>
+                <td class="cell-string" data-type="String" title="String value">
+                    &amp;lt;tag&amp;gt;
+                </td>
+                <td class="cell-json" data-type="Json" title="Json value">
+                    {&quot;html&quot;: &quot;&lt;div&gt;content&lt;/div&gt;&quot;}
+                </td></tr>
+<tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    Unicode
+                </td>
+                <td class="cell-string" data-type="String" title="String value">
+                    🚀
+                </td>
+                <td class="cell-string cell-truncated" data-type="String" title="Full value: Unicode content with émojis 🎉 and spëcial çharacters">
+                    Unicode content with émojis 🎉…
+                </td>
+                <td class="cell-string" data-type="String" title="String value">
+                    Spéciål ¢hars
+                </td>
+                <td class="cell-json cell-truncated" data-type="Json" title="Full value: {&quot;emoji&quot;: &quot;🌟&quot;, &quot;text&quot;: &quot;unicode&quot;}">
+                    {&quot;emoji&quot;: &quot;🌟&quot;, &quot;text&quot;: &quot;unico…
+                </td></tr>
+<tr>
+                <td class="cell-string" data-type="String" title="String value">
+                    Quotes
+                </td>
+                <td class="cell-string" data-type="String" title="String value">
+                    &#39;Test&#39;
+                </td>
+                <td class="cell-string cell-truncated" data-type="String" title="Full value: Content with &quot;double quotes&quot; and &#39;single quotes&#39;">
+                    Content with &quot;double quotes&quot; …
+                </td>
+                <td class="cell-string" data-type="String" title="String value">
+                    &quot;Quoted&quot;
+                </td>
+                <td class="cell-json" data-type="Json" title="Json value">
+                    {&quot;nested&quot;: {&quot;quotes&quot;: &quot;test&quot;}}
+                </td></tr>
+                </tbody>
+            </table>
+            
+        <div class="table-info">
+            <span>Showing 4 of 1004 rows (sample data)</span>
+            <button class="interactive-btn" onclick="launchInteractive()" 
+                    title="Launch interactive view for full dataset">
+                View All (1004 rows) →
+            </button>
+        </div>
+        </div>
+    </div>
+
+    <script>
+        function changeTheme() {
+            const select = document.getElementById('theme-select');
+            const theme = select.value;
+            
+            // Update CSS link
+            const cssLink = document.querySelector('link[rel="stylesheet"]');
+            cssLink.href = `themes/${theme}.css`;
+            
+            // Update all theme data attributes
+            const containers = document.querySelectorAll('.groggy-display-container');
+            containers.forEach(container => {
+                container.setAttribute('data-theme', theme);
+            });
+            
+            // Update table classes
+            const tables = document.querySelectorAll('.groggy-table');
+            tables.forEach(table => {
+                table.className = `groggy-table theme-${theme}`;
+            });
+        }
+
+        // Interactive features from the original Rust code
+        function launchInteractive() {
+            alert('Interactive streaming view coming in Phase 3!\n\nThis will launch a WebSocket-powered interface for browsing massive datasets with virtual scrolling.');
+        }
+
+        // Keyboard navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const tables = document.querySelectorAll('.groggy-table');
+            tables.forEach(table => {
+                table.setAttribute('tabindex', '0');
+                
+                table.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        const interactiveBtn = table.parentElement.querySelector('.interactive-btn');
+                        if (interactiveBtn) {
+                            interactiveBtn.click();
+                            e.preventDefault();
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

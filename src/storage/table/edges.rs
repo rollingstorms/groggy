@@ -214,6 +214,11 @@ impl EdgesTable {
         &self.base
     }
     
+    /// Get mutable reference to underlying BaseTable
+    pub fn base_table_mut(&mut self) -> &mut BaseTable {
+        &mut self.base
+    }
+    
     // =============================================================================
     // Phase 3: Edge-specific validation and iteration methods  
     // =============================================================================
