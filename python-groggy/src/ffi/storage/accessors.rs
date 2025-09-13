@@ -4,6 +4,7 @@
 
 use groggy::{AttrValue, EdgeId, NodeId};
 use groggy::storage::table::Table;  // Add Table trait for select method
+use groggy::storage::array::{BaseArray, NumArray};  // Modern array types
 use pyo3::exceptions::{PyIndexError, PyKeyError, PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySlice};
@@ -12,8 +13,12 @@ use std::collections::HashSet;
 // Import utils for conversion functions
 use crate::ffi::utils::python_value_to_attr_value;
 
-// Import table FFI types
+// Import table FFI types  
 use crate::ffi::storage::table::PyGraphTable;
+
+// Import modern array FFI types
+use crate::ffi::storage::array::PyBaseArray;
+use crate::ffi::storage::num_array::PyNumArray;
 
 /// Utility function to convert AttrValue to Python object
 fn attr_value_to_python_value(py: Python, attr_value: &AttrValue) -> PyResult<PyObject> {
@@ -223,8 +228,8 @@ impl PyNodesAccessor {
             return Ok(node_entity);
         }
 
-        // Try to extract as GraphArray (indexed boolean lookup) - CHECK FIRST
-        if let Ok(graph_array) = key.extract::<PyRef<crate::ffi::storage::array::PyGraphArray>>() {
+        // Try to extract as BaseArray (indexed boolean lookup) - CHECK FIRST
+        if let Ok(base_array) = key.extract::<PyRef<PyBaseArray>>() {
             let graph = self.graph.borrow();
             let all_node_ids = if let Some(ref constrained) = self.constrained_nodes {
                 constrained.clone()
@@ -234,11 +239,11 @@ impl PyNodesAccessor {
 
             let mut selected_nodes = Vec::new();
 
-            // Use GraphArray as indexed lookup: for each node_id, check grapharray[node_id]
+            // Use BaseArray as indexed lookup: for each node_id, check basearray[node_id]
             // The table is indexed so that row index = node_id
             for &node_id in &all_node_ids {
-                // Use node_id as index into GraphArray to get boolean value
-                if let Some(attr_value) = graph_array.inner.get(node_id as usize) {
+                // Use node_id as index into BaseArray to get boolean value
+                if let Some(attr_value) = base_array.inner.get(node_id as usize) {
                     if let groggy::AttrValue::Bool(true) = attr_value {
                         selected_nodes.push(node_id);
                     }
@@ -247,7 +252,7 @@ impl PyNodesAccessor {
 
             if selected_nodes.is_empty() {
                 return Err(PyIndexError::new_err(
-                    "GraphArray boolean mask selected no nodes",
+                    "BaseArray boolean mask selected no nodes",
                 ));
             }
 
@@ -583,9 +588,9 @@ impl PyNodesAccessor {
         Ok(crate::ffi::storage::table::PyNodesTable { table: nodes_table })
     }
 
-    /// Get node IDs as a GraphArray
+    /// Get node IDs as an IntArray for integer operations
     /// Implements: g.nodes.ids()
-    pub fn ids(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+    pub fn ids(&self) -> PyResult<crate::ffi::storage::num_array::PyIntArray> {
         let node_ids = if let Some(ref constrained) = self.constrained_nodes {
             constrained.clone()
         } else {
@@ -593,16 +598,8 @@ impl PyNodesAccessor {
             graph.node_ids()
         };
         
-        // Convert node IDs to AttrValue vector
-        let attr_values: Vec<groggy::AttrValue> = node_ids
-            .into_iter()
-            .map(|id| groggy::AttrValue::Int(id as i64))
-            .collect();
-            
-        // Create GraphArray from AttrValues
-        let graph_array = groggy::GraphArray::from_vec(attr_values);
-            
-        Ok(crate::ffi::storage::array::PyGraphArray { inner: graph_array })
+        // Return as IntArray to preserve integer type for node IDs
+        Ok(crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids))
     }
 
     /// Get all nodes as a subgraph (equivalent to g.nodes[:]) - DELEGATED to SubgraphOperations  
@@ -721,7 +718,7 @@ impl PyNodesAccessor {
             }
         }
 
-        // Convert to AttrValue vector for GraphArray
+        // Convert to AttrValue vector for BaseArray
         let attr_values: Vec<groggy::AttrValue> = values
             .into_iter()
             .map(|opt_val| match opt_val {
@@ -733,16 +730,16 @@ impl PyNodesAccessor {
             })
             .collect();
 
-        // Create GraphArray and wrap in Python
-        let graph_array = groggy::GraphArray::from_vec(attr_values);
-        let py_array = crate::ffi::storage::array::PyGraphArray { inner: graph_array };
+        // Create BaseArray for mixed attribute data
+        let base_array = BaseArray::from_attr_values(attr_values);
+        let py_array = PyBaseArray { inner: base_array };
         Ok(Py::new(py, py_array)?.to_object(py))
     }
 
     /// Access all subgraph-nodes (meta-nodes) in the graph
     /// 
     /// Returns:
-    ///     PyGraphArray: Array of nodes that contain subgraphs
+    ///     PyNumArray: Array of node IDs that contain subgraphs
     /// 
     /// Example:
     ///     subgraph_nodes = g.nodes.subgraphs
@@ -770,9 +767,16 @@ impl PyNodesAccessor {
             }
         }
 
-        // Return as GraphArray
-        let graph_array = groggy::GraphArray::from_vec(subgraph_node_ids);
-        let py_array = crate::ffi::storage::array::PyGraphArray { inner: graph_array };
+        // Return as NumArray (node IDs are numerical)
+        let values: Vec<f64> = subgraph_node_ids
+            .into_iter()
+            .map(|attr_val| match attr_val {
+                groggy::AttrValue::Int(id) => id as f64,
+                _ => 0.0, // Fallback (shouldn't happen since we're only adding Int values)
+            })
+            .collect();
+        
+        let py_array = PyNumArray::new(values);
         Ok(Py::new(py, py_array)?.to_object(py))
     }
 
@@ -1236,8 +1240,8 @@ impl PyEdgesAccessor {
             return Ok(edge_entity);
         }
 
-        // Try to extract as GraphArray (indexed boolean lookup) - CHECK FIRST
-        if let Ok(graph_array) = key.extract::<PyRef<crate::ffi::storage::array::PyGraphArray>>() {
+        // Try to extract as BaseArray (indexed boolean lookup) - CHECK FIRST
+        if let Ok(base_array) = key.extract::<PyRef<PyBaseArray>>() {
             let graph = self.graph.borrow();
             let all_edge_ids = if let Some(ref constrained) = self.constrained_edges {
                 constrained.clone()
@@ -1247,11 +1251,11 @@ impl PyEdgesAccessor {
 
             let mut selected_edges = Vec::new();
 
-            // Use GraphArray as indexed lookup: for each edge_id, check grapharray[edge_id]
+            // Use BaseArray as indexed lookup: for each edge_id, check basearray[edge_id]
             // The table/accessor is indexed so that row index = edge_id
             for &edge_id in &all_edge_ids {
-                // Use edge_id as index into GraphArray to get boolean value
-                if let Some(attr_value) = graph_array.inner.get(edge_id as usize) {
+                // Use edge_id as index into BaseArray to get boolean value
+                if let Some(attr_value) = base_array.inner.get(edge_id as usize) {
                     if let groggy::AttrValue::Bool(true) = attr_value {
                         selected_edges.push(edge_id);
                     }
@@ -1260,7 +1264,7 @@ impl PyEdgesAccessor {
 
             if selected_edges.is_empty() {
                 return Err(PyIndexError::new_err(
-                    "GraphArray boolean mask selected no edges",
+                    "BaseArray boolean mask selected no edges",
                 ));
             }
 
@@ -1740,9 +1744,9 @@ impl PyEdgesAccessor {
         Ok(crate::ffi::storage::table::PyEdgesTable { table: edges_table })
     }
 
-    /// Get edge IDs as a GraphArray
+    /// Get edge IDs as a NumArray for numerical operations
     /// Implements: g.edges.ids()
-    pub fn ids(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+    pub fn ids(&self) -> PyResult<PyNumArray> {
         let edge_ids = if let Some(ref constrained) = self.constrained_edges {
             constrained.clone()
         } else {
@@ -1750,16 +1754,38 @@ impl PyEdgesAccessor {
             graph.edge_ids()
         };
         
-        // Convert edge IDs to AttrValue vector
-        let attr_values: Vec<groggy::AttrValue> = edge_ids
+        // Convert edge IDs to f64 for NumArray (better for numerical operations)
+        let values: Vec<f64> = edge_ids
             .into_iter()
-            .map(|id| groggy::AttrValue::Int(id as i64))
+            .map(|id| id as f64)
             .collect();
             
-        // Create GraphArray from AttrValues
-        let graph_array = groggy::GraphArray::from_vec(attr_values);
-            
-        Ok(crate::ffi::storage::array::PyGraphArray { inner: graph_array })
+        // Create NumArray for ID operations
+        Ok(PyNumArray::new(values))
+    }
+
+    /// Get source node IDs for all edges
+    /// Returns a NumArray parallel to edge_ids where each element is the source of the corresponding edge
+    #[getter]
+    fn sources(&self, _py: Python) -> PyResult<PyNumArray> {
+        let graph = self.graph.borrow();
+        let sources = graph.edge_sources();
+        
+        // Convert to f64 for NumArray consistency
+        let values: Vec<f64> = sources.into_iter().map(|id| id as f64).collect();
+        Ok(PyNumArray::new(values))
+    }
+
+    /// Get target node IDs for all edges  
+    /// Returns a NumArray parallel to edge_ids where each element is the target of the corresponding edge
+    #[getter]
+    fn targets(&self, _py: Python) -> PyResult<PyNumArray> {
+        let graph = self.graph.borrow();
+        let targets = graph.edge_targets();
+        
+        // Convert to f64 for NumArray consistency
+        let values: Vec<f64> = targets.into_iter().map(|id| id as f64).collect();
+        Ok(PyNumArray::new(values))
     }
 }
 

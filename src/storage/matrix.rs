@@ -11,7 +11,7 @@
 //! - Linear algebra operations for numeric matrices
 //! - Memory-efficient storage and lazy evaluation
 
-use crate::storage::legacy_array::GraphArray;
+use crate::storage::array::NumArray;
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrValue, AttrValueType, NodeId};
 use std::fmt;
@@ -30,7 +30,7 @@ impl MatrixProperties {
     pub fn analyze(matrix: &GraphMatrix) -> Self {
         let (rows, cols) = matrix.shape();
         let is_square = rows == cols;
-        let is_numeric = matrix.dtype().is_numeric();
+        let is_numeric = true; // NumArray is always numeric
 
         // Check symmetry (only for square numeric matrices)
         let is_symmetric = if is_square && is_numeric && rows > 0 {
@@ -75,18 +75,18 @@ pub enum JoinType {
     Outer,
 }
 
-/// General-purpose matrix built on GraphArray foundation
+/// General-purpose matrix built on NumArray foundation
 #[derive(Debug, Clone)]
 pub struct GraphMatrix {
-    /// Columns stored as GraphArrays
-    columns: Vec<GraphArray>,
+    /// Columns stored as NumArrays for numerical operations
+    columns: Vec<NumArray<f64>>,
     /// Column names/labels
     column_names: Vec<String>,
-    /// Row labels (optional)
+    /// Row labels (optional) - string labels stored as BaseArray
     #[allow(dead_code)]
-    row_labels: Option<GraphArray>,
-    /// Enforced data type (all columns must match)
-    dtype: AttrValueType,
+    row_labels: Option<Vec<String>>,
+    /// Shape of the matrix (rows, cols)
+    shape: (usize, usize),
     /// Cached matrix properties
     properties: Option<MatrixProperties>,
     /// Reference to the source graph (optional)
@@ -94,59 +94,38 @@ pub struct GraphMatrix {
 }
 
 impl GraphMatrix {
-    /// Create a new GraphMatrix from a collection of GraphArrays
-    /// All arrays must have the same length and compatible types
-    pub fn from_arrays(arrays: Vec<GraphArray>) -> GraphResult<Self> {
+    /// Create a new GraphMatrix from a collection of NumArrays
+    /// All arrays must have the same length for proper matrix structure
+    pub fn from_arrays(arrays: Vec<NumArray<f64>>) -> GraphResult<Self> {
         if arrays.is_empty() {
             return Err(GraphError::InvalidInput(
                 "Cannot create matrix from empty array list".to_string(),
             ));
         }
 
-        // Check all arrays have the same length
-        let expected_len = arrays[0].len();
+        // Check all arrays have the same length for valid matrix structure
+        let num_rows = arrays[0].len();
         for (i, array) in arrays.iter().enumerate() {
-            if array.len() != expected_len {
+            if array.len() != num_rows {
                 return Err(GraphError::InvalidInput(format!(
-                    "Array {} has length {} but expected {}",
+                    "Column {} has length {} but expected {}",
                     i,
                     array.len(),
-                    expected_len
+                    num_rows
                 )));
             }
         }
 
-        // Determine common type and validate compatibility
-        let dtype = Self::determine_common_type(&arrays)?;
-
-        // Convert all arrays to the common type if needed
-        let converted_arrays = arrays
-            .into_iter()
-            .enumerate()
-            .map(|(i, array)| {
-                if array.dtype() == dtype {
-                    Ok(array)
-                } else {
-                    array.convert_to(dtype).map_err(|_| {
-                        GraphError::InvalidInput(format!(
-                            "Cannot convert array {} to type {:?}",
-                            i, dtype
-                        ))
-                    })
-                }
-            })
-            .collect::<GraphResult<Vec<_>>>()?;
-
-        // Generate default column names
-        let column_names = (0..converted_arrays.len())
+        let num_cols = arrays.len();
+        let column_names: Vec<String> = (0..num_cols)
             .map(|i| format!("col_{}", i))
             .collect();
 
-        Ok(Self {
-            columns: converted_arrays,
+        Ok(GraphMatrix {
+            columns: arrays,
             column_names,
             row_labels: None,
-            dtype,
+            shape: (num_rows, num_cols),
             properties: None,
             graph: None,
         })
@@ -158,15 +137,10 @@ impl GraphMatrix {
         attrs: &[&str],
         entities: &[NodeId],
     ) -> GraphResult<Self> {
-        let arrays = attrs
-            .iter()
-            .map(|attr| GraphArray::from_graph_attribute(&graph, attr, entities))
-            .collect::<GraphResult<Vec<_>>>()?;
-
-        let mut matrix = Self::from_arrays(arrays)?;
-        matrix.column_names = attrs.iter().map(|s| s.to_string()).collect();
-        matrix.graph = Some(graph);
-        Ok(matrix)
+        // TODO: Implement graph attribute extraction for NumArray
+        // This requires converting GraphArray::from_graph_attribute to work with NumArray<f64>
+        let _arrays: Vec<NumArray<f64>> = Vec::new();
+        Err(GraphError::InvalidInput("from_graph_attributes not yet implemented for NumArray".to_string()))
     }
 
     /// Create a zero matrix with specified dimensions and type
@@ -180,9 +154,9 @@ impl GraphMatrix {
         };
 
         let arrays = (0..cols)
-            .map(|i| {
-                let values = vec![zero_value.clone(); rows];
-                GraphArray::from_vec(values).with_name(format!("col_{}", i))
+            .map(|_i| {
+                let values = vec![0.0f64; rows];
+                NumArray::new(values)
             })
             .collect();
 
@@ -192,25 +166,157 @@ impl GraphMatrix {
             columns: arrays,
             column_names,
             row_labels: None,
-            dtype,
+            shape: (rows, cols),
             properties: None,
             graph: None,
         }
     }
 
-    /// Create an identity matrix of specified size
-    pub fn identity(size: usize) -> Self {
-        let mut matrix = Self::zeros(size, size, AttrValueType::Int);
+    /// Create adjacency matrix from edge data
+    pub fn adjacency_from_edges(
+        nodes: &[NodeId],
+        edges: &[(NodeId, NodeId)],
+    ) -> crate::errors::GraphResult<Self> {
+        let size = nodes.len();
+        if size == 0 {
+            return Ok(Self::zeros_f64(0, 0));
+        }
 
-        // Set diagonal elements to 1
-        for i in 0..size {
-            if let Some(_col) = matrix.columns.get_mut(i) {
-                // This would need to be implemented in GraphArray
-                // col.set(i, AttrValue::Int(1));
+        // Create node index mapping
+        let node_to_index: std::collections::HashMap<NodeId, usize> = nodes
+            .iter()
+            .enumerate()
+            .map(|(i, &node)| (node, i))
+            .collect();
+
+        // Initialize adjacency matrix data (row-major)
+        let mut matrix_data = vec![0.0f64; size * size];
+
+        // Fill adjacency matrix from edge list
+        for &(source, target) in edges {
+            if let (Some(&src_idx), Some(&tgt_idx)) = 
+                (node_to_index.get(&source), node_to_index.get(&target)) {
+                // Set adjacency (1.0 for unweighted)
+                matrix_data[src_idx * size + tgt_idx] = 1.0;
             }
         }
 
-        matrix
+        // Convert to column-major format
+        Self::from_row_major_data(matrix_data, size, size, Some(nodes))
+    }
+
+    /// Create weighted adjacency matrix from weighted edge data
+    pub fn weighted_adjacency_from_edges(
+        nodes: &[NodeId],
+        weighted_edges: &[(NodeId, NodeId, f64)],
+    ) -> crate::errors::GraphResult<Self> {
+        let size = nodes.len();
+        if size == 0 {
+            return Ok(Self::zeros_f64(0, 0));
+        }
+
+        // Create node index mapping
+        let node_to_index: std::collections::HashMap<NodeId, usize> = nodes
+            .iter()
+            .enumerate()
+            .map(|(i, &node)| (node, i))
+            .collect();
+
+        // Initialize adjacency matrix data (row-major)
+        let mut matrix_data = vec![0.0f64; size * size];
+
+        // Fill weighted adjacency matrix
+        for &(source, target, weight) in weighted_edges {
+            if let (Some(&src_idx), Some(&tgt_idx)) = 
+                (node_to_index.get(&source), node_to_index.get(&target)) {
+                matrix_data[src_idx * size + tgt_idx] = weight;
+            }
+        }
+
+        // Convert to column-major format
+        Self::from_row_major_data(matrix_data, size, size, Some(nodes))
+    }
+
+    /// Create zeros matrix with f64 type
+    pub fn zeros_f64(rows: usize, cols: usize) -> Self {
+        let arrays = (0..cols)
+            .map(|_| {
+                let values = vec![0.0f64; rows];
+                crate::storage::array::NumArray::new(values)
+            })
+            .collect();
+
+        let column_names = (0..cols).map(|i| format!("col_{}", i)).collect();
+
+        GraphMatrix {
+            columns: arrays,
+            column_names,
+            row_labels: None,
+            shape: (rows, cols),
+            properties: None,
+            graph: None,
+        }
+    }
+
+    /// Helper: Create GraphMatrix from row-major data
+    fn from_row_major_data(
+        data: Vec<f64>,
+        rows: usize,
+        cols: usize,
+        nodes: Option<&[NodeId]>,
+    ) -> crate::errors::GraphResult<Self> {
+        // Convert row-major to column-major
+        let mut columns = Vec::with_capacity(cols);
+        for col_idx in 0..cols {
+            let mut column_data = Vec::with_capacity(rows);
+            for row_idx in 0..rows {
+                column_data.push(data[row_idx * cols + col_idx]);
+            }
+            columns.push(crate::storage::array::NumArray::new(column_data));
+        }
+
+        // Create appropriate labels
+        let (column_names, row_labels) = if let Some(node_ids) = nodes {
+            let col_names = node_ids.iter().map(|id| format!("node_{}", id)).collect();
+            let row_labels = node_ids.iter().map(|id| format!("node_{}", id)).collect();
+            (col_names, Some(row_labels))
+        } else {
+            let col_names = (0..cols).map(|i| format!("col_{}", i)).collect();
+            (col_names, None)
+        };
+
+        Ok(GraphMatrix {
+            columns,
+            column_names,
+            row_labels,
+            shape: (rows, cols),
+            properties: None,
+            graph: None,
+        })
+    }
+
+    /// Create an identity matrix of specified size
+    pub fn identity(size: usize) -> Self {
+        let mut columns = Vec::new();
+        let column_names: Vec<String> = (0..size).map(|i| format!("col_{}", i)).collect();
+
+        // Create each column with 1 at diagonal position, 0 elsewhere
+        for j in 0..size {
+            let mut col_values = Vec::new();
+            for i in 0..size {
+                col_values.push(if i == j { 1.0 } else { 0.0 });
+            }
+            columns.push(NumArray::new(col_values));
+        }
+
+        Self {
+            columns,
+            column_names,
+            row_labels: None,
+            shape: (size, size),
+            properties: None,
+            graph: None,
+        }
     }
 
     /// Get matrix dimensions
@@ -222,9 +328,9 @@ impl GraphMatrix {
         }
     }
 
-    /// Get the data type of the matrix
+    /// Get the data type of the matrix - always Float for NumArray<f64>
     pub fn dtype(&self) -> AttrValueType {
-        self.dtype
+        AttrValueType::Float
     }
 
     /// Get column names
@@ -260,9 +366,9 @@ impl GraphMatrix {
         rows == cols
     }
 
-    /// Check if matrix is numeric
+    /// Check if matrix is numeric - always true for NumArray<f64>
     pub fn is_numeric(&self) -> bool {
-        self.dtype.is_numeric()
+        true
     }
 
     /// Get optional graph reference
@@ -271,50 +377,50 @@ impl GraphMatrix {
     }
 
     /// Get element at (row, col) position
-    pub fn get(&self, row: usize, col: usize) -> Option<&AttrValue> {
+    pub fn get(&self, row: usize, col: usize) -> Option<&f64> {
         self.columns.get(col)?.get(row)
     }
 
     /// Get a column by index
-    pub fn get_column(&self, col: usize) -> Option<&GraphArray> {
+    pub fn get_column(&self, col: usize) -> Option<&NumArray<f64>> {
         self.columns.get(col)
     }
 
     /// Get a column by name
-    pub fn get_column_by_name(&self, name: &str) -> Option<&GraphArray> {
+    pub fn get_column_by_name(&self, name: &str) -> Option<&NumArray<f64>> {
         self.column_names
             .iter()
             .position(|n| n == name)
             .and_then(|idx| self.columns.get(idx))
     }
 
-    /// Get a row as a new GraphArray
-    pub fn get_row(&self, row: usize) -> Option<GraphArray> {
+    /// Get a row as a new NumArray
+    pub fn get_row(&self, row: usize) -> Option<NumArray<f64>> {
         let (rows, _) = self.shape();
         if row >= rows {
             return None;
         }
 
-        let row_values: Vec<AttrValue> = self
+        let row_values: Vec<f64> = self
             .columns
             .iter()
-            .filter_map(|col| col.get(row).cloned())
+            .filter_map(|col| col.get(row).copied())
             .collect();
 
         if row_values.len() == self.columns.len() {
-            Some(GraphArray::from_vec(row_values))
+            Some(NumArray::new(row_values))
         } else {
             None
         }
     }
 
     /// Iterator over columns
-    pub fn iter_columns(&self) -> impl Iterator<Item = &GraphArray> {
+    pub fn iter_columns(&self) -> impl Iterator<Item = &NumArray<f64>> {
         self.columns.iter()
     }
 
-    /// Iterator over rows (returns GraphArrays)
-    pub fn iter_rows(&self) -> impl Iterator<Item = GraphArray> + '_ {
+    /// Iterator over rows (returns NumArrays)
+    pub fn iter_rows(&self) -> impl Iterator<Item = NumArray<f64>> + '_ {
         let (rows, _) = self.shape();
         (0..rows).filter_map(move |i| self.get_row(i))
     }
@@ -326,14 +432,14 @@ impl GraphMatrix {
             return self.clone();
         }
 
-        let transposed_arrays: Vec<GraphArray> = (0..rows)
+        let transposed_arrays: Vec<NumArray<f64>> = (0..rows)
             .map(|row_idx| {
-                let row_values: Vec<AttrValue> = self
+                let row_values: Vec<f64> = self
                     .columns
                     .iter()
-                    .filter_map(|col| col.get(row_idx).cloned())
+                    .filter_map(|col| col.get(row_idx).copied())
                     .collect();
-                GraphArray::from_vec(row_values).with_name(format!("row_{}", row_idx))
+                NumArray::new(row_values)
             })
             .collect();
 
@@ -344,107 +450,92 @@ impl GraphMatrix {
             columns: transposed_arrays,
             column_names: new_column_names,
             row_labels: None,
-            dtype: self.dtype,
+            shape: (cols, rows),
             properties: None,
             graph: self.graph.clone(),
         }
     }
 
     /// Statistical operations along an axis
-    pub fn sum_axis(&self, axis: Axis) -> GraphArray {
+    pub fn sum_axis(&self, axis: Axis) -> NumArray<f64> {
         match axis {
             Axis::Columns => {
                 // Sum each column (returns array of column sums)
-                let sums: Vec<AttrValue> = self
+                let sums: Vec<f64> = self
                     .columns
                     .iter()
-                    .map(|col| {
-                        col.sum()
-                            .map(|f| AttrValue::Float(f as f32))
-                            .unwrap_or(AttrValue::Int(0))
-                    })
+                    .map(|col| col.sum())
                     .collect();
-                GraphArray::from_vec(sums)
+                NumArray::new(sums)
             }
             Axis::Rows => {
                 // Sum each row (returns array of row sums)
                 let (rows, _) = self.shape();
-                let sums: Vec<AttrValue> = (0..rows)
+                let sums: Vec<f64> = (0..rows)
                     .map(|row_idx| {
-                        let row_sum: f32 = self
-                            .columns
+                        self.columns
                             .iter()
                             .filter_map(|col| col.get(row_idx))
-                            .filter_map(|val| val.as_float())
-                            .sum();
-                        AttrValue::Float(row_sum)
+                            .map(|&val| val)
+                            .sum()
                     })
                     .collect();
-                GraphArray::from_vec(sums)
+                NumArray::new(sums)
             }
         }
     }
 
     /// Mean along an axis
-    pub fn mean_axis(&self, axis: Axis) -> GraphArray {
+    pub fn mean_axis(&self, axis: Axis) -> NumArray<f64> {
         match axis {
             Axis::Columns => {
-                let means: Vec<AttrValue> = self
+                let means: Vec<f64> = self
                     .columns
                     .iter()
-                    .map(|col| {
-                        col.mean()
-                            .map(|f| AttrValue::Float(f as f32))
-                            .unwrap_or(AttrValue::Int(0))
-                    })
+                    .map(|col| col.mean().unwrap_or(0.0))
                     .collect();
-                GraphArray::from_vec(means)
+                NumArray::new(means)
             }
             Axis::Rows => {
-                let (rows, _cols) = self.shape();
-                let means: Vec<AttrValue> = (0..rows)
+                let (rows, cols) = self.shape();
+                let means: Vec<f64> = (0..rows)
                     .map(|row_idx| {
-                        let row_values: Vec<f32> = self
+                        let row_sum: f64 = self
                             .columns
                             .iter()
                             .filter_map(|col| col.get(row_idx))
-                            .filter_map(|val| val.as_float())
-                            .collect();
-
-                        if row_values.is_empty() {
-                            AttrValue::Int(0)
+                            .map(|&val| val)
+                            .sum();
+                        
+                        if cols == 0 {
+                            0.0
                         } else {
-                            let mean = row_values.iter().sum::<f32>() / row_values.len() as f32;
-                            AttrValue::Float(mean)
+                            row_sum / cols as f64
                         }
                     })
                     .collect();
-                GraphArray::from_vec(means)
+                NumArray::new(means)
             }
         }
     }
 
     /// Standard deviation along an axis
-    pub fn std_axis(&self, axis: Axis) -> GraphArray {
+    pub fn std_axis(&self, axis: Axis) -> NumArray<f64> {
         match axis {
             Axis::Columns => {
-                let stds: Vec<AttrValue> = self
+                let stds: Vec<f64> = self
                     .columns
                     .iter()
-                    .map(|col| {
-                        col.std()
-                            .map(|f| AttrValue::Float(f as f32))
-                            .unwrap_or(AttrValue::Int(0))
-                    })
+                    .map(|col| col.std_dev().unwrap_or(0.0))
                     .collect();
-                GraphArray::from_vec(stds)
+                NumArray::new(stds)
             }
             Axis::Rows => {
                 // This would be more complex - compute std deviation for each row
                 // For now, return zeros as placeholder
                 let (rows, _) = self.shape();
-                let zeros = vec![AttrValue::Float(0.0); rows];
-                GraphArray::from_vec(zeros)
+                let zeros = vec![0.0f64; rows];
+                NumArray::new(zeros)
             }
         }
     }
@@ -504,7 +595,7 @@ impl GraphMatrix {
             let row = i / cols;
             let col = i % cols;
             if let Some(val) = self.get(row, col) {
-                if val.as_float().unwrap_or(0.0).abs() > 1e-10 {
+                if val.abs() > 1e-10 {
                     non_zero_count += 1;
                 }
             }
@@ -548,10 +639,9 @@ impl GraphMatrix {
         for row_idx in 0..rows {
             for col_idx in 0..cols {
                 if let Some(val) = self.get(row_idx, col_idx) {
-                    let float_val = val.as_float().unwrap_or(0.0) as f64;
-                    if float_val.abs() > 1e-10 {
+                    if val.abs() > 1e-10 {
                         // Consider values > epsilon as non-zero
-                        sparse_data.push((row_idx, col_idx, float_val));
+                        sparse_data.push((row_idx, col_idx, *val));
                     }
                 }
             }
@@ -571,8 +661,8 @@ impl GraphMatrix {
             for col_idx in 0..cols {
                 let val = self
                     .get(row_idx, col_idx)
-                    .and_then(|v| v.as_float())
-                    .unwrap_or(0.0) as f64;
+                    .copied()
+                    .unwrap_or(0.0);
                 data.push(val);
             }
         }
@@ -630,17 +720,17 @@ impl GraphMatrix {
     ) -> GraphResult<GraphMatrix> {
         let mut result_columns = Vec::with_capacity(cols);
 
-        // Convert row-major data back to column-major GraphArrays
+        // Convert row-major data back to column-major NumArrays
         for col_idx in 0..cols {
             let mut column_data = Vec::with_capacity(rows);
 
             for row_idx in 0..rows {
-                let val = data[row_idx * cols + col_idx] as f32;
-                column_data.push(AttrValue::Float(val));
+                let val = data[row_idx * cols + col_idx] as f64;
+                column_data.push(val);
             }
 
             let column_name = format!("col_{}", col_idx);
-            let column = GraphArray::from_vec(column_data).with_name(column_name);
+            let column = NumArray::new(column_data);
             result_columns.push(column);
         }
 
@@ -726,23 +816,23 @@ impl GraphMatrix {
         let mut result_columns = Vec::with_capacity(self_cols);
 
         for col_idx in 0..self_cols {
-            let mut result_column = Vec::with_capacity(self_rows);
+            let mut result_column: Vec<f64> = Vec::with_capacity(self_rows);
 
             for row_idx in 0..self_rows {
                 let self_val = self
                     .get(row_idx, col_idx)
-                    .and_then(|v| v.as_float())
+                    .copied()
                     .unwrap_or(0.0);
                 let other_val = other
                     .get(row_idx, col_idx)
-                    .and_then(|v| v.as_float())
+                    .copied()
                     .unwrap_or(0.0);
 
-                result_column.push(AttrValue::Float(self_val * other_val));
+                result_column.push(self_val * other_val);
             }
 
             let column_name = format!("col_{}", col_idx);
-            let column = GraphArray::from_vec(result_column).with_name(column_name.clone());
+            let column = NumArray::new(result_column);
             result_columns.push(column);
         }
 
@@ -758,28 +848,134 @@ impl GraphMatrix {
 
     // Helper methods
 
-    /// Determine the common type for a collection of arrays
-    fn determine_common_type(arrays: &[GraphArray]) -> GraphResult<AttrValueType> {
-        if arrays.is_empty() {
-            return Ok(AttrValueType::Int); // Default
+    // Adjacency Matrix Specialized Operations
+
+    /// Convert adjacency matrix to Laplacian matrix
+    pub fn to_laplacian(&self) -> crate::errors::GraphResult<Self> {
+        if !self.is_square() {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Laplacian transformation requires square matrix".to_string()
+            ));
         }
 
-        let first_type = arrays[0].dtype();
+        let size = self.shape().0;
 
-        // For now, require exact type matches
-        // TODO: Implement type promotion rules (int -> float, etc.)
-        for array in arrays.iter() {
-            if array.dtype() != first_type {
-                return Err(GraphError::InvalidInput(format!(
-                    "Type mismatch: expected {:?}, found {:?}",
-                    first_type,
-                    array.dtype()
-                )));
+        // Calculate degree for each node (row sums)
+        let degrees = self.sum_axis(Axis::Rows);
+
+        // Create new columns for Laplacian matrix: L = D - A
+        let mut new_columns = Vec::new();
+        
+        for j in 0..size {
+            let mut col_values = Vec::new();
+            
+            for i in 0..size {
+                let laplacian_val = if i == j {
+                    // Diagonal: degree - self_connection
+                    let degree = degrees.get(i).copied().unwrap_or(0.0);
+                    let self_conn = self.get(i, j).copied().unwrap_or(0.0);
+                    degree - self_conn
+                } else {
+                    // Off-diagonal: -adjacency_value
+                    let adj_val = self.get(i, j).copied().unwrap_or(0.0);
+                    -adj_val
+                };
+                
+                col_values.push(laplacian_val);
+            }
+            
+            new_columns.push(NumArray::new(col_values));
+        }
+
+        Ok(GraphMatrix {
+            columns: new_columns,
+            column_names: self.column_names.clone(),
+            row_labels: self.row_labels.clone(),
+            shape: self.shape,
+            properties: None,
+            graph: self.graph.clone(),
+        })
+    }
+
+    /// Convert adjacency matrix to normalized Laplacian matrix
+    pub fn to_normalized_laplacian(&self) -> crate::errors::GraphResult<Self> {
+        let laplacian = self.to_laplacian()?;
+        let size = self.shape().0;
+
+        // Calculate degrees for normalization
+        let degrees = self.sum_axis(Axis::Rows);
+
+        // Create new columns with normalized values
+        let mut new_columns = Vec::new();
+        
+        for j in 0..size {
+            let mut col_values = Vec::new();
+            
+            for i in 0..size {
+                let original_val = laplacian.get(i, j).copied().unwrap_or(0.0);
+                let deg_i = degrees.get(i).copied().unwrap_or(0.0);
+                let deg_j = degrees.get(j).copied().unwrap_or(0.0);
+                
+                let normalized_val = if deg_i > 0.0 && deg_j > 0.0 {
+                    let normalizer = (deg_i * deg_j).sqrt();
+                    original_val / normalizer
+                } else {
+                    original_val
+                };
+                
+                col_values.push(normalized_val);
+            }
+            
+            new_columns.push(NumArray::new(col_values));
+        }
+
+        Ok(GraphMatrix {
+            columns: new_columns,
+            column_names: laplacian.column_names.clone(),
+            row_labels: laplacian.row_labels.clone(),
+            shape: laplacian.shape,
+            properties: None,
+            graph: self.graph.clone(),
+        })
+    }
+
+    /// Check if this appears to be an adjacency matrix (square, non-negative)
+    pub fn is_adjacency_matrix(&self) -> bool {
+        if !self.is_square() {
+            return false;
+        }
+
+        // Check if all values are non-negative
+        for col in &self.columns {
+            for val in col.iter() {
+                if *val < 0.0 {
+                    return false;
+                }
             }
         }
 
-        Ok(first_type)
+        true
     }
+
+    /// Get diagonal values (degrees for adjacency matrix)
+    pub fn diagonal(&self) -> crate::storage::array::NumArray<f64> {
+        let size = self.shape().0.min(self.shape().1);
+        let mut diag_values = Vec::with_capacity(size);
+        
+        for i in 0..size {
+            let val = self.get(i, i).copied().unwrap_or(0.0);
+            diag_values.push(val);
+        }
+        
+        crate::storage::array::NumArray::new(diag_values)
+    }
+
+    /// Calculate trace (sum of diagonal elements)
+    pub fn trace(&self) -> f64 {
+        self.diagonal().sum()
+    }
+
+    // Helper methods removed - NumArray<f64> is always Float type
 
     /// Check if the matrix is symmetric (internal helper)
     fn is_symmetric_internal(&self) -> bool {
@@ -812,11 +1008,7 @@ impl GraphMatrix {
             .iter()
             .map(|col| {
                 col.iter()
-                    .filter(|val| match val {
-                        AttrValue::Int(0) | AttrValue::SmallInt(0) => true,
-                        AttrValue::Float(f) if *f == 0.0 => true,
-                        _ => false,
-                    })
+                    .filter(|&val| *val == 0.0)
                     .count()
             })
             .sum()
@@ -855,7 +1047,7 @@ impl GraphMatrix {
 
     /// Materialize the matrix to nested vectors for Python consumption
     /// This is the primary materialization method used by .data property
-    pub fn materialize(&self) -> Vec<Vec<AttrValue>> {
+    pub fn materialize(&self) -> Vec<Vec<f64>> {
         let (rows, cols) = self.shape();
         let mut materialized = Vec::with_capacity(rows);
 
@@ -864,8 +1056,8 @@ impl GraphMatrix {
             for col_idx in 0..cols {
                 let value = self
                     .get(row_idx, col_idx)
-                    .cloned()
-                    .unwrap_or(AttrValue::Int(0));
+                    .copied()
+                    .unwrap_or(0.0);
                 row.push(value);
             }
             materialized.push(row);
@@ -893,7 +1085,7 @@ impl GraphMatrix {
         let (rows, cols) = self.shape();
         let is_sparse = self.is_sparse();
         let is_square = self.is_square();
-        let dtype = self.dtype;
+        let dtype = "f64";
 
         format!(
             "GraphMatrix(shape=({}, {}), dtype={:?}, sparse={}, square={})",
@@ -923,7 +1115,7 @@ impl fmt::Display for GraphMatrix {
         writeln!(
             f,
             "GraphMatrix ({} x {}) - dtype: {:?}",
-            rows, cols, self.dtype
+            rows, cols, "f64"
         )?;
 
         // Show column names

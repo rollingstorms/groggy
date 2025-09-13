@@ -2,8 +2,10 @@
 //!
 //! Python bindings for GraphMatrix - general-purpose matrix operations.
 
-use groggy::storage::GraphArray;
+use groggy::storage::array::BaseArray;
 use groggy::storage::GraphMatrix;
+use groggy::storage::array::NumArray;
+use groggy::types::AttrValue as RustAttrValue;
 use pyo3::exceptions::{
     PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
     PyValueError,
@@ -13,7 +15,8 @@ use std::collections::HashMap;
 use pyo3::types::PyType;
 
 // Use utility functions from utils module
-use crate::ffi::storage::array::PyGraphArray;
+use crate::ffi::storage::array::PyBaseArray;
+use crate::ffi::storage::num_array::PyNumArray;
 use crate::ffi::utils::attr_value_to_python_value;
 
 /// Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays
@@ -26,14 +29,52 @@ pub struct PyGraphMatrix {
 
 #[pymethods]
 impl PyGraphMatrix {
-    /// Create a new GraphMatrix from arrays
+    /// Create a new GraphMatrix from BaseArrays (mixed types) or NumArrays (numerical)
     #[new]
-    pub fn new(py: Python, arrays: Vec<Py<PyGraphArray>>) -> PyResult<Self> {
-        // Convert PyGraphArrays to core GraphArrays
-        let core_arrays: Vec<GraphArray> = arrays
-            .iter()
-            .map(|py_array| py_array.borrow(py).inner.clone())
-            .collect();
+    pub fn new(py: Python, arrays: Vec<PyObject>) -> PyResult<Self> {
+        if arrays.is_empty() {
+            return Err(PyValueError::new_err("Cannot create matrix from empty array list"));
+        }
+
+        let mut core_arrays: Vec<NumArray<f64>> = Vec::new();
+        
+        for (i, array_obj) in arrays.iter().enumerate() {
+            // Try NumArray first (preferred for matrices)
+            if let Ok(num_array) = array_obj.extract::<PyRef<PyNumArray>>(py) {
+                // Use NumArray directly - no conversion needed
+                core_arrays.push(num_array.inner.clone());
+            }
+            // Convert BaseArray to NumArray<f64>
+            else if let Ok(base_array) = array_obj.extract::<PyRef<PyBaseArray>>(py) {
+                let f64_values: Vec<f64> = base_array.inner.iter()
+                    .map(|attr_value| match attr_value {
+                        RustAttrValue::Float(f) => *f as f64,
+                        RustAttrValue::Int(i) => *i as f64,
+                        RustAttrValue::Bool(b) => if *b { 1.0 } else { 0.0 },
+                        _ => 0.0, // Default for non-numeric types
+                    })
+                    .collect();
+                core_arrays.push(NumArray::new(f64_values));
+            }
+            // Convert legacy PyGraphArray to NumArray<f64>
+            else if let Ok(base_array) = array_obj.extract::<PyRef<PyBaseArray>>(py) {
+                let f64_values: Vec<f64> = base_array.inner.data()
+                    .iter()
+                    .map(|attr_value| match attr_value {
+                        RustAttrValue::Float(f) => *f as f64,
+                        RustAttrValue::Int(i) => *i as f64,
+                        RustAttrValue::Bool(b) => if *b { 1.0 } else { 0.0 },
+                        _ => 0.0, // Default for non-numeric types
+                    })
+                    .collect();
+                core_arrays.push(NumArray::new(f64_values));
+            }
+            else {
+                return Err(PyTypeError::new_err(format!(
+                    "Array {} must be BaseArray, NumArray, or GraphArray", i
+                )));
+            }
+        }
 
         // Create core GraphMatrix
         let matrix = GraphMatrix::from_arrays(core_arrays)
@@ -160,7 +201,7 @@ impl PyGraphMatrix {
     /// Get single cell value at (row, col)
     fn get_cell(&self, py: Python, row: usize, col: usize) -> PyResult<PyObject> {
         match self.inner.get(row, col) {
-            Some(attr_value) => attr_value_to_python_value(py, attr_value),
+            Some(f64_value) => Ok(f64_value.to_object(py)),
             None => {
                 let (rows, cols) = self.inner.shape();
                 Err(PyIndexError::new_err(format!(
@@ -171,12 +212,13 @@ impl PyGraphMatrix {
         }
     }
 
-    /// Get entire row as GraphArray
+    /// Get entire row as BaseArray (mixed types) or NumArray (if all numerical)
     fn get_row(&self, py: Python, row: usize) -> PyResult<PyObject> {
         match self.inner.get_row(row) {
             Some(row_array) => {
-                let py_array = PyGraphArray::from_graph_array(row_array);
-                Ok(Py::new(py, py_array)?.to_object(py))
+                // GraphMatrix is always numerical, so wrap in PyNumArray
+                let py_num_array = PyNumArray { inner: row_array };
+                Ok(Py::new(py, py_num_array)?.to_object(py))
             }
             None => {
                 let (rows, _) = self.inner.shape();
@@ -188,23 +230,25 @@ impl PyGraphMatrix {
         }
     }
 
-    /// Get column by name as GraphArray
+    /// Get column by name as BaseArray (mixed types) or NumArray (if all numerical)
     fn get_column_by_name(&self, py: Python, name: String) -> PyResult<PyObject> {
         match self.inner.get_column_by_name(&name) {
             Some(column) => {
-                let py_array = PyGraphArray::from_graph_array(column.clone());
-                Ok(Py::new(py, py_array)?.to_object(py))
+                // GraphMatrix columns are always numerical NumArrays
+                let py_num_array = PyNumArray { inner: column.clone() };
+                Ok(Py::new(py, py_num_array)?.to_object(py))
             }
             None => Err(PyKeyError::new_err(format!("Column '{}' not found", name))),
         }
     }
 
-    /// Get column by index as GraphArray
+    /// Get column by index as BaseArray (mixed types) or NumArray (if all numerical)
     fn get_column(&self, py: Python, col: usize) -> PyResult<PyObject> {
         match self.inner.get_column(col) {
             Some(column) => {
-                let py_array = PyGraphArray::from_graph_array(column.clone());
-                Ok(Py::new(py, py_array)?.to_object(py))
+                // GraphMatrix columns are always numerical NumArrays
+                let py_num_array = PyNumArray { inner: column.clone() };
+                Ok(Py::new(py, py_num_array)?.to_object(py))
             }
             None => {
                 let (_, cols) = self.inner.shape();
@@ -218,7 +262,7 @@ impl PyGraphMatrix {
 
     // === ITERATION ===
 
-    /// Iterate over rows - returns iterator of GraphArrays
+    /// Iterate over rows - returns iterator of BaseArrays or NumArrays
     fn iter_rows(&self, py: Python) -> PyResult<Vec<PyObject>> {
         let (rows, _) = self.inner.shape();
         let mut row_arrays = Vec::with_capacity(rows);
@@ -226,8 +270,9 @@ impl PyGraphMatrix {
         for i in 0..rows {
             match self.inner.get_row(i) {
                 Some(row_array) => {
-                    let py_array = PyGraphArray::from_graph_array(row_array);
-                    row_arrays.push(Py::new(py, py_array)?.to_object(py));
+                    // GraphMatrix rows are always numerical NumArrays
+                    let py_num_array = PyNumArray { inner: row_array };
+                    row_arrays.push(Py::new(py, py_num_array)?.to_object(py));
                 }
                 None => return Err(PyIndexError::new_err(format!("Row {} not found", i))),
             }
@@ -236,7 +281,7 @@ impl PyGraphMatrix {
         Ok(row_arrays)
     }
 
-    /// Iterate over columns - returns iterator of GraphArrays
+    /// Iterate over columns - returns iterator of BaseArrays or NumArrays
     fn iter_columns(&self, py: Python) -> PyResult<Vec<PyObject>> {
         let (_, cols) = self.inner.shape();
         let mut col_arrays = Vec::with_capacity(cols);
@@ -244,8 +289,9 @@ impl PyGraphMatrix {
         for i in 0..cols {
             match self.inner.get_column(i) {
                 Some(col_array) => {
-                    let py_array = PyGraphArray::from_graph_array(col_array.clone());
-                    col_arrays.push(Py::new(py, py_array)?.to_object(py));
+                    // GraphMatrix columns are always numerical NumArrays
+                    let py_num_array = PyNumArray { inner: col_array.clone() };
+                    col_arrays.push(Py::new(py, py_num_array)?.to_object(py));
                 }
                 None => return Err(PyIndexError::new_err(format!("Column {} not found", i))),
             }
@@ -329,8 +375,11 @@ impl PyGraphMatrix {
         };
 
         let result_array = self.inner.sum_axis(axis_enum);
-        let py_array = PyGraphArray::from_graph_array(result_array);
-        Ok(Py::new(py, py_array)?.to_object(py))
+        
+        // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
+        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let num_array = PyNumArray::new(f64_values);
+        Ok(Py::new(py, num_array)?.to_object(py))
     }
 
     /// Mean along specified axis (0=rows, 1=columns)
@@ -346,8 +395,11 @@ impl PyGraphMatrix {
         };
 
         let result_array = self.inner.mean_axis(axis_enum);
-        let py_array = PyGraphArray::from_graph_array(result_array);
-        Ok(Py::new(py, py_array)?.to_object(py))
+        
+        // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
+        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let num_array = PyNumArray::new(f64_values);
+        Ok(Py::new(py, num_array)?.to_object(py))
     }
 
     /// Standard deviation along specified axis (0=rows, 1=columns)
@@ -363,8 +415,11 @@ impl PyGraphMatrix {
         };
 
         let result_array = self.inner.std_axis(axis_enum);
-        let py_array = PyGraphArray::from_graph_array(result_array);
-        Ok(Py::new(py, py_array)?.to_object(py))
+        
+        // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
+        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let num_array = PyNumArray::new(f64_values);
+        Ok(Py::new(py, num_array)?.to_object(py))
     }
 
     // === SCIENTIFIC COMPUTING CONVERSIONS ===
@@ -387,9 +442,12 @@ impl PyGraphMatrix {
             if col_idx < cols {
                 match self.inner.get_column(col_idx) {
                     Some(column) => {
-                        let py_array = PyGraphArray::from_graph_array(column.clone());
-                        let values = py_array.to_list(py)?;
-                        dict.set_item(col_name, values)?;
+                        // Convert column values directly to Python list
+                        let py_list = pyo3::types::PyList::empty(py);
+                        for val in column.iter() {
+                            py_list.append(val.to_object(py))?;
+                        }
+                        dict.set_item(col_name, py_list)?;
                     }
                     None => {
                         return Err(PyIndexError::new_err(format!(
@@ -408,14 +466,47 @@ impl PyGraphMatrix {
 
     // === DISPLAY & REPRESENTATION ===
 
-    /// String representation
+    /// String representation with rich display hints
     fn __repr__(&self, py: Python) -> PyResult<String> {
         let (rows, cols) = self.inner.shape();
+        let dtype = format!("{:?}", self.inner.dtype());
+        
+        // Show a preview of the matrix data
+        let preview = if rows == 0 || cols == 0 {
+            "empty".to_string()
+        } else {
+            // Show first few values as a preview
+            let mut preview_values = Vec::new();
+            let preview_rows = std::cmp::min(2, rows);
+            let preview_cols = std::cmp::min(3, cols);
+            
+            for i in 0..preview_rows {
+                let mut row_values = Vec::new();
+                for j in 0..preview_cols {
+                    match self.inner.get(i, j) {
+                        Some(val) => {
+                            let val_str = format!("{:.2}", val);
+                            row_values.push(val_str);
+                        }
+                        None => row_values.push("0".to_string()),
+                    }
+                }
+                if cols > preview_cols {
+                    row_values.push("...".to_string());
+                }
+                preview_values.push(format!("[{}]", row_values.join(" ")));
+            }
+            
+            if rows > preview_rows {
+                preview_values.push("...".to_string());
+            }
+            
+            format!("\n{}", preview_values.join("\n"))
+        };
+        
         Ok(format!(
-            "GraphMatrix({} x {}, dtype={:?})",
-            rows,
-            cols,
-            self.inner.dtype()
+            "GraphMatrix({} x {}, dtype={}){}\n💡 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
+            rows, cols, dtype, preview
         ))
     }
 
@@ -447,16 +538,7 @@ impl PyGraphMatrix {
         for i in 0..sample_rows {
             for j in 0..sample_cols {
                 if let Some(value) = self.inner.get(i, j) {
-                    let value_str = match value {
-                        groggy::AttrValue::Text(s) => s.clone(),
-                        groggy::AttrValue::CompactText(s) => format!("{:?}", s),
-                        groggy::AttrValue::Int(n) => format!("{}", n),
-                        groggy::AttrValue::SmallInt(n) => format!("{}", n),
-                        groggy::AttrValue::Float(f) => format!("{}", f),
-                        groggy::AttrValue::Bool(b) => format!("{}", b),
-                        groggy::AttrValue::Null => "null".to_string(),
-                        _ => format!("{:?}", value),
-                    };
+                    let value_str = format!("{}", value);
                     col_widths[j] = std::cmp::max(col_widths[j], value_str.len());
                 }
             }
@@ -504,16 +586,7 @@ impl PyGraphMatrix {
             let mut row_line = "│".to_string();
             for (j, &width) in col_widths.iter().enumerate() {
                 let value_str = if let Some(value) = self.inner.get(i, j) {
-                    match value {
-                        groggy::AttrValue::Text(s) => s.clone(),
-                        groggy::AttrValue::CompactText(s) => format!("{:?}", s),
-                        groggy::AttrValue::Int(n) => format!("{}", n),
-                        groggy::AttrValue::SmallInt(n) => format!("{}", n),
-                        groggy::AttrValue::Float(f) => format!("{}", f),
-                        groggy::AttrValue::Bool(b) => format!("{}", b),
-                        groggy::AttrValue::Null => "null".to_string(),
-                        _ => format!("{:?}", value),
-                    }
+                    format!("{}", value)
                 } else {
                     "null".to_string()
                 };
@@ -542,9 +615,12 @@ impl PyGraphMatrix {
     
     /// Rich HTML representation for Jupyter notebooks
     fn _repr_html_(&self, _py: Python) -> PyResult<String> {
-        let formatted = self.rich_display(None)?;
-        // Convert to HTML format for Jupyter
-        Ok(format!("<pre>{}</pre>", html_escape::encode_text(&formatted)))
+        // Convert matrix to table and get its HTML representation
+        let table = self.to_table_for_streaming()?;
+        
+        // Use the core table's _repr_html_ method for proper HTML output
+        let html = table.table._repr_html_();
+        Ok(html)
     }
 
 
@@ -560,7 +636,7 @@ impl PyGraphMatrix {
             for j in 0..cols {
                 match self.inner.get(i, j) {
                     Some(attr_value) => {
-                        row_data.push(attr_value_to_python_value(py, attr_value)?);
+                        row_data.push(attr_value.to_object(py));
                     }
                     None => row_data.push(py.None()),
                 }
@@ -598,7 +674,7 @@ impl PyGraphMatrix {
             .iter()
             .map(|row| {
                 row.iter()
-                    .map(|val| attr_value_to_python_value(py, val))
+                    .map(|val| Ok(val.to_object(py)))
                     .collect()
             })
             .collect();
@@ -655,6 +731,82 @@ impl PyGraphMatrix {
         let array = numpy.call_method1("array", (data,))?;
         Ok(array.to_object(py))
     }
+
+    /// Launch interactive streaming table view in browser
+    /// 
+    /// Converts the matrix into a table format and launches a streaming
+    /// interactive view in the browser. The table will show the matrix data
+    /// with row and column indices for easy exploration.
+    /// 
+    /// Returns:
+    ///     str: URL of the interactive table interface
+    pub fn interactive(&self) -> PyResult<String> {
+        // Convert matrix to table format for streaming
+        let table = self.to_table_for_streaming()?;
+        
+        // Use the table's interactive method
+        table.interactive()
+    }
+    
+    /// Generate embedded iframe HTML for Jupyter notebooks
+    /// 
+    /// Creates an interactive streaming table representation of the matrix
+    /// that can be embedded directly in a Jupyter notebook cell.
+    /// 
+    /// Returns:
+    ///     str: HTML iframe code for embedding in Jupyter
+    pub fn interactive_embed(&self) -> PyResult<String> {
+        // Convert matrix to table format for streaming
+        let mut table = self.to_table_for_streaming()?;
+        
+        // Use the table's interactive_embed method
+        table.interactive_embed()
+    }
+    
+    /// Convert matrix to table format for streaming visualization
+    /// 
+    /// Creates a BaseTable with columns representing matrix data:
+    /// - 'row': row index
+    /// - 'column': column index  
+    /// - 'value': the matrix value at that position
+    fn to_table_for_streaming(&self) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        use groggy::storage::table::BaseTable;
+        use groggy::types::AttrValue;
+        use std::collections::HashMap;
+        
+        let (rows, cols) = self.shape();
+        let mut columns = HashMap::new();
+        
+        // Prepare data vectors
+        let mut row_indices = Vec::new();
+        let mut col_indices = Vec::new();
+        let mut values = Vec::new();
+        
+        // Flatten the matrix into table format (row, column, value)
+        for row in 0..rows {
+            for col in 0..cols {
+                row_indices.push(AttrValue::SmallInt(row as i32));
+                col_indices.push(AttrValue::SmallInt(col as i32));
+                
+                // Get the value from the matrix
+                match self.inner.get(row, col) {
+                    Some(f64_value) => values.push(AttrValue::Float(*f64_value as f32)),
+                    None => values.push(AttrValue::Null),
+                }
+            }
+        }
+        
+        // Create columns for the table
+        columns.insert("row".to_string(), groggy::storage::array::BaseArray::new(row_indices));
+        columns.insert("column".to_string(), groggy::storage::array::BaseArray::new(col_indices));
+        columns.insert("value".to_string(), groggy::storage::array::BaseArray::new(values));
+        
+        // Create the BaseTable
+        let base_table = BaseTable::from_columns(columns)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create table: {}", e)))?;
+        
+        Ok(crate::ffi::storage::table::PyBaseTable::from_table(base_table))
+    }
 }
 
 // Implement display data conversion for PyGraphMatrix
@@ -687,17 +839,9 @@ impl PyGraphMatrix {
             let mut row_data = Vec::new();
             for j in 0..sample_cols {
                 if let Some(value) = self.inner.get(i, j) {
-                    let json_value = match value {
-                        groggy::AttrValue::Text(s) => serde_json::Value::String(s.clone()),
-                        groggy::AttrValue::CompactText(s) => serde_json::Value::String(format!("{:?}", s)),
-                        groggy::AttrValue::Int(n) => serde_json::Value::Number(serde_json::Number::from(*n)),
-                        groggy::AttrValue::SmallInt(n) => serde_json::Value::Number(serde_json::Number::from(*n)),
-                        groggy::AttrValue::Float(f) => serde_json::Value::Number(serde_json::Number::from_f64(*f as f64).unwrap_or(serde_json::Number::from(0))),
-                        groggy::AttrValue::Bool(b) => serde_json::Value::Bool(*b),
-                        groggy::AttrValue::Null => serde_json::Value::Null,
-                        // Handle other variants by converting to string representation
-                        _ => serde_json::Value::String(format!("{:?}", value)),
-                    };
+                    let json_value = serde_json::Value::Number(
+                        serde_json::Number::from_f64(*value).unwrap_or(serde_json::Number::from(0))
+                    );
                     row_data.push(json_value);
                 } else {
                     row_data.push(serde_json::Value::Null);

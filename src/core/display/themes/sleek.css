@@ -19,25 +19,31 @@
 
 /* Container */
 .groggy-display-container {
-  font-family: var(--mono);
+  font-family: var(--font);
   background: var(--bg);
   color: var(--fg);
   border: var(--border) solid var(--line);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
   overflow: hidden;
-  border: 1px solid #ccc;
+  width: fit-content;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.groggy-table-container {
+  width: fit-content;
 }
 
 /* Table */
 .groggy-table {
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: 11.5px !important;
+  line-height: 1.1;
   background-color: #f8f9fa;
-  min-width: 100%
+  margin-bottom: 0 !important
 }
+
 .groggy-table th,
 .groggy-table td {
   padding: var(--cell-py) var(--cell-px);
@@ -115,7 +121,7 @@
     margin-top: 0px;
     padding: 5px 12px 3px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 10px;
     color: #6c757d;
     display: flex;
     justify-content: space-between;
@@ -129,7 +135,7 @@
     border: none;
     padding: 4px 8px;
     border-radius: 3px;
-    font-size: 12px;
+    font-size: 10px;
     cursor: pointer;
     transition: background-color 0.2s;
     display: none;

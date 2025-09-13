@@ -47,42 +47,50 @@ def to_networkx(graph: Graph,
     
     # Add nodes
     node_ids = graph.node_ids
-    for node_id in node_ids:
+    for i, node_id in enumerate(node_ids):
         node_attrs = {}
         if include_attributes:
             # Try to get common attributes
             for attr_name in ['name', 'index', 'level', 'component_id', 'age', 'dept', 'salary', 'location', 'community']:
                 try:
-                    if hasattr(graph.nodes[node_id], '__getitem__'):
-                        attr_value = graph.nodes[node_id][attr_name]
+                    # Get the attribute array for all nodes
+                    attr_array = graph.nodes[attr_name]
+                    # Extract the value for this specific node (using index)
+                    attr_value = attr_array[i] if hasattr(attr_array, '__getitem__') else None
+                    if attr_value is not None:
                         # Convert to Python native types for NetworkX compatibility
                         if hasattr(attr_value, 'inner'):
                             attr_value = attr_value.inner
                         node_attrs[f"{node_attr_prefix}{attr_name}"] = attr_value
-                except (KeyError, AttributeError):
+                except (KeyError, AttributeError, IndexError):
                     continue
         
         nx_graph.add_node(node_id, **node_attrs)
     
     # Add edges
     edge_ids = graph.edge_ids
-    for edge_id in edge_ids:
+    
+    for i, edge_id in enumerate(edge_ids):
         try:
-            edge_view = graph.edges[edge_id]
-            source = edge_view.source
-            target = edge_view.target
+            # Get source and target from the edge table
+            source = graph.edges.sources[i]
+            target = graph.edges.targets[i]
             
             edge_attrs = {}
             if include_attributes:
                 # Try to get common edge attributes
                 for attr_name in ['weight', 'relationship', 'type', 'strength', 'frequency']:
                     try:
-                        attr_value = edge_view[attr_name]
-                        # Convert to Python native types for NetworkX compatibility
-                        if hasattr(attr_value, 'inner'):
-                            attr_value = attr_value.inner
-                        edge_attrs[f"{edge_attr_prefix}{attr_name}"] = attr_value
-                    except (KeyError, AttributeError):
+                        # Get the attribute array for all edges
+                        attr_array = graph.edges[attr_name]
+                        # Extract the value for this specific edge (using index)
+                        attr_value = attr_array[i] if hasattr(attr_array, '__getitem__') else None
+                        if attr_value is not None:
+                            # Convert to Python native types for NetworkX compatibility
+                            if hasattr(attr_value, 'inner'):
+                                attr_value = attr_value.inner
+                            edge_attrs[f"{edge_attr_prefix}{attr_name}"] = attr_value
+                    except (KeyError, AttributeError, IndexError):
                         continue
             
             nx_graph.add_edge(source, target, **edge_attrs)

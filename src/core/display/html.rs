@@ -33,7 +33,9 @@ impl HtmlRenderer {
             r#"<div class="groggy-display-container" data-theme="{}">"#,
             theme.name
         ));
-
+        html.push_str(&format!(
+            r#"<div class="groggy-table-container">"#
+        ));
         // Main table element
         html.push_str(&format!(
             r#"<table class="groggy-table {}">"#,
@@ -53,11 +55,12 @@ impl HtmlRenderer {
         html.push_str("</tbody>");
 
         html.push_str("</table>");
-
+       
         // Table info section (if data is truncated)
         if let Some(info) = data.truncation_info() {
             html.push_str(&self.render_table_info(&info, data, config));
         }
+        html.push_str("</div>");
 
         html.push_str("</div>");
 

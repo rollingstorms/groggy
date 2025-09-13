@@ -42,6 +42,11 @@ impl<T> BaseArray<T> {
         (*self.inner).clone() 
     }
     
+    /// Get access to underlying data as a slice (for SIMD operations)
+    pub fn as_slice(&self) -> &[T] {
+        &self.inner
+    }
+    
     /// Get the first element
     pub fn first(&self) -> Option<&T> {
         self.inner.first()

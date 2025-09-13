@@ -10,11 +10,11 @@ documentation = "https://groggy.readthedocs.io"
 
 [lib]
 name = "groggy"
-crate-type = ["rlib"]
+crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 fastrand = "2.0"
-# pyo3 = { version = "0.20", features = ["extension-module"] } # Moved to python-groggy
+pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
 petgraph = "0.6"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -32,6 +32,10 @@ tokio = { version = "1.0", features = ["full"] } # Async runtime
 tokio-tungstenite = "0.21" # WebSocket server implementation
 tokio-util = "0.7" # Tokio utilities including CancellationToken
 futures-util = "0.3" # Futures utilities for WebSocket streams
+
+[features]
+default = []
+python = ["pyo3"]
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

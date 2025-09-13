@@ -36,7 +36,7 @@
   font-size: 14px;
   line-height: 1.4;
   background-color: #f8f9fa;
-  min-width: 100%
+  min-width: fit-content;
 }
 .groggy-table th,
 .groggy-table td {

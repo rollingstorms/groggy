@@ -428,6 +428,9 @@ impl StreamingServer {
 
         // Use the actual port the server is running on for WebSocket connection
         let ws_port = port;
+        
+        // Get the sleek theme CSS
+        let sleek_css = include_str!("../display/themes/sleek.css");
 
         let html = format!(r#"<!DOCTYPE html>
 <html lang="en">
@@ -436,17 +439,21 @@ impl StreamingServer {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Groggy Interactive Table</title>
     <style>
+        /* Sleek theme CSS */
+        {sleek_css}
+        
+        /* Additional streaming-specific styles */
         body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: var(--font);
             margin: 0;
             padding: 20px;
-            background: #f8f9fa;
+            background: var(--bg);
         }}
         
         .table-container {{
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            background: var(--bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
             overflow: hidden;
             max-height: 80vh;
             overflow-y: auto;
@@ -454,8 +461,8 @@ impl StreamingServer {
         
         .table-header {{
             padding: 16px 20px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e9ecef;
+            background: var(--hover);
+            border-bottom: var(--border) solid var(--line);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -464,12 +471,12 @@ impl StreamingServer {
         .table-title {{
             font-size: 18px;
             font-weight: 600;
-            color: #212529;
+            color: var(--fg);
         }}
         
         .table-stats {{
             font-size: 14px;
-            color: #6c757d;
+            color: var(--muted);
         }}
         
         .connection-status {{
@@ -489,42 +496,10 @@ impl StreamingServer {
             color: #721c24;
         }}
         
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-        }}
-        
-        th {{
-            background: #f8f9fa;
-            font-weight: 600;
-            text-align: left;
-            padding: 12px 16px;
-            border-bottom: 2px solid #e9ecef;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }}
-        
-        td {{
-            padding: 10px 16px;
-            border-bottom: 1px solid #f1f3f4;
-        }}
-        
-        tr:hover {{
-            background: #f8f9fa;
-        }}
-        
-        .cell {{
-            max-width: 200px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }}
-        
         .loading {{
             text-align: center;
             padding: 20px;
-            color: #6c757d;
+            color: var(--muted);
         }}
         
         .error {{
@@ -535,11 +510,60 @@ impl StreamingServer {
             margin: 10px;
             border-radius: 4px;
         }}
+        
+        /* Apply sleek table styling to data table */
+        #data-table {{
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 14px;
+            line-height: 1.4;
+            background-color: var(--bg);
+            min-width: 100%;
+        }}
+        
+        #data-table th,
+        #data-table td {{
+            padding: var(--cell-py) var(--cell-px);
+            border-right: var(--border) solid var(--line);
+            border-bottom: var(--border) solid var(--line);
+        }}
+        
+        #data-table th:last-child,
+        #data-table td:last-child {{
+            border-right: none;
+        }}
+        
+        #data-table thead th {{
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #fafafa;
+            font-weight: 600;
+            text-align: left;
+            color: var(--fg);
+        }}
+        
+        #data-table tbody tr:nth-child(even) td {{
+            background: #f9f9f9;
+        }}
+        
+        #data-table tbody tr:hover td {{
+            background: var(--row-hover);
+        }}
+        
+        .cell {{
+            max-width: 240px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
     </style>
 </head>
 <body>
-    <div class="table-container">
-        <div class="table-header">
+    <div class="groggy-display-container" data-theme="sleek">
+        <div class="table-container">
+            <div class="table-header">
             <div class="table-title">🐸 Interactive Streaming Table</div>
             <div style="display: flex; align-items: center; gap: 12px;">
                 <div class="table-stats">{total_rows} rows × {total_cols} cols</div>
@@ -549,7 +573,7 @@ impl StreamingServer {
         
         <div id="error-container"></div>
         
-        <table id="data-table">
+        <table id="data-table" class="groggy-table theme-sleek">
             <thead>
                 <tr>
                     {headers_html}
@@ -562,6 +586,7 @@ impl StreamingServer {
         
         <div id="loading" class="loading" style="display: none;">
             Loading more data...
+        </div>
         </div>
     </div>
 

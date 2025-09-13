@@ -1,4 +1,5 @@
 use super::BaseArray;
+use super::simd_optimizations;
 use std::ops::{Add, Mul};
 
 /// NumArray extends BaseArray with statistical and numerical operations.
@@ -336,5 +337,82 @@ mod tests {
         assert!(summary.is_valid());
         assert_eq!(summary.mean, Some(3.0));
         assert_eq!(summary.median, Some(3.0));
+    }
+}
+
+// SIMD-optimized implementations specifically for f64 arrays
+impl NumArray<f64> {
+    /// SIMD-optimized sum for f64 arrays
+    pub fn sum_simd(&self) -> f64 {
+        simd_optimizations::simd_sum(self.base.as_slice())
+    }
+    
+    /// SIMD-optimized mean for f64 arrays
+    pub fn mean_simd(&self) -> Option<f64> {
+        simd_optimizations::simd_mean(self.base.as_slice())
+    }
+    
+    /// SIMD-optimized standard deviation for f64 arrays
+    pub fn std_dev_simd(&self) -> Option<f64> {
+        simd_optimizations::simd_std_dev(self.base.as_slice())
+    }
+    
+    /// SIMD-optimized variance for f64 arrays
+    pub fn variance_simd(&self) -> Option<f64> {
+        if let Some(mean) = self.mean_simd() {
+            Some(simd_optimizations::simd_variance(self.base.as_slice(), mean))
+        } else {
+            None
+        }
+    }
+    
+    /// SIMD-optimized min for f64 arrays
+    pub fn min_simd(&self) -> Option<f64> {
+        simd_optimizations::simd_min(self.base.as_slice())
+    }
+    
+    /// SIMD-optimized max for f64 arrays
+    pub fn max_simd(&self) -> Option<f64> {
+        simd_optimizations::simd_max(self.base.as_slice())
+    }
+    
+    /// Optimized median using quickselect algorithm for f64 arrays
+    pub fn median_optimized(&self) -> Option<f64> {
+        if self.is_empty() {
+            return None;
+        }
+        
+        // Make a mutable copy for quickselect
+        let mut data: Vec<f64> = self.base.as_slice().to_vec();
+        simd_optimizations::quickselect_median(&mut data)
+    }
+    
+    /// Auto-choose between regular and SIMD implementations based on array size
+    pub fn sum_auto(&self) -> f64 {
+        if self.len() >= 8 {
+            self.sum_simd()
+        } else {
+            self.sum()
+        }
+    }
+    
+    /// Auto-choose mean implementation based on array size
+    pub fn mean_auto(&self) -> Option<f64> {
+        if self.len() >= 8 {
+            self.mean_simd()
+        } else {
+            self.mean()
+        }
+    }
+    
+    /// Auto-choose median implementation based on array size
+    pub fn median_auto(&self) -> Option<f64> {
+        if self.len() >= 100 {
+            // Use quickselect for larger arrays
+            self.median_optimized()
+        } else {
+            // Use regular sort for smaller arrays
+            self.median()
+        }
     }
 }

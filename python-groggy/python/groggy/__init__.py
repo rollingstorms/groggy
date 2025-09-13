@@ -22,7 +22,6 @@ from ._groggy import (
     HistoryStatistics,
     HistoricalView,
     # Statistical arrays and matrices
-    GraphArray,
     BaseArray,
     NodesArray,
     EdgesArray,
@@ -39,6 +38,7 @@ from ._groggy import (
     EdgesTable,
     # Builder functions with auto-conversion
     array,
+    num_array,
     matrix,
     table,
     # Display functionality
@@ -80,7 +80,7 @@ from .enhanced_query import enhanced_filter_nodes, enhanced_filter_edges
 from . import table_extensions
 
 # Note: array, matrix, table are now imported directly as auto-converting builder functions
-# The classes GraphArray, GraphMatrix, GraphTable are still available for direct instantiation
+# The classes BaseArray, GraphMatrix, GraphTable are still available for direct instantiation
 
 # Import display formatters for rich display integration
 try:
@@ -129,7 +129,6 @@ __all__ = [
     "HistoryStatistics",
     "HistoricalView",
     # Statistical arrays and matrices
-    "GraphArray",
     "BaseArray",
     "NodesArray",
     "EdgesArray",
@@ -171,6 +170,7 @@ __all__ = [
     "enhanced_filter_edges",
     # Auto-converting builder functions
     "array",
+    "num_array",
     "matrix", 
     "table",
     # Hierarchical subgraph functionality
