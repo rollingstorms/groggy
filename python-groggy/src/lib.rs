@@ -14,7 +14,7 @@ pub use ffi::api::graph_version::PyHistoricalView;
 pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
 // Re-enabled accessor exports for table integration
 pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
-pub use ffi::storage::array::{PyGraphArray, PyBaseArray, PyNodesArray, PyEdgesArray, PyMetaNodeArray};
+pub use ffi::storage::array::{PyBaseArray, PyNodesArray, PyEdgesArray, PyMetaNodeArray};
 pub use ffi::storage::num_array::{PyNumArray, PyNumArrayIterator, PyIntArray, PyStatsArray, PyStatsArrayIterator};
 pub use ffi::storage::simple_stats_array::PySimpleStatsArray;
 pub use ffi::storage::subgraph_array::{PySubgraphArray, PySubgraphArrayIterator, PySubgraphArrayChainIterator};
@@ -74,12 +74,16 @@ fn num_array(values: Vec<f64>) -> PyResult<PyNumArray> {
 #[pyfunction]
 #[pyo3(signature = (values))]
 fn array(values: Vec<PyObject>) -> PyResult<PyBaseArray> {
-    // Use Python::with_gil to create the BaseArray
+    // Convert PyObjects to AttrValues
     Python::with_gil(|py| {
-        let py_base_array_class = py.get_type::<PyBaseArray>();
-        let py_args = pyo3::types::PyTuple::new(py, &[values.to_object(py)]);
-        let result = py_base_array_class.call1(py_args)?;
-        result.extract::<PyBaseArray>()
+        let mut attr_values = Vec::new();
+        for value in values {
+            let attr_value = crate::ffi::utils::python_value_to_attr_value(value.as_ref(py))?;
+            attr_values.push(attr_value);
+        }
+        Ok(PyBaseArray {
+            inner: ::groggy::storage::array::BaseArray::new(attr_values),
+        })
     })
 }
 
@@ -94,11 +98,25 @@ fn array(values: Vec<PyObject>) -> PyResult<PyBaseArray> {
 fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
     // Check if data is a list of lists (nested structure)
     if let Ok(nested_lists) = data.extract::<Vec<Vec<PyObject>>>(py) {
-        // Convert nested lists to core GraphArrays directly
+        // Convert nested lists to core NumArrays for GraphMatrix
         let mut core_arrays = Vec::new();
         for row in nested_lists {
-            let py_array = PyGraphArray::from_py_objects(row)?;
-            core_arrays.push(py_array.inner);
+            // Convert PyObjects to f64 values
+            let mut f64_values = Vec::new();
+            for py_obj in row {
+                if let Ok(f_val) = py_obj.extract::<f64>(py) {
+                    f64_values.push(f_val);
+                } else if let Ok(i_val) = py_obj.extract::<i64>(py) {
+                    f64_values.push(i_val as f64);
+                } else if let Ok(b_val) = py_obj.extract::<bool>(py) {
+                    f64_values.push(if b_val { 1.0 } else { 0.0 });
+                } else {
+                    f64_values.push(0.0); // Default for non-numeric
+                }
+            }
+            // Create NumArray<f64> directly
+            let num_array = ::groggy::storage::array::NumArray::new(f64_values);
+            core_arrays.push(num_array);
         }
 
         // Create core GraphMatrix directly
@@ -114,8 +132,20 @@ fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
     // Check if data is a flat list (single row)
     else if let Ok(flat_list) = data.extract::<Vec<PyObject>>(py) {
         // Convert single list to single-row matrix
-        let py_array = PyGraphArray::from_py_objects(flat_list)?;
-        let core_arrays = vec![py_array.inner];
+        let mut f64_values = Vec::new();
+        for py_obj in flat_list {
+            if let Ok(f_val) = py_obj.extract::<f64>(py) {
+                f64_values.push(f_val);
+            } else if let Ok(i_val) = py_obj.extract::<i64>(py) {
+                f64_values.push(i_val as f64);
+            } else if let Ok(b_val) = py_obj.extract::<bool>(py) {
+                f64_values.push(if b_val { 1.0 } else { 0.0 });
+            } else {
+                f64_values.push(0.0); // Default for non-numeric
+            }
+        }
+        let num_array = ::groggy::storage::array::NumArray::new(f64_values);
+        let core_arrays = vec![num_array];
 
         // Create core GraphMatrix directly
         let matrix = ::groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
@@ -127,13 +157,26 @@ fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
 
         Ok(PyGraphMatrix { inner: matrix })
     }
-    // Check if data is a list of GraphArrays
-    else if let Ok(array_list) = data.extract::<Vec<Py<PyGraphArray>>>(py) {
-        // Convert PyGraphArrays to core GraphArrays
-        let core_arrays: Vec<::groggy::storage::GraphArray> = array_list
-            .iter()
-            .map(|py_array| py_array.borrow(py).inner.clone())
-            .collect();
+    // Check if data is a list of BaseArrays
+    else if let Ok(array_list) = data.extract::<Vec<Py<PyBaseArray>>>(py) {
+        // Convert PyBaseArrays to NumArrays for GraphMatrix
+        let mut core_arrays = Vec::new();
+        for py_array_ref in array_list.iter() {
+            let py_array = py_array_ref.borrow(py);
+            // Convert BaseArray<AttrValue> to NumArray<f64>
+            let mut f64_values = Vec::new();
+            for attr_value in py_array.inner.iter() {
+                match attr_value {
+                    ::groggy::AttrValue::Float(f) => f64_values.push(*f as f64),
+                    ::groggy::AttrValue::Int(i) => f64_values.push(*i as f64),
+                    ::groggy::AttrValue::SmallInt(i) => f64_values.push(*i as f64),
+                    ::groggy::AttrValue::Bool(b) => f64_values.push(if *b { 1.0 } else { 0.0 }),
+                    _ => f64_values.push(0.0),
+                }
+            }
+            let num_array = ::groggy::storage::array::NumArray::new(f64_values);
+            core_arrays.push(num_array);
+        }
 
         // Create core GraphMatrix
         let matrix = ::groggy::storage::GraphMatrix::from_arrays(core_arrays).map_err(|e| {
@@ -146,7 +189,7 @@ fn matrix(py: Python, data: PyObject) -> PyResult<PyGraphMatrix> {
         Ok(PyGraphMatrix::from_graph_matrix(matrix))
     } else {
         Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "matrix() expects nested lists [[1,2],[3,4]], flat list [1,2,3,4], or list of GraphArrays"
+            "matrix() expects nested lists [[1,2],[3,4]], flat list [1,2,3,4], or list of BaseArrays"
         ))
     }
 }
@@ -358,7 +401,6 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PySubgraph>()?;
 
     // Register array and matrix types
-    m.add_class::<PyGraphArray>()?;
     m.add_class::<PyBaseArray>()?;
     m.add_class::<PyNodesArray>()?;
     m.add_class::<PyEdgesArray>()?;

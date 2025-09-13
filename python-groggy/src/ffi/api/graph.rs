@@ -14,8 +14,9 @@ use std::rc::Rc;
 
 // Import all graph modules
 use crate::ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor}; // Essential FFI - re-enabled
+use crate::ffi::storage::array::PyBaseArray;
 use crate::ffi::storage::views::{PyEdgeView, PyNodeView}; // Essential FFI - re-enabled
-use crate::ffi::storage::array::PyGraphArray;
+use crate::PyNumArray;
 use crate::ffi::subgraphs::neighborhood::PyNeighborhoodStats;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
 use crate::ffi::query::query::{PyEdgeFilter, PyNodeFilter};
@@ -63,8 +64,9 @@ impl PyGraph {
 
         // Create metadata dict
         let result_dict = PyDict::new(py);
-        result_dict.set_item("size", matrix.size)?;
-        result_dict.set_item("is_sparse", matrix.data.is_sparse())?;
+        let (rows, cols) = matrix.shape();
+        result_dict.set_item("size", (rows, cols))?;
+        result_dict.set_item("is_sparse", matrix.is_sparse())?;
         result_dict.set_item("type", "adjacency_matrix")?;
 
         // Convert to GraphMatrix for structured access
@@ -396,30 +398,20 @@ impl PyGraph {
             .map_err(graph_error_to_py_err)
     }
 
-    /// Get all active node IDs as GraphArray (lazy Rust view) - use .values for Python list
+    /// Get all active node IDs as IntArray
     #[getter]
-    fn node_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+    fn node_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
         let node_ids = self.inner.borrow_mut().node_ids();
-        let attr_values: Vec<groggy::AttrValue> = node_ids
-            .into_iter()
-            .map(|id| groggy::AttrValue::Int(id as i64))
-            .collect();
-        let graph_array = groggy::GraphArray::from_vec(attr_values);
-        let py_graph_array = PyGraphArray { inner: graph_array };
-        Py::new(py, py_graph_array)
+        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids);
+        Py::new(py, py_int_array)
     }
 
-    /// Get all active edge IDs as GraphArray (lazy Rust view) - use .values for Python list
+    /// Get all active edge IDs as IntArray  
     #[getter]
-    fn edge_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+    fn edge_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
         let edge_ids = self.inner.borrow_mut().edge_ids();
-        let attr_values: Vec<groggy::AttrValue> = edge_ids
-            .into_iter()
-            .map(|id| groggy::AttrValue::Int(id as i64))
-            .collect();
-        let graph_array = groggy::GraphArray::from_vec(attr_values);
-        let py_graph_array = PyGraphArray { inner: graph_array };
-        Py::new(py, py_graph_array)
+        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(edge_ids);
+        Py::new(py, py_int_array)
     }
 
     /// Get nodes accessor for fluent API (g.nodes property)
@@ -1682,60 +1674,45 @@ impl PyGraph {
         &self,
         adjacency_matrix: groggy::AdjacencyMatrix,
     ) -> PyResult<groggy::GraphMatrix> {
-        use groggy::storage::GraphArray;
         use groggy::storage::GraphMatrix;
+        use crate::ffi::storage::num_array::PyNumArray;
+        use crate::ffi::storage::array::PyBaseArray;
+        use pyo3::types::PyAny;
 
-        // Extract matrix data and convert to GraphArrays (columns)
-        let size = adjacency_matrix.size;
-        let mut columns = Vec::with_capacity(size);
+        // Extract matrix data and convert to NumArrays (numerical adjacency data)
+        // Phase 2.2: Updated to use NumArray since adjacency matrices are always numerical
+        let (rows, cols) = adjacency_matrix.shape();
+        let mut py_arrays: Vec<PyObject> = Vec::with_capacity(cols);
 
-        // Create a column for each matrix column
-        for col_idx in 0..size {
-            let column_values: Vec<groggy::AttrValue> = (0..size)
-                .map(|row_idx| {
-                    adjacency_matrix
-                        .get(row_idx, col_idx)
-                        .cloned()
-                        .unwrap_or(groggy::AttrValue::Float(0.0))
-                })
-                .collect();
+        Python::with_gil(|py| {
+            // Create a column for each matrix column as NumArray
+            for col_idx in 0..cols {
+                let column_values: Vec<f64> = (0..rows)
+                    .map(|row_idx| {
+                        // GraphMatrix.get() now returns Option<&f64>
+                        adjacency_matrix.get(row_idx, col_idx).copied().unwrap_or(0.0)
+                    })
+                    .collect();
 
-            let column_name = if let Some(ref labels) = adjacency_matrix.labels {
-                format!(
-                    "node_{}",
-                    labels
-                        .get(col_idx)
-                        .copied()
-                        .unwrap_or(col_idx as groggy::NodeId)
-                )
-            } else {
-                format!("col_{}", col_idx)
-            };
+                // Create NumArray since adjacency matrices are always numerical
+                let num_array = PyNumArray::new(column_values);
+                py_arrays.push(Py::new(py, num_array)?.to_object(py));
+            }
 
-            let column = GraphArray::from_vec(column_values).with_name(column_name);
-            columns.push(column);
-        }
-
-        // Create GraphMatrix from the columns
-        let mut graph_matrix = GraphMatrix::from_arrays(columns).map_err(|e| {
-            PyRuntimeError::new_err(format!(
-                "Failed to create GraphMatrix from adjacency matrix: {:?}",
-                e
-            ))
-        })?;
-
-        // Set proper column names using node labels if available
-        if let Some(ref labels) = adjacency_matrix.labels {
-            let column_names: Vec<String> = labels
-                .iter()
-                .map(|&node_id| format!("node_{}", node_id))
-                .collect();
-            graph_matrix.set_column_names(column_names).map_err(|e| {
+            // Create GraphMatrix using the new constructor that accepts PyObject arrays
+            let matrix = crate::ffi::storage::matrix::PyGraphMatrix::new(py, py_arrays)?;
+            
+            // Set proper column names (for now, use default names)
+            let column_names: Vec<String> = (0..cols).map(|i| format!("col_{}", i)).collect();
+            
+            // Update the GraphMatrix with proper column names
+            let mut inner_matrix = matrix.inner;
+            inner_matrix.set_column_names(column_names).map_err(|e| {
                 PyRuntimeError::new_err(format!("Failed to set column names: {:?}", e))
             })?;
-        }
-
-        Ok(graph_matrix)
+            
+            Ok(inner_matrix)
+        })
     }
     /// Internal helper methods for accessors/views
     pub fn create_node_view_internal(
@@ -1907,26 +1884,24 @@ impl PyGraph {
         self.inner.borrow_mut().edge_ids()
     }
 
-    pub fn get_node_ids_array(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+    pub fn get_node_ids_array(&self, py: Python) -> PyResult<Py<PyNumArray>> {
         let node_ids = self.inner.borrow_mut().node_ids();
-        let attr_values: Vec<groggy::AttrValue> = node_ids
+        let values: Vec<f64> = node_ids
             .into_iter()
-            .map(|id| groggy::AttrValue::Int(id as i64))
+            .map(|id| id as f64)
             .collect();
-        let graph_array = groggy::storage::GraphArray::from_vec(attr_values);
-        let py_graph_array = PyGraphArray { inner: graph_array };
-        Py::new(py, py_graph_array)
+        let py_num_array = PyNumArray::new(values);
+        Py::new(py, py_num_array)
     }
 
-    pub fn get_edge_ids_array(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
+    pub fn get_edge_ids_array(&self, py: Python) -> PyResult<Py<PyNumArray>> {
         let edge_ids = self.inner.borrow_mut().edge_ids();
-        let attr_values: Vec<groggy::AttrValue> = edge_ids
+        let values: Vec<f64> = edge_ids
             .into_iter()
-            .map(|id| groggy::AttrValue::Int(id as i64))
+            .map(|id| id as f64)
             .collect();
-        let graph_array = groggy::storage::GraphArray::from_vec(attr_values);
-        let py_graph_array = PyGraphArray { inner: graph_array };
-        Py::new(py, py_graph_array)
+        let py_num_array = PyNumArray::new(values);
+        Py::new(py, py_num_array)
     }
 
     /// Group nodes by attribute value and compute aggregates for each group (internal method)
@@ -1964,8 +1939,8 @@ impl PyGraph {
     // === PROPERTY GETTERS FOR ATTRIBUTE ACCESS ===
 
     /// Get complete attribute column for ALL nodes (optimized for table() method)
-    /// Returns GraphArray for enhanced analytics and proper integration with table columns
-    fn _get_node_attr_column(&self, py: Python, attr_name: &str) -> PyResult<Py<PyGraphArray>> {
+    /// Returns BaseArray for attribute columns with proper integration with table columns
+    fn _get_node_attr_column(&self, py: Python, attr_name: &str) -> PyResult<Py<PyBaseArray>> {
         match self
             .inner
             .borrow_mut()
@@ -1978,11 +1953,12 @@ impl PyGraph {
                     .map(|opt_val| opt_val.unwrap_or(groggy::AttrValue::Null)) // Use Null for missing values
                     .collect();
 
-                // Create GraphArray and convert to PyGraphArray
-                let graph_array = groggy::storage::GraphArray::from_vec(attr_values);
-                let py_graph_array = PyGraphArray::from_graph_array(graph_array);
+                // Create BaseArray directly from attribute values
+                let py_base_array = PyBaseArray { 
+                    inner: groggy::storage::array::BaseArray::new(attr_values) 
+                };
 
-                Py::new(py, py_graph_array)
+                Py::new(py, py_base_array)
             }
             Err(e) => Err(graph_error_to_py_err(e)),
         }

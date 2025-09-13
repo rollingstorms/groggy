@@ -8,6 +8,7 @@ use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
 use groggy::subgraphs::Subgraph;
 use groggy::traits::{SubgraphOperations, GraphEntity};
 use groggy::{AttrValue, EdgeId, NodeId, SimilarityMetric};
+use groggy::storage::array::BaseArray;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -16,7 +17,8 @@ use std::collections::{HashMap, HashSet};
 // Import FFI types we need to preserve compatibility
 use crate::ffi::api::graph::PyGraph;
 use crate::ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor}; // Essential FFI - re-enabled
-use crate::ffi::storage::array::PyGraphArray;
+use crate::ffi::storage::array::PyBaseArray;
+use crate::PyNumArray;
 use crate::ffi::storage::components::PyComponentsArray;
 // use crate::ffi::storage::table::PyBaseTable; // Temporarily disabled
 
@@ -96,32 +98,30 @@ impl PySubgraph {
         self.inner.edge_count() // SubgraphOperations::edge_count()
     }
 
-    /// Get node IDs as PyGraphArray
+    /// Get node IDs as PyIntArray
     #[getter]
-    fn node_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
-        let attr_values: Vec<AttrValue> = self
+    fn node_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
+        let node_ids: Vec<usize> = self
             .inner
             .node_set()
             .iter()
-            .map(|&id| AttrValue::Int(id as i64))
+            .copied()
             .collect();
-        let graph_array = groggy::GraphArray::from_vec(attr_values);
-        let py_graph_array = PyGraphArray { inner: graph_array };
-        Py::new(py, py_graph_array)
+        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids);
+        Py::new(py, py_int_array)
     }
 
-    /// Get edge IDs as PyGraphArray
+    /// Get edge IDs as PyIntArray
     #[getter]
-    fn edge_ids(&self, py: Python) -> PyResult<Py<PyGraphArray>> {
-        let attr_values: Vec<AttrValue> = self
+    fn edge_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
+        let edge_ids: Vec<usize> = self
             .inner
             .edge_set()
             .iter()
-            .map(|&id| AttrValue::Int(id as i64))
+            .copied()
             .collect();
-        let graph_array = groggy::GraphArray::from_vec(attr_values);
-        let py_graph_array = PyGraphArray { inner: graph_array };
-        Py::new(py, py_graph_array)
+        let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(edge_ids);
+        Py::new(py, py_int_array)
     }
 
     /// Check if a node exists in this subgraph
@@ -454,9 +454,9 @@ impl PySubgraph {
                     degrees.push(groggy::AttrValue::Int(deg as i64));
                 }
 
-                let graph_array = groggy::GraphArray::from_vec(degrees);
-                let py_graph_array = PyGraphArray { inner: graph_array };
-                Ok(Py::new(py, py_graph_array)?.to_object(py))
+                // Convert to NumArray for numerical operations and rich display
+                let py_num_array = PyNumArray::from_attr_values(degrees)?;
+                Ok(Py::new(py, py_num_array)?.to_object(py))
             }
 
             // All nodes case (or None)
@@ -490,9 +490,9 @@ impl PySubgraph {
                     degrees.push(groggy::AttrValue::Int(deg as i64));
                 }
 
-                let graph_array = groggy::GraphArray::from_vec(degrees);
-                let py_graph_array = PyGraphArray { inner: graph_array };
-                Ok(Py::new(py, py_graph_array)?.to_object(py))
+                // Convert to NumArray for numerical operations and rich display
+                let py_num_array = PyNumArray::from_attr_values(degrees)?;
+                Ok(Py::new(py, py_num_array)?.to_object(py))
             }
 
             // Invalid argument type
@@ -585,9 +585,9 @@ impl PySubgraph {
                     in_degrees.push(groggy::AttrValue::Int(in_deg as i64));
                 }
 
-                let graph_array = groggy::GraphArray::from_vec(in_degrees);
-                let py_graph_array = PyGraphArray { inner: graph_array };
-                Ok(Py::new(py, py_graph_array)?.to_object(py))
+                // Convert to NumArray for rich display and comparison operations
+                let py_num_array = PyNumArray::from_attr_values(in_degrees)?;
+                Ok(Py::new(py, py_num_array)?.to_object(py))
             }
 
             // All nodes case (or None)
@@ -621,9 +621,9 @@ impl PySubgraph {
                     in_degrees.push(groggy::AttrValue::Int(in_deg as i64));
                 }
 
-                let graph_array = groggy::GraphArray::from_vec(in_degrees);
-                let py_graph_array = PyGraphArray { inner: graph_array };
-                Ok(Py::new(py, py_graph_array)?.to_object(py))
+                // Convert to NumArray for rich display and comparison operations
+                let py_num_array = PyNumArray::from_attr_values(in_degrees)?;
+                Ok(Py::new(py, py_num_array)?.to_object(py))
             }
         }
     }
@@ -716,9 +716,9 @@ impl PySubgraph {
                     out_degrees.push(groggy::AttrValue::Int(out_deg as i64));
                 }
 
-                let graph_array = groggy::GraphArray::from_vec(out_degrees);
-                let py_graph_array = PyGraphArray { inner: graph_array };
-                Ok(Py::new(py, py_graph_array)?.to_object(py))
+                // Convert to NumArray for rich display and comparison operations  
+                let py_num_array = PyNumArray::from_attr_values(out_degrees)?;
+                Ok(Py::new(py, py_num_array)?.to_object(py))
             }
 
             // All nodes case (or None)
@@ -752,9 +752,9 @@ impl PySubgraph {
                     out_degrees.push(groggy::AttrValue::Int(out_deg as i64));
                 }
 
-                let graph_array = groggy::GraphArray::from_vec(out_degrees);
-                let py_graph_array = PyGraphArray { inner: graph_array };
-                Ok(Py::new(py, py_graph_array)?.to_object(py))
+                // Convert to NumArray for rich display and comparison operations  
+                let py_num_array = PyNumArray::from_attr_values(out_degrees)?;
+                Ok(Py::new(py, py_num_array)?.to_object(py))
             }
         }
     }
@@ -782,11 +782,11 @@ impl PySubgraph {
             })
     }
 
-    /// Support attribute access via indexing: subgraph['attr_name'] -> GraphArray
+    /// Support attribute access via indexing: subgraph['attr_name'] -> BaseArray
     fn __getitem__(&self, key: &PyAny, py: Python) -> PyResult<PyObject> {
         // Only support string keys (attribute names) for now
         if let Ok(attr_name) = key.extract::<String>() {
-            // Return GraphArray of attribute values for all nodes in the subgraph
+            // Return BaseArray of attribute values for all nodes in the subgraph
             let graph_ref = self.inner.graph();
             let mut attr_values = Vec::new();
 
@@ -803,9 +803,10 @@ impl PySubgraph {
                 }
             }
 
-            let graph_array = groggy::GraphArray::from_vec(attr_values);
-            let py_graph_array = PyGraphArray { inner: graph_array };
-            return Ok(Py::new(py, py_graph_array)?.to_object(py));
+            let py_base_array = PyBaseArray { 
+                inner: BaseArray::new(attr_values) 
+            };
+            return Ok(Py::new(py, py_base_array)?.to_object(py));
         }
 
         // For now, only support string attribute access
@@ -893,16 +894,14 @@ impl PySubgraph {
     }
 
     /// Get neighbors of a node within the subgraph
-    fn neighbors(&self, py: Python, node_id: NodeId) -> PyResult<Py<PyGraphArray>> {
+    fn neighbors(&self, py: Python, node_id: NodeId) -> PyResult<Py<PyNumArray>> {
         match self.inner.neighbors(node_id) {
             Ok(neighbor_ids) => {
-                let attr_values: Vec<AttrValue> = neighbor_ids
+                let values: Vec<f64> = neighbor_ids
                     .into_iter()
-                    .map(|id| AttrValue::Int(id as i64))
+                    .map(|id| id as f64)
                     .collect();
-                let py_array = PyGraphArray {
-                    inner: groggy::storage::GraphArray::from_vec(attr_values)
-                };
+                let py_array = PyNumArray::new(values);
                 Py::new(py, py_array)
             }
             Err(e) => Err(PyRuntimeError::new_err(format!("Neighbors error: {}", e))),
@@ -1504,11 +1503,37 @@ impl PySubgraph {
             }
         }
         
-        // For now, return a placeholder error until proper matrix conversion is implemented
-        // TODO: Implement proper adjacency matrix conversion
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "Subgraph to matrix conversion not yet implemented"
-        ))
+        // Convert matrix data to NumArrays for each column
+        Python::with_gil(|py| {
+            let mut py_arrays: Vec<PyObject> = Vec::with_capacity(n);
+            
+            // Create a column for each node (column-major format)
+            for col_idx in 0..n {
+                let column_values: Vec<f64> = (0..n)
+                    .map(|row_idx| matrix_data[row_idx][col_idx] as f64)
+                    .collect();
+                
+                // Create NumArray since adjacency matrices are always numerical
+                let num_array = PyNumArray::new(column_values);
+                py_arrays.push(Py::new(py, num_array)?.to_object(py));
+            }
+            
+            // Create GraphMatrix using the new constructor that accepts PyObject arrays  
+            let matrix = crate::ffi::storage::matrix::PyGraphMatrix::new(py, py_arrays)?;
+            
+            // Set column names based on node IDs
+            let column_names: Vec<String> = node_ids
+                .iter()
+                .map(|&node_id| format!("node_{}", node_id))
+                .collect();
+            
+            let mut inner_matrix = matrix.inner;
+            inner_matrix.set_column_names(column_names).map_err(|e| {
+                PyRuntimeError::new_err(format!("Failed to set column names: {:?}", e))
+            })?;
+            
+            Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(inner_matrix))
+        })
     }
 }
 

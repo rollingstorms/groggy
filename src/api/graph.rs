@@ -1232,6 +1232,20 @@ impl Graph {
         self.space.get_active_edges().iter().copied().collect()
     }
 
+    /// Get all source node IDs for edges currently in the graph
+    /// Returns a vector parallel to edge_ids() where each element is the source of the corresponding edge
+    pub fn edge_sources(&self) -> Vec<NodeId> {
+        let (_, sources, _, _) = self.space.snapshot(&self.pool.borrow());
+        sources.to_vec()
+    }
+
+    /// Get all target node IDs for edges currently in the graph
+    /// Returns a vector parallel to edge_ids() where each element is the target of the corresponding edge
+    pub fn edge_targets(&self) -> Vec<NodeId> {
+        let (_, _, targets, _) = self.space.snapshot(&self.pool.borrow());
+        targets.to_vec()
+    }
+
     /// Get the degree of a node (number of incident edges)
     pub fn degree(&self, node: NodeId) -> Result<usize, GraphError> {
         if !self.space.contains_node(node) {
@@ -2344,7 +2358,18 @@ impl Graph {
 
     /// Generate adjacency matrix for the entire graph
     pub fn adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
-        AdjacencyMatrixBuilder::new().build_full_graph(&self.pool.borrow(), &mut self.space)
+        let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
+        let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
+        
+        // Convert edges to (source, target) tuples
+        let mut edges = Vec::new();
+        for edge_id in edge_ids {
+            if let Ok((source, target)) = self.edge_endpoints(edge_id) {
+                edges.push((source, target));
+            }
+        }
+        
+        AdjacencyMatrixBuilder::from_edges(&nodes, &edges)
     }
 
     /// Simple adjacency matrix (alias for adjacency_matrix)
@@ -2354,32 +2379,50 @@ impl Graph {
 
     /// Generate weighted adjacency matrix using specified edge attribute
     pub fn weighted_adjacency_matrix(&mut self, weight_attr: &str) -> GraphResult<AdjacencyMatrix> {
-        AdjacencyMatrixBuilder::new()
-            .matrix_type(MatrixType::Weighted {
-                weight_attr: Some(weight_attr.to_string()),
-            })
-            .build_full_graph(&self.pool.borrow(), &mut self.space)
+        let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
+        let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
+        
+        // Convert edges to (source, target, weight) tuples
+        let mut weighted_edges = Vec::new();
+        for edge_id in edge_ids {
+            if let Ok((source, target)) = self.edge_endpoints(edge_id) {
+                let weight = match self.get_edge_attr(edge_id, &weight_attr.to_string()) {
+                    Ok(Some(attr_val)) => match attr_val {
+                        AttrValue::Float(w) => w as f64,
+                        AttrValue::Int(i) => i as f64,
+                        _ => 1.0,
+                    },
+                    Ok(None) => 1.0, // Attribute doesn't exist
+                    Err(_) => 1.0, // Error getting attribute
+                };
+                weighted_edges.push((source, target, weight));
+            }
+        }
+        
+        AdjacencyMatrixBuilder::from_weighted_edges(&nodes, &weighted_edges)
     }
 
     /// Generate dense adjacency matrix
     pub fn dense_adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
-        AdjacencyMatrixBuilder::new()
-            .format(MatrixFormat::Dense)
-            .build_full_graph(&self.pool.borrow(), &mut self.space)
+        // In the unified system, all matrices are dense NumArrays
+        self.adjacency_matrix()
     }
 
-    /// Generate sparse adjacency matrix
+    /// Generate sparse adjacency matrix  
     pub fn sparse_adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
-        AdjacencyMatrixBuilder::new()
-            .format(MatrixFormat::Sparse)
-            .build_full_graph(&self.pool.borrow(), &mut self.space)
+        // In the unified system, all matrices are dense NumArrays
+        // TODO: Implement true sparse matrix support if needed
+        self.adjacency_matrix()
     }
 
     /// Generate Laplacian matrix
     pub fn laplacian_matrix(&mut self, normalized: bool) -> GraphResult<AdjacencyMatrix> {
-        AdjacencyMatrixBuilder::new()
-            .matrix_type(MatrixType::Laplacian { normalized })
-            .build_full_graph(&self.pool.borrow(), &mut self.space)
+        let adj = self.adjacency_matrix()?;
+        if normalized {
+            adj.to_normalized_laplacian()
+        } else {
+            adj.to_laplacian()
+        }
     }
 
     /// Generate adjacency matrix for a subgraph with specific nodes
@@ -2387,26 +2430,53 @@ impl Graph {
         &mut self,
         node_ids: &[NodeId],
     ) -> GraphResult<AdjacencyMatrix> {
-        AdjacencyMatrixBuilder::new().build_subgraph(&self.pool.borrow(), &mut self.space, node_ids)
+        let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
+        
+        // Filter edges to only include those between the specified nodes
+        let node_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
+        let mut subgraph_edges = Vec::new();
+        
+        for edge_id in edge_ids {
+            if let Ok((source, target)) = self.edge_endpoints(edge_id) {
+                if node_set.contains(&source) && node_set.contains(&target) {
+                    subgraph_edges.push((source, target));
+                }
+            }
+        }
+        
+        AdjacencyMatrixBuilder::from_edges(node_ids, &subgraph_edges)
     }
 
     /// Generate custom adjacency matrix with full control
     pub fn custom_adjacency_matrix(
         &mut self,
-        format: MatrixFormat,
+        _format: MatrixFormat,  // Ignored in unified system
         matrix_type: MatrixType,
-        compact_indexing: bool,
+        _compact_indexing: bool,  // Ignored in unified system
         node_ids: Option<&[NodeId]>,
     ) -> GraphResult<AdjacencyMatrix> {
-        let builder = AdjacencyMatrixBuilder::new()
-            .format(format)
-            .matrix_type(matrix_type)
-            .compact_indexing(compact_indexing);
-
-        if let Some(nodes) = node_ids {
-            builder.build_subgraph(&self.pool.borrow(), &mut self.space, nodes)
+        // Get the base adjacency matrix for the specified nodes or full graph
+        let base_matrix = if let Some(nodes) = node_ids {
+            self.subgraph_adjacency_matrix(nodes)?
         } else {
-            builder.build_full_graph(&self.pool.borrow(), &mut self.space)
+            self.adjacency_matrix()?
+        };
+
+        // Apply the specified matrix transformation
+        match matrix_type {
+            MatrixType::Adjacency => Ok(base_matrix),
+            MatrixType::Laplacian { normalized } => {
+                if normalized {
+                    base_matrix.to_normalized_laplacian()
+                } else {
+                    base_matrix.to_laplacian()
+                }
+            },
+            MatrixType::Transition => {
+                // TODO: Implement transition matrix transformation
+                // For now, return adjacency matrix
+                Ok(base_matrix)
+            }
         }
     }
 

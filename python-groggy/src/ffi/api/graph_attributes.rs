@@ -2,7 +2,7 @@
 //!
 //! Simple, structured attribute operations with pure delegation to core.
 
-use crate::ffi::storage::array::PyGraphArray;
+use crate::ffi::storage::array::PyBaseArray;
 // use crate::ffi::storage::table::PyBaseTable; // Temporarily disabled
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
@@ -250,9 +250,9 @@ impl PyGraphAttrMut {
             return self.parse_node_centric_format::<T>(py, node_dict);
         }
 
-        // Format 3: GraphArray
-        if let Ok(graph_array) = attr_data.extract::<PyRef<PyGraphArray>>() {
-            return self.parse_graph_array_format::<T>(py, &graph_array, is_nodes);
+        // Format 3: BaseArray
+        if let Ok(base_array) = attr_data.extract::<PyRef<PyBaseArray>>() {
+            return self.parse_base_array_format::<T>(py, &base_array, is_nodes);
         }
 
         // Format 4: GraphTable - Temporarily disabled
@@ -262,7 +262,7 @@ impl PyGraphAttrMut {
 
         Err(pyo3::exceptions::PyTypeError::new_err(
             format!(
-                "Unsupported attribute format. Expected: dict {{id: value}}, dict {{\"nodes\": [...], \"values\": [...]}}, GraphArray, or GraphTable. Got: {}",
+                "Unsupported attribute format. Expected: dict {{id: value}}, dict {{\"nodes\": [...], \"values\": [...]}}, BaseArray, or BaseTable. Got: {}",
                 attr_data.get_type().name()?
             )
         ))
@@ -356,21 +356,21 @@ impl PyGraphAttrMut {
         Ok(attr_values)
     }
 
-    /// Parse GraphArray format: values correspond to graph order
+    /// Parse BaseArray format: values correspond to graph order
     /// Note: Complex type conversion deferred to next phase
-    fn parse_graph_array_format<T>(
+    fn parse_base_array_format<T>(
         &self,
         _py: Python,
-        _graph_array: &PyRef<PyGraphArray>,
+        _base_array: &PyRef<PyBaseArray>,
         is_nodes: bool,
     ) -> PyResult<Vec<(T, AttrValue)>>
     where
         T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
     {
-        // GraphArray support requires complex type conversion between NodeId/EdgeId and T
+        // BaseArray support requires complex type conversion between NodeId/EdgeId and T
         // This will be implemented in the next phase once we have proper type mappings
         Err(pyo3::exceptions::PyNotImplementedError::new_err(format!(
-            "GraphArray format for {} not yet implemented - complex type conversion needed",
+            "BaseArray format for {} not yet implemented - complex type conversion needed",
             if is_nodes { "nodes" } else { "edges" }
         )))
     }

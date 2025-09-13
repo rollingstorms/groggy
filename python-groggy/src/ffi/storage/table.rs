@@ -3,9 +3,9 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
 use crate::ffi::storage::array::PyBaseArray;
-use groggy::storage::{ArrayOps, array::BaseArray, table::{BaseTable, NodesTable, EdgesTable, Table, TableIterator}};
+use crate::ffi::storage::num_array::PyNumArray;
+use groggy::storage::{ArrayOps, array::{BaseArray, NumArray}, table::{BaseTable, NodesTable, EdgesTable, Table, TableIterator}};
 use groggy::core::streaming::DataSource;  // Import DataSource trait for streaming methods
-use groggy::GraphArray;  // Correct import path
 use groggy::types::{NodeId, EdgeId, AttrValue, AttrValueType};
 use std::collections::HashMap;
 use std::cell::RefCell;
@@ -125,10 +125,10 @@ impl PyBaseTable {
     
     /// Get a specific column as BaseArray for chaining operations
     /// This enables: table.column('age').iter().filter(...).collect()
-    pub fn column(&self, column_name: &str) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+    pub fn column(&self, column_name: &str) -> PyResult<PyBaseArray> {
         match self.table.column(column_name) {
             Some(base_array) => {
-                Ok(crate::ffi::storage::array::PyBaseArray {
+                Ok(PyBaseArray {
                     inner: base_array.clone()
                 })
             }
@@ -545,9 +545,9 @@ impl PyBaseTable {
                 if let Ok(stats) = crate::ffi::storage::num_array::PyNumArray::from_attr_values(attr_values.clone()) {
                     Ok(stats.into_py(py))
                 } else {
-                    // Fallback to BaseArray for non-numeric columns (GraphArray deprecated)
+                    // Use BaseArray for non-numeric columns
                     let base = groggy::storage::array::BaseArray::from_attr_values(attr_values.clone());
-                    let py_base = crate::ffi::storage::array::PyBaseArray { inner: base };
+                    let py_base = PyBaseArray { inner: base };
                     Ok(py_base.into_py(py))
                 }
             } else {
@@ -596,9 +596,12 @@ impl PyBaseTable {
             // Create a new BaseTable with the sliced rows
             let sliced_table = self.table.head(stop).tail(stop - start);
             Ok(PyBaseTable::from_table(sliced_table).into_py(py))
-        } else if let Ok(py_array) = key.extract::<crate::ffi::storage::array::PyGraphArray>() {
+        } else if let Ok(py_array) = key.extract::<PyBaseArray>() {
             // Boolean mask access: table[boolean_array]
-            let mask_values = py_array.to_list(py)?;
+            // Get boolean mask values directly from the inner BaseArray
+            let mask_values: Vec<PyObject> = py_array.inner.iter()
+                .map(|attr_val| crate::ffi::utils::attr_value_to_python_value(py, attr_val))
+                .collect::<Result<Vec<_>, _>>()?;
             let mut boolean_mask = Vec::new();
             
             for value in mask_values {
@@ -622,9 +625,22 @@ impl PyBaseTable {
             let filtered_table = self.table.filter_by_mask(&boolean_mask)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             Ok(PyBaseTable::from_table(filtered_table).into_py(py))
+        } else if let Ok(mask_list) = key.extract::<Vec<bool>>() {
+            // Boolean mask from Python list: table[[True, False, True, ...]]
+            if mask_list.len() != self.table.nrows() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    format!("Boolean mask length ({}) doesn't match table rows ({})", 
+                           mask_list.len(), self.table.nrows())
+                ));
+            }
+            
+            // Apply boolean mask to filter rows
+            let filtered_table = self.table.filter_by_mask(&mask_list)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            Ok(PyBaseTable::from_table(filtered_table).into_py(py))
         } else {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "BaseTable indices must be strings (column names), integers (row indices), lists of column names, slices, or boolean arrays"
+                "BaseTable indices must be strings (column names), integers (row indices), lists of column names, slices, boolean arrays, or boolean lists"
             ))
         }
     }
@@ -1410,17 +1426,12 @@ impl PyNodesTable {
     }
     
     /// Get node IDs
-    pub fn node_ids(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+    pub fn node_ids(&self) -> PyResult<crate::ffi::storage::num_array::PyIntArray> {
         let node_ids = self.table.node_ids()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         
-        // Convert to AttrValue vector and then to PyGraphArray
-        let attr_values: Vec<groggy::AttrValue> = node_ids.into_iter()
-            .map(|id| groggy::AttrValue::Int(id as i64))
-            .collect();
-        
-        let graph_array = GraphArray::from_vec(attr_values);
-        Ok(crate::ffi::storage::array::PyGraphArray::from_graph_array(graph_array))
+        // Return as IntArray to preserve integer type
+        Ok(crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids))
     }
     
     /// Add node attributes - flexible input format
@@ -1688,7 +1699,7 @@ impl PyNodesTable {
                     Ok(stats.into_py(py))
                 } else {
                     let base = groggy::storage::array::BaseArray::from_attr_values(attr_values.clone());
-                    let py_base = crate::ffi::storage::array::PyBaseArray { inner: base };
+                    let py_base = PyBaseArray { inner: base };
                     Ok(py_base.into_py(py))
                 }
             } else {
@@ -1754,9 +1765,12 @@ impl PyNodesTable {
             let nodes_sliced = groggy::storage::table::NodesTable::from_base_table(base_sliced)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             Ok(PyNodesTable { table: nodes_sliced }.into_py(py))
-        } else if let Ok(py_array) = key.extract::<crate::ffi::storage::array::PyGraphArray>() {
+        } else if let Ok(py_array) = key.extract::<PyBaseArray>() {
             // Boolean mask access: table[boolean_array]
-            let mask_values = py_array.to_list(py)?;
+            // Get boolean mask values directly from the inner BaseArray
+            let mask_values: Vec<PyObject> = py_array.inner.iter()
+                .map(|attr_val| crate::ffi::utils::attr_value_to_python_value(py, attr_val))
+                .collect::<Result<Vec<_>, _>>()?;
             let mut mask_booleans = Vec::new();
             
             for value in mask_values.iter() {
@@ -1791,9 +1805,24 @@ impl PyNodesTable {
             let nodes_filtered = groggy::storage::table::NodesTable::from_base_table(filtered_base)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             Ok(PyNodesTable { table: nodes_filtered }.into_py(py))
+        } else if let Ok(mask_list) = key.extract::<Vec<bool>>() {
+            // Boolean mask from Python list: table[[True, False, True, ...]]
+            if mask_list.len() != self.table.nrows() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    format!("Boolean mask length ({}) does not match table length ({})", 
+                            mask_list.len(), self.table.nrows())
+                ));
+            }
+            
+            // Filter the base table using the boolean mask
+            let filtered_base = self.table.base_table().filter_by_mask(&mask_list)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            let nodes_filtered = groggy::storage::table::NodesTable::from_base_table(filtered_base)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            Ok(PyNodesTable { table: nodes_filtered }.into_py(py))
         } else {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "NodesTable indices must be strings (column names), integers (row indices), lists of column names, slices, or boolean arrays"
+                "NodesTable indices must be strings (column names), integers (row indices), lists of column names, slices, boolean arrays, or boolean lists"
             ))
         }
     }
@@ -2088,45 +2117,42 @@ impl PyEdgesTable {
     }
     
     /// Get edge IDs
-    pub fn edge_ids(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+    pub fn edge_ids(&self) -> PyResult<PyNumArray> {
         let edge_ids = self.table.edge_ids()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         
-        // Convert to AttrValue vector and then to PyGraphArray
-        let attr_values: Vec<groggy::AttrValue> = edge_ids.into_iter()
-            .map(|id| groggy::AttrValue::Int(id as i64))
+        // Convert to NumArray for numerical operations on IDs
+        let values: Vec<f64> = edge_ids.into_iter()
+            .map(|id| id as f64)
             .collect();
         
-        let graph_array = GraphArray::from_vec(attr_values);
-        Ok(crate::ffi::storage::array::PyGraphArray::from_graph_array(graph_array))
+        Ok(PyNumArray::new(values))
     }
     
     /// Get source node IDs
-    pub fn sources(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+    pub fn sources(&self) -> PyResult<PyNumArray> {
         let sources = self.table.sources()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         
-        // Convert to AttrValue vector and then to PyGraphArray
-        let attr_values: Vec<groggy::AttrValue> = sources.into_iter()
-            .map(|id| groggy::AttrValue::Int(id as i64))
+        // Convert to NumArray for numerical operations on source IDs
+        let values: Vec<f64> = sources.into_iter()
+            .map(|id| id as f64)
             .collect();
         
-        let graph_array = GraphArray::from_vec(attr_values);
-        Ok(crate::ffi::storage::array::PyGraphArray::from_graph_array(graph_array))
+        Ok(PyNumArray::new(values))
     }
     
     /// Get target node IDs  
-    pub fn targets(&self) -> PyResult<crate::ffi::storage::array::PyGraphArray> {
+    pub fn targets(&self) -> PyResult<PyNumArray> {
         let targets = self.table.targets()
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
         
-        // Convert to AttrValue vector and then to PyGraphArray
-        let attr_values: Vec<groggy::AttrValue> = targets.into_iter()
-            .map(|id| groggy::AttrValue::Int(id as i64))
+        // Convert to NumArray for numerical operations on target IDs
+        let values: Vec<f64> = targets.into_iter()
+            .map(|id| id as f64)
             .collect();
         
-        let graph_array = GraphArray::from_vec(attr_values);
-        Ok(crate::ffi::storage::array::PyGraphArray::from_graph_array(graph_array))
+        Ok(PyNumArray::new(values))
     }
     
     /// Get edges as tuples (edge_id, source, target)
@@ -2390,12 +2416,12 @@ impl PyEdgesTable {
                     return Ok(py_attr_value.to_python_value(py));
                 }
                 
-                // For multi-row tables, prefer StatsArray for numeric columns; fallback to GraphArray
+                // For multi-row tables, prefer NumArray for numeric columns; fallback to BaseArray
                 if let Ok(stats) = crate::ffi::storage::num_array::PyNumArray::from_attr_values(attr_values.clone()) {
                     Ok(stats.into_py(py))
                 } else {
                     let base = groggy::storage::array::BaseArray::from_attr_values(attr_values.clone());
-                    let py_base = crate::ffi::storage::array::PyBaseArray { inner: base };
+                    let py_base = PyBaseArray { inner: base };
                     Ok(py_base.into_py(py))
                 }
             } else {
@@ -2441,9 +2467,12 @@ impl PyEdgesTable {
             let edges_sliced = groggy::storage::table::EdgesTable::from_base_table(base_sliced)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             Ok(PyEdgesTable { table: edges_sliced }.into_py(py))
-        } else if let Ok(py_array) = key.extract::<crate::ffi::storage::array::PyGraphArray>() {
+        } else if let Ok(py_array) = key.extract::<PyBaseArray>() {
             // Boolean mask access: table[boolean_array]
-            let mask_values = py_array.to_list(py)?;
+            // Get boolean mask values directly from the inner BaseArray
+            let mask_values: Vec<PyObject> = py_array.inner.iter()
+                .map(|attr_val| crate::ffi::utils::attr_value_to_python_value(py, attr_val))
+                .collect::<Result<Vec<_>, _>>()?;
             let mut mask_booleans = Vec::new();
             
             for value in mask_values.iter() {
@@ -2478,6 +2507,21 @@ impl PyEdgesTable {
             let edges_filtered = groggy::storage::table::EdgesTable::from_base_table(filtered_base)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             Ok(PyEdgesTable { table: edges_filtered }.into_py(py))
+        } else if let Ok(mask_list) = key.extract::<Vec<bool>>() {
+            // Boolean mask from Python list: table[[True, False, True, ...]]
+            if mask_list.len() != self.table.nrows() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    format!("Boolean mask length ({}) does not match table length ({})", 
+                            mask_list.len(), self.table.nrows())
+                ));
+            }
+            
+            // Filter the base table using the boolean mask
+            let filtered_base = self.table.base_table().filter_by_mask(&mask_list)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            let edges_filtered = groggy::storage::table::EdgesTable::from_base_table(filtered_base)
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+            Ok(PyEdgesTable { table: edges_filtered }.into_py(py))
         } else if let Ok(row_index) = key.extract::<isize>() {
             // Row access by integer: edges_table[5] or edges_table[-1]
             let nrows = self.table.nrows() as isize;
@@ -2498,7 +2542,7 @@ impl PyEdgesTable {
             Ok(PyBaseTable::from_table(single_row_table).into_py(py))
         } else {
             Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "EdgesTable indices must be strings (column names), integers (row indices), lists of column names, slices, or boolean arrays"
+                "EdgesTable indices must be strings (column names), integers (row indices), lists of column names, slices, boolean arrays, or boolean lists"
             ))
         }
     }
@@ -2958,7 +3002,12 @@ impl PyGraphTable {
                             py_attr.to_object(py)
                         })
                         .collect();
-                    let py_array = crate::ffi::storage::array::PyGraphArray::from_py_objects(py_objects)?;
+                    // Convert PyObjects to AttrValues for BaseArray
+                    let attr_values: Result<Vec<AttrValue>, PyErr> = py_objects.into_iter()
+                        .map(|obj| crate::ffi::utils::python_value_to_attr_value(obj.as_ref(py)))
+                        .collect();
+                    let base_array = BaseArray::from_attr_values(attr_values?);
+                    let py_array = PyBaseArray { inner: base_array };
                     Ok(py_array.into_py(py))
                 }
             } else {
@@ -2969,7 +3018,7 @@ impl PyGraphTable {
                         Ok(stats.into_py(py))
                     } else {
                         let base = groggy::storage::array::BaseArray::from_attr_values(attr_values.clone());
-                        let py_base = crate::ffi::storage::array::PyBaseArray { inner: base };
+                        let py_base = PyBaseArray { inner: base };
                         Ok(py_base.into_py(py))
                     }
                 } else {
