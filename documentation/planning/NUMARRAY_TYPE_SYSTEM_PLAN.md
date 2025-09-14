@@ -1063,20 +1063,56 @@ impl PyIntArray {
 
 ### Incremental Rollout Strategy
 
-#### Week 1-2: Type Infrastructure
-- Implement `NumericType` enum
-- Create basic `astype()` methods for existing types
-- Add cross-conversion between PyIntArray and PyNumArray
+#### Week 1-2: Type Infrastructure ✅ **COMPLETED**
+- ✅ **Implement `NumericType` enum** - Complete enum with Int32/Int64/Float32/Float64/Bool variants
+  - Type promotion logic with `can_convert_to()` and `promote_with()` methods
+  - Size and classification methods (`is_integer()`, `is_float()`, `size_bytes()`)
+  - Public API export in lib.rs for external usage
+- ✅ **Create basic `astype()` methods for existing types** - All array types support conversion
+  - **PyNumArray**: Supports conversion to `"int64"`, `"float64"`, `"basearray"`
+  - **PyIntArray**: Enhanced to support `"float64"`, `"int64"`, `"basearray"`  
+  - **PyBaseArray**: New method supporting `"int64"`, `"float64"`, `"basearray"`
+- ✅ **Add cross-conversion between PyIntArray and PyNumArray** - Seamless type transitions
+  - `PyIntArray.astype("float64")` → `PyNumArray` with type preservation
+  - `PyNumArray.astype("int64")` → `PyIntArray` with proper rounding
+  - Overflow/underflow handling with informative error messages
+- ✅ **AttrValue Integration** - Core type system enhancements
+  - `numeric_type()` method for type detection on AttrValue variants
+  - `is_numeric()` helper for quick numeric classification
+  - `to_numeric_type()` conversion infrastructure (foundation implemented)
 
-#### Week 3-4: Smart Table Access  
-- Implement automatic NumArray return for numeric columns
-- Add `column_info()` method for type introspection
-- Create `get_column_raw()` and `get_column_numeric()` explicit methods
+#### Week 3-4: Smart Table Access ✅ **COMPLETED**
+- ✅ **Implement automatic NumArray return for numeric columns** - Already implemented in PyBaseTable
+  - `table["column"]` automatically returns `PyNumArray` for numeric data, `PyBaseArray` for mixed data
+  - Smart type detection tries `PyNumArray.from_attr_values()` first, falls back gracefully
+  - Seamless experience: users get the most appropriate array type without manual conversion
+- ✅ **Add `column_info()` method for type introspection** - Comprehensive column metadata analysis
+  - Returns detailed dictionary with `length`, `non_null_count`, `type_counts` for all columns
+  - Automatic numeric type detection and promotion with `NumericType` enum integration
+  - Recommends optimal array type: `BoolArray`, `IntArray`, or `NumArray` based on data
+- ✅ **Create `get_column_raw()` and `get_column_numeric()` explicit methods** - Fine-grained column access
+  - `get_column_raw(column_name)`: Always returns `PyBaseArray` regardless of data type
+  - `get_column_numeric(column_name)`: Returns `PyNumArray`/`PyIntArray` or raises informative error
+  - Explicit control for users who need specific array types or error handling
 
-#### Week 5-6: BaseArray Intelligence
-- Add `infer_numeric_type()` to BaseArray
-- Implement `to_num_array()` conversion
-- Create type validation and error handling
+#### Week 5-6: BaseArray Intelligence ✅ **COMPLETED**
+- ✅ **Add `infer_numeric_type()` to BaseArray** - Intelligent type analysis with promotion rules
+  - Analyzes all elements to determine optimal `NumericType` (Bool, Int32, Int64, Float32, Float64)
+  - Uses type promotion logic: `Bool` → `Int32` → `Int64` → `Float32` → `Float64`
+  - Gracefully handles nulls by skipping them in type inference
+  - Returns `None` if non-numeric data is detected, enabling fallback strategies
+- ✅ **Implement `to_num_array()` conversion** - Smart BaseArray to specialized array conversion
+  - Returns `PyBoolArray` for boolean data, `PyIntArray` for integers, `PyNumArray` for floats
+  - Handles type coercion with null handling (defaults: false, 0, 0.0)
+  - Automatic promotion: mixed int/float data promotes to `PyNumArray`
+  - Clear error messages for non-convertible data with specific type information
+- ✅ **Create type validation and error handling** - Comprehensive conversion diagnostics
+  - `is_numeric()` method for quick boolean check of conversion feasibility
+  - `numeric_compatibility_info()` method providing detailed analysis:
+    - Count statistics: total, numeric, null counts with percentages
+    - Type breakdown: frequency count of each AttrValue variant
+    - Conversion recommendations and specific error reasons for failures
+    - Suggestions for data cleaning when mixed types are detected
 
 #### Week 7-8: Matrix Integration
 - Add basic Matrix ↔ NumArray conversions
