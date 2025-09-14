@@ -164,7 +164,7 @@ pub use api::graph::Graph;
 pub use utils::{GraphConfig, convert::*};
 pub use state::{HistoricalView, HistoryForest, ViewSummary};
 pub use errors::{GraphError, GraphResult};
-pub use types::{AttrName, AttrValue, AttrValueType, BranchName, EdgeId, NodeId, StateId};
+pub use types::{AttrName, AttrValue, AttrValueType, BranchName, EdgeId, NodeId, NumericType, StateId};
 // pub use query::{
 //     AttributeFilter, NumericComparison, StringComparison, MultiCriteria, Criterion,
 //     filter_nodes_by_attributes, filter_edges_by_attributes,
