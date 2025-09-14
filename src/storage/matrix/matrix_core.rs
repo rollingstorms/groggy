@@ -94,6 +94,20 @@ pub struct GraphMatrix {
 }
 
 impl GraphMatrix {
+    /// Internal method to get column by index - needed by slicing module
+    pub(crate) fn get_column_internal(&self, col_idx: usize) -> GraphResult<&NumArray<f64>> {
+        self.columns.get(col_idx).ok_or_else(|| {
+            GraphError::InvalidInput(format!("Column {} not found", col_idx))
+        })
+    }
+    
+    /// Get column name by index - needed by slicing module  
+    pub(crate) fn get_column_name(&self, col_idx: usize) -> String {
+        self.column_names.get(col_idx)
+            .cloned()
+            .unwrap_or_else(|| format!("col_{}", col_idx))
+    }
+    
     /// Create a new GraphMatrix from a collection of NumArrays
     /// All arrays must have the same length for proper matrix structure
     pub fn from_arrays(arrays: Vec<NumArray<f64>>) -> GraphResult<Self> {

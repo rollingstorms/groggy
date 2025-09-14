@@ -107,19 +107,38 @@ impl PyNumArray {
     }
     
     /// Get element at index
-    fn __getitem__(&self, index: isize) -> PyResult<f64> {
-        let len = self.inner.len() as isize;
-        let actual_index = if index < 0 {
-            (len + index) as usize
-        } else {
-            index as usize
-        };
+    /// Advanced index access supporting multiple indexing types
+    fn __getitem__(&self, py: Python, index: &PyAny) -> PyResult<PyObject> {
+        use groggy::storage::array::AdvancedIndexing;
+        use crate::ffi::utils::indexing::python_index_to_slice_index;
         
-        self.inner.get(actual_index)
-            .copied()
-            .ok_or_else(|| pyo3::exceptions::PyIndexError::new_err(
-                format!("Index {} out of range", index)
-            ))
+        // Handle simple integer case directly for performance
+        if let Ok(int_val) = index.extract::<isize>() {
+            let len = self.inner.len() as isize;
+            let actual_index = if int_val < 0 {
+                (len + int_val) as usize
+            } else {
+                int_val as usize
+            };
+            
+            return self.inner.get(actual_index)
+                .copied()
+                .map(|val| val.to_object(py))
+                .ok_or_else(|| pyo3::exceptions::PyIndexError::new_err(
+                    format!("Index {} out of range", int_val)
+                ));
+        }
+        
+        // Handle advanced indexing cases
+        let slice_index = python_index_to_slice_index(py, index)?;
+        
+        match self.inner.get_slice(&slice_index) {
+            Ok(sliced_array) => {
+                let py_array = PyNumArray { inner: sliced_array };
+                Ok(py_array.into_py(py))
+            }
+            Err(e) => Err(pyo3::exceptions::PyIndexError::new_err(format!("{}", e)))
+        }
     }
     
     /// Convert to Python list
@@ -130,18 +149,34 @@ impl PyNumArray {
     /// String representation
     fn __repr__(&self) -> String {
         let len = self.inner.len();
-        let preview: Vec<f64> = self.inner.iter().take(3).copied().collect();
         
-        let preview_str = if self.inner.len() <= 3 {
-            format!("{:?}", preview)
+        if len == 0 {
+            return "NumArray(dtype: f64)\n[]".to_string();
+        }
+        
+        let max_display = 10;
+        let show_all = len <= max_display;
+        
+        let mut output = format!("NumArray(dtype: f64)\n");
+        
+        if show_all {
+            // Show all elements with indices
+            for (i, &value) in self.inner.iter().enumerate() {
+                output.push_str(&format!("[{:>3}] {:.6}\n", i, value));
+            }
         } else {
-            format!("{:?}...", preview)
-        };
+            // Show first few and last few with ellipsis
+            for (i, &value) in self.inner.iter().take(5).enumerate() {
+                output.push_str(&format!("[{:>3}] {:.6}\n", i, value));
+            }
+            output.push_str("      ...\n");
+            let start_idx = len - 3;
+            for (i, &value) in self.inner.iter().skip(start_idx).enumerate() {
+                output.push_str(&format!("[{:>3}] {:.6}\n", start_idx + i, value));
+            }
+        }
         
-        format!(
-            "NumArray[{}] {} (dtype: f64)\n💡 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
-            len, preview_str
-        )
+        output.trim_end().to_string()
     }
     
     /// Rich HTML representation for Jupyter notebooks
@@ -317,11 +352,14 @@ impl PyNumArray {
 
     // Comparison operators for boolean masking
     
-    /// Greater than comparison (>) - returns Vec<bool> for boolean masking
+    /// Greater than comparison (>) - returns BoolArray for boolean masking
     fn __gt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         if let Ok(scalar) = other.extract::<f64>() {
             let result: Vec<bool> = self.inner.iter().map(|&x| x > scalar).collect();
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else {
             Err(pyo3::exceptions::PyTypeError::new_err(
                 "NumArray comparison requires a numeric value"
@@ -329,11 +367,14 @@ impl PyNumArray {
         }
     }
 
-    /// Less than comparison (<) - returns Vec<bool> for boolean masking
+    /// Less than comparison (<) - returns BoolArray for boolean masking
     fn __lt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         if let Ok(scalar) = other.extract::<f64>() {
             let result: Vec<bool> = self.inner.iter().map(|&x| x < scalar).collect();
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else {
             Err(pyo3::exceptions::PyTypeError::new_err(
                 "NumArray comparison requires a numeric value"
@@ -341,11 +382,14 @@ impl PyNumArray {
         }
     }
 
-    /// Greater than or equal comparison (>=) - returns Vec<bool> for boolean masking
+    /// Greater than or equal comparison (>=) - returns BoolArray for boolean masking
     fn __ge__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         if let Ok(scalar) = other.extract::<f64>() {
             let result: Vec<bool> = self.inner.iter().map(|&x| x >= scalar).collect();
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else {
             Err(pyo3::exceptions::PyTypeError::new_err(
                 "NumArray comparison requires a numeric value"
@@ -353,11 +397,14 @@ impl PyNumArray {
         }
     }
 
-    /// Less than or equal comparison (<=) - returns Vec<bool> for boolean masking
+    /// Less than or equal comparison (<=) - returns BoolArray for boolean masking
     fn __le__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         if let Ok(scalar) = other.extract::<f64>() {
             let result: Vec<bool> = self.inner.iter().map(|&x| x <= scalar).collect();
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else {
             Err(pyo3::exceptions::PyTypeError::new_err(
                 "NumArray comparison requires a numeric value"
@@ -365,11 +412,14 @@ impl PyNumArray {
         }
     }
 
-    /// Equality comparison (==) - returns Vec<bool> for boolean masking
+    /// Equality comparison (==) - returns BoolArray for boolean masking
     fn __eq__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         if let Ok(scalar) = other.extract::<f64>() {
             let result: Vec<bool> = self.inner.iter().map(|&x| (x - scalar).abs() < f64::EPSILON).collect();
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else {
             Err(pyo3::exceptions::PyTypeError::new_err(
                 "NumArray comparison requires a numeric value"
@@ -377,11 +427,14 @@ impl PyNumArray {
         }
     }
 
-    /// Not equal comparison (!=) - returns Vec<bool> for boolean masking
+    /// Not equal comparison (!=) - returns BoolArray for boolean masking
     fn __ne__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         if let Ok(scalar) = other.extract::<f64>() {
             let result: Vec<bool> = self.inner.iter().map(|&x| (x - scalar).abs() >= f64::EPSILON).collect();
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else {
             Err(pyo3::exceptions::PyTypeError::new_err(
                 "NumArray comparison requires a numeric value"
@@ -544,15 +597,21 @@ impl PyIntArray {
         unique.len()
     }
     
-    /// Equality comparison (==) - returns Vec<bool> for boolean masking
+    /// Equality comparison (==) - returns BoolArray for boolean masking
     fn __eq__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         if let Ok(scalar) = other.extract::<i64>() {
             let result: Vec<bool> = self.inner.iter().map(|&x| x == scalar).collect();
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else if other.is_none() {
             // Node IDs are never None, so comparison with None is always False
             let result: Vec<bool> = vec![false; self.inner.len()];
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else {
             Err(pyo3::exceptions::PyTypeError::new_err(
                 "IntArray comparison requires an integer value or None"
@@ -560,15 +619,21 @@ impl PyIntArray {
         }
     }
     
-    /// Not equal comparison (!=) - returns Vec<bool> for boolean masking
+    /// Not equal comparison (!=) - returns BoolArray for boolean masking
     fn __ne__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         if let Ok(scalar) = other.extract::<i64>() {
             let result: Vec<bool> = self.inner.iter().map(|&x| x != scalar).collect();
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else if other.is_none() {
             // Node IDs are never None, so != None is always True
             let result: Vec<bool> = vec![true; self.inner.len()];
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else {
             Err(pyo3::exceptions::PyTypeError::new_err(
                 "IntArray comparison requires an integer value or None"
@@ -576,15 +641,21 @@ impl PyIntArray {
         }
     }
     
-    /// Greater than comparison (>) - returns Vec<bool> for boolean masking
+    /// Greater than comparison (>) - returns BoolArray for boolean masking
     fn __gt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         if let Ok(scalar) = other.extract::<i64>() {
             let result: Vec<bool> = self.inner.iter().map(|&x| x > scalar).collect();
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else if other.is_none() {
             // Integers are never greater than None
             let result: Vec<bool> = vec![false; self.inner.len()];
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else {
             Err(pyo3::exceptions::PyTypeError::new_err(
                 "IntArray comparison requires an integer value or None"
@@ -592,15 +663,21 @@ impl PyIntArray {
         }
     }
     
-    /// Less than comparison (<) - returns Vec<bool> for boolean masking
+    /// Less than comparison (<) - returns BoolArray for boolean masking
     fn __lt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         if let Ok(scalar) = other.extract::<i64>() {
             let result: Vec<bool> = self.inner.iter().map(|&x| x < scalar).collect();
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else if other.is_none() {
             // Integers are never less than None
             let result: Vec<bool> = vec![false; self.inner.len()];
-            Ok(result.to_object(py))
+            // Convert Vec<bool> to BoolArray
+            let bool_array = groggy::storage::BoolArray::new(result);
+            let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+            Ok(py_bool_array.into_py(py))
         } else {
             Err(pyo3::exceptions::PyTypeError::new_err(
                 "IntArray comparison requires an integer value or None"
