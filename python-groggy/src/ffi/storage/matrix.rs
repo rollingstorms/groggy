@@ -176,26 +176,42 @@ impl PyGraphMatrix {
     // === ACCESS & INDEXING ===
 
     /// Multi-index access for matrix elements: matrix[row, col] -> value, matrix[row] -> row, matrix["col"] -> column
+    /// Advanced matrix indexing supporting 2D slicing operations
+    /// Supports:
+    /// - Single cell: matrix[row, col] -> f64
+    /// - Row access: matrix[row] -> NumArray
+    /// - Column access: matrix["col_name"] -> NumArray
+    /// - 2D slicing: matrix[:5, :3], matrix[::2, ::2]
+    /// - Advanced indexing: matrix[[0, 2], [1, 3]]
+    /// - Boolean indexing: matrix[row_mask, :]
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
-        // Multi-index access (row, col) -> single cell value
-        if let Ok(indices) = key.extract::<(usize, usize)>() {
-            let (row, col) = indices;
-            return self.get_cell(py, row, col);
+        use groggy::storage::matrix::MatrixSlicing;
+        use crate::ffi::utils::matrix_indexing::{parse_matrix_index, MatrixIndexResult};
+        
+        match parse_matrix_index(py, key)? {
+            MatrixIndexResult::Cell(row, col) => {
+                // Single cell access: matrix[row, col]
+                self.get_cell(py, row, col)
+            }
+            MatrixIndexResult::Row(row_index) => {
+                // Row access: matrix[row]
+                self.get_row(py, row_index)
+            }
+            MatrixIndexResult::ColumnByName(col_name) => {
+                // Column access by name: matrix["col_name"]
+                self.get_column_by_name(py, col_name)
+            }
+            MatrixIndexResult::Slice(matrix_slice) => {
+                // Advanced 2D slicing: matrix[:5, :3], matrix[[0,2], [1,3]], etc.
+                match self.inner.get_submatrix(&matrix_slice) {
+                    Ok(sliced_matrix) => {
+                        let py_matrix = PyGraphMatrix { inner: sliced_matrix };
+                        Ok(py_matrix.into_py(py))
+                    }
+                    Err(e) => Err(pyo3::exceptions::PyIndexError::new_err(format!("{}", e)))
+                }
+            }
         }
-
-        // Single integer -> row access
-        if let Ok(row_index) = key.extract::<usize>() {
-            return self.get_row(py, row_index);
-        }
-
-        // String -> column access
-        if let Ok(col_name) = key.extract::<String>() {
-            return self.get_column_by_name(py, col_name);
-        }
-
-        Err(PyTypeError::new_err(
-            "Key must be: int (row index), string (column name), or (row, col) tuple for multi-index access"
-        ))
     }
 
     /// Get single cell value at (row, col)
@@ -469,45 +485,75 @@ impl PyGraphMatrix {
     /// String representation with rich display hints
     fn __repr__(&self, py: Python) -> PyResult<String> {
         let (rows, cols) = self.inner.shape();
-        let dtype = format!("{:?}", self.inner.dtype());
         
-        // Show a preview of the matrix data
-        let preview = if rows == 0 || cols == 0 {
-            "empty".to_string()
-        } else {
-            // Show first few values as a preview
-            let mut preview_values = Vec::new();
-            let preview_rows = std::cmp::min(2, rows);
-            let preview_cols = std::cmp::min(3, cols);
+        if rows == 0 || cols == 0 {
+            return Ok("GraphMatrix(shape=(0, 0), dtype=f64)\n[]".to_string());
+        }
+        
+        let mut output = format!("GraphMatrix(shape=({}, {}), dtype=f64)\n", rows, cols);
+        
+        let max_display_rows = 8;
+        let max_display_cols = 6;
+        let show_all_rows = rows <= max_display_rows;
+        let show_all_cols = cols <= max_display_cols;
+        
+        // Calculate column widths for alignment
+        let mut col_widths = vec![8; if show_all_cols { cols } else { max_display_cols }];
+        
+        // Display matrix in mathematical bracket format
+        let display_rows = if show_all_rows { rows } else { 5 };
+        let display_cols = if show_all_cols { cols } else { 4 };
+        
+        for i in 0..display_rows {
+            let row_idx = if !show_all_rows && i >= 3 {
+                // For last 2 rows when truncating
+                rows - (display_rows - i)
+            } else {
+                i
+            };
             
-            for i in 0..preview_rows {
-                let mut row_values = Vec::new();
-                for j in 0..preview_cols {
-                    match self.inner.get(i, j) {
-                        Some(val) => {
-                            let val_str = format!("{:.2}", val);
-                            row_values.push(val_str);
-                        }
-                        None => row_values.push("0".to_string()),
+            let row_prefix = if i == 0 { "[[" } else { " [" };
+            output.push_str(row_prefix);
+            
+            for j in 0..display_cols {
+                let col_idx = if !show_all_cols && j >= 2 {
+                    // For last 2 columns when truncating  
+                    cols - (display_cols - j)
+                } else {
+                    j
+                };
+                
+                if !show_all_cols && j == 2 {
+                    output.push_str("...  ");
+                    continue;
+                }
+                
+                match self.inner.get_cell(row_idx, col_idx) {
+                    Ok(val) => {
+                        output.push_str(&format!("{:>8.3}", val));
                     }
+                    Err(_) => output.push_str("    0.000"),
                 }
-                if cols > preview_cols {
-                    row_values.push("...".to_string());
+                
+                if j < display_cols - 1 {
+                    output.push_str("  ");
                 }
-                preview_values.push(format!("[{}]", row_values.join(" ")));
             }
             
-            if rows > preview_rows {
-                preview_values.push("...".to_string());
+            let row_suffix = if i == display_rows - 1 { "]]" } else { "]" };
+            output.push_str(row_suffix);
+            
+            if i < display_rows - 1 {
+                output.push('\n');
             }
             
-            format!("\n{}", preview_values.join("\n"))
-        };
+            // Add ellipsis row if needed
+            if !show_all_rows && i == 2 && rows > max_display_rows {
+                output.push_str("\n ...");
+            }
+        }
         
-        Ok(format!(
-            "GraphMatrix({} x {}, dtype={}){}\n💡 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
-            rows, cols, dtype, preview
-        ))
+        Ok(output)
     }
 
     /// String representation (same as __repr__ for consistency)

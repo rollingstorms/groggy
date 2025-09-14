@@ -16,6 +16,7 @@ pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
 pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
 pub use ffi::storage::array::{PyBaseArray, PyNodesArray, PyEdgesArray, PyMetaNodeArray};
 pub use ffi::storage::num_array::{PyNumArray, PyNumArrayIterator, PyIntArray, PyStatsArray, PyStatsArrayIterator};
+pub use ffi::storage::bool_array::{PyBoolArray, PyBoolArrayIterator, bool_array, ones_bool, zeros_bool};
 pub use ffi::storage::simple_stats_array::PySimpleStatsArray;
 pub use ffi::storage::subgraph_array::{PySubgraphArray, PySubgraphArrayIterator, PySubgraphArrayChainIterator};
 pub use ffi::storage::table_array::{PyTableArray, PyTableArrayIterator, PyTableArrayChainIterator};
@@ -417,6 +418,9 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyNumArray>()?;
     m.add_class::<PyNumArrayIterator>()?;
     m.add_class::<PyIntArray>()?;
+    // Boolean array API
+    m.add_class::<PyBoolArray>()?;
+    m.add_class::<PyBoolArrayIterator>()?;
     // m.add_class::<PySimpleStatsArray>()?;
     m.add_class::<PyTableArray>()?;
     m.add_class::<PyTableArrayIterator>()?;
@@ -508,6 +512,10 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(matrix, m)?)?;
     m.add_function(wrap_pyfunction!(table, m)?)?; // Re-enabled for Phase 5 completion
     m.add_function(wrap_pyfunction!(merge, m)?)?;
+    // Boolean array builder functions
+    m.add_function(wrap_pyfunction!(bool_array, m)?)?;
+    m.add_function(wrap_pyfunction!(ones_bool, m)?)?;
+    m.add_function(wrap_pyfunction!(zeros_bool, m)?)?;
 
     // Use the module registration function (currently empty)
     // module::register_classes(py, m)?;

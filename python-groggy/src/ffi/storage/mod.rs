@@ -6,6 +6,7 @@ pub mod matrix;
 pub mod table; // Re-enabled NEW BaseTable FFI for Phase 5
 pub mod array;
 pub mod num_array; // Statistical array with numerical operations
+pub mod bool_array; // Boolean array for efficient boolean operations
 pub mod simple_stats_array; // Minimal test version
 pub mod accessors; // Essential FFI - keep enabled
 pub mod views; // Essential FFI - keep enabled  
@@ -20,6 +21,7 @@ pub use matrix::*;
 pub use table::*; // Re-enabled NEW BaseTable FFI for Phase 5
 pub use array::*;
 pub use num_array::*; // Statistical array with numerical operations
+pub use bool_array::*; // Boolean array for efficient boolean operations
 pub use simple_stats_array::*; // Minimal test version
 pub use accessors::*; // Essential FFI
 pub use views::*; // Essential FFI

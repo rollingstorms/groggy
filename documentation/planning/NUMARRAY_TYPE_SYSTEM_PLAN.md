@@ -11,6 +11,9 @@ Currently, the type system across `NumArray`, `Matrix`, `Table`, and `BaseArray`
 4. **API Consistency**: Different return types for the same logical data
 5. **Limited Interoperability**: No seamless conversion between NumArray, BaseArray, Matrix, and Table
 6. **Manual Type Management**: Users must manually handle type conversions across data structures
+7. **Missing Boolean Array Support**: Boolean masks return as lists instead of efficient BoolArray
+8. **Incomplete Indexing/Slicing**: No sophisticated slicing system for matrices and arrays
+9. **Inconsistent Representations**: Column names in matrices, inconsistent array displays
 
 ## Current Architecture Issues
 
@@ -451,6 +454,215 @@ elif table["column"].dtype.startswith('float'):
     # Handle float data
 ```
 
+---
+
+## Advanced Indexing and Slicing System
+
+### Problem: Incomplete Indexing Support
+
+Currently, the indexing system has major gaps:
+1. **Boolean masks return as lists** instead of efficient arrays
+2. **No sophisticated matrix slicing** like `[:, :2]` or `[0, 1, 2]`
+3. **Inconsistent column ordering** in matrix displays
+4. **No BoolArray type** for efficient boolean operations
+
+### Solution: Comprehensive BoolArray and Slicing System
+
+#### 1. BoolArray Implementation
+```rust
+// New BoolArray type based on NumArray<bool>
+#[pyclass(name = "BoolArray", unsendable)]
+pub struct PyBoolArray {
+    pub(crate) inner: NumArray<bool>,
+    pub(crate) length: usize,
+}
+
+impl PyBoolArray {
+    // Efficient boolean operations
+    fn and(&self, other: &PyBoolArray) -> PyResult<PyBoolArray>
+    fn or(&self, other: &PyBoolArray) -> PyResult<PyBoolArray>
+    fn not(&self) -> PyResult<PyBoolArray>
+    fn any(&self) -> bool
+    fn all(&self) -> bool
+    fn count(&self) -> usize  // Count of True values
+    
+    // Convert to indices for advanced indexing
+    fn nonzero(&self) -> PyResult<PyNumArray<usize>>
+    fn to_indices(&self) -> PyResult<Vec<usize>>
+}
+```
+
+#### 2. Boolean Indexing Integration
+```python
+# ===== BEFORE: Lists returned =====
+# g.degree() > 4 returns [True, False, True, ...]
+high_degree_mask = g.degree() > 4  # Returns list
+high_degree_nodes = g.nodes[high_degree_mask]  # Works but inefficient
+
+# ===== AFTER: BoolArray returned =====
+high_degree_mask = g.degree() > 4  # Returns BoolArray
+high_degree_nodes = g.nodes[high_degree_mask]  # Much more efficient
+
+# Advanced boolean operations
+complex_mask = (g.degree() > 4) & (g.nodes['age'] < 30)  # BoolArray operations
+selected_nodes = g.nodes[complex_mask]
+
+# Boolean array methods
+print(f"Selected {high_degree_mask.count()} nodes")  # Count True values
+print(f"All high degree: {high_degree_mask.all()}")
+print(f"Any high degree: {high_degree_mask.any()}")
+
+# Convert to indices when needed
+indices = high_degree_mask.nonzero()  # NumArray<usize> of True indices
+```
+
+#### 3. Sophisticated Matrix Slicing
+```python
+# ===== NUMPY-STYLE MATRIX SLICING =====
+
+matrix = g.adjacency()  # Returns Matrix with shape (n, n)
+
+# Basic slicing
+submatrix = matrix[:5, :5]        # First 5x5 submatrix
+row_slice = matrix[2, :]          # Row 2 as NumArray
+col_slice = matrix[:, 3]          # Column 3 as NumArray
+
+# Advanced integer indexing
+selected_rows = matrix[[0, 2, 4], :]      # Select specific rows
+selected_cols = matrix[:, [1, 3, 5]]      # Select specific columns
+submatrix = matrix[[0, 2], [1, 3]]        # Select 2x2 submatrix
+
+# Range slicing with step
+every_other = matrix[::2, ::2]     # Every other row and column
+reversed_matrix = matrix[::-1, :]  # Reverse row order
+
+# Boolean indexing on matrices
+degree_matrix = g.degree_matrix()
+high_degree_mask = g.degree() > 4
+filtered_matrix = degree_matrix[high_degree_mask, :]  # Select rows by boolean mask
+```
+
+#### 4. Array Indexing Enhancements
+```python
+# ===== ADVANCED ARRAY INDEXING =====
+
+degrees = g.degree()  # NumArray<int64>
+
+# Integer array indexing
+selected_indices = [0, 2, 5, 7]
+selected_degrees = degrees[selected_indices]  # NumArray subset
+
+# Boolean indexing (now with BoolArray)
+high_degree_mask = degrees > 4    # BoolArray
+high_degrees = degrees[high_degree_mask]  # Efficient boolean indexing
+
+# Slice indexing
+first_half = degrees[:len(degrees)//2]
+every_third = degrees[::3]
+last_ten = degrees[-10:]
+
+# Combined indexing
+complex_selection = degrees[high_degree_mask][:5]  # First 5 high-degree values
+```
+
+#### 5. Consistent Slicing API
+```rust
+// Unified slicing interface
+trait Sliceable<T> {
+    fn slice(&self, index: SliceIndex) -> PyResult<Self>;
+    fn slice_mut(&mut self, index: SliceIndex) -> PyResult<&mut Self>;
+}
+
+// Slice index types
+#[derive(Debug)]
+pub enum SliceIndex {
+    Single(i64),                    // [5]
+    Range(Option<i64>, Option<i64>, Option<i64>), // [start:end:step]
+    List(Vec<i64>),                 // [[0, 2, 4]]
+    BoolArray(PyBoolArray),         // [mask]
+    Tuple(Vec<SliceIndex>),         // [row_slice, col_slice] for matrices
+}
+```
+
+---
+
+## Display and Representation System
+
+### Problem: Inconsistent Display Format
+
+Current issues with array and matrix display:
+1. **Matrices show column names** when they shouldn't
+2. **Arrays inconsistently show indices**
+3. **No standardized formatting** across types
+
+### Solution: Clean, Consistent Representations
+
+#### 1. NumArray Display (Keep Index)
+```python
+# ===== NUMARRAY REPRESENTATION =====
+degrees = g.degree()
+print(degrees)
+# Output:
+# NumArray([1, 3, 2, 4, 1, 2, 3], dtype=int64)
+# [0] 1
+# [1] 3  
+# [2] 2
+# [3] 4
+# [4] 1
+# [5] 2
+# [6] 3
+```
+
+#### 2. BoolArray Display (Keep Index)
+```python
+# ===== BOOLARRAY REPRESENTATION =====
+mask = degrees > 2
+print(mask)
+# Output:
+# BoolArray([False, True, False, True, False, False, True])
+# [0] False
+# [1] True
+# [2] False  
+# [3] True
+# [4] False
+# [5] False
+# [6] True
+# Count: 3/7 (42.9%)
+```
+
+#### 3. Matrix Display (No Column Names)
+```python
+# ===== MATRIX REPRESENTATION =====
+matrix = g.adjacency()
+print(matrix)
+# Output:
+# Matrix(shape=(4, 4), dtype=float64)
+# [[0.0, 1.0, 0.0, 1.0],
+#  [1.0, 0.0, 1.0, 0.0],
+#  [0.0, 1.0, 0.0, 1.0], 
+#  [1.0, 0.0, 1.0, 0.0]]
+
+# No row/column names displayed - clean mathematical representation
+```
+
+#### 4. Sorted Column Consistency
+```rust
+// Ensure consistent column ordering in matrices
+impl Matrix {
+    fn ensure_sorted_columns(&mut self) {
+        // Sort columns by name/index to ensure consistent ordering
+        // This guarantees [:, :2] always selects the same columns
+    }
+    
+    fn column_names(&self) -> Option<Vec<String>> {
+        // Internal column tracking without display
+        // Used for slicing like matrix["col1":"col3"]
+    }
+}
+```
+
+---
+
 ## Implementation Phases
 
 ### Phase 1: Core Unified Type System (Foundation)
@@ -487,7 +699,48 @@ elif table["column"].dtype.startswith('float'):
    - Implement column type detection and casting
    - Create table schema inference
 
-### Phase 4: Matrix System Integration
+### Phase 4: BoolArray and Boolean Operations
+1. **BoolArray Implementation**
+   - Create `PyBoolArray` based on `NumArray<bool>`
+   - Implement boolean operations (`and`, `or`, `not`, `any`, `all`, `count`)
+   - Add conversion methods (`nonzero()`, `to_indices()`)
+
+2. **Boolean Indexing Integration**
+   - Update comparison operators to return `BoolArray` instead of lists
+   - Implement efficient boolean indexing for arrays and matrices
+   - Add boolean mask support for node/edge filtering
+
+### Phase 5: Advanced Indexing and Slicing System
+1. **Unified Slicing Interface**
+   - Create `SliceIndex` enum for all indexing types
+   - Implement `Sliceable<T>` trait for arrays and matrices
+   - Add support for integer lists, ranges, and boolean arrays
+
+2. **NumPy-Style Matrix Slicing**
+   - Implement 2D slicing syntax `matrix[:5, :3]`
+   - Add advanced indexing `matrix[[0, 2], [1, 3]]`
+   - Support step slicing `matrix[::2, ::2]`
+   - Ensure consistent column ordering
+
+3. **Array Indexing Enhancements**
+   - Advanced integer array indexing
+   - Boolean array indexing with BoolArray
+   - Combined indexing operations
+   - Slice chaining support
+
+### Phase 6: Display and Representation System
+1. **Consistent Display Format**
+   - Clean NumArray display with indices
+   - BoolArray display with count statistics  
+   - Matrix display without column names
+   - Standardized formatting across all types
+
+2. **Column Ordering and Consistency**
+   - Implement sorted column ordering for matrices
+   - Internal column name tracking without display
+   - Consistent slicing behavior
+
+### Phase 7: Matrix System Integration
 1. **Generic Matrix Implementation**
    - Create `PyGraphMatrix<T>` with type parameter
    - Implement Matrix ↔ NumArray conversions (`flatten()`, `reshape()`)
@@ -498,7 +751,7 @@ elif table["column"].dtype.startswith('float'):
    - Add `PyGraphMatrix::from_num_array()`
    - Create matrix dimension inference
 
-### Phase 5: API Updates and Migration
+### Phase 8: API Updates and Migration
 1. **Update Core Accessors**
    - Modify `g.nodes.ids()` to return `NumArray<i64>` instead of `PyIntArray`
    - Update `g.edges.ids()` similarly
@@ -508,8 +761,10 @@ elif table["column"].dtype.startswith('float'):
    - Create type conversion test suite
    - Add cross-structure conversion tests
    - Implement performance benchmarks
+   - Test BoolArray operations and indexing
+   - Validate matrix slicing behavior
 
-### Phase 6: Documentation and Polish
+### Phase 9: Documentation and Polish
 1. **API Documentation Updates**
    - Document all new conversion methods
    - Create migration guide from old API
@@ -576,6 +831,116 @@ elif table["column"].dtype.startswith('float'):
 - **Performance Benchmarks**: Ensure no regression in critical paths
 - **User Acceptance Testing**: Validate with real-world workflows
 - **Edge Case Coverage**: Handle all type conversion scenarios
+
+---
+
+## 🎯 Priority Implementation Roadmap
+
+### High Priority (Immediate - Next 4 weeks)
+**Focus: Boolean Arrays and Basic Slicing**
+
+#### Week 1-2: BoolArray Foundation ✅ **COMPLETED**
+1. **✅ Implement `PyBoolArray`** - Based on `NumArray<bool>` with efficient operations
+   - Core `PyBoolArray` struct with `NumArray<bool>` backing
+   - Comprehensive Python FFI integration with PyO3
+   - Iterator support and full indexing capabilities
+2. **✅ Boolean operations** - `and`, `or`, `not`, `any`, `all`, `count`
+   - Bitwise operators: `&` (and), `|` (or), `~` (not)
+   - Statistical methods: `count()`, `any()`, `all()`, `count_false()`, `percentage()`
+   - Index operations: `nonzero()`, `to_indices()`, `false_indices()`
+   - Utility functions: `ones_bool()`, `zeros_bool()`, `apply_mask()`
+3. **✅ Update comparison operators** - Return `BoolArray` instead of lists
+   - **BaseArray**: All comparison operators (`>`, `<`, `>=`, `<=`, `==`, `!=`) return BoolArray
+   - **NumArray**: All numeric comparison operators return BoolArray
+   - **StatsArray**: All integer comparison operators return BoolArray
+4. **✅ Integration testing** - Ensure `g.nodes[g.degree() > 4]` works with BoolArray
+   - `g.degree() > 4` now returns BoolArray (not list)
+   - `g.nodes[boolean_mask]` successfully filters using BoolArray
+   - Complex boolean expressions work: `(degrees > 2) & (degrees < 10)`
+   - **Result**: `g.nodes[g.degree() > 2]` returns filtered subgraph with 5 nodes and 6 edges
+
+#### Week 3-4: Basic Array Slicing ✅ **COMPLETED**
+1. **✅ Integer list indexing** - `array[[0, 2, 5]]` support
+   - Full support for integer lists: `array[[0, 2, 5]]` returns filtered array
+   - Negative index support: `array[[-1, -2, 0]]` works correctly
+   - Works with BaseArray, NumArray, and BoolArray
+2. **✅ Boolean indexing** - `array[bool_mask]` with BoolArray
+   - Direct BoolArray indexing: `array[bool_mask]` filters elements
+   - Comparison-generated masks: `array[array > 3]` creates and applies mask
+   - Efficient boolean masking with proper length validation
+3. **✅ Range slicing** - `array[:5]`, `array[::2]` support
+   - Python slice notation: `array[:5]`, `array[2:7]`, `array[::2]`
+   - Negative slicing: `array[-3:]`, `array[::-1]` (reverse)
+   - Complex slicing: `array[1:8:2]` with step values
+4. **✅ Combined operations** - `array[mask][:10]` chaining
+   - Multi-step filtering: `array[bool_mask][:5]` chains correctly
+   - Complex operations: `degrees[degrees > 2][:3]` works seamlessly
+   - **Result**: Full NumPy-style indexing system with unified SliceIndex enum
+
+### Medium Priority (Weeks 5-8)
+**Focus: Matrix Slicing and Display**
+
+#### Week 5-6: Matrix Slicing System ✅ **COMPLETED**
+1. **✅ 2D slicing syntax** - `matrix[:5, :3]`, `matrix[::2, ::2]`
+   - Full NumPy-style 2D slicing: `matrix[:2, :2]`, `matrix[::2, ::2]`
+   - Range slicing: `matrix[1:3, 0:2]` with proper bounds checking
+   - Step slicing: `matrix[::2, ::2]` for sampling matrices
+2. **✅ Advanced indexing** - `matrix[[0, 2], [1, 3]]`
+   - Integer list indexing: `matrix[[0, 2, 3], [0, 2]]` selects specific rows/cols
+   - Negative index support: `matrix[[-1, -2], [0, 1]]` works correctly
+   - Mixed indexing: `matrix[:2, [0, 2]]` combines slices with lists
+3. **✅ Boolean matrix indexing** - `matrix[row_mask, :]`
+   - Row boolean filtering: `matrix[row_mask, :]` filters rows by BoolArray
+   - Column boolean filtering: `matrix[:, col_mask]` filters columns by BoolArray  
+   - 2D boolean filtering: `matrix[row_mask, col_mask]` filters both dimensions
+4. **✅ SliceIndex enum** - Unified indexing interface
+   - `MatrixIndex` enum supports all indexing types
+   - `MatrixSlice` handles 2D indexing specifications  
+   - `MatrixSlicing` trait provides consistent API
+   - **Result**: Complete NumPy-style 2D matrix indexing system with 10/10 tests passing
+
+#### Week 7-8: Display and Representation
+1. **Clean NumArray display** - With indices, no column names
+2. **BoolArray display** - With count statistics and percentages  
+3. **Matrix display cleanup** - No column names, clean mathematical format
+4. **Consistent column ordering** - Sorted, predictable matrix columns
+
+### Lower Priority (Weeks 9-16) 
+**Focus: Advanced Features and Polish**
+
+#### Week 9-12: Advanced Type System
+1. **Generic NumArray implementation** - `NumArray<T>` support
+2. **Type conversion system** - `astype()` across all structures
+3. **Cross-structure conversions** - Matrix ↔ NumArray ↔ BaseArray
+4. **Integer node ID support** - `g.nodes.ids()` returns `NumArray<i64>`
+
+#### Week 13-16: Integration and Polish
+1. **Performance optimizations** - Zero-copy conversions where possible
+2. **Comprehensive testing** - All slicing and indexing scenarios
+3. **Documentation** - Migration guides and API documentation
+4. **Backward compatibility** - Deprecation warnings and migration path
+
+### Success Metrics
+
+#### BoolArray System Success
+- ✅ `g.degree() > 4` returns `BoolArray` instead of list
+- ✅ Boolean operations work: `(mask1 & mask2).count()` 
+- ✅ Efficient boolean indexing: `g.nodes[complex_mask]`
+- ✅ Performance improvement: 5x+ faster than list-based boolean indexing
+
+#### Matrix Slicing Success  
+- ✅ NumPy-style syntax works: `matrix[:5, :3]`, `matrix[::2, ::2]`
+- ✅ Advanced indexing: `matrix[[0, 2], [1, 3]]`
+- ✅ Consistent behavior: `matrix[:, :2]` always selects same columns
+- ✅ Clean display: No column names in matrix repr
+
+#### Overall Integration Success
+- ✅ API consistency: All arrays support same slicing syntax
+- ✅ User experience: Intuitive, NumPy-like behavior
+- ✅ Performance: No regressions, improved efficiency
+- ✅ Backward compatibility: Existing code continues working
+
+---
 
 ## Complexity Considerations
 

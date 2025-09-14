@@ -51,18 +51,40 @@ impl PyBaseArray {
         self.inner.len()
     }
     
-    /// Get single element by index
-    fn __getitem__(&self, py: Python, index: isize) -> PyResult<PyObject> {
-        let len = self.inner.len() as isize;
-        let actual_index = if index < 0 { len + index } else { index };
+    /// Advanced index access supporting multiple indexing types
+    /// Supports: 
+    /// - Single integer: array[5], array[-1]
+    /// - Integer lists: array[[0, 2, 5]]
+    /// - Boolean arrays: array[bool_mask]
+    /// - Slices: array[:5], array[::2], array[1:10:2]
+    fn __getitem__(&self, py: Python, index: &PyAny) -> PyResult<PyObject> {
+        use groggy::storage::array::AdvancedIndexing;
+        use crate::ffi::utils::indexing::python_index_to_slice_index;
         
-        if actual_index < 0 || actual_index >= len {
-            return Err(PyIndexError::new_err("Index out of range"));
+        // Handle simple integer case directly for performance
+        if let Ok(int_val) = index.extract::<isize>() {
+            let len = self.inner.len() as isize;
+            let actual_index = if int_val < 0 { len + int_val } else { int_val };
+            
+            if actual_index < 0 || actual_index >= len {
+                return Err(PyIndexError::new_err("Index out of range"));
+            }
+            
+            match self.inner.get(actual_index as usize) {
+                Some(attr_value) => return attr_value_to_python_value(py, attr_value),
+                None => return Err(PyIndexError::new_err("Index out of range")),
+            }
         }
         
-        match self.inner.get(actual_index as usize) {
-            Some(attr_value) => attr_value_to_python_value(py, attr_value),
-            None => Err(PyIndexError::new_err("Index out of range")),
+        // Handle advanced indexing cases
+        let slice_index = python_index_to_slice_index(py, index)?;
+        
+        match self.inner.get_slice(&slice_index) {
+            Ok(sliced_array) => {
+                let py_array = PyBaseArray { inner: sliced_array };
+                Ok(py_array.into_py(py))
+            }
+            Err(e) => Err(pyo3::exceptions::PyIndexError::new_err(format!("{}", e)))
         }
     }
 
@@ -328,10 +350,13 @@ impl PyBaseArray {
             result.push(comparison_result);
         }
         
-        Ok(result.to_object(py))
+        // Convert Vec<bool> to BoolArray
+        let bool_array = groggy::storage::BoolArray::new(result);
+        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        Ok(py_bool_array.into_py(py))
     }
 
-    /// Less than comparison (<) - returns Vec<bool> for boolean masking
+    /// Less than comparison (<) - returns BoolArray for boolean masking
     fn __lt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
         let mut result = Vec::new();
@@ -374,10 +399,13 @@ impl PyBaseArray {
             result.push(comparison_result);
         }
         
-        Ok(result.to_object(py))
+        // Convert Vec<bool> to BoolArray
+        let bool_array = groggy::storage::BoolArray::new(result);
+        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        Ok(py_bool_array.into_py(py))
     }
 
-    /// Greater than or equal comparison (>=) - returns Vec<bool> for boolean masking
+    /// Greater than or equal comparison (>=) - returns BoolArray for boolean masking
     fn __ge__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
         let mut result = Vec::new();
@@ -420,10 +448,13 @@ impl PyBaseArray {
             result.push(comparison_result);
         }
         
-        Ok(result.to_object(py))
+        // Convert Vec<bool> to BoolArray
+        let bool_array = groggy::storage::BoolArray::new(result);
+        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        Ok(py_bool_array.into_py(py))
     }
 
-    /// Less than or equal comparison (<=) - returns Vec<bool> for boolean masking
+    /// Less than or equal comparison (<=) - returns BoolArray for boolean masking
     fn __le__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
         let mut result = Vec::new();
@@ -466,10 +497,13 @@ impl PyBaseArray {
             result.push(comparison_result);
         }
         
-        Ok(result.to_object(py))
+        // Convert Vec<bool> to BoolArray
+        let bool_array = groggy::storage::BoolArray::new(result);
+        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        Ok(py_bool_array.into_py(py))
     }
 
-    /// Equality comparison (==) - returns Vec<bool> for boolean masking
+    /// Equality comparison (==) - returns BoolArray for boolean masking
     fn __eq__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
         let mut result = Vec::new();
@@ -503,16 +537,22 @@ impl PyBaseArray {
             result.push(comparison_result);
         }
         
-        Ok(result.to_object(py))
+        // Convert Vec<bool> to BoolArray
+        let bool_array = groggy::storage::BoolArray::new(result);
+        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        Ok(py_bool_array.into_py(py))
     }
 
-    /// Not equal comparison (!=) - returns Vec<bool> for boolean masking
+    /// Not equal comparison (!=) - returns BoolArray for boolean masking
     fn __ne__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         // Just negate the equality result
         let eq_result = self.__eq__(py, other)?;
         let bool_vec: Vec<bool> = eq_result.extract(py)?;
         let ne_result: Vec<bool> = bool_vec.into_iter().map(|x| !x).collect();
-        Ok(ne_result.to_object(py))
+        // Convert Vec<bool> to BoolArray
+        let bool_array = groggy::storage::BoolArray::new(ne_result);
+        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        Ok(py_bool_array.into_py(py))
     }
 }
 
