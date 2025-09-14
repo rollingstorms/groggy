@@ -554,6 +554,239 @@ impl PyBaseArray {
         let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
         Ok(py_bool_array.into_py(py))
     }
+    
+    /// Convert BaseArray to different numeric types when possible
+    fn astype(&self, py: Python, dtype: &str) -> PyResult<PyObject> {
+        match dtype {
+            "int64" | "i64" => {
+                // Try to convert all elements to i64
+                let mut int_values = Vec::new();
+                for value in self.inner.iter() {
+                    match value {
+                        groggy::AttrValue::Int(i) => int_values.push(*i),
+                        groggy::AttrValue::SmallInt(i) => int_values.push(*i as i64),
+                        groggy::AttrValue::Float(f) => int_values.push(f.round() as i64),
+                        groggy::AttrValue::Bool(b) => int_values.push(if *b { 1 } else { 0 }),
+                        _ => return Err(pyo3::exceptions::PyValueError::new_err(
+                            format!("Cannot convert {:?} to int64", value)
+                        ))
+                    }
+                }
+                let int_array = crate::ffi::storage::num_array::PyIntArray::new(int_values);
+                Ok(int_array.into_py(py))
+            }
+            "float64" | "f64" => {
+                // Try to convert all elements to f64  
+                let mut float_values = Vec::new();
+                for value in self.inner.iter() {
+                    match value {
+                        groggy::AttrValue::Int(i) => float_values.push(*i as f64),
+                        groggy::AttrValue::SmallInt(i) => float_values.push(*i as f64),
+                        groggy::AttrValue::Float(f) => float_values.push(*f as f64),
+                        groggy::AttrValue::Bool(b) => float_values.push(if *b { 1.0 } else { 0.0 }),
+                        _ => return Err(pyo3::exceptions::PyValueError::new_err(
+                            format!("Cannot convert {:?} to float64", value)
+                        ))
+                    }
+                }
+                let num_array = crate::ffi::storage::num_array::PyNumArray::new(float_values);
+                Ok(num_array.into_py(py))
+            }
+            "basearray" => {
+                // Return a copy of self
+                Ok(self.clone().into_py(py))
+            }
+            _ => Err(pyo3::exceptions::PyValueError::new_err(
+                format!("Unsupported dtype: {}. Supported: 'int64', 'float64', 'basearray'", dtype)
+            ))
+        }
+    }
+    
+    // === BASEARRAY INTELLIGENCE METHODS (Week 5-6: BaseArray Intelligence) ===
+    
+    /// Infer the optimal numeric type for this BaseArray
+    /// Analyzes all elements to determine the most appropriate NumericType
+    /// Returns None if the array contains non-numeric data
+    fn infer_numeric_type(&self) -> Option<String> {
+        use groggy::NumericType;
+        
+        if self.inner.is_empty() {
+            return None;
+        }
+        
+        let mut current_type: Option<NumericType> = None;
+        
+        for value in self.inner.iter() {
+            let value_type = match value {
+                groggy::AttrValue::Bool(_) => Some(NumericType::Bool),
+                groggy::AttrValue::SmallInt(_) => Some(NumericType::Int32),
+                groggy::AttrValue::Int(_) => Some(NumericType::Int64),
+                groggy::AttrValue::Float(_) => Some(NumericType::Float32),
+                groggy::AttrValue::Null => continue, // Skip nulls in type inference
+                _ => return None, // Non-numeric data found
+            };
+            
+            if let Some(vt) = value_type {
+                current_type = Some(match current_type {
+                    None => vt,
+                    Some(ct) => ct.promote_with(vt),
+                });
+            }
+        }
+        
+        current_type.map(|t| format!("{:?}", t))
+    }
+    
+    /// Convert BaseArray to NumArray if all elements are numeric
+    /// Returns appropriate numeric array type based on inferred type
+    fn to_num_array(&self, py: Python) -> PyResult<PyObject> {
+        if let Some(inferred_type) = self.infer_numeric_type() {
+            match inferred_type.as_str() {
+                "Bool" => {
+                    // Convert to BoolArray
+                    let bool_values: Result<Vec<bool>, _> = self.inner.iter().map(|v| {
+                        match v {
+                            groggy::AttrValue::Bool(b) => Ok(*b),
+                            groggy::AttrValue::Null => Ok(false), // Default null to false
+                            _ => Err("Non-boolean value found")
+                        }
+                    }).collect();
+                    
+                    match bool_values {
+                        Ok(values) => {
+                            let bool_array = groggy::storage::BoolArray::new(values);
+                            let py_bool = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+                            Ok(py_bool.into_py(py))
+                        }
+                        Err(e) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(e))
+                    }
+                }
+                "Int32" | "Int64" => {
+                    // Convert to IntArray (i64)
+                    let int_values: Result<Vec<i64>, _> = self.inner.iter().map(|v| {
+                        match v {
+                            groggy::AttrValue::Bool(b) => Ok(if *b { 1 } else { 0 }),
+                            groggy::AttrValue::SmallInt(i) => Ok(*i as i64),
+                            groggy::AttrValue::Int(i) => Ok(*i),
+                            groggy::AttrValue::Null => Ok(0), // Default null to 0
+                            _ => Err("Non-integer value found")
+                        }
+                    }).collect();
+                    
+                    match int_values {
+                        Ok(values) => {
+                            let int_array = crate::ffi::storage::num_array::PyIntArray::new(values);
+                            Ok(int_array.into_py(py))
+                        }
+                        Err(e) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(e))
+                    }
+                }
+                "Float32" | "Float64" => {
+                    // Convert to NumArray (f64)
+                    let float_values: Result<Vec<f64>, _> = self.inner.iter().map(|v| {
+                        match v {
+                            groggy::AttrValue::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
+                            groggy::AttrValue::SmallInt(i) => Ok(*i as f64),
+                            groggy::AttrValue::Int(i) => Ok(*i as f64),
+                            groggy::AttrValue::Float(f) => Ok(*f as f64),
+                            groggy::AttrValue::Null => Ok(0.0), // Default null to 0.0
+                            _ => Err("Non-float value found")
+                        }
+                    }).collect();
+                    
+                    match float_values {
+                        Ok(values) => {
+                            let num_array = crate::ffi::storage::num_array::PyNumArray::new(values);
+                            Ok(num_array.into_py(py))
+                        }
+                        Err(e) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(e))
+                    }
+                }
+                _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    format!("Unsupported numeric type: {}", inferred_type)
+                ))
+            }
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "BaseArray contains non-numeric data and cannot be converted to numeric array"
+            ))
+        }
+    }
+    
+    /// Check if this BaseArray can be converted to a numeric array
+    fn is_numeric(&self) -> bool {
+        self.infer_numeric_type().is_some()
+    }
+    
+    /// Get statistics about the numeric compatibility of this BaseArray
+    fn numeric_compatibility_info(&self, py: Python) -> PyResult<PyObject> {
+        use pyo3::types::PyDict;
+        
+        let info = PyDict::new(py);
+        
+        if self.inner.is_empty() {
+            info.set_item("is_numeric", false)?;
+            info.set_item("reason", "Array is empty")?;
+            return Ok(info.to_object(py));
+        }
+        
+        let total_count = self.inner.len();
+        let mut numeric_count = 0;
+        let mut null_count = 0;
+        let mut type_counts = std::collections::HashMap::new();
+        
+        for value in self.inner.iter() {
+            match value {
+                groggy::AttrValue::Bool(_) | 
+                groggy::AttrValue::SmallInt(_) |
+                groggy::AttrValue::Int(_) |
+                groggy::AttrValue::Float(_) => {
+                    numeric_count += 1;
+                    let type_name = match value {
+                        groggy::AttrValue::Bool(_) => "bool",
+                        groggy::AttrValue::SmallInt(_) => "int32",
+                        groggy::AttrValue::Int(_) => "int64", 
+                        groggy::AttrValue::Float(_) => "float32",
+                        _ => unreachable!()
+                    };
+                    *type_counts.entry(type_name.to_string()).or_insert(0) += 1;
+                }
+                groggy::AttrValue::Null => null_count += 1,
+                _ => {
+                    let type_name = match value {
+                        groggy::AttrValue::Text(_) => "text",
+                        groggy::AttrValue::CompactText(_) => "compact_text",
+                        groggy::AttrValue::FloatVec(_) => "float_vec",
+                        groggy::AttrValue::Bytes(_) => "bytes",
+                        _ => "other"
+                    };
+                    *type_counts.entry(type_name.to_string()).or_insert(0) += 1;
+                }
+            }
+        }
+        
+        let is_numeric = numeric_count + null_count == total_count;
+        let numeric_percentage = (numeric_count as f64 / total_count as f64) * 100.0;
+        
+        info.set_item("is_numeric", is_numeric)?;
+        info.set_item("total_count", total_count)?;
+        info.set_item("numeric_count", numeric_count)?;
+        info.set_item("null_count", null_count)?;
+        info.set_item("numeric_percentage", numeric_percentage)?;
+        info.set_item("type_counts", type_counts)?;
+        
+        if let Some(inferred_type) = self.infer_numeric_type() {
+            info.set_item("inferred_numeric_type", inferred_type)?;
+            info.set_item("recommended_conversion", "to_num_array()")?;
+        } else if numeric_count > 0 {
+            info.set_item("reason", "Contains mixed numeric and non-numeric data")?;
+            info.set_item("suggestion", "Filter out non-numeric values first")?;
+        } else {
+            info.set_item("reason", "No numeric data found")?;
+        }
+        
+        Ok(info.to_object(py))
+    }
 }
 
 /// Python wrapper for ArrayIterator<AttrValue> that supports method chaining

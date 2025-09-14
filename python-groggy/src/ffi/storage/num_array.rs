@@ -323,6 +323,31 @@ impl PyNumArray {
         }
     }
     
+    /// Convert to different numeric type or structure
+    fn astype(&self, dtype: &str) -> PyResult<PyObject> {
+        match dtype {
+            "float64" | "f64" => {
+                Python::with_gil(|py| Ok(self.clone().into_py(py)))
+            }
+            "int64" | "i64" => {
+                let int_values: Vec<i64> = self.inner.iter().map(|&x| x.round() as i64).collect();
+                let int_array = PyIntArray::new(int_values);
+                Python::with_gil(|py| Ok(int_array.into_py(py)))
+            }
+            "basearray" => {
+                use groggy::types::AttrValue;
+                let attr_values: Vec<AttrValue> = self.inner.iter()
+                    .map(|&x| AttrValue::Float(x as f32))
+                    .collect();
+                let base_array = crate::ffi::storage::array::PyBaseArray::from_attr_values(attr_values)?;
+                Python::with_gil(|py| Ok(base_array.into_py(py)))
+            }
+            _ => Err(pyo3::exceptions::PyValueError::new_err(
+                format!("Unsupported dtype: {}. Supported: 'float64', 'int64', 'basearray'", dtype)
+            ))
+        }
+    }
+    
     /// Get descriptive statistics summary as a dictionary
     // TODO: Fix linking issue with describe method
     // fn describe(&self) -> PyResult<PyObject> {
@@ -548,7 +573,7 @@ impl PyIntArray {
         )
     }
     
-    /// Convert to float NumArray for numerical operations
+    /// Convert to different numeric type or structure
     fn astype(&self, dtype: &str) -> PyResult<PyObject> {
         match dtype {
             "float64" | "f64" => {
@@ -559,8 +584,16 @@ impl PyIntArray {
             "int64" | "i64" => {
                 Python::with_gil(|py| Ok(self.clone().into_py(py)))
             }
+            "basearray" => {
+                use groggy::types::AttrValue;
+                let attr_values: Vec<AttrValue> = self.inner.iter()
+                    .map(|&x| AttrValue::Int(x))
+                    .collect();
+                let base_array = crate::ffi::storage::array::PyBaseArray::from_attr_values(attr_values)?;
+                Python::with_gil(|py| Ok(base_array.into_py(py)))
+            }
             _ => Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Unsupported dtype: {}. Supported: 'int64', 'float64'", dtype)
+                format!("Unsupported dtype: {}. Supported: 'int64', 'float64', 'basearray'", dtype)
             ))
         }
     }
