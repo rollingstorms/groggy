@@ -862,6 +862,123 @@ impl PyBaseTable {
         
         Ok(Self::from_table(result))
     }
+    
+    // === SMART ACCESS METHODS (Week 3-4: Smart Table Access) ===
+    
+    /// Get column information for type introspection
+    /// Returns a dictionary with column metadata including type, shape, and statistics
+    pub fn column_info(&self, py: Python) -> PyResult<PyObject> {
+        use pyo3::types::PyDict;
+        use groggy::NumericType;
+        
+        let info_dict = PyDict::new(py);
+        
+        for column_name in self.table.column_names() {
+            if let Some(column) = self.table.column(column_name) {
+                let column_dict = PyDict::new(py);
+                
+                // Basic info
+                column_dict.set_item("length", column.len())?;
+                column_dict.set_item("non_null_count", column.iter().filter(|v| !matches!(v, AttrValue::Null)).count())?;
+                
+                // Type analysis
+                let mut type_counts = std::collections::HashMap::new();
+                let mut numeric_type: Option<NumericType> = None;
+                let mut is_all_numeric = true;
+                
+                for value in column.iter() {
+                    let type_name = match value {
+                        AttrValue::Bool(_) => {
+                            if numeric_type.is_none() { numeric_type = Some(NumericType::Bool); }
+                            "bool"
+                        },
+                        AttrValue::SmallInt(_) => {
+                            if numeric_type.is_none() { numeric_type = Some(NumericType::Int32); }
+                            else if let Some(NumericType::Bool) = numeric_type { numeric_type = Some(NumericType::Int32); }
+                            "int32"
+                        },
+                        AttrValue::Int(_) => {
+                            if numeric_type.is_none() { numeric_type = Some(NumericType::Int64); }
+                            else { numeric_type = Some(numeric_type.unwrap().promote_with(NumericType::Int64)); }
+                            "int64"
+                        },
+                        AttrValue::Float(_) => {
+                            if numeric_type.is_none() { numeric_type = Some(NumericType::Float32); }
+                            else { numeric_type = Some(numeric_type.unwrap().promote_with(NumericType::Float32)); }
+                            "float32"
+                        },
+                        AttrValue::Text(_) => { is_all_numeric = false; "text" },
+                        AttrValue::CompactText(_) => { is_all_numeric = false; "compact_text" },
+                        AttrValue::FloatVec(_) => { is_all_numeric = false; "float_vec" },
+                        AttrValue::Bytes(_) => { is_all_numeric = false; "bytes" },
+                        AttrValue::CompressedText(_) => { is_all_numeric = false; "compressed_text" },
+                        AttrValue::CompressedFloatVec(_) => { is_all_numeric = false; "compressed_float_vec" },
+                        AttrValue::Null => "null",
+                        AttrValue::SubgraphRef(_) => { is_all_numeric = false; "subgraph_ref" },
+                        AttrValue::NodeArray(_) => { is_all_numeric = false; "node_array" },
+                        AttrValue::EdgeArray(_) => { is_all_numeric = false; "edge_array" },
+                    };
+                    
+                    *type_counts.entry(type_name.to_string()).or_insert(0) += 1;
+                }
+                
+                column_dict.set_item("type_counts", type_counts)?;
+                column_dict.set_item("is_numeric", is_all_numeric)?;
+                
+                if let Some(nt) = numeric_type {
+                    column_dict.set_item("numeric_type", format!("{:?}", nt))?;
+                    column_dict.set_item("recommended_array_type", match nt {
+                        NumericType::Bool => "BoolArray",
+                        NumericType::Int32 | NumericType::Int64 => "IntArray", 
+                        NumericType::Float32 | NumericType::Float64 => "NumArray",
+                    })?;
+                }
+                
+                info_dict.set_item(column_name, column_dict)?;
+            }
+        }
+        
+        Ok(info_dict.to_object(py))
+    }
+    
+    /// Get column as raw BaseArray (always returns BaseArray regardless of type)
+    pub fn get_column_raw(&self, py: Python, column_name: &str) -> PyResult<PyObject> {
+        if let Some(column) = self.table.column(column_name) {
+            let attr_values = column.data();
+            let base = groggy::storage::array::BaseArray::from_attr_values(attr_values.clone());
+            let py_base = PyBaseArray { inner: base };
+            Ok(py_base.into_py(py))
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Column '{}' not found", column_name)
+            ))
+        }
+    }
+    
+    /// Get column as numeric array if possible (returns NumArray/IntArray or error)
+    pub fn get_column_numeric(&self, py: Python, column_name: &str) -> PyResult<PyObject> {
+        if let Some(column) = self.table.column(column_name) {
+            let attr_values = column.data();
+            
+            // Try NumArray first (for floats)
+            if let Ok(num_array) = crate::ffi::storage::num_array::PyNumArray::from_attr_values(attr_values.clone()) {
+                Ok(num_array.into_py(py))
+            }
+            // Try IntArray (for integers) 
+            else if let Ok(int_array) = crate::ffi::storage::num_array::PyIntArray::from_attr_values(attr_values.clone()) {
+                Ok(int_array.into_py(py))
+            }
+            else {
+                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    format!("Column '{}' contains non-numeric data and cannot be converted to numeric array", column_name)
+                ))
+            }
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                format!("Column '{}' not found", column_name)
+            ))
+        }
+    }
 
 }
 
