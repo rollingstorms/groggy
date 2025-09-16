@@ -147,7 +147,7 @@ impl MatrixSlicing for GraphMatrix {
         
         // Create new matrix
         let mut result = GraphMatrix::from_arrays(new_columns)?;
-        result.set_column_names(new_column_names)?;
+        result.set_column_names(new_column_names);
         Ok(result)
     }
     
@@ -178,7 +178,7 @@ impl MatrixSlicing for GraphMatrix {
             ));
         }
         
-        Ok(self.get_column_internal(col_idx)?.clone())
+        Ok(NumArray::new(self.get_column_internal(col_idx)?))
     }
     
     fn get_rows(&self, row_indices: &[usize]) -> GraphResult<GraphMatrix> {

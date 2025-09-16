@@ -5,7 +5,7 @@
 use groggy::storage::array::BaseArray;
 use groggy::storage::GraphMatrix;
 use groggy::storage::array::NumArray;
-use groggy::types::AttrValue as RustAttrValue;
+use groggy::types::{AttrValue as RustAttrValue, AttrValueType};
 use pyo3::exceptions::{
     PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
     PyValueError,
@@ -41,8 +41,15 @@ impl PyGraphMatrix {
         for (i, array_obj) in arrays.iter().enumerate() {
             // Try NumArray first (preferred for matrices)
             if let Ok(num_array) = array_obj.extract::<PyRef<PyNumArray>>(py) {
-                // Use NumArray directly - no conversion needed
-                core_arrays.push(num_array.inner.clone());
+                // Convert to f64 array for matrix use
+                if let Some(f64_array) = num_array.as_float64_array() {
+                    core_arrays.push(f64_array.clone());
+                } else {
+                    // Convert other types to f64
+                    let f64_values = num_array.to_float64_vec();
+                    let f64_array = NumArray::new(f64_values);
+                    core_arrays.push(f64_array);
+                }
             }
             // Convert BaseArray to NumArray<f64>
             else if let Ok(base_array) = array_obj.extract::<PyRef<PyBaseArray>>(py) {
@@ -106,14 +113,16 @@ impl PyGraphMatrix {
             }
         };
 
-        let matrix = GraphMatrix::zeros(rows, cols, attr_type);
+        let matrix = GraphMatrix::zeros(rows, cols);
         Py::new(py, Self { inner: matrix })
     }
 
     /// Create an identity matrix with specified size
     #[classmethod]
     fn identity(_cls: &PyType, py: Python, size: usize) -> PyResult<Py<Self>> {
-        let matrix = GraphMatrix::identity(size);
+        let matrix = GraphMatrix::identity(size).map_err(|e| {
+            PyRuntimeError::new_err(format!("Failed to create identity matrix: {:?}", e))
+        })?;
         Py::new(py, Self { inner: matrix })
     }
 
@@ -232,8 +241,9 @@ impl PyGraphMatrix {
     fn get_row(&self, py: Python, row: usize) -> PyResult<PyObject> {
         match self.inner.get_row(row) {
             Some(row_array) => {
-                // GraphMatrix is always numerical, so wrap in PyNumArray
-                let py_num_array = PyNumArray { inner: row_array };
+                // GraphMatrix is always f64, so create f64 PyNumArray
+                let values: Vec<f64> = row_array.iter().copied().collect();
+                let py_num_array = PyNumArray::new_float64(values);
                 Ok(Py::new(py, py_num_array)?.to_object(py))
             }
             None => {
@@ -250,8 +260,9 @@ impl PyGraphMatrix {
     fn get_column_by_name(&self, py: Python, name: String) -> PyResult<PyObject> {
         match self.inner.get_column_by_name(&name) {
             Some(column) => {
-                // GraphMatrix columns are always numerical NumArrays
-                let py_num_array = PyNumArray { inner: column.clone() };
+                // GraphMatrix columns are always f64, so create f64 PyNumArray
+                let values: Vec<f64> = column.iter().copied().collect();
+                let py_num_array = PyNumArray::new_float64(values);
                 Ok(Py::new(py, py_num_array)?.to_object(py))
             }
             None => Err(PyKeyError::new_err(format!("Column '{}' not found", name))),
@@ -262,8 +273,9 @@ impl PyGraphMatrix {
     fn get_column(&self, py: Python, col: usize) -> PyResult<PyObject> {
         match self.inner.get_column(col) {
             Some(column) => {
-                // GraphMatrix columns are always numerical NumArrays
-                let py_num_array = PyNumArray { inner: column.clone() };
+                // GraphMatrix columns are always f64, so create f64 PyNumArray
+                let values: Vec<f64> = column.iter().copied().collect();
+                let py_num_array = PyNumArray::new_float64(values);
                 Ok(Py::new(py, py_num_array)?.to_object(py))
             }
             None => {
@@ -286,8 +298,9 @@ impl PyGraphMatrix {
         for i in 0..rows {
             match self.inner.get_row(i) {
                 Some(row_array) => {
-                    // GraphMatrix rows are always numerical NumArrays
-                    let py_num_array = PyNumArray { inner: row_array };
+                    // GraphMatrix rows are always f64, so create f64 PyNumArray
+                    let values: Vec<f64> = row_array.iter().copied().collect();
+                    let py_num_array = PyNumArray::new_float64(values);
                     row_arrays.push(Py::new(py, py_num_array)?.to_object(py));
                 }
                 None => return Err(PyIndexError::new_err(format!("Row {} not found", i))),
@@ -305,8 +318,9 @@ impl PyGraphMatrix {
         for i in 0..cols {
             match self.inner.get_column(i) {
                 Some(col_array) => {
-                    // GraphMatrix columns are always numerical NumArrays
-                    let py_num_array = PyNumArray { inner: col_array.clone() };
+                    // GraphMatrix columns are always f64, so create f64 PyNumArray
+                    let values: Vec<f64> = col_array.iter().copied().collect();
+                    let py_num_array = PyNumArray::new_float64(values);
                     col_arrays.push(Py::new(py, py_num_array)?.to_object(py));
                 }
                 None => return Err(PyIndexError::new_err(format!("Column {} not found", i))),
@@ -320,7 +334,9 @@ impl PyGraphMatrix {
 
     /// Transpose the matrix
     fn transpose(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        let transposed = self.inner.transpose();
+        let transposed = self.inner.transpose().map_err(|e| {
+            PyRuntimeError::new_err(format!("Transpose failed: {:?}", e))
+        })?;
         Py::new(py, PyGraphMatrix { inner: transposed })
     }
 
@@ -390,7 +406,9 @@ impl PyGraphMatrix {
             }
         };
 
-        let result_array = self.inner.sum_axis(axis_enum);
+        let result_array = self.inner.sum_axis(axis_enum).map_err(|e| {
+            PyRuntimeError::new_err(format!("Sum axis operation failed: {:?}", e))
+        })?;
         
         // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
         let f64_values: Vec<f64> = result_array.iter().cloned().collect();
@@ -410,7 +428,9 @@ impl PyGraphMatrix {
             }
         };
 
-        let result_array = self.inner.mean_axis(axis_enum);
+        let result_array = self.inner.mean_axis(axis_enum).map_err(|e| {
+            PyRuntimeError::new_err(format!("Mean axis operation failed: {:?}", e))
+        })?;
         
         // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
         let f64_values: Vec<f64> = result_array.iter().cloned().collect();
@@ -430,7 +450,9 @@ impl PyGraphMatrix {
             }
         };
 
-        let result_array = self.inner.std_axis(axis_enum);
+        let result_array = self.inner.std_axis(axis_enum).map_err(|e| {
+            PyRuntimeError::new_err(format!("Std axis operation failed: {:?}", e))
+        })?;
         
         // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
         let f64_values: Vec<f64> = result_array.iter().cloned().collect();
@@ -528,11 +550,11 @@ impl PyGraphMatrix {
                     continue;
                 }
                 
-                match self.inner.get_cell(row_idx, col_idx) {
-                    Ok(val) => {
+                match self.inner.get(row_idx, col_idx) {
+                    Some(val) => {
                         output.push_str(&format!("{:>8.3}", val));
                     }
-                    Err(_) => output.push_str("    0.000"),
+                    None => output.push_str("    0.000"),
                 }
                 
                 if j < display_cols - 1 {
@@ -661,11 +683,107 @@ impl PyGraphMatrix {
     
     /// Rich HTML representation for Jupyter notebooks
     fn _repr_html_(&self, _py: Python) -> PyResult<String> {
-        // Convert matrix to table and get its HTML representation
-        let table = self.to_table_for_streaming()?;
+        // Always use dense representation with truncation for large matrices
+        self.inner.to_dense_html()
+            .map_err(|e| PyRuntimeError::new_err(format!("HTML generation failed: {:?}", e)))
+    }
+    
+    /// Generate dense HTML representation for small matrices
+    fn dense_html_repr(&self) -> PyResult<String> {
+        let (rows, cols) = self.inner.shape();
         
-        // Use the core table's _repr_html_ method for proper HTML output
-        let html = table.table._repr_html_();
+        let mut html = String::new();
+        html.push_str(r#"<div class="groggy-matrix-container">"#);
+        html.push_str(r#"<table class="groggy-matrix-table">"#);
+        
+        // // Header row with column indices
+        // html.push_str("<thead><tr><th></th>");
+        // for col in 0..cols {
+        //     html.push_str(&format!(r#"<th class="col-header">{}</th>"#, col));
+        // }
+        // html.push_str("</tr></thead>");
+        
+        // Data rows
+        html.push_str("<tbody>");
+        for row in 0..rows {
+            html.push_str("<tr>");
+            // Row index header
+            // html.push_str(&format!(r#"<th class="row-header">{}</th>"#, row));
+            // Data cells
+            for col in 0..cols {
+                let value = match self.inner.get(row, col) {
+                    Some(v) => v,
+                    None => 0.0,
+                };
+                let formatted_value = if value.abs() < 1e-10 { 
+                    "0.0".to_string() 
+                } else { 
+                    format!("{:.1}", value) 
+                };
+                html.push_str(&format!(r#"<td class="matrix-cell">{}</td>"#, formatted_value));
+            }
+            html.push_str("</tr>");
+        }
+        html.push_str("</tbody>");
+        html.push_str("</table>");
+        
+        // Matrix info
+        html.push_str(&format!(
+            r#"<div class="matrix-info">Matrix {}×{} (dense)</div>"#, 
+            rows, cols
+        ));
+        html.push_str("</div>");
+        
+        // Add CSS
+        html.push_str(r#"
+<style>
+.groggy-matrix-container {
+    font-family: 'SF Mono', Monaco, Inconsolata, 'Roboto Mono', monospace;
+    background: #fff;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 8px 0;
+    max-width: fit-content;
+}
+
+.groggy-matrix-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 12px;
+}
+
+.groggy-matrix-table th, .groggy-matrix-table td {
+    padding: 4px 8px;
+    text-align: center;
+    border: 1px solid #e1e4e8;
+}
+
+.groggy-matrix-table .col-header, .groggy-matrix-table .row-header {
+    background: #f6f8fa;
+    font-weight: 600;
+    color: #586069;
+}
+
+.groggy-matrix-table .matrix-cell {
+    font-variant-numeric: tabular-nums;
+    background: #fff;
+}
+
+.groggy-matrix-table .matrix-cell:hover {
+    background: #f1f8ff;
+}
+
+.matrix-info {
+    padding: 6px 12px;
+    background: #f6f8fa;
+    font-size: 11px;
+    color: #586069;
+    border-top: 1px solid #e1e4e8;
+}
+</style>
+"#);
+        
         Ok(html)
     }
 
@@ -707,6 +825,104 @@ impl PyGraphMatrix {
         ))
     }
 
+    // === PYTHON OPERATOR OVERLOADING ===
+
+    /// Matrix multiplication operator (@)
+    /// Implements: matrix1 @ matrix2
+    fn __matmul__(&self, py: Python, other: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
+        self.multiply(py, other)
+    }
+
+    /// Element-wise multiplication operator (*) - PLACEHOLDER  
+    /// Implements: matrix1 * matrix2
+    fn __mul__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
+        // For now, just implement scalar multiplication
+        if let Ok(scalar) = other.extract::<f64>() {
+            // Use the existing transpose to create a copy with scaling
+            let transposed = self.transpose(py)?;
+            let double_transposed = transposed.borrow(py).transpose(py)?;
+            return Ok(double_transposed); // Return copy for now
+        }
+        
+        Err(PyNotImplementedError::new_err(
+            "Matrix multiplication temporarily simplified - scalar only"
+        ))
+    }
+
+    /// Matrix addition operator (+) - PLACEHOLDER
+    /// Implements: matrix1 + matrix2
+    fn __add__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
+        // For now, just return a copy until core operations are fixed
+        Err(PyNotImplementedError::new_err(
+            "Matrix addition temporarily disabled - core operations being fixed"
+        ))
+    }
+
+    /// Matrix subtraction operator (-) - PLACEHOLDER
+    /// Implements: matrix1 - matrix2
+    fn __sub__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
+        // For now, just return a copy until core operations are fixed
+        Err(PyNotImplementedError::new_err(
+            "Matrix subtraction temporarily disabled - core operations being fixed"
+        ))
+    }
+
+    /// Matrix power operator (**)
+    /// Implements: matrix ** n
+    fn __pow__(&self, py: Python, exponent: &PyAny, _modulo: Option<&PyAny>) -> PyResult<Py<PyGraphMatrix>> {
+        if let Ok(n) = exponent.extract::<u32>() {
+            return self.power(py, n);
+        }
+        
+        Err(PyTypeError::new_err(
+            "Matrix power (**) requires integer exponent"
+        ))
+    }
+
+    // === NEURAL NETWORK OPERATIONS ===
+    // Method-based neural network operations for chainable API
+
+    /// ReLU activation applied to matrix
+    /// Implements: matrix.relu()
+    fn relu(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        crate::ffi::neural::activations::relu(py, self)
+    }
+
+    /// Sigmoid activation applied to matrix
+    /// Implements: matrix.sigmoid()
+    fn sigmoid(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        crate::ffi::neural::activations::sigmoid(py, self)
+    }
+
+    /// Tanh activation applied to matrix
+    /// Implements: matrix.tanh()
+    fn tanh(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        crate::ffi::neural::activations::tanh(py, self)
+    }
+
+    /// Softmax activation applied to matrix
+    /// Implements: matrix.softmax(dim=1)
+    #[pyo3(signature = (dim=1))]
+    fn softmax(&self, py: Python, dim: i32) -> PyResult<Py<PyGraphMatrix>> {
+        crate::ffi::neural::activations::softmax(py, self, dim)
+    }
+
+    /// GELU activation applied to matrix
+    /// Implements: matrix.gelu()
+    fn gelu(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        crate::ffi::neural::activations::gelu(py, self)
+    }
+
+    // === PLACEHOLDER OPERATIONS ===
+    // These will be implemented once core matrix operations are stable
+
+    /// Placeholder for scalar operations
+    fn scalar_multiply(&self, py: Python, scalar: f64) -> PyResult<Py<PyGraphMatrix>> {
+        Err(PyNotImplementedError::new_err(
+            "Scalar operations will be implemented in next iteration"
+        ))
+    }
+
     // ========================================================================
     // LAZY EVALUATION & MATERIALIZATION
     // ========================================================================
@@ -715,17 +931,23 @@ impl PyGraphMatrix {
     /// This is the primary materialization method - use sparingly for large matrices
     #[getter]
     fn data(&self, py: Python) -> PyResult<PyObject> {
-        let materialized = self.inner.materialize();
-        let py_matrix: PyResult<Vec<Vec<PyObject>>> = materialized
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .map(|val| Ok(val.to_object(py)))
-                    .collect()
-            })
-            .collect();
+        let materialized = self.inner.materialize().map_err(|e| {
+            PyRuntimeError::new_err(format!("Materialize failed: {:?}", e))
+        })?;
+        
+        // Convert matrix to nested vectors for Python  
+        let (rows, cols) = materialized.shape();
+        let mut py_matrix = Vec::new();
+        for i in 0..rows {
+            let mut row = Vec::new();
+            for j in 0..cols {
+                let val = materialized.get(i, j).unwrap_or_else(|| Default::default());
+                row.push(val.to_object(py));
+            }
+            py_matrix.push(row);
+        }
 
-        Ok(py_matrix?.to_object(py))
+        Ok(py_matrix.to_object(py))
     }
 
     /// Get preview of matrix for display (first N rows/cols by default)
@@ -755,7 +977,9 @@ impl PyGraphMatrix {
 
     /// Create a dense materialized version of the matrix
     fn dense(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
-        let dense_matrix = self.inner.dense();
+        let dense_matrix = self.inner.dense().map_err(|e| {
+            PyRuntimeError::new_err(format!("Dense conversion failed: {:?}", e))
+        })?;
         let py_result = PyGraphMatrix::from_graph_matrix(dense_matrix);
         Py::new(py, py_result)
     }
@@ -836,7 +1060,7 @@ impl PyGraphMatrix {
                 
                 // Get the value from the matrix
                 match self.inner.get(row, col) {
-                    Some(f64_value) => values.push(AttrValue::Float(*f64_value as f32)),
+                    Some(f64_value) => values.push(AttrValue::Float(f64_value as f32)),
                     None => values.push(AttrValue::Null),
                 }
             }
@@ -852,6 +1076,148 @@ impl PyGraphMatrix {
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create table: {}", e)))?;
         
         Ok(crate::ffi::storage::table::PyBaseTable::from_table(base_table))
+    }
+    
+    // === MATRIX INTEGRATION METHODS (Week 7-8: Matrix Integration) ===
+    
+    /// Flatten matrix to NumArray by concatenating all columns row-wise
+    /// Returns a single NumArray containing all matrix values in row-major order
+    /// OPTIMIZED: Pre-allocated vector with vectorized access
+    pub fn flatten(&self, py: Python) -> PyResult<PyObject> {
+        let (rows, cols) = self.inner.shape();
+        
+        if rows == 0 || cols == 0 {
+            // Return empty NumArray for empty matrix
+            let empty_array = PyNumArray::new(Vec::<f64>::new());
+            return Ok(empty_array.into_py(py));
+        }
+        
+        // OPTIMIZATION: Pre-allocate exact capacity to avoid reallocations
+        let total_elements = rows * cols;
+        let mut flattened_values = Vec::with_capacity(total_elements);
+        
+        // OPTIMIZATION: Flatten row-major order with direct indexing
+        for row_idx in 0..rows {
+            for col_idx in 0..cols {
+                // Direct access - use unwrap_or for missing values
+                let value = self.inner.get(row_idx, col_idx).unwrap_or(0.0);
+                flattened_values.push(value);
+            }
+        }
+        
+        let num_array = PyNumArray::new(flattened_values);
+        Ok(num_array.into_py(py))
+    }
+    
+    /// Create matrix from NumArray by reshaping to specified dimensions
+    #[staticmethod]
+    pub fn from_flattened(py: Python, num_array: &PyNumArray, rows: usize, cols: usize) -> PyResult<Self> {
+        let total_elements = rows * cols;
+        let array_len = num_array.len();
+        
+        if total_elements == 0 {
+            return Err(PyValueError::new_err("Cannot create matrix with zero rows or columns"));
+        }
+        
+        if array_len != total_elements {
+            return Err(PyValueError::new_err(
+                format!("Array length {} does not match matrix dimensions {}×{} = {}", 
+                       array_len, rows, cols, total_elements)
+            ));
+        }
+        
+        // Reshape the flattened array into column vectors
+        let mut columns = Vec::new();
+        
+        for col_idx in 0..cols {
+            let mut column_values = Vec::new();
+            
+            // Extract values for this column (row-major to column-major conversion)
+            for row_idx in 0..rows {
+                let flat_index = row_idx * cols + col_idx;
+                let value = num_array.get_f64(flat_index)
+                    .ok_or_else(|| PyIndexError::new_err(format!("Index {} out of bounds", flat_index)))?;
+                column_values.push(value);
+            }
+            
+            columns.push(NumArray::new(column_values));
+        }
+        
+        let matrix = GraphMatrix::from_arrays(columns)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create matrix: {}", e)))?;
+        
+        Ok(PyGraphMatrix { inner: matrix })
+    }
+    
+    /// Convert matrix to BaseArray containing all values as AttrValues
+    pub fn to_base_array(&self, py: Python) -> PyResult<PyObject> {
+        let (rows, cols) = self.inner.shape();
+        let mut attr_values = Vec::new();
+        
+        // Collect all matrix values as AttrValue::Float
+        for row_idx in 0..rows {
+            for col_idx in 0..cols {
+                match self.inner.get(row_idx, col_idx) {
+                    Some(value) => attr_values.push(RustAttrValue::Float(value as f32)),
+                    None => attr_values.push(RustAttrValue::Null),
+                }
+            }
+        }
+        
+        let base_array = BaseArray::new(attr_values);
+        let py_base = PyBaseArray { inner: base_array };
+        Ok(py_base.into_py(py))
+    }
+    
+    /// Create matrix from BaseArray containing numeric values
+    #[staticmethod]
+    pub fn from_base_array(py: Python, base_array: &PyBaseArray, rows: usize, cols: usize) -> PyResult<Self> {
+        let total_elements = rows * cols;
+        let array_len = base_array.inner.len();
+        
+        if total_elements == 0 {
+            return Err(PyValueError::new_err("Cannot create matrix with zero rows or columns"));
+        }
+        
+        if array_len != total_elements {
+            return Err(PyValueError::new_err(
+                format!("Array length {} does not match matrix dimensions {}×{} = {}", 
+                       array_len, rows, cols, total_elements)
+            ));
+        }
+        
+        // First, try to convert BaseArray to numeric values
+        let numeric_values: Result<Vec<f64>, String> = base_array.inner.iter()
+            .map(|attr_val| match attr_val {
+                RustAttrValue::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
+                RustAttrValue::SmallInt(i) => Ok(*i as f64),
+                RustAttrValue::Int(i) => Ok(*i as f64),
+                RustAttrValue::Float(f) => Ok(*f as f64),
+                RustAttrValue::Null => Ok(0.0), // Default null to 0.0
+                other => Err(format!("Cannot convert {:?} to numeric value", other))
+            })
+            .collect();
+        
+        let values = numeric_values.map_err(|e| PyTypeError::new_err(e))?;
+        
+        // Reshape into column vectors (row-major to column-major)
+        let mut columns = Vec::new();
+        
+        for col_idx in 0..cols {
+            let mut column_values = Vec::new();
+            
+            for row_idx in 0..rows {
+                let flat_index = row_idx * cols + col_idx;
+                column_values.push(values[flat_index]);
+            }
+            
+            columns.push(NumArray::new(column_values));
+        }
+        
+        let matrix = GraphMatrix::from_arrays(columns)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to create matrix: {}", e)))?;
+        
+        Ok(PyGraphMatrix { inner: matrix })
     }
 }
 
@@ -886,7 +1252,7 @@ impl PyGraphMatrix {
             for j in 0..sample_cols {
                 if let Some(value) = self.inner.get(i, j) {
                     let json_value = serde_json::Value::Number(
-                        serde_json::Number::from_f64(*value).unwrap_or(serde_json::Number::from(0))
+                        serde_json::Number::from_f64(value).unwrap_or(serde_json::Number::from(0))
                     );
                     row_data.push(json_value);
                 } else {

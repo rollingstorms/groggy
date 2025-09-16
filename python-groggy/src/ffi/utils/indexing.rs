@@ -5,7 +5,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PySlice, PyList, PyTuple};
 use groggy::storage::array::{SliceIndex, BoolArray};
-use crate::ffi::storage::bool_array::PyBoolArray;
+// PyBoolArray functionality integrated into unified NumArray
 
 /// Convert Python indexing object to SliceIndex
 pub fn python_index_to_slice_index(py: Python, index: &PyAny) -> PyResult<SliceIndex> {
@@ -66,9 +66,14 @@ pub fn python_index_to_slice_index(py: Python, index: &PyAny) -> PyResult<SliceI
         return Ok(SliceIndex::List(int_indices));
     }
     
-    // Handle BoolArray
-    if let Ok(bool_array) = index.extract::<PyRef<PyBoolArray>>() {
-        return Ok(SliceIndex::BoolArray(bool_array.inner.clone()));
+    // Handle NumArray with bool dtype (replaces BoolArray)
+    if let Ok(num_array) = index.extract::<PyRef<crate::ffi::storage::num_array::PyNumArray>>() {
+        if num_array.get_dtype() == "bool" {
+            // Extract bool data from unified NumArray
+            let bool_values: Vec<bool> = num_array.get_list(py)?.extract(py)?;
+            let bool_array = groggy::storage::BoolArray::new(bool_values);
+            return Ok(SliceIndex::BoolArray(bool_array));
+        }
     }
     
     // Handle Python list of booleans

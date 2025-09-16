@@ -876,6 +876,28 @@ impl PyNodesAccessor {
         
         Ok(Py::new(py, meta_accessor)?.to_object(py))
     }
+
+    /// Convert node attributes to matrix
+    /// Implements: g.nodes.matrix()
+    fn matrix(&self, py: Python) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
+        use crate::ffi::storage::matrix::PyGraphMatrix;
+        
+        let graph_ref = self.graph.borrow();
+        let matrix = graph_ref.to_matrix_f64()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Matrix conversion failed: {}", e)))?;
+        
+        Py::new(py, PyGraphMatrix { inner: matrix })
+    }
+
+    /// Create a NodesArray containing this single accessor (for delegation chaining)
+    /// Implements: g.nodes.array() -> enables array operations and chaining
+    fn array(&self, py: Python) -> PyResult<Py<crate::ffi::storage::nodes_array::PyNodesArray>> {
+        use crate::ffi::storage::nodes_array::PyNodesArray;
+        
+        // Create a NodesArray with just this accessor to enable delegation
+        let nodes_array = PyNodesArray::new(vec![self.clone()]);
+        Py::new(py, nodes_array)
+    }
 }
 
 impl PyNodesAccessor {
@@ -1786,6 +1808,34 @@ impl PyEdgesAccessor {
         // Convert to f64 for NumArray consistency
         let values: Vec<f64> = targets.into_iter().map(|id| id as f64).collect();
         Ok(PyNumArray::new(values))
+    }
+
+    /// Convert edge attributes to matrix
+    /// Implements: g.edges.matrix()
+    fn matrix(&self, py: Python) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
+        use crate::ffi::storage::matrix::PyGraphMatrix;
+        
+        // For now, delegate to adjacency matrix - later we can implement edge attribute matrices
+        let graph_ref = self.graph.borrow();
+        let matrix = graph_ref.to_adjacency_matrix::<f64>()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Matrix conversion failed: {}", e)))?;
+        
+        Py::new(py, PyGraphMatrix { inner: matrix })
+    }
+    
+    /// Edge weight matrix (source × target with weights)
+    /// Default to 'weight' attribute, but allow custom attribute selection
+    /// Implements: g.edges.weight_matrix() and g.edges.weight_matrix('strength')
+    fn weight_matrix(&self, py: Python, attr_name: Option<String>) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
+        use crate::ffi::storage::matrix::PyGraphMatrix;
+        
+        let weight_attr = attr_name.unwrap_or_else(|| "weight".to_string());
+        let graph_ref = self.graph.borrow();
+        
+        let matrix = graph_ref.to_weighted_adjacency_matrix::<f64>(&weight_attr)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Weight matrix conversion failed: {}", e)))?;
+        
+        Py::new(py, PyGraphMatrix { inner: matrix })
     }
 }
 

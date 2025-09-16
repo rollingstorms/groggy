@@ -42,10 +42,12 @@ impl HtmlRenderer {
             theme.table_class
         ));
 
-        // Table header
-        html.push_str("<thead>");
-        html.push_str(&self.render_header_row(&data.headers, &data.schema, config));
-        html.push_str("</thead>");
+        // Table header (only if show_headers is true)
+        if config.show_headers {
+            html.push_str("<thead>");
+            html.push_str(&self.render_header_row(&data.headers, &data.schema, config));
+            html.push_str("</thead>");
+        }
 
         // Table body
         html.push_str("<tbody>");

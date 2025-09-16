@@ -1,0 +1,23 @@
+{
+  "columns": [
+    "edge_id",
+    "method",
+    "source",
+    "target"
+  ],
+  "data": [
+    {
+      "edge_id": 1,
+      "method": "table",
+      "source": 1,
+      "target": 2
+    },
+    {
+      "edge_id": 2,
+      "method": "head",
+      "source": 2,
+      "target": 3
+    }
+  ],
+  "nrows": 2
+}

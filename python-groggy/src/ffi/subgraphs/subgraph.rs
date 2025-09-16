@@ -1528,12 +1528,72 @@ impl PySubgraph {
                 .collect();
             
             let mut inner_matrix = matrix.inner;
-            inner_matrix.set_column_names(column_names).map_err(|e| {
-                PyRuntimeError::new_err(format!("Failed to set column names: {:?}", e))
-            })?;
+            inner_matrix.set_column_names(column_names);
             
             Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(inner_matrix))
         })
+    }
+
+    // === ADJACENCY METHODS (moved from Graph to Subgraph) ===
+
+    /// Get adjacency matrix for this subgraph view
+    /// Returns: GraphMatrix representing adjacency relationships
+    fn adjacency_matrix(&self, py: Python) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
+        let nodes: Vec<NodeId> = self.inner.node_set().iter().copied().collect();
+        let edges: Vec<EdgeId> = self.inner.edge_set().iter().copied().collect();
+        
+        // Convert edges to (source, target) tuples
+        let mut edge_pairs = Vec::new();
+        let graph_ref = self.inner.graph();
+        let graph_borrow = graph_ref.borrow();
+        
+        for edge_id in edges {
+            if let Ok((source, target)) = graph_borrow.edge_endpoints(edge_id) {
+                edge_pairs.push((source, target));
+            }
+        }
+        
+        // Build adjacency matrix using existing infrastructure
+        let adjacency_matrix = groggy::storage::adjacency::AdjacencyMatrixBuilder::from_edges(&nodes, &edge_pairs)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Adjacency matrix creation failed: {}", e)))?;
+            
+        Py::new(py, crate::ffi::storage::matrix::PyGraphMatrix { inner: adjacency_matrix })
+    }
+
+    /// Get adjacency matrix (shortcut for adjacency_matrix)
+    /// Returns: GraphMatrix representing adjacency relationships  
+    fn adj(&self, py: Python) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
+        self.adjacency_matrix(py)
+    }
+
+    /// Get adjacency list representation
+    /// Returns: Dict mapping node_id -> list of connected node_ids
+    fn adjacency_list(&self, py: Python) -> PyResult<PyObject> {
+        use pyo3::types::PyDict;
+        
+        let result_dict = PyDict::new(py);
+        let graph_ref = self.inner.graph();
+        let graph_borrow = graph_ref.borrow();
+        
+        // For each node in subgraph, find connected nodes
+        for &node_id in self.inner.node_set() {
+            let mut neighbors = Vec::new();
+            
+            // Check all edges in subgraph to find neighbors
+            for &edge_id in self.inner.edge_set() {
+                if let Ok((source, target)) = graph_borrow.edge_endpoints(edge_id) {
+                    if source == node_id && self.inner.contains_node(target) {
+                        neighbors.push(target as usize);
+                    } else if target == node_id && self.inner.contains_node(source) {
+                        neighbors.push(source as usize);
+                    }
+                }
+            }
+            
+            result_dict.set_item(node_id as usize, neighbors)?;
+        }
+        
+        Ok(result_dict.into())
     }
 }
 

@@ -1074,6 +1074,143 @@ impl std::fmt::Display for GraphTable {
     }
 }
 
+/// GraphMatrix conversion methods for GraphTable
+impl GraphTable {
+    /// Convert table data to GraphMatrix with generic numeric type support
+    pub fn to_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
+    where
+        T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>
+    {
+        use crate::storage::matrix::{GraphMatrix, FromAttrValue};
+        
+        // For now, convert nodes table to matrix (most common use case)
+        // TODO: Add option to convert edges table or combined table
+        
+        if self.nodes.is_empty() {
+            return Ok(GraphMatrix::zeros(0, 0));
+        }
+
+        // Get node data as columns
+        let node_ids = self.nodes.node_ids()?;
+        let attribute_names = self.nodes.column_names();
+        
+        // Filter out the ID column if it exists  
+        let data_columns: Vec<_> = attribute_names.iter()
+            .filter(|&name| name != "id" && name != "node_id")
+            .collect();
+
+        if data_columns.is_empty() {
+            return Ok(GraphMatrix::zeros(node_ids.len(), 0));
+        }
+
+        // Build matrix data column by column
+        let mut matrix_data = Vec::with_capacity(node_ids.len() * data_columns.len());
+        
+        for &col_name in &data_columns {
+            if let Ok(column) = self.nodes.get_column(col_name) {
+                for row_idx in 0..node_ids.len() {
+                    let value = column.get(row_idx).unwrap_or(&AttrValue::Null);
+                    let numeric_value = T::from_attr_value(value)?;
+                    matrix_data.push(numeric_value);
+                }
+            } else {
+                // Fill missing columns with zeros
+                for _ in 0..node_ids.len() {
+                    matrix_data.push(T::zero());
+                }
+            }
+        }
+
+        // Create column names vector
+        let column_names: Vec<String> = data_columns.iter().map(|s| s.to_string()).collect();
+        
+        // Create GraphMatrix with proper column names
+        let mut matrix = GraphMatrix::from_row_major_data(
+            matrix_data, 
+            node_ids.len(), 
+            data_columns.len(), 
+            Some(&node_ids)
+        )?;
+        
+        // Set custom column names
+        matrix.set_column_names(column_names);
+        
+        Ok(matrix)
+    }
+    
+    /// Convert to f64 matrix (most common use case)
+    pub fn to_matrix_f64(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<f64>> {
+        self.to_matrix::<f64>()
+    }
+    
+    /// Convert to f32 matrix (memory-efficient for ML)
+    pub fn to_matrix_f32(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<f32>> {
+        self.to_matrix::<f32>()
+    }
+
+    /// Convert to integer matrix
+    pub fn to_matrix_i64(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<i64>> {
+        self.to_matrix::<i64>()
+    }
+
+    /// Convert edges table to GraphMatrix 
+    pub fn edges_to_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
+    where
+        T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>
+    {
+        use crate::storage::matrix::{GraphMatrix, FromAttrValue};
+        
+        if self.edges.is_empty() {
+            return Ok(GraphMatrix::zeros(0, 0));
+        }
+
+        let edge_ids = self.edges.edge_ids()?;
+        let attribute_names = self.edges.column_names();
+        
+        // Filter out structural columns (id, source, target)
+        let data_columns: Vec<_> = attribute_names.iter()
+            .filter(|&name| !["id", "edge_id", "source", "target"].contains(&name.as_str()))
+            .collect();
+
+        if data_columns.is_empty() {
+            return Ok(GraphMatrix::zeros(edge_ids.len(), 0));
+        }
+
+        // Build matrix data
+        let mut matrix_data = Vec::with_capacity(edge_ids.len() * data_columns.len());
+        
+        for &col_name in &data_columns {
+            if let Ok(column) = self.edges.get_column(col_name) {
+                for row_idx in 0..edge_ids.len() {
+                    let value = column.get(row_idx).unwrap_or(&AttrValue::Null);
+                    let numeric_value = T::from_attr_value(value)?;
+                    matrix_data.push(numeric_value);
+                }
+            }
+        }
+
+        GraphMatrix::from_row_major_data(
+            matrix_data,
+            edge_ids.len(),
+            data_columns.len(),
+            None // Edge IDs as NodeIds not supported yet
+        )
+    }
+
+    /// Get table shape (rows, columns) for nodes table
+    pub fn shape(&self) -> (usize, usize) {
+        (
+            self.nodes.nrows(),
+            self.nodes.column_names().len()
+        )
+    }
+
+    /// Check if table is empty
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty() && self.edges.is_empty()
+    }
+}
+
 /// Factory methods for creating GraphTables from different sources
 impl GraphTable {
     /// Create GraphTable from BaseTable components

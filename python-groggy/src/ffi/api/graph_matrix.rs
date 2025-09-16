@@ -180,4 +180,28 @@ impl PyGraphMatrixHelper {
             "transition_matrix needs to be implemented in core first",
         ))
     }
+
+    /// Convert graph to attribute matrix - PURE DELEGATION to core
+    pub fn to_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        use crate::ffi::storage::matrix::PyGraphMatrix;
+
+        // DELEGATION: Use core to_matrix implementation (graph.rs:2383)
+        let graph_matrix = {
+            let graph_ref = self.graph.borrow(py);
+            let result = graph_ref
+                .inner
+                .borrow()
+                .to_matrix_f64()
+                .map_err(graph_error_to_py_err);
+            drop(graph_ref);
+            result
+        }?;
+
+        Py::new(
+            py,
+            PyGraphMatrix {
+                inner: graph_matrix,
+            },
+        )
+    }
 }

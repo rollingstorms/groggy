@@ -1099,42 +1099,8 @@ impl PyGraph {
 
     // === MATRIX OPERATIONS (delegate to PyGraphMatrixHelper) ===
 
-    /// Get adjacency matrix - delegates to PyGraphMatrixHelper
-    fn adjacency_matrix(&mut self, py: Python) -> PyResult<PyObject> {
-        let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
-        matrix_handler.adjacency_matrix(py)
-    }
-
-    /// Simple adjacency matrix (alias) - delegates to PyGraphMatrixHelper
-    fn adjacency(&mut self, py: Python) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
-        let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
-        matrix_handler.adjacency(py)
-    }
-
-    /// Get weighted adjacency matrix - delegates to PyGraphMatrixHelper
-    fn weighted_adjacency_matrix(
-        &mut self,
-        py: Python,
-        weight_attr: &str,
-    ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
-        let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
-        matrix_handler.weighted_adjacency_matrix(py, weight_attr)
-    }
-
-    /// Get dense adjacency matrix - delegates to PyGraphMatrixHelper
-    fn dense_adjacency_matrix(
-        &mut self,
-        py: Python,
-    ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
-        let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
-        matrix_handler.dense_adjacency_matrix(py)
-    }
-
-    /// Get sparse adjacency matrix - delegates to PyGraphMatrixHelper
-    fn sparse_adjacency_matrix(&mut self, py: Python) -> PyResult<PyObject> {
-        let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
-        matrix_handler.sparse_adjacency_matrix(py)
-    }
+    // Adjacency methods removed - these should only be available on Subgraph/view()
+    // Use g.view().adjacency_matrix(), g.view().adj(), etc. instead
 
     /// Get Laplacian matrix - delegates to PyGraphMatrixHelper
     fn laplacian_matrix(
@@ -1153,6 +1119,15 @@ impl PyGraph {
     ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
         matrix_handler.transition_matrix(py)
+    }
+
+    /// Convert graph to attribute matrix - delegates to PyGraphMatrixHelper
+    fn to_matrix(
+        &mut self,
+        py: Python,
+    ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
+        let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
+        matrix_handler.to_matrix(py)
     }
 
     /// Aggregate attribute values across nodes or edges
@@ -1690,7 +1665,7 @@ impl PyGraph {
                 let column_values: Vec<f64> = (0..rows)
                     .map(|row_idx| {
                         // GraphMatrix.get() now returns Option<&f64>
-                        adjacency_matrix.get(row_idx, col_idx).copied().unwrap_or(0.0)
+                        adjacency_matrix.get(row_idx, col_idx).unwrap_or(0.0)
                     })
                     .collect();
 
@@ -1707,9 +1682,7 @@ impl PyGraph {
             
             // Update the GraphMatrix with proper column names
             let mut inner_matrix = matrix.inner;
-            inner_matrix.set_column_names(column_names).map_err(|e| {
-                PyRuntimeError::new_err(format!("Failed to set column names: {:?}", e))
-            })?;
+            inner_matrix.set_column_names(column_names);
             
             Ok(inner_matrix)
         })

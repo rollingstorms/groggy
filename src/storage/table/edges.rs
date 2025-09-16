@@ -507,6 +507,17 @@ impl EdgesTable {
         
         column.unique_values()
     }
+    
+    /// Check if the table is empty
+    pub fn is_empty(&self) -> bool {
+        self.base.nrows() == 0
+    }
+    
+    /// Get a column by name (alias for column method)
+    pub fn get_column(&self, name: &str) -> GraphResult<&BaseArray<AttrValue>> {
+        self.base.column(name).ok_or_else(|| 
+            GraphError::InvalidInput(format!("Column '{}' not found", name)))
+    }
 }
 
 

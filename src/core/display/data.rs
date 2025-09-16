@@ -84,10 +84,11 @@ impl DataWindow {
             None
         } else {
             Some(format!(
-                "Showing {} of {} rows, {} of {} columns",
-                self.displayed_rows(),
+                // "{} of {} rows, {} of {} columns",
+                "{} rows x {} cols",
+                // self.displayed_rows(),
                 self.total_rows,
-                self.displayed_cols(),
+                // self.displayed_cols(),
                 self.total_cols
             ))
         }

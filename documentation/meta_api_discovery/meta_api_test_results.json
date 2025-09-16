@@ -1,10 +1,10 @@
 {
   "test_metadata": {
-    "total_tests": 281,
-    "successful_tests": 139,
-    "failed_tests": 9,
-    "skipped_tests": 133,
-    "success_rate": 49.46619217081851
+    "total_tests": 315,
+    "successful_tests": 161,
+    "failed_tests": 10,
+    "skipped_tests": 144,
+    "success_rate": 51.11111111111111
   },
   "test_results": [
     {
@@ -43,10 +43,20 @@
       "signature": "(column_name)",
       "requires_params": true,
       "status": "success_with_params",
-      "result": "BaseArray[3] (dtype: Int)",
+      "result": "BaseArray[3] [1, 2, 3] (dtype: Int)\n\ud83d\udca1 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
       "error": null,
       "return_type": "BaseArray",
       "test_params": "node_id"
+    },
+    {
+      "object": "BaseTable",
+      "method": "column_info",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "{'name': {'length': 3, 'non_null_count': 3, 'type_counts': {'text': 3}, 'is_numeric': False}, 'node_id': {'length': 3, 'non_null_count': 3, 'type_counts': {'int64': 3}, 'is_numeric': True, 'numeric_ty",
+      "error": null,
+      "return_type": "dict"
     },
     {
       "object": "BaseTable",
@@ -67,7 +77,7 @@
       "result": "BaseTable[3 x 3]",
       "error": null,
       "return_type": "BaseTable",
-      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x10494f0d0>"
+      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x10132a0d0>"
     },
     {
       "object": "BaseTable",
@@ -108,6 +118,28 @@
       "result": null,
       "error": "Requires parameters: ['path']",
       "return_type": null
+    },
+    {
+      "object": "BaseTable",
+      "method": "get_column_numeric",
+      "signature": "(column_name)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "NumArray(dtype: int32)\n[  0] 1\n[  1] 2\n[  2] 3",
+      "error": null,
+      "return_type": "NumArray",
+      "test_params": "node_id"
+    },
+    {
+      "object": "BaseTable",
+      "method": "get_column_raw",
+      "signature": "(column_name)",
+      "requires_params": true,
+      "status": "success_with_params",
+      "result": "BaseArray[3] [1, 2, 3] (dtype: Int)\n\ud83d\udca1 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
+      "error": null,
+      "return_type": "BaseArray",
+      "test_params": "node_id"
     },
     {
       "object": "BaseTable",
@@ -156,7 +188,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "<groggy.BaseTableIterator object at 0x104a6a0b0>",
+      "result": "<groggy.BaseTableIterator object at 0x11f62ff30>",
       "error": null,
       "return_type": "BaseTableIterator"
     },
@@ -176,7 +208,7 @@
       "signature": "(config=None)",
       "requires_params": false,
       "status": "success",
-      "result": "\u2296\u2296 gr.table\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502                      # \u2502 name                            \u2502 type  ",
+      "result": "\u2296\u2296 gr.table\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 \u001b[1m                     #\u001b[0m \u2502 \u001b[1mname                        ",
       "error": null,
       "return_type": "str"
     },
@@ -338,10 +370,10 @@
       "signature": "(predicate)",
       "requires_params": true,
       "status": "success_with_params",
-      "result": "NodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |       core |          1 | \n|  BaseTable |      table |          2 |",
+      "result": "NodesTable[3 x 3]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 name       \u2502 node_id \u2502 type  \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 Graph      \u2502       1 \u2502 core  \u2502\n\u2502 BaseTable  \u2502       2 \u2502 table \u2502\n\u2502 NodesTable \u2502   ",
       "error": null,
       "return_type": "NodesTable",
-      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x1096510d0>"
+      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x1012b8f70>"
     },
     {
       "object": "NodesTable",
@@ -409,9 +441,29 @@
       "signature": "(n=5)",
       "requires_params": false,
       "status": "success",
-      "result": "NodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |       core |          1 | \n|  BaseTable |      table |          2 |",
+      "result": "NodesTable[3 x 3]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 name       \u2502 node_id \u2502 type  \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 Graph      \u2502       1 \u2502 core  \u2502\n\u2502 BaseTable  \u2502       2 \u2502 table \u2502\n\u2502 NodesTable \u2502   ",
       "error": null,
       "return_type": "NodesTable"
+    },
+    {
+      "object": "NodesTable",
+      "method": "interactive",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "http://127.0.0.1:53044",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "NodesTable",
+      "method": "interactive_embed",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "\n            <iframe \n                src=\"http://127.0.0.1:53045\" \n                width=\"100%\" \n                height=\"600px\" \n                frameborder=\"0\" \n                style=\"border: 1px so",
+      "error": null,
+      "return_type": "str"
     },
     {
       "object": "NodesTable",
@@ -429,7 +481,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "<groggy.NodesTableIterator object at 0x10961fa30>",
+      "result": "<groggy.NodesTableIterator object at 0x11f6886d0>",
       "error": null,
       "return_type": "NodesTableIterator"
     },
@@ -449,9 +501,9 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "GraphArray(len=3, dtype=int64)",
+      "result": "NumArray(dtype: int64)\n[  0] 1\n[  1] 2\n[  2] 3",
       "error": null,
-      "return_type": "GraphArray"
+      "return_type": "NumArray"
     },
     {
       "object": "NodesTable",
@@ -469,7 +521,7 @@
       "signature": "(config=None)",
       "requires_params": false,
       "status": "success",
-      "result": "\u2296\u2296 gr.table\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502                      # \u2502 name                            \u2502 type  ",
+      "result": "\u2296\u2296 gr.table\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 \u001b[1m                     #\u001b[0m \u2502 \u001b[1mname                        ",
       "error": null,
       "return_type": "str"
     },
@@ -519,7 +571,7 @@
       "signature": "(n=5)",
       "requires_params": false,
       "status": "success",
-      "result": "NodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |       core |          1 | \n|  BaseTable |      table |          2 |",
+      "result": "NodesTable[3 x 3]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 name       \u2502 node_id \u2502 type  \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 Graph      \u2502       1 \u2502 core  \u2502\n\u2502 BaseTable  \u2502       2 \u2502 table \u2502\n\u2502 NodesTable \u2502   ",
       "error": null,
       "return_type": "NodesTable"
     },
@@ -551,7 +603,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "   node_id   type        name\n0        1   core       Graph\n1        2  table   BaseTable\n2        3  table  NodesTable",
+      "result": "   node_id        name   type\n0        1       Graph   core\n1        2   BaseTable  table\n2        3  NodesTable  table",
       "error": null,
       "return_type": "DataFrame"
     },
@@ -601,7 +653,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|     method |     source |     target |    edge_id | \n|------------|------------|------------|------------|\n|      table |          1 |          2 |          1 | \n|",
+      "result": "EdgesTable[2 x 4]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 edge_id \u2502 method \u2502 source \u2502 target \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502       1 \u2502 table  \u2502      1 \u2502      2 \u2502\n\u2502       2 \u2502 head   \u2502      ",
       "error": null,
       "return_type": "EdgesTable"
     },
@@ -631,9 +683,9 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "GraphArray(len=2, dtype=int64)",
+      "result": "NumArray(dtype: float64)\n[  0] 1.000000\n[  1] 2.000000",
       "error": null,
-      "return_type": "GraphArray"
+      "return_type": "NumArray"
     },
     {
       "object": "EdgesTable",
@@ -641,10 +693,10 @@
       "signature": "(predicate)",
       "requires_params": true,
       "status": "success_with_params",
-      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|     method |     source |     target |    edge_id | \n|------------|------------|------------|------------|\n|      table |          1 |          2 |          1 | \n|",
+      "result": "EdgesTable[2 x 4]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 edge_id \u2502 method \u2502 source \u2502 target \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502       1 \u2502 table  \u2502      1 \u2502      2 \u2502\n\u2502       2 \u2502 head   \u2502      ",
       "error": null,
       "return_type": "EdgesTable",
-      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x1096510d0>"
+      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x1012b8f70>"
     },
     {
       "object": "EdgesTable",
@@ -732,9 +784,29 @@
       "signature": "(n=5)",
       "requires_params": false,
       "status": "success",
-      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|     method |     source |     target |    edge_id | \n|------------|------------|------------|------------|\n|      table |          1 |          2 |          1 | \n|",
+      "result": "EdgesTable[2 x 4]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 edge_id \u2502 method \u2502 source \u2502 target \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502       1 \u2502 table  \u2502      1 \u2502      2 \u2502\n\u2502       2 \u2502 head   \u2502      ",
       "error": null,
       "return_type": "EdgesTable"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "interactive",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "http://127.0.0.1:53046",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "EdgesTable",
+      "method": "interactive_embed",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "\n            <iframe \n                src=\"http://127.0.0.1:53047\" \n                width=\"100%\" \n                height=\"600px\" \n                frameborder=\"0\" \n                style=\"border: 1px so",
+      "error": null,
+      "return_type": "str"
     },
     {
       "object": "EdgesTable",
@@ -752,7 +824,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "<groggy.EdgesTableIterator object at 0x10961fa30>",
+      "result": "<groggy.EdgesTableIterator object at 0x10f6e35c0>",
       "error": null,
       "return_type": "EdgesTableIterator"
     },
@@ -782,7 +854,7 @@
       "signature": "(config=None)",
       "requires_params": false,
       "status": "success",
-      "result": "\u2296\u2296 gr.table\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502                 # \u2502 method                 \u2502 source              ",
+      "result": "\u2296\u2296 gr.table\n\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 \u001b[1m                #\u001b[0m \u2502 \u001b[1medge_id                \u001b[0m \u2502 \u001b[1",
       "error": null,
       "return_type": "str"
     },
@@ -832,9 +904,9 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "GraphArray(len=2, dtype=int64)",
+      "result": "NumArray(dtype: float64)\n[  0] 1.000000\n[  1] 2.000000",
       "error": null,
-      "return_type": "GraphArray"
+      "return_type": "NumArray"
     },
     {
       "object": "EdgesTable",
@@ -842,7 +914,7 @@
       "signature": "(n=5)",
       "requires_params": false,
       "status": "success",
-      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|     method |     source |     target |    edge_id | \n|------------|------------|------------|------------|\n|      table |          1 |          2 |          1 | \n|",
+      "result": "EdgesTable[2 x 4]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 edge_id \u2502 method \u2502 source \u2502 target \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502       1 \u2502 table  \u2502      1 \u2502      2 \u2502\n\u2502       2 \u2502 head   \u2502      ",
       "error": null,
       "return_type": "EdgesTable"
     },
@@ -852,9 +924,9 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "GraphArray(len=2, dtype=int64)",
+      "result": "NumArray(dtype: float64)\n[  0] 2.000000\n[  1] 3.000000",
       "error": null,
-      "return_type": "GraphArray"
+      "return_type": "NumArray"
     },
     {
       "object": "EdgesTable",
@@ -884,7 +956,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "  method  edge_id  target  source\n0  table        1       2       1\n1   head        2       3       2",
+      "result": "   source  target method  edge_id\n0       1       2  table        1\n1       2       3   head        2",
       "error": null,
       "return_type": "DataFrame"
     },
@@ -914,7 +986,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |    ",
+      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 name       \u2502 node_id \u2502 type  \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 Graph      \u2502     ",
       "error": null,
       "return_type": "GraphTable"
     },
@@ -944,7 +1016,7 @@
       "signature": "(n=5)",
       "requires_params": false,
       "status": "success",
-      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |    ",
+      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 name       \u2502 node_id \u2502 type  \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 Graph      \u2502     ",
       "error": null,
       "return_type": "GraphTable"
     },
@@ -1024,7 +1096,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "(5, 7)",
+      "result": "(3, 3)",
       "error": null,
       "return_type": "tuple"
     },
@@ -1034,7 +1106,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "{'unique_targets': 2, 'edge_columns': 4, 'total_nodes': 3, 'node_columns': 3, 'total_columns': 4, 'total_edges': 2, 'unique_sources': 2, 'self_loops': 0}",
+      "result": "{'total_nodes': 3, 'total_edges': 2, 'node_columns': 3, 'edge_columns': 4, 'self_loops': 0, 'total_columns': 4, 'unique_sources': 2, 'unique_targets': 2}",
       "error": null,
       "return_type": "dict"
     },
@@ -1044,7 +1116,7 @@
       "signature": "(n=5)",
       "requires_params": false,
       "status": "success",
-      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|      Graph |    ",
+      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 name       \u2502 node_id \u2502 type  \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 Graph      \u2502     ",
       "error": null,
       "return_type": "GraphTable"
     },
@@ -1094,7 +1166,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "ValidationReport { errors: [], warnings: [], info: [\"Node UIDs validation passed\", \"Edge validation passed\", \"Edge node reference validation passed\"], stats: {\"total_nodes\": 3, \"total_edges\": 2} }",
+      "result": "ValidationReport { errors: [], warnings: [], info: [\"Node UIDs validation passed\", \"Edge validation passed\", \"Edge node reference validation passed\"], stats: {\"total_edges\": 2, \"total_nodes\": 3} }",
       "error": null,
       "return_type": "str"
     },
@@ -1116,6 +1188,16 @@
       "status": "skipped",
       "result": null,
       "error": "Requires parameters: ['method_name', 'args']",
+      "return_type": null
+    },
+    {
+      "object": "BaseArray",
+      "method": "astype",
+      "signature": "(dtype)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['dtype']",
       "return_type": null
     },
     {
@@ -1144,10 +1226,50 @@
       "signature": "(n)",
       "requires_params": true,
       "status": "success_with_params",
-      "result": "BaseArray[5] (dtype: Int)",
+      "result": "BaseArray[5] [1, 2, 3, ...] (dtype: Int)\n\ud83d\udca1 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
       "error": null,
       "return_type": "BaseArray",
       "test_params": "5"
+    },
+    {
+      "object": "BaseArray",
+      "method": "infer_numeric_type",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "Int64",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "BaseArray",
+      "method": "interactive",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "http://127.0.0.1:53048",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "BaseArray",
+      "method": "interactive_embed",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "<iframe src=\"http://127.0.0.1:53049\" width=\"100%\" height=\"420\" style=\"border:0;border-radius:12px;\"></iframe>",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "BaseArray",
+      "method": "is_numeric",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "True",
+      "error": null,
+      "return_type": "bool"
     },
     {
       "object": "BaseArray",
@@ -1155,9 +1277,19 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "<builtins.BaseArrayIterator object at 0x10967d730>",
+      "result": "<builtins.BaseArrayIterator object at 0x1083ac2f0>",
       "error": null,
       "return_type": "BaseArrayIterator"
+    },
+    {
+      "object": "BaseArray",
+      "method": "numeric_compatibility_info",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "{'is_numeric': True, 'total_count': 5, 'numeric_count': 5, 'null_count': 0, 'numeric_percentage': 100.0, 'type_counts': {'int64': 5}, 'inferred_numeric_type': 'Int64', 'recommended_conversion': 'to_nu",
+      "error": null,
+      "return_type": "dict"
     },
     {
       "object": "BaseArray",
@@ -1165,10 +1297,30 @@
       "signature": "(n)",
       "requires_params": true,
       "status": "success_with_params",
-      "result": "BaseArray[5] (dtype: Int)",
+      "result": "BaseArray[5] [1, 2, 3, ...] (dtype: Int)\n\ud83d\udca1 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
       "error": null,
       "return_type": "BaseArray",
       "test_params": "5"
+    },
+    {
+      "object": "BaseArray",
+      "method": "to_num_array",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "NumArray(dtype: int64)\n[  0] 1\n[  1] 2\n[  2] 3\n[  3] 4\n[  4] 5",
+      "error": null,
+      "return_type": "NumArray"
+    },
+    {
+      "object": "BaseArray",
+      "method": "to_table",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "BaseTable[5 x 2]",
+      "error": null,
+      "return_type": "BaseTable"
     },
     {
       "object": "BaseArray",
@@ -1176,7 +1328,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "BaseArray[5] (dtype: Int)",
+      "result": "BaseArray[5] [1, 2, 3, ...] (dtype: Int)\n\ud83d\udca1 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
       "error": null,
       "return_type": "BaseArray"
     },
@@ -1229,26 +1381,6 @@
       "result": null,
       "error": "Requires parameters: ['data']",
       "return_type": null
-    },
-    {
-      "object": "Graph",
-      "method": "adjacency",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "GraphMatrix(3 x 3, dtype=Float)",
-      "error": null,
-      "return_type": "GraphMatrix"
-    },
-    {
-      "object": "Graph",
-      "method": "adjacency_matrix",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "{'size': 3, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(3 x 3, dtype=Float)}",
-      "error": null,
-      "return_type": "dict"
     },
     {
       "object": "Graph",
@@ -1359,16 +1491,6 @@
       "result": null,
       "error": "Requires parameters: ['branch_name']",
       "return_type": null
-    },
-    {
-      "object": "Graph",
-      "method": "dense_adjacency_matrix",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "GraphMatrix(3 x 3, dtype=Float)",
-      "error": null,
-      "return_type": "GraphMatrix"
     },
     {
       "object": "Graph",
@@ -1585,10 +1707,10 @@
       "method": "laplacian_matrix",
       "signature": "(normalized=None)",
       "requires_params": false,
-      "status": "success",
-      "result": "GraphMatrix(3 x 3, dtype=Float)",
-      "error": null,
-      "return_type": "GraphMatrix"
+      "status": "error",
+      "result": null,
+      "error": "Laplacian matrix calculation not yet implemented",
+      "return_type": null
     },
     {
       "object": "Graph",
@@ -1743,23 +1865,23 @@
     },
     {
       "object": "Graph",
-      "method": "sparse_adjacency_matrix",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "{'size': 3, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(3 x 3, dtype=Float)}",
-      "error": null,
-      "return_type": "dict"
-    },
-    {
-      "object": "Graph",
       "method": "table",
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\nBaseTable[3 x 3]\n|       name |       type |    node_id | \n|------------|------------|------------|\n|  BaseTable |    ",
+      "result": "GraphTable[3 nodes, 2 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[3 x 3]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 name       \u2502 type  \u2502 node_id \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 NodesTable \u2502 tabl",
       "error": null,
       "return_type": "GraphTable"
+    },
+    {
+      "object": "Graph",
+      "method": "to_matrix",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(1, 1), dtype=f64)\n[[   0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
     },
     {
       "object": "Graph",
@@ -1787,19 +1909,9 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     1       1 \u2192 2\n     0       0 \u2192 1",
+      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     0       0 \u2192 1\n     1       1 \u2192 2",
       "error": null,
       "return_type": "Subgraph"
-    },
-    {
-      "object": "Graph",
-      "method": "weighted_adjacency_matrix",
-      "signature": "(weight_attr)",
-      "requires_params": true,
-      "status": "skipped",
-      "result": null,
-      "error": "Requires parameters: ['weight_attr']",
-      "return_type": null
     },
     {
       "object": "Nodes",
@@ -1807,9 +1919,19 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     0       0 \u2192 1\n     1       1 \u2192 2",
+      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     1       1 \u2192 2\n     0       0 \u2192 1",
       "error": null,
       "return_type": "Subgraph"
+    },
+    {
+      "object": "Nodes",
+      "method": "array",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "NodesArray[1 accessors, 3 total nodes]",
+      "error": null,
+      "return_type": "NodesArray"
     },
     {
       "object": "Nodes",
@@ -1827,9 +1949,19 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "GraphArray(len=3, dtype=int64)",
+      "result": "NumArray(dtype: int64)\n[  0] 2\n[  1] 0\n[  2] 1",
       "error": null,
-      "return_type": "GraphArray"
+      "return_type": "NumArray"
+    },
+    {
+      "object": "Nodes",
+      "method": "matrix",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(1, 1), dtype=f64)\n[[   0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
     },
     {
       "object": "Nodes",
@@ -1847,7 +1979,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "NodesTable[3 x 3]\nBaseTable[3 x 3]\n|       type |    node_id |       name | \n|------------|------------|------------|\n|      table |          1 |  BaseTable | \n|       core |          0 |      Graph |",
+      "result": "NodesTable[3 x 3]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 node_id \u2502 name       \u2502 type  \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502       2 \u2502 NodesTable \u2502 table \u2502\n\u2502       0 \u2502 Graph      \u2502 core  \u2502\n\u2502       1 \u2502 BaseT",
       "error": null,
       "return_type": "NodesTable"
     },
@@ -1867,9 +1999,19 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "GraphArray(len=2, dtype=int64)",
+      "result": "NumArray(dtype: float64)\n[  0] 0.000000\n[  1] 1.000000",
       "error": null,
-      "return_type": "GraphArray"
+      "return_type": "NumArray"
+    },
+    {
+      "object": "Edges",
+      "method": "matrix",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.000     0.000     1.000]\n [   0.000     0.000     1.000]\n [   1.000     1.000     0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
     },
     {
       "object": "Edges",
@@ -1887,9 +2029,19 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|     source |     target |     method |    edge_id | \n|------------|------------|------------|------------|\n|          1 |          2 |       head |          1 | \n|",
+      "result": "EdgesTable[2 x 4]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 method \u2502 target \u2502 edge_id \u2502 source \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 table  \u2502      1 \u2502       0 \u2502      0 \u2502\n\u2502 head   \u2502      2 \u2502       ",
       "error": null,
       "return_type": "EdgesTable"
+    },
+    {
+      "object": "Edges",
+      "method": "weight_matrix",
+      "signature": "(attr_name=None)",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.000     0.000     1.000]\n [   0.000     0.000     1.000]\n [   1.000     1.000     0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
     },
     {
       "object": "ComponentsArray",
@@ -1900,7 +2052,7 @@
       "result": "ComponentsArray(1 components)",
       "error": null,
       "return_type": "ComponentsArray",
-      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x109651310>"
+      "test_params": "<function APITestGenerator.try_method_with_common_params.<locals>.<lambda> at 0x10837f040>"
     },
     {
       "object": "ComponentsArray",
@@ -1908,7 +2060,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     0       0 \u2192 1\n     1       1 \u2192 2",
+      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     1       1 \u2192 2\n     0       0 \u2192 1",
       "error": null,
       "return_type": "Subgraph"
     },
@@ -1962,6 +2114,36 @@
       "result": "[Subgraph(nodes=3, edges=2)]",
       "error": null,
       "return_type": "list"
+    },
+    {
+      "object": "Subgraph",
+      "method": "adj",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.000     1.000     1.000]\n [   1.000     0.000     0.000]\n [   1.000     0.000     0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
+    },
+    {
+      "object": "Subgraph",
+      "method": "adjacency_list",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "{1: [0, 2], 2: [1], 0: [1]}",
+      "error": null,
+      "return_type": "dict"
+    },
+    {
+      "object": "Subgraph",
+      "method": "adjacency_matrix",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.000     1.000     1.000]\n [   1.000     0.000     0.000]\n [   1.000     0.000     0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
     },
     {
       "object": "Subgraph",
@@ -2069,9 +2251,9 @@
       "signature": "(nodes=None, *, full_graph=False)",
       "requires_params": false,
       "status": "success",
-      "result": "GraphArray(len=3, dtype=int64)",
+      "result": "NumArray(dtype: int32)\n[  0] 2\n[  1] 1\n[  2] 1",
       "error": null,
-      "return_type": "GraphArray"
+      "return_type": "NumArray"
     },
     {
       "object": "Subgraph",
@@ -2119,7 +2301,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "EdgesTable[2 x 4]\nBaseTable[2 x 4]\n|    edge_id |     source |     target |     method | \n|------------|------------|------------|------------|\n|          1 |          1 |          2 |       head | \n|",
+      "result": "EdgesTable[2 x 4]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 source \u2502 method \u2502 edge_id \u2502 target \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502      0 \u2502 table  \u2502       0 \u2502      1 \u2502\n\u2502      1 \u2502 head   \u2502       ",
       "error": null,
       "return_type": "EdgesTable"
     },
@@ -2229,9 +2411,9 @@
       "signature": "(nodes=None, full_graph=False)",
       "requires_params": false,
       "status": "success",
-      "result": "GraphArray(len=3, dtype=int64)",
+      "result": "NumArray(dtype: int32)\n[  0] 1\n[  1] 1\n[  2] 0",
       "error": null,
-      "return_type": "GraphArray"
+      "return_type": "NumArray"
     },
     {
       "object": "Subgraph",
@@ -2329,9 +2511,9 @@
       "signature": "(nodes=None, full_graph=False)",
       "requires_params": false,
       "status": "success",
-      "result": "GraphArray(len=3, dtype=int64)",
+      "result": "NumArray(dtype: int32)\n[  0] 1\n[  1] 0\n[  2] 1",
       "error": null,
-      "return_type": "GraphArray"
+      "return_type": "NumArray"
     },
     {
       "object": "Subgraph",
@@ -2349,7 +2531,7 @@
       "signature": "(k)",
       "requires_params": true,
       "status": "success_with_params",
-      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     1       1 \u2192 2\n     0       0 \u2192 1",
+      "result": "Subgraph with 3 nodes and 2 edges\n\nEdges:\n  ID    Source \u2192 Target\n  ----  ---------------\n     0       0 \u2192 1\n     1       1 \u2192 2",
       "error": null,
       "return_type": "Subgraph",
       "test_params": "3"
@@ -2420,7 +2602,7 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "NodesTable[3 x 4]\nBaseTable[3 x 4]\n| entity_type |       type |    node_id |       name | \n|------------|------------|------------|------------|\n|       base |      table |          1 |  BaseTable | \n",
+      "result": "NodesTable[3 x 4]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 node_id \u2502 name       \u2502 type  \u2502 entity_type \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502       1 \u2502 BaseTable  \u2502 table \u2502 base    ",
       "error": null,
       "return_type": "NodesTable"
     },
@@ -2449,10 +2631,10 @@
       "method": "to_matrix",
       "signature": "()",
       "requires_params": false,
-      "status": "error",
-      "result": null,
-      "error": "Subgraph to matrix conversion not yet implemented",
-      "return_type": null
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.000     1.000     1.000]\n [   1.000     0.000     0.000]\n [   1.000     0.000     0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
     },
     {
       "object": "Subgraph",
@@ -2486,57 +2668,27 @@
     },
     {
       "object": "GraphArray",
-      "method": "apply_to_each",
-      "signature": "(method_name, args)",
+      "method": "astype",
+      "signature": "(dtype)",
       "requires_params": true,
       "status": "skipped",
       "result": null,
-      "error": "Requires parameters: ['method_name', 'args']",
+      "error": "Requires parameters: ['dtype']",
       "return_type": null
     },
     {
       "object": "GraphArray",
-      "method": "count",
+      "method": "first",
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "3",
+      "result": "2",
       "error": null,
       "return_type": "int"
     },
     {
       "object": "GraphArray",
-      "method": "describe",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "Statistical Summary:\n  Count: 3\n  Mean:  1.00\n  Std:   1.00\n  Min:   Int(0)\n  25%:   1.00\n  50%:   1.00\n  75%:   2.00\n  Max:   Int(2)\n",
-      "error": null,
-      "return_type": "StatsSummary"
-    },
-    {
-      "object": "GraphArray",
-      "method": "drop_na",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "GraphArray(len=3, dtype=int64)",
-      "error": null,
-      "return_type": "GraphArray"
-    },
-    {
-      "object": "GraphArray",
-      "method": "fill_na",
-      "signature": "(fill_value)",
-      "requires_params": true,
-      "status": "skipped",
-      "result": null,
-      "error": "Requires parameters: ['fill_value']",
-      "return_type": null
-    },
-    {
-      "object": "GraphArray",
-      "method": "has_null",
+      "method": "is_empty",
       "signature": "()",
       "requires_params": false,
       "status": "success",
@@ -2546,13 +2698,13 @@
     },
     {
       "object": "GraphArray",
-      "method": "items",
+      "method": "last",
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "[(0, 1), (1, 0), (2, 2)]",
+      "result": "1",
       "error": null,
-      "return_type": "list"
+      "return_type": "int"
     },
     {
       "object": "GraphArray",
@@ -2560,9 +2712,9 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "2",
+      "result": "2.0",
       "error": null,
-      "return_type": "int"
+      "return_type": "float"
     },
     {
       "object": "GraphArray",
@@ -2576,73 +2728,33 @@
     },
     {
       "object": "GraphArray",
-      "method": "median",
+      "method": "min",
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "1.0",
+      "result": "0.0",
       "error": null,
       "return_type": "float"
     },
     {
       "object": "GraphArray",
-      "method": "min",
+      "method": "nunique",
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "0",
+      "result": "3",
       "error": null,
       "return_type": "int"
     },
     {
       "object": "GraphArray",
-      "method": "null_count",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "0",
-      "error": null,
-      "return_type": "int"
-    },
-    {
-      "object": "GraphArray",
-      "method": "percentile",
-      "signature": "(p)",
+      "method": "reshape",
+      "signature": "(rows, cols)",
       "requires_params": true,
       "status": "skipped",
       "result": null,
-      "error": "Requires parameters: ['p']",
+      "error": "Requires parameters: ['rows', 'cols']",
       "return_type": null
-    },
-    {
-      "object": "GraphArray",
-      "method": "preview",
-      "signature": "(limit=None)",
-      "requires_params": false,
-      "status": "success",
-      "result": "[1, 0, 2]",
-      "error": null,
-      "return_type": "list"
-    },
-    {
-      "object": "GraphArray",
-      "method": "quantile",
-      "signature": "(q)",
-      "requires_params": true,
-      "status": "skipped",
-      "result": null,
-      "error": "Requires parameters: ['q']",
-      "return_type": null
-    },
-    {
-      "object": "GraphArray",
-      "method": "rich_display",
-      "signature": "(config=None)",
-      "requires_params": false,
-      "status": "success",
-      "result": "\u256d\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 # \u2502 value \u2502\n\u2502   \u2502 obj   \u2502\n\u251c\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 0 \u2502 1     \u2502\n\u2502 1 \u2502 0     \u2502\n\u2502 2 \u2502 2     \u2502\n\u2570\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\nrows: 3 \u2022 type: GraphArray \u2022 dtype: int64",
-      "error": null,
-      "return_type": "str"
     },
     {
       "object": "GraphArray",
@@ -2656,13 +2768,13 @@
     },
     {
       "object": "GraphArray",
-      "method": "summary",
+      "method": "sum",
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "GraphArray('unnamed', length=3, dtype=Int, sparse=false)",
+      "result": "3.0",
       "error": null,
-      "return_type": "str"
+      "return_type": "float"
     },
     {
       "object": "GraphArray",
@@ -2670,187 +2782,417 @@
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "[1, 0, 2]",
+      "result": "[2, 0, 1]",
       "error": null,
       "return_type": "list"
     },
     {
       "object": "GraphArray",
+      "method": "var",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "1.0",
+      "error": null,
+      "return_type": "float"
+    },
+    {
+      "object": "Matrix",
+      "method": "dense",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.000     0.000     1.000]\n [   0.000     0.000     1.000]\n [   1.000     1.000     0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
+    },
+    {
+      "object": "Matrix",
+      "method": "dense_html_repr",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "<div class=\"groggy-matrix-container\"><table class=\"groggy-matrix-table\"><tbody><tr><td class=\"matrix-cell\">0.0</td><td class=\"matrix-cell\">0.0</td><td class=\"matrix-cell\">1.0</td></tr><tr><td class=\"m",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "Matrix",
+      "method": "determinant",
+      "signature": "()",
+      "requires_params": false,
+      "status": "error",
+      "result": null,
+      "error": "Determinant calculation will be implemented in Phase 5",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "elementwise_multiply",
+      "signature": "(other)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['other']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "flatten",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "NumArray(dtype: float64)\n[  0] 0.000000\n[  1] 0.000000\n[  2] 1.000000\n[  3] 0.000000\n[  4] 0.000000\n[  5] 1.000000\n[  6] 1.000000\n[  7] 1.000000\n[  8] 0.000000",
+      "error": null,
+      "return_type": "NumArray"
+    },
+    {
+      "object": "Matrix",
+      "method": "from_base_array",
+      "signature": "(base_array, rows, cols)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['base_array', 'rows', 'cols']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "from_flattened",
+      "signature": "(num_array, rows, cols)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['num_array', 'rows', 'cols']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "from_graph_attributes",
+      "signature": "(_graph, _attrs, _entities)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['_graph', '_attrs', '_entities']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "gelu",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.000     0.000     0.841]\n [   0.000     0.000     0.841]\n [   0.841     0.841     0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
+    },
+    {
+      "object": "Matrix",
+      "method": "get_cell",
+      "signature": "(row, col)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['row', 'col']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "get_column",
+      "signature": "(col)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['col']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "get_column_by_name",
+      "signature": "(name)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['name']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "get_row",
+      "signature": "(row)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['row']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "identity",
+      "signature": "(size)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['size']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "interactive",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "http://127.0.0.1:53051",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "Matrix",
+      "method": "interactive_embed",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "<iframe src=\"http://127.0.0.1:53052\" width=\"100%\" height=\"420\" style=\"border:0;border-radius:12px;\"></iframe>",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "Matrix",
+      "method": "inverse",
+      "signature": "()",
+      "requires_params": false,
+      "status": "error",
+      "result": null,
+      "error": "Matrix inverse will be implemented in Phase 5",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "iter_columns",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[NumArray(dtype: float64)\n[  0] 0.000000\n[  1] 0.000000\n[  2] 1.000000, NumArray(dtype: float64)\n[  0] 0.000000\n[  1] 0.000000\n[  2] 1.000000, NumArray(dtype: float64)\n[  0] 1.000000\n[  1] 1.000000\n[ ",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "Matrix",
+      "method": "iter_rows",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "[NumArray(dtype: float64)\n[  0] 0.000000\n[  1] 0.000000\n[  2] 1.000000, NumArray(dtype: float64)\n[  0] 0.000000\n[  1] 0.000000\n[  2] 1.000000, NumArray(dtype: float64)\n[  0] 1.000000\n[  1] 1.000000\n[ ",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "Matrix",
+      "method": "mean_axis",
+      "signature": "(axis)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['axis']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "multiply",
+      "signature": "(other)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['other']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "power",
+      "signature": "(n)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['n']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "preview",
+      "signature": "(row_limit=None, col_limit=None)",
+      "requires_params": false,
+      "status": "success",
+      "result": "[[0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [1.0, 1.0, 0.0]]",
+      "error": null,
+      "return_type": "list"
+    },
+    {
+      "object": "Matrix",
+      "method": "relu",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.000     0.000     1.000]\n [   0.000     0.000     1.000]\n [   1.000     1.000     0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
+    },
+    {
+      "object": "Matrix",
+      "method": "rich_display",
+      "signature": "(config=None)",
+      "requires_params": false,
+      "status": "success",
+      "result": "\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502 col_0 \u2502 col_1 \u2502 col_2 \u2502\n\u2502 obj   \u2502 obj   \u2502 obj   \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 0     \u2502 0     \u2502 1     \u2502\n\u2502 0     \u2502 0     \u2502 1     \u2502\n\u2502 1     \u2502 1     \u2502 0     \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "Matrix",
+      "method": "scalar_multiply",
+      "signature": "(scalar)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['scalar']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "sigmoid",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.500     0.500     0.731]\n [   0.500     0.500     0.731]\n [   0.731     0.731     0.500]]",
+      "error": null,
+      "return_type": "GraphMatrix"
+    },
+    {
+      "object": "Matrix",
+      "method": "softmax",
+      "signature": "(dim=1)",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.212     0.212     0.576]\n [   0.212     0.212     0.576]\n [   0.422     0.422     0.155]]",
+      "error": null,
+      "return_type": "GraphMatrix"
+    },
+    {
+      "object": "Matrix",
+      "method": "std_axis",
+      "signature": "(axis)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['axis']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "sum_axis",
+      "signature": "(axis)",
+      "requires_params": true,
+      "status": "skipped",
+      "result": null,
+      "error": "Requires parameters: ['axis']",
+      "return_type": null
+    },
+    {
+      "object": "Matrix",
+      "method": "summary",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix<f64>: 3x3 matrix",
+      "error": null,
+      "return_type": "str"
+    },
+    {
+      "object": "Matrix",
+      "method": "tanh",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.000     0.000     0.762]\n [   0.000     0.000     0.762]\n [   0.762     0.762     0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
+    },
+    {
+      "object": "Matrix",
+      "method": "to_base_array",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "BaseArray[9] [0.00, 0.00, 1.00, ...] (dtype: Float)\n\ud83d\udca1 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
+      "error": null,
+      "return_type": "BaseArray"
+    },
+    {
+      "object": "Matrix",
       "method": "to_numpy",
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "[1 0 2]",
+      "result": "[[0. 0. 1.]\n [0. 0. 1.]\n [1. 1. 0.]]",
       "error": null,
       "return_type": "ndarray"
     },
     {
-      "object": "GraphArray",
+      "object": "Matrix",
       "method": "to_pandas",
       "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "0    1\n1    0\n2    2\ndtype: int64",
+      "result": "   node_0  node_2  node_1\n0     0.0     0.0     1.0\n1     0.0     0.0     1.0\n2     1.0     1.0     0.0",
       "error": null,
-      "return_type": "Series"
-    },
-    {
-      "object": "GraphArray",
-      "method": "to_scipy_sparse",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "  (np.int32(0), np.int32(0))\t1\n  (np.int32(0), np.int32(2))\t2",
-      "error": null,
-      "return_type": "csr_matrix"
-    },
-    {
-      "object": "GraphArray",
-      "method": "true_indices",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "[]",
-      "error": null,
-      "return_type": "list"
-    },
-    {
-      "object": "GraphArray",
-      "method": "unique",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "GraphArray(len=3, dtype=int64)",
-      "error": null,
-      "return_type": "GraphArray"
-    },
-    {
-      "object": "GraphArray",
-      "method": "value_counts",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "{2: 1, 1: 1, 0: 1}",
-      "error": null,
-      "return_type": "dict"
+      "return_type": "DataFrame"
     },
     {
       "object": "Matrix",
-      "method": "copy",
-      "signature": "signature_unavailable",
+      "method": "to_table_for_streaming",
+      "signature": "()",
       "requires_params": false,
       "status": "success",
-      "result": "{'size': 3, 'is_sparse': True, 'type': 'adjacency_matrix', 'matrix': GraphMatrix(3 x 3, dtype=Float)}",
+      "result": "BaseTable[9 x 3]",
       "error": null,
-      "return_type": "dict"
+      "return_type": "BaseTable"
     },
     {
       "object": "Matrix",
-      "method": "fromkeys",
-      "signature": "(iterable, value=None, /)",
+      "method": "transpose",
+      "signature": "()",
+      "requires_params": false,
+      "status": "success",
+      "result": "GraphMatrix(shape=(3, 3), dtype=f64)\n[[   0.000     0.000     1.000]\n [   0.000     0.000     1.000]\n [   1.000     1.000     0.000]]",
+      "error": null,
+      "return_type": "GraphMatrix"
+    },
+    {
+      "object": "Matrix",
+      "method": "zeros",
+      "signature": "(rows, cols, dtype=None)",
       "requires_params": true,
       "status": "skipped",
       "result": null,
-      "error": "Requires parameters: ['iterable']",
+      "error": "Requires parameters: ['rows', 'cols']",
       "return_type": null
-    },
-    {
-      "object": "Matrix",
-      "method": "get",
-      "signature": "(key, default=None, /)",
-      "requires_params": true,
-      "status": "skipped",
-      "result": null,
-      "error": "Requires parameters: ['key']",
-      "return_type": null
-    },
-    {
-      "object": "Matrix",
-      "method": "items",
-      "signature": "signature_unavailable",
-      "requires_params": false,
-      "status": "success",
-      "result": "dict_items([('size', 3), ('is_sparse', True), ('type', 'adjacency_matrix'), ('matrix', GraphMatrix(3 x 3, dtype=Float))])",
-      "error": null,
-      "return_type": "dict_items"
-    },
-    {
-      "object": "Matrix",
-      "method": "keys",
-      "signature": "signature_unavailable",
-      "requires_params": false,
-      "status": "success",
-      "result": "dict_keys(['size', 'is_sparse', 'type', 'matrix'])",
-      "error": null,
-      "return_type": "dict_keys"
-    },
-    {
-      "object": "Matrix",
-      "method": "pop",
-      "signature": "signature_unavailable",
-      "requires_params": false,
-      "status": "error",
-      "result": null,
-      "error": "pop expected at least 1 argument, got 0",
-      "return_type": null
-    },
-    {
-      "object": "Matrix",
-      "method": "popitem",
-      "signature": "()",
-      "requires_params": false,
-      "status": "success",
-      "result": "('matrix', GraphMatrix(3 x 3, dtype=Float))",
-      "error": null,
-      "return_type": "tuple"
-    },
-    {
-      "object": "Matrix",
-      "method": "setdefault",
-      "signature": "(key, default=None, /)",
-      "requires_params": true,
-      "status": "skipped",
-      "result": null,
-      "error": "Requires parameters: ['key']",
-      "return_type": null
-    },
-    {
-      "object": "Matrix",
-      "method": "update",
-      "signature": "signature_unavailable",
-      "requires_params": false,
-      "status": "success",
-      "result": "None",
-      "error": null,
-      "return_type": "NoneType"
-    },
-    {
-      "object": "Matrix",
-      "method": "values",
-      "signature": "signature_unavailable",
-      "requires_params": false,
-      "status": "success",
-      "result": "dict_values([3, True, 'adjacency_matrix'])",
-      "error": null,
-      "return_type": "dict_values"
     }
   ],
   "coverage_analysis": {
     "BaseTable": {
-      "total": 30,
-      "successful": 10,
+      "total": 33,
+      "successful": 13,
       "failed": 0,
       "skipped": 20
     },
     "NodesTable": {
-      "total": 27,
-      "successful": 14,
+      "total": 29,
+      "successful": 16,
       "failed": 0,
       "skipped": 13
     },
     "EdgesTable": {
-      "total": 32,
-      "successful": 18,
+      "total": 34,
+      "successful": 20,
       "failed": 0,
       "skipped": 14
     },
@@ -2861,26 +3203,26 @@
       "skipped": 8
     },
     "BaseArray": {
-      "total": 7,
-      "successful": 6,
+      "total": 15,
+      "successful": 13,
       "failed": 0,
-      "skipped": 1
+      "skipped": 2
     },
     "Graph": {
-      "total": 62,
-      "successful": 19,
-      "failed": 2,
-      "skipped": 41
+      "total": 58,
+      "successful": 15,
+      "failed": 3,
+      "skipped": 40
     },
     "Nodes": {
-      "total": 5,
-      "successful": 3,
+      "total": 7,
+      "successful": 5,
       "failed": 0,
       "skipped": 2
     },
     "Edges": {
-      "total": 4,
-      "successful": 3,
+      "total": 6,
+      "successful": 5,
       "failed": 0,
       "skipped": 1
     },
@@ -2891,22 +3233,22 @@
       "skipped": 0
     },
     "Subgraph": {
-      "total": 52,
-      "successful": 23,
-      "failed": 3,
+      "total": 55,
+      "successful": 27,
+      "failed": 2,
       "skipped": 26
     },
     "GraphArray": {
-      "total": 25,
-      "successful": 21,
+      "total": 13,
+      "successful": 11,
       "failed": 0,
-      "skipped": 4
+      "skipped": 2
     },
     "Matrix": {
-      "total": 10,
-      "successful": 6,
-      "failed": 1,
-      "skipped": 3
+      "total": 38,
+      "successful": 20,
+      "failed": 2,
+      "skipped": 16
     }
   },
   "method_success_patterns": {
@@ -2923,6 +3265,10 @@
       "successful": 0
     },
     "column": {
+      "total": 1,
+      "successful": 1
+    },
+    "column_info": {
       "total": 1,
       "successful": 1
     },
@@ -2949,6 +3295,14 @@
     "from_parquet": {
       "total": 3,
       "successful": 0
+    },
+    "get_column_numeric": {
+      "total": 1,
+      "successful": 1
+    },
+    "get_column_raw": {
+      "total": 1,
+      "successful": 1
     },
     "group_by": {
       "total": 4,
@@ -3037,6 +3391,14 @@
     "filter_by_attr": {
       "total": 2,
       "successful": 0
+    },
+    "interactive": {
+      "total": 4,
+      "successful": 4
+    },
+    "interactive_embed": {
+      "total": 4,
+      "successful": 4
     },
     "into_base_table": {
       "total": 2,
@@ -3151,20 +3513,44 @@
       "successful": 0
     },
     "apply_to_each": {
+      "total": 1,
+      "successful": 0
+    },
+    "astype": {
       "total": 2,
       "successful": 0
     },
     "describe": {
-      "total": 2,
-      "successful": 2
+      "total": 1,
+      "successful": 1
     },
     "dtype": {
       "total": 1,
       "successful": 1
     },
+    "infer_numeric_type": {
+      "total": 1,
+      "successful": 1
+    },
+    "is_numeric": {
+      "total": 1,
+      "successful": 1
+    },
+    "numeric_compatibility_info": {
+      "total": 1,
+      "successful": 1
+    },
+    "to_num_array": {
+      "total": 1,
+      "successful": 1
+    },
+    "to_table": {
+      "total": 1,
+      "successful": 1
+    },
     "unique": {
-      "total": 2,
-      "successful": 2
+      "total": 1,
+      "successful": 1
     },
     "add_edge": {
       "total": 1,
@@ -3185,14 +3571,6 @@
     "add_nodes": {
       "total": 1,
       "successful": 0
-    },
-    "adjacency": {
-      "total": 1,
-      "successful": 1
-    },
-    "adjacency_matrix": {
-      "total": 1,
-      "successful": 1
     },
     "all_edge_attribute_names": {
       "total": 1,
@@ -3233,10 +3611,6 @@
     "create_branch": {
       "total": 1,
       "successful": 0
-    },
-    "dense_adjacency_matrix": {
-      "total": 1,
-      "successful": 1
     },
     "density": {
       "total": 2,
@@ -3320,7 +3694,7 @@
     },
     "laplacian_matrix": {
       "total": 1,
-      "successful": 1
+      "successful": 0
     },
     "neighborhood": {
       "total": 3,
@@ -3382,13 +3756,13 @@
       "total": 1,
       "successful": 0
     },
-    "sparse_adjacency_matrix": {
-      "total": 1,
-      "successful": 1
-    },
     "table": {
       "total": 5,
       "successful": 5
+    },
+    "to_matrix": {
+      "total": 2,
+      "successful": 2
     },
     "to_networkx": {
       "total": 2,
@@ -3402,13 +3776,13 @@
       "total": 1,
       "successful": 1
     },
-    "weighted_adjacency_matrix": {
-      "total": 1,
-      "successful": 0
-    },
     "all": {
       "total": 2,
       "successful": 2
+    },
+    "array": {
+      "total": 1,
+      "successful": 1
     },
     "get_meta_node": {
       "total": 1,
@@ -3418,9 +3792,17 @@
       "total": 2,
       "successful": 2
     },
+    "matrix": {
+      "total": 2,
+      "successful": 2
+    },
     "set_attrs": {
       "total": 2,
       "successful": 0
+    },
+    "weight_matrix": {
+      "total": 1,
+      "successful": 1
     },
     "largest_component": {
       "total": 1,
@@ -3437,6 +3819,18 @@
     "to_list": {
       "total": 2,
       "successful": 2
+    },
+    "adj": {
+      "total": 1,
+      "successful": 1
+    },
+    "adjacency_list": {
+      "total": 1,
+      "successful": 1
+    },
+    "adjacency_matrix": {
+      "total": 1,
+      "successful": 1
     },
     "calculate_similarity": {
       "total": 1,
@@ -3511,8 +3905,8 @@
       "successful": 0
     },
     "is_empty": {
-      "total": 1,
-      "successful": 1
+      "total": 2,
+      "successful": 2
     },
     "meta_nodes": {
       "total": 1,
@@ -3542,33 +3936,17 @@
       "total": 2,
       "successful": 2
     },
-    "to_matrix": {
-      "total": 1,
-      "successful": 0
-    },
     "transitivity": {
       "total": 1,
       "successful": 0
     },
-    "count": {
+    "first": {
       "total": 1,
       "successful": 1
     },
-    "drop_na": {
+    "last": {
       "total": 1,
       "successful": 1
-    },
-    "fill_na": {
-      "total": 1,
-      "successful": 0
-    },
-    "has_null": {
-      "total": 1,
-      "successful": 1
-    },
-    "items": {
-      "total": 2,
-      "successful": 2
     },
     "max": {
       "total": 1,
@@ -3578,27 +3956,15 @@
       "total": 1,
       "successful": 1
     },
-    "median": {
-      "total": 1,
-      "successful": 1
-    },
     "min": {
       "total": 1,
       "successful": 1
     },
-    "null_count": {
+    "nunique": {
       "total": 1,
       "successful": 1
     },
-    "percentile": {
-      "total": 1,
-      "successful": 0
-    },
-    "preview": {
-      "total": 1,
-      "successful": 1
-    },
-    "quantile": {
+    "reshape": {
       "total": 1,
       "successful": 0
     },
@@ -3606,57 +3972,145 @@
       "total": 1,
       "successful": 1
     },
+    "sum": {
+      "total": 1,
+      "successful": 1
+    },
+    "var": {
+      "total": 1,
+      "successful": 1
+    },
+    "dense": {
+      "total": 1,
+      "successful": 1
+    },
+    "dense_html_repr": {
+      "total": 1,
+      "successful": 1
+    },
+    "determinant": {
+      "total": 1,
+      "successful": 0
+    },
+    "elementwise_multiply": {
+      "total": 1,
+      "successful": 0
+    },
+    "flatten": {
+      "total": 1,
+      "successful": 1
+    },
+    "from_base_array": {
+      "total": 1,
+      "successful": 0
+    },
+    "from_flattened": {
+      "total": 1,
+      "successful": 0
+    },
+    "from_graph_attributes": {
+      "total": 1,
+      "successful": 0
+    },
+    "gelu": {
+      "total": 1,
+      "successful": 1
+    },
+    "get_cell": {
+      "total": 1,
+      "successful": 0
+    },
+    "get_column": {
+      "total": 1,
+      "successful": 0
+    },
+    "get_column_by_name": {
+      "total": 1,
+      "successful": 0
+    },
+    "get_row": {
+      "total": 1,
+      "successful": 0
+    },
+    "identity": {
+      "total": 1,
+      "successful": 0
+    },
+    "inverse": {
+      "total": 1,
+      "successful": 0
+    },
+    "iter_columns": {
+      "total": 1,
+      "successful": 1
+    },
+    "iter_rows": {
+      "total": 1,
+      "successful": 1
+    },
+    "mean_axis": {
+      "total": 1,
+      "successful": 0
+    },
+    "multiply": {
+      "total": 1,
+      "successful": 0
+    },
+    "power": {
+      "total": 1,
+      "successful": 0
+    },
+    "preview": {
+      "total": 1,
+      "successful": 1
+    },
+    "relu": {
+      "total": 1,
+      "successful": 1
+    },
+    "scalar_multiply": {
+      "total": 1,
+      "successful": 0
+    },
+    "sigmoid": {
+      "total": 1,
+      "successful": 1
+    },
+    "softmax": {
+      "total": 1,
+      "successful": 1
+    },
+    "std_axis": {
+      "total": 1,
+      "successful": 0
+    },
+    "sum_axis": {
+      "total": 1,
+      "successful": 0
+    },
+    "tanh": {
+      "total": 1,
+      "successful": 1
+    },
+    "to_base_array": {
+      "total": 1,
+      "successful": 1
+    },
     "to_numpy": {
       "total": 1,
       "successful": 1
     },
-    "to_scipy_sparse": {
+    "to_table_for_streaming": {
       "total": 1,
       "successful": 1
     },
-    "true_indices": {
+    "transpose": {
       "total": 1,
       "successful": 1
     },
-    "value_counts": {
-      "total": 1,
-      "successful": 1
-    },
-    "copy": {
-      "total": 1,
-      "successful": 1
-    },
-    "fromkeys": {
+    "zeros": {
       "total": 1,
       "successful": 0
-    },
-    "get": {
-      "total": 1,
-      "successful": 0
-    },
-    "keys": {
-      "total": 1,
-      "successful": 1
-    },
-    "pop": {
-      "total": 1,
-      "successful": 0
-    },
-    "popitem": {
-      "total": 1,
-      "successful": 1
-    },
-    "setdefault": {
-      "total": 1,
-      "successful": 0
-    },
-    "update": {
-      "total": 1,
-      "successful": 1
-    },
-    "values": {
-      "total": 1,
-      "successful": 1
     }
   }
 }
