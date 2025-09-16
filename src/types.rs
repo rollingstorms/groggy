@@ -454,7 +454,7 @@ impl NumericType {
         use NumericType::*;
         match (self, target) {
             // Same types can always convert
-            (a, b) if a == b => true,
+            (a, b) if *a == b => true,
             
             // Integer promotions (lossless)
             (Int32, Int64) => true,
@@ -473,9 +473,9 @@ impl NumericType {
     /// Get the "highest" type that can represent both types without loss
     pub fn promote_with(&self, other: NumericType) -> NumericType {
         use NumericType::*;
-        match (self, other) {
+        match (*self, other) {
             // Same types
-            (a, b) if a == b => *a,
+            (a, b) if a == b => a,
             
             // Bool promotes to anything
             (Bool, other) | (other, Bool) => other,

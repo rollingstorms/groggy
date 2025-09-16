@@ -2377,6 +2377,191 @@ impl Graph {
         self.adjacency_matrix()
     }
 
+    // ===== GRAPHMATRIX CONVERSION OPERATIONS =====
+
+    /// Convert graph data to GraphMatrix with generic numeric type support
+    pub fn to_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>> 
+    where
+        T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>
+    {
+        use crate::storage::matrix::{GraphMatrix, FromAttrValue};
+        
+        let mut nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
+        nodes.sort(); // Sort to ensure consistent ordering (creation order)
+        if nodes.is_empty() {
+            return Ok(GraphMatrix::zeros(0, 0));
+        }
+
+        // Get all node attribute names
+        let (node_attr_names, _edge_attr_names) = self.pool.borrow().attribute_names();
+        let attribute_names: Vec<String> = node_attr_names.into_iter().map(|s| s.to_string()).collect();
+        let col_count = attribute_names.len();
+
+        if col_count == 0 {
+            return Ok(GraphMatrix::zeros(nodes.len(), 0));
+        }
+
+        // Build matrix data column by column
+        let mut matrix_data = Vec::with_capacity(nodes.len() * col_count);
+        
+        // Phase 1: Detect all numerical attributes and determine LCD type
+        use crate::types::AttrValue;
+        
+        let mut valid_attribute_names = Vec::new();
+        let mut has_float = false;
+        let mut has_int = false;
+        let mut has_bool = false;
+        
+        for attr_name in &attribute_names {
+            let pool_ref = self.pool.borrow();
+            let mut is_numeric = false;
+            
+            // Check ALL values in this attribute to detect type
+            for &node_id in &nodes {
+                let value_result = pool_ref.get_node_attribute(node_id, &attr_name);
+                if let Ok(Some(attr_val)) = value_result {
+                    match attr_val {
+                        AttrValue::Int(_) => {
+                            has_int = true;
+                            is_numeric = true;
+                        }
+                        AttrValue::SmallInt(_) => {
+                            has_int = true;
+                            is_numeric = true;
+                        }
+                        AttrValue::Float(_) => {
+                            has_float = true;
+                            is_numeric = true;
+                        }
+                        AttrValue::Bool(_) => {
+                            has_bool = true;
+                            is_numeric = true;
+                        }
+                        _ => {} // Non-numeric types ignored
+                    }
+                }
+            }
+            
+            if is_numeric {
+                valid_attribute_names.push(attr_name.clone());
+            }
+        }
+        
+        // LCD Logic: float > int > bool (float can represent all, int can represent bool)
+        // If we have mixed types, use the most general type that can represent all
+        let _use_float_type = has_float || (has_int && has_bool); // Need float if mixed int/float or int/bool
+        
+        let valid_col_count = valid_attribute_names.len();
+        if valid_col_count == 0 {
+            return Ok(GraphMatrix::zeros(nodes.len(), 0));
+        }
+        
+        matrix_data = Vec::with_capacity(nodes.len() * valid_col_count);
+        
+        // Phase 2: Build matrix data with LCD conversion in ROW-MAJOR order
+        for &node_id in &nodes {  // For each ROW (node)
+            let pool_ref = self.pool.borrow();
+            for attr_name in &valid_attribute_names {  // For each COLUMN (attribute)
+                let value_result = pool_ref.get_node_attribute(node_id, &attr_name);
+                let value = match value_result {
+                    Ok(Some(ref attr_val)) => attr_val,
+                    _ => &AttrValue::Null,
+                };
+                
+                // Convert using LCD logic - all numerical types should convert to T
+                let numeric_value = match value {
+                    AttrValue::Int(i) => T::from_attr_value(value)?,
+                    AttrValue::SmallInt(i) => T::from_attr_value(value)?,
+                    AttrValue::Float(f) => T::from_attr_value(value)?,
+                    AttrValue::Bool(b) => T::from_attr_value(value)?,
+                    AttrValue::Null => T::from_attr_value(value)?, // Should convert to 0
+                    _ => {
+                        // Skip non-numeric (shouldn't happen due to filtering)
+                        T::from_attr_value(&AttrValue::Null)?
+                    }
+                };
+                matrix_data.push(numeric_value);
+            }
+        }
+
+        let mut matrix = GraphMatrix::from_row_major_data(matrix_data, nodes.len(), valid_col_count, None)?;
+        matrix.set_column_names(valid_attribute_names);
+        Ok(matrix)
+    }
+    
+    /// Convert to f64 matrix (most common use case)
+    pub fn to_matrix_f64(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<f64>> {
+        self.to_matrix::<f64>()
+    }
+    
+    /// Convert to f32 matrix (memory-efficient for ML)
+    pub fn to_matrix_f32(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<f32>> {
+        self.to_matrix::<f32>()
+    }
+
+    /// Convert to integer matrix
+    pub fn to_matrix_i64(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<i64>> {
+        self.to_matrix::<i64>()
+    }
+
+    /// Create GraphMatrix adjacency representation (replaces AdjacencyMatrix)
+    pub fn to_adjacency_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
+    where
+        T: crate::storage::advanced_matrix::NumericType
+    {
+        use crate::storage::matrix::GraphMatrix;
+        
+        let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
+        let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
+        
+        // Convert edges to (source, target) tuples
+        let mut edges = Vec::new();
+        for edge_id in edge_ids {
+            if let Ok((source, target)) = self.edge_endpoints(edge_id) {
+                edges.push((source, target));
+            }
+        }
+        
+        GraphMatrix::adjacency_from_edges(&nodes, &edges)
+    }
+
+    /// Create weighted GraphMatrix adjacency representation
+    pub fn to_weighted_adjacency_matrix<T>(&self, weight_attr: &str) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
+    where
+        T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>
+    {
+        use crate::storage::matrix::{GraphMatrix, FromAttrValue};
+        
+        let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
+        let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
+        
+        // Convert edges to (source, target, weight) tuples using bulk operations
+        let mut weighted_edges = Vec::new();
+        
+        // Prepare bulk input for weight attributes
+        let edge_indices: Vec<(NodeId, Option<usize>)> = edge_ids.iter().map(|&id| (id, None)).collect();
+        
+        // Single bulk operation to get all weight values
+        let pool_ref = self.pool.borrow();
+        let weight_values = pool_ref.get_attribute_values(&weight_attr.to_string(), &edge_indices, false);
+        
+        // Create weight lookup map for O(1) access
+        let weight_map: std::collections::HashMap<NodeId, &AttrValue> = weight_values.iter()
+            .filter_map(|(id, val_opt)| val_opt.map(|val| (*id, val)))
+            .collect();
+        
+        // Build weighted edges using bulk results
+        for edge_id in edge_ids {
+            if let Ok((source, target)) = self.edge_endpoints(edge_id) {
+                let weight_value = weight_map.get(&edge_id).unwrap_or(&&AttrValue::Float(1.0));
+                let weight = T::from_attr_value(weight_value)?;
+                weighted_edges.push((source, target, weight));
+            }
+        }
+        
+        GraphMatrix::weighted_adjacency_from_edges(&nodes, &weighted_edges)
+    }
+
     /// Generate weighted adjacency matrix using specified edge attribute
     pub fn weighted_adjacency_matrix(&mut self, weight_attr: &str) -> GraphResult<AdjacencyMatrix> {
         let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();

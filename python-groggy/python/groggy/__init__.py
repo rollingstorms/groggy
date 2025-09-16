@@ -30,6 +30,11 @@ from ._groggy import (
     SubgraphArray,
     NumArray,
     StatsArray,  # Backward compatibility alias for NumArray
+    # Array factory functions for backward compatibility  
+    bool_array,
+    int_array,
+    ones_bool,
+    zeros_bool,
     GraphMatrix,
     GraphTable,
     # Table classes
@@ -60,6 +65,8 @@ from .errors import (
     NotImplementedError
 )
 from ._groggy import parse_node_query, parse_edge_query
+# Import neural network submodule
+from ._groggy import neural
 from . import generators
 from .generators import (
     complete_graph,
@@ -135,8 +142,13 @@ __all__ = [
     "MetaNodeArray",
     "ComponentsArray",
     "SubgraphArray",
-    "NumArray",
+    "NumArray", 
     "StatsArray",  # Backward compatibility
+    # Array factory functions  
+    "bool_array",
+    "int_array",
+    "ones_bool", 
+    "zeros_bool",
     "GraphMatrix",
     "GraphTable",
     # Table classes
@@ -176,4 +188,6 @@ __all__ = [
     # Hierarchical subgraph functionality
     "AggregationFunction",
     "MetaNode",
+    # Neural network module
+    "neural",
 ]

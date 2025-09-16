@@ -15,6 +15,7 @@ pub mod adjacency;
 pub mod pool;
 pub mod node;
 pub mod edge;
+pub mod advanced_matrix; // Advanced Matrix System - Foundation Infrastructure
 
 // Re-export components
 pub use matrix::*;
@@ -24,3 +25,4 @@ pub use adjacency::*;
 pub use pool::*;
 pub use node::*;
 pub use edge::*;
+pub use advanced_matrix::*; // Advanced Matrix System

@@ -46,6 +46,14 @@ impl PyBaseArray {
         })
     }
 
+    /// Create a BaseArray from existing AttrValues (internal constructor)
+    /// TODO: Fix PyO3 type inference issue
+    // pub fn from_attr_values(attr_values: Vec<RustAttrValue>) -> PyResult<Self> {
+    //     Ok(PyBaseArray {
+    //         inner: BaseArray::new(attr_values),
+    //     })
+    // }
+
     /// Get the number of elements (len())
     fn __len__(&self) -> usize {
         self.inner.len()
@@ -350,9 +358,8 @@ impl PyBaseArray {
             result.push(comparison_result);
         }
         
-        // Convert Vec<bool> to BoolArray
-        let bool_array = groggy::storage::BoolArray::new(result);
-        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        // Convert Vec<bool> to unified NumArray with bool dtype
+        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
         Ok(py_bool_array.into_py(py))
     }
 
@@ -399,9 +406,8 @@ impl PyBaseArray {
             result.push(comparison_result);
         }
         
-        // Convert Vec<bool> to BoolArray
-        let bool_array = groggy::storage::BoolArray::new(result);
-        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        // Convert Vec<bool> to unified NumArray with bool dtype
+        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
         Ok(py_bool_array.into_py(py))
     }
 
@@ -448,9 +454,8 @@ impl PyBaseArray {
             result.push(comparison_result);
         }
         
-        // Convert Vec<bool> to BoolArray
-        let bool_array = groggy::storage::BoolArray::new(result);
-        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        // Convert Vec<bool> to unified NumArray with bool dtype
+        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
         Ok(py_bool_array.into_py(py))
     }
 
@@ -497,9 +502,8 @@ impl PyBaseArray {
             result.push(comparison_result);
         }
         
-        // Convert Vec<bool> to BoolArray
-        let bool_array = groggy::storage::BoolArray::new(result);
-        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        // Convert Vec<bool> to unified NumArray with bool dtype
+        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
         Ok(py_bool_array.into_py(py))
     }
 
@@ -537,9 +541,8 @@ impl PyBaseArray {
             result.push(comparison_result);
         }
         
-        // Convert Vec<bool> to BoolArray
-        let bool_array = groggy::storage::BoolArray::new(result);
-        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        // Convert Vec<bool> to unified NumArray with bool dtype
+        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
         Ok(py_bool_array.into_py(py))
     }
 
@@ -549,9 +552,8 @@ impl PyBaseArray {
         let eq_result = self.__eq__(py, other)?;
         let bool_vec: Vec<bool> = eq_result.extract(py)?;
         let ne_result: Vec<bool> = bool_vec.into_iter().map(|x| !x).collect();
-        // Convert Vec<bool> to BoolArray
-        let bool_array = groggy::storage::BoolArray::new(ne_result);
-        let py_bool_array = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
+        // Convert Vec<bool> to unified NumArray with bool dtype
+        let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(ne_result);
         Ok(py_bool_array.into_py(py))
     }
     
@@ -572,7 +574,7 @@ impl PyBaseArray {
                         ))
                     }
                 }
-                let int_array = crate::ffi::storage::num_array::PyIntArray::new(int_values);
+                let int_array = crate::ffi::storage::num_array::PyNumArray::new_int64(int_values);
                 Ok(int_array.into_py(py))
             }
             "float64" | "f64" => {
@@ -589,7 +591,7 @@ impl PyBaseArray {
                         ))
                     }
                 }
-                let num_array = crate::ffi::storage::num_array::PyNumArray::new(float_values);
+                let num_array = crate::ffi::storage::num_array::PyNumArray::new_float64(float_values);
                 Ok(num_array.into_py(py))
             }
             "basearray" => {
@@ -639,77 +641,69 @@ impl PyBaseArray {
     
     /// Convert BaseArray to NumArray if all elements are numeric
     /// Returns appropriate numeric array type based on inferred type
+    /// OPTIMIZED: Single-pass conversion with pre-allocated vectors
     fn to_num_array(&self, py: Python) -> PyResult<PyObject> {
-        if let Some(inferred_type) = self.infer_numeric_type() {
-            match inferred_type.as_str() {
-                "Bool" => {
-                    // Convert to BoolArray
-                    let bool_values: Result<Vec<bool>, _> = self.inner.iter().map(|v| {
-                        match v {
-                            groggy::AttrValue::Bool(b) => Ok(*b),
-                            groggy::AttrValue::Null => Ok(false), // Default null to false
-                            _ => Err("Non-boolean value found")
-                        }
-                    }).collect();
-                    
-                    match bool_values {
-                        Ok(values) => {
-                            let bool_array = groggy::storage::BoolArray::new(values);
-                            let py_bool = crate::ffi::storage::bool_array::PyBoolArray { inner: bool_array };
-                            Ok(py_bool.into_py(py))
-                        }
-                        Err(e) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(e))
-                    }
-                }
-                "Int32" | "Int64" => {
-                    // Convert to IntArray (i64)
-                    let int_values: Result<Vec<i64>, _> = self.inner.iter().map(|v| {
-                        match v {
-                            groggy::AttrValue::Bool(b) => Ok(if *b { 1 } else { 0 }),
-                            groggy::AttrValue::SmallInt(i) => Ok(*i as i64),
-                            groggy::AttrValue::Int(i) => Ok(*i),
-                            groggy::AttrValue::Null => Ok(0), // Default null to 0
-                            _ => Err("Non-integer value found")
-                        }
-                    }).collect();
-                    
-                    match int_values {
-                        Ok(values) => {
-                            let int_array = crate::ffi::storage::num_array::PyIntArray::new(values);
-                            Ok(int_array.into_py(py))
-                        }
-                        Err(e) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(e))
-                    }
-                }
-                "Float32" | "Float64" => {
-                    // Convert to NumArray (f64)
-                    let float_values: Result<Vec<f64>, _> = self.inner.iter().map(|v| {
-                        match v {
-                            groggy::AttrValue::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
-                            groggy::AttrValue::SmallInt(i) => Ok(*i as f64),
-                            groggy::AttrValue::Int(i) => Ok(*i as f64),
-                            groggy::AttrValue::Float(f) => Ok(*f as f64),
-                            groggy::AttrValue::Null => Ok(0.0), // Default null to 0.0
-                            _ => Err("Non-float value found")
-                        }
-                    }).collect();
-                    
-                    match float_values {
-                        Ok(values) => {
-                            let num_array = crate::ffi::storage::num_array::PyNumArray::new(values);
-                            Ok(num_array.into_py(py))
-                        }
-                        Err(e) => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(e))
-                    }
-                }
-                _ => Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    format!("Unsupported numeric type: {}", inferred_type)
+        // OPTIMIZATION: Single-pass type inference and conversion
+        if self.inner.is_empty() {
+            // Return empty NumArray for empty input
+            return Ok(crate::ffi::storage::num_array::PyNumArray::new_float64(Vec::new()).into_py(py));
+        }
+        
+        let len = self.inner.len();
+        let mut current_type: Option<groggy::NumericType> = None;
+        
+        // Pre-allocate vectors with known capacity for better performance
+        let mut bool_values = Vec::with_capacity(len);
+        let mut int_values = Vec::with_capacity(len);
+        let mut float_values = Vec::with_capacity(len);
+        
+        // Single pass: determine type and convert simultaneously
+        for value in self.inner.iter() {
+            let (value_type, bool_val, int_val, float_val) = match value {
+                groggy::AttrValue::Bool(b) => (Some(groggy::NumericType::Bool), *b, if *b { 1 } else { 0 }, if *b { 1.0 } else { 0.0 }),
+                groggy::AttrValue::SmallInt(i) => (Some(groggy::NumericType::Int32), *i != 0, *i as i64, *i as f64),
+                groggy::AttrValue::Int(i) => (Some(groggy::NumericType::Int64), *i != 0, *i, *i as f64),
+                groggy::AttrValue::Float(f) => (Some(groggy::NumericType::Float32), *f != 0.0, f.round() as i64, *f as f64),
+                groggy::AttrValue::Null => (None, false, 0, 0.0), // Skip nulls in type inference
+                _ => return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "BaseArray contains non-numeric data and cannot be converted to numeric array"
                 ))
+            };
+            
+            // Update promoted type
+            if let Some(vt) = value_type {
+                current_type = Some(match current_type {
+                    None => vt,
+                    Some(ct) => ct.promote_with(vt),
+                });
             }
-        } else {
-            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                "BaseArray contains non-numeric data and cannot be converted to numeric array"
-            ))
+            
+            // Store converted values (we'll use the appropriate one based on final type)
+            bool_values.push(bool_val);
+            int_values.push(int_val);
+            float_values.push(float_val);
+        }
+        
+        // Return appropriate array type based on promoted type
+        match current_type {
+            Some(groggy::NumericType::Bool) => {
+                // Convert to unified NumArray with bool dtype
+                let py_bool = crate::ffi::storage::num_array::PyNumArray::new_bool(bool_values);
+                Ok(py_bool.into_py(py))
+            },
+            Some(groggy::NumericType::Int32) | Some(groggy::NumericType::Int64) => {
+                let int_array = crate::ffi::storage::num_array::PyNumArray::new_int64(int_values);
+                Ok(int_array.into_py(py))
+            },
+            Some(groggy::NumericType::Float32) | Some(groggy::NumericType::Float64) => {
+                let num_array = crate::ffi::storage::num_array::PyNumArray::new_float64(float_values);
+                Ok(num_array.into_py(py))
+            },
+            None => {
+                // All nulls - default to empty NumArray
+                let num_array = crate::ffi::storage::num_array::PyNumArray::new_float64(Vec::new());
+                Ok(num_array.into_py(py))
+            }
         }
     }
     

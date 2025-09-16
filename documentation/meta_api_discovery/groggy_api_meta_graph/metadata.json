@@ -1,9 +1,9 @@
 {
   "version": "2.0",
-  "created_at": "2025-09-10T19:01:49.679863+00:00",
+  "created_at": "2025-09-15T20:41:58.236711+00:00",
   "groggy_version": "0.3.1",
   "node_count": 12,
-  "edge_count": 47,
+  "edge_count": 59,
   "validation_policy": {
     "strictness": "Standard",
     "validate_node_references": true,
@@ -15,23 +15,23 @@
     "auto_repair": false
   },
   "checksums": {
-    "nodes_sha256": "e4fc4b704a2543",
-    "edges_sha256": "fe05267b31917d52",
-    "metadata_sha256": "b9c1ba53c87abc84"
+    "nodes_sha256": "ba1ff564c8b0bac3",
+    "edges_sha256": "643963a00183f3d0",
+    "metadata_sha256": "f33743b2c83c354e"
   },
   "schema_info": {
     "node_columns": [
-      "object_name",
-      "node_id",
       "module",
-      "method_count",
-      "object_type"
+      "object_type",
+      "node_id",
+      "object_name",
+      "method_count"
     ],
     "edge_columns": [
+      "return_type",
+      "method_name",
       "method_signature",
       "source",
-      "method_name",
-      "return_type",
       "edge_id",
       "target"
     ],

@@ -717,7 +717,14 @@ impl BaseTable {
 impl BaseTable {
     /// Convert BaseTable data to unified DataWindow format
     fn to_data_window(&self, config: &DisplayConfig) -> DisplayDataWindow {
-        // Determine how many rows to include
+        // Check if we should use ellipses truncation pattern
+        if (self.nrows > config.max_rows && config.max_rows > 6) || 
+           (self.column_order.len() > config.max_cols && config.max_cols > 6) {
+            // Use ellipses pattern for both dense matrices and large tables
+            return self.create_ellipses_data_window(config);
+        }
+        
+        // Standard truncation for small tables  
         let max_rows = config.max_rows.min(self.nrows);
         let max_cols = config.max_cols.min(self.column_order.len());
         
@@ -772,6 +779,136 @@ impl BaseTable {
             self.nrows,          // total_rows
             self.column_order.len(), // total_cols
             0                    // start_offset
+        )
+    }
+    
+    /// Create data window with ellipses pattern for large tables and matrices
+    fn create_ellipses_data_window(&self, config: &DisplayConfig) -> DisplayDataWindow {
+        // Calculate how many rows/cols to show at beginning and end
+        let display_rows = config.max_rows;
+        let display_cols = config.max_cols;
+        
+        // Show roughly equal parts at start and end, with ellipses in middle
+        let rows_per_side = (display_rows - 1) / 2; // -1 for ellipses row
+        let cols_per_side = (display_cols - 1) / 2; // -1 for ellipses col
+        
+        // Extract column names for display (first N, ellipsis marker, last N)
+        let mut display_headers = Vec::new();
+        let total_cols = self.column_order.len();
+        
+        // First columns
+        for i in 0..cols_per_side.min(total_cols) {
+            display_headers.push(self.column_order[i].clone());
+        }
+        
+        // Ellipsis column marker (if needed)
+        if total_cols > display_cols {
+            display_headers.push(if config.show_headers { "⋯ (cols)" } else { "⋯" }.to_string());
+        }
+        
+        // Last columns (only if we have more than can fit in first part)
+        if total_cols > cols_per_side {
+            let start_last = (total_cols - cols_per_side).max(cols_per_side + 1);
+            for i in start_last..total_cols {
+                display_headers.push(self.column_order[i].clone());
+            }
+        }
+        
+        // Extract rows data with ellipses pattern
+        let mut display_rows_data = Vec::new();
+        let total_rows = self.nrows;
+        
+        // Helper closure to create a row of data
+        let create_row = |row_idx: usize| -> Vec<String> {
+            let mut row = Vec::new();
+            
+            // First columns
+            for i in 0..cols_per_side.min(total_cols) {
+                let col_name = &self.column_order[i];
+                let value_str = if let Some(column) = self.columns.get(col_name) {
+                    if let Some(value) = column.get(row_idx) {
+                        value.to_string()
+                    } else {
+                        "0.00".to_string()
+                    }
+                } else {
+                    "ERROR".to_string()
+                };
+                row.push(value_str);
+            }
+            
+            // Ellipsis column (if needed)
+            if total_cols > display_cols {
+                row.push("⋯".to_string());
+            }
+            
+            // Last columns
+            if total_cols > cols_per_side {
+                let start_last = (total_cols - cols_per_side).max(cols_per_side + 1);
+                for i in start_last..total_cols {
+                    let col_name = &self.column_order[i];
+                    let value_str = if let Some(column) = self.columns.get(col_name) {
+                        if let Some(value) = column.get(row_idx) {
+                            value.to_string()
+                        } else {
+                            "0.00".to_string()
+                        }
+                    } else {
+                        "ERROR".to_string()
+                    };
+                    row.push(value_str);
+                }
+            }
+            
+            row
+        };
+        
+        // First rows
+        for row_idx in 0..rows_per_side.min(total_rows) {
+            display_rows_data.push(create_row(row_idx));
+        }
+        
+        // Ellipsis row (if we have truncation)
+        if total_rows > display_rows {
+            let ellipsis_row: Vec<String> = display_headers.iter()
+                .map(|_| "⋮".to_string())
+                .collect();
+            display_rows_data.push(ellipsis_row);
+        }
+        
+        // Last rows
+        if total_rows > rows_per_side {
+            let start_last = (total_rows - rows_per_side).max(rows_per_side + 1);
+            for row_idx in start_last..total_rows {
+                display_rows_data.push(create_row(row_idx));
+            }
+        }
+        
+        // Create schema with proper data type inference
+        let columns_schema: Vec<ColumnSchema> = display_headers.iter()
+            .map(|name| ColumnSchema {
+                name: name.clone(),
+                data_type: if name == "⋯" || name.contains("⋮") || name.contains("(cols)") {
+                    DataType::String
+                } else if let Some(column) = self.columns.get(name) {
+                    // Infer actual data type from column
+                    self.infer_column_data_type(column)
+                } else {
+                    DataType::Unknown
+                },
+            })
+            .collect();
+        
+        let schema = DisplayDataSchema::new(columns_schema);
+        
+        // Create DataWindow with full dataset info
+        DisplayDataWindow::with_window_info(
+            display_headers,
+            display_rows_data,
+            schema,
+            self.nrows,              // total_rows
+            self.column_order.len(), // total_cols
+            0                        // start_offset
         )
     }
     

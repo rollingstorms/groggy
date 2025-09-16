@@ -107,6 +107,9 @@ pub struct DisplayConfig {
     // Truncation behavior
     pub truncation_strategy: TruncationStrategy,
     pub show_truncation_info: bool,
+    
+    // Header display control
+    pub show_headers: bool,
 
     // Future streaming settings (placeholder for Phase 3)
     pub buffer_size: usize,
@@ -126,6 +129,7 @@ impl DisplayConfig {
             output_format: OutputFormat::Unicode,
             truncation_strategy: TruncationStrategy::TypeAware,
             show_truncation_info: true,
+            show_headers: true,
             buffer_size: 1000,
             lazy_threshold: 10000,
         }
@@ -143,6 +147,7 @@ impl DisplayConfig {
             output_format: OutputFormat::Unicode,
             truncation_strategy: TruncationStrategy::TypeAware,
             show_truncation_info: true,
+            show_headers: true,
             buffer_size: 1000,
             lazy_threshold: 10000,
         }
@@ -153,6 +158,15 @@ impl DisplayConfig {
         let mut config = Self::compact();
         config.output_format = OutputFormat::Html;
         config.max_rows = 20; // Show more rows in HTML
+        config
+    }
+    
+    /// Create configuration for dense matrix display (no headers, truncated)
+    pub fn dense_matrix() -> Self {
+        let mut config = Self::html();
+        config.show_headers = false;
+        config.max_rows = 10;
+        config.max_cols = 10;
         config
     }
 

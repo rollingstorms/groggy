@@ -89,17 +89,17 @@ impl GraphMatrix {
     }
 
     /// Get node degrees (row sums for adjacency matrix)
-    pub fn node_degrees(&self) -> crate::storage::array::NumArray<f64> {
-        self.sum_axis(crate::storage::matrix::Axis::Rows)
+    pub fn node_degrees(&self) -> GraphResult<crate::storage::array::NumArray<f64>> {
+        Ok(crate::storage::array::NumArray::new(self.sum_axis(crate::storage::matrix::Axis::Rows)?))
     }
 
     /// Get in-degrees (column sums for directed adjacency matrix)
-    pub fn in_degrees(&self) -> crate::storage::array::NumArray<f64> {
-        self.sum_axis(crate::storage::matrix::Axis::Columns)
+    pub fn in_degrees(&self) -> GraphResult<crate::storage::array::NumArray<f64>> {
+        Ok(crate::storage::array::NumArray::new(self.sum_axis(crate::storage::matrix::Axis::Columns)?))
     }
 
     /// Get out-degrees (same as node_degrees for adjacency matrix)
-    pub fn out_degrees(&self) -> crate::storage::array::NumArray<f64> {
+    pub fn out_degrees(&self) -> GraphResult<crate::storage::array::NumArray<f64>> {
         self.node_degrees()
     }
 }

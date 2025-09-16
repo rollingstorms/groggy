@@ -15,9 +15,8 @@ pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
 // Re-enabled accessor exports for table integration
 pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
 pub use ffi::storage::array::{PyBaseArray, PyNodesArray, PyEdgesArray, PyMetaNodeArray};
-pub use ffi::storage::num_array::{PyNumArray, PyNumArrayIterator, PyIntArray, PyStatsArray, PyStatsArrayIterator};
-pub use ffi::storage::bool_array::{PyBoolArray, PyBoolArrayIterator, bool_array, ones_bool, zeros_bool};
-pub use ffi::storage::simple_stats_array::PySimpleStatsArray;
+pub use ffi::storage::num_array::{PyNumArray, PyNumArrayIterator, PyStatsArray, PyStatsArrayIterator};
+// BoolArray and SimpleStatsArray functionality integrated into unified NumArray
 pub use ffi::storage::subgraph_array::{PySubgraphArray, PySubgraphArrayIterator, PySubgraphArrayChainIterator};
 pub use ffi::storage::table_array::{PyTableArray, PyTableArrayIterator, PyTableArrayChainIterator};
 pub use ffi::storage::nodes_array::{PyNodesArray as PyNodesArrayNew, PyNodesArrayIterator};
@@ -394,6 +393,36 @@ fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
     ))
 }
 
+/// Create NumArray with bool dtype (replaces BoolArray constructor)
+#[pyfunction]
+#[pyo3(name = "bool_array")]
+fn bool_array_factory(values: Vec<bool>) -> PyNumArray {
+    PyNumArray::new_bool(values)
+}
+
+/// Create NumArray with bool dtype filled with True values
+#[pyfunction]  
+#[pyo3(name = "ones_bool")]
+fn ones_bool_factory(size: usize) -> PyNumArray {
+    let values = vec![true; size];
+    PyNumArray::new_bool(values)
+}
+
+/// Create NumArray with bool dtype filled with False values
+#[pyfunction]
+#[pyo3(name = "zeros_bool")]  
+fn zeros_bool_factory(size: usize) -> PyNumArray {
+    let values = vec![false; size];
+    PyNumArray::new_bool(values)
+}
+
+/// Integer array factory function (backward compatibility)
+#[pyfunction]
+#[pyo3(name = "int_array")]
+fn int_array_factory(values: Vec<i64>) -> PyNumArray {
+    PyNumArray::new_int64(values)
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
@@ -414,14 +443,9 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PySubgraphArray>()?;
     m.add_class::<PySubgraphArrayIterator>()?;
     m.add_class::<PySubgraphArrayChainIterator>()?;
-    // Numerical array API
+    // Unified Numerical array API (supports all numeric types with dtype)
     m.add_class::<PyNumArray>()?;
     m.add_class::<PyNumArrayIterator>()?;
-    m.add_class::<PyIntArray>()?;
-    // Boolean array API
-    m.add_class::<PyBoolArray>()?;
-    m.add_class::<PyBoolArrayIterator>()?;
-    // m.add_class::<PySimpleStatsArray>()?;
     m.add_class::<PyTableArray>()?;
     m.add_class::<PyTableArrayIterator>()?;
     m.add_class::<PyTableArrayChainIterator>()?;
@@ -513,12 +537,19 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(table, m)?)?; // Re-enabled for Phase 5 completion
     m.add_function(wrap_pyfunction!(merge, m)?)?;
     // Boolean array builder functions
-    m.add_function(wrap_pyfunction!(bool_array, m)?)?;
-    m.add_function(wrap_pyfunction!(ones_bool, m)?)?;
-    m.add_function(wrap_pyfunction!(zeros_bool, m)?)?;
+    // Array factory functions now use unified NumArray with appropriate dtypes
+    m.add_function(wrap_pyfunction!(bool_array_factory, m)?)?;
+    m.add_function(wrap_pyfunction!(ones_bool_factory, m)?)?;
+    m.add_function(wrap_pyfunction!(zeros_bool_factory, m)?)?;
+    m.add_function(wrap_pyfunction!(int_array_factory, m)?)?;
 
     // Use the module registration function (currently empty)
     // module::register_classes(py, m)?;
+
+    // Register neural network submodule
+    let neural_module = PyModule::new(py, "neural")?;
+    ffi::neural::neural(py, neural_module)?;
+    m.add_submodule(neural_module)?;
 
     Ok(())
 }

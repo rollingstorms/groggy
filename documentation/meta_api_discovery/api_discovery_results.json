@@ -1,7 +1,7 @@
 {
   "discovery_metadata": {
     "total_objects": 12,
-    "total_methods": 282,
+    "total_methods": 315,
     "total_errors": 0,
     "objects_discovered": [
       "BaseTable",
@@ -21,7 +21,7 @@
   "objects": {
     "BaseTable": {
       "type": "BaseTable",
-      "method_count": 30,
+      "method_count": 33,
       "methods": [
         {
           "name": "agg",
@@ -70,6 +70,17 @@
           "requires_parameters": [
             "column_name"
           ]
+        },
+        {
+          "name": "column_info",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Get column information for type introspection\nReturns a dictionary with column metadata including type, shape, and statistics",
+          "actual_return_type": "dict",
+          "test_successful": true
         },
         {
           "name": "drop_columns",
@@ -141,6 +152,30 @@
           "doc": "Import BaseTable from Parquet file",
           "requires_parameters": [
             "path"
+          ]
+        },
+        {
+          "name": "get_column_numeric",
+          "signature": "(column_name)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Get column as numeric array if possible (returns NumArray/IntArray or error)",
+          "requires_parameters": [
+            "column_name"
+          ]
+        },
+        {
+          "name": "get_column_raw",
+          "signature": "(column_name)",
+          "return_type": "unknown",
+          "source_object": "BaseTable",
+          "source_type": "BaseTable",
+          "is_property": false,
+          "doc": "Get column as raw BaseArray (always returns BaseArray regardless of type)",
+          "requires_parameters": [
+            "column_name"
           ]
         },
         {
@@ -399,7 +434,7 @@
     },
     "NodesTable": {
       "type": "NodesTable",
-      "method_count": 27,
+      "method_count": 29,
       "methods": [
         {
           "name": "base_table",
@@ -525,6 +560,28 @@
           "returned_object_type": "NodesTable"
         },
         {
+          "name": "interactive",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Launch interactive streaming table view in browser\n\nReturns the URL where the interactive table can be viewed.\nThe table will be available for real-time exploration with virtual scrolling,\nfiltering, and other interactive features.\n\nReturns:\n    str: URL of the interactive table interface",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "interactive_embed",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "NodesTable",
+          "source_type": "NodesTable",
+          "is_property": false,
+          "doc": "Generate embedded iframe HTML for Jupyter notebooks\n\nCreates an interactive streaming nodes table that can be embedded directly\nin a Jupyter notebook cell, eliminating the need for a separate browser tab.\n\nReturns:\n    str: HTML iframe code for embedding in Jupyter",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
           "name": "into_base_table",
           "signature": "()",
           "return_type": "unknown",
@@ -569,7 +626,7 @@
           "source_type": "NodesTable",
           "is_property": false,
           "doc": "Get node IDs",
-          "actual_return_type": "GraphArray",
+          "actual_return_type": "NumArray",
           "test_successful": true
         },
         {
@@ -731,7 +788,7 @@
     },
     "EdgesTable": {
       "type": "EdgesTable",
-      "method_count": 32,
+      "method_count": 34,
       "methods": [
         {
           "name": "as_tuples",
@@ -790,7 +847,7 @@
           "source_type": "EdgesTable",
           "is_property": false,
           "doc": "Get edge IDs",
-          "actual_return_type": "GraphArray",
+          "actual_return_type": "NumArray",
           "test_successful": true
         },
         {
@@ -916,6 +973,28 @@
           "returned_object_type": "EdgesTable"
         },
         {
+          "name": "interactive",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Launch interactive streaming table view in browser\n\nReturns the URL where the interactive table can be viewed.\nThe table will be available for real-time exploration with virtual scrolling,\nfiltering, and other interactive features.\n\nReturns:\n    str: URL of the interactive table interface",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "interactive_embed",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "EdgesTable",
+          "source_type": "EdgesTable",
+          "is_property": false,
+          "doc": "Generate embedded iframe HTML for Jupyter notebooks\n\nCreates an interactive streaming edges table that can be embedded directly\nin a Jupyter notebook cell, eliminating the need for a separate browser tab.\n\nReturns:\n    str: HTML iframe code for embedding in Jupyter",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
           "name": "into_base_table",
           "signature": "()",
           "return_type": "unknown",
@@ -1030,7 +1109,7 @@
           "source_type": "EdgesTable",
           "is_property": false,
           "doc": "Get source node IDs",
-          "actual_return_type": "GraphArray",
+          "actual_return_type": "NumArray",
           "test_successful": true
         },
         {
@@ -1054,7 +1133,7 @@
           "source_type": "EdgesTable",
           "is_property": false,
           "doc": "Get target node IDs  ",
-          "actual_return_type": "GraphArray",
+          "actual_return_type": "NumArray",
           "test_successful": true
         },
         {
@@ -1362,7 +1441,7 @@
     },
     "BaseArray": {
       "type": "BaseArray",
-      "method_count": 7,
+      "method_count": 15,
       "methods": [
         {
           "name": "apply_to_each",
@@ -1375,6 +1454,18 @@
           "requires_parameters": [
             "method_name",
             "args"
+          ]
+        },
+        {
+          "name": "astype",
+          "signature": "(dtype)",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": "Convert BaseArray to different numeric types when possible",
+          "requires_parameters": [
+            "dtype"
           ]
         },
         {
@@ -1412,6 +1503,50 @@
           ]
         },
         {
+          "name": "infer_numeric_type",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": "Infer the optimal numeric type for this BaseArray\nAnalyzes all elements to determine the most appropriate NumericType\nReturns None if the array contains non-numeric data",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "interactive",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": "Launch interactive streaming table view in browser\n\nConverts the array into a table format and launches a streaming\ninteractive view in the browser. The table will have two columns:\n'index' and 'value' for easy exploration of the array data.\n\nReturns:\n    str: URL of the interactive table interface",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "interactive_embed",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": "Generate embedded iframe HTML for Jupyter notebooks\n\nCreates an interactive streaming table representation of the array\nthat can be embedded directly in a Jupyter notebook cell.\n\nReturns:\n    str: HTML iframe code for embedding in Jupyter",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "is_numeric",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": "Check if this BaseArray can be converted to a numeric array",
+          "actual_return_type": "bool",
+          "test_successful": true
+        },
+        {
           "name": "iter",
           "signature": "()",
           "return_type": "unknown",
@@ -1420,6 +1555,17 @@
           "is_property": false,
           "doc": "NEW: Enable fluent chaining with .iter() method",
           "actual_return_type": "BaseArrayIterator",
+          "test_successful": true
+        },
+        {
+          "name": "numeric_compatibility_info",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": "Get statistics about the numeric compatibility of this BaseArray",
+          "actual_return_type": "dict",
           "test_successful": true
         },
         {
@@ -1433,6 +1579,30 @@
           "requires_parameters": [
             "n"
           ]
+        },
+        {
+          "name": "to_num_array",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": "Convert BaseArray to NumArray if all elements are numeric\nReturns appropriate numeric array type based on inferred type\nOPTIMIZED: Single-pass conversion with pre-allocated vectors",
+          "actual_return_type": "NumArray",
+          "test_successful": true
+        },
+        {
+          "name": "to_table",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "BaseArray",
+          "source_type": "BaseArray",
+          "is_property": false,
+          "doc": "Convert array to table format for streaming visualization\n\nCreates a BaseTable with 'index' and 'value' columns from the array data.\nThis enables the array to use the rich streaming table infrastructure.",
+          "actual_return_type": "BaseTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "BaseTable"
         },
         {
           "name": "unique",
@@ -1449,7 +1619,7 @@
     },
     "Graph": {
       "type": "Graph",
-      "method_count": 62,
+      "method_count": 58,
       "methods": [
         {
           "name": "add_edge",
@@ -1512,28 +1682,6 @@
           "requires_parameters": [
             "data"
           ]
-        },
-        {
-          "name": "adjacency",
-          "signature": "()",
-          "return_type": "unknown",
-          "source_object": "Graph",
-          "source_type": "Graph",
-          "is_property": false,
-          "doc": "Simple adjacency matrix (alias) - delegates to PyGraphMatrixHelper",
-          "actual_return_type": "GraphMatrix",
-          "test_successful": true
-        },
-        {
-          "name": "adjacency_matrix",
-          "signature": "()",
-          "return_type": "unknown",
-          "source_object": "Graph",
-          "source_type": "Graph",
-          "is_property": false,
-          "doc": "Get adjacency matrix - delegates to PyGraphMatrixHelper",
-          "actual_return_type": "dict",
-          "test_successful": true
         },
         {
           "name": "aggregate",
@@ -1664,17 +1812,6 @@
           "requires_parameters": [
             "branch_name"
           ]
-        },
-        {
-          "name": "dense_adjacency_matrix",
-          "signature": "()",
-          "return_type": "unknown",
-          "source_object": "Graph",
-          "source_type": "Graph",
-          "is_property": false,
-          "doc": "Get dense adjacency matrix - delegates to PyGraphMatrixHelper",
-          "actual_return_type": "GraphMatrix",
-          "test_successful": true
         },
         {
           "name": "density",
@@ -1942,8 +2079,8 @@
           "source_type": "Graph",
           "is_property": false,
           "doc": "Get Laplacian matrix - delegates to PyGraphMatrixHelper",
-          "actual_return_type": "GraphMatrix",
-          "test_successful": true
+          "test_error": "Laplacian matrix calculation not yet implemented",
+          "test_successful": false
         },
         {
           "name": "neighborhood",
@@ -2129,17 +2266,6 @@
           ]
         },
         {
-          "name": "sparse_adjacency_matrix",
-          "signature": "()",
-          "return_type": "unknown",
-          "source_object": "Graph",
-          "source_type": "Graph",
-          "is_property": false,
-          "doc": "Get sparse adjacency matrix - delegates to PyGraphMatrixHelper",
-          "actual_return_type": "dict",
-          "test_successful": true
-        },
-        {
           "name": "table",
           "signature": "()",
           "return_type": "unknown",
@@ -2151,6 +2277,17 @@
           "test_successful": true,
           "returns_groggy_object": true,
           "returned_object_type": "GraphTable"
+        },
+        {
+          "name": "to_matrix",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Graph",
+          "source_type": "Graph",
+          "is_property": false,
+          "doc": "Convert graph to attribute matrix - delegates to PyGraphMatrixHelper",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
         },
         {
           "name": "to_networkx",
@@ -2184,24 +2321,12 @@
           "doc": "Return a full-view Subgraph (whole graph as a subgraph).\nDownstream code can always resolve parent graph from this object.",
           "actual_return_type": "Subgraph",
           "test_successful": true
-        },
-        {
-          "name": "weighted_adjacency_matrix",
-          "signature": "(weight_attr)",
-          "return_type": "unknown",
-          "source_object": "Graph",
-          "source_type": "Graph",
-          "is_property": false,
-          "doc": "Get weighted adjacency matrix - delegates to PyGraphMatrixHelper",
-          "requires_parameters": [
-            "weight_attr"
-          ]
         }
       ]
     },
     "Nodes": {
       "type": "NodesAccessor",
-      "method_count": 5,
+      "method_count": 7,
       "methods": [
         {
           "name": "all",
@@ -2212,6 +2337,17 @@
           "is_property": false,
           "doc": "Get all nodes as a subgraph (equivalent to g.nodes[:]) - DELEGATED to SubgraphOperations  \nReturns a subgraph containing all nodes and all induced edges",
           "actual_return_type": "Subgraph",
+          "test_successful": true
+        },
+        {
+          "name": "array",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Nodes",
+          "source_type": "NodesAccessor",
+          "is_property": false,
+          "doc": "Create a NodesArray containing this single accessor (for delegation chaining)\nImplements: g.nodes.array() -> enables array operations and chaining",
+          "actual_return_type": "NodesArray",
           "test_successful": true
         },
         {
@@ -2233,8 +2369,19 @@
           "source_object": "Nodes",
           "source_type": "NodesAccessor",
           "is_property": false,
-          "doc": "Get node IDs as a GraphArray\nImplements: g.nodes.ids()",
-          "actual_return_type": "GraphArray",
+          "doc": "Get node IDs as an IntArray for integer operations\nImplements: g.nodes.ids()",
+          "actual_return_type": "NumArray",
+          "test_successful": true
+        },
+        {
+          "name": "matrix",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Nodes",
+          "source_type": "NodesAccessor",
+          "is_property": false,
+          "doc": "Convert node attributes to matrix\nImplements: g.nodes.matrix()",
+          "actual_return_type": "GraphMatrix",
           "test_successful": true
         },
         {
@@ -2266,7 +2413,7 @@
     },
     "Edges": {
       "type": "EdgesAccessor",
-      "method_count": 4,
+      "method_count": 6,
       "methods": [
         {
           "name": "all",
@@ -2286,8 +2433,19 @@
           "source_object": "Edges",
           "source_type": "EdgesAccessor",
           "is_property": false,
-          "doc": "Get edge IDs as a GraphArray\nImplements: g.edges.ids()",
-          "actual_return_type": "GraphArray",
+          "doc": "Get edge IDs as a NumArray for numerical operations\nImplements: g.edges.ids()",
+          "actual_return_type": "NumArray",
+          "test_successful": true
+        },
+        {
+          "name": "matrix",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Edges",
+          "source_type": "EdgesAccessor",
+          "is_property": false,
+          "doc": "Convert edge attributes to matrix\nImplements: g.edges.matrix()",
+          "actual_return_type": "GraphMatrix",
           "test_successful": true
         },
         {
@@ -2314,6 +2472,17 @@
           "test_successful": true,
           "returns_groggy_object": true,
           "returned_object_type": "EdgesTable"
+        },
+        {
+          "name": "weight_matrix",
+          "signature": "(attr_name=None)",
+          "return_type": "unknown",
+          "source_object": "Edges",
+          "source_type": "EdgesAccessor",
+          "is_property": false,
+          "doc": "Edge weight matrix (source \u00d7 target with weights)\nDefault to 'weight' attribute, but allow custom attribute selection\nImplements: g.edges.weight_matrix() and g.edges.weight_matrix('strength')",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
         }
       ]
     },
@@ -2404,8 +2573,41 @@
     },
     "Subgraph": {
       "type": "Subgraph",
-      "method_count": 52,
+      "method_count": 55,
       "methods": [
+        {
+          "name": "adj",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get adjacency matrix (shortcut for adjacency_matrix)\nReturns: GraphMatrix representing adjacency relationships  ",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "adjacency_list",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get adjacency list representation\nReturns: Dict mapping node_id -> list of connected node_ids",
+          "actual_return_type": "dict",
+          "test_successful": true
+        },
+        {
+          "name": "adjacency_matrix",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Subgraph",
+          "source_type": "Subgraph",
+          "is_property": false,
+          "doc": "Get adjacency matrix for this subgraph view\nReturns: GraphMatrix representing adjacency relationships",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
         {
           "name": "bfs",
           "signature": "(start, max_depth=None)",
@@ -2530,7 +2732,7 @@
           "source_type": "Subgraph",
           "is_property": false,
           "doc": "Get degree of nodes in subgraph as GraphArray\n\nUsage:\n- degree(node_id, full_graph=False) -> int: degree of single node (local or full graph)\n- degree(node_ids, full_graph=False) -> GraphArray: degrees for list of nodes\n- degree(full_graph=False) -> GraphArray: degrees for all nodes in subgraph\n\nParameters:\n- nodes: Optional node ID, list of node IDs, or None for all nodes\n- full_graph: If False (default), compute degrees within subgraph only.\n              If True, compute degrees from the original full graph.",
-          "actual_return_type": "GraphArray",
+          "actual_return_type": "NumArray",
           "test_successful": true
         },
         {
@@ -2722,7 +2924,7 @@
           "source_type": "Subgraph",
           "is_property": false,
           "doc": "Get in-degree of nodes within subgraph",
-          "actual_return_type": "GraphArray",
+          "actual_return_type": "NumArray",
           "test_successful": true
         },
         {
@@ -2838,7 +3040,7 @@
           "source_type": "Subgraph",
           "is_property": false,
           "doc": "Get out-degree of nodes within subgraph",
-          "actual_return_type": "GraphArray",
+          "actual_return_type": "NumArray",
           "test_successful": true
         },
         {
@@ -2979,8 +3181,8 @@
           "source_type": "Subgraph",
           "is_property": false,
           "doc": "Convert this subgraph to its adjacency matrix representation\nEnables chaining like: subgraph.to_matrix().eigen().stats()",
-          "test_error": "Subgraph to matrix conversion not yet implemented",
-          "test_successful": false
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
         },
         {
           "name": "to_networkx",
@@ -3018,87 +3220,52 @@
       ]
     },
     "GraphArray": {
-      "type": "GraphArray",
-      "method_count": 25,
+      "type": "NumArray",
+      "method_count": 13,
       "methods": [
         {
-          "name": "apply_to_each",
-          "signature": "(method_name, args)",
+          "name": "astype",
+          "signature": "(dtype)",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Delegation-based method application to each element \nThis demonstrates the concept: apply a method to each element and return new array",
+          "doc": "Convert to different numeric type",
           "requires_parameters": [
-            "method_name",
-            "args"
+            "dtype"
           ]
         },
         {
-          "name": "count",
+          "name": "first",
           "signature": "()",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Count non-null values",
+          "doc": "Get first element",
           "actual_return_type": "int",
           "test_successful": true
         },
         {
-          "name": "describe",
+          "name": "is_empty",
           "signature": "()",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Get comprehensive statistical summary",
-          "actual_return_type": "StatsSummary",
-          "test_successful": true
-        },
-        {
-          "name": "drop_na",
-          "signature": "()",
-          "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
-          "is_property": false,
-          "doc": "Drop null values, returning a new array",
-          "actual_return_type": "GraphArray",
-          "test_successful": true
-        },
-        {
-          "name": "fill_na",
-          "signature": "(fill_value)",
-          "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
-          "is_property": false,
-          "doc": "Fill null values with a specified value, returning a new array",
-          "requires_parameters": [
-            "fill_value"
-          ]
-        },
-        {
-          "name": "has_null",
-          "signature": "()",
-          "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
-          "is_property": false,
-          "doc": "Check if array contains any null values",
+          "doc": "Check if empty",
           "actual_return_type": "bool",
           "test_successful": true
         },
         {
-          "name": "items",
+          "name": "last",
           "signature": "()",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Return iterator over array items (compatibility with pandas/numpy)\nReturns iterator of (index, value) tuples",
-          "actual_return_type": "list",
+          "doc": "Get last element  ",
+          "actual_return_type": "int",
           "test_successful": true
         },
         {
@@ -3106,10 +3273,10 @@
           "signature": "()",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Get maximum value",
-          "actual_return_type": "int",
+          "doc": "Find the maximum value",
+          "actual_return_type": "float",
           "test_successful": true
         },
         {
@@ -3117,20 +3284,9 @@
           "signature": "()",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Calculate mean (average) of numeric values",
-          "actual_return_type": "float",
-          "test_successful": true
-        },
-        {
-          "name": "median",
-          "signature": "()",
-          "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
-          "is_property": false,
-          "doc": "Calculate median (50th percentile)",
+          "doc": "Calculate the mean (average)",
           "actual_return_type": "float",
           "test_successful": true
         },
@@ -3139,89 +3295,56 @@
           "signature": "()",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Get minimum value",
-          "actual_return_type": "int",
+          "doc": "Find the minimum value",
+          "actual_return_type": "float",
           "test_successful": true
         },
         {
-          "name": "null_count",
+          "name": "nunique",
           "signature": "()",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Count null values",
+          "doc": "Count unique values",
           "actual_return_type": "int",
           "test_successful": true
         },
         {
-          "name": "percentile",
-          "signature": "(p)",
+          "name": "reshape",
+          "signature": "(rows, cols)",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Calculate percentile (user-friendly wrapper for quantile)\npercentile: 0-100 (e.g., 25 for 25th percentile, 90 for 90th percentile)",
+          "doc": "Matrix Integration: Reshape NumArray into a GraphMatrix",
           "requires_parameters": [
-            "p"
+            "rows",
+            "cols"
           ]
-        },
-        {
-          "name": "preview",
-          "signature": "(limit=None)",
-          "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
-          "is_property": false,
-          "doc": "Get preview of array for display (first 10 elements by default)",
-          "actual_return_type": "list",
-          "test_successful": true
-        },
-        {
-          "name": "quantile",
-          "signature": "(q)",
-          "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
-          "is_property": false,
-          "doc": "Calculate quantile (percentile)",
-          "requires_parameters": [
-            "q"
-          ]
-        },
-        {
-          "name": "rich_display",
-          "signature": "(config=None)",
-          "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
-          "is_property": false,
-          "doc": "Get rich display representation using Rust formatter",
-          "actual_return_type": "str",
-          "test_successful": true
         },
         {
           "name": "std",
           "signature": "()",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Calculate standard deviation of numeric values",
+          "doc": "Calculate standard deviation",
           "actual_return_type": "float",
           "test_successful": true
         },
         {
-          "name": "summary",
+          "name": "sum",
           "signature": "()",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Get summary information without materializing data",
-          "actual_return_type": "str",
+          "doc": "Calculate the sum",
+          "actual_return_type": "float",
           "test_successful": true
         },
         {
@@ -3229,20 +3352,422 @@
           "signature": "()",
           "return_type": "unknown",
           "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_type": "NumArray",
           "is_property": false,
-          "doc": "Convert to plain Python list",
+          "doc": "Convert to Python list",
           "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "var",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "GraphArray",
+          "source_type": "NumArray",
+          "is_property": false,
+          "doc": "Calculate variance",
+          "actual_return_type": "float",
+          "test_successful": true
+        }
+      ]
+    },
+    "Matrix": {
+      "type": "GraphMatrix",
+      "method_count": 38,
+      "methods": [
+        {
+          "name": "dense",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Create a dense materialized version of the matrix",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "dense_html_repr",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Generate dense HTML representation for small matrices",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "determinant",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Determinant calculation (Phase 5 - placeholder for now)",
+          "test_error": "Determinant calculation will be implemented in Phase 5",
+          "test_successful": false
+        },
+        {
+          "name": "elementwise_multiply",
+          "signature": "(other)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Elementwise multiplication (Hadamard product)\nReturns: new GraphMatrix with elementwise product",
+          "requires_parameters": [
+            "other"
+          ]
+        },
+        {
+          "name": "flatten",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Flatten matrix to NumArray by concatenating all columns row-wise\nReturns a single NumArray containing all matrix values in row-major order\nOPTIMIZED: Pre-allocated vector with vectorized access",
+          "actual_return_type": "NumArray",
+          "test_successful": true
+        },
+        {
+          "name": "from_base_array",
+          "signature": "(base_array, rows, cols)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Create matrix from BaseArray containing numeric values",
+          "requires_parameters": [
+            "base_array",
+            "rows",
+            "cols"
+          ]
+        },
+        {
+          "name": "from_flattened",
+          "signature": "(num_array, rows, cols)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Create matrix from NumArray by reshaping to specified dimensions",
+          "requires_parameters": [
+            "num_array",
+            "rows",
+            "cols"
+          ]
+        },
+        {
+          "name": "from_graph_attributes",
+          "signature": "(_graph, _attrs, _entities)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Create matrix from graph attributes",
+          "requires_parameters": [
+            "_graph",
+            "_attrs",
+            "_entities"
+          ]
+        },
+        {
+          "name": "gelu",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "GELU activation applied to matrix\nImplements: matrix.gelu()",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "get_cell",
+          "signature": "(row, col)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Get single cell value at (row, col)",
+          "requires_parameters": [
+            "row",
+            "col"
+          ]
+        },
+        {
+          "name": "get_column",
+          "signature": "(col)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Get column by index as BaseArray (mixed types) or NumArray (if all numerical)",
+          "requires_parameters": [
+            "col"
+          ]
+        },
+        {
+          "name": "get_column_by_name",
+          "signature": "(name)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Get column by name as BaseArray (mixed types) or NumArray (if all numerical)",
+          "requires_parameters": [
+            "name"
+          ]
+        },
+        {
+          "name": "get_row",
+          "signature": "(row)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Get entire row as BaseArray (mixed types) or NumArray (if all numerical)",
+          "requires_parameters": [
+            "row"
+          ]
+        },
+        {
+          "name": "identity",
+          "signature": "(size)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Create an identity matrix with specified size",
+          "requires_parameters": [
+            "size"
+          ]
+        },
+        {
+          "name": "interactive",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Launch interactive streaming table view in browser\n\nConverts the matrix into a table format and launches a streaming\ninteractive view in the browser. The table will show the matrix data\nwith row and column indices for easy exploration.\n\nReturns:\n    str: URL of the interactive table interface",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "interactive_embed",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Generate embedded iframe HTML for Jupyter notebooks\n\nCreates an interactive streaming table representation of the matrix\nthat can be embedded directly in a Jupyter notebook cell.\n\nReturns:\n    str: HTML iframe code for embedding in Jupyter",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "inverse",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Matrix inverse (Phase 5 - placeholder for now)",
+          "test_error": "Matrix inverse will be implemented in Phase 5",
+          "test_successful": false
+        },
+        {
+          "name": "iter_columns",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Iterate over columns - returns iterator of BaseArrays or NumArrays",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "iter_rows",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Iterate over rows - returns iterator of BaseArrays or NumArrays",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "mean_axis",
+          "signature": "(axis)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Mean along specified axis (0=rows, 1=columns)",
+          "requires_parameters": [
+            "axis"
+          ]
+        },
+        {
+          "name": "multiply",
+          "signature": "(other)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Matrix multiplication - multiply this matrix with another\nReturns: new GraphMatrix that is the product of self * other",
+          "requires_parameters": [
+            "other"
+          ]
+        },
+        {
+          "name": "power",
+          "signature": "(n)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Matrix power - raise matrix to integer power\nReturns: new GraphMatrix that is self^n",
+          "requires_parameters": [
+            "n"
+          ]
+        },
+        {
+          "name": "preview",
+          "signature": "(row_limit=None, col_limit=None)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Get preview of matrix for display (first N rows/cols by default)",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "relu",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "ReLU activation applied to matrix\nImplements: matrix.relu()",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "rich_display",
+          "signature": "(config=None)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Get rich display representation using Rust formatter",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "scalar_multiply",
+          "signature": "(scalar)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Placeholder for scalar operations",
+          "requires_parameters": [
+            "scalar"
+          ]
+        },
+        {
+          "name": "sigmoid",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Sigmoid activation applied to matrix\nImplements: matrix.sigmoid()",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "softmax",
+          "signature": "(dim=1)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Softmax activation applied to matrix\nImplements: matrix.softmax(dim=1)",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "std_axis",
+          "signature": "(axis)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Standard deviation along specified axis (0=rows, 1=columns)",
+          "requires_parameters": [
+            "axis"
+          ]
+        },
+        {
+          "name": "sum_axis",
+          "signature": "(axis)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Sum along specified axis (0=rows, 1=columns)",
+          "requires_parameters": [
+            "axis"
+          ]
+        },
+        {
+          "name": "summary",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Get summary information without materializing data",
+          "actual_return_type": "str",
+          "test_successful": true
+        },
+        {
+          "name": "tanh",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Tanh activation applied to matrix\nImplements: matrix.tanh()",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "to_base_array",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Convert matrix to BaseArray containing all values as AttrValues",
+          "actual_return_type": "BaseArray",
           "test_successful": true
         },
         {
           "name": "to_numpy",
           "signature": "()",
           "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
           "is_property": false,
-          "doc": "Convert to NumPy array (when numpy available)\nUses .values property to materialize data",
+          "doc": "Convert to NumPy array (when numpy available)\nUses .data property to materialize data",
           "actual_return_type": "ndarray",
           "test_successful": true
         },
@@ -3250,177 +3775,49 @@
           "name": "to_pandas",
           "signature": "()",
           "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
           "is_property": false,
-          "doc": "Convert to Pandas Series (when pandas available)",
-          "actual_return_type": "Series",
+          "doc": "Convert to Pandas DataFrame (when pandas available)",
+          "actual_return_type": "DataFrame",
           "test_successful": true
         },
         {
-          "name": "to_scipy_sparse",
+          "name": "to_table_for_streaming",
           "signature": "()",
-          "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
-          "is_property": false,
-          "doc": "Convert to SciPy sparse array (for compatibility - GraphArray is dense by nature)",
-          "actual_return_type": "csr_matrix",
-          "test_successful": true
-        },
-        {
-          "name": "true_indices",
-          "signature": "()",
-          "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
-          "is_property": false,
-          "doc": "Extract indices where boolean array is True\nThis is used for efficient boolean indexing with node/edge accessors",
-          "actual_return_type": "list",
-          "test_successful": true
-        },
-        {
-          "name": "unique",
-          "signature": "()",
-          "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
-          "is_property": false,
-          "doc": "Get unique values as a new GraphArray",
-          "actual_return_type": "GraphArray",
-          "test_successful": true
-        },
-        {
-          "name": "value_counts",
-          "signature": "()",
-          "return_type": "unknown",
-          "source_object": "GraphArray",
-          "source_type": "GraphArray",
-          "is_property": false,
-          "doc": "Get value counts (frequency of each unique value) as Python dict",
-          "actual_return_type": "dict",
-          "test_successful": true
-        }
-      ]
-    },
-    "Matrix": {
-      "type": "dict",
-      "method_count": 11,
-      "methods": [
-        {
-          "name": "clear",
-          "signature": "signature_unavailable",
           "return_type": "unknown",
           "source_object": "Matrix",
-          "source_type": "dict",
+          "source_type": "GraphMatrix",
           "is_property": false,
-          "doc": "D.clear() -> None.  Remove all items from D."
+          "doc": "Convert matrix to table format for streaming visualization\n\nCreates a BaseTable with columns representing matrix data:\n- 'row': row index\n- 'column': column index  \n- 'value': the matrix value at that position",
+          "actual_return_type": "BaseTable",
+          "test_successful": true,
+          "returns_groggy_object": true,
+          "returned_object_type": "BaseTable"
         },
         {
-          "name": "copy",
-          "signature": "signature_unavailable",
+          "name": "transpose",
+          "signature": "()",
           "return_type": "unknown",
           "source_object": "Matrix",
-          "source_type": "dict",
+          "source_type": "GraphMatrix",
           "is_property": false,
-          "doc": "D.copy() -> a shallow copy of D",
-          "discovery_error": "no signature found for builtin <built-in method copy of dict object at 0x1050fd900>"
+          "doc": "Transpose the matrix",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
         },
         {
-          "name": "fromkeys",
-          "signature": "(iterable, value=None, /)",
+          "name": "zeros",
+          "signature": "(rows, cols, dtype=None)",
           "return_type": "unknown",
           "source_object": "Matrix",
-          "source_type": "dict",
+          "source_type": "GraphMatrix",
           "is_property": false,
-          "doc": "Create a new dictionary with keys from iterable and values set to value.",
+          "doc": "Create a zero matrix with specified dimensions and type",
           "requires_parameters": [
-            "iterable"
+            "rows",
+            "cols"
           ]
-        },
-        {
-          "name": "get",
-          "signature": "(key, default=None, /)",
-          "return_type": "unknown",
-          "source_object": "Matrix",
-          "source_type": "dict",
-          "is_property": false,
-          "doc": "Return the value for key if key is in the dictionary, else default.",
-          "requires_parameters": [
-            "key"
-          ]
-        },
-        {
-          "name": "items",
-          "signature": "signature_unavailable",
-          "return_type": "unknown",
-          "source_object": "Matrix",
-          "source_type": "dict",
-          "is_property": false,
-          "doc": "D.items() -> a set-like object providing a view on D's items",
-          "discovery_error": "no signature found for builtin <built-in method items of dict object at 0x1050fd900>"
-        },
-        {
-          "name": "keys",
-          "signature": "signature_unavailable",
-          "return_type": "unknown",
-          "source_object": "Matrix",
-          "source_type": "dict",
-          "is_property": false,
-          "doc": "D.keys() -> a set-like object providing a view on D's keys",
-          "discovery_error": "no signature found for builtin <built-in method keys of dict object at 0x1050fd900>"
-        },
-        {
-          "name": "pop",
-          "signature": "signature_unavailable",
-          "return_type": "unknown",
-          "source_object": "Matrix",
-          "source_type": "dict",
-          "is_property": false,
-          "doc": "D.pop(k[,d]) -> v, remove specified key and return the corresponding value.\n\nIf key is not found, default is returned if given, otherwise KeyError is raised"
-        },
-        {
-          "name": "popitem",
-          "signature": "()",
-          "return_type": "unknown",
-          "source_object": "Matrix",
-          "source_type": "dict",
-          "is_property": false,
-          "doc": "Remove and return a (key, value) pair as a 2-tuple.\n\nPairs are returned in LIFO (last-in, first-out) order.\nRaises KeyError if the dict is empty.",
-          "actual_return_type": "tuple",
-          "test_successful": true
-        },
-        {
-          "name": "setdefault",
-          "signature": "(key, default=None, /)",
-          "return_type": "unknown",
-          "source_object": "Matrix",
-          "source_type": "dict",
-          "is_property": false,
-          "doc": "Insert key with a value of default if key is not in the dictionary.\n\nReturn the value for key if key is in the dictionary, else default.",
-          "requires_parameters": [
-            "key"
-          ]
-        },
-        {
-          "name": "update",
-          "signature": "signature_unavailable",
-          "return_type": "unknown",
-          "source_object": "Matrix",
-          "source_type": "dict",
-          "is_property": false,
-          "doc": "D.update([E, ]**F) -> None.  Update D from dict/iterable E and F.\nIf E is present and has a .keys() method, then does:  for k in E: D[k] = E[k]\nIf E is present and lacks a .keys() method, then does:  for k, v in E: D[k] = v\nIn either case, this is followed by: for k in F:  D[k] = F[k]",
-          "discovery_error": "no signature found for builtin <built-in method update of dict object at 0x1050fd900>"
-        },
-        {
-          "name": "values",
-          "signature": "signature_unavailable",
-          "return_type": "unknown",
-          "source_object": "Matrix",
-          "source_type": "dict",
-          "is_property": false,
-          "doc": "D.values() -> an object providing a view on D's values",
-          "discovery_error": "no signature found for builtin <built-in method values of dict object at 0x1050fd900>"
         }
       ]
     }
@@ -3899,7 +4296,7 @@
       },
       {
         "from": "BaseTable",
-        "to": "GraphArray",
+        "to": "Matrix",
         "method": "rich_display"
       },
       {
@@ -3914,7 +4311,7 @@
       },
       {
         "from": "NodesTable",
-        "to": "GraphArray",
+        "to": "Matrix",
         "method": "rich_display"
       },
       {
@@ -3929,21 +4326,21 @@
       },
       {
         "from": "EdgesTable",
-        "to": "GraphArray",
+        "to": "Matrix",
         "method": "rich_display"
       },
       {
-        "from": "GraphArray",
+        "from": "Matrix",
         "to": "BaseTable",
         "method": "rich_display"
       },
       {
-        "from": "GraphArray",
+        "from": "Matrix",
         "to": "NodesTable",
         "method": "rich_display"
       },
       {
-        "from": "GraphArray",
+        "from": "Matrix",
         "to": "EdgesTable",
         "method": "rich_display"
       }
@@ -4223,7 +4620,7 @@
       },
       {
         "from": "BaseTable",
-        "to": "GraphArray",
+        "to": "Matrix",
         "method": "to_pandas"
       },
       {
@@ -4238,7 +4635,7 @@
       },
       {
         "from": "NodesTable",
-        "to": "GraphArray",
+        "to": "Matrix",
         "method": "to_pandas"
       },
       {
@@ -4253,21 +4650,21 @@
       },
       {
         "from": "EdgesTable",
-        "to": "GraphArray",
+        "to": "Matrix",
         "method": "to_pandas"
       },
       {
-        "from": "GraphArray",
+        "from": "Matrix",
         "to": "BaseTable",
         "method": "to_pandas"
       },
       {
-        "from": "GraphArray",
+        "from": "Matrix",
         "to": "NodesTable",
         "method": "to_pandas"
       },
       {
-        "from": "GraphArray",
+        "from": "Matrix",
         "to": "EdgesTable",
         "method": "to_pandas"
       }
@@ -4326,6 +4723,130 @@
         "from": "EdgesTable",
         "to": "NodesTable",
         "method": "filter_by_attr"
+      }
+    ],
+    "interactive": [
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "interactive"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseArray",
+        "method": "interactive"
+      },
+      {
+        "from": "NodesTable",
+        "to": "Matrix",
+        "method": "interactive"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "interactive"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseArray",
+        "method": "interactive"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "Matrix",
+        "method": "interactive"
+      },
+      {
+        "from": "BaseArray",
+        "to": "NodesTable",
+        "method": "interactive"
+      },
+      {
+        "from": "BaseArray",
+        "to": "EdgesTable",
+        "method": "interactive"
+      },
+      {
+        "from": "BaseArray",
+        "to": "Matrix",
+        "method": "interactive"
+      },
+      {
+        "from": "Matrix",
+        "to": "NodesTable",
+        "method": "interactive"
+      },
+      {
+        "from": "Matrix",
+        "to": "EdgesTable",
+        "method": "interactive"
+      },
+      {
+        "from": "Matrix",
+        "to": "BaseArray",
+        "method": "interactive"
+      }
+    ],
+    "interactive_embed": [
+      {
+        "from": "NodesTable",
+        "to": "EdgesTable",
+        "method": "interactive_embed"
+      },
+      {
+        "from": "NodesTable",
+        "to": "BaseArray",
+        "method": "interactive_embed"
+      },
+      {
+        "from": "NodesTable",
+        "to": "Matrix",
+        "method": "interactive_embed"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "NodesTable",
+        "method": "interactive_embed"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "BaseArray",
+        "method": "interactive_embed"
+      },
+      {
+        "from": "EdgesTable",
+        "to": "Matrix",
+        "method": "interactive_embed"
+      },
+      {
+        "from": "BaseArray",
+        "to": "NodesTable",
+        "method": "interactive_embed"
+      },
+      {
+        "from": "BaseArray",
+        "to": "EdgesTable",
+        "method": "interactive_embed"
+      },
+      {
+        "from": "BaseArray",
+        "to": "Matrix",
+        "method": "interactive_embed"
+      },
+      {
+        "from": "Matrix",
+        "to": "NodesTable",
+        "method": "interactive_embed"
+      },
+      {
+        "from": "Matrix",
+        "to": "EdgesTable",
+        "method": "interactive_embed"
+      },
+      {
+        "from": "Matrix",
+        "to": "BaseArray",
+        "method": "interactive_embed"
       }
     ],
     "into_base_table": [
@@ -4508,40 +5029,16 @@
         "method": "to_nodes"
       }
     ],
-    "apply_to_each": [
+    "astype": [
       {
         "from": "BaseArray",
         "to": "GraphArray",
-        "method": "apply_to_each"
+        "method": "astype"
       },
       {
         "from": "GraphArray",
         "to": "BaseArray",
-        "method": "apply_to_each"
-      }
-    ],
-    "describe": [
-      {
-        "from": "BaseArray",
-        "to": "GraphArray",
-        "method": "describe"
-      },
-      {
-        "from": "GraphArray",
-        "to": "BaseArray",
-        "method": "describe"
-      }
-    ],
-    "unique": [
-      {
-        "from": "BaseArray",
-        "to": "GraphArray",
-        "method": "unique"
-      },
-      {
-        "from": "GraphArray",
-        "to": "BaseArray",
-        "method": "unique"
+        "method": "astype"
       }
     ],
     "bfs": [
@@ -4870,6 +5367,18 @@
         "method": "table"
       }
     ],
+    "to_matrix": [
+      {
+        "from": "Graph",
+        "to": "Subgraph",
+        "method": "to_matrix"
+      },
+      {
+        "from": "Subgraph",
+        "to": "Graph",
+        "method": "to_matrix"
+      }
+    ],
     "to_networkx": [
       {
         "from": "Graph",
@@ -4904,6 +5413,18 @@
         "from": "Edges",
         "to": "Nodes",
         "method": "ids"
+      }
+    ],
+    "matrix": [
+      {
+        "from": "Nodes",
+        "to": "Edges",
+        "method": "matrix"
+      },
+      {
+        "from": "Edges",
+        "to": "Nodes",
+        "method": "matrix"
       }
     ],
     "set_attrs": [
@@ -4942,35 +5463,35 @@
         "method": "to_list"
       }
     ],
-    "summary": [
+    "is_empty": [
       {
         "from": "Subgraph",
         "to": "GraphArray",
-        "method": "summary"
+        "method": "is_empty"
       },
       {
         "from": "GraphArray",
         "to": "Subgraph",
-        "method": "summary"
+        "method": "is_empty"
       }
     ],
-    "items": [
+    "summary": [
       {
-        "from": "GraphArray",
+        "from": "Subgraph",
         "to": "Matrix",
-        "method": "items"
+        "method": "summary"
       },
       {
         "from": "Matrix",
-        "to": "GraphArray",
-        "method": "items"
+        "to": "Subgraph",
+        "method": "summary"
       }
     ]
   },
   "errors": [],
   "meta_graph": {
-    "meta_graph": "Graph(nodes=12, edges=47)",
-    "meta_graph_table": "GraphTable[12 nodes, 47 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[12 x 5]\nBaseTable[12 x 5]\n| object_name |    node_id |     module | method_count | object_type | \n|------------|------------|------------|------------|------------|\n|  BaseTable |          1 |     groggy |         30 |  BaseTable | \n| NodesTable |          2 |     groggy |         27 | NodesTable | \n| EdgesTable |          3 |     groggy |         32 | EdgesTable | \n| GraphTable |          4 |     groggy |         20 | GraphTable | \n|  BaseArray |          5 |   builtins |          7 |  BaseArray | \n... (7 more rows)\nEdges:\nEdgesTable[47 x 6]\nBaseTable[47 x 6]\n| method_signature |     source | method_name | return_type |    edge_id |     target | \n|------------|------------|------------|------------|------------|------------|\n|      (n=5) |          1 |       head |  BaseTable |          1 |          1 | \n|      (n=5) |          1 |       tail |  BaseTable |          2 |          1 | \n|         () |          2 | base_table |  BaseTable |          3 |          1 | \n|      (n=5) |          2 |       head | NodesTable |          4 |          2 | \n|         () |          2 | into_base_table |  BaseTable |          5 |          1 | \n... (42 more rows)\n",
+    "meta_graph": "Graph(nodes=12, edges=59)",
+    "meta_graph_table": "GraphTable[12 nodes, 59 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[12 x 5]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 module   \u2502 object_type     \u2502 node_id \u2502 method_count \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 groggy   \u2502 BaseTable       \u2502       1 \u2502           33 \u2502\n\u2502 groggy   \u2502 NodesTable      \u2502       2 \u2502           29 \u2502\n\u2502 groggy   \u2502 EdgesTable      \u2502       3 \u2502           34 \u2502\n\u2502 groggy   \u2502 GraphTable      \u2502       4 \u2502           20 \u2502\n\u2502 \u22ee        \u2502 \u22ee               \u2502       \u22ee \u2502            \u22ee \u2502\n\u2502 builtins \u2502 ComponentsArray \u2502       9 \u2502            7 \u2502\n\u2502 builtins \u2502 Subgraph        \u2502      10 \u2502           55 \u2502\n\u2502 builtins \u2502 NumArray        \u2502      11 \u2502           13 \u2502\n\u2502 builtins \u2502 GraphMatrix     \u2502      12 \u2502           38 \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n12 rows x 5 colsEdges:\nEdgesTable[59 x 6]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 return_type \u2502 method_name          \u2502 method_signature \u2502 edge_id \u2502 target \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 BaseTable   \u2502 head                 \u2502 (n=5)            \u2502       1 \u2502      1 \u2502\n\u2502 BaseTable   \u2502 tail                 \u2502 (n=5)            \u2502       2 \u2502      1 \u2502\n\u2502 BaseTable   \u2502 base_table           \u2502 ()               \u2502       3 \u2502      1 \u2502\n\u2502 NodesTable  \u2502 head                 \u2502 (n=5)            \u2502       4 \u2502      2 \u2502\n\u2502 \u22ee           \u2502 \u22ee                    \u2502 \u22ee                \u2502       \u22ee \u2502      \u22ee \u2502\n\u2502 GraphMatrix \u2502 tanh                 \u2502 ()               \u2502      56 \u2502     12 \u2502\n\u2502 BaseArray   \u2502 to_base_array        \u2502 ()               \u2502      57 \u2502      5 \u2502\n\u2502 BaseTable   \u2502 to_table_for_stream\u2026 \u2502 ()               \u2502      58 \u2502      1 \u2502\n\u2502 GraphMatrix \u2502 transpose            \u2502 ()               \u2502      59 \u2502     12 \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n59 rows x 6 cols",
     "object_name_to_node_id": {
       "BaseTable": 1,
       "NodesTable": 2,
@@ -4996,8 +5517,8 @@
       "EdgesAccessor": "Edges",
       "ComponentsArray": "ComponentsArray",
       "Subgraph": "Subgraph",
-      "GraphArray": "GraphArray",
-      "dict": "Matrix"
+      "NumArray": "GraphArray",
+      "GraphMatrix": "Matrix"
     },
     "nodes_data": {
       "node_id": [
@@ -5039,22 +5560,22 @@
         "EdgesAccessor",
         "ComponentsArray",
         "Subgraph",
-        "GraphArray",
-        "dict"
+        "NumArray",
+        "GraphMatrix"
       ],
       "method_count": [
-        30,
-        27,
-        32,
+        33,
+        29,
+        34,
         20,
+        15,
+        58,
         7,
-        62,
-        5,
-        4,
+        6,
         7,
-        52,
-        25,
-        11
+        55,
+        13,
+        38
       ],
       "module": [
         "groggy",
@@ -5119,7 +5640,19 @@
         44,
         45,
         46,
-        47
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59
       ],
       "source": [
         1,
@@ -5141,10 +5674,9 @@
         4,
         4,
         4,
-        4,
         5,
         5,
-        6,
+        5,
         6,
         6,
         6,
@@ -5152,6 +5684,9 @@
         7,
         7,
         7,
+        7,
+        8,
+        8,
         8,
         8,
         8,
@@ -5166,9 +5701,19 @@
         10,
         10,
         10,
-        11,
-        11,
-        11
+        10,
+        10,
+        10,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12
       ],
       "target": [
         1,
@@ -5188,23 +5733,27 @@
         11,
         4,
         4,
-        12,
         4,
         6,
-        12,
+        11,
+        1,
         5,
-        12,
-        12,
         4,
+        12,
         6,
         10,
         10,
         11,
+        12,
         2,
         10,
         11,
+        12,
         3,
+        12,
         10,
+        12,
+        12,
         9,
         11,
         3,
@@ -5213,10 +5762,18 @@
         2,
         8,
         6,
+        12,
         6,
         7,
+        12,
         11,
-        11,
+        12,
+        12,
+        12,
+        12,
+        12,
+        5,
+        1,
         12
       ],
       "method_name": [
@@ -5237,23 +5794,27 @@
         "targets",
         "auto_assign_edge_ids",
         "head",
-        "stats",
         "tail",
         "to_graph",
-        "describe",
+        "to_num_array",
+        "to_table",
         "unique",
-        "adjacency_matrix",
-        "sparse_adjacency_matrix",
         "table",
+        "to_matrix",
         "to_networkx",
         "view",
         "all",
         "ids",
+        "matrix",
         "table",
         "all",
         "ids",
+        "matrix",
         "table",
+        "weight_matrix",
         "largest_component",
+        "adj",
+        "adjacency_matrix",
         "connected_components",
         "degree",
         "edges_table",
@@ -5262,11 +5823,19 @@
         "table",
         "to_edges",
         "to_graph",
+        "to_matrix",
         "to_networkx",
         "to_nodes",
-        "drop_na",
-        "unique",
-        "value_counts"
+        "dense",
+        "flatten",
+        "gelu",
+        "relu",
+        "sigmoid",
+        "softmax",
+        "tanh",
+        "to_base_array",
+        "to_table_for_streaming",
+        "transpose"
       ],
       "method_signature": [
         "(n=5)",
@@ -5286,7 +5855,6 @@
         "()",
         "()",
         "(n=5)",
-        "()",
         "(n=5)",
         "()",
         "()",
@@ -5304,6 +5872,11 @@
         "()",
         "()",
         "()",
+        "(attr_name=None)",
+        "()",
+        "()",
+        "()",
+        "()",
         "(nodes=None, *, full_graph=False)",
         "()",
         "(nodes=None, full_graph=False)",
@@ -5315,6 +5888,14 @@
         "()",
         "()",
         "()",
+        "()",
+        "()",
+        "()",
+        "()",
+        "(dim=1)",
+        "()",
+        "()",
+        "()",
         "()"
       ],
       "return_type": [
@@ -5323,48 +5904,60 @@
         "BaseTable",
         "NodesTable",
         "BaseTable",
-        "GraphArray",
+        "NumArray",
         "NodesTable",
         "EdgesTable",
         "BaseTable",
-        "GraphArray",
+        "NumArray",
         "EdgesTable",
         "BaseTable",
-        "GraphArray",
+        "NumArray",
         "EdgesTable",
-        "GraphArray",
+        "NumArray",
         "GraphTable",
         "GraphTable",
-        "dict",
         "GraphTable",
         "Graph",
-        "dict",
+        "NumArray",
+        "BaseTable",
         "BaseArray",
-        "dict",
-        "dict",
         "GraphTable",
+        "GraphMatrix",
         "Graph",
         "Subgraph",
         "Subgraph",
-        "GraphArray",
+        "NumArray",
+        "GraphMatrix",
         "NodesTable",
         "Subgraph",
-        "GraphArray",
+        "NumArray",
+        "GraphMatrix",
         "EdgesTable",
+        "GraphMatrix",
         "Subgraph",
+        "GraphMatrix",
+        "GraphMatrix",
         "ComponentsArray",
-        "GraphArray",
+        "NumArray",
         "EdgesTable",
-        "GraphArray",
-        "GraphArray",
+        "NumArray",
+        "NumArray",
         "NodesTable",
         "EdgesAccessor",
         "Graph",
+        "GraphMatrix",
         "Graph",
         "NodesAccessor",
-        "GraphArray",
-        "GraphArray",
-        "dict"
+        "GraphMatrix",
+        "NumArray",
+        "GraphMatrix",
+        "GraphMatrix",
+        "GraphMatrix",
+        "GraphMatrix",
+        "GraphMatrix",
+        "BaseArray",
+        "BaseTable",
+        "GraphMatrix"
       ]
     }
   }
