@@ -16,7 +16,7 @@ use crate::storage::advanced_matrix::{
 };
 use crate::storage::array::NumArray;
 use crate::storage::table::BaseTable;
-use crate::core::display::{DisplayEngine, DisplayConfig};
+use crate::viz::display::{DisplayEngine, DisplayConfig};
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrValue, AttrValueType, NodeId};
 use std::fmt;

@@ -154,6 +154,9 @@ pub mod traits;      // Graph entity traits
 // Display formatting (legacy - being replaced by core::display)
 pub mod display;
 
+// Visualization module for interactive graph exploration
+pub mod viz;
+
 // Public API
 pub mod api {
     pub mod graph;

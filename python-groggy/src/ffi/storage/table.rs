@@ -4,11 +4,14 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
 use crate::ffi::storage::array::PyBaseArray;
 use crate::ffi::storage::num_array::PyNumArray;
+use crate::ffi::viz::PyVizModule;
 use groggy::storage::{ArrayOps, array::{BaseArray, NumArray}, table::{BaseTable, NodesTable, EdgesTable, Table, TableIterator}};
-use groggy::core::streaming::DataSource;  // Import DataSource trait for streaming methods
+use groggy::viz::streaming::data_source::DataSource as VizDataSource;  // Import DataSource trait for streaming methods
+use groggy::viz::VizModule;
 use groggy::types::{NodeId, EdgeId, AttrValue, AttrValueType};
 use std::collections::HashMap;
 use std::cell::RefCell;
+use std::sync::Arc;
 use serde_json::{Map, Value};
 
 // =============================================================================
@@ -20,7 +23,7 @@ use serde_json::{Map, Value};
 pub struct PyBaseTable {
     pub(crate) table: BaseTable,
     // Keep-alive guards for streaming servers spawned by this table
-    server_guards: RefCell<Vec<groggy::core::streaming::websocket_server::ServerHandle>>,
+    server_guards: RefCell<Vec<groggy::viz::streaming::websocket_server::ServerHandle>>,
 }
 
 impl Clone for PyBaseTable {
@@ -979,6 +982,48 @@ impl PyBaseTable {
             ))
         }
     }
+    
+    /// Launch interactive visualization for this table
+    /// 
+    /// Creates a VizModule for interactive browser-based visualization
+    /// with support for both table and graph views.
+    /// 
+    /// # Arguments
+    /// * `port` - Optional port number (0 for auto-assign)
+    /// * `layout` - Layout algorithm: "force-directed", "circular", "grid", "hierarchical"
+    /// * `theme` - Visual theme: "light", "dark", "publication", "minimal"
+    /// * `width` - Canvas width in pixels
+    /// * `height` - Canvas height in pixels
+    /// 
+    /// # Returns
+    /// PyVizModule for launching visualization
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Launch interactive visualization
+    /// viz = table.interactive()
+    /// session = viz.interactive()
+    /// print(f"View at: {session.url()}")
+    /// 
+    /// # With custom options
+    /// viz = table.interactive(port=8080, layout="force-directed", theme="dark")
+    /// ```
+    pub fn interactive_viz(
+        &self,
+        port: Option<u16>,
+        layout: Option<String>,
+        theme: Option<String>,
+        width: Option<u32>,
+        height: Option<u32>
+    ) -> PyResult<PyVizModule> {
+        // Create VizModule from this BaseTable using delegation pattern
+        let data_source: Arc<dyn groggy::viz::streaming::data_source::DataSource> = Arc::new(self.table.clone());
+        let viz_module = VizModule::new(data_source);
+        
+        Ok(PyVizModule {
+            inner: viz_module,
+        })
+    }
 
 }
 
@@ -1153,12 +1198,20 @@ impl PyBaseTable {
     /// ```
     pub fn interactive(&self) -> PyResult<String> {
         match self.table.interactive(None) {
-            Ok(browser_interface) => {
-                println!("🚀 Interactive table launched at: {}", browser_interface.url);
+            Ok(viz_module) => {
+                // Launch the interactive visualization and get the session
+                let interactive_viz = viz_module.interactive(None)
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create interactive viz: {}", e)))?;
+                
+                let session = interactive_viz.start(None)
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to start viz session: {}", e)))?;
+                
+                let url = session.url().to_string();
+                println!("🚀 Interactive table launched at: {}", url);
                 println!("📊 Streaming {} rows × {} columns", 
-                        self.table.total_rows(), 
-                        self.table.total_cols());
-                Ok(browser_interface.url)
+                        VizDataSource::total_rows(&self.table), 
+                        VizDataSource::total_cols(&self.table));
+                Ok(url)
             }
             Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(
                 format!("Failed to start interactive table: {}", e)
@@ -1184,10 +1237,10 @@ impl PyBaseTable {
     /// ```
     pub fn interactive_embed(&self) -> PyResult<String> {
         // Create the streaming server
-        use groggy::core::streaming::{StreamingConfig, StreamingServer};
+        use groggy::viz::streaming::{StreamingConfig, StreamingServer};
         use std::sync::Arc;
         
-        let data_source: Arc<dyn groggy::core::streaming::DataSource> = Arc::new(self.table.clone());
+        let data_source: Arc<dyn groggy::viz::streaming::DataSource> = Arc::new(self.table.clone());
         let config = StreamingConfig::default();
         let server = StreamingServer::new(data_source, config);
         
@@ -2098,12 +2151,20 @@ impl PyNodesTable {
         // Get BaseTable from NodesTable for streaming
         let base_table = self.table.base_table();
         match base_table.interactive(None) {
-            Ok(browser_interface) => {
-                println!("🚀 Interactive nodes table launched at: {}", browser_interface.url);
+            Ok(viz_module) => {
+                // Launch the interactive visualization and get the session
+                let interactive_viz = viz_module.interactive(None)
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create interactive viz: {}", e)))?;
+                
+                let session = interactive_viz.start(None)
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to start viz session: {}", e)))?;
+                
+                let url = session.url().to_string();
+                println!("🚀 Interactive nodes table launched at: {}", url);
                 println!("📊 Streaming {} rows × {} columns", 
-                        base_table.total_rows(), 
-                        base_table.total_cols());
-                Ok(browser_interface.url)
+                        VizDataSource::total_rows(base_table), 
+                        VizDataSource::total_cols(base_table));
+                Ok(url)
             }
             Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(
                 format!("Failed to start interactive nodes table: {}", e)
@@ -2130,6 +2191,34 @@ impl PyNodesTable {
                 format!("Failed to generate interactive nodes table embed: {}", e)
             ))
         }
+    }
+    
+    /// Launch interactive visualization for this NodesTable
+    /// 
+    /// # Arguments
+    /// * `port` - Optional port number (0 for auto-assign)
+    /// * `layout` - Layout algorithm: \"force-directed\", \"circular\", \"grid\", \"hierarchical\"
+    /// * `theme` - Visual theme: \"light\", \"dark\", \"publication\", \"minimal\"
+    /// * `width` - Canvas width in pixels
+    /// * `height` - Canvas height in pixels
+    /// 
+    /// # Returns
+    /// PyVizModule for launching interactive visualization
+    pub fn interactive_viz(
+        &self,
+        port: Option<u16>,
+        layout: Option<String>,
+        theme: Option<String>,
+        width: Option<u32>,
+        height: Option<u32>
+    ) -> PyResult<PyVizModule> {
+        // Create VizModule from this NodesTable using delegation pattern
+        let data_source: Arc<dyn groggy::viz::streaming::data_source::DataSource> = Arc::new(self.table.clone());
+        let viz_module = VizModule::new(data_source);
+        
+        Ok(PyVizModule {
+            inner: viz_module,
+        })
     }
 }
 
@@ -2818,12 +2907,20 @@ impl PyEdgesTable {
         // Get BaseTable from EdgesTable for streaming
         let base_table = self.table.base_table();
         match base_table.interactive(None) {
-            Ok(browser_interface) => {
-                println!("🚀 Interactive edges table launched at: {}", browser_interface.url);
+            Ok(viz_module) => {
+                // Launch the interactive visualization and get the session
+                let interactive_viz = viz_module.interactive(None)
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create interactive viz: {}", e)))?;
+                
+                let session = interactive_viz.start(None)
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to start viz session: {}", e)))?;
+                
+                let url = session.url().to_string();
+                println!("🚀 Interactive edges table launched at: {}", url);
                 println!("📊 Streaming {} rows × {} columns", 
-                        base_table.total_rows(), 
-                        base_table.total_cols());
-                Ok(browser_interface.url)
+                        VizDataSource::total_rows(base_table), 
+                        VizDataSource::total_cols(base_table));
+                Ok(url)
             }
             Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(
                 format!("Failed to start interactive edges table: {}", e)
@@ -2850,6 +2947,34 @@ impl PyEdgesTable {
                 format!("Failed to generate interactive edges table embed: {}", e)
             ))
         }
+    }
+    
+    /// Launch interactive visualization for this EdgesTable (new visualization system)
+    /// 
+    /// # Arguments
+    /// * `port` - Optional port number (0 for auto-assign)
+    /// * `layout` - Layout algorithm: \"force-directed\", \"circular\", \"grid\", \"hierarchical\"
+    /// * `theme` - Visual theme: \"light\", \"dark\", \"publication\", \"minimal\"
+    /// * `width` - Canvas width in pixels
+    /// * `height` - Canvas height in pixels
+    /// 
+    /// # Returns
+    /// PyVizModule for launching interactive visualization
+    pub fn interactive_viz(
+        &self,
+        port: Option<u16>,
+        layout: Option<String>,
+        theme: Option<String>,
+        width: Option<u32>,
+        height: Option<u32>
+    ) -> PyResult<PyVizModule> {
+        // Create VizModule from this EdgesTable using delegation pattern
+        let data_source: Arc<dyn groggy::viz::streaming::data_source::DataSource> = Arc::new(self.table.clone());
+        let viz_module = VizModule::new(data_source);
+        
+        Ok(PyVizModule {
+            inner: viz_module,
+        })
     }
 }
 

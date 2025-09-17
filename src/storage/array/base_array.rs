@@ -1,6 +1,8 @@
 use std::sync::Arc;
 use crate::types::AttrValue;
 use super::{ArrayOps, ArrayIterator};
+use crate::errors::GraphResult;
+use crate::viz::VizModule;
 
 /// BaseArray provides fundamental array operations for all array types.
 /// This is the foundation that all specialized arrays delegate to for basic functionality.
@@ -277,6 +279,26 @@ impl BaseArray<AttrValue> {
         }
         
         (edge_ids, valid_indices)
+    }
+    
+    /// Launch interactive visualization for this AttrValue array
+    /// 
+    /// Creates a single-column table from this array and delegates to 
+    /// BaseTable.interactive() following the delegation pattern.
+    pub fn interactive(&self) -> GraphResult<VizModule> {
+        use std::collections::HashMap;
+        use crate::storage::table::BaseTable;
+        
+        // Create a single-column table from this array
+        let mut columns = HashMap::new();
+        let column_name = "values".to_string();
+        columns.insert(column_name.clone(), self.clone());
+        
+        // Create BaseTable from the column
+        let table = BaseTable::from_columns(columns)?;
+        
+        // Delegate to BaseTable's interactive method
+        table.interactive(None)
     }
 }
 

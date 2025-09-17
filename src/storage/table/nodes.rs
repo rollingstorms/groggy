@@ -5,6 +5,13 @@ use super::traits::{Table, TableIterator};
 use crate::storage::array::{BaseArray, ArrayOps};
 use crate::types::{NodeId, AttrValue};
 use crate::errors::{GraphResult, GraphError};
+use crate::viz::streaming::data_source::{
+    DataSource, DataWindow, DataSchema, WindowKey, 
+    GraphNode, GraphEdge, GraphMetadata, LayoutAlgorithm, NodePosition, Position
+};
+use crate::viz::display::{ColumnSchema, DataType};
+use crate::viz::VizModule;
+use super::base::InteractiveConfig;
 use std::collections::{HashMap, HashSet};
 
 /// Specialized table for node data - requires a node_id column
@@ -253,6 +260,15 @@ impl NodesTable {
         self.column(name).ok_or_else(|| 
             GraphError::InvalidInput(format!("Column '{}' not found", name)))
     }
+    
+    /// Launch interactive visualization for this nodes table
+    /// 
+    /// Delegates to BaseTable.interactive() following the delegation pattern.
+    /// The visualization will show the node data with any associated attributes.
+    pub fn interactive(&self, config: Option<InteractiveConfig>) -> GraphResult<VizModule> {
+        // Delegate to the base table's interactive method
+        self.base.interactive(config)
+    }
 }
 
 // Delegate all Table trait methods to the base table
@@ -349,5 +365,254 @@ impl std::fmt::Display for NodesTable {
 impl From<Vec<NodeId>> for NodesTable {
     fn from(node_ids: Vec<NodeId>) -> Self {
         Self::new(node_ids)
+    }
+}
+
+// =============================================================================
+// DataSource Implementation for Graph Visualization
+// =============================================================================
+
+impl DataSource for NodesTable {
+    fn total_rows(&self) -> usize {
+        self.nrows()
+    }
+    
+    fn total_cols(&self) -> usize {
+        self.ncols()
+    }
+    
+    fn get_window(&self, start: usize, count: usize) -> DataWindow {
+        let end = (start + count).min(self.nrows());
+        let windowed_table = self.slice(start, end);
+        
+        // Convert table data to DataWindow format
+        let headers = windowed_table.column_names().to_vec();
+        let mut rows = Vec::new();
+        
+        for i in 0..windowed_table.nrows() {
+            let mut row = Vec::new();
+            for col_name in &headers {
+                if let Some(column) = windowed_table.column(col_name) {
+                    if let Some(value) = column.get(i) {
+                        row.push(value.clone());
+                    } else {
+                        row.push(AttrValue::Null);
+                    }
+                } else {
+                    row.push(AttrValue::Null);
+                }
+            }
+            rows.push(row);
+        }
+        
+        let schema = self.get_schema();
+        DataWindow::new(headers, rows, schema, self.total_rows(), start)
+    }
+    
+    fn get_schema(&self) -> DataSchema {
+        let mut columns = Vec::new();
+        
+        for col_name in self.column_names() {
+            let data_type = if col_name == "node_id" {
+                DataType::Integer
+            } else if let Some(column) = self.column(col_name) {
+                // Infer type from first non-null value
+                let mut data_type = DataType::String; // Default fallback
+                for i in 0..column.len() {
+                    match column.get(i) {
+                        Some(AttrValue::Int(_)) => {
+                            data_type = DataType::Integer;
+                            break;
+                        },
+                        Some(AttrValue::Float(_)) => {
+                            data_type = DataType::Float;
+                            break;
+                        },
+                        Some(AttrValue::Text(_)) => {
+                            data_type = DataType::String;
+                            break;
+                        },
+                        Some(AttrValue::Bool(_)) => {
+                            data_type = DataType::Boolean;
+                            break;
+                        },
+                        _ => continue,
+                    };
+                }
+                data_type
+            } else {
+                DataType::String
+            };
+            
+            columns.push(ColumnSchema {
+                name: col_name.clone(),
+                data_type,
+            });
+        }
+        
+        DataSchema {
+            columns,
+            primary_key: Some("node_id".to_string()),
+            source_type: "nodes_table".to_string(),
+        }
+    }
+    
+    fn supports_streaming(&self) -> bool {
+        true
+    }
+    
+    fn get_column_types(&self) -> Vec<DataType> {
+        self.get_schema().columns.into_iter().map(|c| c.data_type).collect()
+    }
+    
+    fn get_column_names(&self) -> Vec<String> {
+        self.column_names().to_vec()
+    }
+    
+    fn get_source_id(&self) -> String {
+        format!("nodes_table_{}", self.nrows())
+    }
+    
+    fn get_version(&self) -> u64 {
+        // Simple hash-based version - could be improved
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut hasher = DefaultHasher::new();
+        self.nrows().hash(&mut hasher);
+        self.ncols().hash(&mut hasher);
+        hasher.finish()
+    }
+    
+    // Graph visualization support
+    fn supports_graph_view(&self) -> bool {
+        true
+    }
+    
+    fn get_graph_nodes(&self) -> Vec<GraphNode> {
+        let mut nodes = Vec::new();
+        
+        if let Ok(node_ids) = self.node_ids() {
+            for (i, node_id) in node_ids.iter().enumerate() {
+                let mut attributes = HashMap::new();
+                
+                // Collect all attributes for this node
+                for col_name in self.column_names() {
+                    if col_name != "node_id" {
+                        if let Some(column) = self.column(col_name) {
+                            if let Some(value) = column.get(i) {
+                                attributes.insert(col_name.clone(), value.clone());
+                            }
+                        }
+                    }
+                }
+                
+                // Try to get a label from common label columns
+                let label = attributes.get("label")
+                    .or_else(|| attributes.get("name"))
+                    .or_else(|| attributes.get("title"))
+                    .map(|v| match v {
+                        AttrValue::Text(s) => s.clone(),
+                        AttrValue::Int(i) => i.to_string(),
+                        AttrValue::Float(f) => f.to_string(),
+                        _ => node_id.to_string(),
+                    })
+                    .or_else(|| Some(node_id.to_string()));
+                
+                nodes.push(GraphNode {
+                    id: node_id.to_string(),
+                    label,
+                    attributes,
+                    position: None, // Will be computed by layout algorithm
+                });
+            }
+        }
+        
+        nodes
+    }
+    
+    fn get_graph_edges(&self) -> Vec<GraphEdge> {
+        // NodesTable doesn't contain edge information
+        Vec::new()
+    }
+    
+    fn get_graph_metadata(&self) -> GraphMetadata {
+        let nodes = self.get_graph_nodes();
+        let mut attribute_types = HashMap::new();
+        
+        // Infer attribute types from the schema
+        for col_schema in self.get_schema().columns {
+            if col_schema.name != "node_id" {
+                let type_name = match col_schema.data_type {
+                    DataType::Integer => "integer",
+                    DataType::Float => "float", 
+                    DataType::String => "string",
+                    DataType::Boolean => "boolean",
+                    DataType::DateTime => "datetime",
+                    DataType::Json => "json",
+                    DataType::Unknown => "unknown",
+                };
+                attribute_types.insert(col_schema.name, type_name.to_string());
+            }
+        }
+        
+        GraphMetadata {
+            node_count: nodes.len(),
+            edge_count: 0,
+            is_directed: false, // No edges in nodes table
+            has_weights: false,
+            attribute_types,
+        }
+    }
+    
+    fn compute_layout(&self, algorithm: LayoutAlgorithm) -> Vec<NodePosition> {
+        let nodes = self.get_graph_nodes();
+        
+        match algorithm {
+            LayoutAlgorithm::Circular { radius, start_angle } => {
+                let radius = radius.unwrap_or(200.0);
+                let angle_step = 2.0 * std::f64::consts::PI / nodes.len() as f64;
+                
+                nodes.into_iter().enumerate().map(|(i, node)| {
+                    let angle = start_angle + i as f64 * angle_step;
+                    NodePosition {
+                        node_id: node.id,
+                        position: Position {
+                            x: radius * angle.cos(),
+                            y: radius * angle.sin(),
+                        },
+                    }
+                }).collect()
+            },
+            LayoutAlgorithm::Grid { columns, cell_size } => {
+                nodes.into_iter().enumerate().map(|(i, node)| {
+                    let row = i / columns;
+                    let col = i % columns;
+                    NodePosition {
+                        node_id: node.id,
+                        position: Position {
+                            x: col as f64 * cell_size,
+                            y: row as f64 * cell_size,
+                        },
+                    }
+                }).collect()
+            },
+            _ => {
+                // Default circular layout for other algorithms
+                let radius = 200.0;
+                let angle_step = 2.0 * std::f64::consts::PI / nodes.len() as f64;
+                
+                nodes.into_iter().enumerate().map(|(i, node)| {
+                    let angle = i as f64 * angle_step;
+                    NodePosition {
+                        node_id: node.id,
+                        position: Position {
+                            x: radius * angle.cos(),
+                            y: radius * angle.sin(),
+                        },
+                    }
+                }).collect()
+            }
+        }
     }
 }

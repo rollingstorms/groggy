@@ -74,39 +74,53 @@ class APIMetaGraphExtractor:
         if not docstring:
             return 'Unknown'
         
-        # Look for return type patterns
+        # First, check for known type patterns in the docstring (most reliable)
+        for type_pattern, canonical_type in self.type_patterns.items():
+            # Only match whole words to avoid partial matches
+            word_pattern = r'\b' + type_pattern.strip(r'\b') + r'\b'
+            if re.search(word_pattern, docstring, re.IGNORECASE):
+                self.discovered_types.add(canonical_type)
+                return canonical_type
+        
+        # If no known types found, try specific return type patterns
         return_patterns = [
-            r'Returns?:?\s*([A-Za-z_][A-Za-z0-9_]*)',
-            r'-> ([A-Za-z_][A-Za-z0-9_]*)',
-            r'return[s]?\s+([A-Za-z_][A-Za-z0-9_]*)',
-            r'(?:Returns?|Output):?\s*.*?([A-Za-z_][A-Za-z0-9_]*)',
+            r'Returns?:?\s*([A-Z][A-Za-z0-9_]*)',  # Capitalized types after "Returns:"
+            r'-> ([A-Z][A-Za-z0-9_]*)',  # Arrow notation with capitalized types
+            r'return[s]?\s+([A-Z][A-Za-z0-9_]*)',  # "return Type" with capitalized types
             r'PyResult<([A-Za-z_][A-Za-z0-9_]*)>',  # Rust-style PyResult
-            r'Py([A-Za-z_][A-Za-z0-9_]*)',  # Python wrapper types
+            r'Py([A-Z][A-Za-z0-9_]*)',  # Python wrapper types (PyGraph, PyTable, etc.)
         ]
+        
+        # Common words to reject (expanded list)
+        reject_words = {
+            'the', 'and', 'this', 'that', 'with', 'from', 'for', 'new', 'old',
+            'ing', 'ion', 'tion', 'thon', 'report', 'empty', 'New', 'a', 's', 'L'
+        }
         
         for pattern in return_patterns:
             match = re.search(pattern, docstring, re.IGNORECASE)
             if match:
                 return_type = match.group(1)
                 
+                # Filter out obviously wrong types
+                if (len(return_type) <= 2 or 
+                    return_type.lower() in reject_words or
+                    not return_type[0].isupper() or
+                    not return_type.isalpha()):  # Only alphabetic characters
+                    continue
+                
                 # Clean up common prefixes
+                original_type = return_type
                 return_type = return_type.replace('Py', '')  # Remove Py prefix
                 
-                # Check if it matches our known types
-                for type_pattern, canonical_type in self.type_patterns.items():
-                    if re.search(type_pattern, return_type, re.IGNORECASE):
-                        self.discovered_types.add(canonical_type)
-                        return canonical_type
+                # Skip if it becomes too short after cleanup or matches reject list
+                if len(return_type) <= 2 or return_type.lower() in reject_words:
+                    continue
                 
-                # Add to discovered types
-                self.discovered_types.add(return_type)
-                return return_type
-        
-        # Check for known type patterns in the whole docstring
-        for type_pattern, canonical_type in self.type_patterns.items():
-            if re.search(type_pattern, docstring, re.IGNORECASE):
-                self.discovered_types.add(canonical_type)
-                return canonical_type
+                # Validate it looks like a proper class name
+                if return_type[0].isupper() and len(return_type) >= 3 and return_type.isalnum():
+                    self.discovered_types.add(return_type)
+                    return return_type
         
         return 'Unknown'
     
@@ -197,9 +211,9 @@ class APIMetaGraphExtractor:
         try:
             # Create a graph with some data to get access to more object types
             g = groggy.Graph()
-            nodes_data = [{'id': 'test1'}, {'id': 'test2'}]
+            nodes_data = [{'id': 'test1'}, {'id': 'test2'}, {'id': 'test3'}]
             g.add_nodes(nodes_data, uid_key='id')
-            g.add_edges([('test1', 'test2')], uid_key='id')
+            g.add_edges([('test1', 'test2'), ('test2', 'test3')], uid_key='id')
             
             # Try to get table objects
             try:
@@ -225,6 +239,57 @@ class APIMetaGraphExtractor:
                 core_objects['Matrix'] = matrix
             except:
                 pass
+            
+            # Try to create Subgraph objects using various methods
+            try:
+                # Method 1: Try slicing nodes (if supported)
+                subgraph = g.nodes[:2]  # First 2 nodes
+                if subgraph is not None:
+                    core_objects['Subgraph'] = subgraph
+                    print(f"    Found Subgraph via slicing: {type(subgraph)}")
+            except Exception as slice_e:
+                print(f"    Slicing method failed: {slice_e}")
+            
+            # Method 2: Try filter methods if Subgraph not found yet
+            if 'Subgraph' not in core_objects:
+                try:
+                    # Try filtering nodes
+                    subgraph = g.filter_nodes(lambda node: True)  # Filter that accepts all
+                    if subgraph is not None:
+                        core_objects['Subgraph'] = subgraph
+                        print(f"    Found Subgraph via filter_nodes: {type(subgraph)}")
+                except Exception as filter_e:
+                    print(f"    filter_nodes method failed: {filter_e}")
+            
+            # Method 3: Try connected_components if Subgraph not found yet
+            if 'Subgraph' not in core_objects:
+                try:
+                    components = g.connected_components()
+                    if components and len(components) > 0:
+                        subgraph = components[0]  # First component
+                        if subgraph is not None:
+                            core_objects['Subgraph'] = subgraph
+                            print(f"    Found Subgraph via connected_components: {type(subgraph)}")
+                except Exception as comp_e:
+                    print(f"    connected_components method failed: {comp_e}")
+            
+            # Method 4: Try subgraph method if exists
+            if 'Subgraph' not in core_objects:
+                try:
+                    if hasattr(g, 'subgraph'):
+                        subgraph = g.subgraph(nodes=['test1', 'test2'])
+                        if subgraph is not None:
+                            core_objects['Subgraph'] = subgraph
+                            print(f"    Found Subgraph via subgraph method: {type(subgraph)}")
+                except Exception as sub_e:
+                    print(f"    subgraph method failed: {sub_e}")
+            
+            # If we still don't have a Subgraph, list available methods on the graph
+            if 'Subgraph' not in core_objects:
+                print(f"    Could not create Subgraph object. Available Graph methods:")
+                graph_methods = [m for m in dir(g) if not m.startswith('_') and callable(getattr(g, m))]
+                subgraph_related = [m for m in graph_methods if 'subgraph' in m.lower() or 'component' in m.lower() or 'filter' in m.lower()]
+                print(f"      Potentially relevant methods: {subgraph_related}")
             
         except Exception as e:
             print(f"Note: Could not create test objects: {e}")
