@@ -1,0 +1,767 @@
+/**
+ * 🎨 Phase 9: Responsive Design Enhancement
+ * 
+ * Advanced responsive design for Groggy Graph Visualization
+ * Optimized for mobile, tablet, desktop, and ultra-wide displays
+ * 
+ * Features:
+ * - mobile-first responsive design
+ * - Touch-friendly interactions
+ * - Adaptive layouts for different screen sizes
+ * - Performance optimizations for mobile devices
+ * - Accessibility enhancements
+ */
+
+/* ==========================================================================
+   MOBILE-FIRST responsive design with breakpoint system
+   ========================================================================== */
+
+/* Base Mobile Styles (320px and up) */
+@media (min-width: 320px) {
+    .viz-container {
+        font-size: 14px;
+    }
+    
+    .viz-header {
+        padding: 0 8px;
+        height: 48px;
+    }
+    
+    .viz-title {
+        font-size: 14px;
+        font-weight: 500;
+    }
+    
+    .control-button {
+        min-width: 28px;
+        height: 28px;
+        padding: 4px 6px;
+        font-size: 12px;
+    }
+    
+    .control-select {
+        padding: 4px 6px;
+        font-size: 12px;
+    }
+    
+    /* Mobile sidebar overlay */
+    .viz-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 280px;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease-out;
+        z-index: 1100;
+        box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .viz-sidebar.open {
+        transform: translateX(0);
+    }
+    
+    .sidebar-section {
+        padding: 12px;
+    }
+    
+    .sidebar-section h3 {
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+    
+    /* Mobile-optimized canvas controls */
+    .canvas-controls {
+        bottom: 12px;
+        right: 12px;
+        transform: scale(0.85);
+    }
+    
+    /* Touch-friendly interactions */
+    .control-button,
+    .context-menu-item,
+    .filter-item {
+        min-height: 44px;
+        touch-action: manipulation;
+    }
+    
+    /* Mobile status bar */
+    .viz-status {
+        padding: 0 8px;
+        height: 28px;
+        font-size: 11px;
+    }
+    
+    .status-left,
+    .status-right {
+        gap: 8px;
+    }
+    
+    /* Hide complex elements on small screens */
+    .graph-stats,
+    .performance-indicator {
+        display: none;
+    }
+}
+
+/* Large Mobile (375px and up) */
+@media (min-width: 375px) {
+    .viz-header {
+        padding: 0 12px;
+        height: 52px;
+    }
+    
+    .viz-title {
+        font-size: 15px;
+    }
+    
+    .control-button {
+        min-width: 32px;
+        height: 32px;
+        padding: 6px 8px;
+        font-size: 13px;
+    }
+    
+    .sidebar-section {
+        padding: 15px;
+    }
+    
+    .canvas-controls {
+        transform: scale(0.9);
+    }
+    
+    /* Show performance indicator on larger mobile */
+    .performance-indicator {
+        display: flex;
+    }
+}
+
+/* Small Tablet (480px and up) */
+@media (min-width: 480px) {
+    .viz-container {
+        font-size: 15px;
+    }
+    
+    .viz-header {
+        height: 56px;
+        padding: 0 16px;
+    }
+    
+    .viz-title {
+        font-size: 16px;
+    }
+    
+    .header-left {
+        gap: 16px;
+    }
+    
+    .header-right {
+        gap: 12px;
+    }
+    
+    .control-button {
+        min-width: 36px;
+        height: 36px;
+        padding: 8px 10px;
+        font-size: 14px;
+    }
+    
+    .control-select {
+        padding: 6px 10px;
+        font-size: 14px;
+    }
+    
+    .viz-sidebar {
+        width: 300px;
+    }
+    
+    .sidebar-section {
+        padding: 16px;
+    }
+    
+    .sidebar-section h3 {
+        font-size: 15px;
+    }
+    
+    .canvas-controls {
+        transform: scale(0.95);
+    }
+    
+    /* Show graph stats on tablet */
+    .graph-stats {
+        display: flex;
+        gap: 12px;
+    }
+    
+    /* Responsive grid for filter items */
+    #filters-container {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+}
+
+/* Tablet (768px and up) */
+@media (min-width: 768px) {
+    .viz-container {
+        font-size: 16px;
+    }
+    
+    .viz-header {
+        height: 60px;
+        padding: 0 20px;
+    }
+    
+    .viz-title {
+        font-size: 18px;
+        font-weight: 600;
+    }
+    
+    .header-left {
+        gap: 20px;
+    }
+    
+    .header-right {
+        gap: 15px;
+    }
+    
+    .control-button {
+        min-width: 40px;
+        height: 40px;
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+    
+    .control-select {
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+    
+    /* Tablet sidebar - side by side layout */
+    .viz-sidebar {
+        position: relative;
+        transform: none;
+        width: 280px;
+        height: auto;
+        box-shadow: none;
+        border-right: 1px solid var(--color-border);
+    }
+    
+    .viz-sidebar.collapsed {
+        width: 60px;
+    }
+    
+    .sidebar-section {
+        padding: 18px;
+    }
+    
+    .sidebar-section h3 {
+        font-size: 16px;
+        margin-bottom: 12px;
+    }
+    
+    .canvas-controls {
+        transform: scale(1);
+        bottom: 16px;
+        right: 16px;
+    }
+    
+    .viz-status {
+        height: 32px;
+        padding: 0 20px;
+        font-size: 12px;
+    }
+    
+    /* Two-column filter layout */
+    #filters-container {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+    
+    /* Show all status elements */
+    .graph-stats,
+    .performance-indicator {
+        display: flex;
+    }
+    
+    .graph-stats {
+        gap: 15px;
+    }
+}
+
+/* Large Tablet / Small Desktop (1024px and up) */
+@media (min-width: 1024px) {
+    .viz-header {
+        height: 64px;
+        padding: 0 24px;
+    }
+    
+    .viz-title {
+        font-size: 20px;
+    }
+    
+    .viz-sidebar {
+        width: 320px;
+    }
+    
+    .sidebar-section {
+        padding: 20px;
+    }
+    
+    .canvas-controls {
+        bottom: 20px;
+        right: 20px;
+    }
+    
+    /* Three-column filter layout */
+    #filters-container {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 12px;
+    }
+    
+    /* Enhanced tooltips for desktop */
+    .tooltip {
+        max-width: 300px;
+        padding: 12px 16px;
+        font-size: 13px;
+    }
+}
+
+/* Desktop (1200px and up) */
+@media (min-width: 1200px) {
+    .viz-header {
+        padding: 0 32px;
+    }
+    
+    .viz-sidebar {
+        width: 360px;
+    }
+    
+    .sidebar-section {
+        padding: 24px;
+    }
+    
+    .sidebar-section h3 {
+        font-size: 17px;
+    }
+    
+    /* Larger tooltips and modals */
+    .modal-content {
+        max-width: 720px;
+    }
+    
+    .tooltip {
+        max-width: 400px;
+        padding: 16px 20px;
+        font-size: 14px;
+    }
+}
+
+/* Large Desktop (1440px and up) */
+@media (min-width: 1440px) {
+    .viz-header {
+        padding: 0 40px;
+    }
+    
+    .viz-sidebar {
+        width: 400px;
+    }
+    
+    .sidebar-section {
+        padding: 28px;
+    }
+    
+    /* Four-column filter layout */
+    #filters-container {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+}
+
+/* Ultra-wide (1920px and up) */
+@media (min-width: 1920px) {
+    .viz-container {
+        font-size: 17px;
+    }
+    
+    .viz-header {
+        height: 72px;
+        padding: 0 48px;
+    }
+    
+    .viz-title {
+        font-size: 22px;
+    }
+    
+    .viz-sidebar {
+        width: 440px;
+    }
+    
+    .sidebar-section {
+        padding: 32px;
+    }
+    
+    .sidebar-section h3 {
+        font-size: 18px;
+    }
+    
+    /* Enhanced spacing for ultra-wide */
+    .canvas-controls {
+        bottom: 32px;
+        right: 32px;
+    }
+    
+    .modal-content {
+        max-width: 960px;
+    }
+}
+
+/* ==========================================================================
+   ORIENTATION-SPECIFIC STYLES
+   ========================================================================== */
+
+/* Landscape orientation on mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+    .viz-header {
+        height: 44px;
+        padding: 0 12px;
+    }
+    
+    .viz-title {
+        font-size: 14px;
+    }
+    
+    .control-button {
+        min-width: 28px;
+        height: 28px;
+        padding: 4px 6px;
+        font-size: 12px;
+    }
+    
+    .viz-status {
+        height: 24px;
+        font-size: 10px;
+    }
+    
+    .sidebar-section {
+        padding: 8px;
+    }
+    
+    .sidebar-section h3 {
+        font-size: 13px;
+        margin-bottom: 6px;
+    }
+    
+    /* Compact canvas controls for landscape */
+    .canvas-controls {
+        bottom: 8px;
+        right: 8px;
+        transform: scale(0.75);
+    }
+}
+
+/* Portrait orientation on tablet */
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+    .viz-sidebar {
+        width: 300px;
+    }
+    
+    /* Stack header controls vertically */
+    .header-right {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .control-group {
+        flex-direction: row;
+        gap: 8px;
+    }
+}
+
+/* ==========================================================================
+   TOUCH-SPECIFIC ENHANCEMENTS
+   ========================================================================== */
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger touch targets */
+    .control-button,
+    .context-menu-item,
+    .filter-item {
+        min-height: 48px;
+        touch-action: manipulation;
+    }
+    
+    /* Remove hover effects on touch devices */
+    .control-button:hover,
+    .context-menu-item:hover,
+    .filter-item:hover {
+        background-color: inherit;
+    }
+    
+    /* Touch-friendly search input */
+    .search-input {
+        padding: 12px 16px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    /* Larger scrollbars for touch */
+    .viz-sidebar::-webkit-scrollbar {
+        width: 12px;
+    }
+    
+    .viz-sidebar::-webkit-scrollbar-thumb {
+        background-color: var(--color-border);
+        border-radius: 6px;
+    }
+    
+    /* Touch feedback animations */
+    .control-button:active {
+        transform: scale(0.95);
+        transition: transform 0.1s ease-out;
+    }
+}
+
+/* ==========================================================================
+   HIGH-DPI DISPLAY OPTIMIZATIONS
+   ========================================================================== */
+
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    /* Crisp borders on high-DPI displays */
+    .viz-header,
+    .viz-sidebar,
+    .viz-status,
+    .control-button,
+    .control-select,
+    .search-input {
+        border-width: 0.5px;
+    }
+    
+    /* Enhanced shadows for retina displays */
+    .canvas-controls,
+    .modal-content,
+    .tooltip {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+}
+
+/* ==========================================================================
+   REDUCED MOTION SUPPORT
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    /* Disable animations for users who prefer reduced motion */
+    .viz-sidebar,
+    .loading-spinner,
+    .canvas-controls,
+    .tooltip,
+    .modal {
+        transition: none !important;
+        animation: none !important;
+    }
+    
+    /* Provide instant feedback instead of animations */
+    .control-button:active {
+        transform: none;
+        background-color: var(--color-surface-hover);
+    }
+}
+
+/* ==========================================================================
+   PRINT STYLES
+   ========================================================================== */
+
+@media print {
+    /* Hide interactive elements */
+    .viz-header,
+    .viz-sidebar,
+    .viz-status,
+    .canvas-controls,
+    .loading-screen,
+    .mobile-overlay {
+        display: none !important;
+    }
+    
+    /* Full-width canvas for printing */
+    .viz-main {
+        flex-direction: column;
+    }
+    
+    .viz-canvas-area {
+        width: 100% !important;
+        height: 100vh !important;
+    }
+    
+    .canvas-container {
+        border: 2px solid #000;
+        background-color: white !important;
+    }
+    
+    /* Print-friendly colors */
+    * {
+        color: #000 !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+    }
+    
+    /* Page break controls */
+    .viz-container {
+        page-break-inside: avoid;
+    }
+}
+
+/* ==========================================================================
+   ACCESSIBILITY ENHANCEMENTS
+   ========================================================================== */
+
+/* Focus indicators for keyboard navigation */
+@media (prefers-reduced-motion: no-preference) {
+    .control-button:focus-visible,
+    .control-select:focus-visible,
+    .search-input:focus-visible {
+        outline: 3px solid var(--color-primary);
+        outline-offset: 2px;
+        transition: outline-offset 0.2s ease-out;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .viz-header,
+    .viz-sidebar,
+    .viz-status {
+        border-width: 2px;
+        border-color: #000;
+    }
+    
+    .control-button,
+    .control-select,
+    .search-input {
+        border-width: 2px;
+        border-color: #000;
+    }
+    
+    .tooltip {
+        border: 2px solid #000;
+        background-color: #fff;
+        color: #000;
+    }
+}
+
+/* ==========================================================================
+   CONTAINER QUERIES (FUTURE-PROOFING)
+   ========================================================================== */
+
+/* When container queries are widely supported */
+@supports (container-type: inline-size) {
+    .viz-sidebar {
+        container-type: inline-size;
+    }
+    
+    @container (max-width: 200px) {
+        .sidebar-section h3 {
+            font-size: 14px;
+        }
+        
+        .search-input {
+            font-size: 12px;
+        }
+    }
+    
+    @container (min-width: 350px) {
+        #filters-container {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+}
+
+/* ==========================================================================
+   PERFORMANCE OPTIMIZATIONS
+   ========================================================================== */
+
+/* GPU acceleration for smooth animations */
+.viz-sidebar,
+.canvas-controls,
+.tooltip,
+.modal-content {
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+/* Optimize rendering for mobile */
+@media (max-width: 768px) {
+    * {
+        /* Reduce complexity on mobile */
+        box-shadow: none;
+        text-shadow: none;
+    }
+    
+    .viz-container {
+        /* Simplified rendering on mobile */
+        backface-visibility: hidden;
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+    }
+}
+
+/* Content visibility for performance */
+@supports (content-visibility: auto) {
+    .sidebar-section {
+        content-visibility: auto;
+        contain-intrinsic-size: 0 200px;
+    }
+}
+
+/* ==========================================================================
+   RESPONSIVE IMAGES AND ICONS
+   ========================================================================== */
+
+/* Scalable icons for different screen densities */
+.control-button::before,
+.status-indicator::before {
+    font-size: 1.2em;
+    line-height: 1;
+}
+
+@media (max-width: 480px) {
+    .control-button::before,
+    .status-indicator::before {
+        font-size: 1em;
+    }
+}
+
+@media (min-width: 1440px) {
+    .control-button::before,
+    .status-indicator::before {
+        font-size: 1.3em;
+    }
+}
+
+/* ==========================================================================
+   RESPONSIVE TYPOGRAPHY
+   ========================================================================== */
+
+/* Fluid typography */
+@media (min-width: 320px) and (max-width: 1920px) {
+    .viz-title {
+        font-size: clamp(14px, 4vw, 22px);
+    }
+    
+    .sidebar-section h3 {
+        font-size: clamp(13px, 3.5vw, 18px);
+    }
+    
+    body {
+        font-size: clamp(12px, 2.5vw, 16px);
+    }
+}
+
+/* Reading comfort optimizations */
+@media (min-width: 1200px) {
+    .sidebar-section {
+        line-height: 1.6;
+    }
+    
+    .tooltip {
+        line-height: 1.5;
+    }
+}

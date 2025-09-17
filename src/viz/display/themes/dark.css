@@ -1,0 +1,185 @@
+/* Dark theme CSS for Groggy display tables */
+
+.groggy-display-container[data-theme="dark"] {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', 'Inconsolata', 'Liberation Mono', monospace;
+    background-color: #1a1a1a;
+    color: #e9ecef;
+    border-radius: 4px;
+    overflow-x: auto;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.groggy-table.theme-dark {
+    border-collapse: collapse;
+    font-size: 14px;
+    width: auto;
+    min-width: fit-content;
+    margin: 0;
+    background-color: #1a1a1a;
+    border: 1px solid #495057;
+}
+
+.groggy-table.theme-dark th {
+    background-color: #343a40;
+    border: 1px solid #495057;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #e9ecef;
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.groggy-table.theme-dark td {
+    border: 1px solid #495057;
+    padding: 6px 12px;
+    color: #e9ecef;
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.groggy-table.theme-dark tr:nth-child(even) {
+    background-color: #2d3338;
+}
+
+.groggy-table.theme-dark tr:hover {
+    background-color: #3d4449;
+}
+
+/* Data type specific styling */
+.groggy-table.theme-dark .cell-float,
+.groggy-table.theme-dark .cell-integer {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #66b3ff;
+}
+
+.groggy-table.theme-dark .cell-string {
+    text-align: left;
+    color: #e9ecef;
+}
+
+.groggy-table.theme-dark .cell-boolean {
+    text-align: center;
+    color: #51cf66;
+    font-weight: 500;
+}
+
+.groggy-table.theme-dark .cell-datetime {
+    text-align: left;
+    color: #cc99ff;
+    font-variant-numeric: tabular-nums;
+}
+
+.groggy-table.theme-dark .cell-unknown {
+    text-align: left;
+    color: #adb5bd;
+    font-style: italic;
+}
+
+/* Table info section */
+.groggy-display-container[data-theme="dark"] .table-info {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background-color: #343a40;
+    border: 1px solid #495057;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #adb5bd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.groggy-display-container[data-theme="dark"] .table-info .interactive-btn {
+    background-color: #0d6efd;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.groggy-display-container[data-theme="dark"] .table-info .interactive-btn:hover {
+    background-color: #0b5ed7;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .groggy-table.theme-dark {
+        font-size: 12px;
+    }
+    
+    .groggy-table.theme-dark th,
+    .groggy-table.theme-dark td {
+        padding: 4px 8px;
+    }
+    
+    .groggy-display-container[data-theme="dark"] {
+        border-radius: 0;
+        box-shadow: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .groggy-table.theme-dark {
+        font-size: 11px;
+    }
+    
+    .groggy-table.theme-dark th,
+    .groggy-table.theme-dark td {
+        padding: 3px 6px;
+    }
+}
+
+/* Print styles (convert to light for printing) */
+@media print {
+    .groggy-display-container[data-theme="dark"] {
+        box-shadow: none;
+        border: 1px solid #000;
+        background-color: #fff !important;
+        color: #000 !important;
+    }
+    
+    .groggy-table.theme-dark {
+        border: 1px solid #000;
+        background-color: #fff !important;
+    }
+    
+    .groggy-table.theme-dark th,
+    .groggy-table.theme-dark td {
+        border: 1px solid #000;
+        background-color: #fff !important;
+        color: #000 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .table-info,
+    .interactive-btn {
+        display: none;
+    }
+}
+
+/* Accessibility improvements */
+.groggy-table.theme-dark:focus-within {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
+.groggy-table.theme-dark th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Truncated content indicator */
+.groggy-table.theme-dark .cell-truncated::after {
+    content: "…";
+    color: #adb5bd;
+    font-weight: normal;
+}
