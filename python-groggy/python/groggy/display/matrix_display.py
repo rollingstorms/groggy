@@ -9,7 +9,7 @@ from .truncation import smart_matrix_truncation, truncate_string
 class MatrixDisplayFormatter:
     """Formatter for GraphMatrix rich display with shape and dtype information."""
     
-    def __init__(self, max_rows: int = 10, max_cols: int = 8, max_width: int = 120, precision: int = 2):
+    def __init__(self, max_rows: int = 10, max_cols: int = 20, max_width: int = 120, precision: int = 2):
         self.max_rows = max_rows
         self.max_cols = max_cols
         self.max_width = max_width

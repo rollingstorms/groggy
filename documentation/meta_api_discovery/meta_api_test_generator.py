@@ -78,8 +78,8 @@ class APITestGenerator:
                     'BaseArray': groggy.BaseArray([1, 2, 3, 4, 5]),
                     'ComponentsArray': api_meta_graph.connected_components(),
                     'Subgraph': api_meta_graph.view(),
-                    'GraphArray': api_meta_graph.nodes.ids(),
-                    'Matrix': api_meta_graph.adjacency_matrix(),
+                    'NumArray': api_meta_graph.nodes.ids(),
+                    'Matrix': api_meta_graph.adj(),
                 }
             }
             
@@ -353,7 +353,7 @@ def main():
     generator.print_test_summary(test_summary)
     
     # Save test results
-    output_file = "meta_api_test_results.json"
+    output_file = "meta_api_test_results_enhanced_v2.json"
     with open(output_file, 'w') as f:
         json.dump(test_summary, f, indent=2, default=str)
     

@@ -117,6 +117,33 @@ impl PyGraphMatrix {
         Py::new(py, Self { inner: matrix })
     }
 
+    /// Create a ones matrix with specified dimensions
+    #[classmethod]
+    fn ones(
+        _cls: &PyType,
+        py: Python,
+        rows: usize,
+        cols: usize,
+        dtype: Option<&str>,
+    ) -> PyResult<Py<Self>> {
+        // Parse dtype string to AttrValueType (for consistency with zeros)
+        let _attr_type = match dtype.unwrap_or("float") {
+            "int" | "int64" => groggy::AttrValueType::Int,
+            "float" | "float64" | "f64" => groggy::AttrValueType::Float,
+            "bool" => groggy::AttrValueType::Bool,
+            "str" | "string" | "text" => groggy::AttrValueType::Text,
+            _ => {
+                return Err(PyValueError::new_err(format!(
+                    "Unsupported dtype: {}",
+                    dtype.unwrap_or("unknown")
+                )))
+            }
+        };
+
+        let matrix = GraphMatrix::ones(rows, cols);
+        Py::new(py, Self { inner: matrix })
+    }
+
     /// Create an identity matrix with specified size
     #[classmethod]
     fn identity(_cls: &PyType, py: Python, size: usize) -> PyResult<Py<Self>> {
@@ -124,6 +151,21 @@ impl PyGraphMatrix {
             PyRuntimeError::new_err(format!("Failed to create identity matrix: {:?}", e))
         })?;
         Py::new(py, Self { inner: matrix })
+    }
+
+    /// Create matrix from nested Python lists (API consistency)
+    /// 
+    /// This is a classmethod wrapper around the `groggy.matrix()` function
+    /// for API consistency with other matrix libraries.
+    /// 
+    /// Examples:
+    ///   groggy.GraphMatrix.from_data([[1, 2], [3, 4]])  # 2×2 matrix
+    ///   groggy.GraphMatrix.from_data([[1, 2, 3]])       # 1×3 matrix
+    #[classmethod]
+    fn from_data(_cls: &PyType, py: Python, data: PyObject) -> PyResult<Py<Self>> {
+        // Delegate to the existing matrix() function which handles nested lists perfectly
+        let matrix = crate::matrix(py, data)?;
+        Py::new(py, matrix)
     }
 
     /// Create matrix from graph attributes
@@ -172,14 +214,51 @@ impl PyGraphMatrix {
     /// Check if matrix is symmetric (for square numeric matrices)
     #[getter]
     fn is_symmetric(&self) -> bool {
-        // TODO: Implement is_symmetric in core GraphMatrix
-        false
+        self.inner.is_symmetric()
     }
 
     /// Check if matrix contains only numeric data
     #[getter]
     fn is_numeric(&self) -> bool {
         self.inner.is_numeric()
+    }
+
+    /// Check if gradients are enabled for this matrix
+    #[getter]
+    fn requires_grad(&self) -> bool {
+        self.inner.requires_grad_enabled()
+    }
+
+    /// Get gradient matrix (None if no gradients computed yet)
+    #[getter]
+    fn grad(&self, py: Python) -> Option<Py<Self>> {
+        if let Some(grad_matrix) = self.inner.grad() {
+            Some(Py::new(py, PyGraphMatrix { inner: grad_matrix }).unwrap())
+        } else {
+            None
+        }
+    }
+
+    // === AUTOMATIC DIFFERENTIATION ===
+
+    /// Enable or disable gradient tracking for this matrix
+    fn requires_grad_(&self, py: Python, requires_grad: bool) -> Py<Self> {
+        let new_matrix = self.inner.clone().requires_grad(requires_grad);
+        Py::new(py, PyGraphMatrix { inner: new_matrix }).unwrap()
+    }
+
+    /// Compute gradients via backpropagation
+    fn backward(&mut self) -> PyResult<()> {
+        self.inner.backward().map_err(|e| {
+            PyRuntimeError::new_err(format!("Backward pass failed: {:?}", e))
+        })
+    }
+
+    /// Zero out all gradients in the computation graph
+    fn zero_grad(&mut self) -> PyResult<()> {
+        self.inner.zero_grad().map_err(|e| {
+            PyRuntimeError::new_err(format!("Gradient clearing failed: {:?}", e))
+        })
     }
 
     // === ACCESS & INDEXING ===
@@ -234,6 +313,44 @@ impl PyGraphMatrix {
                     row, col, rows, cols
                 )))
             }
+        }
+    }
+
+    /// Get single cell value at (row, col) - public interface
+    fn get(&self, row: usize, col: usize) -> PyResult<f64> {
+        match self.inner.get(row, col) {
+            Some(value) => Ok(value),
+            None => {
+                let (rows, cols) = self.inner.shape();
+                Err(PyIndexError::new_err(format!(
+                    "Index ({}, {}) out of range for {}x{} matrix",
+                    row, col, rows, cols
+                )))
+            }
+        }
+    }
+
+    /// Set single cell value at (row, col)
+    fn set(&mut self, row: usize, col: usize, value: f64) -> PyResult<()> {
+        self.inner.set(row, col, value).map_err(|e| {
+            PyRuntimeError::new_err(format!("Failed to set cell value: {:?}", e))
+        })
+    }
+
+    /// Python __setitem__ implementation for matrix[row, col] = value assignment
+    fn __setitem__(&mut self, index: PyObject, value: PyObject, py: Python) -> PyResult<()> {
+        // Parse index - support (row, col) tuple or single index
+        if let Ok((row, col)) = index.extract::<(usize, usize)>(py) {
+            // Direct (row, col) assignment: matrix[1, 2] = 5.0
+            let f64_value = value.extract::<f64>(py).map_err(|_| {
+                PyTypeError::new_err("Matrix assignment value must be numeric (f64)")
+            })?;
+            self.set(row, col, f64_value)
+        } else {
+            // TODO: Support advanced indexing like slices, arrays, etc.
+            Err(PyNotImplementedError::new_err(
+                "Advanced indexing assignment not yet implemented. Use matrix.set(row, col, value) or matrix[row, col] = value"
+            ))
         }
     }
 
@@ -352,10 +469,12 @@ impl PyGraphMatrix {
     }
 
     /// Matrix inverse (Phase 5 - placeholder for now)
-    fn inverse(&self) -> PyResult<Py<PyGraphMatrix>> {
-        Err(PyNotImplementedError::new_err(
-            "Matrix inverse will be implemented in Phase 5",
-        ))
+    fn inverse(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        let result = self.inner.inverse().map_err(|e| {
+            PyRuntimeError::new_err(format!("Matrix inverse calculation failed: {:?}", e))
+        })?;
+        let matrix = PyGraphMatrix { inner: result };
+        Py::new(py, matrix)
     }
 
     /// Matrix power - raise matrix to integer power
@@ -365,6 +484,17 @@ impl PyGraphMatrix {
             .inner
             .power(n)
             .map_err(|e| PyRuntimeError::new_err(format!("Matrix power failed: {:?}", e)))?;
+
+        let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
+        Py::new(py, py_result)
+    }
+
+    /// Reshape matrix to new dimensions while preserving total element count
+    /// Returns: new GraphMatrix with specified shape
+    fn reshape(&self, py: Python, new_rows: usize, new_cols: usize) -> PyResult<Py<PyGraphMatrix>> {
+        let result_matrix = self.inner.reshape(new_rows, new_cols).map_err(|e| {
+            PyRuntimeError::new_err(format!("Reshape failed: {:?}", e))
+        })?;
 
         let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
         Py::new(py, py_result)
@@ -385,11 +515,33 @@ impl PyGraphMatrix {
         Py::new(py, py_result)
     }
 
-    /// Determinant calculation (Phase 5 - placeholder for now)
-    fn determinant(&self) -> PyResult<Option<f64>> {
-        Err(PyNotImplementedError::new_err(
-            "Determinant calculation will be implemented in Phase 5",
-        ))
+    /// Determinant calculation (for square matrices)
+    fn determinant(&self) -> PyResult<f64> {
+        self.inner.determinant().map_err(|e| {
+            PyRuntimeError::new_err(format!("Determinant calculation failed: {:?}", e))
+        })
+    }
+
+    /// Calculate the trace (sum of diagonal elements) - only for square matrices
+    fn trace(&self) -> PyResult<f64> {
+        self.inner.trace().map_err(|e| {
+            PyRuntimeError::new_err(format!("Trace calculation failed: {:?}", e))
+        })
+    }
+
+    /// Calculate the Frobenius norm (Euclidean norm) of the matrix
+    fn norm(&self) -> PyResult<f64> {
+        Ok(self.inner.norm())
+    }
+
+    /// Calculate the L1 norm (sum of absolute values) of the matrix
+    fn norm_l1(&self) -> PyResult<f64> {
+        Ok(self.inner.norm_l1())
+    }
+
+    /// Calculate the L∞ norm (maximum absolute value) of the matrix
+    fn norm_inf(&self) -> PyResult<f64> {
+        Ok(self.inner.norm_inf())
     }
 
     // === STATISTICAL OPERATIONS ===
@@ -458,6 +610,92 @@ impl PyGraphMatrix {
         let f64_values: Vec<f64> = result_array.iter().cloned().collect();
         let num_array = PyNumArray::new(f64_values);
         Ok(Py::new(py, num_array)?.to_object(py))
+    }
+
+    /// Variance along specified axis (0=rows, 1=columns)
+    fn var_axis(&self, py: Python, axis: usize) -> PyResult<PyObject> {
+        let axis_enum = match axis {
+            0 => groggy::storage::Axis::Rows,
+            1 => groggy::storage::Axis::Columns,
+            _ => {
+                return Err(PyValueError::new_err(
+                    "Axis must be 0 (rows) or 1 (columns)",
+                ))
+            }
+        };
+
+        let result_array = self.inner.var_axis(axis_enum).map_err(|e| {
+            PyRuntimeError::new_err(format!("Variance axis operation failed: {:?}", e))
+        })?;
+        
+        // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
+        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let num_array = PyNumArray::new(f64_values);
+        Ok(Py::new(py, num_array)?.to_object(py))
+    }
+
+    /// Minimum along specified axis (0=rows, 1=columns)
+    fn min_axis(&self, py: Python, axis: usize) -> PyResult<PyObject> {
+        let axis_enum = match axis {
+            0 => groggy::storage::Axis::Rows,
+            1 => groggy::storage::Axis::Columns,
+            _ => {
+                return Err(PyValueError::new_err(
+                    "Axis must be 0 (rows) or 1 (columns)",
+                ))
+            }
+        };
+
+        let result_array = self.inner.min_axis(axis_enum).map_err(|e| {
+            PyRuntimeError::new_err(format!("Min axis operation failed: {:?}", e))
+        })?;
+        
+        // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
+        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let num_array = PyNumArray::new(f64_values);
+        Ok(Py::new(py, num_array)?.to_object(py))
+    }
+
+    /// Maximum along specified axis (0=rows, 1=columns)
+    fn max_axis(&self, py: Python, axis: usize) -> PyResult<PyObject> {
+        let axis_enum = match axis {
+            0 => groggy::storage::Axis::Rows,
+            1 => groggy::storage::Axis::Columns,
+            _ => {
+                return Err(PyValueError::new_err(
+                    "Axis must be 0 (rows) or 1 (columns)",
+                ))
+            }
+        };
+
+        let result_array = self.inner.max_axis(axis_enum).map_err(|e| {
+            PyRuntimeError::new_err(format!("Max axis operation failed: {:?}", e))
+        })?;
+        
+        // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
+        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let num_array = PyNumArray::new(f64_values);
+        Ok(Py::new(py, num_array)?.to_object(py))
+    }
+
+    /// Global sum of all elements in the matrix
+    fn sum(&self) -> PyResult<f64> {
+        Ok(self.inner.sum())
+    }
+
+    /// Global mean of all elements in the matrix  
+    fn mean(&self) -> PyResult<f64> {
+        Ok(self.inner.mean())
+    }
+
+    /// Global minimum value in the matrix
+    fn min(&self) -> PyResult<Option<f64>> {
+        Ok(self.inner.min())
+    }
+
+    /// Global maximum value in the matrix
+    fn max(&self) -> PyResult<Option<f64>> {
+        Ok(self.inner.max())
     }
 
     // === SCIENTIFIC COMPUTING CONVERSIONS ===
@@ -818,11 +1056,14 @@ impl PyGraphMatrix {
         Ok(dict.to_object(py))
     }
 
-    /// Iterator support - iterates over rows as lists (temporarily disabled)
-    fn __iter__(_slf: PyRef<Self>) -> PyResult<PyObject> {
-        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
-            "Matrix iteration temporarily disabled during Phase 3 - use matrix[i] for row access",
-        ))
+    /// Iterator support - iterates over rows as lists
+    fn __iter__(slf: PyRef<Self>) -> PyResult<PyMatrixRowIterator> {
+        let (rows, _) = slf.inner.shape();
+        Ok(PyMatrixRowIterator {
+            matrix: slf.into(),
+            current_row: 0,
+            total_rows: rows,
+        })
     }
 
     // === PYTHON OPERATOR OVERLOADING ===
@@ -833,38 +1074,93 @@ impl PyGraphMatrix {
         self.multiply(py, other)
     }
 
-    /// Element-wise multiplication operator (*) - PLACEHOLDER  
-    /// Implements: matrix1 * matrix2
+    /// Matrix multiplication operator (*) 
+    /// Implements: matrix1 * matrix2 (matrix multiplication, not element-wise)
     fn __mul__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
-        // For now, just implement scalar multiplication
+        // Try scalar multiplication first
         if let Ok(scalar) = other.extract::<f64>() {
-            // Use the existing transpose to create a copy with scaling
-            let transposed = self.transpose(py)?;
-            let double_transposed = transposed.borrow(py).transpose(py)?;
-            return Ok(double_transposed); // Return copy for now
+            let (rows, cols) = self.inner.shape();
+            
+            // Create arrays with scalar values
+            let mut arrays = Vec::new();
+            for _ in 0..cols {
+                arrays.push(groggy::storage::array::NumArray::new(vec![scalar; rows]));
+            }
+            
+            let scalar_matrix = groggy::storage::GraphMatrix::from_arrays(arrays)
+                .map_err(|e| PyRuntimeError::new_err(format!("Scalar multiplication failed: {:?}", e)))?;
+            
+            let result = self.inner.elementwise_multiply(&scalar_matrix).map_err(|e| 
+                PyRuntimeError::new_err(format!("Scalar multiplication failed: {:?}", e)))?;
+            
+            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
         }
         
-        Err(PyNotImplementedError::new_err(
-            "Matrix multiplication temporarily simplified - scalar only"
-        ))
+        // Try matrix multiplication
+        if let Ok(other_matrix) = other.extract::<PyRef<PyGraphMatrix>>() {
+            let result = &self.inner * &other_matrix.inner;
+            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
+        }
+        
+        Err(PyTypeError::new_err("Unsupported operand type for matrix multiplication"))
     }
 
-    /// Matrix addition operator (+) - PLACEHOLDER
-    /// Implements: matrix1 + matrix2
+    /// Matrix addition operator (+)
+    /// Implements: matrix1 + matrix2 and matrix + scalar (broadcasting)
     fn __add__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
-        // For now, just return a copy until core operations are fixed
-        Err(PyNotImplementedError::new_err(
-            "Matrix addition temporarily disabled - core operations being fixed"
-        ))
+        // Try scalar addition first (broadcasting)
+        if let Ok(scalar) = other.extract::<f64>() {
+            let (rows, cols) = self.inner.shape();
+            
+            // Create arrays with scalar values
+            let mut arrays = Vec::new();
+            for _ in 0..cols {
+                arrays.push(groggy::storage::array::NumArray::new(vec![scalar; rows]));
+            }
+            
+            let scalar_matrix = groggy::storage::GraphMatrix::from_arrays(arrays)
+                .map_err(|e| PyRuntimeError::new_err(format!("Scalar addition failed: {:?}", e)))?;
+            
+            let result = &self.inner + &scalar_matrix;
+            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
+        }
+        
+        // Try matrix addition
+        if let Ok(other_matrix) = other.extract::<PyRef<PyGraphMatrix>>() {
+            let result = &self.inner + &other_matrix.inner;
+            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
+        }
+        
+        Err(PyTypeError::new_err("Unsupported operand type for matrix addition"))
     }
 
-    /// Matrix subtraction operator (-) - PLACEHOLDER
-    /// Implements: matrix1 - matrix2
+    /// Matrix subtraction operator (-)
+    /// Implements: matrix1 - matrix2 and matrix - scalar (broadcasting)
     fn __sub__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
-        // For now, just return a copy until core operations are fixed
-        Err(PyNotImplementedError::new_err(
-            "Matrix subtraction temporarily disabled - core operations being fixed"
-        ))
+        // Try scalar subtraction first (broadcasting)
+        if let Ok(scalar) = other.extract::<f64>() {
+            let (rows, cols) = self.inner.shape();
+            
+            // Create arrays with scalar values
+            let mut arrays = Vec::new();
+            for _ in 0..cols {
+                arrays.push(groggy::storage::array::NumArray::new(vec![scalar; rows]));
+            }
+            
+            let scalar_matrix = groggy::storage::GraphMatrix::from_arrays(arrays)
+                .map_err(|e| PyRuntimeError::new_err(format!("Scalar subtraction failed: {:?}", e)))?;
+            
+            let result = &self.inner - &scalar_matrix;
+            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
+        }
+        
+        // Try matrix subtraction
+        if let Ok(other_matrix) = other.extract::<PyRef<PyGraphMatrix>>() {
+            let result = &self.inner - &other_matrix.inner;
+            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
+        }
+        
+        Err(PyTypeError::new_err("Unsupported operand type for matrix subtraction"))
     }
 
     /// Matrix power operator (**)
@@ -877,6 +1173,201 @@ impl PyGraphMatrix {
         Err(PyTypeError::new_err(
             "Matrix power (**) requires integer exponent"
         ))
+    }
+
+    /// Matrix division operator (/)
+    /// Implements: matrix / scalar (element-wise division)
+    fn __truediv__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
+        if let Ok(scalar) = other.extract::<f64>() {
+            if scalar.abs() < 1e-10 {
+                return Err(PyRuntimeError::new_err("Division by zero"));
+            }
+            
+            let (rows, cols) = self.inner.shape();
+            
+            // Create arrays with scalar values for division
+            let mut arrays = Vec::new();
+            for _ in 0..cols {
+                arrays.push(groggy::storage::array::NumArray::new(vec![scalar; rows]));
+            }
+            
+            let scalar_matrix = groggy::storage::GraphMatrix::from_arrays(arrays)
+                .map_err(|e| PyRuntimeError::new_err(format!("Scalar division failed: {:?}", e)))?;
+            
+            // Element-wise division using multiplication with reciprocal
+            let reciprocal = 1.0 / scalar;
+            let mut reciprocal_arrays = Vec::new();
+            for _ in 0..cols {
+                reciprocal_arrays.push(groggy::storage::array::NumArray::new(vec![reciprocal; rows]));
+            }
+            
+            let reciprocal_matrix = groggy::storage::GraphMatrix::from_arrays(reciprocal_arrays)
+                .map_err(|e| PyRuntimeError::new_err(format!("Scalar division failed: {:?}", e)))?;
+            
+            let result = self.inner.elementwise_multiply(&reciprocal_matrix).map_err(|e| 
+                PyRuntimeError::new_err(format!("Division failed: {:?}", e)))?;
+            
+            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
+        }
+        
+        Err(PyTypeError::new_err("Matrix division only supports scalar divisor"))
+    }
+
+    /// Unary negation operator (-)
+    /// Implements: -matrix (element-wise negation)
+    fn __neg__(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        // Multiply by -1 to negate all elements
+        let (rows, cols) = self.inner.shape();
+        
+        let mut arrays = Vec::new();
+        for _ in 0..cols {
+            arrays.push(groggy::storage::array::NumArray::new(vec![-1.0; rows]));
+        }
+        
+        let neg_one_matrix = groggy::storage::GraphMatrix::from_arrays(arrays)
+            .map_err(|e| PyRuntimeError::new_err(format!("Negation failed: {:?}", e)))?;
+        
+        let result = self.inner.elementwise_multiply(&neg_one_matrix).map_err(|e| 
+            PyRuntimeError::new_err(format!("Negation failed: {:?}", e)))?;
+        
+        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+    }
+
+    /// Absolute value operator (abs)
+    /// Implements: abs(matrix) (element-wise absolute value)
+    fn __abs__(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+        // Apply element-wise absolute value
+        let (rows, cols) = self.inner.shape();
+        let mut result_arrays = Vec::new();
+        
+        for col in 0..cols {
+            if let Some(column) = self.inner.get_column(col) {
+                let mut abs_values = Vec::new();
+                for value in column.iter() {
+                    abs_values.push(value.abs());
+                }
+                result_arrays.push(groggy::storage::array::NumArray::new(abs_values));
+            } else {
+                return Err(PyRuntimeError::new_err("Failed to get matrix column"));
+            }
+        }
+        
+        let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
+            .map_err(|e| PyRuntimeError::new_err(format!("Absolute value operation failed: {:?}", e)))?;
+        
+        Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?)
+    }
+
+    /// Comparison operator (>)
+    /// Implements: matrix > scalar (element-wise comparison)
+    fn __gt__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
+        if let Ok(scalar) = other.extract::<f64>() {
+            let (rows, cols) = self.inner.shape();
+            let mut result_arrays = Vec::new();
+            
+            for col in 0..cols {
+                if let Some(column) = self.inner.get_column(col) {
+                    let mut bool_values = Vec::new();
+                    for value in column.iter() {
+                        bool_values.push(if *value > scalar { 1.0 } else { 0.0 });
+                    }
+                    result_arrays.push(groggy::storage::array::NumArray::new(bool_values));
+                } else {
+                    return Err(PyRuntimeError::new_err("Failed to get matrix column"));
+                }
+            }
+            
+            let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
+                .map_err(|e| PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e)))?;
+            
+            return Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?);
+        }
+        
+        Err(PyTypeError::new_err("Comparison operations only support scalar values"))
+    }
+
+    /// Comparison operator (<)
+    /// Implements: matrix < scalar (element-wise comparison)
+    fn __lt__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
+        if let Ok(scalar) = other.extract::<f64>() {
+            let (rows, cols) = self.inner.shape();
+            let mut result_arrays = Vec::new();
+            
+            for col in 0..cols {
+                if let Some(column) = self.inner.get_column(col) {
+                    let mut bool_values = Vec::new();
+                    for value in column.iter() {
+                        bool_values.push(if *value < scalar { 1.0 } else { 0.0 });
+                    }
+                    result_arrays.push(groggy::storage::array::NumArray::new(bool_values));
+                } else {
+                    return Err(PyRuntimeError::new_err("Failed to get matrix column"));
+                }
+            }
+            
+            let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
+                .map_err(|e| PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e)))?;
+            
+            return Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?);
+        }
+        
+        Err(PyTypeError::new_err("Comparison operations only support scalar values"))
+    }
+
+    /// Comparison operator (>=)
+    /// Implements: matrix >= scalar (element-wise comparison)
+    fn __ge__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
+        if let Ok(scalar) = other.extract::<f64>() {
+            let (rows, cols) = self.inner.shape();
+            let mut result_arrays = Vec::new();
+            
+            for col in 0..cols {
+                if let Some(column) = self.inner.get_column(col) {
+                    let mut bool_values = Vec::new();
+                    for value in column.iter() {
+                        bool_values.push(if *value >= scalar { 1.0 } else { 0.0 });
+                    }
+                    result_arrays.push(groggy::storage::array::NumArray::new(bool_values));
+                } else {
+                    return Err(PyRuntimeError::new_err("Failed to get matrix column"));
+                }
+            }
+            
+            let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
+                .map_err(|e| PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e)))?;
+            
+            return Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?);
+        }
+        
+        Err(PyTypeError::new_err("Comparison operations only support scalar values"))
+    }
+
+    /// Comparison operator (<=)
+    /// Implements: matrix <= scalar (element-wise comparison)
+    fn __le__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
+        if let Ok(scalar) = other.extract::<f64>() {
+            let (rows, cols) = self.inner.shape();
+            let mut result_arrays = Vec::new();
+            
+            for col in 0..cols {
+                if let Some(column) = self.inner.get_column(col) {
+                    let mut bool_values = Vec::new();
+                    for value in column.iter() {
+                        bool_values.push(if *value <= scalar { 1.0 } else { 0.0 });
+                    }
+                    result_arrays.push(groggy::storage::array::NumArray::new(bool_values));
+                } else {
+                    return Err(PyRuntimeError::new_err("Failed to get matrix column"));
+                }
+            }
+            
+            let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
+                .map_err(|e| PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e)))?;
+            
+            return Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?);
+        }
+        
+        Err(PyTypeError::new_err("Comparison operations only support scalar values"))
     }
 
     // === NEURAL NETWORK OPERATIONS ===
@@ -1218,6 +1709,395 @@ impl PyGraphMatrix {
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to create matrix: {}", e)))?;
         
         Ok(PyGraphMatrix { inner: matrix })
+    }
+    
+    /// Get degree matrix from adjacency matrix
+    fn to_degree_matrix(&self, py: Python) -> PyResult<Py<Self>> {
+        let degree_matrix = self.inner.to_degree_matrix().map_err(|e| {
+            PyRuntimeError::new_err(format!("Degree matrix calculation failed: {:?}", e))
+        })?;
+        let matrix = Self { inner: degree_matrix };
+        Py::new(py, matrix)
+    }
+    
+    /// Get normalized Laplacian matrix with enhanced parameterization
+    /// 
+    /// Args:
+    ///     eps: Exponent for degree matrix (default 0.5 for standard normalization)
+    ///     k: Power to raise the result to (default 1)
+    /// 
+    /// Formula: (D^eps @ A @ D^eps)^k
+    fn to_normalized_laplacian(&self, py: Python, eps: Option<f64>, k: Option<u32>) -> PyResult<Py<Self>> {
+        let eps_val = eps.unwrap_or(0.5);  // Standard normalization uses 0.5
+        let k_val = k.unwrap_or(1);        // Standard result uses power 1
+        
+        let normalized_laplacian = self.inner.to_normalized_laplacian(eps_val, k_val).map_err(|e| {
+            PyRuntimeError::new_err(format!("Normalized Laplacian calculation failed: {:?}", e))
+        })?;
+        let matrix = Self { inner: normalized_laplacian };
+        Py::new(py, matrix)
+    }
+    
+    /// Get standard Laplacian matrix (D - A)
+    fn to_laplacian(&self, py: Python) -> PyResult<Py<Self>> {
+        let laplacian = self.inner.to_laplacian().map_err(|e| {
+            PyRuntimeError::new_err(format!("Laplacian calculation failed: {:?}", e))
+        })?;
+        let matrix = Self { inner: laplacian };
+        Py::new(py, matrix)
+    }
+    
+    // === ADVANCED RESHAPING OPERATIONS ===
+    
+    /// Concatenate matrices along specified axis
+    fn concatenate(&self, py: Python, other: &Self, axis: usize) -> PyResult<Py<Self>> {
+        let result = self.inner.concatenate(&other.inner, axis).map_err(|e| {
+            PyRuntimeError::new_err(format!("Matrix concatenation failed: {:?}", e))
+        })?;
+        let matrix = Self { inner: result };
+        Py::new(py, matrix)
+    }
+    
+    /// Stack matrices along specified axis
+    fn stack(&self, py: Python, other: &Self, axis: usize) -> PyResult<Py<Self>> {
+        let result = self.inner.stack(&other.inner, axis).map_err(|e| {
+            PyRuntimeError::new_err(format!("Matrix stacking failed: {:?}", e))
+        })?;
+        let matrix = Self { inner: result };
+        Py::new(py, matrix)
+    }
+    
+    /// Split matrix along specified axis
+    fn split(&self, py: Python, split_points: Vec<usize>, axis: usize) -> PyResult<Vec<Py<Self>>> {
+        let matrices = self.inner.split(&split_points, axis).map_err(|e| {
+            PyRuntimeError::new_err(format!("Matrix split failed: {:?}", e))
+        })?;
+        
+        let mut result = Vec::new();
+        for matrix in matrices {
+            let py_matrix = Self { inner: matrix };
+            result.push(Py::new(py, py_matrix)?);
+        }
+        
+        Ok(result)
+    }
+    
+    // === ENHANCED NEURAL OPERATIONS ===
+    
+    /// Leaky ReLU activation function
+    fn leaky_relu(&self, py: Python, alpha: Option<f64>) -> PyResult<Py<Self>> {
+        let result = self.inner.leaky_relu(alpha).map_err(|e| {
+            PyRuntimeError::new_err(format!("Leaky ReLU activation failed: {:?}", e))
+        })?;
+        let matrix = Self { inner: result };
+        Py::new(py, matrix)
+    }
+    
+    /// ELU (Exponential Linear Unit) activation function
+    fn elu(&self, py: Python, alpha: Option<f64>) -> PyResult<Py<Self>> {
+        let result = self.inner.elu(alpha).map_err(|e| {
+            PyRuntimeError::new_err(format!("ELU activation failed: {:?}", e))
+        })?;
+        let matrix = Self { inner: result };
+        Py::new(py, matrix)
+    }
+    
+    /// Dropout operation for regularization
+    fn dropout(&self, py: Python, p: f64, training: Option<bool>) -> PyResult<Py<Self>> {
+        let training_val = training.unwrap_or(true);
+        let result = self.inner.dropout(p, training_val).map_err(|e| {
+            PyRuntimeError::new_err(format!("Dropout operation failed: {:?}", e))
+        })?;
+        let matrix = Self { inner: result };
+        Py::new(py, matrix)
+    }
+    
+    /// Solve linear system Ax = b
+    fn solve(&self, py: Python, b: &Self) -> PyResult<Py<Self>> {
+        let result = self.inner.solve(&b.inner).map_err(|e| {
+            PyRuntimeError::new_err(format!("Linear system solve failed: {:?}", e))
+        })?;
+        let matrix = Self { inner: result };
+        Py::new(py, matrix)
+    }
+
+    /// SVD decomposition: A = U * Σ * V^T
+    /// Returns tuple of (U, singular_values, V_transpose)
+    fn svd(&self, py: Python) -> PyResult<(Py<Self>, PyObject, Py<Self>)> {
+        let (u_matrix, singular_values, vt_matrix) = self.inner.svd().map_err(|e| {
+            PyRuntimeError::new_err(format!("SVD decomposition failed: {:?}", e))
+        })?;
+        
+        let u_py = PyGraphMatrix { inner: u_matrix };
+        let vt_py = PyGraphMatrix { inner: vt_matrix };
+        
+        // Convert singular values to Python list
+        let singular_values_py = pyo3::types::PyList::new(py, singular_values);
+        
+        Ok((
+            Py::new(py, u_py)?,
+            singular_values_py.into(),
+            Py::new(py, vt_py)?
+        ))
+    }
+
+    /// QR decomposition: A = Q * R
+    /// Returns tuple of (Q, R) where Q is orthogonal and R is upper triangular
+    fn qr_decomposition(&self, py: Python) -> PyResult<(Py<Self>, Py<Self>)> {
+        let (q_matrix, r_matrix) = self.inner.qr_decomposition().map_err(|e| {
+            PyRuntimeError::new_err(format!("QR decomposition failed: {:?}", e))
+        })?;
+        
+        let q_py = PyGraphMatrix { inner: q_matrix };
+        let r_py = PyGraphMatrix { inner: r_matrix };
+        
+        Ok((
+            Py::new(py, q_py)?,
+            Py::new(py, r_py)?
+        ))
+    }
+
+    /// LU decomposition: PA = LU
+    /// Returns tuple of (P, L, U) where P is permutation, L is lower triangular, U is upper triangular
+    fn lu_decomposition(&self, py: Python) -> PyResult<(Py<Self>, Py<Self>, Py<Self>)> {
+        let (p_matrix, l_matrix, u_matrix) = self.inner.lu_decomposition().map_err(|e| {
+            PyRuntimeError::new_err(format!("LU decomposition failed: {:?}", e))
+        })?;
+        
+        let p_py = PyGraphMatrix { inner: p_matrix };
+        let l_py = PyGraphMatrix { inner: l_matrix };
+        let u_py = PyGraphMatrix { inner: u_matrix };
+        
+        Ok((
+            Py::new(py, p_py)?,
+            Py::new(py, l_py)?,
+            Py::new(py, u_py)?
+        ))
+    }
+
+    /// Cholesky decomposition: A = L * L^T
+    /// Returns L (lower triangular) for positive definite matrices
+    fn cholesky_decomposition(&self, py: Python) -> PyResult<Py<Self>> {
+        let l_matrix = self.inner.cholesky_decomposition().map_err(|e| {
+            PyRuntimeError::new_err(format!("Cholesky decomposition failed: {:?}", e))
+        })?;
+        
+        Ok(Py::new(py, PyGraphMatrix { inner: l_matrix })?)
+    }
+
+    /// Eigenvalue decomposition: A * V = V * Λ
+    /// Returns tuple of (eigenvalues, eigenvectors) 
+    fn eigenvalue_decomposition(&self, py: Python) -> PyResult<(PyObject, Py<Self>)> {
+        let (eigenvalues, eigenvector_matrix) = self.inner.eigenvalue_decomposition().map_err(|e| {
+            PyRuntimeError::new_err(format!("Eigenvalue decomposition failed: {:?}", e))
+        })?;
+        
+        // Convert eigenvalues to Python list
+        let eigenval_list: Vec<f64> = eigenvalues;
+        let py_eigenvals = eigenval_list.to_object(py);
+        
+        let py_eigenvecs = PyGraphMatrix { inner: eigenvector_matrix };
+        
+        Ok((py_eigenvals, Py::new(py, py_eigenvecs)?))
+    }
+
+    /// Matrix rank - number of linearly independent rows/columns
+    /// Uses SVD with numerical tolerance for near-zero singular values
+    fn rank(&self) -> PyResult<usize> {
+        self.inner.rank().map_err(|e| {
+            PyRuntimeError::new_err(format!("Matrix rank computation failed: {:?}", e))
+        })
+    }
+
+    /// Tile (repeat) the matrix a specified number of times along each axis
+    /// Args: reps - tuple of (rows_repeat, cols_repeat)
+    fn tile(&self, py: Python, reps: (usize, usize)) -> PyResult<Py<Self>> {
+        let result = self.inner.tile(reps).map_err(|e| {
+            PyRuntimeError::new_err(format!("Matrix tiling failed: {:?}", e))
+        })?;
+        
+        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+    }
+
+    /// Repeat elements of the matrix along a specified axis
+    /// Args: repeats - number of times to repeat, axis - 0 for rows, 1 for columns
+    fn repeat(&self, py: Python, repeats: usize, axis: usize) -> PyResult<Py<Self>> {
+        let result = self.inner.repeat(repeats, axis).map_err(|e| {
+            PyRuntimeError::new_err(format!("Matrix repeat failed: {:?}", e))
+        })?;
+        
+        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+    }
+
+    /// Element-wise absolute value
+    fn abs(&self, py: Python) -> PyResult<Py<Self>> {
+        let result = self.inner.abs().map_err(|e| {
+            PyRuntimeError::new_err(format!("Element-wise abs failed: {:?}", e))
+        })?;
+        
+        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+    }
+
+    /// Element-wise exponential (e^x)
+    fn exp(&self, py: Python) -> PyResult<Py<Self>> {
+        let result = self.inner.exp().map_err(|e| {
+            PyRuntimeError::new_err(format!("Element-wise exp failed: {:?}", e))
+        })?;
+        
+        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+    }
+
+    /// Element-wise natural logarithm
+    fn log(&self, py: Python) -> PyResult<Py<Self>> {
+        let result = self.inner.log().map_err(|e| {
+            PyRuntimeError::new_err(format!("Element-wise log failed: {:?}", e))
+        })?;
+        
+        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+    }
+
+    /// Element-wise square root
+    fn sqrt(&self, py: Python) -> PyResult<Py<Self>> {
+        let result = self.inner.sqrt().map_err(|e| {
+            PyRuntimeError::new_err(format!("Element-wise sqrt failed: {:?}", e))
+        })?;
+        
+        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+    }
+
+    // === CONVERSION OPERATIONS ===
+
+    /// Convert matrix to nested Python list
+    /// Returns: [[row1], [row2], ...] format
+    fn to_list(&self, py: Python) -> PyResult<PyObject> {
+        let (rows, cols) = self.inner.shape();
+        let mut result_rows = Vec::new();
+        
+        for row in 0..rows {
+            let mut row_values = Vec::new();
+            for col in 0..cols {
+                let value = self.inner.get(row, col).unwrap_or(0.0);
+                row_values.push(value);
+            }
+            result_rows.push(row_values);
+        }
+        
+        Ok(result_rows.to_object(py))
+    }
+
+    /// Convert matrix to Python dictionary
+    /// Returns: {"data": [[...]], "shape": [rows, cols], "dtype": "float64"}
+    fn to_dict(&self, py: Python) -> PyResult<PyObject> {
+        let (rows, cols) = self.inner.shape();
+        let dict = pyo3::types::PyDict::new(py);
+        
+        // Add matrix data as nested list
+        let data_list = self.to_list(py)?;
+        dict.set_item("data", data_list)?;
+        
+        // Add shape information
+        dict.set_item("shape", (rows, cols))?;
+        
+        // Add dtype information  
+        dict.set_item("dtype", "float64")?;
+        
+        Ok(dict.into())
+    }
+
+    // === FUNCTIONAL OPERATIONS ===
+
+    /// Apply a Python function to each element of the matrix
+    /// Returns: New matrix with function applied element-wise
+    fn apply(&self, py: Python, func: PyObject) -> PyResult<Py<PyGraphMatrix>> {
+        let (rows, cols) = self.inner.shape();
+        let mut result_arrays = Vec::new();
+        
+        for col in 0..cols {
+            if let Some(column) = self.inner.get_column(col) {
+                let mut new_values = Vec::new();
+                for value in column.iter() {
+                    // Call Python function on each value
+                    let py_value = value.to_object(py);
+                    let result = func.call1(py, (py_value,))?;
+                    let new_value: f64 = result.extract(py)?;
+                    new_values.push(new_value);
+                }
+                result_arrays.push(groggy::storage::array::NumArray::new(new_values));
+            } else {
+                return Err(PyRuntimeError::new_err("Failed to get matrix column"));
+            }
+        }
+        
+        let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
+            .map_err(|e| PyRuntimeError::new_err(format!("Apply operation failed: {:?}", e)))?;
+        
+        Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?)
+    }
+
+    /// Map a Python function over matrix elements (alias for apply)
+    /// Returns: New matrix with function mapped over elements
+    fn map(&self, py: Python, func: PyObject) -> PyResult<Py<PyGraphMatrix>> {
+        self.apply(py, func)
+    }
+
+    /// Filter matrix elements based on a condition function
+    /// Returns: Matrix with only elements where condition(element) is True, others set to 0
+    fn filter(&self, py: Python, condition: PyObject) -> PyResult<Py<PyGraphMatrix>> {
+        let (rows, cols) = self.inner.shape();
+        let mut result_arrays = Vec::new();
+        
+        for col in 0..cols {
+            if let Some(column) = self.inner.get_column(col) {
+                let mut filtered_values = Vec::new();
+                for value in column.iter() {
+                    // Test condition on each value
+                    let py_value = value.to_object(py);
+                    let condition_result = condition.call1(py, (py_value,))?;
+                    let passes: bool = condition_result.extract(py)?;
+                    
+                    // Keep value if condition is true, otherwise set to 0
+                    filtered_values.push(if passes { *value } else { 0.0 });
+                }
+                result_arrays.push(groggy::storage::array::NumArray::new(filtered_values));
+            } else {
+                return Err(PyRuntimeError::new_err("Failed to get matrix column"));
+            }
+        }
+        
+        let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
+            .map_err(|e| PyRuntimeError::new_err(format!("Filter operation failed: {:?}", e)))?;
+        
+        Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?)
+    }
+
+    // === ITERATION SUPPORT ===
+    // Iterator is now implemented above in the main impl block
+}
+
+/// Python iterator for matrix rows
+#[pyclass]
+struct PyMatrixRowIterator {
+    matrix: Py<PyGraphMatrix>,
+    current_row: usize,
+    total_rows: usize,
+}
+
+#[pymethods]
+impl PyMatrixRowIterator {
+    fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
+        slf
+    }
+
+    fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
+        if self.current_row >= self.total_rows {
+            return Ok(None);
+        }
+        
+        let matrix = self.matrix.borrow(py);
+        let row_data = matrix.get_row(py, self.current_row)?;
+        self.current_row += 1;
+        
+        Ok(Some(row_data))
     }
 }
 

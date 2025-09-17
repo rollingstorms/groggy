@@ -2604,7 +2604,7 @@ impl Graph {
     pub fn laplacian_matrix(&mut self, normalized: bool) -> GraphResult<AdjacencyMatrix> {
         let adj = self.adjacency_matrix()?;
         if normalized {
-            adj.to_normalized_laplacian()
+            adj.to_normalized_laplacian(0.5, 1)
         } else {
             adj.to_laplacian()
         }
@@ -2652,7 +2652,7 @@ impl Graph {
             MatrixType::Adjacency => Ok(base_matrix),
             MatrixType::Laplacian { normalized } => {
                 if normalized {
-                    base_matrix.to_normalized_laplacian()
+                    base_matrix.to_normalized_laplacian(0.5, 1)
                 } else {
                     base_matrix.to_laplacian()
                 }

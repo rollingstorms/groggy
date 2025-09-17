@@ -77,7 +77,7 @@ impl AdjacencyMatrixBuilder {
         edges: &[(NodeId, NodeId)],
     ) -> GraphResult<GraphMatrix> {
         let adjacency = Self::from_edges(nodes, edges)?;
-        adjacency.to_normalized_laplacian()
+        adjacency.to_normalized_laplacian(0.5, 1)
     }
 }
 
@@ -143,7 +143,7 @@ mod tests {
         assert_eq!(adj.get(0, 2), Some(&2.0)); // node 1 -> node 3
         
         // Test normalization
-        let normalized = adj.to_normalized_laplacian().unwrap();
+        let normalized = adj.to_normalized_laplacian(0.5, 1).unwrap();
         assert_eq!(normalized.shape(), (3, 3));
     }
 }

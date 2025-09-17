@@ -8,7 +8,7 @@ use groggy::traits::SubgraphOperations;
 use groggy::{AttrName, AttrValue as RustAttrValue, EdgeId, Graph as RustGraph, NodeId, StateId};
 use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyTuple};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -429,17 +429,20 @@ impl PyGraph {
     }
 
     /// Add multiple edges at once
-    #[pyo3(signature = (edges, node_mapping = None, _uid_key = None, warm_cache = None))]
+    #[pyo3(signature = (edges, node_mapping = None, uid_key = None, source = None, target = None, warm_cache = None))]
     fn add_edges(
         &mut self,
         py: Python,
         edges: &PyAny,
         node_mapping: Option<std::collections::HashMap<String, NodeId>>,
-        _uid_key: Option<String>,
+        uid_key: Option<String>,
+        source: Option<String>,
+        target: Option<String>,
         warm_cache: Option<bool>,
     ) -> PyResult<Vec<EdgeId>> {
         // Format 1: List of (source, target) tuples - most common case for benchmarks
         if let Ok(edge_pairs) = edges.extract::<Vec<(NodeId, NodeId)>>() {
+            // Fast path for numeric IDs
             let result = self.inner.borrow_mut().add_edges(&edge_pairs);
 
             // OPTIMIZATION: Warm cache after bulk edge addition if requested
@@ -449,15 +452,168 @@ impl PyGraph {
 
             return Ok(result);
         }
+        // Format 1b: List of (source, target) tuples with string IDs and uid_key
+        else if uid_key.is_some() {
+            if let Ok(string_pairs) = edges.extract::<Vec<(String, String)>>() {
+                let mut edge_ids = Vec::new();
+                let key = uid_key.as_ref().unwrap();
+
+                for (source_str, target_str) in string_pairs {
+                    let source_id = self.resolve_string_id_to_node(&source_str, key)?;
+                    let target_id = self.resolve_string_id_to_node(&target_str, key)?;
+
+                    let edge_id = self
+                        .inner
+                        .borrow_mut()
+                        .add_edge(source_id, target_id)
+                        .map_err(graph_error_to_py_err)?;
+                    edge_ids.push(edge_id);
+                }
+
+                // OPTIMIZATION: Warm cache after bulk edge addition if requested
+                if warm_cache.unwrap_or(false) {
+                    self.warm_caches_after_bulk_operation(py)?;
+                }
+
+                return Ok(edge_ids);
+            }
+        }
         // Format 2: List of (source, target, attrs_dict) tuples
+        if let Ok(edge_list) = edges.extract::<Vec<&PyTuple>>() {
+            // Check if all tuples have 3 elements (indicating attrs format)
+            let has_attrs = edge_list.iter().all(|t| t.len() == 3);
+            
+            if has_attrs {
+                let mut edge_ids = Vec::new();
+                let mut edges_with_attrs = Vec::new();
+
+                // First pass: create all edges and collect attribute data
+                for edge_tuple in edge_list {
+                    let src_any = edge_tuple.get_item(0)?;
+                    let tgt_any = edge_tuple.get_item(1)?;
+                    let attrs_any = edge_tuple.get_item(2)?;
+
+                    // Handle source node ID (NodeId or string with uid_key)
+                    let source = if let Ok(node_id) = src_any.extract::<NodeId>() {
+                        node_id
+                    } else if let Ok(string_id) = src_any.extract::<String>() {
+                        if let Some(ref key) = uid_key {
+                            self.resolve_string_id_to_node(&string_id, key)?
+                        } else {
+                            return Err(PyErr::new::<PyTypeError, _>(
+                                "String node IDs require uid_key parameter",
+                            ));
+                        }
+                    } else {
+                        return Err(PyErr::new::<PyTypeError, _>(
+                            "Source must be NodeId or string",
+                        ));
+                    };
+
+                    // Handle target node ID (NodeId or string with uid_key)
+                    let target = if let Ok(node_id) = tgt_any.extract::<NodeId>() {
+                        node_id
+                    } else if let Ok(string_id) = tgt_any.extract::<String>() {
+                        if let Some(ref key) = uid_key {
+                            self.resolve_string_id_to_node(&string_id, key)?
+                        } else {
+                            return Err(PyErr::new::<PyTypeError, _>(
+                                "String node IDs require uid_key parameter",
+                            ));
+                        }
+                    } else {
+                        return Err(PyErr::new::<PyTypeError, _>(
+                            "Target must be NodeId or string",
+                        ));
+                    };
+
+                    let edge_id = self
+                        .inner
+                        .borrow_mut()
+                        .add_edge(source, target)
+                        .map_err(graph_error_to_py_err)?;
+                    edge_ids.push(edge_id);
+
+                    // Store edge attributes for bulk processing
+                    if let Ok(attrs_dict) = attrs_any.extract::<&PyDict>() {
+                        edges_with_attrs.push((edge_id, attrs_dict));
+                    }
+                    // Handle None attributes case
+                }
+
+                // OPTIMIZATION: Use bulk attribute setting instead of individual calls
+                if !edges_with_attrs.is_empty() {
+                    let mut attrs_by_name: std::collections::HashMap<
+                        String,
+                        Vec<(EdgeId, RustAttrValue)>,
+                    > = std::collections::HashMap::new();
+
+                    for (edge_id, attrs) in edges_with_attrs {
+                        for (key, value) in attrs.iter() {
+                            let attr_name: String = key.extract()?;
+                            let attr_value = python_value_to_attr_value(value);
+
+                            attrs_by_name
+                                .entry(attr_name)
+                                .or_default()
+                                .push((edge_id, attr_value?));
+                        }
+                    }
+
+                    self.inner
+                        .borrow_mut()
+                        .set_edge_attrs(attrs_by_name)
+                        .map_err(graph_error_to_py_err)?;
+                }
+
+                // OPTIMIZATION: Warm cache after bulk edge addition if requested
+                if warm_cache.unwrap_or(false) {
+                    self.warm_caches_after_bulk_operation(py)?;
+                }
+
+                return Ok(edge_ids);
+            }
+        }
+        // Format 2b: Try the old approach for backward compatibility
         else if let Ok(edge_tuples) = edges.extract::<Vec<(&PyAny, &PyAny, Option<&PyDict>)>>() {
             let mut edge_ids = Vec::new();
             let mut edges_with_attrs = Vec::new();
 
             // First pass: create all edges and collect attribute data
             for (src_any, tgt_any, attrs_opt) in edge_tuples {
-                let source: NodeId = src_any.extract()?;
-                let target: NodeId = tgt_any.extract()?;
+                // Handle source node ID (NodeId or string with uid_key)
+                let source = if let Ok(node_id) = src_any.extract::<NodeId>() {
+                    node_id
+                } else if let Ok(string_id) = src_any.extract::<String>() {
+                    if let Some(ref key) = uid_key {
+                        self.resolve_string_id_to_node(&string_id, key)?
+                    } else {
+                        return Err(PyErr::new::<PyTypeError, _>(
+                            "String node IDs require uid_key parameter",
+                        ));
+                    }
+                } else {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Source must be NodeId or string",
+                    ));
+                };
+
+                // Handle target node ID (NodeId or string with uid_key)
+                let target = if let Ok(node_id) = tgt_any.extract::<NodeId>() {
+                    node_id
+                } else if let Ok(string_id) = tgt_any.extract::<String>() {
+                    if let Some(ref key) = uid_key {
+                        self.resolve_string_id_to_node(&string_id, key)?
+                    } else {
+                        return Err(PyErr::new::<PyTypeError, _>(
+                            "String node IDs require uid_key parameter",
+                        ));
+                    }
+                } else {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Target must be NodeId or string",
+                    ));
+                };
 
                 let edge_id = self
                     .inner
@@ -504,16 +660,25 @@ impl PyGraph {
 
             return Ok(edge_ids);
         }
-        // Format 3: List of dictionaries with node mapping
+        // Format 3: List of dictionaries with node mapping or uid_key
         else if let Ok(edge_dicts) = edges.extract::<Vec<&PyDict>>() {
             let mut edge_ids = Vec::new();
             let mut edges_with_attrs = Vec::new();
 
             // First pass: create all edges and collect attribute data
             for edge_dict in edge_dicts {
+                // Determine source and target field names
+                let source_field = source.as_deref().unwrap_or("source");
+                let target_field = target.as_deref().unwrap_or("target");
+                
                 // Extract source and target
-                let source = if let Some(mapping) = &node_mapping {
-                    let source_str: String = edge_dict.get_item("source")?.unwrap().extract()?;
+                let source_id = if let Some(mapping) = &node_mapping {
+                    // Use node_mapping if provided
+                    let source_val = edge_dict.get_item(source_field)?
+                        .ok_or_else(|| PyErr::new::<PyKeyError, _>(
+                            format!("Missing source field: {}", source_field)
+                        ))?;
+                    let source_str: String = source_val.extract()?;
                     *mapping.get(&source_str).ok_or_else(|| {
                         pyo3::exceptions::PyKeyError::new_err(format!(
                             "Node {} not found in mapping",
@@ -521,11 +686,36 @@ impl PyGraph {
                         ))
                     })?
                 } else {
-                    edge_dict.get_item("source")?.unwrap().extract()?
+                    // Try to extract directly as NodeId first
+                    let source_val = edge_dict.get_item(source_field)?
+                        .ok_or_else(|| PyErr::new::<PyKeyError, _>(
+                            format!("Missing source field: {}", source_field)
+                        ))?;
+                    if let Ok(node_id) = source_val.extract::<NodeId>() {
+                        node_id
+                    } else if let Ok(string_id) = source_val.extract::<String>() {
+                        // Handle string ID with uid_key
+                        if let Some(ref key) = uid_key {
+                            self.resolve_string_id_to_node(&string_id, key)?
+                        } else {
+                            return Err(PyErr::new::<PyTypeError, _>(
+                                "String node IDs in dictionaries require either node_mapping or uid_key parameter",
+                            ));
+                        }
+                    } else {
+                        return Err(PyErr::new::<PyTypeError, _>(
+                            "Source must be NodeId or string",
+                        ));
+                    }
                 };
 
-                let target = if let Some(mapping) = &node_mapping {
-                    let target_str: String = edge_dict.get_item("target")?.unwrap().extract()?;
+                let target_id = if let Some(mapping) = &node_mapping {
+                    // Use node_mapping if provided
+                    let target_val = edge_dict.get_item(target_field)?
+                        .ok_or_else(|| PyErr::new::<PyKeyError, _>(
+                            format!("Missing target field: {}", target_field)
+                        ))?;
+                    let target_str: String = target_val.extract()?;
                     *mapping.get(&target_str).ok_or_else(|| {
                         pyo3::exceptions::PyKeyError::new_err(format!(
                             "Node {} not found in mapping",
@@ -533,19 +723,39 @@ impl PyGraph {
                         ))
                     })?
                 } else {
-                    edge_dict.get_item("target")?.unwrap().extract()?
+                    // Try to extract directly as NodeId first
+                    let target_val = edge_dict.get_item(target_field)?
+                        .ok_or_else(|| PyErr::new::<PyKeyError, _>(
+                            format!("Missing target field: {}", target_field)
+                        ))?;
+                    if let Ok(node_id) = target_val.extract::<NodeId>() {
+                        node_id
+                    } else if let Ok(string_id) = target_val.extract::<String>() {
+                        // Handle string ID with uid_key
+                        if let Some(ref key) = uid_key {
+                            self.resolve_string_id_to_node(&string_id, key)?
+                        } else {
+                            return Err(PyErr::new::<PyTypeError, _>(
+                                "String node IDs in dictionaries require either node_mapping or uid_key parameter",
+                            ));
+                        }
+                    } else {
+                        return Err(PyErr::new::<PyTypeError, _>(
+                            "Target must be NodeId or string",
+                        ));
+                    }
                 };
 
                 // Add the edge
                 let edge_id = self
                     .inner
                     .borrow_mut()
-                    .add_edge(source, target)
+                    .add_edge(source_id, target_id)
                     .map_err(graph_error_to_py_err)?;
                 edge_ids.push(edge_id);
 
                 // Store edge and its attributes for bulk processing
-                edges_with_attrs.push((edge_id, edge_dict));
+                edges_with_attrs.push((edge_id, edge_dict, source_field.to_string(), target_field.to_string()));
             }
 
             // OPTIMIZATION: Use bulk attribute setting instead of individual calls
@@ -555,10 +765,10 @@ impl PyGraph {
                     Vec<(EdgeId, RustAttrValue)>,
                 > = std::collections::HashMap::new();
 
-                for (edge_id, edge_dict) in edges_with_attrs {
+                for (edge_id, edge_dict, source_field, target_field) in edges_with_attrs {
                     for (key, value) in edge_dict.iter() {
                         let key_str: String = key.extract()?;
-                        if key_str != "source" && key_str != "target" {
+                        if key_str != source_field && key_str != target_field {
                             let attr_value = python_value_to_attr_value(value);
                             attrs_by_name
                                 .entry(key_str)
@@ -586,7 +796,7 @@ impl PyGraph {
 
         // If none of the formats matched, return error
         Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-            "add_edges expects a list of (source, target) tuples, (source, target, attrs) tuples, or dictionaries with node_mapping"
+            "add_edges expects a list of (source, target) tuples, (source, target, attrs) tuples, or dictionaries. Use uid_key parameter for string node IDs, node_mapping for dictionary format, or source/target parameters to specify custom field names."
         ))
     }
 
