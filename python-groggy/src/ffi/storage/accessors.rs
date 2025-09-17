@@ -239,11 +239,11 @@ impl PyNodesAccessor {
 
             let mut selected_nodes = Vec::new();
 
-            // Use BaseArray as indexed lookup: for each node_id, check basearray[node_id]
-            // The table is indexed so that row index = node_id
-            for &node_id in &all_node_ids {
-                // Use node_id as index into BaseArray to get boolean value
-                if let Some(attr_value) = base_array.inner.get(node_id as usize) {
+            // Use BaseArray with positional lookup: position in array matches position in node_ids
+            // This aligns with how attribute arrays are built in _get_node_attribute_column
+            for (index, &node_id) in all_node_ids.iter().enumerate() {
+                // Use index position into BaseArray to get boolean value
+                if let Some(attr_value) = base_array.inner.get(index) {
                     if let groggy::AttrValue::Bool(true) = attr_value {
                         selected_nodes.push(node_id);
                     }
@@ -688,15 +688,9 @@ impl PyNodesAccessor {
             )));
         }
 
-        // Create index-aligned attribute values where values[node_id] = attribute_value
+        // Create attribute values in node_ids order (same as table order)
         // This ensures g.nodes[g.nodes['attr'] == value] works correctly
-        let max_node_id = if let Some(ref constrained) = self.constrained_nodes {
-            constrained.iter().max().copied().unwrap_or(0)
-        } else {
-            node_ids.iter().max().copied().unwrap_or(0)
-        };
-
-        let mut values: Vec<Option<PyObject>> = vec![None; (max_node_id + 1) as usize];
+        let mut values: Vec<Option<PyObject>> = Vec::with_capacity(node_ids.len());
 
         for &node_id in &node_ids {
             if graph.contains_node(node_id) {
@@ -704,17 +698,17 @@ impl PyNodesAccessor {
                     Ok(Some(value)) => {
                         // Convert the attribute value to Python object
                         let py_value = attr_value_to_python_value(py, &value)?;
-                        values[node_id as usize] = Some(py_value);
+                        values.push(Some(py_value));
                     }
                     Ok(None) => {
-                        values[node_id as usize] = None;
+                        values.push(None);
                     }
                     Err(_) => {
-                        values[node_id as usize] = None;
+                        values.push(None);
                     }
                 }
             } else {
-                values[node_id as usize] = None;
+                values.push(None);
             }
         }
 
@@ -1273,11 +1267,11 @@ impl PyEdgesAccessor {
 
             let mut selected_edges = Vec::new();
 
-            // Use BaseArray as indexed lookup: for each edge_id, check basearray[edge_id]
-            // The table/accessor is indexed so that row index = edge_id
-            for &edge_id in &all_edge_ids {
-                // Use edge_id as index into BaseArray to get boolean value
-                if let Some(attr_value) = base_array.inner.get(edge_id as usize) {
+            // Use BaseArray with positional lookup: position in array matches position in edge_ids
+            // This aligns with how attribute arrays are built in _get_edge_attribute_column
+            for (index, &edge_id) in all_edge_ids.iter().enumerate() {
+                // Use index position into BaseArray to get boolean value
+                if let Some(attr_value) = base_array.inner.get(index) {
                     if let groggy::AttrValue::Bool(true) = attr_value {
                         selected_edges.push(edge_id);
                     }
@@ -1668,42 +1662,42 @@ impl PyEdgesAccessor {
             )));
         }
 
-        // Create index-aligned attribute values where values[edge_id] = attribute_value
+        // Create attribute values in edge_ids order (same as table order)
         // This ensures g.edges[g.edges['attr'] == value] works correctly
-        let max_edge_id = if let Some(ref constrained) = self.constrained_edges {
-            constrained.iter().max().copied().unwrap_or(0)
-        } else {
-            edge_ids.iter().max().copied().unwrap_or(0)
-        };
-
-        let mut values: Vec<Option<PyObject>> = vec![None; (max_edge_id + 1) as usize];
+        let mut values: Vec<Option<PyObject>> = Vec::with_capacity(edge_ids.len());
 
         for &edge_id in &edge_ids {
             match graph.get_edge_attr(edge_id, &attr_name.to_string()) {
                 Ok(Some(value)) => {
                     // Convert the attribute value to Python object
                     let py_value = attr_value_to_python_value(py, &value)?;
-                    values[edge_id as usize] = Some(py_value);
+                    values.push(Some(py_value));
                 }
                 Ok(None) => {
-                    values[edge_id as usize] = None;
+                    values.push(None);
                 }
                 Err(_) => {
-                    values[edge_id as usize] = None;
+                    values.push(None);
                 }
             }
         }
 
-        // Convert to Python list
-        let py_values: Vec<PyObject> = values
+        // Convert to AttrValue vector for BaseArray (consistent with nodes accessor)
+        let attr_values: Vec<groggy::AttrValue> = values
             .into_iter()
             .map(|opt_val| match opt_val {
-                Some(val) => val,
-                None => py.None(),
+                Some(val) => {
+                    // Convert Python object back to AttrValue
+                    python_value_to_attr_value(val.as_ref(py)).unwrap_or(groggy::AttrValue::Null)
+                }
+                None => groggy::AttrValue::Null,
             })
             .collect();
 
-        Ok(py_values.to_object(py))
+        // Create BaseArray for mixed attribute data (consistent with nodes accessor)
+        let base_array = BaseArray::from_attr_values(attr_values);
+        let py_array = PyBaseArray { inner: base_array };
+        Ok(Py::new(py, py_array)?.to_object(py))
     }
 
     /// Get filtered accessor for base edges (non-meta edges)

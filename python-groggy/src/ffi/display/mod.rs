@@ -18,7 +18,7 @@ pub struct PyDisplayConfig {
 impl PyDisplayConfig {
     /// Create new DisplayConfig with default settings
     #[new]
-    #[pyo3(signature = (max_rows=10, max_cols=8, max_width=120, precision=2, use_color=true))]
+    #[pyo3(signature = (max_rows=10, max_cols=50, max_width=120, precision=2, use_color=true))]
     pub fn new(max_rows: usize, max_cols: usize, max_width: usize, precision: usize, use_color: bool) -> Self {
         Self {
             config: groggy::display::DisplayConfig {

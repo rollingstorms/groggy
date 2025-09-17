@@ -629,9 +629,18 @@ impl<T: NumericType> UnifiedMatrix<T> {
             });
         }
         
-        // TODO: Implement proper element-wise multiplication
-        // For now, return error to indicate incomplete implementation
-        Err(MatrixError::UnsupportedOperation("Element-wise multiplication not yet implemented".to_string()))
+        let mut result = Self::new(self.shape.rows, self.shape.cols)?;
+        
+        // Element-wise multiplication: C[i,j] = A[i,j] * B[i,j]
+        for i in 0..self.shape.rows {
+            for j in 0..self.shape.cols {
+                let a_val = self.get(i, j)?;
+                let b_val = other.get(i, j)?;
+                result.set(i, j, a_val.mul(b_val))?;
+            }
+        }
+        
+        Ok(result)
     }
 
     // === PLACEHOLDER FOR ENHANCED OPERATIONS ===

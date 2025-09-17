@@ -1,8 +1,8 @@
 {
   "columns": [
+    "source",
     "edge_id",
     "method",
-    "source",
     "target"
   ],
   "data": [

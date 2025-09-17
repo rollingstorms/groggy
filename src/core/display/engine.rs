@@ -123,7 +123,7 @@ impl DisplayConfig {
             compact_mode: true,
             max_cell_width: 20,
             max_rows: 10,
-            max_cols: 8,
+            max_cols: 50,
             precision: 2,
             theme: "sleek".to_string(),
             output_format: OutputFormat::Unicode,

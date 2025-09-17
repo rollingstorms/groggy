@@ -1,7 +1,7 @@
 {
   "discovery_metadata": {
     "total_objects": 12,
-    "total_methods": 315,
+    "total_methods": 361,
     "total_errors": 0,
     "objects_discovered": [
       "BaseTable",
@@ -2079,8 +2079,8 @@
           "source_type": "Graph",
           "is_property": false,
           "doc": "Get Laplacian matrix - delegates to PyGraphMatrixHelper",
-          "test_error": "Laplacian matrix calculation not yet implemented",
-          "test_successful": false
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
         },
         {
           "name": "neighborhood",
@@ -3373,8 +3373,66 @@
     },
     "Matrix": {
       "type": "GraphMatrix",
-      "method_count": 38,
+      "method_count": 84,
       "methods": [
+        {
+          "name": "abs",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Element-wise absolute value",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "apply",
+          "signature": "(func)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Apply a Python function to each element of the matrix\nReturns: New matrix with function applied element-wise",
+          "requires_parameters": [
+            "func"
+          ]
+        },
+        {
+          "name": "backward",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Compute gradients via backpropagation",
+          "test_error": "Backward pass failed: InvalidInput(\"No computation graph available for gradient computation\")",
+          "test_successful": false
+        },
+        {
+          "name": "cholesky_decomposition",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Cholesky decomposition: A = L * L^T\nReturns L (lower triangular) for positive definite matrices",
+          "test_error": "Cholesky decomposition failed: InvalidInput(\"Matrix is not positive definite\")",
+          "test_successful": false
+        },
+        {
+          "name": "concatenate",
+          "signature": "(other, axis)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Concatenate matrices along specified axis",
+          "requires_parameters": [
+            "other",
+            "axis"
+          ]
+        },
         {
           "name": "dense",
           "signature": "()",
@@ -3404,9 +3462,32 @@
           "source_object": "Matrix",
           "source_type": "GraphMatrix",
           "is_property": false,
-          "doc": "Determinant calculation (Phase 5 - placeholder for now)",
-          "test_error": "Determinant calculation will be implemented in Phase 5",
-          "test_successful": false
+          "doc": "Determinant calculation (for square matrices)",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
+          "name": "dropout",
+          "signature": "(p, training=None)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Dropout operation for regularization",
+          "requires_parameters": [
+            "p"
+          ]
+        },
+        {
+          "name": "eigenvalue_decomposition",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Eigenvalue decomposition: A * V = V * \u039b\nReturns tuple of (eigenvalues, eigenvectors) ",
+          "actual_return_type": "tuple",
+          "test_successful": true
         },
         {
           "name": "elementwise_multiply",
@@ -3418,6 +3499,40 @@
           "doc": "Elementwise multiplication (Hadamard product)\nReturns: new GraphMatrix with elementwise product",
           "requires_parameters": [
             "other"
+          ]
+        },
+        {
+          "name": "elu",
+          "signature": "(alpha=None)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "ELU (Exponential Linear Unit) activation function",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "exp",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Element-wise exponential (e^x)",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "filter",
+          "signature": "(condition)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Filter matrix elements based on a condition function\nReturns: Matrix with only elements where condition(element) is True, others set to 0",
+          "requires_parameters": [
+            "condition"
           ]
         },
         {
@@ -3443,6 +3558,18 @@
             "base_array",
             "rows",
             "cols"
+          ]
+        },
+        {
+          "name": "from_data",
+          "signature": "(data)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Create matrix from nested Python lists (API consistency)\n\nThis is a classmethod wrapper around the `groggy.matrix()` function\nfor API consistency with other matrix libraries.\n\nExamples:\n  groggy.GraphMatrix.from_data([[1, 2], [3, 4]])  # 2\u00d72 matrix\n  groggy.GraphMatrix.from_data([[1, 2, 3]])       # 1\u00d73 matrix",
+          "requires_parameters": [
+            "data"
           ]
         },
         {
@@ -3483,6 +3610,19 @@
           "doc": "GELU activation applied to matrix\nImplements: matrix.gelu()",
           "actual_return_type": "GraphMatrix",
           "test_successful": true
+        },
+        {
+          "name": "get",
+          "signature": "(row, col)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Get single cell value at (row, col) - public interface",
+          "requires_parameters": [
+            "row",
+            "col"
+          ]
         },
         {
           "name": "get_cell",
@@ -3575,7 +3715,7 @@
           "source_type": "GraphMatrix",
           "is_property": false,
           "doc": "Matrix inverse (Phase 5 - placeholder for now)",
-          "test_error": "Matrix inverse will be implemented in Phase 5",
+          "test_error": "Matrix inverse calculation failed: InvalidInput(\"Matrix is singular (determinant near zero), cannot compute inverse\")",
           "test_successful": false
         },
         {
@@ -3601,6 +3741,85 @@
           "test_successful": true
         },
         {
+          "name": "leaky_relu",
+          "signature": "(alpha=None)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Leaky ReLU activation function",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "log",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Element-wise natural logarithm",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "lu_decomposition",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "LU decomposition: PA = LU\nReturns tuple of (P, L, U) where P is permutation, L is lower triangular, U is upper triangular",
+          "test_error": "LU decomposition failed: InvalidInput(\"Matrix is singular, LU decomposition failed\")",
+          "test_successful": false
+        },
+        {
+          "name": "map",
+          "signature": "(func)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Map a Python function over matrix elements (alias for apply)\nReturns: New matrix with function mapped over elements",
+          "requires_parameters": [
+            "func"
+          ]
+        },
+        {
+          "name": "max",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Global maximum value in the matrix",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
+          "name": "max_axis",
+          "signature": "(axis)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Maximum along specified axis (0=rows, 1=columns)",
+          "requires_parameters": [
+            "axis"
+          ]
+        },
+        {
+          "name": "mean",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Global mean of all elements in the matrix  ",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
           "name": "mean_axis",
           "signature": "(axis)",
           "return_type": "unknown",
@@ -3608,6 +3827,29 @@
           "source_type": "GraphMatrix",
           "is_property": false,
           "doc": "Mean along specified axis (0=rows, 1=columns)",
+          "requires_parameters": [
+            "axis"
+          ]
+        },
+        {
+          "name": "min",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Global minimum value in the matrix",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
+          "name": "min_axis",
+          "signature": "(axis)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Minimum along specified axis (0=rows, 1=columns)",
           "requires_parameters": [
             "axis"
           ]
@@ -3622,6 +3864,52 @@
           "doc": "Matrix multiplication - multiply this matrix with another\nReturns: new GraphMatrix that is the product of self * other",
           "requires_parameters": [
             "other"
+          ]
+        },
+        {
+          "name": "norm",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Calculate the Frobenius norm (Euclidean norm) of the matrix",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
+          "name": "norm_inf",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Calculate the L\u221e norm (maximum absolute value) of the matrix",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
+          "name": "norm_l1",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Calculate the L1 norm (sum of absolute values) of the matrix",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
+          "name": "ones",
+          "signature": "(rows, cols, dtype=None)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Create a ones matrix with specified dimensions",
+          "requires_parameters": [
+            "rows",
+            "cols"
           ]
         },
         {
@@ -3648,6 +3936,28 @@
           "test_successful": true
         },
         {
+          "name": "qr_decomposition",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "QR decomposition: A = Q * R\nReturns tuple of (Q, R) where Q is orthogonal and R is upper triangular",
+          "actual_return_type": "tuple",
+          "test_successful": true
+        },
+        {
+          "name": "rank",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Matrix rank - number of linearly independent rows/columns\nUses SVD with numerical tolerance for near-zero singular values",
+          "actual_return_type": "int",
+          "test_successful": true
+        },
+        {
           "name": "relu",
           "signature": "()",
           "return_type": "unknown",
@@ -3657,6 +3967,44 @@
           "doc": "ReLU activation applied to matrix\nImplements: matrix.relu()",
           "actual_return_type": "GraphMatrix",
           "test_successful": true
+        },
+        {
+          "name": "repeat",
+          "signature": "(repeats, axis)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Repeat elements of the matrix along a specified axis\nArgs: repeats - number of times to repeat, axis - 0 for rows, 1 for columns",
+          "requires_parameters": [
+            "repeats",
+            "axis"
+          ]
+        },
+        {
+          "name": "requires_grad_",
+          "signature": "(requires_grad)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Enable or disable gradient tracking for this matrix",
+          "requires_parameters": [
+            "requires_grad"
+          ]
+        },
+        {
+          "name": "reshape",
+          "signature": "(new_rows, new_cols)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Reshape matrix to new dimensions while preserving total element count\nReturns: new GraphMatrix with specified shape",
+          "requires_parameters": [
+            "new_rows",
+            "new_cols"
+          ]
         },
         {
           "name": "rich_display",
@@ -3682,6 +4030,20 @@
           ]
         },
         {
+          "name": "set",
+          "signature": "(row, col, value)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Set single cell value at (row, col)",
+          "requires_parameters": [
+            "row",
+            "col",
+            "value"
+          ]
+        },
+        {
           "name": "sigmoid",
           "signature": "()",
           "return_type": "unknown",
@@ -3704,6 +4066,55 @@
           "test_successful": true
         },
         {
+          "name": "solve",
+          "signature": "(b)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Solve linear system Ax = b",
+          "requires_parameters": [
+            "b"
+          ]
+        },
+        {
+          "name": "split",
+          "signature": "(split_points, axis)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Split matrix along specified axis",
+          "requires_parameters": [
+            "split_points",
+            "axis"
+          ]
+        },
+        {
+          "name": "sqrt",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Element-wise square root",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "stack",
+          "signature": "(other, axis)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Stack matrices along specified axis",
+          "requires_parameters": [
+            "other",
+            "axis"
+          ]
+        },
+        {
           "name": "std_axis",
           "signature": "(axis)",
           "return_type": "unknown",
@@ -3714,6 +4125,17 @@
           "requires_parameters": [
             "axis"
           ]
+        },
+        {
+          "name": "sum",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Global sum of all elements in the matrix",
+          "actual_return_type": "float",
+          "test_successful": true
         },
         {
           "name": "sum_axis",
@@ -3739,6 +4161,17 @@
           "test_successful": true
         },
         {
+          "name": "svd",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "SVD decomposition: A = U * \u03a3 * V^T\nReturns tuple of (U, singular_values, V_transpose)",
+          "actual_return_type": "tuple",
+          "test_successful": true
+        },
+        {
           "name": "tanh",
           "signature": "()",
           "return_type": "unknown",
@@ -3750,6 +4183,18 @@
           "test_successful": true
         },
         {
+          "name": "tile",
+          "signature": "(reps)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Tile (repeat) the matrix a specified number of times along each axis\nArgs: reps - tuple of (rows_repeat, cols_repeat)",
+          "requires_parameters": [
+            "reps"
+          ]
+        },
+        {
           "name": "to_base_array",
           "signature": "()",
           "return_type": "unknown",
@@ -3758,6 +4203,61 @@
           "is_property": false,
           "doc": "Convert matrix to BaseArray containing all values as AttrValues",
           "actual_return_type": "BaseArray",
+          "test_successful": true
+        },
+        {
+          "name": "to_degree_matrix",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Get degree matrix from adjacency matrix",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "to_dict",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Convert matrix to Python dictionary\nReturns: {\"data\": [[...]], \"shape\": [rows, cols], \"dtype\": \"float64\"}",
+          "actual_return_type": "dict",
+          "test_successful": true
+        },
+        {
+          "name": "to_laplacian",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Get standard Laplacian matrix (D - A)",
+          "actual_return_type": "GraphMatrix",
+          "test_successful": true
+        },
+        {
+          "name": "to_list",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Convert matrix to nested Python list\nReturns: [[row1], [row2], ...] format",
+          "actual_return_type": "list",
+          "test_successful": true
+        },
+        {
+          "name": "to_normalized_laplacian",
+          "signature": "(eps=None, k=None)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Get normalized Laplacian matrix with enhanced parameterization\n\nArgs:\n    eps: Exponent for degree matrix (default 0.5 for standard normalization)\n    k: Power to raise the result to (default 1)\n\nFormula: (D^eps @ A @ D^eps)^k",
+          "actual_return_type": "GraphMatrix",
           "test_successful": true
         },
         {
@@ -3796,6 +4296,17 @@
           "returned_object_type": "BaseTable"
         },
         {
+          "name": "trace",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Calculate the trace (sum of diagonal elements) - only for square matrices",
+          "actual_return_type": "float",
+          "test_successful": true
+        },
+        {
           "name": "transpose",
           "signature": "()",
           "return_type": "unknown",
@@ -3805,6 +4316,29 @@
           "doc": "Transpose the matrix",
           "actual_return_type": "GraphMatrix",
           "test_successful": true
+        },
+        {
+          "name": "var_axis",
+          "signature": "(axis)",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Variance along specified axis (0=rows, 1=columns)",
+          "requires_parameters": [
+            "axis"
+          ]
+        },
+        {
+          "name": "zero_grad",
+          "signature": "()",
+          "return_type": "unknown",
+          "source_object": "Matrix",
+          "source_type": "GraphMatrix",
+          "is_property": false,
+          "doc": "Zero out all gradients in the computation graph",
+          "test_error": "Gradient clearing failed: InvalidInput(\"No computation graph available for gradient clearing\")",
+          "test_successful": false
         },
         {
           "name": "zeros",
@@ -3884,6 +4418,11 @@
         "method": "filter"
       },
       {
+        "from": "BaseTable",
+        "to": "Matrix",
+        "method": "filter"
+      },
+      {
         "from": "NodesTable",
         "to": "BaseTable",
         "method": "filter"
@@ -3896,6 +4435,11 @@
       {
         "from": "NodesTable",
         "to": "ComponentsArray",
+        "method": "filter"
+      },
+      {
+        "from": "NodesTable",
+        "to": "Matrix",
         "method": "filter"
       },
       {
@@ -3914,6 +4458,11 @@
         "method": "filter"
       },
       {
+        "from": "EdgesTable",
+        "to": "Matrix",
+        "method": "filter"
+      },
+      {
         "from": "ComponentsArray",
         "to": "BaseTable",
         "method": "filter"
@@ -3926,6 +4475,31 @@
       {
         "from": "ComponentsArray",
         "to": "EdgesTable",
+        "method": "filter"
+      },
+      {
+        "from": "ComponentsArray",
+        "to": "Matrix",
+        "method": "filter"
+      },
+      {
+        "from": "Matrix",
+        "to": "BaseTable",
+        "method": "filter"
+      },
+      {
+        "from": "Matrix",
+        "to": "NodesTable",
+        "method": "filter"
+      },
+      {
+        "from": "Matrix",
+        "to": "EdgesTable",
+        "method": "filter"
+      },
+      {
+        "from": "Matrix",
+        "to": "ComponentsArray",
         "method": "filter"
       }
     ],
@@ -5458,8 +6032,28 @@
         "method": "to_list"
       },
       {
+        "from": "ComponentsArray",
+        "to": "Matrix",
+        "method": "to_list"
+      },
+      {
         "from": "GraphArray",
         "to": "ComponentsArray",
+        "method": "to_list"
+      },
+      {
+        "from": "GraphArray",
+        "to": "Matrix",
+        "method": "to_list"
+      },
+      {
+        "from": "Matrix",
+        "to": "ComponentsArray",
+        "method": "to_list"
+      },
+      {
+        "from": "Matrix",
+        "to": "GraphArray",
         "method": "to_list"
       }
     ],
@@ -5486,12 +6080,72 @@
         "to": "Subgraph",
         "method": "summary"
       }
+    ],
+    "max": [
+      {
+        "from": "GraphArray",
+        "to": "Matrix",
+        "method": "max"
+      },
+      {
+        "from": "Matrix",
+        "to": "GraphArray",
+        "method": "max"
+      }
+    ],
+    "mean": [
+      {
+        "from": "GraphArray",
+        "to": "Matrix",
+        "method": "mean"
+      },
+      {
+        "from": "Matrix",
+        "to": "GraphArray",
+        "method": "mean"
+      }
+    ],
+    "min": [
+      {
+        "from": "GraphArray",
+        "to": "Matrix",
+        "method": "min"
+      },
+      {
+        "from": "Matrix",
+        "to": "GraphArray",
+        "method": "min"
+      }
+    ],
+    "reshape": [
+      {
+        "from": "GraphArray",
+        "to": "Matrix",
+        "method": "reshape"
+      },
+      {
+        "from": "Matrix",
+        "to": "GraphArray",
+        "method": "reshape"
+      }
+    ],
+    "sum": [
+      {
+        "from": "GraphArray",
+        "to": "Matrix",
+        "method": "sum"
+      },
+      {
+        "from": "Matrix",
+        "to": "GraphArray",
+        "method": "sum"
+      }
     ]
   },
   "errors": [],
   "meta_graph": {
-    "meta_graph": "Graph(nodes=12, edges=59)",
-    "meta_graph_table": "GraphTable[12 nodes, 59 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[12 x 5]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 module   \u2502 object_type     \u2502 node_id \u2502 method_count \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 groggy   \u2502 BaseTable       \u2502       1 \u2502           33 \u2502\n\u2502 groggy   \u2502 NodesTable      \u2502       2 \u2502           29 \u2502\n\u2502 groggy   \u2502 EdgesTable      \u2502       3 \u2502           34 \u2502\n\u2502 groggy   \u2502 GraphTable      \u2502       4 \u2502           20 \u2502\n\u2502 \u22ee        \u2502 \u22ee               \u2502       \u22ee \u2502            \u22ee \u2502\n\u2502 builtins \u2502 ComponentsArray \u2502       9 \u2502            7 \u2502\n\u2502 builtins \u2502 Subgraph        \u2502      10 \u2502           55 \u2502\n\u2502 builtins \u2502 NumArray        \u2502      11 \u2502           13 \u2502\n\u2502 builtins \u2502 GraphMatrix     \u2502      12 \u2502           38 \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n12 rows x 5 colsEdges:\nEdgesTable[59 x 6]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 return_type \u2502 method_name          \u2502 method_signature \u2502 edge_id \u2502 target \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 BaseTable   \u2502 head                 \u2502 (n=5)            \u2502       1 \u2502      1 \u2502\n\u2502 BaseTable   \u2502 tail                 \u2502 (n=5)            \u2502       2 \u2502      1 \u2502\n\u2502 BaseTable   \u2502 base_table           \u2502 ()               \u2502       3 \u2502      1 \u2502\n\u2502 NodesTable  \u2502 head                 \u2502 (n=5)            \u2502       4 \u2502      2 \u2502\n\u2502 \u22ee           \u2502 \u22ee                    \u2502 \u22ee                \u2502       \u22ee \u2502      \u22ee \u2502\n\u2502 GraphMatrix \u2502 tanh                 \u2502 ()               \u2502      56 \u2502     12 \u2502\n\u2502 BaseArray   \u2502 to_base_array        \u2502 ()               \u2502      57 \u2502      5 \u2502\n\u2502 BaseTable   \u2502 to_table_for_stream\u2026 \u2502 ()               \u2502      58 \u2502      1 \u2502\n\u2502 GraphMatrix \u2502 transpose            \u2502 ()               \u2502      59 \u2502     12 \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n59 rows x 6 cols",
+    "meta_graph": "Graph(nodes=12, edges=69)",
+    "meta_graph_table": "GraphTable[12 nodes, 69 edges]\nValidation Policy: Standard\nNodes:\nNodesTable[12 x 5]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 module   \u2502 node_id \u2502 object_name     \u2502 method_count \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 groggy   \u2502       1 \u2502 BaseTable       \u2502           33 \u2502\n\u2502 groggy   \u2502       2 \u2502 NodesTable      \u2502           29 \u2502\n\u2502 groggy   \u2502       3 \u2502 EdgesTable      \u2502           34 \u2502\n\u2502 groggy   \u2502       4 \u2502 GraphTable      \u2502           20 \u2502\n\u2502 \u22ee        \u2502       \u22ee \u2502 \u22ee               \u2502            \u22ee \u2502\n\u2502 builtins \u2502       9 \u2502 ComponentsArray \u2502            7 \u2502\n\u2502 builtins \u2502      10 \u2502 Subgraph        \u2502           55 \u2502\n\u2502 builtins \u2502      11 \u2502 GraphArray      \u2502           13 \u2502\n\u2502 builtins \u2502      12 \u2502 Matrix          \u2502           84 \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n12 rows x 5 colsEdges:\nEdgesTable[69 x 6]\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 edge_id \u2502 target \u2502 source \u2502 method_name          \u2502 return_type \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502       1 \u2502      1 \u2502      1 \u2502 head                 \u2502 BaseTable   \u2502\n\u2502       2 \u2502      1 \u2502      1 \u2502 tail                 \u2502 BaseTable   \u2502\n\u2502       3 \u2502      1 \u2502      2 \u2502 base_table           \u2502 BaseTable   \u2502\n\u2502       4 \u2502      2 \u2502      2 \u2502 head                 \u2502 NodesTable  \u2502\n\u2502       \u22ee \u2502      \u22ee \u2502      \u22ee \u2502 \u22ee                    \u2502 \u22ee           \u2502\n\u2502      66 \u2502     12 \u2502     12 \u2502 to_laplacian         \u2502 GraphMatrix \u2502\n\u2502      67 \u2502     12 \u2502     12 \u2502 to_normalized_lapla\u2026 \u2502 GraphMatrix \u2502\n\u2502      68 \u2502      1 \u2502     12 \u2502 to_table_for_stream\u2026 \u2502 BaseTable   \u2502\n\u2502      69 \u2502     12 \u2502     12 \u2502 transpose            \u2502 GraphMatrix \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n69 rows x 6 cols",
     "object_name_to_node_id": {
       "BaseTable": 1,
       "NodesTable": 2,
@@ -5575,7 +6229,7 @@
         7,
         55,
         13,
-        38
+        84
       ],
       "module": [
         "groggy",
@@ -5652,7 +6306,17 @@
         56,
         57,
         58,
-        59
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69
       ],
       "source": [
         1,
@@ -5681,6 +6345,7 @@
         6,
         6,
         6,
+        6,
         7,
         7,
         7,
@@ -5704,6 +6369,15 @@
         10,
         10,
         10,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
+        12,
         12,
         12,
         12,
@@ -5738,6 +6412,7 @@
         11,
         1,
         5,
+        12,
         4,
         12,
         6,
@@ -5766,13 +6441,22 @@
         6,
         7,
         12,
+        12,
+        12,
+        12,
         11,
         12,
         12,
         12,
         12,
         12,
+        12,
+        12,
+        12,
         5,
+        12,
+        12,
+        12,
         1,
         12
       ],
@@ -5799,6 +6483,7 @@
         "to_num_array",
         "to_table",
         "unique",
+        "laplacian_matrix",
         "table",
         "to_matrix",
         "to_networkx",
@@ -5826,14 +6511,23 @@
         "to_matrix",
         "to_networkx",
         "to_nodes",
+        "abs",
         "dense",
+        "elu",
+        "exp",
         "flatten",
         "gelu",
+        "leaky_relu",
+        "log",
         "relu",
         "sigmoid",
         "softmax",
+        "sqrt",
         "tanh",
         "to_base_array",
+        "to_degree_matrix",
+        "to_laplacian",
+        "to_normalized_laplacian",
         "to_table_for_streaming",
         "transpose"
       ],
@@ -5860,6 +6554,7 @@
         "()",
         "()",
         "()",
+        "(normalized=None)",
         "()",
         "()",
         "(directed: bool = False, include_attributes: bool = True)",
@@ -5889,12 +6584,21 @@
         "()",
         "()",
         "()",
+        "(alpha=None)",
+        "()",
+        "()",
+        "()",
+        "(alpha=None)",
         "()",
         "()",
         "()",
         "(dim=1)",
         "()",
         "()",
+        "()",
+        "()",
+        "()",
+        "(eps=None, k=None)",
         "()",
         "()"
       ],
@@ -5921,6 +6625,7 @@
         "NumArray",
         "BaseTable",
         "BaseArray",
+        "GraphMatrix",
         "GraphTable",
         "GraphMatrix",
         "Graph",
@@ -5949,13 +6654,22 @@
         "Graph",
         "NodesAccessor",
         "GraphMatrix",
+        "GraphMatrix",
+        "GraphMatrix",
+        "GraphMatrix",
         "NumArray",
         "GraphMatrix",
         "GraphMatrix",
         "GraphMatrix",
         "GraphMatrix",
         "GraphMatrix",
+        "GraphMatrix",
+        "GraphMatrix",
+        "GraphMatrix",
         "BaseArray",
+        "GraphMatrix",
+        "GraphMatrix",
+        "GraphMatrix",
         "BaseTable",
         "GraphMatrix"
       ]
