@@ -7,6 +7,13 @@ use super::traits::{Table, TableIterator};
 use crate::storage::array::{BaseArray, ArrayOps};
 use crate::types::{NodeId, EdgeId, AttrValue};
 use crate::errors::{GraphResult, GraphError};
+use crate::viz::streaming::data_source::{
+    DataSource, DataWindow, DataSchema, WindowKey, 
+    GraphNode, GraphEdge, GraphMetadata, LayoutAlgorithm, NodePosition, Position
+};
+use crate::viz::display::{ColumnSchema, DataType};
+use crate::viz::VizModule;
+use super::base::InteractiveConfig;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -864,6 +871,21 @@ impl GraphTable {
     pub fn components(&self) -> (&BaseTable, &BaseTable) {
         (self.nodes.base(), self.edges.base())
     }
+    
+    /// Launch interactive visualization for this graph table
+    /// 
+    /// Creates a VizModule that visualizes both nodes and edges as a complete graph.
+    /// The visualization will show the graph structure with node-edge relationships.
+    pub fn interactive(&self, config: Option<InteractiveConfig>) -> GraphResult<VizModule> {
+        use std::sync::Arc;
+        
+        // Create VizModule from this GraphTable which already implements DataSource
+        // for unified graph visualization with both nodes and edges
+        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> = Arc::new(self.clone());
+        let viz_module = VizModule::new(data_source);
+        
+        Ok(viz_module)
+    }
 }
 
 // Implement Table trait for GraphTable with composite semantics
@@ -1702,5 +1724,197 @@ impl GraphTable {
             return AttrValue::Float(f);
         }
         AttrValue::Text(field.to_string())
+    }
+}
+
+// =============================================================================
+// DataSource Implementation for Graph Visualization
+// =============================================================================
+
+impl DataSource for GraphTable {
+    fn total_rows(&self) -> usize {
+        // For GraphTable, return total unique entities (nodes + edges)
+        self.nodes.nrows() + self.edges.nrows()
+    }
+    
+    fn total_cols(&self) -> usize {
+        // Return unique column names across both tables
+        let mut columns = HashSet::new();
+        columns.extend(self.nodes.column_names().iter());
+        columns.extend(self.edges.column_names().iter());
+        columns.len()
+    }
+    
+    fn get_window(&self, start: usize, count: usize) -> DataWindow {
+        // For GraphTable, we can window either nodes or edges
+        // For simplicity, window nodes first, then edges if needed
+        let node_count = self.nodes.nrows();
+        
+        if start < node_count {
+            // Window is within nodes range
+            let node_end = (start + count).min(node_count);
+            self.nodes.get_window(start, node_end - start)
+        } else {
+            // Window is in edges range
+            let edge_start = start - node_count;
+            self.edges.get_window(edge_start, count)
+        }
+    }
+    
+    fn get_schema(&self) -> DataSchema {
+        let mut columns = Vec::new();
+        
+        // Add node columns
+        for col_name in self.nodes.column_names() {
+            columns.push(ColumnSchema {
+                name: format!("node_{}", col_name),
+                data_type: match col_name.as_str() {
+                    "node_id" => DataType::Integer,
+                    _ => DataType::String, // Simplified for now
+                },
+            });
+        }
+        
+        // Add edge columns
+        for col_name in self.edges.column_names() {
+            columns.push(ColumnSchema {
+                name: format!("edge_{}", col_name),
+                data_type: match col_name.as_str() {
+                    "edge_id" | "source" | "target" => DataType::Integer,
+                    _ => DataType::String, // Simplified for now
+                },
+            });
+        }
+        
+        DataSchema {
+            columns,
+            primary_key: None, // Composite table doesn't have single primary key
+            source_type: "graph_table".to_string(),
+        }
+    }
+    
+    fn supports_streaming(&self) -> bool {
+        true
+    }
+    
+    fn get_column_types(&self) -> Vec<DataType> {
+        self.get_schema().columns.into_iter().map(|c| c.data_type).collect()
+    }
+    
+    fn get_column_names(&self) -> Vec<String> {
+        self.get_schema().columns.into_iter().map(|c| c.name).collect()
+    }
+    
+    fn get_source_id(&self) -> String {
+        format!("graph_table_{}_{}", self.nodes.nrows(), self.edges.nrows())
+    }
+    
+    fn get_version(&self) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut hasher = DefaultHasher::new();
+        self.nodes.nrows().hash(&mut hasher);
+        self.nodes.ncols().hash(&mut hasher);
+        self.edges.nrows().hash(&mut hasher);
+        self.edges.ncols().hash(&mut hasher);
+        hasher.finish()
+    }
+    
+    // Graph visualization support - this is where GraphTable really shines
+    fn supports_graph_view(&self) -> bool {
+        true
+    }
+    
+    fn get_graph_nodes(&self) -> Vec<GraphNode> {
+        // Delegate to nodes table - it has the full implementation
+        self.nodes.get_graph_nodes()
+    }
+    
+    fn get_graph_edges(&self) -> Vec<GraphEdge> {
+        // Delegate to edges table - it has the full implementation  
+        self.edges.get_graph_edges()
+    }
+    
+    fn get_graph_metadata(&self) -> GraphMetadata {
+        let nodes = self.get_graph_nodes();
+        let edges = self.get_graph_edges();
+        let mut attribute_types = HashMap::new();
+        
+        // Collect attribute types from both tables
+        let nodes_schema = self.nodes.get_schema();
+        let edges_schema = self.edges.get_schema();
+        
+        for col_schema in nodes_schema.columns {
+            if col_schema.name != "node_id" {
+                let type_name = match col_schema.data_type {
+                    DataType::Integer => "integer",
+                    DataType::Float => "float", 
+                    DataType::String => "string",
+                    DataType::Boolean => "boolean",
+                    DataType::DateTime => "datetime",
+                    DataType::Json => "json",
+                    DataType::Unknown => "unknown",
+                };
+                attribute_types.insert(format!("node_{}", col_schema.name), type_name.to_string());
+            }
+        }
+        
+        for col_schema in edges_schema.columns {
+            if !["edge_id", "source", "target"].contains(&col_schema.name.as_str()) {
+                let type_name = match col_schema.data_type {
+                    DataType::Integer => "integer",
+                    DataType::Float => "float", 
+                    DataType::String => "string",
+                    DataType::Boolean => "boolean",
+                    DataType::DateTime => "datetime",
+                    DataType::Json => "json",
+                    DataType::Unknown => "unknown",
+                };
+                attribute_types.insert(format!("edge_{}", col_schema.name), type_name.to_string());
+            }
+        }
+        
+        // Check if any edges have weights
+        let has_weights = edges.iter().any(|e| e.weight.is_some());
+        
+        // Check if graph is directed (heuristic: if any edge has different source/target relationships)
+        let mut edge_pairs = HashSet::new();
+        let mut reverse_pairs = HashSet::new();
+        let mut is_directed = false;
+        
+        for edge in &edges {
+            let pair = (&edge.source, &edge.target);
+            let reverse_pair = (&edge.target, &edge.source);
+            
+            if edge_pairs.contains(&reverse_pair) {
+                // We found a bidirectional edge
+                continue;
+            } else if reverse_pairs.contains(&pair) {
+                // We found the reverse of an edge we've seen
+                continue;
+            } else {
+                edge_pairs.insert(pair);
+                reverse_pairs.insert(reverse_pair);
+                
+                // Check if we have evidence this is directed
+                if !edges.iter().any(|e| e.source == edge.target && e.target == edge.source) {
+                    is_directed = true;
+                }
+            }
+        }
+        
+        GraphMetadata {
+            node_count: nodes.len(),
+            edge_count: edges.len(),
+            is_directed,
+            has_weights,
+            attribute_types,
+        }
+    }
+    
+    fn compute_layout(&self, algorithm: LayoutAlgorithm) -> Vec<NodePosition> {
+        // Use the edges table implementation which considers edge structure
+        self.edges.compute_layout(algorithm)
     }
 }

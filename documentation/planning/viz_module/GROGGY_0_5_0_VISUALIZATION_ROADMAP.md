@@ -20,7 +20,7 @@ g.viz.interactive(
     clickable_nodes=True,      # Click nodes for details
     hoverable_edges=True,      # Hover for edge weights/attributes  
     selectable_regions=True,   # Drag-select multiple nodes
-    zoom_controls=True,        # Mouse wheel zoom, pan
+    zoom_controls=True,        # Mouse wheel zoom, pan, 'rotate' different embedding dimensions
     filter_panel=True,         # Interactive filtering sidebar
     search_box=True           # Real-time node/edge search
 )
@@ -295,9 +295,20 @@ impl GraphWebSocketHandler {
 ```
 
 #### **1.3 Python API Integration**
+
+**🎯 DUAL API ARCHITECTURE CLARIFICATION:**
+
+Based on implementation feedback, we're implementing a **dual API approach** to support both graph-level and table-level visualization:
+
+1. **Graph-Level API**: `g.viz.interactive()` - Full graph visualization with comprehensive layout options
+2. **Table-Level API**: `table.interactive()` - Focused table visualization via delegation pattern
+
 ```python
 # FFI integration for seamless Python experience
-class PyViz:
+
+# GRAPH-LEVEL VISUALIZATION API
+# g.viz.interactive() - Main graph visualization interface
+class PyGraphViz:
     def __init__(self, graph_data):
         self.inner = VizModule::new(graph_data)
     
@@ -308,7 +319,7 @@ class PyViz:
                    width=1200,
                    height=800,
                    **kwargs):
-        """Launch interactive browser visualization."""
+        """Launch interactive browser visualization for entire graph."""
         config = VizConfig(
             layout=layout,
             theme=theme,
@@ -325,7 +336,7 @@ class PyViz:
                theme="publication",
                dpi=300,
                **kwargs):
-        """Generate static visualization export."""
+        """Generate static visualization export for graph."""
         config = StaticConfig(
             filename=filename,
             format=format,
@@ -335,6 +346,29 @@ class PyViz:
             **kwargs
         )
         return self.inner.static_viz(config)
+
+# TABLE-LEVEL VISUALIZATION API  
+# table.interactive() - Delegated table visualization
+class PyBaseTable:
+    def interactive(self,
+                   layout="force",
+                   theme="light",
+                   port=8080,
+                   **kwargs):
+        """Launch interactive visualization for this table's data."""
+        # Delegation pattern: Create VizModule from table data
+        data_source = Arc::new(self.table.clone())
+        viz_module = VizModule::new(data_source)
+        return viz_module.interactive(VizConfig(...))
+
+# Usage Examples:
+# g.viz.interactive()                    # Full graph visualization
+# g.nodes.table().interactive()          # Node-focused visualization  
+# g.edges.table().interactive()          # Edge-focused visualization
+# standalone_table.interactive()         # Generic table visualization
+```
+
+**✅ API Design Status**: Both APIs implemented and working as of Phase 6 completion
 ```
 
 **Week 1-3 Deliverables**:

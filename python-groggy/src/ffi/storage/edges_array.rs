@@ -6,6 +6,8 @@ use crate::ffi::storage::accessors::PyEdgesAccessor;
 use crate::ffi::storage::subgraph_array::PySubgraphArray;
 use crate::ffi::storage::table_array::PyTableArray;
 use crate::ffi::storage::nodes_array::PyNodesArray;
+use groggy::viz::VizModule;
+use crate::ffi::viz::PyVizModule;
 
 /// EdgesArray: Collection of EdgesAccessor objects with delegation to BaseArray
 /// Provides basic array operations and graph-specific transformations
@@ -230,6 +232,35 @@ impl PyEdgesArray {
                 .sum();
             format!("EdgesArray[{} accessors, {} total edges]", self.base.len(), total_edges)
         }
+    }
+    
+    /// Launch interactive visualization for this EdgesArray
+    /// 
+    /// Converts the EdgesArray to a table view and launches visualization
+    /// 
+    /// # Arguments
+    /// * `port` - Optional port number (0 for auto-assign)
+    /// * `layout` - Layout algorithm: \"force-directed\", \"circular\", \"grid\", \"hierarchical\"
+    /// * `theme` - Visual theme: \"light\", \"dark\", \"publication\", \"minimal\"
+    /// * `width` - Canvas width in pixels
+    /// * `height` - Canvas height in pixels
+    /// 
+    /// # Returns
+    /// PyVizModule for launching interactive visualization
+    pub fn interactive(
+        &self,
+        port: Option<u16>,
+        layout: Option<String>,
+        theme: Option<String>,
+        width: Option<u32>,
+        height: Option<u32>
+    ) -> PyResult<PyVizModule> {
+        // Convert EdgesArray to table for visualization via delegation  
+        // For now, delegate through the base interactive method
+        // TODO: Implement proper table conversion once table array structure is clarified
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+            "EdgesArray.interactive() not yet implemented - use .table().interactive_viz() instead"
+        ))
     }
 }
 

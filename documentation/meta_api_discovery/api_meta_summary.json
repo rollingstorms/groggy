@@ -1,0 +1,3279 @@
+{
+  "meta_graph_stats": {
+    "nodes": 30,
+    "edges": 217,
+    "types_discovered": 30
+  },
+  "discovery_data": {
+    "methods": [
+      {
+        "object_type": "Graph",
+        "method_name": "add_edge",
+        "return_type": "str",
+        "parameters": [
+          {
+            "name": "source",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "target",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "uid_key",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "kwargs",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Add a single edge to the graph with support for string IDs and attributes",
+        "signature": "(source, target, uid_key=None, **kwargs)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "add_edges",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "edges",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "node_mapping",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "uid_key",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "source",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "target",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "warm_cache",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Add multiple edges at once",
+        "signature": "(edges, node_mapping=None, uid_key=None, source=None, target=None, warm_cache=None)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "add_graph",
+        "return_type": "Graph",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Add another graph to this graph (merge nodes and edges)\n\nAll nodes and edges from the other graph will be added to this graph.\nNode and edge IDs may be remapped to avoid conflicts.\nAttributes are preserved during the merge.",
+        "signature": "(other)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "add_node",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "node_id",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "kwargs",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "",
+        "signature": "(node_id=None, **kwargs)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "add_nodes",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "data",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "uid_key",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "",
+        "signature": "(data, uid_key=None)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "aggregate",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "attribute",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "operation",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "target",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "_node_ids",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Aggregate attribute values across nodes or edges",
+        "signature": "(attribute, operation, target=None, _node_ids=None)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "all_edge_attribute_names",
+        "return_type": "Graph",
+        "parameters": [],
+        "docstring": "Get all unique edge attribute names across the entire graph",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "all_node_attribute_names",
+        "return_type": "Graph",
+        "parameters": [],
+        "docstring": "Get all unique node attribute names across the entire graph",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "bfs",
+        "return_type": "GraphAnalysis",
+        "parameters": [
+          {
+            "name": "start",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "max_depth",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "inplace",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "attr_name",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "BFS traversal - delegates to PyGraphAnalysis helper",
+        "signature": "(start, max_depth=None, inplace=None, attr_name=None)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "branches",
+        "return_type": "list",
+        "parameters": [],
+        "docstring": "List all branches (FFI wrapper around core history system)",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "checkout_branch",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "branch_name",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Checkout a branch (FFI wrapper around core history system)",
+        "signature": "(branch_name)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "commit",
+        "return_type": "Graph",
+        "parameters": [
+          {
+            "name": "message",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "author",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Commit current state of the graph (FFI wrapper around core history system)",
+        "signature": "(message, author)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "commit_history",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Get commit history (FFI wrapper around core history system)",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "contains_edge",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "edge",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if edge exists - DELEGATED (same as has_edge)  ",
+        "signature": "(edge)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "contains_node",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "node",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if node exists - DELEGATED (same as has_node)",
+        "signature": "(node)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "create_branch",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "branch_name",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Create a new branch (FFI wrapper around core history system)",
+        "signature": "(branch_name)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "density",
+        "return_type": "float",
+        "parameters": [],
+        "docstring": "Calculate graph density (number of edges / number of possible edges) - PURE DELEGATION",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "dfs",
+        "return_type": "GraphAnalysis",
+        "parameters": [
+          {
+            "name": "start",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "max_depth",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "inplace",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "attr_name",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "DFS traversal - delegates to PyGraphAnalysis helper  ",
+        "signature": "(start, max_depth=None, inplace=None, attr_name=None)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "edge_attribute_keys",
+        "return_type": "GraphAttr",
+        "parameters": [
+          {
+            "name": "edge_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get all attribute keys for an edge - delegates to PyGraphAttr",
+        "signature": "(edge_id)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "edge_count",
+        "return_type": "float",
+        "parameters": [],
+        "docstring": "Get the number of edges in the graph - DELEGATED",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "edge_endpoints",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "edge",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "",
+        "signature": "(edge)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "filter_edges",
+        "return_type": "str",
+        "parameters": [
+          {
+            "name": "filter",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Filter edges using EdgeFilter object or string query\n\nOPTIMIZED: Direct implementation avoiding expensive view() creation overhead",
+        "signature": "(filter)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "filter_nodes",
+        "return_type": "str",
+        "parameters": [
+          {
+            "name": "filter",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Filter nodes using NodeFilter object or string query\n\nOPTIMIZED: Direct implementation avoiding expensive view() creation overhead",
+        "signature": "(filter)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "get_edge_attr",
+        "return_type": "GraphAttr",
+        "parameters": [
+          {
+            "name": "edge",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "attr",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "default",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Get single edge attribute - delegates to PyGraphAttr",
+        "signature": "(edge, attr, default=None)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "get_edge_attrs",
+        "return_type": "GraphAttr",
+        "parameters": [
+          {
+            "name": "edges",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "attrs",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get bulk edge attributes - delegates to PyGraphAttr",
+        "signature": "(edges, attrs)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "get_node_attr",
+        "return_type": "GraphAttr",
+        "parameters": [
+          {
+            "name": "node",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "attr",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "default",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Get single node attribute - delegates to PyGraphAttr",
+        "signature": "(node, attr, default=None)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "get_node_attrs",
+        "return_type": "GraphAttr",
+        "parameters": [
+          {
+            "name": "nodes",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "attrs",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get bulk node attributes - delegates to PyGraphAttr",
+        "signature": "(nodes, attrs)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "get_node_mapping",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "uid_key",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "return_inverse",
+            "type": "Any",
+            "default": "False",
+            "required": false
+          }
+        ],
+        "docstring": "Get node mapping for a specific attribute (FFI wrapper around core operations)",
+        "signature": "(uid_key, return_inverse=False)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "group_by",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "attribute",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "aggregation_attr",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "operation",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Group nodes by attribute value and compute aggregates (public method for benchmarks)",
+        "signature": "(attribute, aggregation_attr, operation)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "group_nodes_by_attribute",
+        "return_type": "Graph",
+        "parameters": [
+          {
+            "name": "attribute",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "aggregation_attr",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "operation",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get analytics module for this graph\nGroup nodes by attribute value and compute aggregates for each group",
+        "signature": "(attribute, aggregation_attr, operation)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "has_edge",
+        "return_type": "Graph",
+        "parameters": [
+          {
+            "name": "edge_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if an edge exists in the graph - DELEGATED  ",
+        "signature": "(edge_id)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "has_edge_attribute",
+        "return_type": "GraphAttr",
+        "parameters": [
+          {
+            "name": "edge_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "attr_name",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if edge has specific attribute - delegates to PyGraphAttr",
+        "signature": "(edge_id, attr_name)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "has_node",
+        "return_type": "Graph",
+        "parameters": [
+          {
+            "name": "node_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if a node exists in the graph - DELEGATED",
+        "signature": "(node_id)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "has_node_attribute",
+        "return_type": "GraphAttr",
+        "parameters": [
+          {
+            "name": "node_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "attr_name",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if node has specific attribute - delegates to PyGraphAttr",
+        "signature": "(node_id, attr_name)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "has_uncommitted_changes",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Check if there are uncommitted changes (FFI wrapper around core history system)",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "historical_view",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "commit_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get historical view at specific commit (FFI wrapper around core history system)",
+        "signature": "(commit_id)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "is_connected",
+        "return_type": "Graph",
+        "parameters": [],
+        "docstring": "Check if the graph is connected (delegates to subgraph implementation)",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "laplacian_matrix",
+        "return_type": "GraphMatrixHelper",
+        "parameters": [
+          {
+            "name": "normalized",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Get Laplacian matrix - delegates to PyGraphMatrixHelper",
+        "signature": "(normalized=None)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "neighborhood",
+        "return_type": "GraphAnalysis",
+        "parameters": [
+          {
+            "name": "center_nodes",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "radius",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "max_nodes",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Get neighborhood sampling - delegates to PyGraphAnalysis helper",
+        "signature": "(center_nodes, radius=None, max_nodes=None)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "neighborhood_statistics",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Get neighborhood sampling performance statistics",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "neighbors",
+        "return_type": "GraphAnalysis",
+        "parameters": [
+          {
+            "name": "nodes",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Get neighbors of nodes - delegates to PyGraphAnalysis helper",
+        "signature": "(nodes=None)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "node_attribute_keys",
+        "return_type": "GraphAttr",
+        "parameters": [
+          {
+            "name": "node_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get all attribute keys for a node - delegates to PyGraphAttr",
+        "signature": "(node_id)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "node_count",
+        "return_type": "float",
+        "parameters": [],
+        "docstring": "Get the number of nodes in the graph - DELEGATED",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "remove_edge",
+        "return_type": "Graph",
+        "parameters": [
+          {
+            "name": "edge",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Remove a single edge from the graph",
+        "signature": "(edge)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "remove_edges",
+        "return_type": "Graph",
+        "parameters": [
+          {
+            "name": "edges",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Remove multiple edges from the graph",
+        "signature": "(edges)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "remove_node",
+        "return_type": "Graph",
+        "parameters": [
+          {
+            "name": "node",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Remove a single node from the graph",
+        "signature": "(node)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "remove_nodes",
+        "return_type": "Graph",
+        "parameters": [
+          {
+            "name": "nodes",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Remove multiple nodes from the graph",
+        "signature": "(nodes)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "resolve_string_id_to_node",
+        "return_type": "str",
+        "parameters": [
+          {
+            "name": "string_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "uid_key",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Helper method to resolve string ID to NodeId using uid_key attribute",
+        "signature": "(string_id, uid_key)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "set_edge_attr",
+        "return_type": "GraphAttrMut",
+        "parameters": [
+          {
+            "name": "edge",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "attr",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "value",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Set single edge attribute - delegates to PyGraphAttrMut",
+        "signature": "(edge, attr, value)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "set_edge_attrs",
+        "return_type": "GraphAttrMut",
+        "parameters": [
+          {
+            "name": "attrs_dict",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Set bulk edge attributes - delegates to PyGraphAttrMut",
+        "signature": "(attrs_dict)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "set_node_attr",
+        "return_type": "GraphAttrMut",
+        "parameters": [
+          {
+            "name": "node",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "attr",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "value",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Set single node attribute - delegates to PyGraphAttrMut",
+        "signature": "(node, attr, value)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "set_node_attrs",
+        "return_type": "GraphAttrMut",
+        "parameters": [
+          {
+            "name": "attrs_dict",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Set bulk node attributes - delegates to PyGraphAttrMut",
+        "signature": "(attrs_dict)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "shortest_path",
+        "return_type": "GraphAnalysis",
+        "parameters": [
+          {
+            "name": "source",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "target",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "weight_attribute",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "inplace",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "attr_name",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Get shortest path - delegates to PyGraphAnalysis helper",
+        "signature": "(source, target, weight_attribute=None, inplace=None, attr_name=None)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "table",
+        "return_type": "GraphTable",
+        "parameters": [],
+        "docstring": "Get a GraphTable representation of this graph\nImplements: g.table()",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "to_matrix",
+        "return_type": "GraphMatrixHelper",
+        "parameters": [],
+        "docstring": "Convert graph to attribute matrix - delegates to PyGraphMatrixHelper",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "to_networkx",
+        "return_type": "Graph",
+        "parameters": [
+          {
+            "name": "directed",
+            "type": "bool",
+            "default": "False",
+            "required": false
+          },
+          {
+            "name": "include_attributes",
+            "type": "bool",
+            "default": "True",
+            "required": false
+          }
+        ],
+        "docstring": "Convert this graph to a NetworkX graph.",
+        "signature": "(directed: bool = False, include_attributes: bool = True)"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "transition_matrix",
+        "return_type": "GraphMatrixHelper",
+        "parameters": [],
+        "docstring": "Generate transition matrix - delegates to PyGraphMatrixHelper",
+        "signature": "()"
+      },
+      {
+        "object_type": "Graph",
+        "method_name": "view",
+        "return_type": "a",
+        "parameters": [],
+        "docstring": "Return a full-view Subgraph (whole graph as a subgraph).\nDownstream code can always resolve parent graph from this object.",
+        "signature": "()"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "auto_assign_edge_ids",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Auto-assign edge IDs for null values (useful for meta nodes and imported data)",
+        "signature": "()"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "from_federated_bundles",
+        "return_type": "GraphTable",
+        "parameters": [
+          {
+            "name": "bundle_paths",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "domain_names",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Create federated GraphTable from multiple bundle paths",
+        "signature": "(bundle_paths, domain_names=None)"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "get_bundle_info",
+        "return_type": "s",
+        "parameters": [
+          {
+            "name": "bundle_path",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get bundle metadata information without loading the full bundle\n\n# Arguments\n* `bundle_path` - Directory path containing the bundle\n\n# Returns\n* `dict` - Bundle metadata information\n\n# Examples\n```python\n# Inspect bundle metadata\nmetadata = GraphTable.get_bundle_info(\"./graph_data_bundle\")\nprint(f\"Bundle version: {metadata['version']}\")\nprint(f\"Nodes: {metadata['node_count']}, Edges: {metadata['edge_count']}\")\nprint(f\"Created: {metadata['created_at']}\")\n```",
+        "signature": "(bundle_path)"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "head",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "n",
+            "type": "Any",
+            "default": "5",
+            "required": false
+          }
+        ],
+        "docstring": "Get first n rows (primarily from nodes table, default 5)",
+        "signature": "(n=5)"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "load_bundle",
+        "return_type": "s",
+        "parameters": [
+          {
+            "name": "bundle_path",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Load GraphTable from a bundle directory (supports both v1.0 and v2.0 formats)\n\n# Arguments\n* `bundle_path` - Directory path containing the bundle\n\n# Returns\n* `PyGraphTable` - Loaded graph table with validation policy restored\n\n# Examples\n```python\n# Load from v2.0 bundle (with integrity verification)\ngraph_table = GraphTable.load_bundle(\"./graph_data_bundle\")\n\n# Also supports legacy v1.0 bundles\ngraph_table = GraphTable.load_bundle(\"./old_bundle\")\n```",
+        "signature": "(bundle_path)"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "merge",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "tables",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Merge multiple GraphTables into one",
+        "signature": "(tables)"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "merge_with",
+        "return_type": "GraphTable",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "strategy",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Merge with another GraphTable",
+        "signature": "(other, strategy)"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "merge_with_strategy",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "tables",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "strategy",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Merge with conflict resolution strategy",
+        "signature": "(tables, strategy)"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "ncols",
+        "return_type": "float",
+        "parameters": [],
+        "docstring": "Get number of columns (max of nodes and edges)",
+        "signature": "()"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "nrows",
+        "return_type": "float",
+        "parameters": [],
+        "docstring": "Get number of total rows (nodes + edges)",
+        "signature": "()"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "save_bundle",
+        "return_type": "thon",
+        "parameters": [
+          {
+            "name": "bundle_path",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Save GraphTable as a v2.0 bundle with comprehensive metadata and checksums\n\n# Arguments\n* `bundle_path` - Directory path to save the bundle\n\n# Examples\n```python\n# Save with comprehensive metadata and validation\ngraph_table.save_bundle(\"./graph_data_bundle\")\n\n# Bundle will contain:\n# - metadata.json: Comprehensive metadata with checksums\n# - MANIFEST.json: File integrity manifest\n# - validation_report.json: Structured validation results\n# - nodes.csv: Node data\n# - edges.csv: Edge data\n```",
+        "signature": "(bundle_path)"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "shape",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Get shape as (rows, cols)",
+        "signature": "()"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "stats",
+        "return_type": "Graph",
+        "parameters": [],
+        "docstring": "Get graph statistics  ",
+        "signature": "()"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "tail",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "n",
+            "type": "Any",
+            "default": "5",
+            "required": false
+          }
+        ],
+        "docstring": "Get last n rows (primarily from nodes table, default 5) ",
+        "signature": "(n=5)"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "to_edges",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Convert table to EdgesAccessor by extracting edge IDs from the table",
+        "signature": "()"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "to_graph",
+        "return_type": "Graph",
+        "parameters": [],
+        "docstring": "Convert back to Graph",
+        "signature": "()"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "to_nodes",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Convert table to NodesAccessor by extracting node IDs from the table",
+        "signature": "()"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "to_subgraphs",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Convert table to SubgraphArray by creating subgraphs from table rows",
+        "signature": "()"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "validate",
+        "return_type": "report",
+        "parameters": [],
+        "docstring": "Validate the GraphTable and return report",
+        "signature": "()"
+      },
+      {
+        "object_type": "BaseTable",
+        "method_name": "verify_bundle",
+        "return_type": "s",
+        "parameters": [
+          {
+            "name": "bundle_path",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Verify bundle integrity without loading the full data\n\n# Arguments\n* `bundle_path` - Directory path containing the bundle\n\n# Returns\n* `dict` - Verification results with checksums and validation status\n\n# Examples\n```python\n# Verify bundle integrity\nverification = GraphTable.verify_bundle(\"./graph_data_bundle\")\nif verification['is_valid']:\n    print(\"Bundle integrity verified!\")\nelse:\n    print(f\"Issues found: {verification['errors']}\")\n```",
+        "signature": "(bundle_path)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "abs",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Element-wise absolute value",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "apply",
+        "return_type": "New",
+        "parameters": [
+          {
+            "name": "func",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Apply a Python function to each element of the matrix\nReturns: New matrix with function applied element-wise",
+        "signature": "(func)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "backward",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Compute gradients via backpropagation",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "cholesky_decomposition",
+        "return_type": "L",
+        "parameters": [],
+        "docstring": "Cholesky decomposition: A = L * L^T\nReturns L (lower triangular) for positive definite matrices",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "concatenate",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "axis",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Concatenate matrices along specified axis",
+        "signature": "(other, axis)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "dense",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Create a dense materialized version of the matrix",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "dense_html_repr",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Generate dense HTML representation for small matrices",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "determinant",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Determinant calculation (for square matrices)",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "dropout",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "p",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "training",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Dropout operation for regularization",
+        "signature": "(p, training=None)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "eigenvalue_decomposition",
+        "return_type": "tuple",
+        "parameters": [],
+        "docstring": "Eigenvalue decomposition: A * V = V * \u039b\nReturns tuple of (eigenvalues, eigenvectors) ",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "elementwise_multiply",
+        "return_type": "new",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Elementwise multiplication (Hadamard product)\nReturns: new GraphMatrix with elementwise product",
+        "signature": "(other)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "elu",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "alpha",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "ELU (Exponential Linear Unit) activation function",
+        "signature": "(alpha=None)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "exp",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Element-wise exponential (e^x)",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "filter",
+        "return_type": "Matrix",
+        "parameters": [
+          {
+            "name": "condition",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Filter matrix elements based on a condition function\nReturns: Matrix with only elements where condition(element) is True, others set to 0",
+        "signature": "(condition)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "flatten",
+        "return_type": "a",
+        "parameters": [],
+        "docstring": "Flatten matrix to NumArray by concatenating all columns row-wise\nReturns a single NumArray containing all matrix values in row-major order\nOPTIMIZED: Pre-allocated vector with vectorized access",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "from_base_array",
+        "return_type": "float",
+        "parameters": [
+          {
+            "name": "base_array",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "rows",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "cols",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Create matrix from BaseArray containing numeric values",
+        "signature": "(base_array, rows, cols)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "from_data",
+        "return_type": "thon",
+        "parameters": [
+          {
+            "name": "data",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Create matrix from nested Python lists (API consistency)\n\nThis is a classmethod wrapper around the `groggy.matrix()` function\nfor API consistency with other matrix libraries.\n\nExamples:\n  groggy.GraphMatrix.from_data([[1, 2], [3, 4]])  # 2\u00d72 matrix\n  groggy.GraphMatrix.from_data([[1, 2, 3]])       # 1\u00d73 matrix",
+        "signature": "(data)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "from_flattened",
+        "return_type": "Matrix",
+        "parameters": [
+          {
+            "name": "num_array",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "rows",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "cols",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Create matrix from NumArray by reshaping to specified dimensions",
+        "signature": "(num_array, rows, cols)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "from_graph_attributes",
+        "return_type": "Graph",
+        "parameters": [
+          {
+            "name": "_graph",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "_attrs",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "_entities",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Create matrix from graph attributes",
+        "signature": "(_graph, _attrs, _entities)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "gelu",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "GELU activation applied to matrix\nImplements: matrix.gelu()",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "get",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "row",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "col",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get single cell value at (row, col) - public interface",
+        "signature": "(row, col)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "get_cell",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "row",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "col",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get single cell value at (row, col)",
+        "signature": "(row, col)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "get_column",
+        "return_type": "BaseArray",
+        "parameters": [
+          {
+            "name": "col",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get column by index as BaseArray (mixed types) or NumArray (if all numerical)",
+        "signature": "(col)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "get_column_by_name",
+        "return_type": "BaseArray",
+        "parameters": [
+          {
+            "name": "name",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get column by name as BaseArray (mixed types) or NumArray (if all numerical)",
+        "signature": "(name)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "get_row",
+        "return_type": "BaseArray",
+        "parameters": [
+          {
+            "name": "row",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get entire row as BaseArray (mixed types) or NumArray (if all numerical)",
+        "signature": "(row)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "identity",
+        "return_type": "Matrix",
+        "parameters": [
+          {
+            "name": "size",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Create an identity matrix with specified size",
+        "signature": "(size)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "interactive",
+        "return_type": "str",
+        "parameters": [],
+        "docstring": "Launch interactive streaming table view in browser\n\nConverts the matrix into a table format and launches a streaming\ninteractive view in the browser. The table will show the matrix data\nwith row and column indices for easy exploration.\n\nReturns:\n    str: URL of the interactive table interface",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "interactive_embed",
+        "return_type": "str",
+        "parameters": [],
+        "docstring": "Generate embedded iframe HTML for Jupyter notebooks\n\nCreates an interactive streaming table representation of the matrix\nthat can be embedded directly in a Jupyter notebook cell.\n\nReturns:\n    str: HTML iframe code for embedding in Jupyter",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "inverse",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Matrix inverse (Phase 5 - placeholder for now)",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "iter_columns",
+        "return_type": "iterator",
+        "parameters": [],
+        "docstring": "Iterate over columns - returns iterator of BaseArrays or NumArrays",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "iter_rows",
+        "return_type": "iterator",
+        "parameters": [],
+        "docstring": "Iterate over rows - returns iterator of BaseArrays or NumArrays",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "leaky_relu",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "alpha",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Leaky ReLU activation function",
+        "signature": "(alpha=None)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "log",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Element-wise natural logarithm",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "lu_decomposition",
+        "return_type": "tuple",
+        "parameters": [],
+        "docstring": "LU decomposition: PA = LU\nReturns tuple of (P, L, U) where P is permutation, L is lower triangular, U is upper triangular",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "map",
+        "return_type": "New",
+        "parameters": [
+          {
+            "name": "func",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Map a Python function over matrix elements (alias for apply)\nReturns: New matrix with function mapped over elements",
+        "signature": "(func)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "max",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Global maximum value in the matrix",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "max_axis",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "axis",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Maximum along specified axis (0=rows, 1=columns)",
+        "signature": "(axis)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "mean",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Global mean of all elements in the matrix  ",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "mean_axis",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "axis",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Mean along specified axis (0=rows, 1=columns)",
+        "signature": "(axis)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "min",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Global minimum value in the matrix",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "min_axis",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "axis",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Minimum along specified axis (0=rows, 1=columns)",
+        "signature": "(axis)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "multiply",
+        "return_type": "new",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Matrix multiplication - multiply this matrix with another\nReturns: new GraphMatrix that is the product of self * other",
+        "signature": "(other)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "norm",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Calculate the Frobenius norm (Euclidean norm) of the matrix",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "norm_inf",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Calculate the L\u221e norm (maximum absolute value) of the matrix",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "norm_l1",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Calculate the L1 norm (sum of absolute values) of the matrix",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "ones",
+        "return_type": "Matrix",
+        "parameters": [
+          {
+            "name": "rows",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "cols",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "dtype",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Create a ones matrix with specified dimensions",
+        "signature": "(rows, cols, dtype=None)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "power",
+        "return_type": "new",
+        "parameters": [
+          {
+            "name": "n",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Matrix power - raise matrix to integer power\nReturns: new GraphMatrix that is self^n",
+        "signature": "(n)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "preview",
+        "return_type": "Matrix",
+        "parameters": [
+          {
+            "name": "row_limit",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "col_limit",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Get preview of matrix for display (first N rows/cols by default)",
+        "signature": "(row_limit=None, col_limit=None)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "qr_decomposition",
+        "return_type": "tuple",
+        "parameters": [],
+        "docstring": "QR decomposition: A = Q * R\nReturns tuple of (Q, R) where Q is orthogonal and R is upper triangular",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "rank",
+        "return_type": "float",
+        "parameters": [],
+        "docstring": "Matrix rank - number of linearly independent rows/columns\nUses SVD with numerical tolerance for near-zero singular values",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "relu",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "ReLU activation applied to matrix\nImplements: matrix.relu()",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "repeat",
+        "return_type": "float",
+        "parameters": [
+          {
+            "name": "repeats",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "axis",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Repeat elements of the matrix along a specified axis\nArgs: repeats - number of times to repeat, axis - 0 for rows, 1 for columns",
+        "signature": "(repeats, axis)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "requires_grad_",
+        "return_type": "Matrix",
+        "parameters": [
+          {
+            "name": "requires_grad",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Enable or disable gradient tracking for this matrix",
+        "signature": "(requires_grad)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "reshape",
+        "return_type": "new",
+        "parameters": [
+          {
+            "name": "new_rows",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "new_cols",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Reshape matrix to new dimensions while preserving total element count\nReturns: new GraphMatrix with specified shape",
+        "signature": "(new_rows, new_cols)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "rich_display",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "config",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Get rich display representation using Rust formatter",
+        "signature": "(config=None)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "scalar_multiply",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "scalar",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Placeholder for scalar operations",
+        "signature": "(scalar)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "set",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "row",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "col",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "value",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Set single cell value at (row, col)",
+        "signature": "(row, col, value)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "sigmoid",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Sigmoid activation applied to matrix\nImplements: matrix.sigmoid()",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "softmax",
+        "return_type": "Matrix",
+        "parameters": [
+          {
+            "name": "dim",
+            "type": "Any",
+            "default": "1",
+            "required": false
+          }
+        ],
+        "docstring": "Softmax activation applied to matrix\nImplements: matrix.softmax(dim=1)",
+        "signature": "(dim=1)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "solve",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "b",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Solve linear system Ax = b",
+        "signature": "(b)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "split",
+        "return_type": "Matrix",
+        "parameters": [
+          {
+            "name": "split_points",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "axis",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Split matrix along specified axis",
+        "signature": "(split_points, axis)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "sqrt",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Element-wise square root",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "stack",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "axis",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Stack matrices along specified axis",
+        "signature": "(other, axis)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "std_axis",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "axis",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Standard deviation along specified axis (0=rows, 1=columns)",
+        "signature": "(axis)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "sum",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Global sum of all elements in the matrix",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "sum_axis",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "axis",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Sum along specified axis (0=rows, 1=columns)",
+        "signature": "(axis)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "summary",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Get summary information without materializing data",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "svd",
+        "return_type": "tuple",
+        "parameters": [],
+        "docstring": "SVD decomposition: A = U * \u03a3 * V^T\nReturns tuple of (U, singular_values, V_transpose)",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "tanh",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Tanh activation applied to matrix\nImplements: matrix.tanh()",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "tile",
+        "return_type": "float",
+        "parameters": [
+          {
+            "name": "reps",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Tile (repeat) the matrix a specified number of times along each axis\nArgs: reps - tuple of (rows_repeat, cols_repeat)",
+        "signature": "(reps)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "to_base_array",
+        "return_type": "BaseArray",
+        "parameters": [],
+        "docstring": "Convert matrix to BaseArray containing all values as AttrValues",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "to_degree_matrix",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Get degree matrix from adjacency matrix",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "to_dict",
+        "return_type": "s",
+        "parameters": [],
+        "docstring": "Convert matrix to Python dictionary\nReturns: {\"data\": [[...]], \"shape\": [rows, cols], \"dtype\": \"float64\"}",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "to_laplacian",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Get standard Laplacian matrix (D - A)",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "to_list",
+        "return_type": "s",
+        "parameters": [],
+        "docstring": "Convert matrix to nested Python list\nReturns: [[row1], [row2], ...] format",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "to_normalized_laplacian",
+        "return_type": "Matrix",
+        "parameters": [
+          {
+            "name": "eps",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "k",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Get normalized Laplacian matrix with enhanced parameterization\n\nArgs:\n    eps: Exponent for degree matrix (default 0.5 for standard normalization)\n    k: Power to raise the result to (default 1)\n\nFormula: (D^eps @ A @ D^eps)^k",
+        "signature": "(eps=None, k=None)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "to_numpy",
+        "return_type": "list",
+        "parameters": [],
+        "docstring": "Convert to NumPy array (when numpy available)\nUses .data property to materialize data",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "to_pandas",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Convert to Pandas DataFrame (when pandas available)",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "to_table_for_streaming",
+        "return_type": "BaseTable",
+        "parameters": [],
+        "docstring": "Convert matrix to table format for streaming visualization\n\nCreates a BaseTable with columns representing matrix data:\n- 'row': row index\n- 'column': column index  \n- 'value': the matrix value at that position",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "trace",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Calculate the trace (sum of diagonal elements) - only for square matrices",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "transpose",
+        "return_type": "Matrix",
+        "parameters": [],
+        "docstring": "Transpose the matrix",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "var_axis",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "axis",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Variance along specified axis (0=rows, 1=columns)",
+        "signature": "(axis)"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "zero_grad",
+        "return_type": "Graph",
+        "parameters": [],
+        "docstring": "Zero out all gradients in the computation graph",
+        "signature": "()"
+      },
+      {
+        "object_type": "Matrix",
+        "method_name": "zeros",
+        "return_type": "Matrix",
+        "parameters": [
+          {
+            "name": "rows",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "cols",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "dtype",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Create a zero matrix with specified dimensions and type",
+        "signature": "(rows, cols, dtype=None)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "adj",
+        "return_type": "GraphMatrix",
+        "parameters": [],
+        "docstring": "Get adjacency matrix (shortcut for adjacency_matrix)\nReturns: GraphMatrix representing adjacency relationships  ",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "adjacency_list",
+        "return_type": "dict",
+        "parameters": [],
+        "docstring": "Get adjacency list representation\nReturns: Dict mapping node_id -> list of connected node_ids",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "adjacency_matrix",
+        "return_type": "GraphMatrix",
+        "parameters": [],
+        "docstring": "Get adjacency matrix for this subgraph view\nReturns: GraphMatrix representing adjacency relationships",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "bfs",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "start",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "max_depth",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "BFS traversal - returns subgraph result",
+        "signature": "(start, max_depth=None)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "calculate_similarity",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "other",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "metric",
+            "type": "Any",
+            "default": "jaccard",
+            "required": false
+          }
+        ],
+        "docstring": "Calculate similarity between subgraphs using various metrics",
+        "signature": "(other, metric='jaccard')"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "child_meta_nodes",
+        "return_type": "empty",
+        "parameters": [],
+        "docstring": "Get child meta-nodes if this subgraph contains them\nNOTE: This feature is not yet implemented - always returns empty list",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "clustering_coefficient",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "_node_id",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Calculate clustering coefficient for a node or entire subgraph",
+        "signature": "(_node_id=None)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "collapse",
+        "return_type": "a",
+        "parameters": [
+          {
+            "name": "node_aggs",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "edge_aggs",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "edge_strategy",
+            "type": "Any",
+            "default": "aggregate",
+            "required": false
+          },
+          {
+            "name": "node_strategy",
+            "type": "Any",
+            "default": "extract",
+            "required": false
+          },
+          {
+            "name": "preset",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "include_edge_count",
+            "type": "Any",
+            "default": "True",
+            "required": false
+          },
+          {
+            "name": "mark_entity_type",
+            "type": "Any",
+            "default": "True",
+            "required": false
+          },
+          {
+            "name": "entity_type",
+            "type": "Any",
+            "default": "meta",
+            "required": false
+          },
+          {
+            "name": "allow_missing_attributes",
+            "type": "Any",
+            "default": "True",
+            "required": false
+          }
+        ],
+        "docstring": "Modern MetaGraph Composer API - Clean interface for meta-node creation\n\nThis is the new, intuitive way to create meta-nodes with flexible configuration.\nReturns a MetaNodePlan that can be previewed, modified, and executed.\n\n# Arguments\n* `node_aggs` - Node aggregation specifications (dict or list format)\n* `edge_aggs` - Edge aggregation specifications (dict format)\n* `edge_strategy` - Edge handling strategy (\"aggregate\", \"keep_external\", \"drop_all\", \"contract_all\")\n* `node_strategy` - Node handling strategy (\"extract\", \"collapse\")\n* `preset` - Optional preset name (\"social_network\", \"org_hierarchy\", \"flow_network\")\n* `include_edge_count` - Include edge_count attribute in meta-edges\n* `mark_entity_type` - Mark meta-nodes/edges with entity_type\n* `entity_type` - Entity type for marking\n\n# Examples\n```python\n# Dict format for node aggregations\nplan = subgraph.collapse(\n    node_aggs={\"avg_salary\": (\"mean\", \"salary\"), \"size\": \"count\"},\n    edge_aggs={\"weight\": \"mean\"},\n    edge_strategy=\"aggregate\",\n    node_strategy=\"extract\"\n)\nmeta_node = plan.add_to_graph()\n\n# With preset\nplan = subgraph.collapse(preset=\"social_network\")\nmeta_node = plan.add_to_graph()\n```",
+        "signature": "(node_aggs=None, edge_aggs=None, edge_strategy='aggregate', node_strategy='extract', preset=None, include_edge_count=True, mark_entity_type=True, entity_type='meta', allow_missing_attributes=True)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "collapse_to_node",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "agg_functions",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Collapse subgraph to a single node with aggregated attributes",
+        "signature": "(agg_functions)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "collapse_to_node_with_defaults",
+        "return_type": "dict",
+        "parameters": [
+          {
+            "name": "agg_functions",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "defaults",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "Collapse subgraph to a single node with enhanced missing attribute handling\n\n# Arguments\n* `agg_functions` - Dictionary of {attribute_name: aggregation_function}\n* `defaults` - Optional dictionary of {attribute_name: default_value} for missing attributes\n\n# Behavior  \n* Errors by default when aggregating non-existent attributes (strict validation)\n* Uses provided defaults for missing attributes when specified\n* Count aggregation always works regardless of attribute existence",
+        "signature": "(agg_functions, defaults=None)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "connected_components",
+        "return_type": "list",
+        "parameters": [],
+        "docstring": "Get connected components within this subgraph (lazy array)",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "contains_edge",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "edge_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if subgraph contains a specific edge (alias for has_edge)  ",
+        "signature": "(edge_id)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "contains_node",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "node_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if subgraph contains a specific node (alias for has_node)",
+        "signature": "(node_id)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "degree",
+        "return_type": "int",
+        "parameters": [
+          {
+            "name": "nodes",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "full_graph",
+            "type": "Any",
+            "default": "False",
+            "required": false
+          }
+        ],
+        "docstring": "Get degree of nodes in subgraph as GraphArray\n\nUsage:\n- degree(node_id, full_graph=False) -> int: degree of single node (local or full graph)\n- degree(node_ids, full_graph=False) -> GraphArray: degrees for list of nodes\n- degree(full_graph=False) -> GraphArray: degrees for all nodes in subgraph\n\nParameters:\n- nodes: Optional node ID, list of node IDs, or None for all nodes\n- full_graph: If False (default), compute degrees within subgraph only.\n              If True, compute degrees from the original full graph.",
+        "signature": "(nodes=None, *, full_graph=False)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "density",
+        "return_type": "Subgraph",
+        "parameters": [],
+        "docstring": "Calculate density of this subgraph",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "dfs",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "start",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "max_depth",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          }
+        ],
+        "docstring": "DFS traversal - returns subgraph result",
+        "signature": "(start, max_depth=None)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "edge_count",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Edge count property",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "edge_endpoints",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "edge_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get edge endpoints (source, target)",
+        "signature": "(edge_id)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "edges_table",
+        "return_type": "GraphTable",
+        "parameters": [],
+        "docstring": "Convert subgraph edges to a table - pure delegation to core GraphTable",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "entity_type",
+        "return_type": "the",
+        "parameters": [],
+        "docstring": "Return the entity type string",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "filter_edges",
+        "return_type": "new",
+        "parameters": [
+          {
+            "name": "filter",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Filter edges and return new subgraph",
+        "signature": "(filter)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "filter_nodes",
+        "return_type": "new",
+        "parameters": [
+          {
+            "name": "filter",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Filter nodes and return new subgraph  ",
+        "signature": "(filter)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "get_edge_attribute",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "edge_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "attr_name",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get a single edge attribute value",
+        "signature": "(edge_id, attr_name)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "get_node_attribute",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "node_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "attr_name",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get a single node attribute value",
+        "signature": "(node_id, attr_name)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "has_edge",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "edge_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if an edge exists in this subgraph",
+        "signature": "(edge_id)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "has_edge_between",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "source",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "target",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if edge exists between two nodes",
+        "signature": "(source, target)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "has_meta_nodes",
+        "return_type": "Subgraph",
+        "parameters": [],
+        "docstring": "Check if this subgraph contains nodes that are meta-nodes",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "has_node",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "node_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if a node exists in this subgraph",
+        "signature": "(node_id)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "has_path",
+        "return_type": "s",
+        "parameters": [
+          {
+            "name": "node1_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "node2_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Check if there is a path between two nodes within this subgraph\n\nThis is more efficient than `shortest_path_subgraph` when you only need\nto know if a path exists, not the actual path.\n\n# Arguments\n* `node1_id` - The starting node ID\n* `node2_id` - The destination node ID\n\n# Returns\n* `True` if a path exists between the nodes within this subgraph\n* `False` if no path exists or either node is not in this subgraph\n\n# Example\n```python\n# Check if there's a path between node 1 and node 5 in the subgraph\npath_exists = subgraph.has_path(1, 5)\n```",
+        "signature": "(node1_id, node2_id)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "in_degree",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "nodes",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "full_graph",
+            "type": "Any",
+            "default": "False",
+            "required": false
+          }
+        ],
+        "docstring": "Get in-degree of nodes within subgraph",
+        "signature": "(nodes=None, full_graph=False)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "induced_subgraph",
+        "return_type": "list",
+        "parameters": [
+          {
+            "name": "nodes",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Create induced subgraph from list of nodes",
+        "signature": "(nodes)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "intersect_with",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "_other",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "",
+        "signature": "(_other)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "is_connected",
+        "return_type": "Subgraph",
+        "parameters": [],
+        "docstring": "Check if this subgraph is connected",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "is_empty",
+        "return_type": "Subgraph",
+        "parameters": [],
+        "docstring": "Check if subgraph is empty",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "merge_with",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "_other",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Set operations - merge, intersect, subtract (placeholders)",
+        "signature": "(_other)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "meta_nodes",
+        "return_type": "Subgraph",
+        "parameters": [],
+        "docstring": "Get all meta-nodes within this subgraph",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "neighborhood",
+        "return_type": "ing",
+        "parameters": [
+          {
+            "name": "central_nodes",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "hops",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Compute neighborhoods from this subgraph, returning a PyNeighborhoodResult",
+        "signature": "(central_nodes, hops)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "neighbors",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "node_id",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Get neighbors of a node within the subgraph",
+        "signature": "(node_id)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "node_count",
+        "return_type": "Unknown",
+        "parameters": [],
+        "docstring": "Node count property",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "out_degree",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "nodes",
+            "type": "Any",
+            "default": "None",
+            "required": false
+          },
+          {
+            "name": "full_graph",
+            "type": "Any",
+            "default": "False",
+            "required": false
+          }
+        ],
+        "docstring": "Get out-degree of nodes within subgraph",
+        "signature": "(nodes=None, full_graph=False)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "parent_meta_node",
+        "return_type": "None",
+        "parameters": [],
+        "docstring": "Enhanced collapse supporting three syntax forms for flexible aggregation\n\n# Supported Syntax Forms:\n\n## Form 1: Simple (backward compatible)\n```python\nsubgraph.add_to_graph({\"age\": \"mean\", \"salary\": \"sum\"})\n```\n\n## Form 2: Tuple (custom attribute names)\n```python\nsubgraph.add_to_graph({\n    \"avg_age\": (\"mean\", \"age\"),\n    \"total_salary\": (\"sum\", \"salary\"),\n    \"person_count\": (\"count\", None)\n})\n```\n\n## Form 3: Dict-of-dicts (advanced with defaults)\n```python\nsubgraph.add_to_graph({\n    \"avg_age\": {\"func\": \"mean\", \"source\": \"age\"},\n    \"total_salary\": {\"func\": \"sum\", \"source\": \"salary\", \"default\": 0}\n})\n```\nGet parent meta-node if this subgraph is contained within one\nNOTE: This feature is not yet implemented - always returns None",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "sample",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "k",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Sample k nodes from this subgraph randomly",
+        "signature": "(k)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "set_edge_attrs",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "attrs_dict",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Set multiple edge attributes (bulk operation) - delegates to accessor  ",
+        "signature": "(attrs_dict)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "set_node_attrs",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "attrs_dict",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Set multiple node attributes (bulk operation) - delegates to accessor",
+        "signature": "(attrs_dict)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "shortest_path_subgraph",
+        "return_type": "Subgraph",
+        "parameters": [
+          {
+            "name": "source",
+            "type": "Any",
+            "default": null,
+            "required": true
+          },
+          {
+            "name": "target",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Create subgraph representing shortest path between two nodes",
+        "signature": "(source, target)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "subgraph_from_edges",
+        "return_type": "list",
+        "parameters": [
+          {
+            "name": "edges",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "Create subgraph from list of edges",
+        "signature": "(edges)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "subtract_from",
+        "return_type": "Unknown",
+        "parameters": [
+          {
+            "name": "_other",
+            "type": "Any",
+            "default": null,
+            "required": true
+          }
+        ],
+        "docstring": "",
+        "signature": "(_other)"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "summary",
+        "return_type": "Subgraph",
+        "parameters": [],
+        "docstring": "Get text summary of subgraph",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "table",
+        "return_type": "GraphTable",
+        "parameters": [],
+        "docstring": "Convert subgraph nodes to a table - pure delegation to core GraphTable",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "to_edges",
+        "return_type": "Subgraph",
+        "parameters": [],
+        "docstring": "Get edges from this subgraph as an EdgesAccessor  \nEnables chaining like: subgraph.to_edges().to_nodes().connected_components()",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "to_graph",
+        "return_type": "Graph",
+        "parameters": [],
+        "docstring": "Convert to a new independent graph",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "to_matrix",
+        "return_type": "Subgraph",
+        "parameters": [],
+        "docstring": "Convert this subgraph to its adjacency matrix representation\nEnables chaining like: subgraph.to_matrix().eigen().stats()",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "to_networkx",
+        "return_type": "a",
+        "parameters": [],
+        "docstring": "Convert to NetworkX graph (if available)\n\nReturns a NetworkX Graph or DiGraph (depending on the parent graph type)\ncontaining only the nodes and edges from this subgraph, with all attributes preserved.\n\n# Returns\n* `PyObject` - A NetworkX graph object containing only this subgraph\n\n# Raises\n* `ImportError` - If NetworkX is not installed\n* `RuntimeError` - If conversion fails\n\n# Examples\n```python\nimport groggy\nimport networkx as nx\n\ng = groggy.Graph()\n# ... add nodes and edges ...\nsubgraph = g.filter_nodes(\"age > 25\")\nnx_subgraph = subgraph.to_networkx()\n```",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "to_nodes",
+        "return_type": "Subgraph",
+        "parameters": [],
+        "docstring": "Get nodes from this subgraph as a NodesAccessor\nEnables chaining like: subgraph.to_nodes().table().stats()",
+        "signature": "()"
+      },
+      {
+        "object_type": "Subgraph",
+        "method_name": "transitivity",
+        "return_type": "Subgraph",
+        "parameters": [],
+        "docstring": "Calculate transitivity of the subgraph",
+        "signature": "()"
+      }
+    ],
+    "types": [
+      "new",
+      "GraphMatrixHelper",
+      "Subgraph",
+      "dict",
+      "GraphAttr",
+      "tuple",
+      "thon",
+      "Unknown",
+      "GraphAnalysis",
+      "None",
+      "empty",
+      "int",
+      "GraphAttrMut",
+      "iterator",
+      "a",
+      "BaseTable",
+      "report",
+      "Matrix",
+      "ing",
+      "str",
+      "the",
+      "float",
+      "list",
+      "Graph",
+      "GraphTable",
+      "GraphMatrix",
+      "L",
+      "BaseArray",
+      "s",
+      "New"
+    ],
+    "type_info": {
+      "Graph": {
+        "type_name": "Graph",
+        "class_name": "Graph",
+        "module": "builtins",
+        "methods_count": 58,
+        "docstring": "Python wrapper for the main Graph"
+      },
+      "BaseTable": {
+        "type_name": "BaseTable",
+        "class_name": "GraphTable",
+        "module": "groggy",
+        "methods_count": 20,
+        "docstring": "Python wrapper for GraphTable"
+      },
+      "Matrix": {
+        "type_name": "Matrix",
+        "class_name": "GraphMatrix",
+        "module": "builtins",
+        "methods_count": 84,
+        "docstring": "Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays"
+      },
+      "Subgraph": {
+        "type_name": "Subgraph",
+        "class_name": "Subgraph",
+        "module": "builtins",
+        "methods_count": 55,
+        "docstring": "Python wrapper for core Subgraph - Pure delegation to existing trait methods\n\nThis completely replaces the complex dual-mode PySubgraph with simple delegation\nto the existing SubgraphOperations trait methods. Same API, much simpler implementation."
+      }
+    },
+    "discovery_stats": {
+      "total_methods": 217,
+      "total_types": 30,
+      "core_objects": 4
+    }
+  },
+  "type_info": {
+    "Graph": {
+      "type_name": "Graph",
+      "class_name": "Graph",
+      "module": "builtins",
+      "methods_count": 58,
+      "docstring": "Python wrapper for the main Graph"
+    },
+    "BaseTable": {
+      "type_name": "BaseTable",
+      "class_name": "GraphTable",
+      "module": "groggy",
+      "methods_count": 20,
+      "docstring": "Python wrapper for GraphTable"
+    },
+    "Matrix": {
+      "type_name": "Matrix",
+      "class_name": "GraphMatrix",
+      "module": "builtins",
+      "methods_count": 84,
+      "docstring": "Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays"
+    },
+    "Subgraph": {
+      "type_name": "Subgraph",
+      "class_name": "Subgraph",
+      "module": "builtins",
+      "methods_count": 55,
+      "docstring": "Python wrapper for core Subgraph - Pure delegation to existing trait methods\n\nThis completely replaces the complex dual-mode PySubgraph with simple delegation\nto the existing SubgraphOperations trait methods. Same API, much simpler implementation."
+    }
+  }
+}

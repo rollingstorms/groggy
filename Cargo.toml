@@ -32,6 +32,11 @@ tokio = { version = "1.0", features = ["full"] } # Async runtime
 tokio-tungstenite = "0.21" # WebSocket server implementation
 tokio-util = "0.7" # Tokio utilities including CancellationToken
 futures-util = "0.3" # Futures utilities for WebSocket streams
+askama = "0.12" # HTML templating for visualization
+tower = "0.4" # Service abstractions for HTTP server
+tower-http = "0.4" # HTTP utilities for static file serving
+hyper = { version = "0.14", features = ["full"] } # HTTP server
+uuid = { version = "1.0", features = ["v4"] } # Session ID generation
 
 [features]
 default = []

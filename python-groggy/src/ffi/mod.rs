@@ -16,6 +16,9 @@ pub mod api;
 // Display FFI bindings (mirror main project display/)
 pub mod display;
 
+// Visualization FFI bindings (mirror main project viz/)
+pub mod viz;
+
 // Query FFI bindings (mirror main project query/)
 pub mod query;
 

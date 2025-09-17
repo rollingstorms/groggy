@@ -5,6 +5,13 @@ use super::traits::{Table, TableIterator};
 use crate::storage::array::{BaseArray, ArrayOps};
 use crate::types::{EdgeId, NodeId, AttrValue};
 use crate::errors::{GraphResult, GraphError};
+use crate::viz::streaming::data_source::{
+    DataSource, DataWindow, DataSchema, WindowKey, 
+    GraphNode, GraphEdge, GraphMetadata, LayoutAlgorithm, NodePosition, Position
+};
+use crate::viz::display::{ColumnSchema, DataType};
+use crate::viz::VizModule;
+use super::base::InteractiveConfig;
 use std::collections::{HashMap, HashSet};
 
 /// Configuration for edge validation policies
@@ -518,6 +525,15 @@ impl EdgesTable {
         self.base.column(name).ok_or_else(|| 
             GraphError::InvalidInput(format!("Column '{}' not found", name)))
     }
+    
+    /// Launch interactive visualization for this edges table
+    /// 
+    /// Delegates to BaseTable.interactive() following the delegation pattern.
+    /// The visualization will show the edge data with source/target relationships.
+    pub fn interactive(&self, config: Option<InteractiveConfig>) -> GraphResult<VizModule> {
+        // Delegate to the base table's interactive method
+        self.base.interactive(config)
+    }
 }
 
 
@@ -616,5 +632,338 @@ impl std::fmt::Display for EdgesTable {
 impl From<Vec<(EdgeId, NodeId, NodeId)>> for EdgesTable {
     fn from(edges: Vec<(EdgeId, NodeId, NodeId)>) -> Self {
         Self::new(edges)
+    }
+}
+
+// =============================================================================
+// DataSource Implementation for Graph Visualization
+// =============================================================================
+
+impl DataSource for EdgesTable {
+    fn total_rows(&self) -> usize {
+        self.nrows()
+    }
+    
+    fn total_cols(&self) -> usize {
+        self.ncols()
+    }
+    
+    fn get_window(&self, start: usize, count: usize) -> DataWindow {
+        let end = (start + count).min(self.nrows());
+        let windowed_table = self.slice(start, end);
+        
+        // Convert table data to DataWindow format
+        let headers = windowed_table.column_names().to_vec();
+        let mut rows = Vec::new();
+        
+        for i in 0..windowed_table.nrows() {
+            let mut row = Vec::new();
+            for col_name in &headers {
+                if let Some(column) = windowed_table.column(col_name) {
+                    if let Some(value) = column.get(i) {
+                        row.push(value.clone());
+                    } else {
+                        row.push(AttrValue::Null);
+                    }
+                } else {
+                    row.push(AttrValue::Null);
+                }
+            }
+            rows.push(row);
+        }
+        
+        let schema = self.get_schema();
+        DataWindow::new(headers, rows, schema, self.total_rows(), start)
+    }
+    
+    fn get_schema(&self) -> DataSchema {
+        let mut columns = Vec::new();
+        
+        for col_name in self.column_names() {
+            let data_type = match col_name.as_str() {
+                "edge_id" | "source" | "target" => DataType::Integer,
+                _ => {
+                    if let Some(column) = self.column(col_name) {
+                        // Infer type from first non-null value
+                        let mut data_type = DataType::String; // Default fallback
+                        for i in 0..column.len() {
+                            match column.get(i) {
+                                Some(AttrValue::Int(_)) => {
+                                    data_type = DataType::Integer;
+                                    break;
+                                },
+                                Some(AttrValue::Float(_)) => {
+                                    data_type = DataType::Float;
+                                    break;
+                                },
+                                Some(AttrValue::Text(_)) => {
+                                    data_type = DataType::String;
+                                    break;
+                                },
+                                Some(AttrValue::Bool(_)) => {
+                                    data_type = DataType::Boolean;
+                                    break;
+                                },
+                                _ => continue,
+                            };
+                        }
+                        data_type
+                    } else {
+                        DataType::String
+                    }
+                }
+            };
+            
+            columns.push(ColumnSchema {
+                name: col_name.clone(),
+                data_type,
+            });
+        }
+        
+        DataSchema {
+            columns,
+            primary_key: Some("edge_id".to_string()),
+            source_type: "edges_table".to_string(),
+        }
+    }
+    
+    fn supports_streaming(&self) -> bool {
+        true
+    }
+    
+    fn get_column_types(&self) -> Vec<DataType> {
+        self.get_schema().columns.into_iter().map(|c| c.data_type).collect()
+    }
+    
+    fn get_column_names(&self) -> Vec<String> {
+        self.column_names().to_vec()
+    }
+    
+    fn get_source_id(&self) -> String {
+        format!("edges_table_{}", self.nrows())
+    }
+    
+    fn get_version(&self) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        
+        let mut hasher = DefaultHasher::new();
+        self.nrows().hash(&mut hasher);
+        self.ncols().hash(&mut hasher);
+        hasher.finish()
+    }
+    
+    // Graph visualization support
+    fn supports_graph_view(&self) -> bool {
+        true
+    }
+    
+    fn get_graph_nodes(&self) -> Vec<GraphNode> {
+        // Infer nodes from edge sources and targets
+        let mut node_map: HashMap<NodeId, HashMap<String, AttrValue>> = HashMap::new();
+        
+        if let (Ok(sources), Ok(targets)) = (self.sources(), self.targets()) {
+            // Collect all unique node IDs
+            for node_id in sources.iter().chain(targets.iter()) {
+                node_map.entry(*node_id).or_insert_with(HashMap::new);
+            }
+        }
+        
+        // Convert to GraphNode format
+        node_map.into_iter().map(|(node_id, attributes)| {
+            GraphNode {
+                id: node_id.to_string(),
+                label: Some(node_id.to_string()), // Simple numeric label
+                attributes,
+                position: None,
+            }
+        }).collect()
+    }
+    
+    fn get_graph_edges(&self) -> Vec<GraphEdge> {
+        let mut edges = Vec::new();
+        
+        if let Ok(edge_tuples) = self.as_tuples() {
+            for (i, (edge_id, source, target)) in edge_tuples.iter().enumerate() {
+                let mut attributes = HashMap::new();
+                
+                // Collect all edge attributes
+                for col_name in self.column_names() {
+                    if !["edge_id", "source", "target"].contains(&col_name.as_str()) {
+                        if let Some(column) = self.column(col_name) {
+                            if let Some(value) = column.get(i) {
+                                attributes.insert(col_name.clone(), value.clone());
+                            }
+                        }
+                    }
+                }
+                
+                // Check for weight column
+                let weight = attributes.get("weight")
+                    .or_else(|| attributes.get("cost"))
+                    .and_then(|v| match v {
+                        AttrValue::Float(f) => Some(*f as f64),
+                        AttrValue::Int(i) => Some(*i as f64),
+                        _ => None,
+                    });
+                
+                // Try to get a label
+                let label = attributes.get("label")
+                    .or_else(|| attributes.get("name"))
+                    .map(|v| match v {
+                        AttrValue::Text(s) => s.clone(),
+                        AttrValue::Int(i) => i.to_string(),
+                        AttrValue::Float(f) => f.to_string(),
+                        _ => edge_id.to_string(),
+                    });
+                
+                edges.push(GraphEdge {
+                    id: edge_id.to_string(),
+                    source: source.to_string(),
+                    target: target.to_string(),
+                    label,
+                    weight,
+                    attributes,
+                });
+            }
+        }
+        
+        edges
+    }
+    
+    fn get_graph_metadata(&self) -> GraphMetadata {
+        let nodes = self.get_graph_nodes();
+        let edges = self.get_graph_edges();
+        let mut attribute_types = HashMap::new();
+        
+        // Infer attribute types from the schema
+        for col_schema in self.get_schema().columns {
+            if !["edge_id", "source", "target"].contains(&col_schema.name.as_str()) {
+                let type_name = match col_schema.data_type {
+                    DataType::Integer => "integer",
+                    DataType::Float => "float", 
+                    DataType::String => "string",
+                    DataType::Boolean => "boolean",
+                    DataType::DateTime => "datetime",
+                    DataType::Json => "json",
+                    DataType::Unknown => "unknown",
+                };
+                attribute_types.insert(col_schema.name, type_name.to_string());
+            }
+        }
+        
+        // Check if any edges have weights
+        let has_weights = edges.iter().any(|e| e.weight.is_some());
+        
+        GraphMetadata {
+            node_count: nodes.len(),
+            edge_count: edges.len(),
+            is_directed: true, // Assume directed by default
+            has_weights,
+            attribute_types,
+        }
+    }
+    
+    fn compute_layout(&self, algorithm: LayoutAlgorithm) -> Vec<NodePosition> {
+        let nodes = self.get_graph_nodes();
+        let edges = self.get_graph_edges();
+        
+        // Use the layout algorithms from the layouts module in the future
+        // For now, implement basic layouts here
+        match algorithm {
+            LayoutAlgorithm::Circular { radius, start_angle } => {
+                let radius = radius.unwrap_or(200.0);
+                let angle_step = 2.0 * std::f64::consts::PI / nodes.len() as f64;
+                
+                nodes.into_iter().enumerate().map(|(i, node)| {
+                    let angle = start_angle + i as f64 * angle_step;
+                    NodePosition {
+                        node_id: node.id,
+                        position: Position {
+                            x: radius * angle.cos(),
+                            y: radius * angle.sin(),
+                        },
+                    }
+                }).collect()
+            },
+            LayoutAlgorithm::Grid { columns, cell_size } => {
+                nodes.into_iter().enumerate().map(|(i, node)| {
+                    let row = i / columns;
+                    let col = i % columns;
+                    NodePosition {
+                        node_id: node.id,
+                        position: Position {
+                            x: col as f64 * cell_size,
+                            y: row as f64 * cell_size,
+                        },
+                    }
+                }).collect()
+            },
+            LayoutAlgorithm::ForceDirected { charge: _, distance, iterations: _ } => {
+                // Simple force-directed approximation - place connected nodes closer
+                let mut positions: HashMap<String, Position> = HashMap::new();
+                
+                // Start with circular layout
+                let radius = 200.0;
+                let angle_step = 2.0 * std::f64::consts::PI / nodes.len() as f64;
+                
+                for (i, node) in nodes.iter().enumerate() {
+                    let angle = i as f64 * angle_step;
+                    positions.insert(node.id.clone(), Position {
+                        x: radius * angle.cos(),
+                        y: radius * angle.sin(),
+                    });
+                }
+                
+                // Simple adjustment based on edges
+                for edge in &edges {
+                    if let (Some(source_pos), Some(target_pos)) = 
+                        (positions.get(&edge.source), positions.get(&edge.target)) {
+                        
+                        // Calculate ideal distance and current distance
+                        let dx = target_pos.x - source_pos.x;
+                        let dy = target_pos.y - source_pos.y;
+                        let current_dist = (dx * dx + dy * dy).sqrt();
+                        
+                        if current_dist > distance {
+                            // Pull nodes closer
+                            let factor = 0.1; // Small adjustment factor
+                            let pull_x = dx * factor;
+                            let pull_y = dy * factor;
+                            
+                            if let Some(source_pos) = positions.get_mut(&edge.source) {
+                                source_pos.x += pull_x;
+                                source_pos.y += pull_y;
+                            }
+                            if let Some(target_pos) = positions.get_mut(&edge.target) {
+                                target_pos.x -= pull_x;
+                                target_pos.y -= pull_y;
+                            }
+                        }
+                    }
+                }
+                
+                // Convert back to NodePosition vec
+                positions.into_iter().map(|(node_id, position)| {
+                    NodePosition { node_id, position }
+                }).collect()
+            },
+            _ => {
+                // Default circular layout
+                let radius = 200.0;
+                let angle_step = 2.0 * std::f64::consts::PI / nodes.len() as f64;
+                
+                nodes.into_iter().enumerate().map(|(i, node)| {
+                    let angle = i as f64 * angle_step;
+                    NodePosition {
+                        node_id: node.id,
+                        position: Position {
+                            x: radius * angle.cos(),
+                            y: radius * angle.sin(),
+                        },
+                    }
+                }).collect()
+            }
+        }
     }
 }

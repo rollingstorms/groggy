@@ -4,9 +4,10 @@ use super::traits::{Table, TableIterator};
 use crate::storage::array::{BaseArray, ArrayOps};
 use crate::errors::GraphResult;
 use crate::types::AttrValue;
-use crate::core::display::{DisplayEngine, DisplayConfig, ColumnSchema, DataType, OutputFormat};
+use crate::viz::display::{DisplayEngine, DisplayConfig, ColumnSchema, DataType, OutputFormat};
 use crate::core::{DisplayDataWindow, DisplayDataSchema, StreamingDataWindow, StreamingDataSchema};
-use crate::core::streaming::{DataSource, StreamingServer, StreamingConfig};
+use crate::viz::streaming::{DataSource, StreamingServer, StreamingConfig};
+use crate::viz::{VizModule, InteractiveOptions};
 use std::collections::HashMap;
 
 /// Unified table implementation using BaseArray columns
@@ -24,7 +25,7 @@ pub struct BaseTable {
     /// Streaming server for real-time updates (FOUNDATION ONLY - Phase 2)
     streaming_server: Option<StreamingServer>,
     /// Active server handles to keep them alive
-    active_server_handles: Vec<crate::core::streaming::websocket_server::ServerHandle>,
+    active_server_handles: Vec<crate::viz::streaming::websocket_server::ServerHandle>,
     /// Streaming configuration
     streaming_config: StreamingConfig,
     /// Source ID for caching
@@ -2252,85 +2253,31 @@ impl BaseTable {
     // ==================================================================================
     
     /// Launch interactive streaming table in browser (FOUNDATION ONLY)
-    pub fn interactive(&self, config: Option<InteractiveConfig>) -> GraphResult<BrowserInterface> {
+    pub fn interactive(&self, _config: Option<InteractiveConfig>) -> GraphResult<VizModule> {
         use std::sync::Arc;
         
-        let config = config.unwrap_or_default();
-        
-        // Create data source from self
+        // Create VizModule from this BaseTable following the delegation pattern
+        // This provides unified visualization capabilities for all table types
         let data_source: Arc<dyn DataSource> = Arc::new(self.clone());
+        let viz_module = VizModule::new(data_source);
         
-        // Launch streaming server asynchronously 
-        let server = StreamingServer::new(data_source, config.streaming_config);
-        let port = config.port;
-        
-        // Find an available port if port is 0
-        let actual_port = if port == 0 {
-            // Find an available port by binding to 0 and checking what we get
-            use std::net::{TcpListener, SocketAddr};
-            let listener = TcpListener::bind("127.0.0.1:0")
-                .map_err(|e| crate::errors::GraphError::InvalidInput(
-                    format!("Failed to find available port: {}", e)
-                ))?;
-            let port = listener.local_addr()
-                .map_err(|e| crate::errors::GraphError::InvalidInput(
-                    format!("Failed to get local address: {}", e)
-                ))?
-                .port();
-            drop(listener); // Release the port
-            port
-        } else {
-            port
-        };
-        
-        // Start server using the dedicated background runtime to avoid deadlocks
-        let port_hint = actual_port; // 0 for ephemeral or your chosen port
-        let server = StreamingServer::new(Arc::clone(&server.data_source), server.config.clone());
-        
-        // Always use the dedicated background runtime to avoid deadlocks
-        let server_handle = server
-            .start_background("127.0.0.1".parse().unwrap(), port_hint)
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to start streaming server: {}", e)
-            ))?;
-        
-        // Create browser interface using the actual assigned port
-        let actual_port = server_handle.port;
-        let browser_interface = BrowserInterface {
-            server_handle,
-            url: format!("http://127.0.0.1:{}", actual_port),
-            config: config.browser_config,
-        };
-        
-        // TODO: Open browser automatically if requested
-        println!("🚀 Interactive table launched at: {}", browser_interface.url);
-        println!("📊 Streaming {} rows × {} columns", self.total_rows(), self.total_cols());
-        
-        Ok(browser_interface)
+        Ok(viz_module)
     }
     
     /// Generate embedded iframe HTML for Jupyter notebooks
-    pub fn interactive_embed(&mut self, config: Option<InteractiveConfig>) -> GraphResult<String> {
-        // Start the streaming server
-        let browser_interface = self.interactive(config)?;
+    pub fn interactive_embed(&mut self, _config: Option<InteractiveConfig>) -> GraphResult<String> {
+        // TODO: Update to work with VizModule after Phase 3 delegation pattern is complete
+        // The interactive() method now returns VizModule instead of BrowserInterface
         
-        // Store the server handle to keep it alive
-        self.active_server_handles.push(browser_interface.server_handle);
-        
-        // Generate iframe HTML that can be embedded in Jupyter
+        // For now, return a placeholder
         let iframe_html = format!(r#"
-            <iframe 
-                src="{}" 
-                width="100%" 
-                height="600px" 
-                frameborder="0" 
-                style="border: 1px solid #ddd; border-radius: 4px;">
-            </iframe>
-            <p style="font-size: 12px; color: #666; margin-top: 5px;">
-                📊 Interactive streaming table: {} rows × {} columns
-            </p>
+            <div style="padding: 20px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+                <p>📊 Interactive table visualization (Phase 3 migration in progress)</p>
+                <p style="font-size: 12px; color: #666;">
+                    {} rows × {} columns - Use .interactive() method for full VizModule access
+                </p>
+            </div>
         "#, 
-            browser_interface.url, 
             self.total_rows(), 
             self.total_cols()
         );
@@ -2543,7 +2490,7 @@ impl Default for BrowserConfig {
 /// Browser interface handle
 #[derive(Debug)]
 pub struct BrowserInterface {
-    pub server_handle: crate::core::streaming::websocket_server::ServerHandle,
+    pub server_handle: crate::viz::streaming::websocket_server::ServerHandle,
     pub url: String,
     pub config: BrowserConfig,
 }
