@@ -92,21 +92,17 @@ impl PyEdgesArray {
     // Domain-specific operations (apply-on-each pattern)
     
     
-    /// Apply table() to each EdgesAccessor and return TableArray
+    /// Apply table() to each EdgesAccessor in the array
     fn table(&self) -> PyResult<PyTableArray> {
         let mut tables = Vec::new();
         
-        Python::with_gil(|py| {
-            for accessor in self.base.iter() {
-                match accessor.table() {
-                    Ok(table) => {
-                        let table_obj = table.into_py(py);
-                        tables.push(table_obj);
-                    },
-                    Err(_) => continue, // Skip failed accessors
-                }
-            }
-        });
+        // Iterate through EdgesAccessor objects and apply table()
+        for accessor in self.base.iter() {
+            let edge_table = accessor.table()?;
+            Python::with_gil(|py| {
+                tables.push(edge_table.into_py(py));
+            });
+        }
         
         Ok(PyTableArray::new(tables))
     }
@@ -283,20 +279,16 @@ impl PyEdgesArrayIterator {
     
     /// Apply table() to each EdgesAccessor in the iterator
     fn table(&mut self) -> PyResult<PyTableArray> {
-        let elements = self.inner.clone().into_vec();
         let mut tables = Vec::new();
         
-        Python::with_gil(|py| {
-            for accessor in elements {
-                match accessor.table() {
-                    Ok(table) => {
-                        let table_obj = table.into_py(py);
-                        tables.push(table_obj);
-                    },
-                    Err(_) => continue,
-                }
-            }
-        });
+        // Convert iterator to vector and iterate through EdgesAccessor objects
+        let accessors = self.inner.clone().into_vec();
+        for accessor in accessors {
+            let edge_table = accessor.table()?;
+            Python::with_gil(|py| {
+                tables.push(edge_table.into_py(py));
+            });
+        }
         
         Ok(PyTableArray::new(tables))
     }

@@ -206,7 +206,7 @@ pub struct GraphEdge {
 }
 
 /// 2D position for nodes
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Position {
     pub x: f64,
     pub y: f64,

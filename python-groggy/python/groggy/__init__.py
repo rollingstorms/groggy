@@ -54,6 +54,12 @@ from ._groggy import (
     # Hierarchical subgraph functionality
     AggregationFunction,
     MetaNode,
+    # Visualization system
+    VizConfig,
+    VizModule,
+    InteractiveViz,
+    InteractiveVizSession,
+    StaticViz,
 )
 
 from .types import NodeId, EdgeId, AttrName, StateId, BranchName
@@ -68,6 +74,7 @@ from ._groggy import parse_node_query, parse_edge_query
 # Import neural network submodule
 from ._groggy import neural
 from . import generators
+from . import viz
 from .generators import (
     complete_graph,
     erdos_renyi,
@@ -190,4 +197,33 @@ __all__ = [
     "MetaNode",
     # Neural network module
     "neural",
+    # Visualization system
+    "viz",
+    "VizConfig",
+    "VizModule", 
+    "InteractiveViz",
+    "InteractiveVizSession",
+    "StaticViz",
 ]
+
+# Apply visualization capabilities to main data structures
+# This adds .viz property to all graph and table classes
+from .viz import add_viz_accessor
+
+# Add viz accessor to core graph classes
+Graph = add_viz_accessor(Graph)
+Subgraph = add_viz_accessor(Subgraph)
+
+# Add viz accessor to table classes  
+GraphTable = add_viz_accessor(GraphTable)
+BaseTable = add_viz_accessor(BaseTable)
+NodesTable = add_viz_accessor(NodesTable)
+EdgesTable = add_viz_accessor(EdgesTable)
+
+# Add viz accessor to array classes that can be visualized as networks
+NodesArray = add_viz_accessor(NodesArray)
+EdgesArray = add_viz_accessor(EdgesArray)
+SubgraphArray = add_viz_accessor(SubgraphArray)
+
+# Note: Arrays and matrices can be visualized but may need special handling
+# for now we focus on the main graph structures

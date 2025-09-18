@@ -122,6 +122,39 @@ impl PySubgraphArray {
         
         Ok(PySubgraphArray::new(sampled))
     }
+
+    /// Apply group_by to all subgraphs and flatten results
+    ///
+    /// Args:
+    ///     attr_name: Name of the attribute to group by
+    ///     element_type: Either 'nodes' or 'edges' to specify what to group
+    ///
+    /// Returns:
+    ///     SubgraphArray: Flattened array of all grouped subgraphs
+    ///
+    /// Example:
+    ///     nested_groups = subgraph_array.group_by('department', 'nodes')
+    ///     # Returns all department groups from all input subgraphs
+    pub fn group_by(&self, attr_name: String, element_type: String) -> PyResult<PySubgraphArray> {
+        let mut all_groups = Vec::new();
+        
+        // Apply group_by to each subgraph and flatten results
+        for subgraph in self.inner.iter() {
+            match subgraph.group_by(attr_name.clone(), element_type.clone()) {
+                Ok(groups) => {
+                    // Flatten the groups into our result vector
+                    for i in 0..groups.len() {
+                        if let Some(group_subgraph) = groups.get(i) {
+                            all_groups.push(group_subgraph.clone());
+                        }
+                    }
+                },
+                Err(_) => continue, // Skip failed subgraphs
+            }
+        }
+        
+        Ok(PySubgraphArray::new(all_groups))
+    }
 }
 
 // Implement ArrayOps for integration with core array system

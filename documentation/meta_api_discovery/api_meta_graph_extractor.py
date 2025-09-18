@@ -28,7 +28,7 @@ class APIMetaGraphExtractor:
         self.type_info = {}
         self.method_info = {}
         
-        # Type inference patterns
+        # Type inference patterns (expanded with all discovered Groggy types)
         self.type_patterns = {
             r'\b(?:dictionary|dict|Dict)\b': 'dict',
             r'\b(?:list|List|array|Array)\b': 'list',
@@ -36,16 +36,49 @@ class APIMetaGraphExtractor:
             r'\b(?:integer|int|Integer)\b': 'int',
             r'\b(?:number|float|Float|numeric)\b': 'float',
             r'\b(?:boolean|bool|Boolean)\b': 'bool',
+            
+            # Core Groggy objects
+            r'\bGraph\b': 'Graph',
+            r'\bSubgraph\b': 'Subgraph',
+            
+            # Table types
             r'\bBaseTable\b': 'BaseTable',
             r'\bNodesTable\b': 'NodesTable',
             r'\bEdgesTable\b': 'EdgesTable',
             r'\bGraphTable\b': 'GraphTable',
-            r'\bGraph\b': 'Graph',
-            r'\bSubgraph\b': 'Subgraph',
+            
+            # Array types
             r'\bBaseArray\b': 'BaseArray',
-            r'\bGraphArray\b': 'GraphArray',
-            r'\bMatrix\b': 'Matrix',
+            r'\bNodesArray\b': 'NodesArray',
+            r'\bEdgesArray\b': 'EdgesArray',
+            r'\bSubgraphArray\b': 'SubgraphArray',
+            r'\bTableArray\b': 'TableArray',
             r'\bComponentsArray\b': 'ComponentsArray',
+            r'\bMetaNodeArray\b': 'MetaNodeArray',
+            r'\bStatsArray\b': 'StatsArray',
+            r'\bNumArray\b': 'NumArray',
+            
+            # Matrix types
+            r'\bMatrix\b': 'Matrix',
+            r'\bGraphMatrix\b': 'GraphMatrix',
+            
+            # Accessor types
+            r'\bNodesAccessor\b': 'NodesAccessor',
+            r'\bEdgesAccessor\b': 'EdgesAccessor',
+            
+            # Specialized types
+            r'\bMetaNode\b': 'MetaNode',
+            r'\bDisplayConfig\b': 'DisplayConfig',
+            r'\bTableFormatter\b': 'TableFormatter',
+            r'\bAggregationResult\b': 'AggregationResult',
+            r'\bGroupedAggregationResult\b': 'GroupedAggregationResult',
+            r'\bHistoricalView\b': 'HistoricalView',
+            r'\bHistoryStatistics\b': 'HistoryStatistics',
+            r'\bBranchInfo\b': 'BranchInfo',
+            r'\bCommit\b': 'Commit',
+            
+            # Generic fallbacks
+            r'\bGraphArray\b': 'GraphArray',
         }
     
     def extract_return_type_from_signature(self, method) -> str:
@@ -158,12 +191,29 @@ class APIMetaGraphExtractor:
         """Discover all methods for an object and their relationships"""
         methods = []
         
-        for method_name in dir(obj):
+        try:
+            # Get methods safely, handling special objects that might have issues with dir()
+            if hasattr(obj, '__class__'):
+                # For complex objects, get methods from the class instead of the instance
+                method_names = [name for name in dir(obj.__class__) if not name.startswith('_')]
+            else:
+                method_names = [name for name in dir(obj) if not name.startswith('_')]
+        except Exception as e:
+            print(f"    Warning: Could not get methods for {obj_name}: {e}")
+            return methods
+        
+        for method_name in method_names:
             if method_name.startswith('_'):  # Skip private methods
                 continue
             
             try:
-                method = getattr(obj, method_name)
+                # Get method safely
+                if hasattr(obj, method_name):
+                    method = getattr(obj, method_name)
+                else:
+                    # Try getting from class if not available on instance
+                    method = getattr(obj.__class__, method_name)
+                
                 if not callable(method):
                     continue
                 
@@ -194,6 +244,8 @@ class APIMetaGraphExtractor:
                 self.discovered_types.add(return_type)
                 
             except Exception as e:
+                # Skip methods that can't be analyzed
+                print(f"    Warning: Could not analyze {obj_name}.{method_name}: {e}")
                 continue
         
         return methods
@@ -207,92 +259,170 @@ class APIMetaGraphExtractor:
             'Graph': groggy.Graph(),
         }
         
-        # Try to discover additional objects
+        # Discover objects available directly from the groggy module
+        print("  Checking groggy module for available types...")
+        groggy_module_objects = {}
+        for attr_name in dir(groggy):
+            if (not attr_name.startswith('_') and 
+                not attr_name.islower() and 
+                attr_name not in ['Graph']):  # Skip Graph as we already have it
+                try:
+                    attr_obj = getattr(groggy, attr_name)
+                    if inspect.isclass(attr_obj):
+                        # Try to create an instance (for classes that can be instantiated)
+                        try:
+                            # Some classes might need parameters, try empty constructor first
+                            instance = attr_obj()
+                            groggy_module_objects[attr_name] = instance
+                            print(f"    Created {attr_name} instance")
+                        except:
+                            # If we can't instantiate, at least record the class
+                            print(f"    Found {attr_name} class (could not instantiate)")
+                            pass
+                    elif callable(attr_obj):
+                        # It's a function, skip for now
+                        pass
+                    else:
+                        # It's some other object, try to use it
+                        groggy_module_objects[attr_name] = attr_obj
+                        print(f"    Added {attr_name} object")
+                except Exception as e:
+                    print(f"    Could not access {attr_name}: {e}")
+        
+        # Add successfully created module objects to core_objects
+        core_objects.update(groggy_module_objects)
+        
+        # Try to discover additional objects through API usage
         try:
             # Create a graph with some data to get access to more object types
             g = groggy.Graph()
-            nodes_data = [{'id': 'test1'}, {'id': 'test2'}, {'id': 'test3'}]
-            g.add_nodes(nodes_data, uid_key='id')
-            g.add_edges([('test1', 'test2'), ('test2', 'test3')], uid_key='id')
             
-            # Try to get table objects
+            # Add diverse data to enable various object creations
+            for i in range(5):
+                g.add_node(i, name=f'node_{i}', age=20+i*5, category='A' if i%2==0 else 'B', value=i*10)
+            
+            for i in range(4):
+                g.add_edge(i, i+1, weight=1.0+i*0.5, edge_type='connection')
+            
+            print("  Creating objects through Graph API usage...")
+            
+            # === ACCESSOR OBJECTS ===
             try:
-                table = g.table()
-                core_objects['BaseTable'] = table
-            except:
-                pass
+                nodes_accessor = g.nodes
+                if 'NodesAccessor' not in core_objects:
+                    core_objects['NodesAccessor'] = nodes_accessor
+                    print(f"    Found NodesAccessor: {type(nodes_accessor)}")
+            except: pass
             
             try:
-                nodes_table = g.nodes()
-                core_objects['NodesTable'] = nodes_table
-            except:
-                pass
+                edges_accessor = g.edges
+                if 'EdgesAccessor' not in core_objects:
+                    core_objects['EdgesAccessor'] = edges_accessor
+                    print(f"    Found EdgesAccessor: {type(edges_accessor)}")
+            except: pass
+            
+            # === TABLE OBJECTS ===
+            try:
+                graph_table = g.table()
+                if 'GraphTable' not in core_objects:
+                    core_objects['GraphTable'] = graph_table
+                    print(f"    Found GraphTable: {type(graph_table)}")
+            except: pass
             
             try:
-                edges_table = g.edges()
-                core_objects['EdgesTable'] = edges_table
-            except:
-                pass
+                nodes_table = g.nodes.table()
+                if 'NodesTable' not in core_objects:
+                    core_objects['NodesTable'] = nodes_table
+                    print(f"    Found NodesTable: {type(nodes_table)}")
+            except: pass
             
+            try:
+                edges_table = g.edges.table()
+                if 'EdgesTable' not in core_objects:
+                    core_objects['EdgesTable'] = edges_table
+                    print(f"    Found EdgesTable: {type(edges_table)}")
+            except: pass
+            
+            # === ARRAY OBJECTS ===
+            try:
+                nodes_array = g.nodes.array()
+                if 'NodesArray' not in core_objects:
+                    core_objects['NodesArray'] = nodes_array
+                    print(f"    Found NodesArray: {type(nodes_array)}")
+            except: pass
+            
+            try:
+                num_array = g.nodes.ids()
+                if 'NumArray' not in core_objects:
+                    core_objects['NumArray'] = num_array
+                    print(f"    Found NumArray: {type(num_array)}")
+            except: pass
+            
+            try:
+                subgraph_array = g.nodes.group_by('category')
+                if 'SubgraphArray' not in core_objects:
+                    core_objects['SubgraphArray'] = subgraph_array
+                    print(f"    Found SubgraphArray: {type(subgraph_array)}")
+                
+                # From SubgraphArray, get TableArray
+                try:
+                    table_array = subgraph_array.table()
+                    if 'TableArray' not in core_objects:
+                        core_objects['TableArray'] = table_array
+                        print(f"    Found TableArray: {type(table_array)}")
+                except: pass
+                
+                # Get individual Subgraph from SubgraphArray
+                try:
+                    if len(subgraph_array) > 0:
+                        subgraph = subgraph_array[0]
+                        if 'Subgraph' not in core_objects:
+                            core_objects['Subgraph'] = subgraph
+                            print(f"    Found Subgraph: {type(subgraph)}")
+                except: pass
+                
+            except: pass
+            
+            # === MATRIX OBJECTS ===
             try:
                 matrix = g.to_matrix()
-                core_objects['Matrix'] = matrix
-            except:
-                pass
+                if 'GraphMatrix' not in core_objects:
+                    core_objects['GraphMatrix'] = matrix
+                    print(f"    Found GraphMatrix: {type(matrix)}")
+            except: pass
             
-            # Try to create Subgraph objects using various methods
             try:
-                # Method 1: Try slicing nodes (if supported)
-                subgraph = g.nodes[:2]  # First 2 nodes
-                if subgraph is not None:
-                    core_objects['Subgraph'] = subgraph
-                    print(f"    Found Subgraph via slicing: {type(subgraph)}")
-            except Exception as slice_e:
-                print(f"    Slicing method failed: {slice_e}")
+                nodes_matrix = g.nodes.matrix()
+                # This might be the same as GraphMatrix, but check
+                matrix_type = type(nodes_matrix).__name__
+                if matrix_type not in core_objects:
+                    core_objects[matrix_type] = nodes_matrix
+                    print(f"    Found {matrix_type}: {type(nodes_matrix)}")
+            except: pass
             
-            # Method 2: Try filter methods if Subgraph not found yet
-            if 'Subgraph' not in core_objects:
-                try:
-                    # Try filtering nodes
-                    subgraph = g.filter_nodes(lambda node: True)  # Filter that accepts all
-                    if subgraph is not None:
-                        core_objects['Subgraph'] = subgraph
-                        print(f"    Found Subgraph via filter_nodes: {type(subgraph)}")
-                except Exception as filter_e:
-                    print(f"    filter_nodes method failed: {filter_e}")
+            # === COMPONENTS ===
+            try:
+                components = g.connected_components()
+                if 'ComponentsArray' not in core_objects:
+                    core_objects['ComponentsArray'] = components
+                    print(f"    Found ComponentsArray: {type(components)}")
+            except: pass
             
-            # Method 3: Try connected_components if Subgraph not found yet
-            if 'Subgraph' not in core_objects:
-                try:
-                    components = g.connected_components()
-                    if components and len(components) > 0:
-                        subgraph = components[0]  # First component
-                        if subgraph is not None:
-                            core_objects['Subgraph'] = subgraph
-                            print(f"    Found Subgraph via connected_components: {type(subgraph)}")
-                except Exception as comp_e:
-                    print(f"    connected_components method failed: {comp_e}")
-            
-            # Method 4: Try subgraph method if exists
-            if 'Subgraph' not in core_objects:
-                try:
-                    if hasattr(g, 'subgraph'):
-                        subgraph = g.subgraph(nodes=['test1', 'test2'])
-                        if subgraph is not None:
-                            core_objects['Subgraph'] = subgraph
-                            print(f"    Found Subgraph via subgraph method: {type(subgraph)}")
-                except Exception as sub_e:
-                    print(f"    subgraph method failed: {sub_e}")
-            
-            # If we still don't have a Subgraph, list available methods on the graph
-            if 'Subgraph' not in core_objects:
-                print(f"    Could not create Subgraph object. Available Graph methods:")
-                graph_methods = [m for m in dir(g) if not m.startswith('_') and callable(getattr(g, m))]
-                subgraph_related = [m for m in graph_methods if 'subgraph' in m.lower() or 'component' in m.lower() or 'filter' in m.lower()]
-                print(f"      Potentially relevant methods: {subgraph_related}")
+            # === BASE TYPES (if we can create them) ===
+            try:
+                # Try to get a BaseTable from conversion
+                base_table = nodes_table.base_table() if 'nodes_table' in locals() else None
+                if base_table and 'BaseTable' not in core_objects:
+                    core_objects['BaseTable'] = base_table
+                    print(f"    Found BaseTable: {type(base_table)}")
+            except: pass
             
         except Exception as e:
             print(f"Note: Could not create test objects: {e}")
+        
+        print(f"  Total objects discovered: {len(core_objects)}")
+        object_names = list(core_objects.keys())
+        print(f"  Object types: {', '.join(object_names)}")
         
         # Discover methods for each object
         all_methods = []

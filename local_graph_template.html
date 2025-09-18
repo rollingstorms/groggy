@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groggy Graph Visualization</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background-color: var(--bg-color, #ffffff);
+            color: var(--text-color, #333333);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        #graph-canvas {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            display: block;
+            margin: 0 auto;
+            background-color: var(--canvas-bg, #fafafa);
+        }
+        
+        .info {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        /* Theme variables */
+        .theme-light {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --canvas-bg: #fafafa;
+        }
+        
+        .theme-dark {
+            --bg-color: #1a1a1a;
+            --text-color: #ffffff;
+            --canvas-bg: #2a2a2a;
+        }
+        
+        .theme-publication {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --canvas-bg: #ffffff;
+        }
+    </style>
+</head>
+<body class="theme-{{THEME}}">
+    <div class="container">
+        <div class="header">
+            <h1>{{TITLE}}</h1>
+            <p>{{NODE_COUNT}} nodes, {{EDGE_COUNT}} edges</p>
+        </div>
+        
+        <div class="controls">
+            <button onclick="resetZoom()">Reset View</button>
+            <button onclick="toggleLayout()">Toggle Layout</button>
+            <button onclick="exportSVG()">Export SVG</button>
+        </div>
+        
+        <canvas id="graph-canvas" width="{{WIDTH}}" height="{{HEIGHT}}"></canvas>
+        
+        <div class="info">
+            <p>Click and drag to pan • Scroll to zoom • Click nodes for details</p>
+            <p>Layout: <span id="current-layout">{{LAYOUT}}</span></p>
+        </div>
+    </div>
+
+    <script>
+        // Graph data injected from Python
+        const graphData = {
+            nodes: {{NODES_JSON}},
+            edges: {{EDGES_JSON}},
+            layout: "{{LAYOUT}}",
+            theme: "{{THEME}}"
+        };
+        
+        // Canvas setup
+        const canvas = document.getElementById('graph-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Graph state
+        let currentLayout = graphData.layout;
+        let camera = { x: 0, y: 0, zoom: 1 };
+        let isDragging = false;
+        let lastMouse = { x: 0, y: 0 };
+        let nodePositions = [];
+        
+        // Initialize graph
+        function initGraph() {
+            console.log('Initializing graph with', graphData.nodes.length, 'nodes and', graphData.edges.length, 'edges');
+            calculateLayout();
+            render();
+            setupEventListeners();
+        }
+        
+        // Layout algorithms
+        function calculateLayout() {
+            const width = canvas.width;
+            const height = canvas.height;
+            const padding = 50;
+            
+            nodePositions = [];
+            
+            switch (currentLayout) {
+                case 'circular':
+                    calculateCircularLayout(width, height, padding);
+                    break;
+                case 'grid':
+                    calculateGridLayout(width, height, padding);
+                    break;
+                case 'force-directed':
+                    calculateForceDirectedLayout(width, height, padding);
+                    break;
+                default:
+                    calculateRandomLayout(width, height, padding);
+            }
+        }
+        
+        function calculateCircularLayout(width, height, padding) {
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = Math.min(width, height) / 2 - padding;
+            const angleStep = (2 * Math.PI) / graphData.nodes.length;
+            
+            graphData.nodes.forEach((node, i) => {
+                const angle = i * angleStep;
+                nodePositions.push({
+                    id: node.id,
+                    x: centerX + radius * Math.cos(angle),
+                    y: centerY + radius * Math.sin(angle)
+                });
+            });
+        }
+        
+        function calculateGridLayout(width, height, padding) {
+            const cols = Math.ceil(Math.sqrt(graphData.nodes.length));
+            const cellWidth = (width - 2 * padding) / cols;
+            const cellHeight = (height - 2 * padding) / Math.ceil(graphData.nodes.length / cols);
+            
+            graphData.nodes.forEach((node, i) => {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                nodePositions.push({
+                    id: node.id,
+                    x: padding + col * cellWidth + cellWidth / 2,
+                    y: padding + row * cellHeight + cellHeight / 2
+                });
+            });
+        }
+        
+        function calculateForceDirectedLayout(width, height, padding) {
+            // Simple force-directed layout simulation
+            const nodes = graphData.nodes.map((node, i) => ({
+                id: node.id,
+                x: padding + Math.random() * (width - 2 * padding),
+                y: padding + Math.random() * (height - 2 * padding),
+                vx: 0,
+                vy: 0
+            }));
+            
+            // Run simulation
+            for (let iter = 0; iter < 100; iter++) {
+                // Repulsion between all nodes
+                for (let i = 0; i < nodes.length; i++) {
+                    for (let j = i + 1; j < nodes.length; j++) {
+                        const dx = nodes[j].x - nodes[i].x;
+                        const dy = nodes[j].y - nodes[i].y;
+                        const distance = Math.sqrt(dx * dx + dy * dy) || 0.1;
+                        const force = 1000 / (distance * distance);
+                        
+                        nodes[i].vx -= force * dx / distance;
+                        nodes[i].vy -= force * dy / distance;
+                        nodes[j].vx += force * dx / distance;
+                        nodes[j].vy += force * dy / distance;
+                    }
+                }
+                
+                // Attraction for connected nodes
+                graphData.edges.forEach(edge => {
+                    const source = nodes.find(n => n.id === edge.source);
+                    const target = nodes.find(n => n.id === edge.target);
+                    
+                    if (source && target) {
+                        const dx = target.x - source.x;
+                        const dy = target.y - source.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy) || 0.1;
+                        const force = distance * 0.01;
+                        
+                        source.vx += force * dx / distance;
+                        source.vy += force * dy / distance;
+                        target.vx -= force * dx / distance;
+                        target.vy -= force * dy / distance;
+                    }
+                });
+                
+                // Update positions
+                nodes.forEach(node => {
+                    node.x += node.vx * 0.1;
+                    node.y += node.vy * 0.1;
+                    node.vx *= 0.9;
+                    node.vy *= 0.9;
+                    
+                    // Keep within bounds
+                    node.x = Math.max(padding, Math.min(width - padding, node.x));
+                    node.y = Math.max(padding, Math.min(height - padding, node.y));
+                });
+            }
+            
+            nodePositions = nodes.map(node => ({ id: node.id, x: node.x, y: node.y }));
+        }
+        
+        function calculateRandomLayout(width, height, padding) {
+            graphData.nodes.forEach(node => {
+                nodePositions.push({
+                    id: node.id,
+                    x: padding + Math.random() * (width - 2 * padding),
+                    y: padding + Math.random() * (height - 2 * padding)
+                });
+            });
+        }
+        
+        // Rendering
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.translate(camera.x, camera.y);
+            ctx.scale(camera.zoom, camera.zoom);
+            
+            // Draw edges
+            ctx.strokeStyle = graphData.theme === 'dark' ? '#666' : '#999';
+            ctx.lineWidth = 1;
+            
+            graphData.edges.forEach(edge => {
+                const source = nodePositions.find(n => n.id === edge.source);
+                const target = nodePositions.find(n => n.id === edge.target);
+                
+                if (source && target) {
+                    ctx.beginPath();
+                    ctx.moveTo(source.x, source.y);
+                    ctx.lineTo(target.x, target.y);
+                    ctx.stroke();
+                }
+            });
+            
+            // Draw nodes
+            nodePositions.forEach(pos => {
+                const node = graphData.nodes.find(n => n.id === pos.id);
+                
+                // Node circle
+                ctx.fillStyle = node.color || (graphData.theme === 'dark' ? '#4a9eff' : '#007bff');
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, node.size || 8, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Node border
+                ctx.strokeStyle = graphData.theme === 'dark' ? '#ffffff' : '#000000';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                // Node label
+                if (node.label) {
+                    ctx.fillStyle = graphData.theme === 'dark' ? '#ffffff' : '#000000';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(node.label, pos.x, pos.y - 15);
+                }
+            });
+            
+            ctx.restore();
+        }
+        
+        // Event handling
+        function setupEventListeners() {
+            canvas.addEventListener('mousedown', onMouseDown);
+            canvas.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('mouseup', onMouseUp);
+            canvas.addEventListener('wheel', onWheel);
+        }
+        
+        function onMouseDown(e) {
+            isDragging = true;
+            lastMouse = { x: e.clientX, y: e.clientY };
+        }
+        
+        function onMouseMove(e) {
+            if (isDragging) {
+                const dx = e.clientX - lastMouse.x;
+                const dy = e.clientY - lastMouse.y;
+                camera.x += dx;
+                camera.y += dy;
+                lastMouse = { x: e.clientX, y: e.clientY };
+                render();
+            }
+        }
+        
+        function onMouseUp(e) {
+            isDragging = false;
+        }
+        
+        function onWheel(e) {
+            e.preventDefault();
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            camera.zoom *= zoomFactor;
+            camera.zoom = Math.max(0.1, Math.min(5, camera.zoom));
+            render();
+        }
+        
+        // Control functions
+        function resetZoom() {
+            camera = { x: 0, y: 0, zoom: 1 };
+            render();
+        }
+        
+        function toggleLayout() {
+            const layouts = ['circular', 'grid', 'force-directed'];
+            const currentIndex = layouts.indexOf(currentLayout);
+            currentLayout = layouts[(currentIndex + 1) % layouts.length];
+            document.getElementById('current-layout').textContent = currentLayout;
+            calculateLayout();
+            render();
+        }
+        
+        function exportSVG() {
+            // Simple SVG export
+            const svg = `<svg width="${canvas.width}" height="${canvas.height}" xmlns="http://www.w3.org/2000/svg">
+                ${graphData.edges.map(edge => {
+                    const source = nodePositions.find(n => n.id === edge.source);
+                    const target = nodePositions.find(n => n.id === edge.target);
+                    return source && target ? 
+                        `<line x1="${source.x}" y1="${source.y}" x2="${target.x}" y2="${target.y}" stroke="#999" stroke-width="1"/>` : '';
+                }).join('')}
+                ${nodePositions.map(pos => {
+                    const node = graphData.nodes.find(n => n.id === pos.id);
+                    return `<circle cx="${pos.x}" cy="${pos.y}" r="${node.size || 8}" fill="${node.color || '#007bff'}" stroke="#000" stroke-width="1"/>
+                            ${node.label ? `<text x="${pos.x}" y="${pos.y - 15}" text-anchor="middle" font-size="12">${node.label}</text>` : ''}`;
+                }).join('')}
+            </svg>`;
+            
+            const blob = new Blob([svg], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'graph.svg';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // Initialize when page loads
+        window.addEventListener('load', initGraph);
+    </script>
+</body>
+</html>

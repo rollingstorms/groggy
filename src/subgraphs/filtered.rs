@@ -453,6 +453,18 @@ impl SubgraphOperations for FilteredSubgraph {
 
         Ok(Box::new(edge_subgraph))
     }
+    
+    /// Create a VizModule for this filtered subgraph
+    fn viz(&self) -> crate::viz::VizModule {
+        use crate::subgraphs::visualization::SubgraphDataSource;
+        use std::sync::Arc;
+        
+        // Create wrapper that extracts current filtered data
+        let data_source = SubgraphDataSource::from_subgraph_operations(self);
+        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> = Arc::new(data_source);
+        
+        crate::viz::VizModule::new(data_source)
+    }
 }
 
 impl FilterOperations for FilteredSubgraph {

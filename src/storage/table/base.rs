@@ -7,6 +7,7 @@ use crate::types::AttrValue;
 use crate::viz::display::{DisplayEngine, DisplayConfig, ColumnSchema, DataType, OutputFormat};
 use crate::core::{DisplayDataWindow, DisplayDataSchema, StreamingDataWindow, StreamingDataSchema};
 use crate::viz::streaming::{DataSource, StreamingServer, StreamingConfig};
+use crate::viz::streaming::data_source::{GraphNode, LayoutAlgorithm, NodePosition};
 use crate::viz::{VizModule, InteractiveOptions};
 use std::collections::HashMap;
 
@@ -91,7 +92,9 @@ impl BaseTable {
             }
         }
         
-        let column_order: Vec<String> = normalized_columns.keys().cloned().collect();
+        // Sort column names for deterministic ordering (like groupby sorting)
+        let mut column_order: Vec<String> = normalized_columns.keys().cloned().collect();
+        column_order.sort();
         
         use std::time::{SystemTime, UNIX_EPOCH};
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
@@ -2414,6 +2417,83 @@ impl DataSource for BaseTable {
     
     fn get_version(&self) -> u64 {
         self.version
+    }
+    
+    /// Get graph nodes representing table rows
+    fn get_graph_nodes(&self) -> Vec<GraphNode> {
+        let rows = self.nrows();
+        (0..rows).map(|i| GraphNode {
+            id: i.to_string(),
+            label: Some(format!("Row {}", i)),
+            attributes: std::collections::HashMap::new(),
+            position: None,
+        }).collect()
+    }
+    
+    /// Compute layout for table data visualization
+    /// Creates a simple grid or circular layout based on table structure
+    fn compute_layout(&self, algorithm: LayoutAlgorithm) -> Vec<NodePosition> {
+        use crate::viz::streaming::data_source::{NodePosition, Position};
+        
+        let rows = self.nrows();
+        if rows == 0 {
+            return Vec::new();
+        }
+        
+        // Create node positions for each row
+        let nodes: Vec<_> = (0..rows).map(|i| GraphNode {
+            id: i.to_string(),
+            label: Some(format!("Row {}", i)),
+            attributes: std::collections::HashMap::new(),
+            position: None,
+        }).collect();
+        
+        match algorithm {
+            LayoutAlgorithm::Circular { radius, start_angle } => {
+                let angle_step = 2.0 * std::f64::consts::PI / nodes.len() as f64;
+                
+                nodes.into_iter().enumerate().map(|(i, node)| {
+                    let angle = start_angle + (i as f64 * angle_step);
+                    let actual_radius = radius.unwrap_or(100.0);
+                    NodePosition {
+                        node_id: node.id,
+                        position: Position {
+                            x: actual_radius * angle.cos(),
+                            y: actual_radius * angle.sin(),
+                        },
+                    }
+                }).collect()
+            },
+            LayoutAlgorithm::Grid { columns, cell_size } => {
+                nodes.into_iter().enumerate().map(|(i, node)| {
+                    let row = i / columns;
+                    let col = i % columns;
+                    NodePosition {
+                        node_id: node.id,
+                        position: Position {
+                            x: col as f64 * cell_size,
+                            y: row as f64 * cell_size,
+                        },
+                    }
+                }).collect()
+            },
+            _ => {
+                // Default circular layout for other algorithms
+                let radius = 200.0;
+                let angle_step = 2.0 * std::f64::consts::PI / nodes.len() as f64;
+                
+                nodes.into_iter().enumerate().map(|(i, node)| {
+                    let angle = i as f64 * angle_step;
+                    NodePosition {
+                        node_id: node.id,
+                        position: Position {
+                            x: radius * angle.cos(),
+                            y: radius * angle.sin(),
+                        },
+                    }
+                }).collect()
+            }
+        }
     }
 }
 

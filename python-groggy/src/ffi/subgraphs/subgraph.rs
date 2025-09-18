@@ -201,6 +201,27 @@ impl PySubgraph {
             .map_err(|e| PyRuntimeError::new_err(format!("Error checking path: {}", e)))
     }
 
+    // === Visualization Methods ===
+
+    /// Create a VizModule for this subgraph to enable interactive and static visualization
+    ///
+    /// # Returns
+    /// * A VizModule that can be used for interactive() or static_viz() calls
+    ///
+    /// # Example
+    /// ```python
+    /// # Create a visualization from a subgraph
+    /// viz = subgraph.viz()
+    /// viz.interactive()  # Launch interactive browser visualization
+    /// viz.static_viz(format="svg", filename="subgraph.svg")  # Export to SVG
+    /// ```
+    fn viz(&self) -> PyResult<crate::ffi::viz::PyVizModule> {
+        let viz_module = self.inner.viz();
+        Ok(crate::ffi::viz::PyVizModule {
+            inner: viz_module,
+        })
+    }
+
     // === Data Export Methods ===
 
     /// Convert subgraph nodes to a table - pure delegation to core GraphTable
@@ -1594,6 +1615,47 @@ impl PySubgraph {
         }
         
         Ok(result_dict.into())
+    }
+
+    /// Group subgraph by attribute value
+    ///
+    /// Args:
+    ///     attr_name: Name of the attribute to group by
+    ///     element_type: Either 'nodes' or 'edges' to specify what to group
+    ///
+    /// Returns:
+    ///     SubgraphArray: Array of subgraphs, one for each unique attribute value
+    ///
+    /// Example:
+    ///     dept_groups = subgraph.group_by('department', 'nodes')
+    ///     type_groups = subgraph.group_by('interaction_type', 'edges')
+    pub fn group_by(&self, attr_name: String, element_type: String) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+        let attr_name = groggy::types::AttrName::from(attr_name);
+        
+        let subgraphs = match element_type.as_str() {
+            "nodes" => {
+                self.inner.group_by_nodes(&attr_name)
+                    .map_err(crate::ffi::utils::graph_error_to_py_err)?
+            },
+            "edges" => {
+                self.inner.group_by_edges(&attr_name)
+                    .map_err(crate::ffi::utils::graph_error_to_py_err)?
+            },
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "element_type must be either 'nodes' or 'edges'"
+                ));
+            }
+        };
+
+        // Convert to PySubgraph objects
+        let py_subgraphs: Result<Vec<_>, _> = subgraphs
+            .into_iter()
+            .map(|subgraph| PySubgraph::from_core_subgraph(subgraph))
+            .collect();
+
+        let py_subgraphs = py_subgraphs?;
+        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(py_subgraphs))
     }
 }
 
