@@ -897,6 +897,128 @@ impl Subgraph {
 
         Ok(overlaps)
     }
+
+    /// Group nodes by attribute value, returning a vector of subgraphs
+    /// Each subgraph contains nodes with the same attribute value and their induced edges
+    ///
+    /// # Arguments
+    /// * `attr_name` - The node attribute to group by
+    ///
+    /// # Returns
+    /// Vector of subgraphs, one for each unique attribute value
+    ///
+    /// # Example
+    /// ```
+    /// let dept_groups = subgraph.group_by_nodes("department")?;
+    /// // Returns subgraphs for each department
+    /// ```
+    pub fn group_by_nodes(&self, attr_name: &AttrName) -> GraphResult<Vec<Subgraph>> {
+        use std::collections::HashMap;
+
+        let graph = self.graph.borrow();
+        let mut groups: HashMap<AttrValue, HashSet<NodeId>> = HashMap::new();
+
+        // Group nodes by attribute value
+        for &node_id in &self.nodes {
+            if let Some(attr_value) = graph.get_node_attr(node_id, attr_name)? {
+                groups.entry(attr_value).or_default().insert(node_id);
+            }
+            // Skip nodes without the attribute
+        }
+
+        // Create subgraphs for each group - sort by attribute value for deterministic order
+        let mut result_subgraphs = Vec::new();
+        let mut sorted_groups: Vec<_> = groups.into_iter().collect();
+        sorted_groups.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        
+        for (attr_value, node_group) in sorted_groups {
+            if !node_group.is_empty() {
+                // Find induced edges for this group of nodes
+                let mut induced_edges = HashSet::new();
+                for &edge_id in &self.edges {
+                    if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
+                        if node_group.contains(&source) && node_group.contains(&target) {
+                            induced_edges.insert(edge_id);
+                        }
+                    }
+                }
+
+                // Create subgraph with descriptive name
+                let subgraph_name = format!("{}_group_{:?}", attr_name, attr_value);
+                let subgraph = Subgraph::new(
+                    self.graph.clone(),
+                    node_group,
+                    induced_edges,
+                    subgraph_name,
+                );
+                result_subgraphs.push(subgraph);
+            }
+        }
+
+        Ok(result_subgraphs)
+    }
+
+    /// Group edges by attribute value, returning a vector of subgraphs
+    /// Each subgraph contains edges with the same attribute value and their connected nodes
+    ///
+    /// # Arguments
+    /// * `attr_name` - The edge attribute to group by
+    ///
+    /// # Returns
+    /// Vector of subgraphs, one for each unique attribute value
+    ///
+    /// # Example
+    /// ```
+    /// let type_groups = subgraph.group_by_edges("interaction_type")?;
+    /// // Returns subgraphs for each interaction type
+    /// ```
+    pub fn group_by_edges(&self, attr_name: &AttrName) -> GraphResult<Vec<Subgraph>> {
+        use std::collections::HashMap;
+
+        let graph = self.graph.borrow();
+        let mut groups: HashMap<AttrValue, HashSet<EdgeId>> = HashMap::new();
+
+        // Group edges by attribute value
+        for &edge_id in &self.edges {
+            if let Some(attr_value) = graph.get_edge_attr(edge_id, attr_name)? {
+                groups.entry(attr_value).or_default().insert(edge_id);
+            }
+            // Skip edges without the attribute
+        }
+
+        // Create subgraphs for each group - sort by attribute value for deterministic order
+        let mut result_subgraphs = Vec::new();
+        let mut sorted_groups: Vec<_> = groups.into_iter().collect();
+        sorted_groups.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        
+        for (attr_value, edge_group) in sorted_groups {
+            if !edge_group.is_empty() {
+                // Find connected nodes for this group of edges
+                let mut connected_nodes = HashSet::new();
+                for &edge_id in &edge_group {
+                    if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
+                        connected_nodes.insert(source);
+                        connected_nodes.insert(target);
+                    }
+                }
+
+                // Only include nodes that are in the original subgraph
+                connected_nodes.retain(|node_id| self.nodes.contains(node_id));
+
+                // Create subgraph with descriptive name
+                let subgraph_name = format!("{}_edge_group_{:?}", attr_name, attr_value);
+                let subgraph = Subgraph::new(
+                    self.graph.clone(),
+                    connected_nodes,
+                    edge_group,
+                    subgraph_name,
+                );
+                result_subgraphs.push(subgraph);
+            }
+        }
+
+        Ok(result_subgraphs)
+    }
 }
 
 // Note: Index syntax (subgraph[attr_name]) is not implemented because we can't return
@@ -1179,6 +1301,21 @@ impl SubgraphOperations for Subgraph {
         };
         x
     }
+    
+    /// Create a VizModule for this subgraph to enable visualization
+    /// Uses the thread-safe SubgraphDataSource wrapper to bridge subgraphs to the viz system
+    fn viz(&self) -> crate::viz::VizModule {
+        use crate::subgraphs::visualization::SubgraphDataSource;
+        use std::sync::Arc;
+        
+        // Create thread-safe data source wrapper
+        let data_source = SubgraphDataSource::from_subgraph_operations(self);
+        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> = Arc::new(data_source);
+        
+        // Create and return VizModule 
+        crate::viz::VizModule::new(data_source)
+    }
+    
 }
 
 #[cfg(test)]

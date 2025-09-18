@@ -416,6 +416,18 @@ impl SubgraphOperations for ComponentSubgraph {
 
         Ok(Box::new(edge_component))
     }
+    
+    /// Create a VizModule for this component subgraph
+    fn viz(&self) -> crate::viz::VizModule {
+        use crate::subgraphs::visualization::SubgraphDataSource;
+        use std::sync::Arc;
+        
+        // Create wrapper that extracts current component data
+        let data_source = SubgraphDataSource::from_subgraph_operations(self);
+        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> = Arc::new(data_source);
+        
+        crate::viz::VizModule::new(data_source)
+    }
 }
 
 impl ComponentOperations for ComponentSubgraph {

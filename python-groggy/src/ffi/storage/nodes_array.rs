@@ -95,17 +95,13 @@ impl PyNodesArray {
     fn table(&self) -> PyResult<PyTableArray> {
         let mut tables = Vec::new();
         
-        Python::with_gil(|py| {
-            for accessor in self.base.iter() {
-                match accessor.table() {
-                    Ok(table) => {
-                        let table_obj = table.into_py(py);
-                        tables.push(table_obj);
-                    },
-                    Err(_) => continue, // Skip failed accessors
-                }
-            }
-        });
+        // Apply table() to each NodesAccessor in the array
+        for accessor in self.base.iter() {
+            let node_table = accessor.table()?;
+            Python::with_gil(|py| {
+                tables.push(node_table.into_py(py));
+            });
+        }
         
         Ok(PyTableArray::new(tables))
     }
@@ -255,20 +251,16 @@ impl PyNodesArrayIterator {
     
     /// Apply table() to each NodesAccessor in the iterator
     fn table(&mut self) -> PyResult<PyTableArray> {
-        let elements = self.inner.clone().into_vec();
         let mut tables = Vec::new();
         
-        Python::with_gil(|py| {
-            for accessor in elements {
-                match accessor.table() {
-                    Ok(table) => {
-                        let table_obj = table.into_py(py);
-                        tables.push(table_obj);
-                    },
-                    Err(_) => continue,
-                }
-            }
-        });
+        // Convert iterator to vector and iterate through NodesAccessor objects
+        let accessors = self.inner.clone().into_vec();
+        for accessor in accessors {
+            let node_table = accessor.table()?;
+            Python::with_gil(|py| {
+                tables.push(node_table.into_py(py));
+            });
+        }
         
         Ok(PyTableArray::new(tables))
     }

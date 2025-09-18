@@ -892,6 +892,84 @@ impl PyNodesAccessor {
         let nodes_array = PyNodesArray::new(vec![self.clone()]);
         Py::new(py, nodes_array)
     }
+
+    /// Group nodes by attribute value, returning SubgraphArray
+    ///
+    /// Args:
+    ///     attr_name: Name of the node attribute to group by
+    ///
+    /// Returns:
+    ///     SubgraphArray: Array of subgraphs, one for each unique attribute value
+    ///
+    /// Example:
+    ///     dept_groups = g.nodes.group_by('department')
+    ///     # Returns subgraphs for each department value
+    pub fn group_by(&self, attr_name: String) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+        use std::collections::HashMap;
+        use groggy::types::{AttrName, NodeId};
+        use std::collections::HashSet;
+
+        let attr_name = AttrName::from(attr_name);
+        let graph = self.graph.borrow();
+        
+        // Determine which nodes to group
+        let node_ids = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            graph.node_ids()
+        };
+
+        if node_ids.is_empty() {
+            return Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(Vec::new()));
+        }
+
+        // Group nodes by attribute value
+        let mut groups: HashMap<groggy::types::AttrValue, HashSet<NodeId>> = HashMap::new();
+
+        for &node_id in &node_ids {
+            if let Ok(Some(attr_value)) = graph.get_node_attr(node_id, &attr_name) {
+                groups.entry(attr_value).or_default().insert(node_id);
+            }
+            // Skip nodes without the attribute
+        }
+
+        // Create subgraphs for each group - sort by attribute value for deterministic order
+        let mut result_subgraphs = Vec::new();
+        let mut sorted_groups: Vec<_> = groups.into_iter().collect();
+        sorted_groups.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        
+        for (attr_value, node_group) in sorted_groups {
+            if !node_group.is_empty() {
+                // Find induced edges for this group of nodes
+                let mut induced_edges = HashSet::new();
+                let all_edges = graph.edge_ids();
+                
+                for edge_id in all_edges {
+                    if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
+                        if node_group.contains(&source) && node_group.contains(&target) {
+                            induced_edges.insert(edge_id);
+                        }
+                    }
+                }
+
+                // Create subgraph with descriptive name
+                let subgraph_name = format!("nodes_{}_group_{:?}", attr_name, attr_value);
+                let core_subgraph = groggy::subgraphs::Subgraph::new(
+                    self.graph.clone(),
+                    node_group,
+                    induced_edges,
+                    subgraph_name,
+                );
+                
+                let py_subgraph = crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(core_subgraph)
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create subgraph: {}", e)))?;
+                
+                result_subgraphs.push(py_subgraph);
+            }
+        }
+
+        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(result_subgraphs))
+    }
 }
 
 impl PyNodesAccessor {
@@ -1785,7 +1863,20 @@ impl PyEdgesAccessor {
     #[getter]
     fn sources(&self, _py: Python) -> PyResult<PyNumArray> {
         let graph = self.graph.borrow();
-        let sources = graph.edge_sources();
+        
+        let sources = if let Some(ref constrained_edges) = self.constrained_edges {
+            // Constrained case: only get sources for the constrained edges
+            let mut constrained_sources = Vec::new();
+            for &edge_id in constrained_edges {
+                if let Ok((source, _target)) = graph.edge_endpoints(edge_id) {
+                    constrained_sources.push(source);
+                }
+            }
+            constrained_sources
+        } else {
+            // Unconstrained case: get all edge sources
+            graph.edge_sources()
+        };
         
         // Convert to f64 for NumArray consistency
         let values: Vec<f64> = sources.into_iter().map(|id| id as f64).collect();
@@ -1797,7 +1888,20 @@ impl PyEdgesAccessor {
     #[getter]
     fn targets(&self, _py: Python) -> PyResult<PyNumArray> {
         let graph = self.graph.borrow();
-        let targets = graph.edge_targets();
+        
+        let targets = if let Some(ref constrained_edges) = self.constrained_edges {
+            // Constrained case: only get targets for the constrained edges
+            let mut constrained_targets = Vec::new();
+            for &edge_id in constrained_edges {
+                if let Ok((_source, target)) = graph.edge_endpoints(edge_id) {
+                    constrained_targets.push(target);
+                }
+            }
+            constrained_targets
+        } else {
+            // Unconstrained case: get all edge targets
+            graph.edge_targets()
+        };
         
         // Convert to f64 for NumArray consistency
         let values: Vec<f64> = targets.into_iter().map(|id| id as f64).collect();
@@ -1830,6 +1934,77 @@ impl PyEdgesAccessor {
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Weight matrix conversion failed: {}", e)))?;
         
         Py::new(py, PyGraphMatrix { inner: matrix })
+    }
+    
+    /// Group edges by attribute value, returning SubgraphArray
+    ///
+    /// Args:
+    ///     attr_name: Name of the edge attribute to group by
+    ///
+    /// Returns:
+    ///     SubgraphArray: Array of subgraphs, one for each unique attribute value
+    ///
+    /// Example:
+    ///     type_groups = g.edges.group_by('interaction_type')
+    ///     # Returns subgraphs for each interaction type
+    pub fn group_by(&self, attr_name: String) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+        use std::collections::HashMap;
+        use groggy::types::{AttrName, EdgeId};
+        use std::collections::HashSet;
+
+        let attr_name = AttrName::from(attr_name);
+        let graph = self.graph.borrow();
+        
+        // Determine which edges to group
+        let edge_ids: Vec<groggy::EdgeId> = if let Some(ref constrained) = self.constrained_edges {
+            constrained.iter().copied().collect::<Vec<groggy::EdgeId>>()
+        } else {
+            graph.edge_ids()
+        };
+
+        // Group edges by attribute value
+        let mut groups: HashMap<groggy::AttrValue, Vec<EdgeId>> = HashMap::new();
+        
+        for edge_id in edge_ids {
+            if let Ok(Some(attr_value)) = graph.get_edge_attr(edge_id, &attr_name) {
+                groups.entry(attr_value.clone()).or_insert_with(Vec::new).push(edge_id);
+            }
+        }
+
+        // Create subgraphs for each group - sort by attribute value for deterministic order
+        let mut subgraphs = Vec::new();
+        let mut sorted_groups: Vec<_> = groups.into_iter().collect();
+        sorted_groups.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        
+        for (_attr_value, grouped_edge_ids) in sorted_groups {
+            // For each group of edges, create a subgraph containing:
+            // 1. All nodes that are endpoints of these edges
+            // 2. Only the edges in this group
+            
+            let mut induced_nodes = HashSet::new();
+            for edge_id in &grouped_edge_ids {
+                if let Ok((source, target)) = graph.edge_endpoints(*edge_id) {
+                    induced_nodes.insert(source);
+                    induced_nodes.insert(target);
+                }
+            }
+            
+            // Create subgraph with induced nodes and filtered edges
+            let induced_node_set: HashSet<_> = induced_nodes.into_iter().collect();
+            let grouped_edge_set: HashSet<_> = grouped_edge_ids.into_iter().collect();
+            let subgraph = groggy::subgraphs::Subgraph::new(
+                self.graph.clone(),
+                induced_node_set,
+                grouped_edge_set,
+                format!("edges_group_{:?}", _attr_value)
+            );
+            
+            subgraphs.push(crate::ffi::subgraphs::subgraph::PySubgraph {
+                inner: subgraph,
+            });
+        }
+
+        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(subgraphs))
     }
 }
 

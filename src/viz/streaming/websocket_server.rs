@@ -1907,7 +1907,27 @@ impl StreamingServer {
         // Select the appropriate layout engine
         let positions = match algorithm {
             LayoutAlgorithm::ForceDirected { charge, distance, iterations } => {
-                let engine = ForceDirectedLayout { charge, distance, iterations };
+                let engine = ForceDirectedLayout { 
+                    charge, 
+                    distance, 
+                    iterations,
+                    gravity: 0.1,
+                    friction: 0.9,
+                    theta: 0.8,
+                    alpha: 1.0,
+                    alpha_min: 0.001,
+                    alpha_decay: 0.99,
+                    link_strength: 1.0,
+                    charge_strength: 1.0,
+                    center_strength: 0.1,
+                    collision_radius: 5.0,
+                    bounds: None,
+                    enable_barnes_hut: true,
+                    enable_collision: false,
+                    adaptive_cooling: true,
+                    max_velocity: Some(100.0),
+                    position_constraints: Vec::new(),
+                };
                 engine.compute_layout(&viz_nodes, &viz_edges)
             }
             LayoutAlgorithm::Circular { radius, start_angle: _ } => {

@@ -1175,6 +1175,22 @@ pub trait SubgraphOperations: GraphEntity {
         
         Ok(plan)
     }
+    
+    /// Create a VizModule for this subgraph to enable visualization
+    /// 
+    /// This method creates a thread-safe bridge to the visualization system
+    /// by extracting the subgraph data into a DataSource wrapper.
+    ///
+    /// # Returns
+    /// A VizModule that can be used for interactive and static visualization
+    ///
+    /// # Examples
+    /// ```
+    /// let viz = subgraph.viz();
+    /// viz.interactive(); // Start interactive visualization
+    /// viz.static_viz("output.html"); // Generate static HTML
+    /// ```
+    fn viz(&self) -> crate::viz::VizModule;
 }
 
 // Note: No default implementations provided to avoid conflicts.

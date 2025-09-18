@@ -71,13 +71,432 @@ impl VizModule {
         })
     }
 
-    /// Generate static visualization export (PNG, SVG, PDF)
+    /// Generate static visualization export (PNG, SVG, PDF, HTML)
     pub fn static_viz(&self, options: StaticOptions) -> GraphResult<StaticViz> {
-        // TODO: Implement static visualization export
-        Err(GraphError::NotImplemented { 
-            feature: "Static visualization".to_string(),
-            tracking_issue: Some("https://github.com/anthropics/groggy/issues/viz-static".to_string())
+        match options.format {
+            ExportFormat::HTML => {
+                self.generate_static_html(&options)
+            },
+            ExportFormat::SVG => {
+                self.generate_simple_svg(&options)
+            },
+            _ => Err(GraphError::NotImplemented { 
+                feature: format!("{:?} export", options.format),
+                tracking_issue: Some("https://github.com/anthropics/groggy/issues/viz-static".to_string())
+            })
+        }
+    }
+    
+    /// Generate static HTML file with embedded graph data
+    fn generate_static_html(&self, options: &StaticOptions) -> GraphResult<StaticViz> {
+        use std::fs;
+        
+        // Get graph data from the data source
+        let nodes = self.data_source.get_graph_nodes();
+        let edges = self.data_source.get_graph_edges();
+        let metadata = self.data_source.get_graph_metadata();
+        
+        // Convert to JSON
+        let nodes_json = serde_json::to_string(&nodes)
+            .map_err(|e| GraphError::internal(&format!("Failed to serialize nodes: {}", e), "generate_static_html"))?;
+        let edges_json = serde_json::to_string(&edges)
+            .map_err(|e| GraphError::internal(&format!("Failed to serialize edges: {}", e), "generate_static_html"))?;
+        
+        // Read the HTML template
+        let html_template = self.get_html_template()?;
+        
+        // Replace template variables
+        let html = html_template
+            .replace("{{TITLE}}", "Graph Visualization")
+            .replace("{{NODE_COUNT}}", &metadata.node_count.to_string())
+            .replace("{{EDGE_COUNT}}", &metadata.edge_count.to_string())
+            .replace("{{WIDTH}}", &options.width.to_string())
+            .replace("{{HEIGHT}}", &options.height.to_string())
+            .replace("{{LAYOUT}}", &format!("{:?}", options.layout).to_lowercase())
+            .replace("{{THEME}}", &options.theme)
+            .replace("{{NODES_JSON}}", &nodes_json)
+            .replace("{{EDGES_JSON}}", &edges_json)
+            .replace("{{USE_WEBSOCKET}}", "false");
+        
+        // Write to file
+        fs::write(&options.filename, &html)
+            .map_err(|e| GraphError::internal(&format!("Failed to write HTML file: {}", e), "generate_static_html"))?;
+        
+        Ok(StaticViz {
+            file_path: options.filename.clone(),
+            size_bytes: html.len(),
         })
+    }
+    
+    /// Generate simple SVG export
+    fn generate_simple_svg(&self, options: &StaticOptions) -> GraphResult<StaticViz> {
+        use std::fs;
+        
+        // Get graph data and positions
+        let nodes = self.data_source.get_graph_nodes();
+        let edges = self.data_source.get_graph_edges();
+        let positions = self.data_source.compute_layout(options.layout.clone());
+        
+        // Build SVG
+        let mut svg = format!(
+            r#"<svg width="{}" height="{}" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <style>
+                    .node {{ fill: #007bff; stroke: #fff; stroke-width: 2px; }}
+                    .edge {{ stroke: #999; stroke-width: 1px; }}
+                    .label {{ font-family: Arial, sans-serif; font-size: 12px; text-anchor: middle; }}
+                </style>
+            </defs>"#,
+            options.width, options.height
+        );
+        
+        // Draw edges
+        for edge in &edges {
+            if let (Some(src_pos), Some(dst_pos)) = (
+                positions.iter().find(|p| p.node_id == edge.source),
+                positions.iter().find(|p| p.node_id == edge.target)
+            ) {
+                svg.push_str(&format!(
+                    r#"<line x1="{}" y1="{}" x2="{}" y2="{}" class="edge"/>"#,
+                    src_pos.position.x, src_pos.position.y, 
+                    dst_pos.position.x, dst_pos.position.y
+                ));
+            }
+        }
+        
+        // Draw nodes
+        for (node, pos) in nodes.iter().zip(positions.iter()) {
+            svg.push_str(&format!(
+                r#"<circle cx="{}" cy="{}" r="8" class="node"/>"#,
+                pos.position.x, pos.position.y
+            ));
+            
+            if let Some(label) = &node.label {
+                svg.push_str(&format!(
+                    r#"<text x="{}" y="{}" class="label">{}</text>"#,
+                    pos.position.x, pos.position.y - 15.0, label
+                ));
+            }
+        }
+        
+        svg.push_str("</svg>");
+        
+        // Write to file
+        fs::write(&options.filename, &svg)
+            .map_err(|e| GraphError::internal(&format!("Failed to write SVG file: {}", e), "generate_simple_svg"))?;
+        
+        Ok(StaticViz {
+            file_path: options.filename.clone(),
+            size_bytes: svg.len(),
+        })
+    }
+    
+    /// Get HTML template with embedded CSS and JS
+    fn get_html_template(&self) -> GraphResult<String> {
+        // Simple template without complex JavaScript for now
+        Ok(r###"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}}</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: Arial, sans-serif; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .controls { text-align: center; margin: 20px 0; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; margin: 5px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #graph-canvas { border: 1px solid #ddd; border-radius: 8px; display: block; margin: 0 auto; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .info { text-align: center; margin-top: 20px; color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{TITLE}}</h1>
+            <p><strong>{{NODE_COUNT}}</strong> nodes, <strong>{{EDGE_COUNT}}</strong> edges</p>
+        </div>
+        
+        <div class="controls">
+            <button onclick="resetView()">Reset View</button>
+            <button onclick="toggleLayout()">Change Layout</button>
+            <button onclick="exportSVG()">Export SVG</button>
+        </div>
+        
+        <canvas id="graph-canvas" width="{{WIDTH}}" height="{{HEIGHT}}"></canvas>
+        
+        <div class="info">
+            <p>Click and drag to pan • Scroll to zoom • Current layout: <span id="layout-name">{{LAYOUT}}</span></p>
+            <p>Theme: {{THEME}} • Generated by Groggy</p>
+        </div>
+    </div>
+
+    <script>
+        // Static graph data (no WebSocket needed!)
+        const USE_WEBSOCKET = {{USE_WEBSOCKET}};
+        const graphData = {
+            nodes: {{NODES_JSON}},
+            edges: {{EDGES_JSON}},
+            layout: "{{LAYOUT}}",
+            theme: "{{THEME}}"
+        };
+        
+        // Canvas setup
+        const canvas = document.getElementById('graph-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // State
+        let positions = [];
+        let camera = { x: 0, y: 0, zoom: 1 };
+        let isDragging = false;
+        let lastMouse = { x: 0, y: 0 };
+        let currentLayout = graphData.layout;
+        
+        console.log('📊 Loaded graph:', graphData.nodes.length, 'nodes,', graphData.edges.length, 'edges');
+        
+        // Layout calculation
+        function calculateLayout() {
+            const width = canvas.width;
+            const height = canvas.height;
+            const padding = 50;
+            positions = [];
+            
+            switch (currentLayout) {
+                case 'circular':
+                    calculateCircularLayout(width, height, padding);
+                    break;
+                case 'grid':
+                    calculateGridLayout(width, height, padding);
+                    break;
+                case 'force-directed':
+                default:
+                    calculateForceLayout(width, height, padding);
+                    break;
+            }
+        }
+        
+        function calculateCircularLayout(width, height, padding) {
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = Math.min(width, height) / 2 - padding;
+            
+            graphData.nodes.forEach((node, i) => {
+                const angle = (i * 2 * Math.PI) / graphData.nodes.length;
+                positions.push({
+                    id: node.id,
+                    x: centerX + radius * Math.cos(angle),
+                    y: centerY + radius * Math.sin(angle)
+                });
+            });
+        }
+        
+        function calculateGridLayout(width, height, padding) {
+            const cols = Math.ceil(Math.sqrt(graphData.nodes.length));
+            const cellW = (width - 2 * padding) / cols;
+            const cellH = (height - 2 * padding) / Math.ceil(graphData.nodes.length / cols);
+            
+            graphData.nodes.forEach((node, i) => {
+                positions.push({
+                    id: node.id,
+                    x: padding + (i % cols) * cellW + cellW / 2,
+                    y: padding + Math.floor(i / cols) * cellH + cellH / 2
+                });
+            });
+        }
+        
+        function calculateForceLayout(width, height, padding) {
+            // Simple force-directed layout
+            const nodes = graphData.nodes.map((node, i) => ({
+                id: node.id,
+                x: padding + Math.random() * (width - 2 * padding),
+                y: padding + Math.random() * (height - 2 * padding),
+                vx: 0, vy: 0
+            }));
+            
+            // Simulation
+            for (let iter = 0; iter < 100; iter++) {
+                // Repulsion
+                for (let i = 0; i < nodes.length; i++) {
+                    for (let j = i + 1; j < nodes.length; j++) {
+                        const dx = nodes[j].x - nodes[i].x;
+                        const dy = nodes[j].y - nodes[i].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const force = 1000 / (dist * dist);
+                        
+                        nodes[i].vx -= force * dx / dist;
+                        nodes[i].vy -= force * dy / dist;
+                        nodes[j].vx += force * dx / dist;
+                        nodes[j].vy += force * dy / dist;
+                    }
+                }
+                
+                // Attraction
+                graphData.edges.forEach(edge => {
+                    const src = nodes.find(n => n.id === edge.source);
+                    const dst = nodes.find(n => n.id === edge.target);
+                    if (src && dst) {
+                        const dx = dst.x - src.x;
+                        const dy = dst.y - src.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const force = dist * 0.01;
+                        
+                        src.vx += force * dx / dist;
+                        src.vy += force * dy / dist;
+                        dst.vx -= force * dx / dist;
+                        dst.vy -= force * dy / dist;
+                    }
+                });
+                
+                // Update positions
+                nodes.forEach(node => {
+                    node.x += node.vx * 0.1;
+                    node.y += node.vy * 0.1;
+                    node.vx *= 0.9;
+                    node.vy *= 0.9;
+                    
+                    // Bounds
+                    node.x = Math.max(padding, Math.min(width - padding, node.x));
+                    node.y = Math.max(padding, Math.min(height - padding, node.y));
+                });
+            }
+            
+            positions = nodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
+        }
+        
+        // Rendering
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.translate(camera.x, camera.y);
+            ctx.scale(camera.zoom, camera.zoom);
+            
+            // Edges
+            ctx.strokeStyle = '#999';
+            ctx.lineWidth = 1;
+            graphData.edges.forEach(edge => {
+                const src = positions.find(p => p.id === edge.source);
+                const dst = positions.find(p => p.id === edge.target);
+                if (src && dst) {
+                    ctx.beginPath();
+                    ctx.moveTo(src.x, src.y);
+                    ctx.lineTo(dst.x, dst.y);
+                    ctx.stroke();
+                }
+            });
+            
+            // Nodes
+            positions.forEach(pos => {
+                const node = graphData.nodes.find(n => n.id === pos.id);
+                
+                ctx.fillStyle = node.color || '#007bff';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                if (node.label) {
+                    ctx.fillStyle = '#333';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(node.label, pos.x, pos.y - 15);
+                }
+            });
+            
+            ctx.restore();
+        }
+        
+        // Event handling
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            lastMouse = { x: e.clientX, y: e.clientY };
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                camera.x += e.clientX - lastMouse.x;
+                camera.y += e.clientY - lastMouse.y;
+                lastMouse = { x: e.clientX, y: e.clientY };
+                render();
+            }
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            camera.zoom *= zoomFactor;
+            camera.zoom = Math.max(0.1, Math.min(5, camera.zoom));
+            render();
+        });
+        
+        // Controls
+        function resetView() {
+            camera = { x: 0, y: 0, zoom: 1 };
+            render();
+        }
+        
+        function toggleLayout() {
+            const layouts = ['force-directed', 'circular', 'grid'];
+            const idx = layouts.indexOf(currentLayout);
+            currentLayout = layouts[(idx + 1) % layouts.length];
+            document.getElementById('layout-name').textContent = currentLayout;
+            calculateLayout();
+            render();
+        }
+        
+        function exportSVG() {
+            // Simple SVG export
+            const svgContent = generateSVG();
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'graph.svg';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function generateSVG() {
+            let svg = `<svg width="${canvas.width}" height="${canvas.height}" xmlns="http://www.w3.org/2000/svg">`;
+            
+            // Edges
+            graphData.edges.forEach(edge => {
+                const src = positions.find(p => p.id === edge.source);
+                const dst = positions.find(p => p.id === edge.target);
+                if (src && dst) {
+                    svg += `<line x1="${src.x}" y1="${src.y}" x2="${dst.x}" y2="${dst.y}" stroke="#999" stroke-width="1"/>`;
+                }
+            });
+            
+            // Nodes
+            positions.forEach(pos => {
+                const node = graphData.nodes.find(n => n.id === pos.id);
+                svg += `<circle cx="${pos.x}" cy="${pos.y}" r="8" fill="${node.color || '#007bff'}" stroke="#fff" stroke-width="2"/>`;
+                if (node.label) {
+                    svg += `<text x="${pos.x}" y="${pos.y - 15}" text-anchor="middle" font-size="12" fill="#333">${node.label}</text>`;
+                }
+            });
+            
+            svg += '</svg>';
+            return svg;
+        }
+        
+        // Initialize
+        calculateLayout();
+        render();
+        
+        console.log('🚀 Graph visualization ready! Layout:', currentLayout, 'Theme:', graphData.theme);
+    </script>
+</body>
+</html>"###.to_string())
     }
 
     /// Update the configuration for this visualization module
@@ -270,6 +689,7 @@ pub enum ExportFormat {
     PNG,
     SVG,
     PDF,
+    HTML,
 }
 
 /// Active interactive visualization session using streaming infrastructure

@@ -63,6 +63,28 @@ impl NumericArrayData {
             NumericArrayData::Float64(arr) => arr.iter().copied().collect(),
         }
     }
+
+    /// Convert to int64 vector
+    fn to_int64_vec(&self) -> Vec<i64> {
+        match self {
+            NumericArrayData::Bool(arr) => arr.iter().map(|&b| if b { 1i64 } else { 0i64 }).collect(),
+            NumericArrayData::Int32(arr) => arr.iter().map(|&x| x as i64).collect(),
+            NumericArrayData::Int64(arr) => arr.iter().copied().collect(),
+            NumericArrayData::Float32(arr) => arr.iter().map(|&x| x as i64).collect(),
+            NumericArrayData::Float64(arr) => arr.iter().map(|&x| x as i64).collect(),
+        }
+    }
+
+    /// Convert to bool vector
+    fn to_bool_vec(&self) -> Vec<bool> {
+        match self {
+            NumericArrayData::Bool(arr) => arr.iter().copied().collect(),
+            NumericArrayData::Int32(arr) => arr.iter().map(|&x| x != 0).collect(),
+            NumericArrayData::Int64(arr) => arr.iter().map(|&x| x != 0).collect(),
+            NumericArrayData::Float32(arr) => arr.iter().map(|&x| x != 0.0).collect(),
+            NumericArrayData::Float64(arr) => arr.iter().map(|&x| x != 0.0).collect(),
+        }
+    }
     
     /// Get element as a Python object
     fn get_element(&self, index: usize, py: Python) -> Option<PyObject> {
@@ -754,6 +776,61 @@ impl PyNumArray {
         }
         
         unique.len()
+    }
+    
+    /// Get unique values as a new NumArray
+    fn unique(&self) -> PyResult<PyNumArray> {
+        use std::collections::HashSet;
+        let mut unique_values = Vec::new();
+        
+        // For numeric types, we can use the actual values for uniqueness
+        match &self.inner {
+            NumericArrayData::Float64(_) => {
+                let mut seen = HashSet::new();
+                let values = self.inner.to_float64_vec();
+                for val in values {
+                    if seen.insert(val.to_bits()) {  // Use bits representation for float comparison
+                        unique_values.push(val);
+                    }
+                }
+            },
+            NumericArrayData::Int64(_) => {
+                let mut seen = HashSet::new();
+                let values = self.inner.to_int64_vec();
+                for val in values {
+                    if seen.insert(val) {
+                        unique_values.push(val as f64);  // Convert to f64 for NumArray
+                    }
+                }
+            },
+            NumericArrayData::Bool(_) => {
+                let mut seen = HashSet::new();
+                let values = self.inner.to_bool_vec();
+                for val in values {
+                    if seen.insert(val) {
+                        unique_values.push(if val { 1.0 } else { 0.0 });  // Convert bool to f64
+                    }
+                }
+            },
+            _ => {
+                // For other types, fall back to string representation
+                let mut seen = HashSet::new();
+                for i in 0..self.inner.len() {
+                    Python::with_gil(|py| {
+                        if let Some(val) = self.inner.get_element(i, py) {
+                            let str_repr = format!("{:?}", val);
+                            if seen.insert(str_repr.clone()) {
+                                // Try to convert back to f64, use index if not possible
+                                let numeric_val = str_repr.parse::<f64>().unwrap_or(i as f64);
+                                unique_values.push(numeric_val);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+        
+        Ok(PyNumArray::new(unique_values))
     }
     
     // Comparison Operators (return BoolArray)
