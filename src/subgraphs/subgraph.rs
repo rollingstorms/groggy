@@ -22,6 +22,7 @@ use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::query::traversal::TraversalEngine;
 use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId, SubgraphId};
+use crate::viz::VizModule;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -467,6 +468,16 @@ impl Subgraph {
         }
 
         Ok(false)
+    }
+
+    /// Create visualization module for this subgraph
+    /// Extracts subgraph data into thread-safe structures and returns VizModule
+    pub fn viz(&self) -> VizModule {
+        let data_source = crate::subgraphs::visualization::SubgraphDataSource::from_subgraph(self);
+        
+        use std::sync::Arc;
+        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> = Arc::new(data_source);
+        VizModule::new(data_source)
     }
 }
 
