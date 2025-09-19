@@ -4,7 +4,7 @@
  * Minimal, beautiful registration of our widget for classic Jupyter notebooks.
  */
 
-import { GroggyGraphModel, GroggyGraphView } from './widget';
+import { GroggyGraphModel, GroggyGraphView } from './widget_unified';
 
 // AMD module type declarations
 declare const define: any;
