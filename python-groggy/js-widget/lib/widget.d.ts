@@ -22,13 +22,20 @@ export declare class GroggyGraphView extends DOMWidgetView {
     static view_module: string;
     static view_module_version: string;
     private nodePositions;
+    private nodeVelocities;
     private isDragging;
-    private dragNode;
+    private draggedNode;
     private dragOffset;
+    private animationId;
+    private simulation;
     render(): void;
     private renderGraph;
     private addDragBehavior;
     private updateEdges;
     private getNodeColor;
     private onModelChange;
+    /**
+     * Start force-directed simulation for node positions
+     */
+    private startForceSimulation;
 }

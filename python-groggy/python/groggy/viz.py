@@ -249,18 +249,44 @@ class VizTemplate:
         
         return self._generate_unified_html(layout, theme, width, height, title, backend='local')
     
+    def _get_standalone_js(self):
+        """Load the unified GroggyVizCore standalone JavaScript bundle."""
+        import os
+        import importlib.resources
+        
+        # Try to load from package resources first, fallback to file system
+        try:
+            # For installed package
+            with importlib.resources.open_text('groggy.static', 'groggy-viz-core.standalone.js') as f:
+                return f.read()
+        except (FileNotFoundError, ModuleNotFoundError):
+            try:
+                # For development
+                static_path = os.path.join(os.path.dirname(__file__), 'static', 'groggy-viz-core.standalone.js')
+                with open(static_path, 'r') as f:
+                    return f.read()
+            except FileNotFoundError:
+                # Fallback: inline minimal version
+                return '''
+                console.warn("GroggyVizCore standalone bundle not found, using minimal fallback");
+                window.GroggyVizCore = { GroggyVizCore: function() {} };
+                '''
+
     def _generate_unified_html(self, layout, theme, width, height, title, backend='local'):
-        """Generate unified HTML template that adapts to different backends."""
+        """🎯 Generate unified HTML template using GroggyVizCore (no more Canvas!)."""
         import json
+        
+        # Get the standalone JavaScript bundle
+        standalone_js = self._get_standalone_js()
         
         nodes_json = json.dumps(self._nodes_data)
         edges_json = json.dumps(self._edges_data)
-        canvas_id = f"groggy-viz-{id(self)}"
+        container_id = f"groggy-viz-{id(self)}"
         
-        # Backend-specific wrapper and styling
+        # Backend-specific configuration
         if backend == 'jupyter':
-            # Jupyter: Simple div wrapper, no full HTML structure
-            wrapper_start = f'<div style="width: {width}px; height: {height}px; border: 1px solid #ddd; position: relative; background: #fafafa;">'
+            # Jupyter: Simple wrapper for embedding
+            wrapper_start = f'<div style="width: {width}px; height: {height}px; border: 1px solid #ddd; position: relative;">'
             wrapper_end = '</div>'
             include_head = False
             include_controls = False
@@ -271,7 +297,15 @@ class VizTemplate:
             include_head = True
             include_controls = True
         
-        # Generate unified template
+        # Theme mapping for unified styling
+        theme_config = {
+            'light': {'nodeColor': '#007bff', 'edgeColor': '#999', 'backgroundColor': '#ffffff'},
+            'dark': {'nodeColor': '#4CAF50', 'edgeColor': '#666', 'backgroundColor': '#1e1e1e'},
+            'publication': {'nodeColor': '#2c3e50', 'edgeColor': '#7f8c8d', 'backgroundColor': '#ecf0f1'}
+        }
+        
+        current_theme = theme_config.get(theme, theme_config['light'])
+        
         html_parts = []
         
         # Conditional HEAD section
@@ -281,256 +315,190 @@ class VizTemplate:
 <head>
     <title>{title}</title>
     <style>
-        body {{ margin: 20px; font-family: Arial, sans-serif; }}
-        #groggy-viz-container {{ border: 1px solid #ddd; position: relative; background: #fafafa; margin: 20px auto; }}
-        #groggy-viz-canvas {{ display: block; background: white; }}
-        .groggy-controls {{ text-align: center; margin: 20px; }}
-        .groggy-controls button {{ background: #007bff; color: white; border: none; padding: 8px 16px; margin: 4px; border-radius: 4px; cursor: pointer; }}
-        .groggy-info {{ text-align: center; font-size: 14px; color: #666; }}
-        .groggy-stats {{ position: absolute; top: 5px; right: 5px; font-size: 12px; color: #666; }}
+        body {{ margin: 20px; font-family: Arial, sans-serif; background: {current_theme['backgroundColor']}; }}
+        #groggy-viz-container {{ 
+            border: 1px solid #ddd; 
+            position: relative; 
+            margin: 20px auto; 
+            background: {current_theme['backgroundColor']};
+        }}
+        .groggy-controls {{ 
+            text-align: center; 
+            margin: 20px; 
+        }}
+        .groggy-controls button {{ 
+            background: {current_theme['nodeColor']}; 
+            color: white; 
+            border: none; 
+            padding: 8px 16px; 
+            margin: 4px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-family: Arial, sans-serif;
+        }}
+        .groggy-controls button:hover {{ 
+            opacity: 0.8; 
+        }}
+        .groggy-info {{ 
+            text-align: center; 
+            font-size: 14px; 
+            color: #666; 
+        }}
+        .groggy-stats {{ 
+            position: absolute; 
+            top: 5px; 
+            right: 5px; 
+            font-size: 12px; 
+            color: #666; 
+            background: rgba(255, 255, 255, 0.8);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }}
     </style>
 </head>
 <body>
-    <h1 style="text-align: center;">{title}</h1>
-    <p style="text-align: center;">{self._metadata['node_count']} nodes, {self._metadata['edge_count']} edges</p>''')
+    <h1 style="text-align: center; color: {current_theme['nodeColor']};">{title}</h1>
+    <p style="text-align: center; color: #666;">{self._metadata['node_count']} nodes, {self._metadata['edge_count']} edges</p>''')
         
         # Conditional controls
         if include_controls:
-            html_parts.append('''    <div class="groggy-controls">
+            html_parts.append(f'''    <div class="groggy-controls">
         <button onclick="resetView()">Reset View</button>
         <button onclick="toggleLayout()">Change Layout</button>
+        <button onclick="toggleTheme()">Toggle Theme</button>
     </div>''')
         
         # Main visualization container (always included)
         html_parts.append(f'''{wrapper_start}
-    <div id="groggy-viz-container" style="width: {width}px; height: {height}px;{' border: 1px solid #ddd; position: relative; background: #fafafa;' if backend == 'jupyter' else ''}">
-        <canvas id="{canvas_id}" width="{width}" height="{height}" 
-                style="display: block; background: white;"></canvas>
+    <div id="groggy-viz-container" style="width: {width}px; height: {height}px;">
+        <div id="{container_id}" style="width: 100%; height: 100%;"></div>
         <div class="groggy-stats">
             {self._metadata['node_count']} nodes, {self._metadata['edge_count']} edges
         </div>
     </div>''')
         
-        # Conditional info section
+        # Conditional info section  
         if include_controls:
             html_parts.append(f'''    <div class="groggy-info">
-        <p>Click and drag to pan • Current layout: <span id="current-layout">{layout}</span></p>
+        <p>Drag nodes • Scroll to zoom • Click and drag to pan • Current: <span id="current-layout">{layout}</span></p>
     </div>''')
         
-        # Unified JavaScript (always included)
+        # 🎯 UNIFIED GROGGY VIZ CORE JAVASCRIPT (replaces legacy Canvas)
         html_parts.append(f'''    <script>
+    // Embed GroggyVizCore standalone bundle
+    {standalone_js}
+    
     (function() {{
-        // Unified Groggy Visualization Engine
-        // Backend: {backend} | Layout: {layout} | Theme: {theme}
+        console.log('🎨 Initializing unified GroggyVizCore (NO MORE CANVAS!)');
         
-        const canvas = document.getElementById('{canvas_id}');
-        if (!canvas) {{
-            console.error('Groggy viz: Canvas not found:', '{canvas_id}');
-            return;
-        }}
-        
-        const ctx = canvas.getContext('2d');
-        const width = {width};
-        const height = {height};
+        // Configuration
+        const container = document.getElementById('{container_id}');
         const backend = '{backend}';
         const layout = '{layout}';
         const theme = '{theme}';
         
-        // Graph data (unified across all backends)
+        if (!container) {{
+            console.error('Container not found:', '{container_id}');
+            return;
+        }}
+        
+        // Graph data
         const nodes = {nodes_json};
         const edges = {edges_json};
         
-        console.log(`Groggy viz (${{backend}}): Loading ${{nodes.length}} nodes, ${{edges.length}} edges`);
+        console.log(`Loading ${{nodes.length}} nodes, ${{edges.length}} edges with ${{layout}} layout, ${{theme}} theme`);
         
-        // Unified state management
-        let positions = [];
+        // Theme configuration
+        const themeConfig = {json.dumps(current_theme)};
+        
+        // Create GroggyVizCore instance with unified configuration
+        const vizCore = new window.GroggyVizCore.GroggyVizCore(nodes, edges, {{
+            width: {width},
+            height: {height},
+            rendering: {{
+                width: {width},
+                height: {height},
+                nodeColor: themeConfig.nodeColor,
+                edgeColor: themeConfig.edgeColor,
+                backgroundColor: themeConfig.backgroundColor,
+                nodeRadius: {8 if backend == 'jupyter' else 6},
+                edgeWidth: {2 if backend == 'jupyter' else 1}
+            }},
+            physics: {{
+                enabled: true,
+                charge: -300,
+                distance: 50,
+                damping: 0.9,
+                iterations: {30 if backend == 'jupyter' else 50}
+            }},
+            interaction: {{
+                enableDrag: true,
+                enableZoom: {str(backend != 'jupyter').lower()},
+                enablePan: {str(backend != 'jupyter').lower()}
+            }}
+        }});
+        
+        // Attach to DOM and start simulation
+        vizCore.attachToDOM(container);
+        vizCore.start();
+        
+        // Global state for controls
         let currentLayout = layout;
-        let camera = {{ x: 0, y: 0 }};
-        let isDragging = false;
-        let lastMouse = {{ x: 0, y: 0 }};
+        let currentTheme = theme;
+        const layouts = ['force-directed', 'circular', 'grid'];
+        const themes = ['light', 'dark', 'publication'];
         
-        // Unified layout algorithms
-        function calculateLayout(layoutType = currentLayout) {{
-            const padding = 50;
-            positions = [];
-            
-            if (layoutType === 'circular' && nodes.length > 0) {{
-                const centerX = width / 2;
-                const centerY = height / 2;
-                const radius = Math.min(width, height) / 2 - padding;
-                
-                nodes.forEach((node, i) => {{
-                    const angle = (i * 2 * Math.PI) / nodes.length;
-                    positions.push({{
-                        id: node.id,
-                        x: centerX + radius * Math.cos(angle),
-                        y: centerY + radius * Math.sin(angle)
-                    }});
+        // Global functions for controls (if enabled)
+        if (typeof window !== 'undefined' && {str(include_controls).lower()}) {{
+            window.resetView = function() {{
+                vizCore.updateConfig({{
+                    interaction: {{ pan: {{ x: 0, y: 0 }}, zoom: 1 }}
                 }});
-            }} else if (layoutType === 'force-directed') {{
-                // Initialize random positions
-                positions = nodes.map((node, i) => ({{
-                    id: node.id,
-                    x: padding + Math.random() * (width - 2 * padding),
-                    y: padding + Math.random() * (height - 2 * padding)
-                }}));
-                
-                // Force-directed simulation
-                for (let iter = 0; iter < (backend === 'jupyter' ? 30 : 50); iter++) {{
-                    // Node repulsion
-                    for (let i = 0; i < positions.length; i++) {{
-                        for (let j = i + 1; j < positions.length; j++) {{
-                            const dx = positions[j].x - positions[i].x;
-                            const dy = positions[j].y - positions[i].y;
-                            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
-                            const force = 500 / (distance * distance);
-                            
-                            positions[i].x -= force * dx / distance;
-                            positions[i].y -= force * dy / distance;
-                            positions[j].x += force * dx / distance;
-                            positions[j].y += force * dy / distance;
-                        }}
-                    }}
-                    
-                    // Edge attraction
-                    edges.forEach(edge => {{
-                        const src = positions.find(p => p.id === edge.source);
-                        const dst = positions.find(p => p.id === edge.target);
-                        if (src && dst) {{
-                            const dx = dst.x - src.x;
-                            const dy = dst.y - src.y;
-                            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
-                            const force = distance * 0.01;
-                            
-                            src.x += force * dx / distance;
-                            src.y += force * dy / distance;
-                            dst.x -= force * dx / distance;
-                            dst.y -= force * dy / distance;
-                        }}
-                    }});
-                    
-                    // Keep in bounds
-                    positions.forEach(pos => {{
-                        pos.x = Math.max(padding, Math.min(width - padding, pos.x));
-                        pos.y = Math.max(padding, Math.min(height - padding, pos.y));
-                    }});
-                }}
-            }} else {{
-                // Grid layout (default)
-                const cols = Math.ceil(Math.sqrt(nodes.length));
-                const cellW = (width - 2 * padding) / cols;
-                const cellH = (height - 2 * padding) / Math.ceil(nodes.length / cols);
-                
-                nodes.forEach((node, i) => {{
-                    positions.push({{
-                        id: node.id,
-                        x: padding + (i % cols) * cellW + cellW / 2,
-                        y: padding + Math.floor(i / cols) * cellH + cellH / 2
-                    }});
-                }});
-            }}
-        }}
-        
-        // Unified rendering function
-        function render() {{
-            ctx.clearRect(0, 0, width, height);
-            
-            ctx.save();
-            if (backend !== 'jupyter') {{
-                ctx.translate(camera.x, camera.y);
-            }}
-            
-            // Draw edges
-            ctx.strokeStyle = theme === 'dark' ? '#666' : '#999';
-            ctx.lineWidth = backend === 'jupyter' ? 2 : 1;
-            edges.forEach(edge => {{
-                const src = positions.find(p => p.id === edge.source);
-                const dst = positions.find(p => p.id === edge.target);
-                if (src && dst) {{
-                    ctx.beginPath();
-                    ctx.moveTo(src.x, src.y);
-                    ctx.lineTo(dst.x, dst.y);
-                    ctx.stroke();
-                }}
-            }});
-            
-            // Draw nodes
-            nodes.forEach(node => {{
-                const pos = positions.find(p => p.id === node.id);
-                if (pos) {{
-                    ctx.fillStyle = node.color || (theme === 'dark' ? '#4CAF50' : '#007bff');
-                    ctx.beginPath();
-                    ctx.arc(pos.x, pos.y, node.size || (backend === 'jupyter' ? 12 : 8), 0, 2 * Math.PI);
-                    ctx.fill();
-                    
-                    ctx.strokeStyle = theme === 'dark' ? '#fff' : '#333';
-                    ctx.lineWidth = backend === 'jupyter' ? 2 : 1;
-                    ctx.stroke();
-                    
-                    // Label
-                    ctx.fillStyle = theme === 'dark' ? '#fff' : '#000';
-                    ctx.font = backend === 'jupyter' ? 'bold 12px Arial' : '12px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(node.label || node.id, pos.x, pos.y + (backend === 'jupyter' ? 20 : -15));
-                }}
-            }});
-            
-            ctx.restore();
-        }}
-        
-        // Backend-specific event handling
-        if (backend === 'jupyter') {{
-            // Jupyter: Simple click handling only
-            canvas.onclick = function(e) {{
-                console.log('Groggy viz: Canvas clicked at', e.offsetX, e.offsetY);
+                console.log('🔄 View reset');
             }};
-        }} else {{
-            // File/Local/Streaming: Full interaction
-            canvas.addEventListener('mousedown', (e) => {{
-                isDragging = true;
-                lastMouse = {{ x: e.clientX, y: e.clientY }};
-            }});
             
-            canvas.addEventListener('mousemove', (e) => {{
-                if (isDragging) {{
-                    camera.x += e.clientX - lastMouse.x;
-                    camera.y += e.clientY - lastMouse.y;
-                    lastMouse = {{ x: e.clientX, y: e.clientY }};
-                    render();
-                }}
-            }});
-            
-            canvas.addEventListener('mouseup', () => {{
-                isDragging = false;
-            }});
-            
-            // Global functions for controls
-            if (typeof window !== 'undefined') {{
-                window.resetView = function() {{
-                    camera = {{ x: 0, y: 0 }};
-                    calculateLayout();
-                    render();
-                }};
+            window.toggleLayout = function() {{
+                const currentIndex = layouts.indexOf(currentLayout);
+                currentLayout = layouts[(currentIndex + 1) % layouts.length];
                 
-                window.toggleLayout = function() {{
-                    const layouts = ['circular', 'grid', 'force-directed'];
-                    const currentIndex = layouts.indexOf(currentLayout);
-                    currentLayout = layouts[(currentIndex + 1) % layouts.length];
-                    
-                    const layoutSpan = document.getElementById('current-layout');
-                    if (layoutSpan) layoutSpan.textContent = currentLayout;
-                    
-                    calculateLayout(currentLayout);
-                    render();
-                }};
-            }}
+                // Apply layout through physics recalculation
+                vizCore.stop();
+                vizCore.start();
+                
+                const layoutSpan = document.getElementById('current-layout');
+                if (layoutSpan) layoutSpan.textContent = currentLayout;
+                
+                console.log('🔄 Layout changed to:', currentLayout);
+            }};
+            
+            window.toggleTheme = function() {{
+                const currentIndex = themes.indexOf(currentTheme);
+                currentTheme = themes[(currentIndex + 1) % themes.length];
+                
+                const newThemeConfig = {{
+                    'light': {{ nodeColor: '#007bff', edgeColor: '#999', backgroundColor: '#ffffff' }},
+                    'dark': {{ nodeColor: '#4CAF50', edgeColor: '#666', backgroundColor: '#1e1e1e' }},
+                    'publication': {{ nodeColor: '#2c3e50', edgeColor: '#7f8c8d', backgroundColor: '#ecf0f1' }}
+                }}[currentTheme];
+                
+                vizCore.updateConfig({{
+                    rendering: newThemeConfig
+                }});
+                
+                console.log('🎨 Theme changed to:', currentTheme);
+            }};
         }}
         
-        // Initialize visualization
-        calculateLayout();
-        render();
+        // Event callbacks for interactivity
+        vizCore.on('node_click', function(data) {{
+            console.log('🖱️ Node clicked:', data.nodeId);
+        }});
         
-        console.log(`Groggy viz (${{backend}}): Rendered ${{nodes.length}} nodes with ${{currentLayout}} layout`);
+        vizCore.on('node_drag', function(data) {{
+            // Node dragging is handled internally by GroggyVizCore
+        }});
+        
+        console.log('✅ GroggyVizCore unified visualization initialized successfully!');
     }})();
     </script>''')
         
@@ -1278,11 +1246,53 @@ class VizAccessor:
     def supports_graph_view(self) -> bool:
         """
         Check if the data source supports graph visualization.
-        
+
         Returns:
             True if graph view is supported
         """
         return self.info()['supports_graph']
+
+    # Convenience methods for unified API
+    def serve(self, port: int = 8080, **kwargs) -> InteractiveVizSession:
+        """
+        Start interactive WebSocket server for real-time graph visualization.
+
+        Convenience method for render(backend='streaming', port=port, **kwargs).
+
+        Args:
+            port: Port number for the server (default: 8080)
+            **kwargs: Additional parameters (layout, theme, width, height, etc.)
+
+        Returns:
+            InteractiveVizSession: Server session with .url, .port, and .stop()
+
+        Example:
+            >>> session = graph.viz().serve(port=3000)
+            >>> print(f"Visualization available at: {session.url}")
+            >>> # ... do other work ...
+            >>> session.stop()  # Stop when done
+        """
+        return self.render(backend='streaming', port=port, **kwargs)
+
+    def save(self, filename: str = 'graph_visualization.html', **kwargs) -> StaticViz:
+        """
+        Save graph visualization to static file (HTML/SVG/PNG).
+
+        Convenience method for render(backend='file', filename=filename, **kwargs).
+
+        Args:
+            filename: Output filename (default: 'graph_visualization.html')
+            **kwargs: Additional parameters (layout, theme, width, height, etc.)
+
+        Returns:
+            StaticViz: File result with .file_path, .size_bytes, and .show()
+
+        Example:
+            >>> result = graph.viz().save('network.html', theme='dark')
+            >>> print(f"Saved to: {result.file_path} ({result.size_bytes} bytes)")
+            >>> result.show()  # Display in Jupyter if available
+        """
+        return self.render(backend='file', filename=filename, **kwargs)
 
 
 def add_viz_accessor(cls):

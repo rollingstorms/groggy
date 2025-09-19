@@ -22,15 +22,19 @@
   "scripts": {
     "build": "webpack --mode=development",
     "build:prod": "webpack --mode=production",
+    "build:standalone": "webpack --config webpack.standalone.config.js",
     "watch": "webpack --watch --mode=development",
     "clean": "rimraf lib dist",
     "prepare": "npm run clean && npm run build:prod"
   },
   "devDependencies": {
+    "@babel/core": "^7.22.0",
+    "@babel/preset-env": "^7.22.0",
     "@jupyter-widgets/base": "^1.1.10 || ^2 || ^3 || ^4 || ^5 || ^6",
     "@jupyter-widgets/controls": "^1.1.10 || ^2 || ^3 || ^4 || ^5",
     "@jupyterlab/application": "^3.4.0",
     "@types/node": "^18.0.0",
+    "babel-loader": "^9.1.0",
     "css-loader": "^6.7.0",
     "rimraf": "^3.0.2",
     "source-map-loader": "^4.0.0",

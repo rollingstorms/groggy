@@ -111,6 +111,37 @@ impl VizModule {
             config: VizConfig::default(),
         }
     }
+    
+    /// 🎯 CONVENIENCE METHODS - Simplified unified API
+    /// These methods provide the same interface as described in UNIFIED_VIZ_MIGRATION_PLAN.md
+    
+    /// Create Jupyter widget (unified core)
+    pub fn widget(&mut self) -> GraphResult<RenderResult> {
+        self.render(VizBackend::Jupyter, RenderOptions::default())
+    }
+    
+    /// Start streaming server (unified core)
+    pub fn serve(&mut self, port: Option<u16>) -> GraphResult<RenderResult> {
+        let options = RenderOptions {
+            port,
+            ..Default::default()
+        };
+        self.render(VizBackend::Streaming, options)
+    }
+    
+    /// Save to file (unified core)
+    pub fn save(&mut self, path: &str) -> GraphResult<RenderResult> {
+        let options = RenderOptions {
+            filename: Some(path.to_string()),
+            ..Default::default()
+        };
+        self.render(VizBackend::File, options)
+    }
+    
+    /// Show local visualization (unified core)
+    pub fn show(&mut self) -> GraphResult<RenderResult> {
+        self.render(VizBackend::Local, RenderOptions::default())
+    }
 
     /// 🎯 UNIFIED VISUALIZATION METHOD - The One Command To Rule Them All
     ///

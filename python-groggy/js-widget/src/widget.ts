@@ -237,6 +237,8 @@ export class GroggyGraphView extends DOMWidgetView {
       const deltaY = e.clientY - startY;
       
       const currentPos = this.nodePositions.get(node.id);
+      if (!currentPos) return; // Safety check
+      
       const newX = currentPos.x + deltaX;
       const newY = currentPos.y + deltaY;
       
@@ -346,6 +348,105 @@ export class GroggyGraphView extends DOMWidgetView {
     const header = this.el.querySelector('div:first-child') as HTMLElement;
     if (header) {
       header.textContent = this.model.get('title') || 'Graph Visualization';
+    }
+  }
+  
+  /**
+   * Start force-directed simulation for node positions
+   */
+  private startForceSimulation(nodes: any[], edges: any[], centerX: number, centerY: number) {
+    // Simple force-directed layout simulation
+    const iterations = 100;
+    const repulsionStrength = 1000;
+    const attractionStrength = 0.1;
+    const damping = 0.9;
+    
+    // Initialize velocities
+    const velocities = new Map();
+    nodes.forEach(node => {
+      velocities.set(node.id, { x: 0, y: 0 });
+    });
+    
+    for (let i = 0; i < iterations; i++) {
+      const forces = new Map();
+      
+      // Initialize forces
+      nodes.forEach(node => {
+        forces.set(node.id, { x: 0, y: 0 });
+      });
+      
+      // Repulsion forces
+      for (let j = 0; j < nodes.length; j++) {
+        for (let k = j + 1; k < nodes.length; k++) {
+          const nodeA = nodes[j];
+          const nodeB = nodes[k];
+          const posA = this.nodePositions.get(nodeA.id);
+          const posB = this.nodePositions.get(nodeB.id);
+          
+          if (posA && posB) {
+            const dx = posB.x - posA.x;
+            const dy = posB.y - posA.y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+            const force = repulsionStrength / (distance * distance);
+            
+            const fx = force * dx / distance;
+            const fy = force * dy / distance;
+            
+            const forceA = forces.get(nodeA.id);
+            const forceB = forces.get(nodeB.id);
+            if (forceA && forceB) {
+              forceA.x -= fx;
+              forceA.y -= fy;
+              forceB.x += fx;
+              forceB.y += fy;
+            }
+          }
+        }
+      }
+      
+      // Attraction forces from edges
+      edges.forEach(edge => {
+        const sourcePos = this.nodePositions.get(edge.source);
+        const targetPos = this.nodePositions.get(edge.target);
+        const sourceForce = forces.get(edge.source);
+        const targetForce = forces.get(edge.target);
+        
+        if (sourcePos && targetPos && sourceForce && targetForce) {
+          const dx = targetPos.x - sourcePos.x;
+          const dy = targetPos.y - sourcePos.y;
+          const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+          const force = attractionStrength * distance;
+          
+          const fx = force * dx / distance;
+          const fy = force * dy / distance;
+          
+          sourceForce.x += fx;
+          sourceForce.y += fy;
+          targetForce.x -= fx;
+          targetForce.y -= fy;
+        }
+      });
+      
+      // Update positions
+      nodes.forEach(node => {
+        const position = this.nodePositions.get(node.id);
+        const velocity = velocities.get(node.id);
+        const force = forces.get(node.id);
+        
+        if (position && velocity && force) {
+          velocity.x += force.x * 0.01;
+          velocity.y += force.y * 0.01;
+          velocity.x *= damping;
+          velocity.y *= damping;
+          
+          position.x += velocity.x;
+          position.y += velocity.y;
+          
+          // Keep within bounds
+          position.x = Math.max(50, Math.min(750, position.x));
+          position.y = Math.max(50, Math.min(550, position.y));
+        }
+      });
     }
   }
 }

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Graph Visualization - Graph</title>
+    <style>
+        body { margin: 20px; font-family: Arial, sans-serif; }
+        #groggy-viz-container { border: 1px solid #ddd; position: relative; background: #fafafa; margin: 20px auto; }
+        #groggy-viz-canvas { display: block; background: white; }
+        .groggy-controls { text-align: center; margin: 20px; }
+        .groggy-controls button { background: #007bff; color: white; border: none; padding: 8px 16px; margin: 4px; border-radius: 4px; cursor: pointer; }
+        .groggy-info { text-align: center; font-size: 14px; color: #666; }
+        .groggy-stats { position: absolute; top: 5px; right: 5px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">Graph Visualization - Graph</h1>
+    <p style="text-align: center;">34 nodes, 476 edges</p>
+    <div class="groggy-controls">
+        <button onclick="resetView()">Reset View</button>
+        <button onclick="toggleLayout()">Change Layout</button>
+    </div>
+
+    <div id="groggy-viz-container" style="width: 800px; height: 600px;">
+        <canvas id="groggy-viz-4492417872" width="800" height="600" 
+                style="display: block; background: white;"></canvas>
+        <div class="groggy-stats">
+            34 nodes, 476 edges
+        </div>
+    </div>
+    <div class="groggy-info">
+        <p>Click and drag to pan • Current layout: <span id="current-layout">force-directed</span></p>
+    </div>
+    <script>
+    (function() {
+        // Unified Groggy Visualization Engine
+        // Backend: file | Layout: force-directed | Theme: light
+        
+        const canvas = document.getElementById('groggy-viz-4492417872');
+        if (!canvas) {
+            console.error('Groggy viz: Canvas not found:', 'groggy-viz-4492417872');
+            return;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        const width = 800;
+        const height = 600;
+        const backend = 'file';
+        const layout = 'force-directed';
+        const theme = 'light';
+        
+        // Graph data (unified across all backends)
+        const nodes = [{"id": "18", "label": null, "color": null, "size": null, "age": null}, {"id": "20", "label": null, "color": null, "size": null, "age": null}, {"id": "22", "label": null, "color": null, "size": null, "age": null}, {"id": "27", "label": null, "color": null, "size": null, "age": null}, {"id": "11", "label": null, "color": null, "size": null, "age": null}, {"id": "13", "label": null, "color": null, "size": null, "age": null}, {"id": "19", "label": null, "color": null, "size": null, "age": null}, {"id": "1", "label": null, "color": null, "size": null, "age": null}, {"id": "14", "label": null, "color": null, "size": null, "age": null}, {"id": "10", "label": null, "color": null, "size": null, "age": null}, {"id": "9", "label": null, "color": null, "size": null, "age": null}, {"id": "8", "label": null, "color": null, "size": null, "age": null}, {"id": "33", "label": null, "color": null, "size": null, "age": null}, {"id": "21", "label": null, "color": null, "size": null, "age": null}, {"id": "31", "label": null, "color": null, "size": null, "age": null}, {"id": "16", "label": null, "color": null, "size": null, "age": null}, {"id": "2", "label": null, "color": null, "size": null, "age": null}, {"id": "4", "label": null, "color": null, "size": null, "age": null}, {"id": "5", "label": null, "color": null, "size": null, "age": null}, {"id": "0", "label": null, "color": null, "size": null, "age": null}, {"id": "3", "label": null, "color": null, "size": null, "age": null}, {"id": "25", "label": null, "color": null, "size": null, "age": null}, {"id": "7", "label": null, "color": null, "size": null, "age": null}, {"id": "23", "label": null, "color": null, "size": null, "age": null}, {"id": "15", "label": null, "color": null, "size": null, "age": null}, {"id": "17", "label": null, "color": null, "size": null, "age": null}, {"id": "26", "label": null, "color": null, "size": null, "age": null}, {"id": "12", "label": null, "color": null, "size": null, "age": null}, {"id": "28", "label": null, "color": null, "size": null, "age": null}, {"id": "24", "label": null, "color": null, "size": null, "age": null}, {"id": "6", "label": null, "color": null, "size": null, "age": null}, {"id": "30", "label": null, "color": null, "size": null, "age": null}, {"id": "32", "label": null, "color": null, "size": null, "age": null}, {"id": "29", "label": null, "color": null, "size": null, "age": null}];
+        const edges = [{"id": "170", "source": "21", "target": "27", "weight": null, "label": null}, {"id": "348", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "200", "source": "3", "target": "6", "weight": null, "label": null}, {"id": "117", "source": "32", "target": "18", "weight": null, "label": null}, {"id": "436", "source": "26", "target": "27", "weight": null, "label": null}, {"id": "220", "source": "25", "target": "18", "weight": null, "label": null}, {"id": "315", "source": "30", "target": "18", "weight": null, "label": null}, {"id": "456", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "376", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "279", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "389", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "132", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "217", "source": "3", "target": "6", "weight": null, "label": null}, {"id": "420", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "71", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "474", "source": "2", "target": "20", "weight": null, "label": null}, {"id": "228", "source": "25", "target": "19", "weight": null, "label": null}, {"id": "342", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "351", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "450", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "419", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "188", "source": "4", "target": "7", "weight": null, "label": null}, {"id": "266", "source": "31", "target": "24", "weight": null, "label": null}, {"id": "286", "source": "23", "target": "18", "weight": null, "label": null}, {"id": "194", "source": "15", "target": "7", "weight": null, "label": null}, {"id": "108", "source": "32", "target": "8", "weight": null, "label": null}, {"id": "343", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "284", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "158", "source": "12", "target": "18", "weight": null, "label": null}, {"id": "425", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "196", "source": "15", "target": "31", "weight": null, "label": null}, {"id": "37", "source": "9", "target": "7", "weight": null, "label": null}, {"id": "182", "source": "16", "target": "19", "weight": null, "label": null}, {"id": "422", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "107", "source": "32", "target": "18", "weight": null, "label": null}, {"id": "354", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "31", "source": "9", "target": "1", "weight": null, "label": null}, {"id": "333", "source": "22", "target": "18", "weight": null, "label": null}, {"id": "471", "source": "2", "target": "30", "weight": null, "label": null}, {"id": "14", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "39", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "152", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "160", "source": "12", "target": "18", "weight": null, "label": null}, {"id": "177", "source": "10", "target": "29", "weight": null, "label": null}, {"id": "192", "source": "15", "target": "18", "weight": null, "label": null}, {"id": "74", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "254", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "114", "source": "32", "target": "19", "weight": null, "label": null}, {"id": "116", "source": "32", "target": "19", "weight": null, "label": null}, {"id": "6", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "144", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "253", "source": "31", "target": "18", "weight": null, "label": null}, {"id": "267", "source": "31", "target": "27", "weight": null, "label": null}, {"id": "263", "source": "31", "target": "18", "weight": null, "label": null}, {"id": "296", "source": "23", "target": "18", "weight": null, "label": null}, {"id": "91", "source": "0", "target": "19", "weight": null, "label": null}, {"id": "90", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "99", "source": "32", "target": "8", "weight": null, "label": null}, {"id": "320", "source": "30", "target": "18", "weight": null, "label": null}, {"id": "368", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "387", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "408", "source": "26", "target": "8", "weight": null, "label": null}, {"id": "60", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "247", "source": "25", "target": "19", "weight": null, "label": null}, {"id": "129", "source": "32", "target": "19", "weight": null, "label": null}, {"id": "431", "source": "26", "target": "29", "weight": null, "label": null}, {"id": "80", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "244", "source": "25", "target": "25", "weight": null, "label": null}, {"id": "137", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "282", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "175", "source": "11", "target": "18", "weight": null, "label": null}, {"id": "102", "source": "32", "target": "24", "weight": null, "label": null}, {"id": "33", "source": "9", "target": "1", "weight": null, "label": null}, {"id": "434", "source": "26", "target": "27", "weight": null, "label": null}, {"id": "452", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "206", "source": "3", "target": "27", "weight": null, "label": null}, {"id": "115", "source": "32", "target": "6", "weight": null, "label": null}, {"id": "155", "source": "12", "target": "27", "weight": null, "label": null}, {"id": "248", "source": "25", "target": "19", "weight": null, "label": null}, {"id": "344", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "246", "source": "25", "target": "25", "weight": null, "label": null}, {"id": "211", "source": "3", "target": "19", "weight": null, "label": null}, {"id": "42", "source": "9", "target": "27", "weight": null, "label": null}, {"id": "163", "source": "12", "target": "19", "weight": null, "label": null}, {"id": "475", "source": "2", "target": "18", "weight": null, "label": null}, {"id": "345", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "382", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "66", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "120", "source": "32", "target": "18", "weight": null, "label": null}, {"id": "324", "source": "20", "target": "19", "weight": null, "label": null}, {"id": "390", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "469", "source": "2", "target": "19", "weight": null, "label": null}, {"id": "22", "source": "9", "target": "24", "weight": null, "label": null}, {"id": "235", "source": "25", "target": "19", "weight": null, "label": null}, {"id": "410", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "127", "source": "32", "target": "19", "weight": null, "label": null}, {"id": "363", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "404", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "26", "source": "9", "target": "1", "weight": null, "label": null}, {"id": "453", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "149", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "265", "source": "31", "target": "24", "weight": null, "label": null}, {"id": "55", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "41", "source": "9", "target": "1", "weight": null, "label": null}, {"id": "395", "source": "26", "target": "26", "weight": null, "label": null}, {"id": "444", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "294", "source": "23", "target": "4", "weight": null, "label": null}, {"id": "332", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "189", "source": "4", "target": "9", "weight": null, "label": null}, {"id": "61", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "330", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "97", "source": "32", "target": "6", "weight": null, "label": null}, {"id": "231", "source": "25", "target": "27", "weight": null, "label": null}, {"id": "135", "source": "12", "target": "19", "weight": null, "label": null}, {"id": "68", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "73", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "159", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "7", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "323", "source": "20", "target": "18", "weight": null, "label": null}, {"id": "197", "source": "15", "target": "7", "weight": null, "label": null}, {"id": "291", "source": "23", "target": "18", "weight": null, "label": null}, {"id": "409", "source": "26", "target": "8", "weight": null, "label": null}, {"id": "418", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "455", "source": "26", "target": "8", "weight": null, "label": null}, {"id": "89", "source": "0", "target": "18", "weight": null, "label": null}, {"id": "234", "source": "25", "target": "27", "weight": null, "label": null}, {"id": "440", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "273", "source": "31", "target": "18", "weight": null, "label": null}, {"id": "151", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "401", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "417", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "9", "source": "9", "target": "18", "weight": null, "label": null}, {"id": "466", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "421", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "212", "source": "3", "target": "15", "weight": null, "label": null}, {"id": "193", "source": "15", "target": "13", "weight": null, "label": null}, {"id": "19", "source": "9", "target": "27", "weight": null, "label": null}, {"id": "45", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "460", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "336", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "86", "source": "0", "target": "18", "weight": null, "label": null}, {"id": "109", "source": "32", "target": "18", "weight": null, "label": null}, {"id": "191", "source": "15", "target": "22", "weight": null, "label": null}, {"id": "399", "source": "26", "target": "13", "weight": null, "label": null}, {"id": "230", "source": "25", "target": "24", "weight": null, "label": null}, {"id": "261", "source": "31", "target": "31", "weight": null, "label": null}, {"id": "375", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "328", "source": "22", "target": "7", "weight": null, "label": null}, {"id": "465", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "208", "source": "3", "target": "3", "weight": null, "label": null}, {"id": "46", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "113", "source": "32", "target": "19", "weight": null, "label": null}, {"id": "172", "source": "21", "target": "18", "weight": null, "label": null}, {"id": "385", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "268", "source": "31", "target": "32", "weight": null, "label": null}, {"id": "130", "source": "32", "target": "19", "weight": null, "label": null}, {"id": "165", "source": "12", "target": "6", "weight": null, "label": null}, {"id": "167", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "367", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "64", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "78", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "255", "source": "31", "target": "24", "weight": null, "label": null}, {"id": "449", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "252", "source": "31", "target": "32", "weight": null, "label": null}, {"id": "264", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "199", "source": "3", "target": "3", "weight": null, "label": null}, {"id": "226", "source": "25", "target": "25", "weight": null, "label": null}, {"id": "184", "source": "4", "target": "18", "weight": null, "label": null}, {"id": "232", "source": "25", "target": "32", "weight": null, "label": null}, {"id": "134", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "451", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "21", "source": "9", "target": "24", "weight": null, "label": null}, {"id": "275", "source": "31", "target": "31", "weight": null, "label": null}, {"id": "461", "source": "26", "target": "18", "weight": null, "label": null}, {"id": "153", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "203", "source": "3", "target": "19", "weight": null, "label": null}, {"id": "313", "source": "13", "target": "19", "weight": null, "label": null}, {"id": "146", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "79", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "400", "source": "26", "target": "27", "weight": null, "label": null}, {"id": "301", "source": "13", "target": "19", "weight": null, "label": null}, {"id": "462", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "442", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "463", "source": "26", "target": "32", "weight": null, "label": null}, {"id": "331", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "371", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "397", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "17", "source": "9", "target": "17", "weight": null, "label": null}, {"id": "56", "source": "9", "target": "7", "weight": null, "label": null}, {"id": "75", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "12", "source": "9", "target": "14", "weight": null, "label": null}, {"id": "290", "source": "23", "target": "27", "weight": null, "label": null}, {"id": "49", "source": "9", "target": "28", "weight": null, "label": null}, {"id": "222", "source": "25", "target": "19", "weight": null, "label": null}, {"id": "59", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "148", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "142", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "366", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "386", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "0", "source": "9", "target": "24", "weight": null, "label": null}, {"id": "15", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "47", "source": "9", "target": "24", "weight": null, "label": null}, {"id": "326", "source": "20", "target": "19", "weight": null, "label": null}, {"id": "383", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "126", "source": "32", "target": "32", "weight": null, "label": null}, {"id": "370", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "63", "source": "0", "target": "19", "weight": null, "label": null}, {"id": "303", "source": "13", "target": "19", "weight": null, "label": null}, {"id": "110", "source": "32", "target": "19", "weight": null, "label": null}, {"id": "57", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "52", "source": "9", "target": "17", "weight": null, "label": null}, {"id": "260", "source": "31", "target": "6", "weight": null, "label": null}, {"id": "428", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "8", "source": "9", "target": "17", "weight": null, "label": null}, {"id": "221", "source": "25", "target": "24", "weight": null, "label": null}, {"id": "164", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "374", "source": "22", "target": "18", "weight": null, "label": null}, {"id": "407", "source": "26", "target": "8", "weight": null, "label": null}, {"id": "3", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "365", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "310", "source": "13", "target": "19", "weight": null, "label": null}, {"id": "283", "source": "31", "target": "31", "weight": null, "label": null}, {"id": "356", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "361", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "319", "source": "30", "target": "20", "weight": null, "label": null}, {"id": "373", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "258", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "427", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "457", "source": "26", "target": "6", "weight": null, "label": null}, {"id": "288", "source": "23", "target": "4", "weight": null, "label": null}, {"id": "4", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "112", "source": "32", "target": "27", "weight": null, "label": null}, {"id": "93", "source": "0", "target": "6", "weight": null, "label": null}, {"id": "362", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "36", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "166", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "38", "source": "9", "target": "17", "weight": null, "label": null}, {"id": "169", "source": "21", "target": "29", "weight": null, "label": null}, {"id": "187", "source": "4", "target": "29", "weight": null, "label": null}, {"id": "34", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "50", "source": "9", "target": "28", "weight": null, "label": null}, {"id": "277", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "213", "source": "3", "target": "9", "weight": null, "label": null}, {"id": "157", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "454", "source": "26", "target": "27", "weight": null, "label": null}, {"id": "307", "source": "13", "target": "19", "weight": null, "label": null}, {"id": "121", "source": "32", "target": "19", "weight": null, "label": null}, {"id": "240", "source": "25", "target": "25", "weight": null, "label": null}, {"id": "13", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "379", "source": "22", "target": "9", "weight": null, "label": null}, {"id": "439", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "278", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "458", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "257", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "285", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "346", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "309", "source": "13", "target": "19", "weight": null, "label": null}, {"id": "118", "source": "32", "target": "18", "weight": null, "label": null}, {"id": "123", "source": "32", "target": "32", "weight": null, "label": null}, {"id": "88", "source": "0", "target": "18", "weight": null, "label": null}, {"id": "181", "source": "16", "target": "19", "weight": null, "label": null}, {"id": "138", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "10", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "207", "source": "3", "target": "27", "weight": null, "label": null}, {"id": "210", "source": "3", "target": "9", "weight": null, "label": null}, {"id": "227", "source": "25", "target": "18", "weight": null, "label": null}, {"id": "311", "source": "13", "target": "18", "weight": null, "label": null}, {"id": "353", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "394", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "378", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "437", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "69", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "317", "source": "30", "target": "19", "weight": null, "label": null}, {"id": "448", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "300", "source": "13", "target": "27", "weight": null, "label": null}, {"id": "338", "source": "22", "target": "18", "weight": null, "label": null}, {"id": "357", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "429", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "24", "source": "9", "target": "1", "weight": null, "label": null}, {"id": "435", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "359", "source": "22", "target": "18", "weight": null, "label": null}, {"id": "131", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "262", "source": "31", "target": "31", "weight": null, "label": null}, {"id": "94", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "77", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "384", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "30", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "195", "source": "15", "target": "9", "weight": null, "label": null}, {"id": "249", "source": "25", "target": "6", "weight": null, "label": null}, {"id": "70", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "223", "source": "25", "target": "25", "weight": null, "label": null}, {"id": "335", "source": "22", "target": "6", "weight": null, "label": null}, {"id": "236", "source": "25", "target": "27", "weight": null, "label": null}, {"id": "416", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "219", "source": "25", "target": "32", "weight": null, "label": null}, {"id": "441", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "443", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "141", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "355", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "122", "source": "32", "target": "32", "weight": null, "label": null}, {"id": "412", "source": "26", "target": "24", "weight": null, "label": null}, {"id": "204", "source": "3", "target": "3", "weight": null, "label": null}, {"id": "292", "source": "23", "target": "19", "weight": null, "label": null}, {"id": "171", "source": "21", "target": "18", "weight": null, "label": null}, {"id": "62", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "174", "source": "11", "target": "27", "weight": null, "label": null}, {"id": "430", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "85", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "327", "source": "20", "target": "18", "weight": null, "label": null}, {"id": "145", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "237", "source": "25", "target": "25", "weight": null, "label": null}, {"id": "377", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "218", "source": "3", "target": "19", "weight": null, "label": null}, {"id": "380", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "87", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "54", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "147", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "405", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "23", "source": "9", "target": "1", "weight": null, "label": null}, {"id": "161", "source": "12", "target": "18", "weight": null, "label": null}, {"id": "179", "source": "10", "target": "18", "weight": null, "label": null}, {"id": "198", "source": "3", "target": "19", "weight": null, "label": null}, {"id": "306", "source": "13", "target": "19", "weight": null, "label": null}, {"id": "92", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "433", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "58", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "2", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "180", "source": "10", "target": "18", "weight": null, "label": null}, {"id": "259", "source": "31", "target": "31", "weight": null, "label": null}, {"id": "245", "source": "25", "target": "19", "weight": null, "label": null}, {"id": "84", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "243", "source": "25", "target": "25", "weight": null, "label": null}, {"id": "104", "source": "32", "target": "6", "weight": null, "label": null}, {"id": "295", "source": "23", "target": "20", "weight": null, "label": null}, {"id": "396", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "205", "source": "3", "target": "19", "weight": null, "label": null}, {"id": "381", "source": "22", "target": "9", "weight": null, "label": null}, {"id": "242", "source": "25", "target": "19", "weight": null, "label": null}, {"id": "411", "source": "26", "target": "24", "weight": null, "label": null}, {"id": "5", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "250", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "318", "source": "30", "target": "19", "weight": null, "label": null}, {"id": "173", "source": "11", "target": "29", "weight": null, "label": null}, {"id": "82", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "27", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "445", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "105", "source": "32", "target": "32", "weight": null, "label": null}, {"id": "464", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "472", "source": "2", "target": "30", "weight": null, "label": null}, {"id": "271", "source": "31", "target": "27", "weight": null, "label": null}, {"id": "281", "source": "31", "target": "31", "weight": null, "label": null}, {"id": "18", "source": "9", "target": "1", "weight": null, "label": null}, {"id": "388", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "312", "source": "13", "target": "13", "weight": null, "label": null}, {"id": "214", "source": "3", "target": "4", "weight": null, "label": null}, {"id": "81", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "316", "source": "30", "target": "18", "weight": null, "label": null}, {"id": "276", "source": "31", "target": "31", "weight": null, "label": null}, {"id": "100", "source": "32", "target": "6", "weight": null, "label": null}, {"id": "393", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "403", "source": "26", "target": "9", "weight": null, "label": null}, {"id": "302", "source": "13", "target": "19", "weight": null, "label": null}, {"id": "468", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "143", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "413", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "438", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "392", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "225", "source": "25", "target": "25", "weight": null, "label": null}, {"id": "256", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "358", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "185", "source": "4", "target": "22", "weight": null, "label": null}, {"id": "424", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "25", "source": "9", "target": "1", "weight": null, "label": null}, {"id": "446", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "272", "source": "31", "target": "31", "weight": null, "label": null}, {"id": "337", "source": "22", "target": "6", "weight": null, "label": null}, {"id": "140", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "305", "source": "13", "target": "19", "weight": null, "label": null}, {"id": "364", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "229", "source": "25", "target": "24", "weight": null, "label": null}, {"id": "274", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "233", "source": "25", "target": "19", "weight": null, "label": null}, {"id": "270", "source": "31", "target": "27", "weight": null, "label": null}, {"id": "162", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "398", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "44", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "269", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "289", "source": "23", "target": "4", "weight": null, "label": null}, {"id": "119", "source": "32", "target": "19", "weight": null, "label": null}, {"id": "178", "source": "10", "target": "27", "weight": null, "label": null}, {"id": "372", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "459", "source": "26", "target": "18", "weight": null, "label": null}, {"id": "432", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "251", "source": "31", "target": "19", "weight": null, "label": null}, {"id": "340", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "334", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "391", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "20", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "29", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "156", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "95", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "467", "source": "26", "target": "9", "weight": null, "label": null}, {"id": "209", "source": "3", "target": "19", "weight": null, "label": null}, {"id": "101", "source": "32", "target": "18", "weight": null, "label": null}, {"id": "470", "source": "2", "target": "19", "weight": null, "label": null}, {"id": "186", "source": "4", "target": "18", "weight": null, "label": null}, {"id": "16", "source": "9", "target": "27", "weight": null, "label": null}, {"id": "96", "source": "32", "target": "6", "weight": null, "label": null}, {"id": "28", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "53", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "241", "source": "25", "target": "25", "weight": null, "label": null}, {"id": "369", "source": "22", "target": "6", "weight": null, "label": null}, {"id": "349", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "201", "source": "3", "target": "19", "weight": null, "label": null}, {"id": "133", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "48", "source": "9", "target": "28", "weight": null, "label": null}, {"id": "215", "source": "3", "target": "30", "weight": null, "label": null}, {"id": "224", "source": "25", "target": "6", "weight": null, "label": null}, {"id": "103", "source": "32", "target": "32", "weight": null, "label": null}, {"id": "314", "source": "30", "target": "18", "weight": null, "label": null}, {"id": "136", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "76", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "347", "source": "22", "target": "24", "weight": null, "label": null}, {"id": "216", "source": "3", "target": "3", "weight": null, "label": null}, {"id": "321", "source": "30", "target": "19", "weight": null, "label": null}, {"id": "297", "source": "23", "target": "4", "weight": null, "label": null}, {"id": "125", "source": "32", "target": "32", "weight": null, "label": null}, {"id": "423", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "287", "source": "23", "target": "4", "weight": null, "label": null}, {"id": "190", "source": "4", "target": "25", "weight": null, "label": null}, {"id": "128", "source": "32", "target": "32", "weight": null, "label": null}, {"id": "67", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "280", "source": "31", "target": "31", "weight": null, "label": null}, {"id": "341", "source": "22", "target": "18", "weight": null, "label": null}, {"id": "350", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "139", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "83", "source": "0", "target": "27", "weight": null, "label": null}, {"id": "298", "source": "23", "target": "4", "weight": null, "label": null}, {"id": "154", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "308", "source": "13", "target": "13", "weight": null, "label": null}, {"id": "406", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "360", "source": "22", "target": "19", "weight": null, "label": null}, {"id": "426", "source": "26", "target": "7", "weight": null, "label": null}, {"id": "98", "source": "32", "target": "6", "weight": null, "label": null}, {"id": "32", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "202", "source": "3", "target": "9", "weight": null, "label": null}, {"id": "40", "source": "9", "target": "17", "weight": null, "label": null}, {"id": "239", "source": "25", "target": "19", "weight": null, "label": null}, {"id": "168", "source": "5", "target": "5", "weight": null, "label": null}, {"id": "238", "source": "25", "target": "18", "weight": null, "label": null}, {"id": "352", "source": "22", "target": "18", "weight": null, "label": null}, {"id": "1", "source": "9", "target": "19", "weight": null, "label": null}, {"id": "322", "source": "20", "target": "19", "weight": null, "label": null}, {"id": "329", "source": "22", "target": "6", "weight": null, "label": null}, {"id": "111", "source": "32", "target": "19", "weight": null, "label": null}, {"id": "106", "source": "32", "target": "32", "weight": null, "label": null}, {"id": "51", "source": "9", "target": "28", "weight": null, "label": null}, {"id": "183", "source": "4", "target": "22", "weight": null, "label": null}, {"id": "325", "source": "20", "target": "18", "weight": null, "label": null}, {"id": "473", "source": "2", "target": "19", "weight": null, "label": null}, {"id": "402", "source": "26", "target": "13", "weight": null, "label": null}, {"id": "72", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "304", "source": "13", "target": "19", "weight": null, "label": null}, {"id": "150", "source": "12", "target": "24", "weight": null, "label": null}, {"id": "65", "source": "0", "target": "24", "weight": null, "label": null}, {"id": "414", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "176", "source": "11", "target": "18", "weight": null, "label": null}, {"id": "35", "source": "9", "target": "14", "weight": null, "label": null}, {"id": "415", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "11", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "447", "source": "26", "target": "19", "weight": null, "label": null}, {"id": "124", "source": "32", "target": "19", "weight": null, "label": null}, {"id": "43", "source": "9", "target": "9", "weight": null, "label": null}, {"id": "339", "source": "22", "target": "22", "weight": null, "label": null}, {"id": "299", "source": "23", "target": "19", "weight": null, "label": null}, {"id": "293", "source": "23", "target": "4", "weight": null, "label": null}];
+        
+        console.log(`Groggy viz (${backend}): Loading ${nodes.length} nodes, ${edges.length} edges`);
+        
+        // Unified state management
+        let positions = [];
+        let currentLayout = layout;
+        let camera = { x: 0, y: 0 };
+        let isDragging = false;
+        let lastMouse = { x: 0, y: 0 };
+        
+        // Unified layout algorithms
+        function calculateLayout(layoutType = currentLayout) {
+            const padding = 50;
+            positions = [];
+            
+            if (layoutType === 'circular' && nodes.length > 0) {
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const radius = Math.min(width, height) / 2 - padding;
+                
+                nodes.forEach((node, i) => {
+                    const angle = (i * 2 * Math.PI) / nodes.length;
+                    positions.push({
+                        id: node.id,
+                        x: centerX + radius * Math.cos(angle),
+                        y: centerY + radius * Math.sin(angle)
+                    });
+                });
+            } else if (layoutType === 'force-directed') {
+                // Initialize random positions
+                positions = nodes.map((node, i) => ({
+                    id: node.id,
+                    x: padding + Math.random() * (width - 2 * padding),
+                    y: padding + Math.random() * (height - 2 * padding)
+                }));
+                
+                // Force-directed simulation
+                for (let iter = 0; iter < (backend === 'jupyter' ? 30 : 50); iter++) {
+                    // Node repulsion
+                    for (let i = 0; i < positions.length; i++) {
+                        for (let j = i + 1; j < positions.length; j++) {
+                            const dx = positions[j].x - positions[i].x;
+                            const dy = positions[j].y - positions[i].y;
+                            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+                            const force = 500 / (distance * distance);
+                            
+                            positions[i].x -= force * dx / distance;
+                            positions[i].y -= force * dy / distance;
+                            positions[j].x += force * dx / distance;
+                            positions[j].y += force * dy / distance;
+                        }
+                    }
+                    
+                    // Edge attraction
+                    edges.forEach(edge => {
+                        const src = positions.find(p => p.id === edge.source);
+                        const dst = positions.find(p => p.id === edge.target);
+                        if (src && dst) {
+                            const dx = dst.x - src.x;
+                            const dy = dst.y - src.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+                            const force = distance * 0.01;
+                            
+                            src.x += force * dx / distance;
+                            src.y += force * dy / distance;
+                            dst.x -= force * dx / distance;
+                            dst.y -= force * dy / distance;
+                        }
+                    });
+                    
+                    // Keep in bounds
+                    positions.forEach(pos => {
+                        pos.x = Math.max(padding, Math.min(width - padding, pos.x));
+                        pos.y = Math.max(padding, Math.min(height - padding, pos.y));
+                    });
+                }
+            } else {
+                // Grid layout (default)
+                const cols = Math.ceil(Math.sqrt(nodes.length));
+                const cellW = (width - 2 * padding) / cols;
+                const cellH = (height - 2 * padding) / Math.ceil(nodes.length / cols);
+                
+                nodes.forEach((node, i) => {
+                    positions.push({
+                        id: node.id,
+                        x: padding + (i % cols) * cellW + cellW / 2,
+                        y: padding + Math.floor(i / cols) * cellH + cellH / 2
+                    });
+                });
+            }
+        }
+        
+        // Unified rendering function
+        function render() {
+            ctx.clearRect(0, 0, width, height);
+            
+            ctx.save();
+            if (backend !== 'jupyter') {
+                ctx.translate(camera.x, camera.y);
+            }
+            
+            // Draw edges
+            ctx.strokeStyle = theme === 'dark' ? '#666' : '#999';
+            ctx.lineWidth = backend === 'jupyter' ? 2 : 1;
+            edges.forEach(edge => {
+                const src = positions.find(p => p.id === edge.source);
+                const dst = positions.find(p => p.id === edge.target);
+                if (src && dst) {
+                    ctx.beginPath();
+                    ctx.moveTo(src.x, src.y);
+                    ctx.lineTo(dst.x, dst.y);
+                    ctx.stroke();
+                }
+            });
+            
+            // Draw nodes
+            nodes.forEach(node => {
+                const pos = positions.find(p => p.id === node.id);
+                if (pos) {
+                    ctx.fillStyle = node.color || (theme === 'dark' ? '#4CAF50' : '#007bff');
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, node.size || (backend === 'jupyter' ? 12 : 8), 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = theme === 'dark' ? '#fff' : '#333';
+                    ctx.lineWidth = backend === 'jupyter' ? 2 : 1;
+                    ctx.stroke();
+                    
+                    // Label
+                    ctx.fillStyle = theme === 'dark' ? '#fff' : '#000';
+                    ctx.font = backend === 'jupyter' ? 'bold 12px Arial' : '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(node.label || node.id, pos.x, pos.y + (backend === 'jupyter' ? 20 : -15));
+                }
+            });
+            
+            ctx.restore();
+        }
+        
+        // Backend-specific event handling
+        if (backend === 'jupyter') {
+            // Jupyter: Simple click handling only
+            canvas.onclick = function(e) {
+                console.log('Groggy viz: Canvas clicked at', e.offsetX, e.offsetY);
+            };
+        } else {
+            // File/Local/Streaming: Full interaction
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                lastMouse = { x: e.clientX, y: e.clientY };
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    camera.x += e.clientX - lastMouse.x;
+                    camera.y += e.clientY - lastMouse.y;
+                    lastMouse = { x: e.clientX, y: e.clientY };
+                    render();
+                }
+            });
+            
+            canvas.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+            
+            // Global functions for controls
+            if (typeof window !== 'undefined') {
+                window.resetView = function() {
+                    camera = { x: 0, y: 0 };
+                    calculateLayout();
+                    render();
+                };
+                
+                window.toggleLayout = function() {
+                    const layouts = ['circular', 'grid', 'force-directed'];
+                    const currentIndex = layouts.indexOf(currentLayout);
+                    currentLayout = layouts[(currentIndex + 1) % layouts.length];
+                    
+                    const layoutSpan = document.getElementById('current-layout');
+                    if (layoutSpan) layoutSpan.textContent = currentLayout;
+                    
+                    calculateLayout(currentLayout);
+                    render();
+                };
+            }
+        }
+        
+        // Initialize visualization
+        calculateLayout();
+        render();
+        
+        console.log(`Groggy viz (${backend}): Rendered ${nodes.length} nodes with ${currentLayout} layout`);
+    })();
+    </script>
+
+</body>
+</html>

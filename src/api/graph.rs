@@ -32,6 +32,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
+use crate::viz::VizModule;
 
 /*
 === THE GRAPH: MASTER COORDINATOR ===
@@ -2879,6 +2880,36 @@ impl Graph {
         let base_table = BaseTable::from_columns(columns_map)?;
         EdgesTable::from_base_table(base_table)
     }
+
+    /// 🎨 Get visualization module for unified rendering
+    /// 
+    /// This provides a single entry point for all visualization backends:
+    /// - Jupyter widgets
+    /// - WebSocket streaming servers
+    /// - Static file export (HTML, SVG, PNG, PDF)
+    /// - Local browser display
+    /// 
+    /// # Examples
+    /// 
+    /// ```rust
+    /// use groggy::Graph;
+    /// 
+    /// let mut graph = Graph::new();
+    /// graph.add_node("A", [("label", "Node A")].into());
+    /// graph.add_node("B", [("label", "Node B")].into());
+    /// graph.add_edge("A", "B", [("weight", 1.0)].into());
+    /// 
+    /// // Unified API - all use the same core engine
+    /// let widget = graph.viz().widget()?;           // Jupyter widget
+    /// let server = graph.viz().serve(Some(8080))?;  // Streaming server
+    /// graph.viz().save("graph.html")?;              // Static HTML
+    /// graph.viz().show()?;                          // Local browser
+    /// ```
+    pub fn viz(&self) -> VizModule {
+        // Create a GraphDataSource adapter for this graph
+        let graph_data_source = Arc::new(GraphDataSource::new(self));
+        VizModule::new(graph_data_source)
+    }
 }
 
 /*
@@ -2936,6 +2967,229 @@ fn extract_numeric(attr_value: &AttrValue) -> f64 {
 impl Default for Graph {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Adapter to make Graph compatible with DataSource trait for visualization
+/// 
+/// This adapter bridges the gap between the Graph API and the visualization system
+/// by implementing the DataSource trait required by VizModule.
+#[derive(Debug)]
+pub struct GraphDataSource {
+    /// We store basic graph info since Graph has complex internal structure
+    node_count: usize,
+    edge_count: usize,
+    is_directed: bool,
+    /// Cache of graph data for visualization
+    nodes: Vec<crate::viz::streaming::data_source::GraphNode>,
+    edges: Vec<crate::viz::streaming::data_source::GraphEdge>,
+}
+
+impl GraphDataSource {
+    /// Create a new adapter from a Graph reference
+    pub fn new(graph: &Graph) -> Self {
+        use crate::viz::streaming::data_source::{GraphNode, GraphEdge, Position};
+        
+        let mut nodes = Vec::new();
+        let mut edges = Vec::new();
+        
+        // Extract nodes
+        for (i, node_id) in graph.node_ids().iter().enumerate() {
+            let mut attributes = std::collections::HashMap::new();
+            attributes.insert("color".to_string(), AttrValue::Text("#007bff".to_string()));
+            attributes.insert("size".to_string(), AttrValue::Float(8.0f32));
+            
+            nodes.push(GraphNode {
+                id: node_id.to_string(),
+                label: Some(format!("Node {}", node_id)),
+                attributes,
+                position: Some(Position {
+                    x: (i as f64 * 50.0) % 800.0,
+                    y: (i as f64 * 50.0) % 600.0,
+                }),
+            });
+        }
+        
+        // Extract edges
+        for edge_id in graph.edge_ids() {
+            if let Some((source, target)) = graph.pool.borrow().get_edge_endpoints(edge_id) {
+                let mut attributes = std::collections::HashMap::new();
+                attributes.insert("color".to_string(), AttrValue::Text("#999".to_string()));
+                attributes.insert("width".to_string(), AttrValue::Float(1.0f32));
+                
+                edges.push(GraphEdge {
+                    id: edge_id.to_string(),
+                    source: source.to_string(),
+                    target: target.to_string(),
+                    label: None,
+                    weight: Some(1.0),
+                    attributes,
+                });
+            }
+        }
+        
+        Self {
+            node_count: graph.node_ids().len(),
+            edge_count: graph.edge_ids().len(),
+            is_directed: graph.config.graph_type == crate::types::GraphType::Directed,
+            nodes,
+            edges,
+        }
+    }
+}
+
+impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
+    fn total_rows(&self) -> usize {
+        self.node_count
+    }
+    
+    fn total_cols(&self) -> usize {
+        4 // id, label, x, y
+    }
+    
+    fn get_window(&self, start: usize, count: usize) -> crate::viz::streaming::data_source::DataWindow {
+        use crate::viz::streaming::data_source::{DataWindow, DataWindowMetadata, Position};
+        
+        let end = (start + count).min(self.nodes.len());
+        let window_nodes = &self.nodes[start..end];
+        
+        let headers = vec!["id".to_string(), "label".to_string(), "x".to_string(), "y".to_string()];
+        let mut rows = Vec::new();
+        
+        for node in window_nodes {
+            let position = node.position.unwrap_or(Position { x: 0.0, y: 0.0 });
+            let row = vec![
+                AttrValue::Text(node.id.clone()),
+                AttrValue::Text(node.label.clone().unwrap_or_default()),
+                AttrValue::Float(position.x as f32),
+                AttrValue::Float(position.y as f32),
+            ];
+            rows.push(row);
+        }
+        
+        DataWindow {
+            headers,
+            rows,
+            schema: self.get_schema(),
+            total_rows: self.nodes.len(),
+            start_offset: start,
+            metadata: DataWindowMetadata {
+                created_at: std::time::SystemTime::now(),
+                is_cached: false,
+                load_time_ms: 1,
+                extra: std::collections::HashMap::new(),
+            },
+        }
+    }
+    
+    fn get_schema(&self) -> crate::viz::streaming::data_source::DataSchema {
+        use crate::viz::streaming::data_source::DataSchema;
+        use crate::viz::display::ColumnSchema;
+        use crate::viz::display::DataType;
+        
+        DataSchema {
+            columns: vec![
+                ColumnSchema {
+                    name: "id".to_string(),
+                    data_type: DataType::String,
+                },
+                ColumnSchema {
+                    name: "label".to_string(),
+                    data_type: DataType::String,
+                },
+                ColumnSchema {
+                    name: "x".to_string(),
+                    data_type: DataType::Float,
+                },
+                ColumnSchema {
+                    name: "y".to_string(),
+                    data_type: DataType::Float,
+                },
+            ],
+            primary_key: Some("id".to_string()),
+            source_type: "graph".to_string(),
+        }
+    }
+    
+    fn supports_streaming(&self) -> bool {
+        true
+    }
+    
+    fn get_column_types(&self) -> Vec<crate::viz::display::DataType> {
+        use crate::viz::display::DataType;
+        vec![DataType::String, DataType::String, DataType::Float, DataType::Float]
+    }
+    
+    fn get_column_names(&self) -> Vec<String> {
+        vec!["id".to_string(), "label".to_string(), "x".to_string(), "y".to_string()]
+    }
+    
+    fn get_source_id(&self) -> String {
+        format!("graph-{}", std::ptr::addr_of!(*self) as usize)
+    }
+    
+    fn get_version(&self) -> u64 {
+        1 // Simple version for now
+    }
+    
+    // Graph visualization support
+    fn supports_graph_view(&self) -> bool {
+        true
+    }
+    
+    fn get_graph_nodes(&self) -> Vec<crate::viz::streaming::data_source::GraphNode> {
+        self.nodes.clone()
+    }
+    
+    fn get_graph_edges(&self) -> Vec<crate::viz::streaming::data_source::GraphEdge> {
+        self.edges.clone()
+    }
+    
+    fn get_graph_metadata(&self) -> crate::viz::streaming::data_source::GraphMetadata {
+        use crate::viz::streaming::data_source::GraphMetadata;
+        
+        GraphMetadata {
+            node_count: self.node_count,
+            edge_count: self.edge_count,
+            is_directed: self.is_directed,
+            has_weights: true,
+            ..Default::default()
+        }
+    }
+    
+    fn compute_layout(&self, algorithm: crate::viz::streaming::data_source::LayoutAlgorithm) -> Vec<crate::viz::streaming::data_source::NodePosition> {
+        use crate::viz::streaming::data_source::{NodePosition, Position};
+        
+        let mut positions = Vec::new();
+        
+        match algorithm {
+            crate::viz::streaming::data_source::LayoutAlgorithm::ForceDirected { .. } => {
+                // Force-directed layout (circular for now)
+                for (i, node) in self.nodes.iter().enumerate() {
+                    let angle = (i as f64) * 2.0 * std::f64::consts::PI / (self.nodes.len() as f64);
+                    let radius = 200.0;
+                    positions.push(NodePosition {
+                        node_id: node.id.clone(),
+                        position: Position {
+                            x: 400.0 + radius * angle.cos(),
+                            y: 300.0 + radius * angle.sin(),
+                        },
+                    });
+                }
+            }
+            _ => {
+                // Default layout - use existing positions from nodes
+                for node in &self.nodes {
+                    let position = node.position.unwrap_or(Position { x: 0.0, y: 0.0 });
+                    positions.push(NodePosition {
+                        node_id: node.id.clone(),
+                        position,
+                    });
+                }
+            }
+        }
+        
+        positions
     }
 }
 
