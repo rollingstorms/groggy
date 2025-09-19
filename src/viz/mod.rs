@@ -2,6 +2,12 @@
 //! 
 //! Unified visualization system combining streaming tables and interactive graphs.
 //! Built on existing display and streaming infrastructure.
+//!
+//! The new unified approach uses a single render() method with backend switching:
+//! - render(backend=VizBackend::Jupyter) - Jupyter notebook embedding
+//! - render(backend=VizBackend::Streaming) - Interactive WebSocket server
+//! - render(backend=VizBackend::File) - Static file export (HTML/SVG/PNG)
+//! - render(backend=VizBackend::Local) - Self-contained HTML
 
 use std::sync::Arc;
 use std::net::IpAddr;
@@ -10,11 +16,78 @@ use streaming::websocket_server::{StreamingServer, StreamingConfig};
 use streaming::data_source::{DataSource, LayoutAlgorithm, HierarchicalDirection};
 use streaming::virtual_scroller::VirtualScrollConfig;
 
+/// Visualization backend options for unified rendering
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VizBackend {
+    /// Jupyter notebook embedding with optimized display
+    Jupyter,
+    /// WebSocket interactive server with real-time updates
+    Streaming,
+    /// Static file export (HTML/SVG/PNG)
+    File,
+    /// Self-contained HTML with embedded data
+    Local,
+}
+
+impl VizBackend {
+    /// Convert string to VizBackend with validation
+    pub fn from_string(backend: &str) -> GraphResult<Self> {
+        match backend.to_lowercase().as_str() {
+            "jupyter" => Ok(VizBackend::Jupyter),
+            "streaming" => Ok(VizBackend::Streaming),
+            "file" => Ok(VizBackend::File),
+            "local" => Ok(VizBackend::Local),
+            _ => Err(GraphError::InvalidInput(
+                format!("Invalid backend '{}'. Expected: jupyter, streaming, file, or local", backend)
+            )),
+        }
+    }
+    
+    /// Convert to string representation
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            VizBackend::Jupyter => "jupyter",
+            VizBackend::Streaming => "streaming", 
+            VizBackend::File => "file",
+            VizBackend::Local => "local",
+        }
+    }
+}
+
+/// Unified render options for all backends
+#[derive(Debug, Clone, Default)]
+pub struct RenderOptions {
+    // Universal parameters
+    pub layout: Option<LayoutAlgorithm>,
+    pub theme: Option<String>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub title: Option<String>,
+    
+    // Backend-specific parameters
+    pub port: Option<u16>,              // For streaming backend
+    pub filename: Option<String>,       // For file backend
+    pub format: Option<ExportFormat>,   // For file backend
+    pub dpi: Option<u32>,              // For file backend
+    pub auto_open: Option<bool>,       // For streaming backend
+}
+
+/// Result of rendering operation (different types for different backends)
+pub enum RenderResult {
+    /// HTML content (for jupyter and local backends)
+    Html(String),
+    /// Interactive visualization session (for streaming backend)
+    Interactive(InteractiveViz),
+    /// Static visualization result (for file backend)
+    Static(StaticViz),
+}
+
 // Migrated infrastructure modules
 pub mod streaming;  // Migrated from core/streaming
 pub mod display;    // Migrated from core/display
 
 // New visualization modules
+pub mod core;       // ✅ Unified visualization core engine
 pub mod layouts;    // Graph layout algorithms
 pub mod themes;     // Graph visualization themes
 
@@ -37,6 +110,107 @@ impl VizModule {
             data_source,
             config: VizConfig::default(),
         }
+    }
+
+    /// 🎯 UNIFIED VISUALIZATION METHOD - The One Command To Rule Them All
+    ///
+    /// This is the new unified approach that replaces separate methods with
+    /// a single command that adapts to different backends.
+    ///
+    /// # Arguments
+    /// * `backend` - Target backend (Jupyter/Streaming/File/Local)
+    /// * `options` - Backend-specific options and universal parameters
+    ///
+    /// # Returns
+    /// * `RenderResult` - Different return types based on backend
+    ///
+    /// # Examples
+    /// ```rust
+    /// use groggy::viz::{VizModule, VizBackend, RenderOptions};
+    /// 
+    /// // Jupyter notebook embedding
+    /// let result = viz_module.render(VizBackend::Jupyter, RenderOptions::default())?;
+    /// 
+    /// // Interactive server
+    /// let result = viz_module.render(VizBackend::Streaming, RenderOptions {
+    ///     port: Some(8080),
+    ///     ..Default::default()
+    /// })?;
+    /// 
+    /// // Static file export
+    /// let result = viz_module.render(VizBackend::File, RenderOptions {
+    ///     filename: Some("graph.html".to_string()),
+    ///     ..Default::default()
+    /// })?;
+    /// ```
+    pub fn render(&self, backend: VizBackend, options: RenderOptions) -> GraphResult<RenderResult> {
+        match backend {
+            VizBackend::Jupyter => self.render_jupyter(options),
+            VizBackend::Streaming => self.render_streaming(options),
+            VizBackend::File => self.render_file(options),
+            VizBackend::Local => self.render_local(options),
+        }
+    }
+
+    /// Render for Jupyter notebook with optimized embedding
+    fn render_jupyter(&self, options: RenderOptions) -> GraphResult<RenderResult> {
+        // Generate Jupyter-optimized HTML
+        let html = self.generate_jupyter_html(&options)?;
+        Ok(RenderResult::Html(html))
+    }
+
+    /// Render for streaming WebSocket server
+    fn render_streaming(&self, options: RenderOptions) -> GraphResult<RenderResult> {
+        // Delegate to existing interactive method
+        let interactive_opts = InteractiveOptions {
+            port: options.port.unwrap_or(8080),
+            layout: options.layout.unwrap_or(LayoutAlgorithm::ForceDirected { 
+                charge: -30.0, 
+                distance: 50.0, 
+                iterations: 100 
+            }),
+            theme: options.theme.unwrap_or_else(|| "light".to_string()),
+            width: options.width.unwrap_or(800),
+            height: options.height.unwrap_or(600),
+            interactions: InteractionConfig::default(),
+        };
+        
+        let interactive_viz = self.interactive(Some(interactive_opts))?;
+        Ok(RenderResult::Interactive(interactive_viz))
+    }
+
+    /// Render for static file export
+    fn render_file(&self, options: RenderOptions) -> GraphResult<RenderResult> {
+        let filename = options.filename.ok_or_else(|| {
+            GraphError::InvalidInput("filename is required for file backend".to_string())
+        })?;
+
+        let format = options.format.unwrap_or(ExportFormat::HTML);
+        
+        // Delegate to existing static_viz method
+        let static_opts = StaticOptions {
+            filename,
+            format,
+            layout: options.layout.unwrap_or(LayoutAlgorithm::ForceDirected { 
+                charge: -30.0, 
+                distance: 50.0, 
+                iterations: 100 
+            }),
+            theme: options.theme.unwrap_or_else(|| "light".to_string()),
+            dpi: options.dpi.unwrap_or(300),
+            width: options.width.unwrap_or(800),
+            height: options.height.unwrap_or(600),
+        };
+        
+        let static_viz = self.static_viz(static_opts)?;
+        Ok(RenderResult::Static(static_viz))
+    }
+
+    /// Render for self-contained HTML
+    fn render_local(&self, options: RenderOptions) -> GraphResult<RenderResult> {
+        // Generate self-contained HTML
+        let html = self.generate_local_html(&options)?;
+        Ok(RenderResult::Html(html))
     }
 
     /// Launch interactive browser-based visualization using streaming infrastructure
@@ -497,6 +671,82 @@ impl VizModule {
     </script>
 </body>
 </html>"###.to_string())
+    }
+
+    /// Generate Jupyter-optimized HTML for embedding
+    fn generate_jupyter_html(&self, options: &RenderOptions) -> GraphResult<String> {
+        // Get graph data from the data source
+        let nodes = self.data_source.get_graph_nodes();
+        let edges = self.data_source.get_graph_edges();
+        let metadata = self.data_source.get_graph_metadata();
+        
+        // Convert to JSON
+        let nodes_json = serde_json::to_string(&nodes)
+            .map_err(|e| GraphError::internal(&format!("Failed to serialize nodes: {}", e), "generate_jupyter_html"))?;
+        let edges_json = serde_json::to_string(&edges)
+            .map_err(|e| GraphError::internal(&format!("Failed to serialize edges: {}", e), "generate_jupyter_html"))?;
+        
+        let width = options.width.unwrap_or(800);
+        let height = options.height.unwrap_or(600);
+        let canvas_id = format!("viz-canvas-{}", std::ptr::addr_of!(*self) as usize);
+        
+        // Generate Jupyter-optimized HTML (simpler than full template for embedding)
+        let html = format!(r###"
+<div style="width: {}px; height: {}px; border: 1px solid #ddd; position: relative; background: #fafafa;">
+    <canvas id="{}" width="{}" height="{}" 
+            style="display: block; background: white;"></canvas>
+    <div style="position: absolute; top: 5px; right: 5px; font-size: 12px; color: #666;">
+        {} nodes, {} edges
+    </div>
+    <script>
+    // Jupyter-optimized visualization with embedded data
+    const nodes = {};
+    const edges = {};
+    console.log('Jupyter viz loaded:', nodes.length, 'nodes', edges.length, 'edges');
+    </script>
+</div>
+"###, width, height, canvas_id, width, height, metadata.node_count, metadata.edge_count, 
+             nodes_json, edges_json);
+        
+        Ok(html)
+    }
+
+    /// Generate self-contained HTML for local use
+    fn generate_local_html(&self, options: &RenderOptions) -> GraphResult<String> {
+        // For local HTML, we can reuse the existing static HTML generation
+        let nodes = self.data_source.get_graph_nodes();
+        let edges = self.data_source.get_graph_edges();
+        let metadata = self.data_source.get_graph_metadata();
+        
+        // Convert to JSON
+        let nodes_json = serde_json::to_string(&nodes)
+            .map_err(|e| GraphError::internal(&format!("Failed to serialize nodes: {}", e), "generate_local_html"))?;
+        let edges_json = serde_json::to_string(&edges)
+            .map_err(|e| GraphError::internal(&format!("Failed to serialize edges: {}", e), "generate_local_html"))?;
+        
+        // Read the HTML template
+        let html_template = self.get_html_template()?;
+        
+        let width = options.width.unwrap_or(800);
+        let height = options.height.unwrap_or(600);
+        let layout = options.layout.as_ref().map(|l| format!("{:?}", l).to_lowercase()).unwrap_or_else(|| "force-directed".to_string());
+        let theme = options.theme.as_ref().map(|s| s.as_str()).unwrap_or("light");
+        let title = options.title.as_ref().map(|s| s.as_str()).unwrap_or("Graph Visualization");
+        
+        // Replace template variables
+        let html = html_template
+            .replace("{{TITLE}}", title)
+            .replace("{{NODE_COUNT}}", &metadata.node_count.to_string())
+            .replace("{{EDGE_COUNT}}", &metadata.edge_count.to_string())
+            .replace("{{WIDTH}}", &width.to_string())
+            .replace("{{HEIGHT}}", &height.to_string())
+            .replace("{{LAYOUT}}", &layout)
+            .replace("{{THEME}}", theme)
+            .replace("{{NODES_JSON}}", &nodes_json)
+            .replace("{{EDGES_JSON}}", &edges_json)
+            .replace("{{USE_WEBSOCKET}}", "false");
+        
+        Ok(html)
     }
 
     /// Update the configuration for this visualization module

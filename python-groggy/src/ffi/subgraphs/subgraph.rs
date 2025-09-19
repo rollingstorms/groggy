@@ -20,6 +20,7 @@ use crate::ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor}; // Essen
 use crate::ffi::storage::array::PyBaseArray;
 use crate::PyNumArray;
 use crate::ffi::storage::components::PyComponentsArray;
+use crate::ffi::viz::PyVizModule;
 // use crate::ffi::storage::table::PyBaseTable; // Temporarily disabled
 
 /// Python wrapper for core Subgraph - Pure delegation to existing trait methods

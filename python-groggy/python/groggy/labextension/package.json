@@ -1,0 +1,38 @@
+{
+  "name": "groggy-widgets",
+  "version": "0.1.0",
+  "description": "Interactive Jupyter widget for Groggy graph visualization",
+  "keywords": ["jupyter", "widget", "graph", "visualization"],
+  "homepage": "https://github.com/groggy-dev/groggy",
+  "bugs": {
+    "url": "https://github.com/groggy-dev/groggy/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Groggy Development Team",
+    "email": "dev@groggy.dev"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/**/*.d.ts"
+  ],
+  "main": "lib/index.js",
+  "module": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/groggy-dev/groggy.git"
+  },
+  "jupyterlab": {
+    "extension": true,
+    "sharedPackages": {
+      "@jupyter-widgets/base": {
+        "singleton": true,
+        "strictVersion": false
+      }
+    }
+  },
+  "peerDependencies": {
+    "@jupyter-widgets/base": "^6.0.0"
+  }
+}

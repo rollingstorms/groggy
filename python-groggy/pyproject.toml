@@ -23,6 +23,9 @@ python-source = "python"
 module-name = "groggy._groggy"
 bindings = "pyo3"
 features = ["pyo3/extension-module"]
+include = [
+    "python/groggy/labextension/**/*"
+]
 
 [project.optional-dependencies]
 dev = [
@@ -30,4 +33,8 @@ dev = [
     "pytest-benchmark",
     "numpy",
     "pandas"
+]
+widgets = [
+    "ipywidgets>=7.6.0",
+    "jupyterlab>=3.0.0"
 ]

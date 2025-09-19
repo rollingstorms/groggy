@@ -227,3 +227,31 @@ SubgraphArray = add_viz_accessor(SubgraphArray)
 
 # Note: Arrays and matrices can be visualized but may need special handling
 # for now we focus on the main graph structures
+
+# Widget auto-loading for production experience (like Plotly)
+def _setup_widget_environment():
+    """Set up widget environment for seamless Jupyter integration."""
+    try:
+        # Check if we're in Jupyter
+        from IPython import get_ipython
+        if get_ipython() is not None:
+            # Auto-load widget JavaScript
+            from .widgets.widget_loader import auto_load_widget
+            auto_load_widget()
+    except (ImportError, Exception):
+        # Not in Jupyter or widget loading failed - that's fine
+        pass
+
+# Auto-setup when groggy is imported (production-ready experience)
+_setup_widget_environment()
+
+def _jupyter_labextension_paths():
+    """
+    Discovery hook for JupyterLab federated extensions.
+    
+    This tells JupyterLab where to find our widget extension.
+    """
+    return [{
+        "src": "labextension",  # Directory inside the groggy package
+        "dest": "groggy-widgets",  # Must match NPM package name and Python _model_module
+    }]
