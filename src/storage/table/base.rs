@@ -6,6 +6,7 @@ use crate::errors::GraphResult;
 use crate::types::AttrValue;
 use crate::viz::display::{DisplayEngine, DisplayConfig, ColumnSchema, DataType, OutputFormat};
 use crate::core::{DisplayDataWindow, DisplayDataSchema, StreamingDataWindow, StreamingDataSchema};
+use crate::viz::streaming::data_source::{DataWindow, DataSchema};
 use crate::viz::streaming::{DataSource, StreamingServer, StreamingConfig};
 use crate::viz::streaming::data_source::{GraphNode, LayoutAlgorithm, NodePosition};
 use crate::viz::{VizModule, InteractiveOptions};
@@ -1154,6 +1155,7 @@ impl BaseTable {
     }
 }
 
+
 // File I/O Implementation
 impl BaseTable {
     /// Export table to CSV file
@@ -2268,26 +2270,135 @@ impl BaseTable {
     }
     
     /// Generate embedded iframe HTML for Jupyter notebooks
-    pub fn interactive_embed(&mut self, _config: Option<InteractiveConfig>) -> GraphResult<String> {
-        // TODO: Update to work with VizModule after Phase 3 delegation pattern is complete
-        // The interactive() method now returns VizModule instead of BrowserInterface
-        
-        // For now, return a placeholder
-        let iframe_html = format!(r#"
-            <div style="padding: 20px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
-                <p>📊 Interactive table visualization (Phase 3 migration in progress)</p>
-                <p style="font-size: 12px; color: #666;">
-                    {} rows × {} columns - Use .interactive() method for full VizModule access
-                </p>
-            </div>
-        "#, 
-            self.total_rows(), 
-            self.total_cols()
+    ///
+    /// This method bridges table streaming to the unified viz/streaming infrastructure.
+    /// It starts a WebSocket server and returns iframe HTML for embedding.
+    ///
+    /// # Arguments
+    /// * `config` - Optional interactive configuration (port, theme, etc.)
+    ///
+    /// # Returns
+    /// * `Ok(String)` - HTML iframe code for embedding
+    /// * `Err(GraphError)` - If server failed to start
+    ///
+    /// # Examples
+    /// ```rust
+    /// let iframe_html = table.interactive_embed(None)?;
+    /// // Use iframe_html in Jupyter notebook or web page
+    /// ```
+    pub fn interactive_embed(&mut self, config: Option<InteractiveConfig>) -> GraphResult<String> {
+        use crate::viz::streaming::{StreamingServer, StreamingConfig};
+        use std::sync::Arc;
+
+        // Use provided config or default
+        let config = config.unwrap_or_default();
+
+        // Create data source from this table
+        let data_source: Arc<dyn crate::viz::streaming::DataSource> = Arc::new(self.clone());
+
+        // Configure streaming server
+        let streaming_config = StreamingConfig {
+            port: config.port,
+            max_connections: 100,
+            auto_broadcast: true,
+            update_throttle_ms: 100,
+            scroll_config: crate::viz::streaming::VirtualScrollConfig::default(),
+        };
+
+        // Create and start server
+        let server = StreamingServer::new(data_source, streaming_config);
+
+        // Start server with automatic port assignment if port=0
+        let addr = std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1));
+        let handle = server.start_background(addr, config.port)
+            .map_err(|e| crate::errors::GraphError::InvalidInput(
+                format!("Failed to start streaming server: {}", e)
+            ))?;
+
+        let actual_port = handle.port;
+
+        // Store handle to keep server alive
+        self.active_server_handles.push(handle);
+
+        // Generate iframe HTML
+        let iframe_html = format!(
+            r#"<iframe src="http://127.0.0.1:{port}" width="100%" height="420" style="border:0;border-radius:12px;"></iframe>"#,
+            port = actual_port
         );
-        
+
         Ok(iframe_html)
     }
-    
+
+    /// Close all active streaming servers for this table
+    pub fn close_streaming(&mut self) {
+        self.active_server_handles.clear(); // Dropping handles stops servers
+    }
+
+    /// Convert AttrValue to a primitive AttrValue that serializes to simple JSON
+    /// This function only returns Int, Float, Text, Bool, or Null - no complex enum variants
+    fn attr_value_to_primitive_value(&self, value: &AttrValue) -> AttrValue {
+        match value {
+            // Simple primitive types - pass through directly
+            AttrValue::Int(i) => AttrValue::Int(*i),
+            AttrValue::Float(f) => AttrValue::Float(*f),
+            AttrValue::Text(s) => AttrValue::Text(s.clone()),
+            AttrValue::Bool(b) => AttrValue::Bool(*b),
+            AttrValue::Null => AttrValue::Null,
+
+            // Convert all other types to their string representation
+            AttrValue::SmallInt(i) => AttrValue::Text(i.to_string()), // Convert to text to avoid enum variant
+            AttrValue::CompactText(s) => AttrValue::Text(s.as_str().to_string()),
+            AttrValue::FloatVec(v) => AttrValue::Text(
+                format!("[{}]", v.iter().map(|f| f.to_string()).collect::<Vec<_>>().join(", "))
+            ),
+            AttrValue::Bytes(b) => AttrValue::Text(format!("bytes[{}]", b.len())),
+            AttrValue::CompressedText(cd) => {
+                match cd.decompress_text() {
+                    Ok(text) => AttrValue::Text(text),
+                    Err(_) => AttrValue::Text("[compressed text]".to_string()),
+                }
+            },
+            AttrValue::CompressedFloatVec(_) => AttrValue::Text("[compressed float vec]".to_string()),
+            AttrValue::SubgraphRef(id) => AttrValue::Text(format!("subgraph:{}", id)),
+            AttrValue::NodeArray(nodes) => AttrValue::Text(format!("nodes[{}]", nodes.len())),
+            AttrValue::EdgeArray(edges) => AttrValue::Text(format!("edges[{}]", edges.len())),
+        }
+    }
+
+    /// Convert AttrValue to a simple JSON-compatible value for frontend rendering (unused now)
+    fn attr_value_to_display_value(&self, value: &AttrValue) -> serde_json::Value {
+        match value {
+            // Simple types - convert to JSON primitives
+            AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
+            AttrValue::SmallInt(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
+            AttrValue::Float(f) => {
+                serde_json::Value::Number(
+                    serde_json::Number::from_f64(*f as f64).unwrap_or(serde_json::Number::from(0))
+                )
+            },
+            AttrValue::Text(s) => serde_json::Value::String(s.clone()),
+            AttrValue::CompactText(s) => serde_json::Value::String(s.as_str().to_string()),
+            AttrValue::Bool(b) => serde_json::Value::Bool(*b),
+            AttrValue::Null => serde_json::Value::Null,
+
+            // Complex types - convert to readable strings
+            AttrValue::FloatVec(v) => serde_json::Value::String(
+                format!("[{}]", v.iter().map(|f| f.to_string()).collect::<Vec<_>>().join(", "))
+            ),
+            AttrValue::Bytes(b) => serde_json::Value::String(format!("bytes[{}]", b.len())),
+            AttrValue::CompressedText(cd) => {
+                match cd.decompress_text() {
+                    Ok(text) => serde_json::Value::String(text),
+                    Err(_) => serde_json::Value::String("[compressed text]".to_string()),
+                }
+            },
+            AttrValue::CompressedFloatVec(_) => serde_json::Value::String("[compressed float vec]".to_string()),
+            AttrValue::SubgraphRef(id) => serde_json::Value::String(format!("subgraph:{}", id)),
+            AttrValue::NodeArray(nodes) => serde_json::Value::String(format!("nodes[{}]", nodes.len())),
+            AttrValue::EdgeArray(edges) => serde_json::Value::String(format!("edges[{}]", edges.len())),
+        }
+    }
+
     /// Increment version for cache invalidation
     pub fn increment_version(&mut self) {
         self.version += 1;
@@ -2327,48 +2438,94 @@ impl DataSource for BaseTable {
         self.column_order.len()
     }
     
-    fn get_window(&self, start: usize, count: usize) -> StreamingDataWindow {
+    fn get_window(&self, start: usize, count: usize) -> DataWindow {
+        use crate::viz::streaming::data_source::DataWindowMetadata;
+
         let end = std::cmp::min(start + count, self.nrows);
         let actual_count = end.saturating_sub(start);
-        
+
         if actual_count == 0 || start >= self.nrows {
-            return StreamingDataWindow::new(
-                self.column_names().to_vec(),
-                vec![],
-                self.get_schema(),
-                self.nrows,
-                start,
-            );
+            return DataWindow {
+                headers: self.column_names().to_vec(),
+                rows: vec![],
+                schema: DataSchema {
+                    columns: self.column_order.iter().map(|name| ColumnSchema {
+                        name: name.clone(),
+                        data_type: DataType::String,
+                    }).collect(),
+                    primary_key: None,
+                    source_type: "BaseTable".to_string(),
+                },
+                total_rows: self.nrows,
+                start_offset: start,
+                metadata: DataWindowMetadata {
+                    created_at: std::time::SystemTime::now(),
+                    is_cached: false,
+                    load_time_ms: 0,
+                    extra: HashMap::new(),
+                },
+            };
         }
-        
-        // Extract rows for the window
+
+        // Extract rows for the window, converting to string values to avoid AttrValue serialization issues
         let mut rows = Vec::with_capacity(actual_count);
-        
+
         for row_idx in start..end {
             let mut row = Vec::with_capacity(self.column_order.len());
-            
+
             for col_name in &self.column_order {
                 if let Some(column) = self.columns.get(col_name) {
-                    let value = column.get(row_idx).cloned().unwrap_or(AttrValue::Null);
-                    row.push(value);
+                    let attr_value = column.get(row_idx).cloned().unwrap_or(AttrValue::Null);
+                    // Convert to string representation to bypass AttrValue enum serialization
+                    let string_value = match &attr_value {
+                        AttrValue::Int(i) => AttrValue::Text(i.to_string()),
+                        AttrValue::SmallInt(i) => AttrValue::Text(i.to_string()),
+                        AttrValue::Float(f) => AttrValue::Text(f.to_string()),
+                        AttrValue::Bool(b) => AttrValue::Text(b.to_string()),
+                        AttrValue::Text(s) => AttrValue::Text(s.clone()),
+                        AttrValue::CompactText(s) => AttrValue::Text(s.as_str().to_string()),
+                        AttrValue::Null => AttrValue::Text("".to_string()),
+                        _ => AttrValue::Text(format!("{:?}", attr_value)), // Fallback for complex types
+                    };
+                    row.push(string_value);
                 } else {
-                    row.push(AttrValue::Null);
+                    row.push(AttrValue::Text("".to_string())); // Empty string for missing columns
                 }
             }
-            
+
             rows.push(row);
         }
-        
-        StreamingDataWindow::new(
-            self.column_names().to_vec(),
+
+        DataWindow {
+            headers: self.column_names().to_vec(),
             rows,
-            self.get_schema(),
-            self.nrows,
-            start,
-        )
+            schema: DataSchema {
+                columns: self.column_order.iter().map(|name| {
+                    let data_type = if let Some(column) = self.columns.get(name) {
+                        self.infer_column_data_type(column)
+                    } else {
+                        DataType::String
+                    };
+                    ColumnSchema {
+                        name: name.clone(),
+                        data_type,
+                    }
+                }).collect(),
+                primary_key: None,
+                source_type: "BaseTable".to_string(),
+            },
+            total_rows: self.nrows,
+            start_offset: start,
+            metadata: DataWindowMetadata {
+                created_at: std::time::SystemTime::now(),
+                is_cached: false,
+                load_time_ms: 0,
+                extra: HashMap::new(),
+            },
+        }
     }
     
-    fn get_schema(&self) -> StreamingDataSchema {
+    fn get_schema(&self) -> DataSchema {
         let mut columns = Vec::new();
         
         for col_name in &self.column_order {
@@ -2384,7 +2541,7 @@ impl DataSource for BaseTable {
             });
         }
         
-        StreamingDataSchema {
+        DataSchema {
             columns,
             primary_key: None, // BaseTable doesn't enforce primary keys
             source_type: "BaseTable".to_string(),

@@ -90,6 +90,7 @@ pub mod display;    // Migrated from core/display
 pub mod core;       // ✅ Unified visualization core engine
 pub mod layouts;    // Graph layout algorithms
 pub mod themes;     // Graph visualization themes
+pub mod unified;    // ✅ Unified API entry point
 
 // Legacy - deprecated in favor of unified streaming infrastructure
 // pub mod server;
