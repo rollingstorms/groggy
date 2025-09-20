@@ -95,12 +95,9 @@ impl StreamingServer {
         // Poison-pill guard: detect any tagged AttrValue JSON
         if json.contains(r#""Text":"#) || json.contains(r#""SmallInt":"#) || json.contains(r#""Int":"#) || 
            json.contains(r#""Float":"#) || json.contains(r#""Bool":"#) || json.contains(r#""CompactText":"#) {
-            eprintln!("🚨🚨🚨 [WS POISON GUARD] Tagged AttrValue leaked into WS payload! 🚨🚨🚨");
-            eprintln!("🚨 Payload sample: {}", &json[..std::cmp::min(500, json.len())]);
             return Err(StreamingError::WebSocket("Poison guard: tagged AttrValue detected in WebSocket message".to_string()));
         }
         
-        eprintln!("✅ WS Guard passed - sending clean payload");
         ws_sender.send(tokio_tungstenite::tungstenite::Message::Text(json)).await
             .map_err(|e| StreamingError::WebSocket(format!("Failed to send WebSocket message: {}", e)))?;
         
@@ -280,24 +277,8 @@ impl StreamingServer {
         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
         // Send initial data
-        println!("🚨🚨🚨 STARTING WEBSOCKET CONNECTION HANDLER 🚨🚨🚨");
         let initial_window = self.virtual_scroller.get_visible_window(self.data_source.as_ref())?;
-        
-        // FORCED DEBUG: Create a test window to verify our conversion is working
-        println!("🚨 DEBUG: About to test conversion function");
-        let test_window = &initial_window;
-        println!("🚨 DEBUG: Initial window has {} rows", test_window.rows.len());
-        for (i, row) in test_window.rows.iter().take(3).enumerate() {
-            println!("🚨 DEBUG: Row {} has {} cols", i, row.len());
-            for (j, attr) in row.iter().take(3).enumerate() {
-                println!("🚨 DEBUG: Cell [{},{}] = {:?}", i, j, attr);
-            }
-        }
-        
         let converted_window = data_window_to_json(&initial_window);
-        
-        println!("🚨 About to create WSMessage with converted window");
-        println!("🚨 First row data: {:?}", converted_window.rows.get(0));
         
         let initial_msg = WSMessage::InitialData {
             window: converted_window,
@@ -2155,35 +2136,16 @@ fn attr_value_to_display_text(attr: &crate::types::AttrValue) -> String {
 fn attr_value_to_json(attr: &crate::types::AttrValue) -> serde_json::Value {
     use crate::types::AttrValue;
     
-    let result = match attr {
-        AttrValue::Int(i) => {
-            println!("🔄 Converting Int({}) to JSON", i);
-            serde_json::Value::Number(serde_json::Number::from(*i))
-        },
-        AttrValue::Float(f) => {
-            println!("🔄 Converting Float({}) to JSON", f);
-            serde_json::Number::from_f64(*f as f64)
-                .map(serde_json::Value::Number)
-                .unwrap_or(serde_json::Value::Null)
-        },
-        AttrValue::Text(s) => {
-            println!("🔄 Converting Text({}) to JSON", s);
-            serde_json::Value::String(s.clone())
-        },
-        AttrValue::Bool(b) => {
-            println!("🔄 Converting Bool({}) to JSON", b);
-            serde_json::Value::Bool(*b)
-        },
-        AttrValue::CompactText(s) => {
-            println!("🔄 Converting CompactText({}) to JSON", s.as_str());
-            serde_json::Value::String(s.as_str().to_string())
-        },
-        AttrValue::SmallInt(i) => {
-            println!("🔄 Converting SmallInt({}) to JSON", i);
-            serde_json::Value::Number(serde_json::Number::from(*i))
-        },
+    match attr {
+        AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
+        AttrValue::Float(f) => serde_json::Number::from_f64(*f as f64)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        AttrValue::Text(s) => serde_json::Value::String(s.clone()),
+        AttrValue::Bool(b) => serde_json::Value::Bool(*b),
+        AttrValue::CompactText(s) => serde_json::Value::String(s.as_str().to_string()),
+        AttrValue::SmallInt(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
         AttrValue::FloatVec(v) => {
-            println!("🔄 Converting FloatVec({:?}) to JSON", v);
             let vec: Vec<serde_json::Value> = v.iter()
                 .map(|&f| serde_json::Number::from_f64(f as f64)
                     .map(serde_json::Value::Number)
@@ -2191,60 +2153,27 @@ fn attr_value_to_json(attr: &crate::types::AttrValue) -> serde_json::Value {
                 .collect();
             serde_json::Value::Array(vec)
         },
-        AttrValue::Bytes(b) => {
-            println!("🔄 Converting Bytes({} bytes) to JSON", b.len());
-            serde_json::Value::String(format!("[{} bytes]", b.len()))
-        },
-        AttrValue::CompressedText(_) => {
-            println!("🔄 Converting CompressedText to JSON");
-            serde_json::Value::String("[Compressed Text]".to_string())
-        },
-        AttrValue::CompressedFloatVec(_) => {
-            println!("🔄 Converting CompressedFloatVec to JSON");
-            serde_json::Value::String("[Compressed FloatVec]".to_string())
-        },
-        AttrValue::SubgraphRef(id) => {
-            println!("🔄 Converting SubgraphRef({}) to JSON", id);
-            serde_json::Value::String(format!("[Subgraph:{}]", id))
-        },
-        AttrValue::NodeArray(nodes) => {
-            println!("🔄 Converting NodeArray({} nodes) to JSON", nodes.len());
-            serde_json::Value::String(format!("[{} nodes]", nodes.len()))
-        },
-        AttrValue::EdgeArray(edges) => {
-            println!("🔄 Converting EdgeArray({} edges) to JSON", edges.len());
-            serde_json::Value::String(format!("[{} edges]", edges.len()))
-        },
-        AttrValue::Null => {
-            println!("🔄 Converting Null to JSON");
-            serde_json::Value::Null
-        },
-    };
-    
-    println!("🔄 Result: {:?}", result);
-    result
+        AttrValue::Bytes(b) => serde_json::Value::String(format!("[{} bytes]", b.len())),
+        AttrValue::CompressedText(_) => serde_json::Value::String("[Compressed Text]".to_string()),
+        AttrValue::CompressedFloatVec(_) => serde_json::Value::String("[Compressed FloatVec]".to_string()),
+        AttrValue::SubgraphRef(id) => serde_json::Value::String(format!("[Subgraph:{}]", id)),
+        AttrValue::NodeArray(nodes) => serde_json::Value::String(format!("[{} nodes]", nodes.len())),
+        AttrValue::EdgeArray(edges) => serde_json::Value::String(format!("[{} edges]", edges.len())),
+        AttrValue::Null => serde_json::Value::Null,
+    }
 }
 
 /// Convert DataWindow to clean JSON for WebSocket transmission  
 fn data_window_to_json(window: &DataWindow) -> JsonDataWindow {
-    eprintln!("�🚨🚨 CONVERSION FUNCTION CALLED WITH {} ROWS 🚨🚨🚨", window.rows.len());
     
     let clean_rows: Vec<Vec<WireCell>> = window.rows.iter()
-        .enumerate()
-        .map(|(row_idx, row)| {
-            if row_idx < 3 {
-                eprintln!("�🚨🚨 PROCESSING ROW {} 🚨🚨🚨", row_idx);
-            }
-            row.iter().enumerate().map(|(col_idx, attr)| {
-                if row_idx < 3 && col_idx < 3 {
-                    eprintln!("�🚨🚨 CONVERTING ATTR AT [{},{}]: {:?} 🚨🚨🚨", row_idx, col_idx, attr);
-                }
+        .map(|row| {
+            row.iter().map(|attr| {
                 attr_to_wire(attr)
             }).collect()
         })
         .collect();
     
-    eprintln!("🚨🚨� CONVERSION COMPLETE 🚨🚨🚨");
     JsonDataWindow {
         headers: window.headers.clone(),
         rows: clean_rows,

@@ -1658,6 +1658,34 @@ impl PySubgraph {
         let py_subgraphs = py_subgraphs?;
         Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(py_subgraphs))
     }
+
+    /// Direct access to graph visualization server for this subgraph
+    ///
+    /// Creates an interactive graph visualization server that serves both table and graph data
+    /// for this specific subgraph. This bypasses the table-only server and provides full
+    /// graph visualization capability.
+    ///
+    /// # Returns
+    /// String: HTML iframe element pointing to the visualization server
+    ///
+    /// # Examples
+    /// ```python
+    /// subgraph = graph.subgraph([node1, node2])
+    /// iframe = subgraph.graph_viz()
+    /// print(iframe)  # <iframe src="http://127.0.0.1:PORT" width="100%" height="420" ...>
+    /// ```
+    fn graph_viz(&self, py: Python) -> PyResult<String> {
+        // Create GraphDataSource from this subgraph's graph
+        let graph_ref = self.inner.graph();
+        let graph_data_source = groggy::api::graph::GraphDataSource::new(&*graph_ref.borrow());
+
+        py.allow_threads(|| {
+            graph_data_source.interactive_embed()
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                    format!("Graph visualization failed: {}", e)
+                ))
+        })
+    }
 }
 
 /// Parse enhanced aggregation specification from Python dict supporting three syntax forms

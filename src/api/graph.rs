@@ -2976,7 +2976,7 @@ impl Default for Graph {
 /// 
 /// This adapter bridges the gap between the Graph API and the visualization system
 /// by implementing the DataSource trait required by VizModule.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GraphDataSource {
     /// We store basic graph info since Graph has complex internal structure
     node_count: usize,
@@ -3295,6 +3295,63 @@ impl crate::viz::unified::GraphDataProvider for GraphDataSource {
     
     fn get_edge_count(&self) -> usize {
         self.edge_count
+    }
+}
+
+impl GraphDataSource {
+    /// Generate embedded iframe HTML for graph visualization in Jupyter notebooks
+    ///
+    /// This method creates a streaming server for graph data and returns iframe HTML
+    /// that can be embedded directly in Jupyter notebooks. It supports both table
+    /// and graph visualization views.
+    ///
+    /// # Returns
+    /// * `Ok(String)` - HTML iframe code for embedding
+    /// * `Err(GraphError)` - If server failed to start
+    pub fn interactive_embed(&self) -> GraphResult<String> {
+        use crate::viz::streaming::{StreamingServer, StreamingConfig};
+        use std::sync::Arc;
+
+        println!("🎯 GraphDataSource::interactive_embed called");
+
+        // Create data source from this GraphDataSource
+        let data_source: Arc<dyn crate::viz::streaming::DataSource> = Arc::new(self.clone());
+
+        // Configure streaming server
+        let streaming_config = StreamingConfig {
+            port: 0, // Auto-assign port
+            max_connections: 100,
+            auto_broadcast: true,
+            update_throttle_ms: 100,
+            scroll_config: crate::viz::streaming::VirtualScrollConfig::default(),
+        };
+
+        // Create and start server
+        let server = StreamingServer::new(data_source, streaming_config);
+
+        // Start server with automatic port assignment
+        let addr = std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1));
+        let handle = server.start_background(addr, 0)
+            .map_err(|e| crate::errors::GraphError::InvalidInput(
+                format!("Failed to start graph visualization server: {}", e)
+            ))?;
+
+        let actual_port = handle.port;
+
+        // Generate iframe HTML
+        let iframe_html = format!(
+            r#"<iframe src="http://127.0.0.1:{port}" width="100%" height="420" style="border:0;border-radius:12px;"></iframe>"#,
+            port = actual_port
+        );
+
+        println!("🖼️  Graph visualization iframe generated for port {}", actual_port);
+
+        // Note: We're not storing the handle here, so the server will be dropped
+        // and might stop. In a real implementation, we'd need to store it somewhere.
+        // For now, this is just a proof of concept.
+        std::mem::forget(handle); // Prevent handle from being dropped immediately
+
+        Ok(iframe_html)
     }
 }
 
