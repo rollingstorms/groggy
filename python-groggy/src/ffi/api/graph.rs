@@ -2280,4 +2280,28 @@ impl PyGraph {
 
         Ok(meta_nodes)
     }
+
+    /// Access visualization module for this graph
+    /// 
+    /// Returns a VizModule that provides interactive and static visualization capabilities.
+    /// 
+    /// # Returns
+    /// PyVizModule: Visualization module with interactive() and static_viz() methods
+    /// 
+    /// # Examples
+    /// ```python
+    /// # Interactive visualization
+    /// viz = graph.viz()
+    /// session = viz.interactive(port=8080, layout="force-directed")
+    /// print(f"Visualization at: {session.url()}")
+    /// 
+    /// # Static export
+    /// viz.static_viz("graph.svg", format="svg", layout="circular", theme="publication")
+    /// ```
+    pub fn viz(&self) -> PyResult<crate::ffi::viz::PyVizModule> {
+        let viz_module = self.inner.borrow().viz();
+        Ok(crate::ffi::viz::PyVizModule {
+            inner: viz_module,
+        })
+    }
 }

@@ -722,8 +722,10 @@ class VizTemplate:
                         # Try different methods to get node attributes
                         if hasattr(self.data_source, 'get_node_attrs'):
                             attrs = self.data_source.get_node_attrs(node_id) or {}
+                            print(f"DEBUG: Node {node_id} attrs from get_node_attrs: {attrs}")
                         elif hasattr(self.data_source, 'get_all_node_attrs'):
                             attrs = self.data_source.get_all_node_attrs(node_id) or {}
+                            print(f"DEBUG: Node {node_id} attrs from get_all_node_attrs: {attrs}")
                     except Exception as e:
                         # If attribute access fails, try individual attributes
                         try:
@@ -735,9 +737,12 @@ class VizTemplate:
                         except:
                             pass
                     
+                    # Map 'name' attribute to 'label' if available, otherwise use 'label' or default
+                    label = attrs.get('name') or attrs.get('label') or f'Node {node_id}'
+                    
                     nodes_data.append({
                         'id': str(node_id),
-                        'label': attrs.get('label', f'Node {node_id}'),
+                        'label': label,
                         'color': attrs.get('color', '#4CAF50'),
                         'size': attrs.get('size', 8),
                         'age': attrs.get('age'),  # Include other attributes for info

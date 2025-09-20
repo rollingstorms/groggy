@@ -15,10 +15,10 @@ use tokio::time::{sleep, Duration};
 use tokio::{select, task::JoinHandle};
 use tokio_tungstenite::{accept_async, tungstenite::Message};
 use tokio_util::sync::CancellationToken;
-use futures_util;
+use futures_util::{SinkExt, StreamExt};
 
 use super::data_source::{
-    DataSource, DataWindow, GraphNode, GraphEdge, GraphMetadata, 
+    DataSource, DataWindow, DataSchema, DataWindowMetadata, GraphNode, GraphEdge, GraphMetadata, 
     LayoutAlgorithm, NodePosition, Position
 };
 use super::virtual_scroller::{VirtualScrollManager, VirtualScrollConfig};
@@ -41,6 +41,9 @@ pub struct StreamingServer {
     
     /// Actual port the server is running on (filled after start)
     actual_port: Option<u16>,
+    
+    /// Unique run identifier for this server instance
+    run_id: String,
 }
 
 impl StreamingServer {
@@ -51,13 +54,57 @@ impl StreamingServer {
     ) -> Self {
         let virtual_scroller = VirtualScrollManager::new(config.scroll_config.clone());
         
+        // Generate unique run identifier
+        let run_id = format!("RUN{}", 
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        );
+        
         Self {
             virtual_scroller,
             data_source,
             active_connections: Arc::new(RwLock::new(HashMap::new())),
             config,
             actual_port: None,
+            run_id,
         }
+    }
+    
+    /// Get protocol metadata for this server instance
+    fn get_meta(&self) -> ProtocolMeta {
+        ProtocolMeta {
+            run_id: self.run_id.clone(),
+            protocol_version: 1,
+        }
+    }
+    
+    /// Centralized WebSocket message sending with poison-pill guards
+    /// All WebSocket messages must go through this function to detect leaks
+    async fn send_ws<T: serde::Serialize>(
+        ws_sender: &mut futures_util::stream::SplitSink<
+            tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+            tokio_tungstenite::tungstenite::Message
+        >,
+        msg: &T
+    ) -> StreamingResult<()> {
+        let json = serde_json::to_string(msg)
+            .map_err(|e| StreamingError::WebSocket(format!("JSON serialization error: {}", e)))?;
+        
+        // Poison-pill guard: detect any tagged AttrValue JSON
+        if json.contains(r#""Text":"#) || json.contains(r#""SmallInt":"#) || json.contains(r#""Int":"#) || 
+           json.contains(r#""Float":"#) || json.contains(r#""Bool":"#) || json.contains(r#""CompactText":"#) {
+            eprintln!("🚨🚨🚨 [WS POISON GUARD] Tagged AttrValue leaked into WS payload! 🚨🚨🚨");
+            eprintln!("🚨 Payload sample: {}", &json[..std::cmp::min(500, json.len())]);
+            return Err(StreamingError::WebSocket("Poison guard: tagged AttrValue detected in WebSocket message".to_string()));
+        }
+        
+        eprintln!("✅ WS Guard passed - sending clean payload");
+        ws_sender.send(tokio_tungstenite::tungstenite::Message::Text(json)).await
+            .map_err(|e| StreamingError::WebSocket(format!("Failed to send WebSocket message: {}", e)))?;
+        
+        Ok(())
     }
     
     /// Start WebSocket server on a dedicated runtime thread
@@ -126,11 +173,14 @@ impl StreamingServer {
                 res = listener.accept() => {
                     match res {
                         Ok((stream, addr)) => {
+                            println!("🔗 NEW CONNECTION: {}", addr);
                             // Spawn connection handler but keep the accept loop running
                             let server_clone = self.clone();
                             tokio::spawn(async move {
                                 if let Err(e) = server_clone.handle_connection_with_port(stream, addr, server_port).await {
                                     eprintln!("🔻 connection {} ended with error: {}", addr, e);
+                                } else {
+                                    println!("✅ connection {} completed successfully", addr);
                                 }
                             });
                         }
@@ -147,6 +197,7 @@ impl StreamingServer {
 
     /// Handle individual client connections (HTTP + WebSocket) with known server port
     async fn handle_connection_with_port(&self, mut stream: TcpStream, addr: SocketAddr, server_port: u16) -> StreamingResult<()> {
+        println!("🌐 HANDLING CONNECTION: {} on port {}", addr, server_port);
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         
         // Use peek() to sniff the request without consuming the stream
@@ -229,17 +280,33 @@ impl StreamingServer {
         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
         // Send initial data
+        println!("🚨🚨🚨 STARTING WEBSOCKET CONNECTION HANDLER 🚨🚨🚨");
         let initial_window = self.virtual_scroller.get_visible_window(self.data_source.as_ref())?;
+        
+        // FORCED DEBUG: Create a test window to verify our conversion is working
+        println!("🚨 DEBUG: About to test conversion function");
+        let test_window = &initial_window;
+        println!("🚨 DEBUG: Initial window has {} rows", test_window.rows.len());
+        for (i, row) in test_window.rows.iter().take(3).enumerate() {
+            println!("🚨 DEBUG: Row {} has {} cols", i, row.len());
+            for (j, attr) in row.iter().take(3).enumerate() {
+                println!("🚨 DEBUG: Cell [{},{}] = {:?}", i, j, attr);
+            }
+        }
+        
+        let converted_window = data_window_to_json(&initial_window);
+        
+        println!("🚨 About to create WSMessage with converted window");
+        println!("🚨 First row data: {:?}", converted_window.rows.get(0));
+        
         let initial_msg = WSMessage::InitialData {
-            window: initial_window,
+            window: converted_window,
             total_rows: self.data_source.total_rows(),
+            meta: self.get_meta(),
         };
 
-        let initial_json = serde_json::to_string(&initial_msg)
-            .map_err(|e| StreamingError::WebSocket(format!("JSON serialization error: {}", e)))?;
-        
-        ws_sender.send(Message::Text(initial_json)).await
-            .map_err(|e| StreamingError::WebSocket(format!("Failed to send initial data: {}", e)))?;
+        // Use centralized send function with poison-pill guard
+        Self::send_ws(&mut ws_sender, &initial_msg).await?;
 
         // Add client to active connections
         let client_state = ClientState {
@@ -286,6 +353,7 @@ impl StreamingServer {
             Message,
         >,
     ) -> StreamingResult<()> {
+        println!("📩 HANDLE CLIENT MESSAGE: {} chars from {}", message.len(), conn_id);
         use futures_util::SinkExt;
 
         let parsed_msg: WSMessage = serde_json::from_str(message)
@@ -308,15 +376,13 @@ impl StreamingServer {
                 }
 
                 let response = WSMessage::DataUpdate {
-                    new_window: window,
+                    new_window: data_window_to_json(&window),
                     offset,
+                    meta: self.get_meta(),
                 };
 
-                let response_json = serde_json::to_string(&response)
-                    .map_err(|e| StreamingError::WebSocket(format!("JSON serialization error: {}", e)))?;
-
-                ws_sender.send(Message::Text(response_json)).await
-                    .map_err(|e| StreamingError::WebSocket(format!("Failed to send data update: {}", e)))?;
+                // Use centralized send function with poison-pill guard
+                Self::send_ws(ws_sender, &response).await?;
             }
             WSMessage::ThemeChange { theme } => {
                 println!("🎨 Client {} changed theme to: {}", conn_id, theme);
@@ -1113,16 +1179,17 @@ impl StreamingServer {
         }
         let headers_html = headers.join("\n                        ");
 
-        // Generate initial rows
+        // Generate initial rows - Use AttrValue directly for HTML display
         let mut rows = Vec::new();
         for (row_idx, row) in initial_window.rows.iter().enumerate() {
             let mut cells = Vec::new();
             for (col_idx, cell_data) in row.iter().enumerate() {
+                let display_value = attr_value_to_display_text(cell_data);
                 cells.push(format!(
                     r#"<td class="cell" data-row="{}" data-col="{}">{}</td>"#,
                     initial_window.start_offset + row_idx,
                     col_idx,
-                    html_escape(&format!("{}", cell_data))
+                    html_escape(&display_value)
                 ));
             }
             let row_html = format!(
@@ -1145,6 +1212,7 @@ impl StreamingServer {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="groggy-run-id" content="{run_id}">
     <title>Groggy Interactive Visualization</title>
     <style>
         /* Sleek theme CSS */
@@ -1857,7 +1925,8 @@ impl StreamingServer {
             total_cols = total_cols,
             headers_html = headers_html,
             rows_html = rows_html,
-            ws_port = ws_port
+            ws_port = ws_port,
+            run_id = self.run_id
         );
 
         Ok(html)
@@ -2009,7 +2078,7 @@ impl From<&GraphNode> for GraphNodeData {
     fn from(node: &GraphNode) -> Self {
         let attributes: std::collections::HashMap<String, serde_json::Value> = node.attributes
             .iter()
-            .map(|(k, v)| (k.clone(), attr_value_to_json(v)))
+            .map(|(k, v)| (k.clone(), serde_json::Value::String(attr_value_to_display_text(v))))
             .collect();
 
         Self {
@@ -2025,7 +2094,7 @@ impl From<&GraphEdge> for GraphEdgeData {
     fn from(edge: &GraphEdge) -> Self {
         let attributes: std::collections::HashMap<String, serde_json::Value> = edge.attributes
             .iter()
-            .map(|(k, v)| (k.clone(), attr_value_to_json(v)))
+            .map(|(k, v)| (k.clone(), serde_json::Value::String(attr_value_to_display_text(v))))
             .collect();
 
         Self {
@@ -2060,19 +2129,61 @@ impl From<&NodePosition> for NodePositionData {
     }
 }
 
+/// Convert AttrValue to display text for HTML rendering
+fn attr_value_to_display_text(attr: &crate::types::AttrValue) -> String {
+    use crate::types::AttrValue;
+    
+    match attr {
+        AttrValue::Int(i) => i.to_string(),
+        AttrValue::Float(f) => f.to_string(),
+        AttrValue::Text(s) => s.clone(),
+        AttrValue::CompactText(s) => s.as_str().to_string(),
+        AttrValue::SmallInt(i) => i.to_string(),
+        AttrValue::Bool(b) => b.to_string(),
+        AttrValue::FloatVec(v) => format!("[{} floats]", v.len()),
+        AttrValue::Bytes(b) => format!("[{} bytes]", b.len()),
+        AttrValue::CompressedText(_) => "[Compressed Text]".to_string(),
+        AttrValue::CompressedFloatVec(_) => "[Compressed FloatVec]".to_string(),
+        AttrValue::SubgraphRef(id) => format!("[Subgraph:{}]", id),
+        AttrValue::NodeArray(nodes) => format!("[{} nodes]", nodes.len()),
+        AttrValue::EdgeArray(edges) => format!("[{} edges]", edges.len()),
+        AttrValue::Null => "null".to_string(),
+    }
+}
+
 /// Convert AttrValue to JSON for WebSocket transmission
 fn attr_value_to_json(attr: &crate::types::AttrValue) -> serde_json::Value {
     use crate::types::AttrValue;
-    match attr {
-        AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
-        AttrValue::Float(f) => serde_json::Number::from_f64(*f as f64)
-            .map(serde_json::Value::Number)
-            .unwrap_or(serde_json::Value::Null),
-        AttrValue::Text(s) => serde_json::Value::String(s.clone()),
-        AttrValue::Bool(b) => serde_json::Value::Bool(*b),
-        AttrValue::CompactText(s) => serde_json::Value::String(s.as_str().to_string()),
-        AttrValue::SmallInt(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
+    
+    let result = match attr {
+        AttrValue::Int(i) => {
+            println!("🔄 Converting Int({}) to JSON", i);
+            serde_json::Value::Number(serde_json::Number::from(*i))
+        },
+        AttrValue::Float(f) => {
+            println!("🔄 Converting Float({}) to JSON", f);
+            serde_json::Number::from_f64(*f as f64)
+                .map(serde_json::Value::Number)
+                .unwrap_or(serde_json::Value::Null)
+        },
+        AttrValue::Text(s) => {
+            println!("🔄 Converting Text({}) to JSON", s);
+            serde_json::Value::String(s.clone())
+        },
+        AttrValue::Bool(b) => {
+            println!("🔄 Converting Bool({}) to JSON", b);
+            serde_json::Value::Bool(*b)
+        },
+        AttrValue::CompactText(s) => {
+            println!("🔄 Converting CompactText({}) to JSON", s.as_str());
+            serde_json::Value::String(s.as_str().to_string())
+        },
+        AttrValue::SmallInt(i) => {
+            println!("🔄 Converting SmallInt({}) to JSON", i);
+            serde_json::Value::Number(serde_json::Number::from(*i))
+        },
         AttrValue::FloatVec(v) => {
+            println!("🔄 Converting FloatVec({:?}) to JSON", v);
             let vec: Vec<serde_json::Value> = v.iter()
                 .map(|&f| serde_json::Number::from_f64(f as f64)
                     .map(serde_json::Value::Number)
@@ -2080,9 +2191,125 @@ fn attr_value_to_json(attr: &crate::types::AttrValue) -> serde_json::Value {
                 .collect();
             serde_json::Value::Array(vec)
         },
-        AttrValue::Null => serde_json::Value::Null,
-        _ => serde_json::Value::String(format!("{:?}", attr)), // Fallback for complex types
+        AttrValue::Bytes(b) => {
+            println!("🔄 Converting Bytes({} bytes) to JSON", b.len());
+            serde_json::Value::String(format!("[{} bytes]", b.len()))
+        },
+        AttrValue::CompressedText(_) => {
+            println!("🔄 Converting CompressedText to JSON");
+            serde_json::Value::String("[Compressed Text]".to_string())
+        },
+        AttrValue::CompressedFloatVec(_) => {
+            println!("🔄 Converting CompressedFloatVec to JSON");
+            serde_json::Value::String("[Compressed FloatVec]".to_string())
+        },
+        AttrValue::SubgraphRef(id) => {
+            println!("🔄 Converting SubgraphRef({}) to JSON", id);
+            serde_json::Value::String(format!("[Subgraph:{}]", id))
+        },
+        AttrValue::NodeArray(nodes) => {
+            println!("🔄 Converting NodeArray({} nodes) to JSON", nodes.len());
+            serde_json::Value::String(format!("[{} nodes]", nodes.len()))
+        },
+        AttrValue::EdgeArray(edges) => {
+            println!("🔄 Converting EdgeArray({} edges) to JSON", edges.len());
+            serde_json::Value::String(format!("[{} edges]", edges.len()))
+        },
+        AttrValue::Null => {
+            println!("🔄 Converting Null to JSON");
+            serde_json::Value::Null
+        },
+    };
+    
+    println!("🔄 Result: {:?}", result);
+    result
+}
+
+/// Convert DataWindow to clean JSON for WebSocket transmission  
+fn data_window_to_json(window: &DataWindow) -> JsonDataWindow {
+    eprintln!("�🚨🚨 CONVERSION FUNCTION CALLED WITH {} ROWS 🚨🚨🚨", window.rows.len());
+    
+    let clean_rows: Vec<Vec<WireCell>> = window.rows.iter()
+        .enumerate()
+        .map(|(row_idx, row)| {
+            if row_idx < 3 {
+                eprintln!("�🚨🚨 PROCESSING ROW {} 🚨🚨🚨", row_idx);
+            }
+            row.iter().enumerate().map(|(col_idx, attr)| {
+                if row_idx < 3 && col_idx < 3 {
+                    eprintln!("�🚨🚨 CONVERTING ATTR AT [{},{}]: {:?} 🚨🚨🚨", row_idx, col_idx, attr);
+                }
+                attr_to_wire(attr)
+            }).collect()
+        })
+        .collect();
+    
+    eprintln!("🚨🚨� CONVERSION COMPLETE 🚨🚨🚨");
+    JsonDataWindow {
+        headers: window.headers.clone(),
+        rows: clean_rows,
+        schema: window.schema.clone(),
+        total_rows: window.total_rows,
+        start_offset: window.start_offset,
+        metadata: window.metadata.clone(),
     }
+}
+
+/// Wire cell type for leak-proof WebSocket transmission
+/// Using #[serde(untagged)] ensures primitives serialize directly without enum tags
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WireCell {
+    N(i64),        // Integers 
+    F(f64),        // Floats
+    S(String),     // Strings
+    B(bool),       // Booleans
+    A(Vec<WireCell>), // Arrays
+    Null,          // Null values
+}
+
+/// Convert AttrValue to leak-proof WireCell
+fn attr_to_wire(attr: &crate::types::AttrValue) -> WireCell {
+    use crate::types::AttrValue;
+    
+    match attr {
+        AttrValue::Int(i) => WireCell::N(*i),
+        AttrValue::SmallInt(i) => WireCell::N(*i as i64),
+        AttrValue::Float(f) => WireCell::F(*f as f64),
+        AttrValue::Text(s) => WireCell::S(s.clone()),
+        AttrValue::CompactText(s) => WireCell::S(s.as_str().to_string()),
+        AttrValue::Bool(b) => WireCell::B(*b),
+        AttrValue::FloatVec(v) => WireCell::A(v.iter().map(|&f| WireCell::F(f as f64)).collect()),
+        AttrValue::Bytes(b) => WireCell::S(format!("[{} bytes]", b.len())),
+        AttrValue::CompressedText(_) => WireCell::S("[Compressed Text]".to_string()),
+        AttrValue::CompressedFloatVec(_) => WireCell::S("[Compressed FloatVec]".to_string()),
+        AttrValue::SubgraphRef(id) => WireCell::S(format!("[Subgraph:{}]", id)),
+        AttrValue::NodeArray(nodes) => WireCell::S(format!("[{} nodes]", nodes.len())),
+        AttrValue::EdgeArray(edges) => WireCell::S(format!("[{} edges]", edges.len())),
+        AttrValue::Null => WireCell::Null,
+    }
+}
+
+/// Clean JSON-compatible DataWindow for WebSocket transmission
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JsonDataWindow {
+    /// Column headers
+    pub headers: Vec<String>,
+    
+    /// Rows of data (each row is a vec of WireCell values - leak-proof)
+    pub rows: Vec<Vec<WireCell>>,
+    
+    /// Schema information
+    pub schema: DataSchema,
+    
+    /// Total number of rows in complete dataset
+    pub total_rows: usize,
+    
+    /// Starting offset of this window
+    pub start_offset: usize,
+    
+    /// Metadata for this window
+    pub metadata: DataWindowMetadata,
 }
 
 /// WebSocket message protocol
@@ -2091,14 +2318,16 @@ fn attr_value_to_json(attr: &crate::types::AttrValue) -> serde_json::Value {
 pub enum WSMessage {
     /// Initial data sent when client connects
     InitialData {
-        window: DataWindow,
+        window: JsonDataWindow,
         total_rows: usize,
+        meta: ProtocolMeta,
     },
     
     /// Data update in response to scroll
     DataUpdate {
-        new_window: DataWindow,
+        new_window: JsonDataWindow,
         offset: usize,
+        meta: ProtocolMeta,
     },
     
     /// Client requests scroll to offset
@@ -2277,7 +2506,7 @@ pub enum WSMessage {
 pub struct DataUpdate {
     pub update_type: UpdateType,
     pub affected_rows: Vec<usize>,
-    pub new_data: Option<DataWindow>,
+    pub new_data: Option<JsonDataWindow>,
     pub timestamp: u64,
 }
 
@@ -2297,6 +2526,13 @@ pub struct ClientState {
     pub current_offset: usize,
     pub last_update: std::time::SystemTime,
     pub subscribed_updates: bool,
+}
+
+/// Metadata for protocol tracking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProtocolMeta {
+    pub run_id: String,
+    pub protocol_version: u8,
 }
 
 /// Server statistics

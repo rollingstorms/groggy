@@ -2906,8 +2906,10 @@ impl Graph {
     /// graph.viz().show()?;                          // Local browser
     /// ```
     pub fn viz(&self) -> VizModule {
+        println!("DEBUG: Graph.viz() called - creating GraphDataSource");
         // Create a GraphDataSource adapter for this graph
         let graph_data_source = Arc::new(GraphDataSource::new(self));
+        println!("DEBUG: GraphDataSource created, creating VizModule");
         VizModule::new(graph_data_source)
     }
 }
@@ -2993,15 +2995,44 @@ impl GraphDataSource {
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
         
-        // Extract nodes
-        for (i, node_id) in graph.node_ids().iter().enumerate() {
+        // Extract nodes with actual attributes
+        let node_ids = graph.node_ids();
+        println!("GROGGY DEBUG: GraphDataSource::new called with {} nodes", node_ids.len());
+        
+        for (i, node_id) in node_ids.iter().enumerate() {
             let mut attributes = std::collections::HashMap::new();
-            attributes.insert("color".to_string(), AttrValue::Text("#007bff".to_string()));
-            attributes.insert("size".to_string(), AttrValue::Float(8.0f32));
+            
+            // Extract real attributes from the graph
+            if let Ok(node_attrs) = graph.get_node_attrs(*node_id) {
+                println!("🔍 Node {}: Found {} attributes", node_id, node_attrs.len());
+                for (attr_name, attr_value) in node_attrs {
+                    println!("🔍   {} = {:?}", attr_name, attr_value);
+                    attributes.insert(attr_name, attr_value);
+                }
+            } else {
+                println!("❌ Node {}: Failed to get attributes", node_id);
+            }
+            
+            // Set default visual attributes if not present
+            if !attributes.contains_key("color") {
+                attributes.insert("color".to_string(), AttrValue::Text("#007bff".to_string()));
+            }
+            if !attributes.contains_key("size") {
+                attributes.insert("size".to_string(), AttrValue::Float(8.0f32));
+            }
+            
+            // Use the 'name' attribute as label if available, otherwise use a generic label
+            let label = if let Some(AttrValue::Text(name)) = attributes.get("name") {
+                println!("🔍 Found name attribute: {}", name);
+                Some(name.clone())
+            } else {
+                println!("❌ No 'name' attribute found for node {}, available attrs: {:?}", node_id, attributes.keys().collect::<Vec<_>>());
+                Some(format!("Node {}", node_id))
+            };
             
             nodes.push(GraphNode {
                 id: node_id.to_string(),
-                label: Some(format!("Node {}", node_id)),
+                label,
                 attributes,
                 position: Some(Position {
                     x: (i as f64 * 50.0) % 800.0,
@@ -3010,19 +3041,39 @@ impl GraphDataSource {
             });
         }
         
-        // Extract edges
+        // Extract edges with actual attributes
         for edge_id in graph.edge_ids() {
             if let Some((source, target)) = graph.pool.borrow().get_edge_endpoints(edge_id) {
                 let mut attributes = std::collections::HashMap::new();
-                attributes.insert("color".to_string(), AttrValue::Text("#999".to_string()));
-                attributes.insert("width".to_string(), AttrValue::Float(1.0f32));
+                
+                // Extract real attributes from the graph
+                if let Ok(edge_attrs) = graph.get_edge_attrs(edge_id) {
+                    for (attr_name, attr_value) in edge_attrs {
+                        attributes.insert(attr_name, attr_value);
+                    }
+                }
+                
+                // Set default visual attributes if not present
+                if !attributes.contains_key("color") {
+                    attributes.insert("color".to_string(), AttrValue::Text("#999".to_string()));
+                }
+                if !attributes.contains_key("width") {
+                    attributes.insert("width".to_string(), AttrValue::Float(1.0f32));
+                }
+                
+                // Extract weight from attributes if available
+                let weight = if let Some(AttrValue::Float(w)) = attributes.get("weight") {
+                    Some(*w)
+                } else {
+                    Some(1.0)
+                };
                 
                 edges.push(GraphEdge {
                     id: edge_id.to_string(),
                     source: source.to_string(),
                     target: target.to_string(),
-                    label: None,
-                    weight: Some(1.0),
+                    label: None, // Could be extracted from attributes if needed
+                    weight: weight.map(|w| w as f64),
                     attributes,
                 });
             }
@@ -3190,6 +3241,60 @@ impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
         }
         
         positions
+    }
+}
+
+// 🌟 Implementation of GraphDataProvider for GraphDataSource
+// This enables GraphDataSource to work with the unified visualization system
+impl crate::viz::unified::GraphDataProvider for GraphDataSource {
+    fn get_viz_nodes(&self) -> crate::errors::GraphResult<Vec<crate::viz::streaming::data_source::GraphNode>> {
+        use crate::viz::streaming::data_source::GraphNode as VizNode;
+        
+        println!("🎯 GraphDataProvider::get_viz_nodes called! Converting {} nodes", self.nodes.len());
+        
+        let mut viz_nodes = Vec::new();
+        for node in &self.nodes {
+            println!("🔍 Converting node: id={}, label={:?}", node.id, node.label);
+            
+            viz_nodes.push(VizNode {
+                id: node.id.clone(),
+                label: node.label.clone(),
+                attributes: node.attributes.clone(),
+                position: node.position.clone(),
+            });
+        }
+        
+        println!("✅ Converted to {} VizNodes", viz_nodes.len());
+        Ok(viz_nodes)
+    }
+    
+    fn get_viz_edges(&self) -> crate::errors::GraphResult<Vec<crate::viz::streaming::data_source::GraphEdge>> {
+        use crate::viz::streaming::data_source::GraphEdge as VizEdge;
+        
+        println!("🎯 GraphDataProvider::get_viz_edges called! Converting {} edges", self.edges.len());
+        
+        let mut viz_edges = Vec::new();
+        for edge in &self.edges {
+            viz_edges.push(VizEdge {
+                id: edge.id.clone(),
+                source: edge.source.clone(),
+                target: edge.target.clone(),
+                label: edge.label.clone(),
+                weight: edge.weight,
+                attributes: std::collections::HashMap::new(),
+            });
+        }
+        
+        println!("✅ Converted to {} VizEdges", viz_edges.len());
+        Ok(viz_edges)
+    }
+    
+    fn get_node_count(&self) -> usize {
+        self.node_count
+    }
+    
+    fn get_edge_count(&self) -> usize {
+        self.edge_count
     }
 }
 
