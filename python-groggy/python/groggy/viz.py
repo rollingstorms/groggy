@@ -191,24 +191,142 @@ class VizTemplate:
         """Render for streaming WebSocket server."""
         port = kwargs.get('port', 8080)
         auto_open = kwargs.get('auto_open', True)
-        
+
         print(f"🌐 Starting interactive visualization server...")
         print(f"   Layout: {layout}, Theme: {theme}")
         print(f"   Size: {width}x{height}")
         print(f"   Port: {port}")
-        
-        # Generate unified HTML with streaming backend flag
-        html_content = self._generate_unified_html(layout, theme, width, height, title, backend='streaming')
-        
-        # TODO: Start actual streaming server with this HTML content
-        # For now, return a mock session
-        url = f"http://127.0.0.1:{port}"
-        print(f"   URL: {url}")
-        
-        if auto_open:
-            self._open_browser(url)
-        
-        return InteractiveVizSession(url, port)
+
+        try:
+            # Import Rust streaming server components
+            from ._groggy import StreamingServer, StreamingConfig
+            import sys
+
+            # Create streaming server using the data source
+            # Note: self.data_source should implement the DataSource trait for graph/table data
+            print(f"🔧 Creating StreamingServer with data source: {type(self.data_source).__name__}")
+
+            # Create server configuration
+            config = StreamingConfig.default() if hasattr(StreamingConfig, 'default') else None
+            if config is None:
+                # Fallback: try to create config manually
+                try:
+                    config = StreamingConfig(
+                        port=port,
+                        max_connections=100,
+                        auto_broadcast=True,
+                        update_throttle_ms=100
+                    )
+                except:
+                    # If StreamingConfig isn't directly accessible, use the data source's own server
+                    print("⚠️  StreamingConfig not accessible, trying data source streaming...")
+
+                    # Check if data source has streaming methods
+                    if hasattr(self.data_source, 'interactive_embed'):
+                        print("✅ Using data source's streaming via interactive_embed")
+                        iframe_html = self.data_source.interactive_embed()
+
+                        # Extract port from iframe
+                        import re
+                        port_match = re.search(r'127\.0\.0\.1:(\d+)', iframe_html)
+                        if port_match:
+                            actual_port = int(port_match.group(1))
+                            url = f"http://127.0.0.1:{actual_port}"
+                            print(f"   ✅ Server started at: {url}")
+
+                            if auto_open:
+                                self._open_browser(url)
+
+                            return InteractiveVizSession(url, actual_port)
+                        else:
+                            raise Exception("Could not extract port from iframe HTML")
+                    else:
+                        raise Exception("No streaming method available")
+
+            # Create and start streaming server
+            server = StreamingServer.new(self.data_source, config)
+
+            # Start server on background thread with automatic port assignment if port=0
+            addr_str = "127.0.0.1"
+            handle = server.start_background(addr_str, port)
+            actual_port = handle.port
+
+            url = f"http://127.0.0.1:{actual_port}"
+            print(f"   ✅ Server started at: {url}")
+
+            # Store handle to keep server alive (this is critical!)
+            session = InteractiveVizSession(url, actual_port)
+            session._server_handle = handle  # Keep handle alive
+
+            if auto_open:
+                self._open_browser(url)
+
+            return session
+
+        except ImportError as e:
+            print(f"❌ StreamingServer not available in FFI: {e}")
+            print("🔄 Falling back to data source streaming method...")
+
+            # Fallback: try to use data source's own streaming
+            if hasattr(self.data_source, 'interactive_embed'):
+                print("✅ Using data source's streaming via interactive_embed")
+                iframe_html = self.data_source.interactive_embed()
+
+                # Extract port from iframe
+                import re
+                port_match = re.search(r'127\.0\.0\.1:(\d+)', iframe_html)
+                if port_match:
+                    actual_port = int(port_match.group(1))
+                    url = f"http://127.0.0.1:{actual_port}"
+                    print(f"   ✅ Fallback server started at: {url}")
+
+                    if auto_open:
+                        self._open_browser(url)
+
+                    return InteractiveVizSession(url, actual_port)
+                else:
+                    raise Exception("Could not extract port from iframe HTML")
+            else:
+                # Last resort: original mock behavior
+                print("⚠️  No streaming method available, returning mock session")
+                url = f"http://127.0.0.1:{port}"
+                print(f"   ❌ Mock URL: {url}")
+
+                if auto_open:
+                    self._open_browser(url)
+
+                return InteractiveVizSession(url, port)
+
+        except Exception as e:
+            print(f"❌ Failed to start streaming server: {e}")
+
+            # Fallback to data source method
+            if hasattr(self.data_source, 'interactive_embed'):
+                print("🔄 Trying fallback via data source interactive_embed...")
+                try:
+                    iframe_html = self.data_source.interactive_embed()
+
+                    # Extract port from iframe
+                    import re
+                    port_match = re.search(r'127\.0\.0\.1:(\d+)', iframe_html)
+                    if port_match:
+                        actual_port = int(port_match.group(1))
+                        url = f"http://127.0.0.1:{actual_port}"
+                        print(f"   ✅ Fallback server started at: {url}")
+
+                        if auto_open:
+                            self._open_browser(url)
+
+                        return InteractiveVizSession(url, actual_port)
+                except Exception as fallback_e:
+                    print(f"❌ Fallback also failed: {fallback_e}")
+
+            # Final fallback: mock session
+            print("⚠️  All methods failed, returning mock session")
+            url = f"http://127.0.0.1:{port}"
+            if auto_open:
+                self._open_browser(url)
+            return InteractiveVizSession(url, port)
     
     def _render_file(self, layout, theme, width, height, title, **kwargs):
         """Render for static file export."""
@@ -842,24 +960,30 @@ class VizTemplate:
 
 class InteractiveVizSession:
     """Python wrapper for interactive visualization session."""
-    
+
     def __init__(self, url, port):
         self._url = url
         self._port = port
         self._running = True
-    
+        self._server_handle = None  # Store server handle to keep alive
+
     def url(self):
         """Get the URL where visualization is accessible."""
         return self._url
-    
+
     def port(self):
         """Get the port the server is running on."""
         return self._port
-    
+
     def stop(self):
         """Stop the visualization server."""
         self._running = False
-        print(f"🛑 Visualization server stopped (session at {self._url})")
+        if self._server_handle is not None:
+            # Dropping the handle should stop the server
+            self._server_handle = None
+            print(f"🛑 Visualization server stopped (session at {self._url})")
+        else:
+            print(f"🛑 Visualization session stopped (mock or already stopped) (session at {self._url})")
 
 
 class StaticViz:
@@ -1278,6 +1402,56 @@ class VizAccessor:
             >>> session.stop()  # Stop when done
         """
         return self.render(backend='streaming', port=port, **kwargs)
+
+    def interactive_embed(self, **kwargs) -> str:
+        """
+        Generate embedded iframe HTML for visualization in Jupyter notebooks.
+
+        This method creates a streaming server and returns iframe HTML that can be
+        embedded directly in Jupyter notebooks. Supports both table and graph views.
+
+        Args:
+            **kwargs: Additional parameters (layout, theme, width, height, etc.)
+
+        Returns:
+            str: HTML iframe code for embedding
+
+        Example:
+            >>> iframe_html = graph.viz().interactive_embed()
+            >>> from IPython.display import HTML, display
+            >>> display(HTML(iframe_html))
+        """
+        # Try to use Rust VizModule if available (for Graph data sources)
+        if hasattr(self.data_source, 'viz'):
+            print("🎯 Using Rust VizModule.interactive_embed() method")
+            try:
+                rust_viz_module = self.data_source.viz()
+                if hasattr(rust_viz_module, 'interactive_embed'):
+                    return rust_viz_module.interactive_embed()
+                else:
+                    print("⚠️  Rust VizModule doesn't have interactive_embed method")
+            except Exception as e:
+                print(f"⚠️  Failed to use Rust VizModule: {e}")
+
+        # Check if data source has interactive_embed method directly (like BaseTable)
+        if hasattr(self.data_source, 'interactive_embed'):
+            print("🎯 Using data_source.interactive_embed() method")
+            return self.data_source.interactive_embed()
+
+        # Fallback: Use render with streaming backend and convert to iframe
+        print("🔄 Fallback: Using render method for interactive_embed")
+        try:
+            session = self.render(backend='streaming', port=0, auto_open=False, **kwargs)
+            if hasattr(session, 'url'):
+                url = session.url()
+                iframe_html = f'<iframe src="{url}" width="100%" height="420" style="border:0;border-radius:12px;"></iframe>'
+                print(f"🖼️  Generated iframe for {url}")
+                return iframe_html
+            else:
+                raise Exception("Session does not have url() method")
+        except Exception as e:
+            print(f"❌ interactive_embed fallback failed: {e}")
+            raise RuntimeError(f"Could not create interactive embed: {e}")
 
     def save(self, filename: str = 'graph_visualization.html', **kwargs) -> StaticViz:
         """

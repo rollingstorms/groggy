@@ -311,12 +311,12 @@ impl PyVizModule {
     pub fn info(&self, py: Python) -> PyResult<PyObject> {
         let info = self.inner.get_info();
         let dict = PyDict::new(py);
-        
+
         dict.set_item("total_rows", info.total_rows)?;
         dict.set_item("total_cols", info.total_cols)?;
         dict.set_item("supports_graph", info.supports_graph)?;
         dict.set_item("source_type", info.source_type)?;
-        
+
         if let Some(graph_info) = info.graph_info {
             let graph_dict = PyDict::new(py);
             graph_dict.set_item("node_count", graph_info.node_count)?;
@@ -325,8 +325,55 @@ impl PyVizModule {
             graph_dict.set_item("has_weights", graph_info.has_weights)?;
             dict.set_item("graph_info", graph_dict)?;
         }
-        
+
         Ok(dict.to_object(py))
+    }
+
+    /// Generate embedded iframe HTML for visualization in Jupyter notebooks
+    ///
+    /// This method creates a streaming server for the data source and returns iframe HTML
+    /// that can be embedded directly in Jupyter notebooks. It supports both table
+    /// and graph visualization views depending on the data source type.
+    ///
+    /// # Returns
+    /// * HTML iframe code for embedding
+    ///
+    /// # Examples
+    /// ```python
+    /// # Create graph and get iframe for embedding
+    /// g = groggy.generators.karate_club()
+    /// viz = g.viz()
+    /// iframe_html = viz.interactive_embed()
+    ///
+    /// # Use in Jupyter
+    /// from IPython.display import HTML, display
+    /// display(HTML(iframe_html))
+    /// ```
+    pub fn interactive_embed(&self) -> PyResult<String> {
+        println!("🎯 VizModule::interactive_embed called");
+
+        // Create an InteractiveViz using the existing infrastructure
+        let interactive_viz = self.inner.interactive(None)
+            .map_err(PyGraphError::from)?;
+
+        // Start the server to get the URL and port
+        let addr = "127.0.0.1".parse().unwrap();
+        let session = interactive_viz.start(Some(addr))
+            .map_err(PyGraphError::from)?;
+
+        let port = session.port();
+        let iframe_html = format!(
+            r#"<iframe src="http://127.0.0.1:{port}" width="100%" height="420" style="border:0;border-radius:12px;"></iframe>"#,
+            port = port
+        );
+
+        println!("🖼️  VizModule iframe generated for port {}", port);
+
+        // Note: The session goes out of scope here, but the server should keep running
+        // because of the streaming server's background thread architecture
+        std::mem::forget(session); // Prevent session from being dropped
+
+        Ok(iframe_html)
     }
 }
 

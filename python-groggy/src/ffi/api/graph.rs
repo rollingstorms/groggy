@@ -2304,4 +2304,26 @@ impl PyGraph {
             inner: viz_module,
         })
     }
+
+    /// Direct access to graph visualization server
+    ///
+    /// Creates an interactive graph visualization server that serves both table and graph data.
+    /// This bypasses the table-only server and provides full graph visualization capability.
+    ///
+    /// # Returns
+    /// String: HTML iframe element pointing to the visualization server
+    ///
+    /// # Examples
+    /// ```python
+    /// iframe = graph.graph_viz()
+    /// print(iframe)  # <iframe src="http://127.0.0.1:PORT" width="100%" height="420" ...>
+    /// ```
+    pub fn graph_viz(&self, py: Python) -> PyResult<String> {
+        let graph_data_source = groggy::api::graph::GraphDataSource::new(&*self.inner.borrow());
+
+        py.allow_threads(|| {
+            graph_data_source.interactive_embed()
+                .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("Graph visualization failed: {}", e)))
+        })
+    }
 }
