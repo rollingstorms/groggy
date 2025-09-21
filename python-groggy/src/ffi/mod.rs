@@ -40,5 +40,8 @@ pub mod traits;
 // Phase 3: Neural Network Integration - activation functions and neural operations
 pub mod neural;
 
+// Viz accessor - provides .viz property for visualization operations
+pub mod viz_accessor;
+
 // Re-export commonly used FFI types
 // Note: PyQueryParser and helper functions are not exposed to Python - only parse_node_query and parse_edge_query are used

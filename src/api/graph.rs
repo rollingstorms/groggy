@@ -2906,10 +2906,8 @@ impl Graph {
     /// graph.viz().show()?;                          // Local browser
     /// ```
     pub fn viz(&self) -> VizModule {
-        println!("DEBUG: Graph.viz() called - creating GraphDataSource");
         // Create a GraphDataSource adapter for this graph
         let graph_data_source = Arc::new(GraphDataSource::new(self));
-        println!("DEBUG: GraphDataSource created, creating VizModule");
         VizModule::new(graph_data_source)
     }
 }
@@ -2988,8 +2986,8 @@ pub struct GraphDataSource {
 }
 
 impl GraphDataSource {
-    /// Create a new adapter from a Graph reference
-    pub fn new(graph: &Graph) -> Self {
+    /// Create a new adapter from a Graph reference with configurable node label attribute
+    pub fn new_with_label(graph: &Graph, node_label_attr: &str) -> Self {
         use crate::viz::streaming::data_source::{GraphNode, GraphEdge, Position};
         
         let mut nodes = Vec::new();
@@ -2997,20 +2995,15 @@ impl GraphDataSource {
         
         // Extract nodes with actual attributes
         let node_ids = graph.node_ids();
-        println!("GROGGY DEBUG: GraphDataSource::new called with {} nodes", node_ids.len());
-        
+
         for (i, node_id) in node_ids.iter().enumerate() {
             let mut attributes = std::collections::HashMap::new();
-            
+
             // Extract real attributes from the graph
             if let Ok(node_attrs) = graph.get_node_attrs(*node_id) {
-                println!("🔍 Node {}: Found {} attributes", node_id, node_attrs.len());
                 for (attr_name, attr_value) in node_attrs {
-                    println!("🔍   {} = {:?}", attr_name, attr_value);
                     attributes.insert(attr_name, attr_value);
                 }
-            } else {
-                println!("❌ Node {}: Failed to get attributes", node_id);
             }
             
             // Set default visual attributes if not present
@@ -3021,12 +3014,22 @@ impl GraphDataSource {
                 attributes.insert("size".to_string(), AttrValue::Float(8.0f32));
             }
             
-            // Use the 'name' attribute as label if available, otherwise use a generic label
-            let label = if let Some(AttrValue::Text(name)) = attributes.get("name") {
-                println!("🔍 Found name attribute: {}", name);
-                Some(name.clone())
+            // Use the specified attribute as label if available, otherwise use a generic label
+            let label = if let Some(attr_value) = attributes.get(node_label_attr) {
+                // Handle different text attribute types
+                match attr_value {
+                    AttrValue::Text(text) => {
+                        Some(text.clone())
+                    }
+                    AttrValue::CompactText(compact_text) => {
+                        let text = compact_text.as_str().to_string();
+                        Some(text)
+                    }
+                    other => {
+                        Some(format!("{:?}", other))
+                    }
+                }
             } else {
-                println!("❌ No 'name' attribute found for node {}, available attrs: {:?}", node_id, attributes.keys().collect::<Vec<_>>());
                 Some(format!("Node {}", node_id))
             };
             
@@ -3086,6 +3089,11 @@ impl GraphDataSource {
             nodes,
             edges,
         }
+    }
+
+    /// Create a new adapter from a Graph reference using default "name" attribute for labels
+    pub fn new(graph: &Graph) -> Self {
+        Self::new_with_label(graph, "name")
     }
 }
 
@@ -3262,7 +3270,6 @@ impl GraphDataSource {
         use crate::viz::streaming::types::StreamingConfig;
         use std::sync::Arc;
 
-        println!("🎯 GraphDataSource::interactive_embed called");
 
         // Create data source from this GraphDataSource
         let data_source: Arc<dyn crate::viz::streaming::DataSource> = Arc::new(self.clone());
@@ -3294,7 +3301,6 @@ impl GraphDataSource {
             port = actual_port
         );
 
-        println!("🖼️  Graph visualization iframe generated for port {}", actual_port);
 
         // Note: We're not storing the handle here, so the server will be dropped
         // and might stop. In a real implementation, we'd need to store it somewhere.

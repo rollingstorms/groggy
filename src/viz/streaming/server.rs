@@ -132,13 +132,44 @@ impl StreamingServer {
                 let rt = Runtime::new().expect("tokio runtime");
                 // Keep this thread parked on the runtime until canceled
                 rt.block_on(async move {
-                    // 1) Bind first (real socket)
-                    let listener = match TcpListener::bind((addr, port_hint)).await {
+                    // 1) Try to bind, with fallback to common ports, then random
+                    let listener = if port_hint != 0 {
+                        // Try the specific port first
+                        TcpListener::bind((addr, port_hint)).await
+                    } else {
+                        Err(std::io::Error::new(std::io::ErrorKind::Other, "No port hint"))
+                    };
+
+                    let listener = match listener {
                         Ok(l) => l,
-                        Err(e) => {
-                            let _ = ready_tx.send(0); // signal failure
-                            eprintln!("❌ bind failed: {e}");
-                            return;
+                        Err(_) => {
+                            // Try common default ports if the hint failed
+                            let default_ports = [8080, 8081, 8082, 3000, 5000, 9000];
+                            let mut success = None;
+
+                            for &port in &default_ports {
+                                if port != port_hint { // Skip if we already tried this port
+                                    if let Ok(listener) = TcpListener::bind((addr, port)).await {
+                                        success = Some(listener);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            match success {
+                                Some(l) => l,
+                                None => {
+                                    // Finally, let the OS choose any available port
+                                    match TcpListener::bind((addr, 0)).await {
+                                        Ok(l) => l,
+                                        Err(e) => {
+                                            let _ = ready_tx.send(0); // signal failure
+                                            eprintln!("❌ Failed to bind to any port: {e}");
+                                            return;
+                                        }
+                                    }
+                                }
+                            }
                         }
                     };
                     let port = listener.local_addr().ok().map(|a| a.port()).unwrap_or(0);
@@ -182,14 +213,12 @@ impl StreamingServer {
                 res = listener.accept() => {
                     match res {
                         Ok((stream, addr)) => {
-                            println!("🔗 NEW CONNECTION: {}", addr);
                             // Spawn connection handler but keep the accept loop running
                             let server_clone = self.clone();
                             tokio::spawn(async move {
                                 if let Err(e) = server_clone.handle_connection_with_port(stream, addr, server_port).await {
-                                    eprintln!("🔻 connection {} ended with error: {}", addr, e);
-                                } else {
-                                    println!("✅ connection {} completed successfully", addr);
+                                    // Only log errors, not successful connections
+                                    eprintln!("Connection {} error: {}", addr, e);
                                 }
                             });
                         }
@@ -206,7 +235,6 @@ impl StreamingServer {
 
     /// Handle individual client connections (HTTP + WebSocket) with known server port
     async fn handle_connection_with_port(&self, mut stream: TcpStream, addr: SocketAddr, server_port: u16) -> StreamingResult<()> {
-        println!("🌐 HANDLING CONNECTION: {} on port {}", addr, server_port);
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         
         // Use peek() to sniff the request without consuming the stream
@@ -217,7 +245,6 @@ impl StreamingServer {
                 
                 if self.is_websocket_upgrade(&request_head) {
                     // This is a WebSocket upgrade request - pass untouched stream to tungstenite
-                    println!("🔌 WebSocket upgrade request from {}", addr);
                     
                     match tokio_tungstenite::accept_async(stream).await {
                         Ok(ws_stream) => {

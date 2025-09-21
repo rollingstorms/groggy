@@ -155,6 +155,55 @@ impl PySubgraphArray {
         
         Ok(PySubgraphArray::new(all_groups))
     }
+
+    /// Get viz accessor for visualization operations
+    #[getter]
+    fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
+        use groggy::api::graph::GraphDataSource;
+        
+        // For SubgraphArray, create a graph that contains all subgraphs
+        let mut viz_graph = groggy::api::graph::Graph::new();
+        
+        for subgraph in self.inner.iter() {
+            let node_ids = subgraph.inner.node_ids();
+            let edge_ids = subgraph.inner.edge_ids();
+            
+            // Copy nodes with their attributes
+            for &node_id in &node_ids {
+                // Check if node already exists to avoid duplicates
+                if !viz_graph.node_ids().contains(&node_id) {
+                    viz_graph.add_node();
+                    if let Ok(attrs) = subgraph.inner.graph().borrow().get_node_attrs(node_id) {
+                        for (attr_name, attr_value) in attrs {
+                            let _ = viz_graph.set_node_attr(node_id, attr_name, attr_value);
+                        }
+                    }
+                }
+            }
+            
+            // Copy edges with their attributes
+            let graph_ref = subgraph.inner.graph();
+            for &edge_id in &edge_ids {
+                if let Ok((source, target)) = graph_ref.borrow().edge_endpoints(edge_id) {
+                    if let Ok(new_edge_id) = viz_graph.add_edge(source, target) {
+                        if let Ok(attrs) = graph_ref.borrow().get_edge_attrs(edge_id) {
+                            for (attr_name, attr_value) in attrs {
+                                let _ = viz_graph.set_edge_attr(new_edge_id, attr_name, attr_value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        let graph_data_source = GraphDataSource::new(&viz_graph);
+        let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
+            graph_data_source,
+            "SubgraphArray".to_string()
+        );
+        
+        Py::new(py, viz_accessor)
+    }
 }
 
 // Implement ArrayOps for integration with core array system
