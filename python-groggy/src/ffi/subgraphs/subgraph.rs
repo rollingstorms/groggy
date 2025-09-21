@@ -84,6 +84,51 @@ impl PySubgraph {
         )
     }
 
+    /// Get viz accessor for visualization operations
+    #[getter]
+    fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
+        use groggy::api::graph::GraphDataSource;
+
+        // Create a subgraph from this subgraph's data
+        let mut viz_graph = groggy::api::graph::Graph::new();
+        
+        // Add the subgraph's nodes and edges to the viz graph
+        let node_ids = self.inner.node_ids();
+        let edge_ids = self.inner.edge_ids();
+        
+        // Copy nodes with their attributes
+        for &node_id in &node_ids {
+            viz_graph.add_node();
+            if let Ok(attrs) = self.inner.graph().borrow().get_node_attrs(node_id) {
+                for (attr_name, attr_value) in attrs {
+                    let _ = viz_graph.set_node_attr(node_id, attr_name, attr_value);
+                }
+            }
+        }
+        
+        // Copy edges with their attributes
+        let graph_ref = self.inner.graph();
+        for &edge_id in &edge_ids {
+            if let Ok((source, target)) = graph_ref.borrow().edge_endpoints(edge_id) {
+                if let Ok(new_edge_id) = viz_graph.add_edge(source, target) {
+                    if let Ok(attrs) = graph_ref.borrow().get_edge_attrs(edge_id) {
+                        for (attr_name, attr_value) in attrs {
+                            let _ = viz_graph.set_edge_attr(new_edge_id, attr_name, attr_value);
+                        }
+                    }
+                }
+            }
+        }
+
+        let graph_data_source = GraphDataSource::new(&viz_graph);
+        let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
+            graph_data_source,
+            "Subgraph".to_string()
+        );
+
+        Py::new(py, viz_accessor)
+    }
+
     /// Python len() support - returns number of nodes
     fn __len__(&self) -> usize {
         self.inner.node_count() // SubgraphOperations::node_count()
@@ -203,25 +248,6 @@ impl PySubgraph {
     }
 
     // === Visualization Methods ===
-
-    /// Create a VizModule for this subgraph to enable interactive and static visualization
-    ///
-    /// # Returns
-    /// * A VizModule that can be used for interactive() or static_viz() calls
-    ///
-    /// # Example
-    /// ```python
-    /// # Create a visualization from a subgraph
-    /// viz = subgraph.viz()
-    /// viz.interactive()  # Launch interactive browser visualization
-    /// viz.static_viz(format="svg", filename="subgraph.svg")  # Export to SVG
-    /// ```
-    fn viz(&self) -> PyResult<crate::ffi::viz::PyVizModule> {
-        let viz_module = self.inner.viz();
-        Ok(crate::ffi::viz::PyVizModule {
-            inner: viz_module,
-        })
-    }
 
     // === Data Export Methods ===
 

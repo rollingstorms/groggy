@@ -231,6 +231,8 @@ def _setup_widget_environment():
 # Auto-setup when groggy is imported (production-ready experience)
 _setup_widget_environment()
 
+# Viz accessors are now implemented directly in Rust FFI
+
 def _jupyter_labextension_paths():
     """
     Discovery hook for JupyterLab federated extensions.

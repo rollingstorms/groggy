@@ -970,6 +970,34 @@ impl PyNodesAccessor {
 
         Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(result_subgraphs))
     }
+
+    /// Get viz accessor for visualization operations
+    #[getter]
+    fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
+        // Create a subgraph from the constrained nodes for visualization
+        let mut viz_graph = groggy::api::graph::Graph::new();
+
+        // Get the constrained node IDs or all nodes if no constraint
+        let node_ids = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            self.graph.borrow().node_ids()
+        };
+
+        // Add nodes to the viz graph (basic implementation for now)
+        for _node_id in &node_ids {
+            let _new_node_id = viz_graph.add_node();
+            // TODO: Copy attributes from original nodes
+        }
+
+        let graph_data_source = groggy::api::graph::GraphDataSource::new(&viz_graph);
+        let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
+            graph_data_source,
+            "NodesAccessor".to_string()
+        );
+
+        Py::new(py, viz_accessor)
+    }
 }
 
 impl PyNodesAccessor {
@@ -2005,6 +2033,59 @@ impl PyEdgesAccessor {
         }
 
         Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(subgraphs))
+    }
+
+    /// Get viz accessor for visualization operations
+    #[getter]
+    fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
+        // Create a viz graph from the constrained edges
+        let mut viz_graph = groggy::api::graph::Graph::new();
+
+        // Get the constrained edge IDs or all edges if no constraint
+        let edge_ids = if let Some(ref constrained) = self.constrained_edges {
+            constrained.clone()
+        } else {
+            self.graph.borrow().edge_ids()
+        };
+
+        // Add nodes and edges to viz graph based on the edges in this accessor
+        {
+            let graph_ref = self.graph.borrow();
+            let mut node_map = std::collections::HashMap::new();
+
+            // Add nodes based on the edges' endpoints
+            for &edge_id in &edge_ids {
+                if let Ok((source, target)) = graph_ref.edge_endpoints(edge_id) {
+                    // Add source node if not already added
+                    if !node_map.contains_key(&source) {
+                        let new_node_id = viz_graph.add_node();
+                        node_map.insert(source, new_node_id);
+                    }
+
+                    // Add target node if not already added
+                    if !node_map.contains_key(&target) {
+                        let new_node_id = viz_graph.add_node();
+                        node_map.insert(target, new_node_id);
+                    }
+
+                    // Add the edge
+                    if let Some(&new_source) = node_map.get(&source) {
+                        if let Some(&new_target) = node_map.get(&target) {
+                            let _new_edge_id = viz_graph.add_edge(new_source, new_target);
+                            // TODO: Copy edge attributes
+                        }
+                    }
+                }
+            }
+        }
+
+        let graph_data_source = groggy::api::graph::GraphDataSource::new(&viz_graph);
+        let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
+            graph_data_source,
+            "EdgesAccessor".to_string()
+        );
+
+        Py::new(py, viz_accessor)
     }
 }
 

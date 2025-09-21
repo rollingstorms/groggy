@@ -2221,6 +2221,44 @@ impl PyNodesTable {
             inner: viz_module,
         })
     }
+
+    /// Get viz accessor for visualization operations (no graph tab)
+    #[getter]
+    fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
+        use groggy::api::graph::GraphDataSource;
+        
+        // Create a graph with only nodes from the NodesTable
+        let mut viz_graph = groggy::api::graph::Graph::new();
+        
+        if let Some(node_id_col) = self.table.column("node_id") {
+            let node_ids = node_id_col.data();
+            for (row_idx, attr_value) in node_ids.iter().enumerate() {
+                if let groggy::types::AttrValue::Int(node_id_int) = attr_value {
+                    let node_id = *node_id_int as groggy::types::NodeId;
+                    viz_graph.add_node();
+                    
+                    // Add all node attributes from the table
+                    for col_name in self.table.column_names() {
+                        if col_name != "node_id" {
+                            if let Some(column) = self.table.column(col_name) {
+                                if let Some(value) = column.data().get(row_idx) {
+                                    let _ = viz_graph.set_node_attr(node_id, col_name.to_string(), value.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        let graph_data_source = GraphDataSource::new(&viz_graph);
+        let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
+            graph_data_source,
+            "NodesTable".to_string()
+        );
+        
+        Py::new(py, viz_accessor)
+    }
 }
 
 // =============================================================================
@@ -2977,6 +3015,61 @@ impl PyEdgesTable {
             inner: viz_module,
         })
     }
+
+    /// Get viz accessor for visualization operations (no graph tab)
+    #[getter]
+    fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
+        use groggy::api::graph::GraphDataSource;
+        
+        // Create a graph from the EdgesTable's edges and their nodes
+        let mut viz_graph = groggy::api::graph::Graph::new();
+        let mut added_nodes = std::collections::HashSet::new();
+        
+        if let Some(edge_id_col) = self.table.column("edge_id") {
+            let edge_ids = edge_id_col.data();
+            for (row_idx, _) in edge_ids.iter().enumerate() {
+                if let (Some(source_col), Some(target_col)) = (self.table.column("source"), self.table.column("target")) {
+                    if let (Some(source_val), Some(target_val)) = (source_col.data().get(row_idx), target_col.data().get(row_idx)) {
+                        if let (groggy::types::AttrValue::Int(source_int), groggy::types::AttrValue::Int(target_int)) = (source_val, target_val) {
+                            let source = *source_int as groggy::types::NodeId;
+                            let target = *target_int as groggy::types::NodeId;
+                            
+                            // Add nodes if they haven't been added yet
+                            if !added_nodes.contains(&source) {
+                                viz_graph.add_node();
+                                added_nodes.insert(source);
+                            }
+                            if !added_nodes.contains(&target) {
+                                viz_graph.add_node();
+                                added_nodes.insert(target);
+                            }
+                            
+                            // Add edge with its attributes
+                            if let Ok(new_edge_id) = viz_graph.add_edge(source, target) {
+                                for col_name in self.table.column_names() {
+                                    if !["edge_id", "source", "target"].contains(&col_name.as_str()) {
+                                        if let Some(column) = self.table.column(col_name) {
+                                            if let Some(value) = column.data().get(row_idx) {
+                                                let _ = viz_graph.set_edge_attr(new_edge_id, col_name.to_string(), value.clone());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        let graph_data_source = GraphDataSource::new(&viz_graph);
+        let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
+            graph_data_source,
+            "EdgesTable".to_string()
+        );
+        
+        Py::new(py, viz_accessor)
+    }
 }
 
 // =============================================================================
@@ -3567,6 +3660,74 @@ impl PyGraphTable {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "GraphTable to SubgraphArray conversion not yet implemented."
         ))
+    }
+
+    /// Get viz accessor for visualization operations
+    #[getter]
+    fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
+        use groggy::api::graph::GraphDataSource;
+        
+        // Create a graph from the GraphTable's nodes and edges
+        let mut viz_graph = groggy::api::graph::Graph::new();
+        
+        // Add nodes from nodes table
+        let nodes_table = self.table.nodes();
+        if let Some(node_id_col) = nodes_table.column("node_id") {
+            let node_ids = node_id_col.data();
+            for (row_idx, attr_value) in node_ids.iter().enumerate() {
+                if let groggy::types::AttrValue::Int(node_id_int) = attr_value {
+                    let node_id = *node_id_int as groggy::types::NodeId;
+                    viz_graph.add_node();
+                    
+                    // Add all node attributes from the table
+                    for col_name in nodes_table.column_names() {
+                        if col_name != "node_id" {
+                            if let Some(column) = nodes_table.column(col_name) {
+                                if let Some(value) = column.data().get(row_idx) {
+                                    let _ = viz_graph.set_node_attr(node_id, col_name.to_string(), value.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Add edges from edges table
+        let edges_table = self.table.edges();
+        if let Some(edge_id_col) = edges_table.column("edge_id") {
+            let edge_ids = edge_id_col.data();
+            for (row_idx, _) in edge_ids.iter().enumerate() {
+                if let (Some(source_col), Some(target_col)) = (edges_table.column("source"), edges_table.column("target")) {
+                    if let (Some(source_val), Some(target_val)) = (source_col.data().get(row_idx), target_col.data().get(row_idx)) {
+                        if let (groggy::types::AttrValue::Int(source_int), groggy::types::AttrValue::Int(target_int)) = (source_val, target_val) {
+                            let source = *source_int as groggy::types::NodeId;
+                            let target = *target_int as groggy::types::NodeId;
+                            if let Ok(new_edge_id) = viz_graph.add_edge(source, target) {
+                                // Add all edge attributes from the table
+                                for col_name in edges_table.column_names() {
+                                    if !["edge_id", "source", "target"].contains(&col_name.as_str()) {
+                                        if let Some(column) = edges_table.column(col_name) {
+                                            if let Some(value) = column.data().get(row_idx) {
+                                                let _ = viz_graph.set_edge_attr(new_edge_id, col_name.to_string(), value.clone());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        let graph_data_source = GraphDataSource::new(&viz_graph);
+        let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
+            graph_data_source,
+            "GraphTable".to_string()
+        );
+        
+        Py::new(py, viz_accessor)
     }
 }
 

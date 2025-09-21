@@ -53,6 +53,9 @@ pub use ffi::display::{PyDisplayConfig, PyTableFormatter};
 // Visualization system exports (Phase 6)
 pub use ffi::viz::{PyVizConfig, PyVizModule, PyInteractiveViz, PyInteractiveVizSession, PyStaticViz};
 
+// Viz accessor for .viz property functionality
+pub use ffi::viz_accessor::VizAccessor;
+
 // ====================================================================
 // UNIFIED BUILDER PATTERNS
 // ====================================================================
@@ -474,6 +477,9 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<ffi::storage::accessors::PyEdgesAccessor>()?; // Re-enabled for table integration
     // m.add_class::<PyNodeView>()?; // Still disabled - not essential for current functionality
     // m.add_class::<PyEdgeView>()?; // Still disabled - not essential for current functionality
+
+    // Register viz accessor
+    m.add_class::<VizAccessor>()?;
 
     // Register type system
     m.add_class::<PyAttrValue>()?;

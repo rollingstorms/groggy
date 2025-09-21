@@ -240,6 +240,57 @@ impl PyComponentsArray {
             materialized_cache: RefCell::new(HashMap::new()),
         })
     }
+
+    /// Get viz accessor for visualization
+    #[getter]
+    fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
+        use groggy::api::graph::GraphDataSource;
+        
+        // Create a combined graph from all components
+        let mut viz_graph = groggy::api::graph::Graph::new();
+        let mut node_mapping = std::collections::HashMap::new();
+
+        // Add all nodes and edges from all components to viz graph
+        for (component_nodes, component_edges) in &self.components_data {
+            // Add nodes from this component
+            for &node_id in component_nodes {
+                if !node_mapping.contains_key(&node_id) {
+                    let new_node_id = viz_graph.add_node();
+                    node_mapping.insert(node_id, new_node_id);
+                    
+                    // Copy node attributes
+                    if let Ok(attrs) = self.graph_ref.borrow().get_node_attrs(node_id) {
+                        for (attr_name, attr_value) in attrs {
+                            let _ = viz_graph.set_node_attr(new_node_id, attr_name.to_string(), attr_value.clone());
+                        }
+                    }
+                }
+            }
+            
+            // Add edges from this component
+            for &edge_id in component_edges {
+                if let Ok((source, target)) = self.graph_ref.borrow().edge_endpoints(edge_id) {
+                    if let (Some(&viz_source), Some(&viz_target)) = (node_mapping.get(&source), node_mapping.get(&target)) {
+                        if let Ok(new_edge_id) = viz_graph.add_edge(viz_source, viz_target) {
+                            // Copy edge attributes
+                            if let Ok(attrs) = self.graph_ref.borrow().get_edge_attrs(edge_id) {
+                                for (attr_name, attr_value) in attrs {
+                                    let _ = viz_graph.set_edge_attr(new_edge_id, attr_name.to_string(), attr_value.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let graph_data_source = GraphDataSource::new(&viz_graph);
+        let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
+            graph_data_source,
+            "ComponentsArray".to_string()
+        );
+        Py::new(py, viz_accessor)
+    }
 }
 
 /// Iterator for ComponentsArray
