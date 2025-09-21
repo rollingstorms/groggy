@@ -3244,59 +3244,8 @@ impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
     }
 }
 
-// 🌟 Implementation of GraphDataProvider for GraphDataSource
-// This enables GraphDataSource to work with the unified visualization system
-impl crate::viz::unified::GraphDataProvider for GraphDataSource {
-    fn get_viz_nodes(&self) -> crate::errors::GraphResult<Vec<crate::viz::streaming::data_source::GraphNode>> {
-        use crate::viz::streaming::data_source::GraphNode as VizNode;
-        
-        println!("🎯 GraphDataProvider::get_viz_nodes called! Converting {} nodes", self.nodes.len());
-        
-        let mut viz_nodes = Vec::new();
-        for node in &self.nodes {
-            println!("🔍 Converting node: id={}, label={:?}", node.id, node.label);
-            
-            viz_nodes.push(VizNode {
-                id: node.id.clone(),
-                label: node.label.clone(),
-                attributes: node.attributes.clone(),
-                position: node.position.clone(),
-            });
-        }
-        
-        println!("✅ Converted to {} VizNodes", viz_nodes.len());
-        Ok(viz_nodes)
-    }
-    
-    fn get_viz_edges(&self) -> crate::errors::GraphResult<Vec<crate::viz::streaming::data_source::GraphEdge>> {
-        use crate::viz::streaming::data_source::GraphEdge as VizEdge;
-        
-        println!("🎯 GraphDataProvider::get_viz_edges called! Converting {} edges", self.edges.len());
-        
-        let mut viz_edges = Vec::new();
-        for edge in &self.edges {
-            viz_edges.push(VizEdge {
-                id: edge.id.clone(),
-                source: edge.source.clone(),
-                target: edge.target.clone(),
-                label: edge.label.clone(),
-                weight: edge.weight,
-                attributes: std::collections::HashMap::new(),
-            });
-        }
-        
-        println!("✅ Converted to {} VizEdges", viz_edges.len());
-        Ok(viz_edges)
-    }
-    
-    fn get_node_count(&self) -> usize {
-        self.node_count
-    }
-    
-    fn get_edge_count(&self) -> usize {
-        self.edge_count
-    }
-}
+// Unified visualization system removed - GraphDataSource now works directly
+// with streaming server via interactive_embed() method
 
 impl GraphDataSource {
     /// Generate embedded iframe HTML for graph visualization in Jupyter notebooks
@@ -3309,7 +3258,8 @@ impl GraphDataSource {
     /// * `Ok(String)` - HTML iframe code for embedding
     /// * `Err(GraphError)` - If server failed to start
     pub fn interactive_embed(&self) -> GraphResult<String> {
-        use crate::viz::streaming::{StreamingServer, StreamingConfig};
+        use crate::viz::streaming::server::StreamingServer;
+        use crate::viz::streaming::types::StreamingConfig;
         use std::sync::Arc;
 
         println!("🎯 GraphDataSource::interactive_embed called");

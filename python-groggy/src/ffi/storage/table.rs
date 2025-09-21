@@ -23,7 +23,7 @@ use serde_json::{Map, Value};
 pub struct PyBaseTable {
     pub(crate) table: BaseTable,
     // Keep-alive guards for streaming servers spawned by this table
-    server_guards: RefCell<Vec<groggy::viz::streaming::websocket_server::ServerHandle>>,
+    server_guards: RefCell<Vec<groggy::viz::streaming::types::ServerHandle>>,
 }
 
 impl Clone for PyBaseTable {
@@ -1237,7 +1237,8 @@ impl PyBaseTable {
     /// ```
     pub fn interactive_embed(&self) -> PyResult<String> {
         // Create the streaming server
-        use groggy::viz::streaming::{StreamingConfig, StreamingServer};
+        use groggy::viz::streaming::server::StreamingServer;
+        use groggy::viz::streaming::types::StreamingConfig;
         use std::sync::Arc;
         
         let data_source: Arc<dyn groggy::viz::streaming::DataSource> = Arc::new(self.table.clone());

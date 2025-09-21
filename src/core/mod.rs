@@ -16,9 +16,10 @@ pub use crate::viz::display::{
 // Re-export key streaming functionality from viz module for backward compatibility
 pub use crate::viz::streaming::{
     DataSource, VirtualScrollManager, VirtualScrollConfig,
-    StreamingServer, StreamingConfig, 
     UpdateResult, CacheStats
 };
+pub use crate::viz::streaming::server::StreamingServer;
+pub use crate::viz::streaming::types::StreamingConfig;
 
 // Qualified re-exports to avoid conflicts
 pub use crate::viz::display::{DataWindow as DisplayDataWindow, DataSchema as DisplayDataSchema};
