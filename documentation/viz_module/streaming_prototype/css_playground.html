@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groggy CSS Playground</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            background: #f5f5f5;
+        }
+
+        .editor-panel {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .editor-panel h3 {
+            margin: 0 0 15px 0;
+            color: #4fd1c7;
+        }
+
+        .css-editor {
+            width: 100%;
+            height: 60vh;
+            background: #1a202c;
+            color: #e2e8f0;
+            border: 1px solid #4a5568;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            resize: vertical;
+        }
+
+        .apply-btn {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background: #4fd1c7;
+            color: #1a202c;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .apply-btn:hover {
+            background: #38b2ac;
+        }
+
+        .preview-panel {
+            background: white;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .preset-buttons {
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .preset-btn {
+            padding: 4px 8px;
+            background: #4a5568;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .preset-btn:hover {
+            background: #2d3748;
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-panel">
+        <h3>🎨 CSS Playground</h3>
+
+        <div class="preset-buttons">
+            <button class="preset-btn" onclick="loadPreset('dark')">Dark Theme</button>
+            <button class="preset-btn" onclick="loadPreset('minimal')">Minimal</button>
+            <button class="preset-btn" onclick="loadPreset('colorful')">Colorful</button>
+            <button class="preset-btn" onclick="loadPreset('reset')">Reset</button>
+        </div>
+
+        <textarea id="css-editor" class="css-editor" placeholder="Enter your CSS here...">
+/* Edit CSS here and click Apply to see changes */
+:root {
+  --node-default-color: #4dabf7;
+  --node-selected-color: #ff6b6b;
+  --node-hover-color: #339af0;
+  --edge-default-color: #999;
+  --edge-default-width: 1px;
+  --line: #eee;
+  --row-hover: #f3f6ff;
+}
+
+.groggy-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.graph-canvas {
+  border: 2px solid var(--line);
+  border-radius: 12px;
+}
+        </textarea>
+
+        <button class="apply-btn" onclick="applyCSS()">Apply CSS</button>
+
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #4a5568;">
+            <h4 style="margin: 0 0 10px 0; color: #cbd5e0;">Quick Actions</h4>
+            <button class="preset-btn" onclick="exportCSS()" style="display: block; width: 100%; margin-bottom: 5px;">📋 Copy CSS</button>
+            <button class="preset-btn" onclick="loadTemplate()" style="display: block; width: 100%;">🔄 Load from Template</button>
+        </div>
+    </div>
+
+    <div class="preview-panel">
+        <iframe id="preview-frame" src="streaming_template.html" style="width: 100%; height: 100%; border: none; border-radius: 8px;"></iframe>
+    </div>
+
+    <script>
+        function applyCSS() {
+            const css = document.getElementById('css-editor').value;
+            const iframe = document.getElementById('preview-frame');
+
+            iframe.onload = function() {
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+                    // Remove existing custom styles
+                    const existingStyle = iframeDoc.getElementById('playground-styles');
+                    if (existingStyle) {
+                        existingStyle.remove();
+                    }
+
+                    // Add new styles
+                    const styleElement = iframeDoc.createElement('style');
+                    styleElement.id = 'playground-styles';
+                    styleElement.textContent = css;
+                    iframeDoc.head.appendChild(styleElement);
+                } catch (e) {
+                    console.error('Error applying CSS:', e);
+                }
+            };
+
+            // If already loaded, apply immediately
+            if (iframe.contentDocument) {
+                iframe.onload();
+            }
+        }
+
+        function loadPreset(preset) {
+            const editor = document.getElementById('css-editor');
+            const presets = {
+                dark: `/* Dark Theme */
+:root {
+  --bg: #1a1a1a;
+  --fg: #e2e8f0;
+  --line: #4a5568;
+  --hover: #2d3748;
+  --row-hover: #2a4365;
+  --node-default-color: #63b3ed;
+  --node-selected-color: #f56565;
+  --edge-default-color: #a0aec0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.graph-canvas {
+  background: #2d3748;
+}`,
+                minimal: `/* Minimal Theme */
+:root {
+  --node-default-color: #718096;
+  --node-selected-color: #2d3748;
+  --edge-default-color: #e2e8f0;
+  --line: #f7fafc;
+  --row-hover: #edf2f7;
+}
+
+.groggy-table {
+  border: none;
+  box-shadow: none;
+}
+
+.graph-canvas {
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+}`,
+                colorful: `/* Colorful Theme */
+:root {
+  --node-default-color: #ed8936;
+  --node-selected-color: #d53f8c;
+  --node-hover-color: #38b2ac;
+  --edge-default-color: #805ad5;
+  --line: #fbb6ce;
+  --row-hover: #fed7d7;
+  --bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.graph-canvas {
+  border: 3px solid #d53f8c;
+  border-radius: 20px;
+  background: linear-gradient(45deg, #fbb6ce, #fed7d7);
+}`,
+                reset: `/* Reset to Default */
+:root {
+  --node-default-color: #4dabf7;
+  --node-selected-color: #ff6b6b;
+  --node-hover-color: #339af0;
+  --edge-default-color: #999;
+  --line: #eee;
+  --row-hover: #f3f6ff;
+}`
+            };
+
+            editor.value = presets[preset] || presets.reset;
+        }
+
+        function exportCSS() {
+            const css = document.getElementById('css-editor').value;
+            navigator.clipboard.writeText(css).then(() => {
+                alert('CSS copied to clipboard!');
+            }).catch(() => {
+                const textarea = document.createElement('textarea');
+                textarea.value = css;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert('CSS copied to clipboard!');
+            });
+        }
+
+        function loadTemplate() {
+            // This would load CSS from the current template
+            alert('Load from template - connect this to your template file');
+        }
+
+        // Auto-apply CSS when typing (debounced)
+        let cssTimeout;
+        document.getElementById('css-editor').addEventListener('input', function() {
+            clearTimeout(cssTimeout);
+            cssTimeout = setTimeout(applyCSS, 500);
+        });
+
+        // Apply initial CSS
+        setTimeout(applyCSS, 1000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,647 @@
+/* Graph Visualization CSS - Extracted from embedded HTML */
+/* This file contains all the styles for the interactive graph visualization */
+
+/* Graph Node and Edge Styling Configuration */
+:root {
+  /* Node styling */
+  --node-default-radius: 8px;
+  --node-large-radius: 12px;
+  --node-small-radius: 5px;
+  --node-default-color: #4dabf7;
+  --node-selected-color: #ff6b6b;
+  --node-hover-color: #339af0;
+  --node-border-color: #333;
+  --node-border-width: 2px;
+  --node-border-hover-width: 3px;
+  --node-label-color: #333;
+  --node-label-font: 10px Arial;
+  --node-label-offset: 12px;
+
+  /* Edge styling */
+  --edge-default-color: #999;
+  --edge-selected-color: #ff8cc8;
+  --edge-hover-color: #666;
+  --edge-default-width: 1px;
+  --edge-thick-width: 2px;
+  --edge-selected-width: 3px;
+  --edge-opacity: 0.8;
+  --edge-hover-opacity: 1.0;
+
+  /* Graph interaction colors */
+  --graph-highlight-color: #ffd43b;
+  --graph-shadow-color: rgba(0,0,0,0.2);
+  --graph-selection-box-color: rgba(50, 103, 227, 0.2);
+  --graph-selection-box-border: #3267e3;
+
+  /* Node type colors */
+  --node-type-primary: #4dabf7;
+  --node-type-secondary: #69db7c;
+  --node-type-warning: #ffd43b;
+  --node-type-danger: #ff6b6b;
+  --node-type-info: #74c0fc;
+  --node-type-success: #51cf66;
+
+  /* Edge type colors */
+  --edge-type-default: #999;
+  --edge-type-strong: #495057;
+  --edge-type-weak: #ced4da;
+  --edge-type-directed: #fd7e14;
+  --edge-type-bidirectional: #7950f2;
+}
+
+/* Additional streaming-specific styles */
+body {
+    font-family: var(--font);
+    margin: 0;
+    padding: 20px;
+    background: var(--bg);
+}
+
+.table-container {
+    background: var(--bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.table-header {
+    padding: 16px 20px;
+    background: var(--hover);
+    border-bottom: var(--border) solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.table-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--fg);
+}
+
+.table-stats {
+    font-size: 14px;
+    color: var(--muted);
+}
+
+.connection-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-connected {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-disconnected {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.loading {
+    text-align: center;
+    padding: 20px;
+    color: var(--muted);
+}
+
+.error {
+    text-align: center;
+    padding: 20px;
+    color: #dc3545;
+    background: #f8d7da;
+    margin: 10px;
+    border-radius: 4px;
+}
+
+/* Apply sleek table styling to data table */
+#data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 14px;
+    line-height: 1.4;
+    background-color: var(--bg);
+    min-width: 100%;
+}
+
+#data-table th,
+#data-table td {
+    padding: var(--cell-py) var(--cell-px);
+    text-align: left;
+    border-bottom: var(--border) solid var(--line);
+    position: relative;
+}
+
+#data-table th {
+    background: var(--hover);
+    font-weight: var(--weight);
+    color: var(--fg);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    white-space: nowrap;
+}
+
+#data-table td {
+    background: var(--bg);
+    color: var(--fg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+#data-table tbody tr:hover {
+    background-color: var(--hover);
+}
+
+#data-table th:first-child,
+#data-table td:first-child {
+    border-left: none;
+}
+
+#data-table th:last-child,
+#data-table td:last-child {
+    border-right: none;
+}
+
+.view-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.view-toggle {
+    display: flex;
+    background: var(--hover);
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.view-toggle-btn {
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.view-toggle-btn.active {
+    background: var(--bg);
+    color: var(--fg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.view-toggle-btn:hover {
+    background: var(--bg);
+    color: var(--fg);
+}
+
+.viz-container {
+    position: relative;
+    height: 70vh;
+    min-height: 400px;
+}
+
+.table-view, .graph-view {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: opacity 0.3s ease;
+}
+
+.table-view {
+    overflow: auto; /* Ensure table can scroll */
+}
+
+.graph-view {
+    overflow: hidden; /* Prevent graph from creating scrollbars */
+}
+
+/* Canvas styling for interactive graph visualization */
+.graph-canvas {
+    width: 100%;
+    height: 100%;
+    border: var(--border) solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg);
+    cursor: grab;
+    transition: all 0.2s ease;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Canvas interaction states */
+.graph-canvas:hover {
+    border-color: var(--accent);
+    box-shadow:
+        inset 0 1px 3px rgba(0,0,0,0.1),
+        0 0 0 1px var(--accent);
+}
+
+.graph-canvas:active,
+.graph-canvas.is-dragging {
+    cursor: grabbing;
+    border-color: var(--accent);
+    box-shadow:
+        inset 0 2px 4px rgba(0,0,0,0.15),
+        0 0 0 2px var(--accent);
+}
+
+.graph-canvas:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow:
+        inset 0 1px 3px rgba(0,0,0,0.1),
+        0 0 0 3px rgba(50, 103, 227, 0.3);
+}
+
+/* Canvas loading state */
+.graph-canvas.is-loading {
+    opacity: 0.7;
+    cursor: wait;
+    background:
+        linear-gradient(45deg, transparent 40%, rgba(50, 103, 227, 0.1) 50%, transparent 60%),
+        var(--bg);
+    background-size: 20px 20px;
+    animation: canvas-loading 1.5s linear infinite;
+}
+
+@keyframes canvas-loading {
+    0% { background-position: -20px 0; }
+    100% { background-position: 20px 0; }
+}
+
+/* Canvas with data state */
+.graph-canvas.has-data {
+    background:
+        radial-gradient(circle at 20% 20%, rgba(50, 103, 227, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(50, 103, 227, 0.03) 0%, transparent 50%),
+        var(--bg);
+}
+
+/* Canvas selection mode */
+.graph-canvas.selection-mode {
+    cursor: crosshair;
+    border-style: dashed;
+    border-color: var(--accent);
+}
+
+/* Canvas zoom indicators */
+.graph-canvas::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.graph-canvas.is-zoomed::before {
+    opacity: 0.6;
+}
+
+/* Dark mode canvas adjustments */
+@media (prefers-color-scheme: dark) {
+    .graph-canvas {
+        background: #1a1a1a;
+        border-color: #404040;
+        box-shadow: inset 0 1px 3px rgba(255,255,255,0.1);
+    }
+
+    .graph-canvas:hover {
+        border-color: #4a9eff;
+        box-shadow:
+            inset 0 1px 3px rgba(255,255,255,0.1),
+            0 0 0 1px #4a9eff;
+    }
+
+    .graph-canvas.has-data {
+        background:
+            radial-gradient(circle at 20% 20%, rgba(74, 158, 255, 0.05) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(74, 158, 255, 0.05) 0%, transparent 50%),
+            #1a1a1a;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .graph-canvas {
+        border-width: 3px;
+        border-color: #000;
+    }
+
+    .graph-canvas:focus {
+        box-shadow: 0 0 0 4px #ff0;
+    }
+}
+
+.graph-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 4px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 6px;
+    padding: 4px;
+    transition: opacity 0.3s ease;
+}
+
+.graph-controls[style*="pointer-events: none"] {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.graph-btn {
+    padding: 6px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: background 0.2s ease;
+}
+
+.graph-btn:hover {
+    background: rgba(0,0,0,0.1);
+}
+
+.layout-controls {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: rgba(255,255,255,0.9);
+    border-radius: 6px;
+    padding: 8px;
+    transition: opacity 0.3s ease;
+}
+
+.layout-controls[style*="pointer-events: none"] {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.layout-select {
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 12px;
+}
+
+/* ========================================
+   TEMPLATE-SPECIFIC STYLES
+   ======================================== */
+
+/* Template body styling */
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: var(--bg);
+}
+
+/* Prototype controls bar */
+.prototype-controls {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.control-group label {
+    font-weight: 500;
+}
+
+.control-group select, .control-group input {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* Style panel - floating editor */
+.style-panel {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 400px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    max-height: 85vh;
+    display: none;
+    flex-direction: column;
+}
+
+.style-panel.active {
+    display: flex;
+}
+
+/* Panel header and tabs */
+.panel-header {
+    padding: 15px 15px 0 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.panel-tabs {
+    display: flex;
+    margin-bottom: 15px;
+}
+
+.panel-tab {
+    flex: 1;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    cursor: pointer;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6c757d;
+    transition: all 0.2s ease;
+}
+
+.panel-tab:first-child {
+    border-radius: 4px 0 0 4px;
+    border-right: none;
+}
+
+.panel-tab:last-child {
+    border-radius: 0 4px 4px 0;
+}
+
+.panel-tab.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+/* Panel content area */
+.panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 15px 15px 15px;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+/* Style controls */
+.style-section {
+    margin-bottom: 20px;
+}
+
+.style-section h4 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.style-control {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.style-control label {
+    font-size: 12px;
+    color: #666;
+}
+
+.style-control input {
+    width: 60px;
+    font-size: 11px;
+}
+
+/* CSS Editor */
+.css-editor {
+    width: 100%;
+    height: 400px;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f8f9fa;
+    color: #333;
+    resize: vertical;
+    outline: none;
+    tab-size: 2;
+}
+
+.css-editor:focus {
+    border-color: #007bff;
+    background: white;
+}
+
+/* CSS Actions */
+.css-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+}
+
+.css-btn {
+    padding: 6px 12px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.css-btn:hover {
+    background: #0056b3;
+}
+
+.css-btn.secondary {
+    background: #6c757d;
+}
+
+.css-btn.secondary:hover {
+    background: #545b62;
+}
+
+/* CSS Presets */
+.css-presets {
+    margin-bottom: 15px;
+}
+
+.preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+}
+
+.preset-btn {
+    padding: 4px 8px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 10px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.preset-btn:hover {
+    background: #e9ecef;
+}
+
+/* CSS Status Messages */
+.css-status {
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 3px;
+    font-size: 11px;
+    color: #155724;
+    display: none;
+}
+
+.css-status.error {
+    background: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
