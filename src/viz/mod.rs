@@ -12,7 +12,8 @@
 use std::sync::Arc;
 use std::net::IpAddr;
 use crate::errors::{GraphResult, GraphError};
-use streaming::websocket_server::{StreamingServer, StreamingConfig};
+use streaming::server::StreamingServer;
+use streaming::types::StreamingConfig;
 use streaming::data_source::{DataSource, LayoutAlgorithm, HierarchicalDirection};
 use streaming::virtual_scroller::VirtualScrollConfig;
 
@@ -82,15 +83,10 @@ pub enum RenderResult {
     Static(StaticViz),
 }
 
-// Migrated infrastructure modules
-pub mod streaming;  // Migrated from core/streaming
-pub mod display;    // Migrated from core/display
-
-// New visualization modules
-pub mod core;       // ✅ Unified visualization core engine
-pub mod layouts;    // Graph layout algorithms
-pub mod themes;     // Graph visualization themes
-pub mod unified;    // ✅ Unified API entry point
+// Working visualization modules
+pub mod streaming;  // The working WebSocket + Canvas server
+pub mod display;    // Table/array/matrix formatting (essential for storage)
+pub mod layouts;    // Graph layout algorithms (used by streaming)
 
 // Legacy - deprecated in favor of unified streaming infrastructure
 // pub mod server;
@@ -1016,7 +1012,7 @@ impl InteractiveViz {
 
 /// Active visualization session with running server
 pub struct InteractiveVizSession {
-    server_handle: streaming::websocket_server::ServerHandle,
+    server_handle: streaming::types::ServerHandle,
     url: String,
     config: InteractiveOptions,
 }

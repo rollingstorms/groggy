@@ -1652,22 +1652,37 @@ impl StreamingServer {
         
         function onCanvasMouseMove(e) {{
             if (!isDragging) return;
-            
+
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
-            
-            translateX += mouseX - lastMouseX;
-            translateY += mouseY - lastMouseY;
-            
+
+            const deltaX = mouseX - lastMouseX;
+            const deltaY = mouseY - lastMouseY;
+
+            if (selectedNode !== null) {{
+                // Drag the selected node
+                const node = graphData.nodes.find(n => n.id === selectedNode);
+                if (node) {{
+                    // Convert screen space delta to world space
+                    node.x = (node.x || 0) + deltaX / scale;
+                    node.y = (node.y || 0) + deltaY / scale;
+                }}
+            }} else {{
+                // Drag the viewport
+                translateX += deltaX;
+                translateY += deltaY;
+            }}
+
             lastMouseX = mouseX;
             lastMouseY = mouseY;
-            
+
             renderGraph();
         }}
         
         function onCanvasMouseUp(e) {{
             isDragging = false;
+            selectedNode = null; // Clear selection after dragging
         }}
         
         function onCanvasWheel(e) {{

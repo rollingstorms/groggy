@@ -7,7 +7,9 @@ use crate::types::AttrValue;
 use crate::viz::display::{DisplayEngine, DisplayConfig, ColumnSchema, DataType, OutputFormat};
 use crate::core::{DisplayDataWindow, DisplayDataSchema, StreamingDataWindow, StreamingDataSchema};
 use crate::viz::streaming::data_source::{DataWindow, DataSchema};
-use crate::viz::streaming::{DataSource, StreamingServer, StreamingConfig};
+use crate::viz::streaming::DataSource;
+use crate::viz::streaming::server::StreamingServer;
+use crate::viz::streaming::types::StreamingConfig;
 use crate::viz::streaming::data_source::{GraphNode, LayoutAlgorithm, NodePosition};
 use crate::viz::{VizModule, InteractiveOptions};
 use std::collections::HashMap;
@@ -27,7 +29,7 @@ pub struct BaseTable {
     /// Streaming server for real-time updates (FOUNDATION ONLY - Phase 2)
     streaming_server: Option<StreamingServer>,
     /// Active server handles to keep them alive
-    active_server_handles: Vec<crate::viz::streaming::websocket_server::ServerHandle>,
+    active_server_handles: Vec<crate::viz::streaming::types::ServerHandle>,
     /// Streaming configuration
     streaming_config: StreamingConfig,
     /// Source ID for caching
@@ -2287,7 +2289,8 @@ impl BaseTable {
     /// // Use iframe_html in Jupyter notebook or web page
     /// ```
     pub fn interactive_embed(&mut self, config: Option<InteractiveConfig>) -> GraphResult<String> {
-        use crate::viz::streaming::{StreamingServer, StreamingConfig};
+        use crate::viz::streaming::server::StreamingServer;
+        use crate::viz::streaming::types::StreamingConfig;
         use std::sync::Arc;
 
         // Use provided config or default
@@ -2727,7 +2730,7 @@ impl Default for BrowserConfig {
 /// Browser interface handle
 #[derive(Debug)]
 pub struct BrowserInterface {
-    pub server_handle: crate::viz::streaming::websocket_server::ServerHandle,
+    pub server_handle: crate::viz::streaming::types::ServerHandle,
     pub url: String,
     pub config: BrowserConfig,
 }
