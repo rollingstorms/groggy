@@ -12,26 +12,67 @@
 
 Groggy is a modern graph analytics library that combines **graph topology** with **tabular data operations**. Built with a high-performance Rust core and intuitive Python API, Groggy lets you seamlessly work with graph data using familiar table-like operations.
 
+## **Quick Start:**
+
+### Installation
+
+```bash
+pip install groggy
+```
+
+### Example Python Usage
+
+```python
+import groggy as gr
+
+# Create a new graph
+g = gr.Graph()
+
+# Add nodes and edges
+g.add_node(name="Alice", age=29)
+g.add_node(name="Bob",   club="Red", active=True)
+g.add_edge(g.nodes[0], g.nodes[1], weight=5)
+
+# Inspect the graph
+print(g.nodes.table().head())
+print(g.edges.table().head())
+
+# Query the graph
+blue_nodes = g.nodes[g.nodes["club"] == "Blue"]
+older_nodes = g.nodes[g.nodes["age"] > 30]
+
+# Run a graph algorithm
+g.connected_components(inplace=True, label='component')
+
+# Viz the graph
+g.viz.show(node_color="component")
+```
+
 ## **A Little Graph Theory:**
 
 A graph is composed of nodes and edges…
-—or is it vertices and edges?
-—or maybe nodes and links?
-Ahem. Let's start over.
+- or is it vertices and edges?
+- or maybe nodes and links?
+Well, let's start over.
 
-At its core, a graph is a network — a collection of entities (nodes) and the relationships (edges) between them. That's the first truth of graph theory: everything is connected.
+At its core, a *graph is a network* - a collection of entities (nodes) and the relationships (edges) between them. That's the first truth of graph theory: 
 
-But the second truth is more interesting: connections carry meaning.
+*Everything is connected.* 
+
+The second truth is more interesting: 
+
+*Connections carry meaning.*
+
 Edges aren't just lines on a diagram — they represent interactions, flows, dependencies, or influence. And when you map those connections, entire hidden structures begin to reveal themselves:
-	•	Communities of related entities
-	•	Bridges between otherwise disconnected groups
-	•	Patterns that point to anomalies, opportunities, or risk
+- Communities of related entities
+- Bridges between otherwise disconnected groups
+- Patterns that point to anomalies, generalizations, or insights
 
-Groggy builds on these ideas and takes them further: every node and edge can have attributes.
+Groggy builds on these ideas and takes them further: every node and edge can have attributes that are stored in a equally efficient format.
 That means your "graph" isn't just dots and lines — it's a rich, living dataset:
-	•	Nodes can store labels, features, embeddings, or metadata
-	•	Edges can carry weights, timestamps, permissions, or scores
-	•	You can analyze both structure and data together — seamlessly
+- Nodes can store labels, features, embeddings, or metadata
+- Edges can carry weights, timestamps, permissions, or scores
+- You can analyze both structure and data together — seamlessly
 
 Whether you're exploring dynamic networks, running graph algorithms, or building machine learning pipelines, Groggy provides a modular, high-performance foundation that feels natural to use. It's designed for thinking in graphs — not just visualizing them, but querying, transforming, simulating, and learning from them.
 
@@ -185,11 +226,6 @@ g.edges.table().to_csv("edges.csv")
 ## 9) Core architecture (how it holds together)
 
 Three tiers:
-	1.	**Graph Space** — the active set of nodes and edges you're working with right now. Fast, ergonomic operations; views and selections feel immediate.
-	2.	**Graph Pool** — columnar storage for node/edge attributes and structure. This is the durable, cache-friendly backbone for tables, arrays, and round-trips to files/dataframes.
-	3.	**History Layer** — commits and branches for graph states. Treat your graph like code: checkpoint, fork, compare, and return.
-
-Three layers:
 	•	**Rust Core** — memory-safe performance, columnar ops, and core graph/state machinery.
 	•	**FFI Bridge** — a slim foreign-function interface that exposes Rust capabilities safely.
 	•	**Python API** — the user-facing surface that reads like you think, with chains, masks, and friendly data interchange.
