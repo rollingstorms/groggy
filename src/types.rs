@@ -486,7 +486,9 @@ impl NumericType {
             
             // Integer promotions
             (Int64, _) | (_, Int64) => Int64,
-            (Int32, _) | (_, Int32) => Int32,
+            // Note: (Int32, _) | (_, Int32) => Int32 is unreachable due to above patterns
+            // If we reach here, both types must be Int32 (caught by same types) or lower precision
+            _ => Int32, // Default fallback for any remaining cases
         }
     }
     

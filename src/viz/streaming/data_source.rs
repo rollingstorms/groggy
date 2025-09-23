@@ -259,6 +259,12 @@ pub enum LayoutAlgorithm {
         columns: usize,
         cell_size: f64,
     },
+    /// Honeycomb layout arranging nodes in hexagonal grid
+    Honeycomb {
+        cell_size: f64,
+        energy_optimization: bool,
+        iterations: usize,
+    },
 }
 
 /// Direction for hierarchical layouts

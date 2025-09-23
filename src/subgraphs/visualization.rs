@@ -262,7 +262,7 @@ impl DataSource for SubgraphDataSource {
                 // Default: circular layout
                 let radius = 200.0;
                 let angle_step = 2.0 * std::f64::consts::PI / self.nodes.len() as f64;
-                
+
                 self.nodes.iter().enumerate().map(|(i, node)| {
                     let angle = i as f64 * angle_step;
                     NodePosition {
@@ -271,6 +271,27 @@ impl DataSource for SubgraphDataSource {
                             x: 300.0 + radius * angle.cos(),
                             y: 300.0 + radius * angle.sin(),
                         },
+                    }
+                }).collect()
+            },
+            LayoutAlgorithm::Honeycomb { cell_size, energy_optimization: _, iterations: _ } => {
+                // Honeycomb/hexagonal grid layout
+                let cell_size = cell_size;
+                let sqrt3 = 3.0_f64.sqrt();
+                let hex_width = cell_size * sqrt3;
+                let hex_height = cell_size * 1.5;
+
+                self.nodes.iter().enumerate().map(|(i, node)| {
+                    let row = (i as f64 / 10.0).floor() as usize; // 10 nodes per row
+                    let col = i % 10;
+
+                    let x_offset = if row % 2 == 1 { hex_width / 2.0 } else { 0.0 };
+                    let x = 50.0 + (col as f64 * hex_width) + x_offset;
+                    let y = 50.0 + (row as f64 * hex_height);
+
+                    NodePosition {
+                        node_id: node.id.to_string(),
+                        position: Position { x, y },
                     }
                 }).collect()
             },

@@ -29,17 +29,20 @@ import groggy as gr
 g = gr.Graph()
 
 # Add nodes and edges
-g.add_node(name="Alice", age=29)
-g.add_node(name="Bob",   club="Red", active=True)
-g.add_edge(g.nodes[0], g.nodes[1], weight=5)
+alice = g.add_node(name="Alice", age=29)
+bob   = g.add_node(name="Bob",   club="Purple", active=True, age=55)
+carol = g.add_node(name="Carol", club="Blue",   active=True, age=31)
+g.add_edge(alice, bob, weight=5)
+g.add_edge(alice, carol, weight=2)
+g.add_edge(bob, carol, weight=1)
 
 # Inspect the graph
 print(g.nodes.table().head())
 print(g.edges.table().head())
 
 # Query the graph
-blue_nodes = g.nodes[g.nodes["club"] == "Blue"]
-older_nodes = g.nodes[g.nodes["age"] > 30]
+purple_nodes = g.nodes[g.nodes["club"] == "Purple"]
+younger_nodes = g.nodes[g.nodes["age"] < 30]
 
 # Run a graph algorithm
 g.connected_components(inplace=True, label='component')

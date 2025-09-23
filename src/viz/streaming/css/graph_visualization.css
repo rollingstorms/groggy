@@ -47,6 +47,21 @@
   --edge-type-weak: #ced4da;
   --edge-type-directed: #fd7e14;
   --edge-type-bidirectional: #7950f2;
+
+  /* Meta element styling */
+  --meta-node-color: #9775fa;
+  --meta-node-border-color: #7048e8;
+  --meta-node-radius: 14px;
+  --meta-node-border-width: 3px;
+  --meta-node-shadow: 0 2px 8px rgba(144, 117, 250, 0.3);
+  --meta-node-label-color: #6741d9;
+  --meta-node-label-font-weight: bold;
+
+  --meta-edge-color: #9775fa;
+  --meta-edge-width: 3px;
+  --meta-edge-dash-pattern: "8,4";
+  --meta-edge-opacity: 0.9;
+  --meta-edge-shadow: 0 1px 4px rgba(144, 117, 250, 0.2);
 }
 
 /* Additional streaming-specific styles */
