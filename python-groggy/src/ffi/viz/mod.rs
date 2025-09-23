@@ -239,13 +239,15 @@ impl PyVizModule {
             width: width.unwrap_or(1200),
             height: height.unwrap_or(800),
             interactions: InteractionConfig::default(),
+            show_labels: true,
+            auto_open: false,
         };
         
         let interactive_viz = self.inner.interactive(Some(options))
             .map_err(PyGraphError::from)?;
         
         Ok(PyInteractiveViz {
-            inner: interactive_viz,
+            inner: Some(interactive_viz),
         })
     }
     
@@ -382,9 +384,9 @@ impl PyVizModule {
 // =============================================================================
 
 /// Python wrapper for InteractiveViz
-#[pyclass(name = "InteractiveViz", module = "groggy")]
+#[pyclass(name = "InteractiveViz", module = "groggy", unsendable)]
 pub struct PyInteractiveViz {
-    inner: InteractiveViz,
+    inner: Option<InteractiveViz>,
 }
 
 #[pymethods]
@@ -396,7 +398,7 @@ impl PyInteractiveViz {
     /// 
     /// # Returns
     /// PyInteractiveVizSession with server details
-    pub fn start(&self, bind_addr: Option<String>) -> PyResult<PyInteractiveVizSession> {
+    pub fn start(&mut self, bind_addr: Option<String>) -> PyResult<PyInteractiveVizSession> {
         let addr = if let Some(addr_str) = bind_addr {
             addr_str.parse().map_err(|e| {
                 PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -407,7 +409,13 @@ impl PyInteractiveViz {
             "127.0.0.1".parse().unwrap()
         };
         
-        let session = self.inner.start(Some(addr))
+        let interactive_viz = self.inner.take().ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "InteractiveViz has already been started"
+            )
+        })?;
+        
+        let session = interactive_viz.start(Some(addr))
             .map_err(PyGraphError::from)?;
         
         Ok(PyInteractiveVizSession {

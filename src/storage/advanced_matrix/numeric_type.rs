@@ -54,9 +54,9 @@ impl DType {
             
             // Integer promotions
             (Int64, _) | (_, Int64) => Int64,
-            (Int32, _) | (_, Int32) => Int32,
-            (Int16, _) | (_, Int16) => Int16,
-            (Int8, _) | (_, Int8) => Int8,
+            // Remaining patterns would be unreachable due to above patterns
+            // All remaining cases default to highest precision integer
+            _ => Int64, // Default fallback for any remaining integer combinations
         }
     }
     

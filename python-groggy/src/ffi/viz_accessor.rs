@@ -18,6 +18,58 @@ pub struct VizAccessor {
 
 #[pymethods]
 impl VizAccessor {
+    /// Show honeycomb visualization with n-dimensional rotation controls
+    fn show_honeycomb(&self, py: Python) -> PyResult<PyObject> {
+        let iframe_html = format!(r#"
+<div style="border: 2px dashed #ff6b6b; padding: 20px; margin: 10px; border-radius: 8px; background: #f8f9fa;">
+    <h3 style="color: #ff6b6b; margin-top: 0;">🍯 Honeycomb N-Dimensional Controls</h3>
+    <p><strong>Canvas Dragging for N-Dimensional Rotation:</strong></p>
+    <ul>
+        <li><strong>Left Mouse + Drag:</strong> Rotate in dimensions 0-1</li>
+        <li><strong>Left + Shift + Drag:</strong> Rotate in dimensions 0-1 (explicit)</li>
+        <li><strong>Left + Ctrl + Drag:</strong> Rotate in higher dimensions (2-3)</li>
+        <li><strong>Right Mouse + Drag:</strong> Multi-dimensional rotation (0-2, 1-3)</li>
+        <li><strong>Middle Mouse + Drag:</strong> Rotate across all dimension pairs</li>
+    </ul>
+    <p><strong>Node Dragging for Direct Manipulation:</strong></p>
+    <ul>
+        <li><strong>Drag Nodes:</strong> Move individual points in n-dimensional space</li>
+        <li><strong>Screen X/Y:</strong> Maps to multi-dimensional coordinates</li>
+        <li><strong>Higher Dimensions:</strong> Affected based on movement patterns</li>
+    </ul>
+    <p><strong>Features:</strong></p>
+    <ul>
+        <li>✨ <strong>Momentum Rotation:</strong> Smooth rotation continues after release</li>
+        <li>🎯 <strong>Real-time Updates:</strong> Immediate visual feedback via WebSocket</li>
+        <li>⚡ <strong>60 FPS:</strong> Smooth animations and interactions</li>
+        <li>🔧 <strong>Adaptive Quality:</strong> Performance optimization based on complexity</li>
+    </ul>
+    <p style="color: #666; font-style: italic;">Note: This is the advanced honeycomb layout with 5D embeddings projected to 2D hexagonal grid.
+    Use regular .show() for traditional force-directed layouts.</p>
+    <iframe src="http://localhost:8080" width="100%" height="600" frameborder="0" style="border: 1px solid #ddd; border-radius: 4px; margin-top: 10px;">
+        <p>Honeycomb visualization with n-dimensional rotation controls</p>
+    </iframe>
+</div>
+"#);
+
+        // Auto-display in Jupyter using display(HTML())
+        py.run(&format!(
+            r#"
+try:
+    from IPython.display import HTML, display
+    _html_obj = HTML(r'''{html}''')
+    display(_html_obj)
+except ImportError:
+    print("IPython not available for auto-display")
+except Exception as e:
+    print(f"Display error: {{e}}")
+"#,
+            html = iframe_html.replace("'", "\\'")
+        ), None, None)?;
+
+        Ok(py.None())
+    }
+
     /// Show visualization with auto-display in Jupyter or return HTML for non-Jupyter
     fn show(&self, py: Python) -> PyResult<PyObject> {
         if let Some(ref data_source) = self.data_source {
@@ -52,6 +104,80 @@ try:
     from IPython.display import HTML, display
     _html_obj = HTML(r'''{html}''')
     display(_html_obj)
+except ImportError:
+    print("IPython not available for auto-display")
+except Exception as e:
+    print(f"Display error: {{e}}")
+"#,
+                html = fallback.replace("'", "\\'")
+            ), None, None)?;
+            Ok(py.None())
+        }
+    }
+
+    /// Show visualization with honeycomb layout
+    fn honeycomb(&self, py: Python, cell_size: Option<f64>, energy_optimization: Option<bool>, iterations: Option<usize>) -> PyResult<PyObject> {
+        eprintln!("🔍 Python FFI: honeycomb method called with cell_size={:?}, energy_opt={:?}, iterations={:?}", 
+                 cell_size, energy_optimization, iterations);
+        
+        if let Some(ref data_source) = self.data_source {
+            eprintln!("🔍 Python FFI: data_source found, calling interactive_embed_with_layout");
+            
+            // Create honeycomb layout with specified parameters
+            let honeycomb_html = py.allow_threads(|| {
+                use groggy::viz::streaming::data_source::LayoutAlgorithm;
+
+                let layout = LayoutAlgorithm::Honeycomb {
+                    cell_size: cell_size.unwrap_or(40.0),
+                    energy_optimization: energy_optimization.unwrap_or(true),
+                    iterations: iterations.unwrap_or(100),
+                };
+
+                eprintln!("🔍 Python FFI: About to call interactive_embed_with_layout with {:?}", layout);
+                let result = data_source.interactive_embed_with_layout(layout);
+                eprintln!("🔍 Python FFI: interactive_embed_with_layout returned");
+                
+                result.map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                        format!("Honeycomb visualization failed: {}", e)
+                    ))
+            })?;
+
+            // Create and return IPython HTML object
+            let html_obj = py.run(&format!(
+                r#"
+try:
+    from IPython.display import HTML, display
+    _html_obj = HTML(r'''{html}''')
+    display(_html_obj)
+    print("🍯 Honeycomb layout applied (cell_size: {cell_size}, optimization: {energy_opt}, iterations: {iterations})")
+    _result = _html_obj
+except ImportError:
+    print("IPython not available for auto-display")
+    _result = None
+except Exception as e:
+    print(f"Display error: {{e}}")
+    _result = None
+"#,
+                html = honeycomb_html.replace("'", "\\'"),
+                cell_size = cell_size.unwrap_or(40.0),
+                energy_opt = energy_optimization.unwrap_or(true),
+                iterations = iterations.unwrap_or(100)
+            ), None, None)?;
+
+            // Return the HTML object or None if IPython not available
+            match py.eval("_result", None, None) {
+                Ok(obj) => Ok(obj.to_object(py)),
+                Err(_) => Ok(py.None()),
+            }
+        } else {
+            let fallback = self.create_fallback_visualization();
+            py.run(&format!(
+                r#"
+try:
+    from IPython.display import HTML, display
+    _html_obj = HTML(r'''{html}''')
+    display(_html_obj)
+    print("🍯 Honeycomb layout requested but not available for this object type")
 except ImportError:
     print("IPython not available for auto-display")
 except Exception as e:

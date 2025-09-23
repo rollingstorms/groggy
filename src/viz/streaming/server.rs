@@ -851,6 +851,11 @@ impl StreamingServer {
                 layer_spacing: 100.0,
                 node_spacing: 50.0,
             },
+            "honeycomb" | "hexagonal" | "hex" => LayoutAlgorithm::Honeycomb {
+                cell_size: 40.0,
+                energy_optimization: true,
+                iterations: 100,
+            },
             _ => {
                 // Default to force-directed for unknown algorithms
                 eprintln!("⚠️ Unknown layout algorithm '{}', defaulting to force-directed", algorithm_name);

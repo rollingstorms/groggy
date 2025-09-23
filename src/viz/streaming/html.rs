@@ -118,6 +118,7 @@ impl StreamingServer {
                             <option value="circular">Circular</option>
                             <option value="grid">Grid</option>
                             <option value="hierarchical">Tree</option>
+                            <option value="honeycomb">Honeycomb</option>
                         </select>
                     </div>
                 </div>
@@ -332,6 +333,20 @@ impl StreamingServer {
                         edgeWidth *= Math.min(3, Math.sqrt(edge.weight));
                     }}
 
+                    // Check if this is a meta edge
+                    const isMetaEdge = edge.entity_type === 'meta' || edge.contains_subgraph !== undefined;
+                    if (isMetaEdge) {{
+                        edgeColor = '#9775fa'; // Purple color for meta edges
+                        edgeWidth = Math.max(edgeWidth, 3); // Thicker width
+                        edgeOpacity = Math.min(1.0, edgeOpacity + 0.1); // More opaque
+
+                        // Set up dashed line for meta edges
+                        ctx.setLineDash([8, 4]);
+                    }} else {{
+                        // Reset to solid line for regular edges
+                        ctx.setLineDash([]);
+                    }}
+
                     ctx.strokeStyle = edgeColor;
                     ctx.lineWidth = edgeWidth;
                     ctx.globalAlpha = edgeOpacity;
@@ -339,6 +354,8 @@ impl StreamingServer {
                     // Draw curved or straight edge based on curviness setting
                     drawCurvedEdge(sourceNode, targetNode, canvasStyles.edge.curviness);
 
+                    // Reset drawing state
+                    ctx.setLineDash([]); // Reset line dash
                     ctx.globalAlpha = 1.0; // Reset alpha
                 }}
             }});
@@ -370,14 +387,29 @@ impl StreamingServer {
                     if (typeColor) nodeColor = typeColor;
                 }}
 
+                // Check if this is a meta node (contains a subgraph)
+                const isMeta = node.entity_type === 'meta' || node.contains_subgraph !== undefined;
+                let nodeRadius = radius;
+                let shadowColor = 'rgba(0,0,0,0.2)';
+                let shadowBlur = isSelected || isHovered ? 8 : 4;
+
+                if (isMeta) {{
+                    // Meta nodes get special styling
+                    nodeColor = '#9775fa'; // Purple color for meta nodes
+                    nodeRadius = Math.max(radius, 14); // Larger radius
+                    borderWidth = Math.max(borderWidth, 3); // Thicker border
+                    shadowColor = 'rgba(144, 117, 250, 0.3)'; // Purple shadow
+                    shadowBlur = isSelected || isHovered ? 12 : 8; // More prominent shadow
+                }}
+
                 // Node circle with shadow for depth
-                ctx.shadowColor = 'rgba(0,0,0,0.2)';
-                ctx.shadowBlur = isSelected || isHovered ? 8 : 4;
+                ctx.shadowColor = shadowColor;
+                ctx.shadowBlur = shadowBlur;
                 ctx.shadowOffsetX = 1;
                 ctx.shadowOffsetY = 1;
 
                 ctx.beginPath();
-                ctx.arc(x, y, radius, 0, 2 * Math.PI);
+                ctx.arc(x, y, nodeRadius, 0, 2 * Math.PI);
                 ctx.fillStyle = nodeColor;
                 ctx.fill();
 
@@ -388,16 +420,36 @@ impl StreamingServer {
                 ctx.shadowOffsetY = 0;
 
                 // Node border
-                ctx.strokeStyle = canvasStyles.node.colors.border;
-                ctx.lineWidth = borderWidth;
-                ctx.stroke();
+                if (isMeta) {{
+                    // Meta nodes get a special purple border
+                    ctx.strokeStyle = '#7048e8';
+                    ctx.lineWidth = borderWidth;
+                    ctx.stroke();
+
+                    // Add an inner ring to indicate it's a meta node
+                    ctx.beginPath();
+                    ctx.arc(x, y, nodeRadius - 2, 0, 2 * Math.PI);
+                    ctx.strokeStyle = '#9775fa';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }} else {{
+                    ctx.strokeStyle = canvasStyles.node.colors.border;
+                    ctx.lineWidth = borderWidth;
+                    ctx.stroke();
+                }}
 
                 // Node label
                 if (node.label || node.id) {{
-                    ctx.fillStyle = canvasStyles.node.colors.label;
-                    ctx.font = '10px Arial';
+                    if (isMeta) {{
+                        // Meta nodes get bold purple labels
+                        ctx.fillStyle = '#6741d9';
+                        ctx.font = 'bold 10px Arial';
+                    }} else {{
+                        ctx.fillStyle = canvasStyles.node.colors.label;
+                        ctx.font = '10px Arial';
+                    }}
                     ctx.textAlign = 'center';
-                    ctx.fillText(node.label || node.id, x, y + radius + 12);
+                    ctx.fillText(node.label || node.id, x, y + nodeRadius + 12);
                 }}
             }});
 

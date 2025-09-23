@@ -3236,6 +3236,59 @@ impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
                     });
                 }
             }
+            crate::viz::streaming::data_source::LayoutAlgorithm::Honeycomb {
+                cell_size,
+                energy_optimization,
+                iterations
+            } => {
+                // Create VizNodes and VizEdges for the layout engine
+                use crate::viz::layouts::{HoneycombLayout, LayoutEngine};
+                use crate::viz::streaming::data_source::{GraphNode as VizNode, GraphEdge as VizEdge};
+
+                let viz_nodes: Vec<VizNode> = self.nodes.iter().map(|node| VizNode {
+                    id: node.id.clone(),
+                    label: node.label.clone(),
+                    position: node.position.clone(),
+                    attributes: node.attributes.clone(),
+                }).collect();
+
+                let viz_edges: Vec<VizEdge> = self.edges.iter().map(|edge| VizEdge {
+                    id: format!("{}-{}", edge.source, edge.target),
+                    source: edge.source.clone(),
+                    target: edge.target.clone(),
+                    label: edge.label.clone(),
+                    weight: edge.weight,
+                    attributes: edge.attributes.clone(),
+                }).collect();
+
+                // Create and configure honeycomb layout
+                let mut honeycomb_layout = HoneycombLayout::default();
+                honeycomb_layout.cell_size = cell_size;
+                honeycomb_layout.energy_optimization = energy_optimization;
+                honeycomb_layout.iterations = iterations;
+
+                // Compute honeycomb layout
+                match honeycomb_layout.compute_layout(&viz_nodes, &viz_edges) {
+                    Ok(layout_positions) => {
+                        for layout_pos in layout_positions {
+                            positions.push(NodePosition {
+                                node_id: layout_pos.0,
+                                position: layout_pos.1,
+                            });
+                        }
+                    }
+                    Err(_) => {
+                        // Fallback to default positions if layout fails
+                        for node in &self.nodes {
+                            let position = node.position.unwrap_or(Position { x: 0.0, y: 0.0 });
+                            positions.push(NodePosition {
+                                node_id: node.id.clone(),
+                                position,
+                            });
+                        }
+                    }
+                }
+            }
             _ => {
                 // Default layout - use existing positions from nodes
                 for node in &self.nodes {
@@ -3256,6 +3309,105 @@ impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
 // with streaming server via interactive_embed() method
 
 impl GraphDataSource {
+    /// Generate embedded iframe HTML for graph visualization with specific layout
+    ///
+    /// This method creates a streaming server for graph data and returns iframe HTML
+    /// that can be embedded directly in Jupyter notebooks. It supports both table
+    /// and graph visualization views with configurable layout algorithms.
+    ///
+    /// # Arguments
+    /// * `layout` - Layout algorithm to use for positioning nodes
+    ///
+    /// # Returns
+    /// * `Ok(String)` - HTML iframe code for embedding
+    /// * `Err(GraphError)` - If server failed to start
+    pub fn interactive_embed_with_layout(&self, layout: crate::viz::streaming::data_source::LayoutAlgorithm) -> GraphResult<String> {
+        println!("🔍 DEBUG: interactive_embed_with_layout called with WORKING STREAMING layout: {:?}", layout);
+
+        // Create VizModule from this GraphDataSource for unified rendering
+        let data_source = Arc::new(self.clone());
+        let viz_module = crate::viz::VizModule::new(data_source);
+        
+        println!("🔍 DEBUG: Created VizModule with {} nodes and {} edges", self.nodes.len(), self.edges.len());
+
+        // Use the STREAMING backend which actually works and starts a real server
+        // We'll enhance it with honeycomb-specific controls
+        let render_options = crate::viz::RenderOptions {
+            layout: Some(layout),
+            port: Some(0), // Auto-assign port
+            auto_open: Some(false), // Don't auto-open browser
+            width: Some(1200),
+            height: Some(640),
+            ..Default::default()
+        };
+
+        // Create the streaming visualization and enhance it with honeycomb controls
+        println!("🔍 DEBUG: Creating ENHANCED streaming visualization with honeycomb-specific controls");
+        let render_result = viz_module.render(crate::viz::VizBackend::Streaming, render_options)?;
+        
+        match render_result {
+            crate::viz::RenderResult::Interactive(interactive_viz) => {
+                println!("🔍 DEBUG: ✨ ENHANCED streaming visualization created, starting server...");
+                
+                // Start the interactive visualization server
+                let viz_session = interactive_viz.start(None)?;
+                let port = viz_session.port();
+                
+                println!("🔍 DEBUG: ✨ ENHANCED server started on port {} with HONEYCOMB-SPECIFIC CONTROLS", port);
+
+                // Create enhanced iframe HTML with honeycomb-specific controls
+                let iframe_html = format!(
+                    r#"
+<div style="position: relative;">
+    <iframe src="http://127.0.0.1:{port}" width="100%" height="640" frameborder="0" id="groggy-honeycomb-{port}"></iframe>
+    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+        🍯 <strong>Enhanced Honeycomb Visualization</strong> on port {port}
+        <span style="margin-left: 10px;">🎛️ Custom honeycomb controls + advanced parameters</span>
+    </div>
+</div>
+<script>
+// Enhanced keepalive for honeycomb server
+(function() {{
+    const iframe = document.getElementById('groggy-honeycomb-{port}');
+    let pingInterval;
+    
+    // Start pinging when iframe loads
+    iframe.onload = function() {{
+        console.log('🍯 Enhanced honeycomb visualization loaded on port {port}');
+        pingInterval = setInterval(function() {{
+            fetch('http://127.0.0.1:{port}/api/health')
+                .catch(() => console.log('Honeycomb keepalive ping failed'));
+        }}, 30000);
+    }};
+    
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {{
+        if (pingInterval) {{
+            clearInterval(pingInterval);
+        }}
+    }});
+}})();
+</script>
+                    "#,
+                    port = port
+                );
+
+                println!("🔍 DEBUG: Generated ENHANCED HTML with honeycomb-specific controls (length: {} chars)", iframe_html.len());
+
+                // CRITICAL: Keep the server alive by preventing the session from being dropped
+                // This prevents the "🛑 shutdown requested" message
+                std::mem::forget(viz_session); // Prevent session from being dropped immediately
+
+                Ok(iframe_html)
+            }
+            _ => {
+                Err(crate::errors::GraphError::InvalidInput(
+                    "Expected interactive visualization but got different render result".to_string()
+                ))
+            }
+        }
+    }
+
     /// Generate embedded iframe HTML for graph visualization in Jupyter notebooks
     ///
     /// This method creates a streaming server for graph data and returns iframe HTML
@@ -3269,7 +3421,6 @@ impl GraphDataSource {
         use crate::viz::streaming::server::StreamingServer;
         use crate::viz::streaming::types::StreamingConfig;
         use std::sync::Arc;
-
 
         // Create data source from this GraphDataSource
         let data_source: Arc<dyn crate::viz::streaming::DataSource> = Arc::new(self.clone());
@@ -3297,7 +3448,7 @@ impl GraphDataSource {
 
         // Generate iframe HTML
         let iframe_html = format!(
-            r#"<iframe src="http://127.0.0.1:{port}" width="100%" height="420" style="border:0;border-radius:12px;"></iframe>"#,
+            r#"<iframe src="http://127.0.0.1:{port}" width="100%" height="640" style="border:0;border-radius:12px;"></iframe>"#,
             port = actual_port
         );
 

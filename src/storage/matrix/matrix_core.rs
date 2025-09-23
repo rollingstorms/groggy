@@ -2929,3 +2929,126 @@ where
         &self * &rhs
     }
 }
+
+impl<T: NumericType> Default for GraphMatrix<T> {
+    fn default() -> Self {
+        GraphMatrix::zeros(0, 0)
+    }
+}
+
+impl<T: NumericType> GraphMatrix<T> {
+    /// Select specific columns by indices
+    pub fn select_columns(&self, indices: &[usize]) -> GraphResult<GraphMatrix<T>> {
+        let (rows, _) = self.shape();
+        let mut result = GraphMatrix::zeros(rows, indices.len());
+        
+        for (new_col, &old_col) in indices.iter().enumerate() {
+            if let Some(column_data) = self.get_column(old_col) {
+                for (row, &value) in column_data.iter().enumerate() {
+                    result.set(row, new_col, value)?;
+                }
+            }
+        }
+        
+        Ok(result)
+    }
+
+    /// Multiply matrix by scalar
+    pub fn scalar_multiply(&self, scalar: f64) -> GraphResult<GraphMatrix<T>> 
+    where 
+        T: std::ops::Mul<Output = T> + From<f64>
+    {
+        let (rows, cols) = self.shape();
+        let mut result = GraphMatrix::zeros(rows, cols);
+        let scalar_t = T::from(scalar);
+        
+        for i in 0..rows {
+            for j in 0..cols {
+                if let Ok(value) = self.get_checked(i, j) {
+                    result.set(i, j, value * scalar_t)?;
+                }
+            }
+        }
+        
+        Ok(result)
+    }
+
+    /// Add two matrices element-wise (method wrapper for + operator)
+    pub fn add(&self, other: &GraphMatrix<T>) -> GraphResult<GraphMatrix<T>> 
+    where 
+        for<'a> &'a GraphMatrix<T>: std::ops::Add<Output = GraphMatrix<T>>
+    {
+        Ok(self + other)
+    }
+
+    /// Compute variance of each column
+    pub fn column_variances(&self) -> GraphResult<Vec<f64>> 
+    where 
+        T: Into<f64> + Copy
+    {
+        let (rows, cols) = self.shape();
+        let mut variances = Vec::with_capacity(cols);
+        
+        for col in 0..cols {
+            if let Some(column_data) = self.get_column(col) {
+                // Compute mean
+                let sum: f64 = column_data.iter().map(|&x| x.into()).sum();
+                let mean = sum / rows as f64;
+                
+                // Compute variance
+                let variance: f64 = column_data.iter()
+                    .map(|&x| {
+                        let diff = x.into() - mean;
+                        diff * diff
+                    })
+                    .sum::<f64>() / rows as f64;
+                    
+                variances.push(variance);
+            } else {
+                variances.push(0.0);
+            }
+        }
+        
+        Ok(variances)
+    }
+
+    /// Concatenate matrices horizontally (by columns)
+    pub fn concatenate_columns(matrices: Vec<GraphMatrix<T>>) -> GraphResult<GraphMatrix<T>> {
+        if matrices.is_empty() {
+            return Ok(GraphMatrix::zeros(0, 0));
+        }
+        
+        if matrices.len() == 1 {
+            return Ok(matrices[0].clone());
+        }
+        
+        // Use existing concatenate method with axis=1 (columns)
+        let mut result = matrices[0].clone();
+        for matrix in matrices.into_iter().skip(1) {
+            result = result.concatenate(&matrix, 1)?;
+        }
+        
+        Ok(result)
+    }
+
+    /// Compute mean of each column
+    pub fn column_means(&self) -> GraphResult<Vec<f64>>
+    where
+        f64: From<T>,
+    {
+        let (rows, cols) = self.shape();
+        let mut means = Vec::with_capacity(cols);
+        
+        for col in 0..cols {
+            if let Some(column_data) = self.get_column(col) {
+                let sum: f64 = column_data.iter().map(|&x| f64::from(x)).sum();
+                let mean = sum / rows as f64;
+                means.push(mean);
+            } else {
+                means.push(0.0);
+            }
+        }
+        
+        Ok(means)
+    }
+}
