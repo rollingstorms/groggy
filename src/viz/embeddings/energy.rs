@@ -6,10 +6,10 @@
 
 use super::{EmbeddingEngine, EnergyFunction};
 use crate::api::graph::Graph;
-use crate::errors::{GraphResult, GraphError};
+use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
-use crate::types::NodeId;
 use crate::traits::subgraph_operations::SubgraphOperations;
+use crate::types::NodeId;
 use std::collections::HashMap;
 
 /// Energy-based embedding engine with customizable energy functions
@@ -30,7 +30,12 @@ pub struct EnergyEmbedding {
 }
 
 impl EnergyEmbedding {
-    pub fn new(iterations: usize, learning_rate: f64, annealing: bool, energy_function: Option<EnergyFunction>) -> Self {
+    pub fn new(
+        iterations: usize,
+        learning_rate: f64,
+        annealing: bool,
+        energy_function: Option<EnergyFunction>,
+    ) -> Self {
         Self {
             iterations,
             learning_rate,
@@ -52,7 +57,11 @@ impl EnergyEmbedding {
     }
 
     /// Initialize random positions for nodes
-    fn initialize_positions(&self, node_count: usize, dimensions: usize) -> GraphResult<GraphMatrix> {
+    fn initialize_positions(
+        &self,
+        node_count: usize,
+        dimensions: usize,
+    ) -> GraphResult<GraphMatrix> {
         let mut rng = if let Some(seed) = self.seed {
             fastrand::Rng::with_seed(seed)
         } else {
@@ -73,20 +82,40 @@ impl EnergyEmbedding {
     }
 
     /// Compute energy gradients for all nodes
-    fn compute_gradients(&self, positions: &GraphMatrix, graph: &Graph, node_indices: &HashMap<NodeId, usize>) -> GraphResult<GraphMatrix> {
+    fn compute_gradients(
+        &self,
+        positions: &GraphMatrix,
+        graph: &Graph,
+        node_indices: &HashMap<NodeId, usize>,
+    ) -> GraphResult<GraphMatrix> {
         let (n_nodes, n_dims) = positions.shape();
         let mut gradients = GraphMatrix::zeros(n_nodes, n_dims);
 
         match &self.energy_function {
-            Some(EnergyFunction::SpringElectric { attraction_strength, repulsion_strength, ideal_distance }) => {
-                self.compute_spring_electric_gradients(&mut gradients, positions, graph, node_indices, *attraction_strength, *repulsion_strength, *ideal_distance)?;
+            Some(EnergyFunction::SpringElectric {
+                attraction_strength,
+                repulsion_strength,
+                ideal_distance,
+            }) => {
+                self.compute_spring_electric_gradients(
+                    &mut gradients,
+                    positions,
+                    graph,
+                    node_indices,
+                    *attraction_strength,
+                    *repulsion_strength,
+                    *ideal_distance,
+                )?;
             }
 
             Some(EnergyFunction::StressMinimization { stress_type }) => {
                 self.compute_stress_gradients(&mut gradients, positions, *stress_type)?;
             }
 
-            Some(EnergyFunction::Custom { attraction_fn, repulsion_fn }) => {
+            Some(EnergyFunction::Custom {
+                attraction_fn,
+                repulsion_fn,
+            }) => {
                 // TODO: Implement custom function evaluation
                 return Err(GraphError::NotImplemented {
                     feature: "Custom energy functions".to_string(),
@@ -96,7 +125,15 @@ impl EnergyEmbedding {
 
             None => {
                 // Default: spring-electric model
-                self.compute_spring_electric_gradients(&mut gradients, positions, graph, node_indices, 1.0, 1.0, 1.0)?;
+                self.compute_spring_electric_gradients(
+                    &mut gradients,
+                    positions,
+                    graph,
+                    node_indices,
+                    1.0,
+                    1.0,
+                    1.0,
+                )?;
             }
         }
 
@@ -126,7 +163,9 @@ impl EnergyEmbedding {
                     GraphError::InvalidInput("Target node not found in graph".to_string())
                 })?;
 
-                if i == j { continue; } // Skip self-loops
+                if i == j {
+                    continue;
+                } // Skip self-loops
 
                 let weight = 1.0; // TODO: get actual edge weight if needed
 
@@ -205,7 +244,11 @@ impl EnergyEmbedding {
     }
 
     /// Perform optimization using gradient descent with optional annealing
-    fn optimize(&self, mut positions: GraphMatrix, graph: &Graph) -> GraphResult<(GraphMatrix, Vec<f64>)> {
+    fn optimize(
+        &self,
+        mut positions: GraphMatrix,
+        graph: &Graph,
+    ) -> GraphResult<(GraphMatrix, Vec<f64>)> {
         let node_ids: Vec<NodeId> = graph.space().node_ids();
         let node_indices: HashMap<NodeId, usize> = node_ids
             .iter()
@@ -243,7 +286,8 @@ impl EnergyEmbedding {
             // Optional: early stopping if energy is not decreasing
             if iteration > 50 && energy_history.len() >= 10 {
                 let recent_energies = &energy_history[energy_history.len() - 10..];
-                let energy_change = recent_energies.first().unwrap() - recent_energies.last().unwrap();
+                let energy_change =
+                    recent_energies.first().unwrap() - recent_energies.last().unwrap();
                 if energy_change < 1e-8 {
                     break; // Converged
                 }
@@ -254,24 +298,36 @@ impl EnergyEmbedding {
     }
 
     /// Compute total energy of the current configuration
-    fn compute_total_energy(&self, positions: &GraphMatrix, graph: &Graph, node_indices: &HashMap<NodeId, usize>) -> GraphResult<f64> {
+    fn compute_total_energy(
+        &self,
+        positions: &GraphMatrix,
+        graph: &Graph,
+        node_indices: &HashMap<NodeId, usize>,
+    ) -> GraphResult<f64> {
         let mut total_energy = 0.0;
 
         match &self.energy_function {
-            Some(EnergyFunction::SpringElectric { attraction_strength, repulsion_strength, ideal_distance }) => {
+            Some(EnergyFunction::SpringElectric {
+                attraction_strength,
+                repulsion_strength,
+                ideal_distance,
+            }) => {
                 // Spring energy from edges
                 for edge_id in graph.space().edge_ids() {
                     if let Some((source, target)) = graph.pool().get_edge_endpoints(edge_id) {
                         let &i = node_indices.get(&source).unwrap();
                         let &j = node_indices.get(&target).unwrap();
 
-                        if i == j { continue; }
+                        if i == j {
+                            continue;
+                        }
 
                         let weight = 1.0; // TODO: get actual edge weight if needed
                         let distance = self.compute_distance(positions, i, j)?;
                         let displacement = distance - ideal_distance;
 
-                        total_energy += 0.5 * attraction_strength * weight * displacement * displacement;
+                        total_energy +=
+                            0.5 * attraction_strength * weight * displacement * displacement;
                     }
                 }
 
@@ -313,21 +369,26 @@ impl EmbeddingEngine for EnergyEmbedding {
 
         if dimensions == 0 {
             return Err(GraphError::InvalidInput(
-                "Cannot compute embedding with 0 dimensions".to_string()
+                "Cannot compute embedding with 0 dimensions".to_string(),
             ));
         }
 
         // Initialize random positions
-        let initial_positions = self.initialize_positions(graph.space().node_count(), dimensions)?;
+        let initial_positions =
+            self.initialize_positions(graph.space().node_count(), dimensions)?;
 
         // Optimize positions using energy minimization
         let (final_positions, energy_history) = self.optimize(initial_positions, graph)?;
 
         if self.debug_enabled {
-            println!("Energy optimization completed. Final energy: {:.6}",
-                energy_history.last().unwrap_or(&0.0));
-            println!("Energy decrease: {:.6}",
-                energy_history.first().unwrap_or(&0.0) - energy_history.last().unwrap_or(&0.0));
+            println!(
+                "Energy optimization completed. Final energy: {:.6}",
+                energy_history.last().unwrap_or(&0.0)
+            );
+            println!(
+                "Energy decrease: {:.6}",
+                energy_history.first().unwrap_or(&0.0) - energy_history.last().unwrap_or(&0.0)
+            );
         }
 
         Ok(final_positions)
@@ -386,10 +447,18 @@ impl EmbeddingEngine for ForceDirectedEmbedding {
         energy_embedding.compute_embedding(graph, dimensions)
     }
 
-    fn supports_incremental(&self) -> bool { true }
-    fn supports_streaming(&self) -> bool { false }
-    fn name(&self) -> &str { "force_directed_nd" }
-    fn default_dimensions(&self) -> usize { 8 }
+    fn supports_incremental(&self) -> bool {
+        true
+    }
+    fn supports_streaming(&self) -> bool {
+        false
+    }
+    fn name(&self) -> &str {
+        "force_directed_nd"
+    }
+    fn default_dimensions(&self) -> usize {
+        8
+    }
 }
 
 /// Builder for energy-based embeddings
@@ -434,7 +503,12 @@ impl EnergyEmbeddingBuilder {
         self
     }
 
-    pub fn with_spring_electric(mut self, attraction: f64, repulsion: f64, ideal_distance: f64) -> Self {
+    pub fn with_spring_electric(
+        mut self,
+        attraction: f64,
+        repulsion: f64,
+        ideal_distance: f64,
+    ) -> Self {
         self.energy_function = Some(EnergyFunction::SpringElectric {
             attraction_strength: attraction,
             repulsion_strength: repulsion,
@@ -477,8 +551,8 @@ mod tests {
     fn path_graph(n: usize) -> Graph {
         let mut graph = Graph::new();
         let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
-        for i in 0..n-1 {
-            graph.add_edge(nodes[i], nodes[i+1]).unwrap();
+        for i in 0..n - 1 {
+            graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
         }
         graph
     }
@@ -487,7 +561,7 @@ mod tests {
         let mut graph = path_graph(n);
         let nodes: Vec<_> = graph.space().node_ids();
         if n > 2 {
-            graph.add_edge(nodes[n-1], nodes[0]).unwrap();
+            graph.add_edge(nodes[n - 1], nodes[0]).unwrap();
         }
         graph
     }
@@ -506,7 +580,17 @@ mod tests {
         let mut graph = Graph::new();
         let nodes: Vec<_> = (0..34).map(|_| graph.add_node()).collect();
         // Add some representative edges for karate club
-        let edges = [(0,1), (0,2), (0,3), (1,2), (1,3), (2,3), (1,7), (2,7), (3,7)];
+        let edges = [
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (1, 2),
+            (1, 3),
+            (2, 3),
+            (1, 7),
+            (2, 7),
+            (3, 7),
+        ];
         for (i, j) in edges.iter() {
             graph.add_edge(nodes[*i], nodes[*j]).unwrap();
         }
@@ -562,7 +646,10 @@ mod tests {
         let pos1 = matrix.row(0).unwrap();
         let pos2 = matrix.row(1).unwrap();
         let diff = pos1.subtract(&pos2).unwrap().norm();
-        assert!(diff > 1e-6, "Different nodes should have different positions");
+        assert!(
+            diff > 1e-6,
+            "Different nodes should have different positions"
+        );
     }
 
     #[test]

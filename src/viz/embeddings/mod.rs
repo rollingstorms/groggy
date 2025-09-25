@@ -6,14 +6,14 @@
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
 use crate::storage::matrix::GraphMatrix;
-use crate::types::{NodeId, AttrValue};
 use crate::traits::subgraph_operations::SubgraphOperations;
+use crate::types::{AttrValue, NodeId};
 use std::collections::HashMap;
 
-pub mod spectral;
+pub mod debug;
 pub mod energy;
 pub mod random;
-pub mod debug;
+pub mod spectral;
 
 /// Core trait for computing high-dimensional node embeddings
 pub trait EmbeddingEngine: std::fmt::Debug {
@@ -38,7 +38,7 @@ pub trait EmbeddingEngine: std::fmt::Debug {
     fn validate_graph(&self, graph: &Graph) -> GraphResult<()> {
         if graph.space().node_count() == 0 {
             return Err(crate::errors::GraphError::InvalidInput(
-                "Cannot compute embedding for empty graph".to_string()
+                "Cannot compute embedding for empty graph".to_string(),
             ));
         }
         Ok(())
@@ -234,48 +234,55 @@ impl EmbeddingEngineFactory {
     /// Create an embedding engine from configuration
     pub fn create_engine(config: &EmbeddingConfig) -> GraphResult<Box<dyn EmbeddingEngine>> {
         match &config.method {
-            EmbeddingMethod::Spectral { normalized, eigenvalue_threshold } => {
-                Ok(Box::new(spectral::SpectralEmbedding::new(
-                    *normalized,
-                    *eigenvalue_threshold,
-                )))
-            }
+            EmbeddingMethod::Spectral {
+                normalized,
+                eigenvalue_threshold,
+            } => Ok(Box::new(spectral::SpectralEmbedding::new(
+                *normalized,
+                *eigenvalue_threshold,
+            ))),
 
-            EmbeddingMethod::EnergyND { iterations, learning_rate, annealing } => {
-                Ok(Box::new(energy::EnergyEmbedding::new(
-                    *iterations,
-                    *learning_rate,
-                    *annealing,
-                    config.energy_function.clone(),
-                )))
-            }
+            EmbeddingMethod::EnergyND {
+                iterations,
+                learning_rate,
+                annealing,
+            } => Ok(Box::new(energy::EnergyEmbedding::new(
+                *iterations,
+                *learning_rate,
+                *annealing,
+                config.energy_function.clone(),
+            ))),
 
-            EmbeddingMethod::RandomND { distribution, normalize } => {
-                Ok(Box::new(random::RandomEmbedding::new(
-                    distribution.clone(),
-                    *normalize,
-                    config.seed,
-                )))
-            }
+            EmbeddingMethod::RandomND {
+                distribution,
+                normalize,
+            } => Ok(Box::new(random::RandomEmbedding::new(
+                distribution.clone(),
+                *normalize,
+                config.seed,
+            ))),
 
-            EmbeddingMethod::ForceDirectedND { spring_constant, repulsion_strength, iterations } => {
-                Ok(Box::new(energy::ForceDirectedEmbedding::new(
-                    *spring_constant,
-                    *repulsion_strength,
-                    *iterations,
-                )))
-            }
+            EmbeddingMethod::ForceDirectedND {
+                spring_constant,
+                repulsion_strength,
+                iterations,
+            } => Ok(Box::new(energy::ForceDirectedEmbedding::new(
+                *spring_constant,
+                *repulsion_strength,
+                *iterations,
+            ))),
 
             EmbeddingMethod::CustomMatrix { matrix } => {
                 Ok(Box::new(CustomMatrixEmbedding::new(matrix.clone())))
             }
 
-            EmbeddingMethod::Composite { methods, combination_strategy } => {
-                Ok(Box::new(CompositeEmbedding::new(
-                    methods.clone(),
-                    combination_strategy.clone(),
-                )))
-            }
+            EmbeddingMethod::Composite {
+                methods,
+                combination_strategy,
+            } => Ok(Box::new(CompositeEmbedding::new(
+                methods.clone(),
+                combination_strategy.clone(),
+            ))),
         }
     }
 
@@ -309,25 +316,33 @@ impl EmbeddingEngine for CustomMatrixEmbedding {
         self.validate_graph(graph)?;
 
         if self.matrix.shape().1 != dimensions {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Custom matrix has {} dimensions, but {} requested",
-                    self.matrix.shape().1, dimensions)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Custom matrix has {} dimensions, but {} requested",
+                self.matrix.shape().1,
+                dimensions
+            )));
         }
 
         if self.matrix.shape().0 != graph.space().node_count() {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Custom matrix has {} nodes, but graph has {}",
-                    self.matrix.shape().0, graph.space().node_count())
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Custom matrix has {} nodes, but graph has {}",
+                self.matrix.shape().0,
+                graph.space().node_count()
+            )));
         }
 
         Ok(self.matrix.clone())
     }
 
-    fn supports_incremental(&self) -> bool { false }
-    fn supports_streaming(&self) -> bool { false }
-    fn name(&self) -> &str { "custom_matrix" }
+    fn supports_incremental(&self) -> bool {
+        false
+    }
+    fn supports_streaming(&self) -> bool {
+        false
+    }
+    fn name(&self) -> &str {
+        "custom_matrix"
+    }
 }
 
 /// Composite embedding that combines multiple methods
@@ -402,9 +417,13 @@ impl EmbeddingEngine for CompositeEmbedding {
         })
     }
 
-    fn supports_streaming(&self) -> bool { false }
+    fn supports_streaming(&self) -> bool {
+        false
+    }
 
-    fn name(&self) -> &str { "composite" }
+    fn name(&self) -> &str {
+        "composite"
+    }
 
     fn default_dimensions(&self) -> usize {
         // Use the max default dimensions of constituent methods
@@ -439,7 +458,10 @@ impl GraphEmbeddingExt for Graph {
 
     fn random_embedding(&self, dimensions: usize) -> GraphResult<GraphMatrix> {
         let engine = random::RandomEmbedding::new(
-            RandomDistribution::Gaussian { mean: 0.0, stddev: 1.0 },
+            RandomDistribution::Gaussian {
+                mean: 0.0,
+                stddev: 1.0,
+            },
             true,
             None,
         );
@@ -459,8 +481,8 @@ mod tests {
     fn path_graph(n: usize) -> Graph {
         let mut graph = Graph::new();
         let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
-        for i in 0..n-1 {
-            graph.add_edge(nodes[i], nodes[i+1]).unwrap();
+        for i in 0..n - 1 {
+            graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
         }
         graph
     }
@@ -469,7 +491,17 @@ mod tests {
         let mut graph = Graph::new();
         let nodes: Vec<_> = (0..34).map(|_| graph.add_node()).collect();
         // Add some representative edges for karate club
-        let edges = [(0,1), (0,2), (0,3), (1,2), (1,3), (2,3), (1,7), (2,7), (3,7)];
+        let edges = [
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (1, 2),
+            (1, 3),
+            (2, 3),
+            (1, 7),
+            (2, 7),
+            (3, 7),
+        ];
         for (i, j) in edges.iter() {
             graph.add_edge(nodes[*i], nodes[*j]).unwrap();
         }

@@ -5,14 +5,14 @@
 
 use groggy::api::graph::Graph;
 use groggy::storage::matrix::GraphMatrix;
-use groggy::viz::embeddings::{
-    EmbeddingEngine, EmbeddingEngineFactory, EmbeddingConfig, EmbeddingMethod,
-    RandomDistribution, GraphEmbeddingExt, EnergyFunction
-};
-use groggy::viz::embeddings::spectral::{SpectralEmbedding, GraphSpectralExt};
+use groggy::viz::embeddings::debug::{DebuggableEmbedding, EmbeddingDebugData};
 use groggy::viz::embeddings::energy::EnergyEmbeddingBuilder;
-use groggy::viz::embeddings::random::{RandomEmbedding, GraphRandomExt};
-use groggy::viz::embeddings::debug::{EmbeddingDebugData, DebuggableEmbedding};
+use groggy::viz::embeddings::random::{GraphRandomExt, RandomEmbedding};
+use groggy::viz::embeddings::spectral::{GraphSpectralExt, SpectralEmbedding};
+use groggy::viz::embeddings::{
+    EmbeddingConfig, EmbeddingEngine, EmbeddingEngineFactory, EmbeddingMethod, EnergyFunction,
+    GraphEmbeddingExt, RandomDistribution,
+};
 // Note: Using inline graph creation since generators module is not publicly available
 use groggy::errors::GraphResult;
 use std::collections::HashMap;
@@ -42,8 +42,8 @@ fn create_path_graph(n: usize) -> Graph {
 
     let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
 
-    for i in 0..n-1 {
-        graph.add_edge(nodes[i], nodes[i+1]).unwrap();
+    for i in 0..n - 1 {
+        graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
     }
 
     graph
@@ -55,10 +55,10 @@ fn create_cycle_graph(n: usize) -> Graph {
 
     let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
 
-    for i in 0..n-1 {
-        graph.add_edge(nodes[i], nodes[i+1]).unwrap();
+    for i in 0..n - 1 {
+        graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
     }
-    graph.add_edge(nodes[n-1], nodes[0]).unwrap(); // Close the cycle
+    graph.add_edge(nodes[n - 1], nodes[0]).unwrap(); // Close the cycle
 
     graph
 }
@@ -85,7 +85,7 @@ fn create_complete_graph(n: usize) -> Graph {
 
     // Connect every pair of nodes
     for i in 0..n {
-        for j in i+1..n {
+        for j in i + 1..n {
             graph.add_edge(nodes[i], nodes[j]).unwrap();
         }
     }
@@ -107,7 +107,7 @@ fn create_erdos_renyi_graph(n: usize, p: f64, seed: Option<u64>) -> GraphResult<
 
     // Add edges with probability p
     for i in 0..n {
-        for j in i+1..n {
+        for j in i + 1..n {
             if rng.f64() < p {
                 graph.add_edge(nodes[i], nodes[j])?;
             }
@@ -158,7 +158,8 @@ fn test_spectral_embedding_matrix_integration() -> GraphResult<()> {
     assert_eq!(embedding2.shape(), (graph.space().node_count(), dimensions));
 
     // Test builder pattern
-    let embedding3 = graph.spectral()
+    let embedding3 = graph
+        .spectral()
         .normalized(false)
         .eigenvalue_threshold(1e-10)
         .compute(&graph, dimensions)?;
@@ -174,7 +175,8 @@ fn test_energy_embedding() -> GraphResult<()> {
     let dimensions = 4;
 
     // Test builder pattern
-    let embedding = graph.energy_embedding()
+    let embedding = graph
+        .energy_embedding()
         .iterations(100)
         .learning_rate(0.05)
         .annealing(true)
@@ -209,7 +211,8 @@ fn test_random_embedding() -> GraphResult<()> {
     let dimensions = 6;
 
     // Test Gaussian
-    let gaussian = graph.random()
+    let gaussian = graph
+        .random()
         .gaussian(0.0, 1.0)
         .normalized(true)
         .seed(123)
@@ -287,7 +290,10 @@ fn test_embedding_configuration() -> GraphResult<()> {
     // Test random config
     let random_config = EmbeddingConfig {
         method: EmbeddingMethod::RandomND {
-            distribution: RandomDistribution::Gaussian { mean: 0.0, stddev: 1.0 },
+            distribution: RandomDistribution::Gaussian {
+                mean: 0.0,
+                stddev: 1.0,
+            },
             normalize: true,
         },
         dimensions: 4,
@@ -308,25 +314,35 @@ fn test_debug_data_collection() -> GraphResult<()> {
     let config_info: HashMap<String, String> = [
         ("method".to_string(), "test".to_string()),
         ("dimensions".to_string(), "5".to_string()),
-    ].iter().cloned().collect();
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     // Create debug data collector
     let debug_data = EmbeddingDebugData::new(&graph, config_info)?;
 
     // Validate graph metadata
-    assert_eq!(debug_data.graph_metadata.node_count, graph.space().node_count());
-    assert_eq!(debug_data.graph_metadata.edge_count, graph.space().edge_count());
+    assert_eq!(
+        debug_data.graph_metadata.node_count,
+        graph.space().node_count()
+    );
+    assert_eq!(
+        debug_data.graph_metadata.edge_count,
+        graph.space().edge_count()
+    );
     assert!(debug_data.graph_metadata.density > 0.0);
     assert!(debug_data.graph_metadata.average_degree > 0.0);
 
     // Test debuggable embedding wrapper
     let engine = RandomEmbedding::gaussian(0.0, 1.0).with_seed(42);
-    let config_info2: HashMap<String, String> = [
-        ("method".to_string(), "random_gaussian".to_string()),
-    ].iter().cloned().collect();
+    let config_info2: HashMap<String, String> =
+        [("method".to_string(), "random_gaussian".to_string())]
+            .iter()
+            .cloned()
+            .collect();
 
-    let debuggable = DebuggableEmbedding::new(engine)
-        .with_debug(&graph, config_info2)?;
+    let debuggable = DebuggableEmbedding::new(engine).with_debug(&graph, config_info2)?;
 
     let embedding = debuggable.compute_embedding(&graph, 6)?;
     assert_eq!(embedding.shape(), (graph.space().node_count(), 6));
@@ -344,15 +360,19 @@ fn test_matrix_ecosystem_integration() -> GraphResult<()> {
 
     // Create multiple embeddings
     let spectral = graph.spectral_embedding(2)?; // Reduced from 5 to 2 for small graph
-    let random1 = graph.random().gaussian(0.0, 1.0).seed(111).compute(&graph, 3)?;
-    let random2 = graph.random().uniform(-1.0, 1.0).seed(222).compute(&graph, 2)?;
+    let random1 = graph
+        .random()
+        .gaussian(0.0, 1.0)
+        .seed(111)
+        .compute(&graph, 3)?;
+    let random2 = graph
+        .random()
+        .uniform(-1.0, 1.0)
+        .seed(222)
+        .compute(&graph, 2)?;
 
     // Test matrix concatenation
-    let combined = GraphMatrix::concatenate_columns(vec![
-        spectral,
-        random1,
-        random2,
-    ])?;
+    let combined = GraphMatrix::concatenate_columns(vec![spectral, random1, random2])?;
 
     assert_eq!(combined.shape(), (4, 2 + 3 + 2)); // 7 total dimensions (2+3+2)
 
@@ -423,7 +443,8 @@ fn test_embedding_performance() -> GraphResult<()> {
 
     // Test energy embedding performance (with fewer iterations for speed)
     let start_time2 = std::time::Instant::now();
-    let energy_embedding = large_graph.energy_embedding()
+    let energy_embedding = large_graph
+        .energy_embedding()
         .iterations(50) // Reduced for testing
         .learning_rate(0.1)
         .seed(42)
@@ -431,11 +452,15 @@ fn test_embedding_performance() -> GraphResult<()> {
     let energy_time = start_time2.elapsed();
 
     assert_eq!(energy_embedding.shape(), (100, 8));
-    println!("Energy embedding (100 nodes, 8D, 50 iter): {:?}", energy_time);
+    println!(
+        "Energy embedding (100 nodes, 8D, 50 iter): {:?}",
+        energy_time
+    );
 
     // Test random embedding performance
     let start_time3 = std::time::Instant::now();
-    let random_embedding = large_graph.random()
+    let random_embedding = large_graph
+        .random()
         .gaussian(0.0, 1.0)
         .seed(42)
         .compute(&large_graph, 12)?;
@@ -488,14 +513,26 @@ fn test_phase_1_integration_complete() -> GraphResult<()> {
     println!("🎉 Phase 1 Integration Test: Multi-dimensional Embeddings with Matrix Ecosystem");
 
     let graph = create_test_graph();
-    println!("📊 Test graph: {} nodes, {} edges", graph.space().node_count(), graph.space().edge_count());
+    println!(
+        "📊 Test graph: {} nodes, {} edges",
+        graph.space().node_count(),
+        graph.space().edge_count()
+    );
 
     // 1. Test all embedding methods work
     println!("🧪 Testing all embedding methods...");
 
     let spectral = graph.spectral_embedding(3)?; // Reduced from 8 to 3
-    let energy = graph.energy_embedding().iterations(100).seed(42).compute(&graph, 4)?; // Reduced from 6 to 4
-    let random = graph.random().gaussian(0.0, 1.0).seed(42).compute(&graph, 4)?;
+    let energy = graph
+        .energy_embedding()
+        .iterations(100)
+        .seed(42)
+        .compute(&graph, 4)?; // Reduced from 6 to 4
+    let random = graph
+        .random()
+        .gaussian(0.0, 1.0)
+        .seed(42)
+        .compute(&graph, 4)?;
 
     println!("✅ Spectral: {:?}", spectral.shape());
     println!("✅ Energy: {:?}", energy.shape());
@@ -517,27 +554,37 @@ fn test_phase_1_integration_complete() -> GraphResult<()> {
     println!("⚙️ Testing configuration system...");
 
     let config = EmbeddingConfig {
-        method: EmbeddingMethod::Spectral { normalized: true, eigenvalue_threshold: 1e-8 },
+        method: EmbeddingMethod::Spectral {
+            normalized: true,
+            eigenvalue_threshold: 1e-8,
+        },
         dimensions: 3, // Reduced from 10 to 3 for small test graph
         seed: Some(123),
         ..Default::default()
     };
 
     let configured_embedding = graph.compute_embedding(&config)?;
-    println!("✅ Configuration-based embedding: {:?}", configured_embedding.shape());
+    println!(
+        "✅ Configuration-based embedding: {:?}",
+        configured_embedding.shape()
+    );
 
     // 4. Test debug capabilities
     println!("🐛 Testing debug capabilities...");
 
-    let debug_config: HashMap<String, String> = [
-        ("test".to_string(), "phase_1_integration".to_string()),
-    ].iter().cloned().collect();
+    let debug_config: HashMap<String, String> =
+        [("test".to_string(), "phase_1_integration".to_string())]
+            .iter()
+            .cloned()
+            .collect();
 
     let debug_data = EmbeddingDebugData::new(&graph, debug_config)?;
-    println!("✅ Debug data collection: {} nodes, {} edges, density: {:.3}",
+    println!(
+        "✅ Debug data collection: {} nodes, {} edges, density: {:.3}",
         debug_data.graph_metadata.node_count,
         debug_data.graph_metadata.edge_count,
-        debug_data.graph_metadata.density);
+        debug_data.graph_metadata.density
+    );
 
     println!("🎯 Phase 1 Integration Test: PASSED");
     println!("📋 Ready for Phase 2: Projection System");

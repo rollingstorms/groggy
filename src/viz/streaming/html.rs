@@ -5,12 +5,15 @@ use super::types::StreamingResult;
 impl StreamingServer {
     pub async fn generate_interactive_html(&self) -> StreamingResult<String> {
         // Use default port (fallback for compatibility)
-        self.generate_interactive_html_with_port(self.config.port).await
+        self.generate_interactive_html_with_port(self.config.port)
+            .await
     }
 
     pub async fn generate_interactive_html_with_port(&self, port: u16) -> StreamingResult<String> {
         // Get initial data window for the table
-        let initial_window = self.virtual_scroller.get_visible_window(self.data_source.as_ref())?;
+        let initial_window = self
+            .virtual_scroller
+            .get_visible_window(self.data_source.as_ref())?;
         let total_rows = self.data_source.total_rows();
         let total_cols = self.data_source.total_cols();
 
@@ -20,7 +23,8 @@ impl StreamingServer {
         for (col_idx, name) in column_names.iter().enumerate() {
             headers.push(format!(
                 r#"<th class="col-header" data-col="{}">{}</th>"#,
-                col_idx, Self::html_escape(name)
+                col_idx,
+                Self::html_escape(name)
             ));
         }
         let headers_html = headers.join("\n                        ");
@@ -49,8 +53,9 @@ impl StreamingServer {
 
         // Use the actual port the server is running on for WebSocket connection
         let ws_port = port;
-        
-        let html = format!(r#"<!DOCTYPE html>
+
+        let html = format!(
+            r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -931,7 +936,6 @@ impl StreamingServer {
 
         Ok(html)
     }
-
 
     /// HTML escape utility function
     fn html_escape(input: &str) -> String {

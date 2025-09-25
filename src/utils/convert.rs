@@ -4,8 +4,8 @@
 //! including exports to NetworkX format and other external representations.
 
 use crate::api::graph::Graph;
-use crate::subgraphs::subgraph::Subgraph;
 use crate::errors::{GraphError, GraphResult};
+use crate::subgraphs::subgraph::Subgraph;
 use crate::types::{AttrValue, NodeId};
 use std::collections::HashMap;
 

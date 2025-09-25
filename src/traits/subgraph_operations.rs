@@ -4,10 +4,12 @@
 //! our existing efficient storage (HashSet<NodeId>, HashSet<EdgeId>) and algorithms.
 //! All subgraph types use the same optimized foundation with specialized behaviors.
 
-use crate::traits::GraphEntity;
 use crate::errors::{GraphError, GraphResult};
+use crate::subgraphs::composer::{
+    ComposerPreview, EdgeAggregation, EdgeStrategy, MetaNodePlan, NodeAggregation,
+};
+use crate::traits::GraphEntity;
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
-use crate::subgraphs::composer::{MetaNodePlan, NodeAggregation, EdgeAggregation, EdgeStrategy, ComposerPreview};
 use std::collections::{HashMap, HashSet};
 
 /// Enhanced aggregation specification supporting multiple syntax forms
@@ -69,7 +71,7 @@ pub enum NodeStrategy {
 
 impl Default for NodeStrategy {
     fn default() -> Self {
-        Self::Extract  // Current behavior - extract creates meta-node but keeps originals
+        Self::Extract // Current behavior - extract creates meta-node but keeps originals
     }
 }
 
@@ -106,93 +108,161 @@ impl EdgeAggregationFunction {
             "concat_unique" => Ok(Self::ConcatUnique),
             "first" => Ok(Self::First),
             "last" => Ok(Self::Last),
-            _ => Err(GraphError::InvalidInput(format!("Unknown edge aggregation function: {}", s))),
+            _ => Err(GraphError::InvalidInput(format!(
+                "Unknown edge aggregation function: {}",
+                s
+            ))),
         }
     }
 
     /// Apply aggregation function to a collection of attribute values
     pub fn aggregate(&self, values: &[AttrValue]) -> GraphResult<AttrValue> {
         if values.is_empty() {
-            return Err(GraphError::InvalidInput("Cannot aggregate empty values".to_string()));
+            return Err(GraphError::InvalidInput(
+                "Cannot aggregate empty values".to_string(),
+            ));
         }
 
         match self {
-            Self::Sum => {
-                match values.first().unwrap() {
-                    AttrValue::Int(_) => {
-                        let sum: i64 = values.iter()
-                            .filter_map(|v| if let AttrValue::Int(i) = v { Some(*i) } else { None })
-                            .sum();
-                        Ok(AttrValue::Int(sum))
-                    }
-                    AttrValue::Float(_) => {
-                        let sum: f32 = values.iter()
-                            .filter_map(|v| if let AttrValue::Float(f) = v { Some(*f) } else { None })
-                            .sum();
-                        Ok(AttrValue::Float(sum))
-                    }
-                    _ => Err(GraphError::InvalidInput("Sum aggregation only supported for numeric types".to_string())),
+            Self::Sum => match values.first().unwrap() {
+                AttrValue::Int(_) => {
+                    let sum: i64 = values
+                        .iter()
+                        .filter_map(|v| {
+                            if let AttrValue::Int(i) = v {
+                                Some(*i)
+                            } else {
+                                None
+                            }
+                        })
+                        .sum();
+                    Ok(AttrValue::Int(sum))
                 }
-            }
-            Self::Mean => {
-                match values.first().unwrap() {
-                    AttrValue::Int(_) => {
-                        let nums: Vec<i64> = values.iter()
-                            .filter_map(|v| if let AttrValue::Int(i) = v { Some(*i) } else { None })
-                            .collect();
-                        let mean = nums.iter().sum::<i64>() as f32 / nums.len() as f32;
-                        Ok(AttrValue::Float(mean))
-                    }
-                    AttrValue::Float(_) => {
-                        let nums: Vec<f32> = values.iter()
-                            .filter_map(|v| if let AttrValue::Float(f) = v { Some(*f) } else { None })
-                            .collect();
-                        let mean = nums.iter().sum::<f32>() / nums.len() as f32;
-                        Ok(AttrValue::Float(mean))
-                    }
-                    _ => Err(GraphError::InvalidInput("Mean aggregation only supported for numeric types".to_string())),
+                AttrValue::Float(_) => {
+                    let sum: f32 = values
+                        .iter()
+                        .filter_map(|v| {
+                            if let AttrValue::Float(f) = v {
+                                Some(*f)
+                            } else {
+                                None
+                            }
+                        })
+                        .sum();
+                    Ok(AttrValue::Float(sum))
                 }
-            }
-            Self::Max => {
-                match values.first().unwrap() {
-                    AttrValue::Int(_) => {
-                        let max = values.iter()
-                            .filter_map(|v| if let AttrValue::Int(i) = v { Some(*i) } else { None })
-                            .max()
-                            .unwrap();
-                        Ok(AttrValue::Int(max))
-                    }
-                    AttrValue::Float(_) => {
-                        let max = values.iter()
-                            .filter_map(|v| if let AttrValue::Float(f) = v { Some(*f) } else { None })
-                            .fold(f32::NEG_INFINITY, |a, b| a.max(b));
-                        Ok(AttrValue::Float(max))
-                    }
-                    _ => Err(GraphError::InvalidInput("Max aggregation only supported for numeric types".to_string())),
+                _ => Err(GraphError::InvalidInput(
+                    "Sum aggregation only supported for numeric types".to_string(),
+                )),
+            },
+            Self::Mean => match values.first().unwrap() {
+                AttrValue::Int(_) => {
+                    let nums: Vec<i64> = values
+                        .iter()
+                        .filter_map(|v| {
+                            if let AttrValue::Int(i) = v {
+                                Some(*i)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    let mean = nums.iter().sum::<i64>() as f32 / nums.len() as f32;
+                    Ok(AttrValue::Float(mean))
                 }
-            }
-            Self::Min => {
-                match values.first().unwrap() {
-                    AttrValue::Int(_) => {
-                        let min = values.iter()
-                            .filter_map(|v| if let AttrValue::Int(i) = v { Some(*i) } else { None })
-                            .min()
-                            .unwrap();
-                        Ok(AttrValue::Int(min))
-                    }
-                    AttrValue::Float(_) => {
-                        let min = values.iter()
-                            .filter_map(|v| if let AttrValue::Float(f) = v { Some(*f) } else { None })
-                            .fold(f32::INFINITY, |a, b| a.min(b));
-                        Ok(AttrValue::Float(min))
-                    }
-                    _ => Err(GraphError::InvalidInput("Min aggregation only supported for numeric types".to_string())),
+                AttrValue::Float(_) => {
+                    let nums: Vec<f32> = values
+                        .iter()
+                        .filter_map(|v| {
+                            if let AttrValue::Float(f) = v {
+                                Some(*f)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    let mean = nums.iter().sum::<f32>() / nums.len() as f32;
+                    Ok(AttrValue::Float(mean))
                 }
-            }
+                _ => Err(GraphError::InvalidInput(
+                    "Mean aggregation only supported for numeric types".to_string(),
+                )),
+            },
+            Self::Max => match values.first().unwrap() {
+                AttrValue::Int(_) => {
+                    let max = values
+                        .iter()
+                        .filter_map(|v| {
+                            if let AttrValue::Int(i) = v {
+                                Some(*i)
+                            } else {
+                                None
+                            }
+                        })
+                        .max()
+                        .unwrap();
+                    Ok(AttrValue::Int(max))
+                }
+                AttrValue::Float(_) => {
+                    let max = values
+                        .iter()
+                        .filter_map(|v| {
+                            if let AttrValue::Float(f) = v {
+                                Some(*f)
+                            } else {
+                                None
+                            }
+                        })
+                        .fold(f32::NEG_INFINITY, |a, b| a.max(b));
+                    Ok(AttrValue::Float(max))
+                }
+                _ => Err(GraphError::InvalidInput(
+                    "Max aggregation only supported for numeric types".to_string(),
+                )),
+            },
+            Self::Min => match values.first().unwrap() {
+                AttrValue::Int(_) => {
+                    let min = values
+                        .iter()
+                        .filter_map(|v| {
+                            if let AttrValue::Int(i) = v {
+                                Some(*i)
+                            } else {
+                                None
+                            }
+                        })
+                        .min()
+                        .unwrap();
+                    Ok(AttrValue::Int(min))
+                }
+                AttrValue::Float(_) => {
+                    let min = values
+                        .iter()
+                        .filter_map(|v| {
+                            if let AttrValue::Float(f) = v {
+                                Some(*f)
+                            } else {
+                                None
+                            }
+                        })
+                        .fold(f32::INFINITY, |a, b| a.min(b));
+                    Ok(AttrValue::Float(min))
+                }
+                _ => Err(GraphError::InvalidInput(
+                    "Min aggregation only supported for numeric types".to_string(),
+                )),
+            },
             Self::Count => Ok(AttrValue::Int(values.len() as i64)),
             Self::Concat => {
-                let concatenated = values.iter()
-                    .filter_map(|v| if let AttrValue::Text(s) = v { Some(s.as_str()) } else { None })
+                let concatenated = values
+                    .iter()
+                    .filter_map(|v| {
+                        if let AttrValue::Text(s) = v {
+                            Some(s.as_str())
+                        } else {
+                            None
+                        }
+                    })
                     .collect::<Vec<&str>>()
                     .join(",");
                 Ok(AttrValue::Text(concatenated))
@@ -568,9 +638,6 @@ pub trait SubgraphOperations: GraphEntity {
 
     // === HIERARCHICAL OPERATIONS (Integration with GraphPool storage) ===
 
-
-
-
     /// Collapse this subgraph into a meta-node with enhanced missing attribute handling
     ///
     /// # Arguments
@@ -603,19 +670,28 @@ pub trait SubgraphOperations: GraphEntity {
 
         // WORF SAFETY: Create meta-node atomically with all required attributes
         let meta_node_id = graph.add_node();
-        graph.set_node_attr_internal(meta_node_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
-        graph.set_node_attr_internal(meta_node_id, "contains_subgraph".to_string(), AttrValue::SubgraphRef(subgraph_id))?;
+        graph.set_node_attr_internal(
+            meta_node_id,
+            "entity_type".to_string(),
+            AttrValue::Text("meta".to_string()),
+        )?;
+        graph.set_node_attr_internal(
+            meta_node_id,
+            "contains_subgraph".to_string(),
+            AttrValue::SubgraphRef(subgraph_id),
+        )?;
 
         // Release borrow for bulk operation
         drop(graph);
-        
+
         // Calculate aggregated attributes with defaults for missing values (requires separate borrows)
         let mut aggregated_attrs = Vec::new();
         for (attr_name, agg_function) in agg_functions {
-            let aggregated_value = self.aggregate_attribute_with_defaults(&attr_name, &agg_function, &defaults)?;
+            let aggregated_value =
+                self.aggregate_attribute_with_defaults(&attr_name, &agg_function, &defaults)?;
             aggregated_attrs.push((attr_name, aggregated_value));
         }
-        
+
         // Set all aggregated attributes in bulk
         if !aggregated_attrs.is_empty() {
             let mut bulk_attrs = std::collections::HashMap::new();
@@ -626,7 +702,6 @@ pub trait SubgraphOperations: GraphEntity {
             self.set_node_attrs(bulk_attrs)?;
         }
 
-        
         // Create meta-edges according to edge configuration
         self.create_meta_edges_with_config(meta_node_id, edge_config)?;
 
@@ -634,7 +709,9 @@ pub trait SubgraphOperations: GraphEntity {
         match edge_config.node_strategy {
             NodeStrategy::Extract => {
                 // Extract: Mark original nodes as absorbed but keep them in graph (current behavior)
-                let entity_type_attrs = self.node_set().iter()
+                let entity_type_attrs = self
+                    .node_set()
+                    .iter()
                     .map(|&node_id| (node_id, AttrValue::Text("base".to_string())))
                     .collect();
                 let mut bulk_attrs = std::collections::HashMap::new();
@@ -656,9 +733,9 @@ pub trait SubgraphOperations: GraphEntity {
     }
 
     fn collapse_to_node_with_defaults(
-        &self, 
+        &self,
         agg_functions: HashMap<AttrName, String>,
-        defaults: HashMap<AttrName, AttrValue>
+        defaults: HashMap<AttrName, AttrValue>,
     ) -> GraphResult<NodeId> {
         let binding = self.graph_ref();
         let mut graph = binding.borrow_mut();
@@ -684,7 +761,10 @@ pub trait SubgraphOperations: GraphEntity {
                 crate::subgraphs::hierarchical::AggregationFunction::from_string(&agg_func_str)?;
 
             // Special handling for Count aggregation - count all nodes in subgraph
-            let aggregated_value = if matches!(agg_func, crate::subgraphs::hierarchical::AggregationFunction::Count) {
+            let aggregated_value = if matches!(
+                agg_func,
+                crate::subgraphs::hierarchical::AggregationFunction::Count
+            ) {
                 AttrValue::Int(self.node_set().len() as i64)
             } else {
                 // Collect all values for this attribute from nodes in the subgraph
@@ -737,7 +817,7 @@ pub trait SubgraphOperations: GraphEntity {
     }
 
     /// Create meta-edges with configurable aggregation strategy
-    /// 
+    ///
     /// This enhanced method provides full control over edge aggregation behavior:
     /// - External edge handling: copy, aggregate, count, or none
     /// - Meta-to-meta edge strategy: auto, explicit, or none
@@ -747,34 +827,34 @@ pub trait SubgraphOperations: GraphEntity {
         &self,
         attr_name: &str,
         agg_function: &str,
-        defaults: &HashMap<AttrName, AttrValue>
+        defaults: &HashMap<AttrName, AttrValue>,
     ) -> GraphResult<AttrValue> {
         use crate::subgraphs::hierarchical::AggregationFunction;
-        
+
         let attr_name: AttrName = attr_name.into();
         let agg_func = AggregationFunction::from_string(agg_function)?;
-        
+
         // Special handling for Count aggregation - count all nodes in subgraph
         if matches!(agg_func, AggregationFunction::Count) {
             return Ok(AttrValue::Int(self.node_set().len() as i64));
         }
-        
+
         // Handle missing attributes
         if let Some(default_value) = defaults.get(&attr_name) {
             return Ok(default_value.clone());
         }
-        
+
         // Collect all values for this attribute from nodes in the subgraph
         let mut values = Vec::new();
         let binding = self.graph_ref();
         let graph = binding.borrow();
-        
+
         for &node_id in self.node_set() {
             if let Some(value) = graph.get_node_attr(node_id, &attr_name)? {
                 values.push(value);
             }
         }
-        
+
         // If no values found, provide sensible defaults based on aggregation function
         if values.is_empty() {
             let default = match agg_function {
@@ -788,7 +868,7 @@ pub trait SubgraphOperations: GraphEntity {
             // Release borrow before aggregation
             drop(graph);
             drop(binding);
-            
+
             // Apply aggregation with collected values
             agg_func.aggregate(&values)
         }
@@ -799,7 +879,11 @@ pub trait SubgraphOperations: GraphEntity {
     /// # Arguments
     /// * `meta_node_id` - The meta-node to create edges from
     /// * `config` - Edge aggregation configuration
-    fn create_meta_edges_with_config(&self, meta_node_id: NodeId, config: &EdgeAggregationConfig) -> GraphResult<()> {
+    fn create_meta_edges_with_config(
+        &self,
+        meta_node_id: NodeId,
+        config: &EdgeAggregationConfig,
+    ) -> GraphResult<()> {
         // Skip edge creation if configured to do nothing
         if config.edge_to_external == ExternalEdgeStrategy::None {
             return Ok(());
@@ -807,10 +891,13 @@ pub trait SubgraphOperations: GraphEntity {
 
         let binding = self.graph_ref();
         let mut graph = binding.borrow_mut();
-        
+
         // Track edges to create: target_node -> (edge_count, aggregated_attributes)
-        let mut meta_edges: std::collections::HashMap<NodeId, (u32, std::collections::HashMap<AttrName, Vec<AttrValue>>)> = std::collections::HashMap::new();
-        
+        let mut meta_edges: std::collections::HashMap<
+            NodeId,
+            (u32, std::collections::HashMap<AttrName, Vec<AttrValue>>),
+        > = std::collections::HashMap::new();
+
         // Iterate through all nodes in the collapsed subgraph
         for &source_node in self.node_set() {
             // Get all incident edges for this node
@@ -821,31 +908,37 @@ pub trait SubgraphOperations: GraphEntity {
                         let external_target = if edge_source == source_node {
                             edge_target
                         } else if edge_target == source_node {
-                            edge_source  // For undirected graphs, edges can go both ways
+                            edge_source // For undirected graphs, edges can go both ways
                         } else {
                             continue; // This shouldn't happen, but skip if it does
                         };
-                        
+
                         // Skip edges within the subgraph (these are now internal to the meta-node)
                         if self.node_set().contains(&external_target) {
                             continue;
                         }
-                        
+
                         // This is an edge to an external node - create/aggregate meta-edge
-                        let entry = meta_edges.entry(external_target).or_insert((0, std::collections::HashMap::new()));
+                        let entry = meta_edges
+                            .entry(external_target)
+                            .or_insert((0, std::collections::HashMap::new()));
                         entry.0 += 1; // Count parallel edges
-                        
+
                         // Collect edge attributes for aggregation
                         if let Ok(edge_attrs) = graph.get_edge_attrs(edge_id) {
                             for (attr_name, attr_value) in edge_attrs {
-                                entry.1.entry(attr_name).or_insert(Vec::new()).push(attr_value);
+                                entry
+                                    .1
+                                    .entry(attr_name)
+                                    .or_insert(Vec::new())
+                                    .push(attr_value);
                             }
                         }
                     }
                 }
             }
         }
-        
+
         // Create the aggregated meta-edges based on strategy
         for (target_node, (edge_count, attr_collections)) in meta_edges {
             // Skip if below minimum edge count threshold
@@ -853,28 +946,52 @@ pub trait SubgraphOperations: GraphEntity {
                 continue;
             }
 
-                // DEFENSIVE CHECK: Validate that target_node still exists before creating edges
-                if !graph.contains_node(target_node) {
-                    eprintln!("Warning: Skipping meta-edge to non-existent node {}", target_node);
-                    continue;
-                }            match config.edge_to_external {
+            // DEFENSIVE CHECK: Validate that target_node still exists before creating edges
+            if !graph.contains_node(target_node) {
+                eprintln!(
+                    "Warning: Skipping meta-edge to non-existent node {}",
+                    target_node
+                );
+                continue;
+            }
+            match config.edge_to_external {
                 ExternalEdgeStrategy::Copy => {
                     // Create separate meta-edges for each original edge (TODO: implement properly)
                     // For now, fall back to aggregate behavior
-                    self.create_aggregated_meta_edge(&mut *graph, meta_node_id, target_node, edge_count, attr_collections, config)?;
+                    self.create_aggregated_meta_edge(
+                        &mut *graph,
+                        meta_node_id,
+                        target_node,
+                        edge_count,
+                        attr_collections,
+                        config,
+                    )?;
                 }
                 ExternalEdgeStrategy::Aggregate => {
-                    self.create_aggregated_meta_edge(&mut *graph, meta_node_id, target_node, edge_count, attr_collections, config)?;
+                    self.create_aggregated_meta_edge(
+                        &mut *graph,
+                        meta_node_id,
+                        target_node,
+                        edge_count,
+                        attr_collections,
+                        config,
+                    )?;
                 }
                 ExternalEdgeStrategy::Count => {
-                    self.create_count_meta_edge(&mut *graph, meta_node_id, target_node, edge_count, config)?;
+                    self.create_count_meta_edge(
+                        &mut *graph,
+                        meta_node_id,
+                        target_node,
+                        edge_count,
+                        config,
+                    )?;
                 }
                 ExternalEdgeStrategy::None => {
                     // Already handled above, skip
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -890,24 +1007,30 @@ pub trait SubgraphOperations: GraphEntity {
     ) -> GraphResult<()> {
         // DEFENSIVE CHECK: Validate both nodes exist before creating edge
         if !graph.contains_node(meta_node_id) {
-            return Err(GraphError::InvalidInput(
-                format!("Meta-node {} does not exist", meta_node_id)
-            ));
+            return Err(GraphError::InvalidInput(format!(
+                "Meta-node {} does not exist",
+                meta_node_id
+            )));
         }
         if !graph.contains_node(target_node) {
-            return Err(GraphError::InvalidInput(
-                format!("Target node {} does not exist", target_node)
-            ));
+            return Err(GraphError::InvalidInput(format!(
+                "Target node {} does not exist",
+                target_node
+            )));
         }
 
         // Create meta-edge from meta-node to target
         let meta_edge_id = graph.add_edge(meta_node_id, target_node)?;
-        
+
         // Set edge count attribute if enabled
         if config.include_edge_count {
-            graph.set_edge_attr(meta_edge_id, "edge_count".to_string(), AttrValue::Int(edge_count as i64))?;
+            graph.set_edge_attr(
+                meta_edge_id,
+                "edge_count".to_string(),
+                AttrValue::Int(edge_count as i64),
+            )?;
         }
-        
+
         // Aggregate edge attributes using configured functions
         for (attr_name, values) in attr_collections {
             if values.is_empty() {
@@ -919,23 +1042,37 @@ pub trait SubgraphOperations: GraphEntity {
                 values.into_iter().next().unwrap()
             } else {
                 // Multiple values - use configured aggregation function
-                let agg_function = config.edge_aggregation.get(&attr_name)
+                let agg_function = config
+                    .edge_aggregation
+                    .get(&attr_name)
                     .unwrap_or(&config.default_aggregation);
-                
+
                 agg_function.aggregate(&values)?
             };
-            
+
             graph.set_edge_attr(meta_edge_id, attr_name, aggregated_value)?;
         }
-        
+
         // Mark this as a meta-edge if enabled
         if config.mark_entity_type {
-            graph.set_edge_attr(meta_edge_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
+            graph.set_edge_attr(
+                meta_edge_id,
+                "entity_type".to_string(),
+                AttrValue::Text("meta".to_string()),
+            )?;
         }
-        
+
         // Add explicit source and target attributes to meta-edges
-        graph.set_edge_attr(meta_edge_id, "source".to_string(), AttrValue::Int(meta_node_id as i64))?;
-        graph.set_edge_attr(meta_edge_id, "target".to_string(), AttrValue::Int(target_node as i64))?;
+        graph.set_edge_attr(
+            meta_edge_id,
+            "source".to_string(),
+            AttrValue::Int(meta_node_id as i64),
+        )?;
+        graph.set_edge_attr(
+            meta_edge_id,
+            "target".to_string(),
+            AttrValue::Int(target_node as i64),
+        )?;
 
         Ok(())
     }
@@ -951,30 +1088,48 @@ pub trait SubgraphOperations: GraphEntity {
     ) -> GraphResult<()> {
         // DEFENSIVE CHECK: Validate both nodes exist before creating edge
         if !graph.contains_node(meta_node_id) {
-            return Err(GraphError::InvalidInput(
-                format!("Meta-node {} does not exist", meta_node_id)
-            ));
+            return Err(GraphError::InvalidInput(format!(
+                "Meta-node {} does not exist",
+                meta_node_id
+            )));
         }
         if !graph.contains_node(target_node) {
-            return Err(GraphError::InvalidInput(
-                format!("Target node {} does not exist", target_node)
-            ));
+            return Err(GraphError::InvalidInput(format!(
+                "Target node {} does not exist",
+                target_node
+            )));
         }
 
         // Create meta-edge from meta-node to target
         let meta_edge_id = graph.add_edge(meta_node_id, target_node)?;
-        
+
         // Only set edge count - no other attributes preserved
-        graph.set_edge_attr(meta_edge_id, "edge_count".to_string(), AttrValue::Int(edge_count as i64))?;
-        
+        graph.set_edge_attr(
+            meta_edge_id,
+            "edge_count".to_string(),
+            AttrValue::Int(edge_count as i64),
+        )?;
+
         // Mark this as a meta-edge if enabled
         if config.mark_entity_type {
-            graph.set_edge_attr(meta_edge_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
+            graph.set_edge_attr(
+                meta_edge_id,
+                "entity_type".to_string(),
+                AttrValue::Text("meta".to_string()),
+            )?;
         }
-        
+
         // Add explicit source and target attributes to meta-edges
-        graph.set_edge_attr(meta_edge_id, "source".to_string(), AttrValue::Int(meta_node_id as i64))?;
-        graph.set_edge_attr(meta_edge_id, "target".to_string(), AttrValue::Int(target_node as i64))?;
+        graph.set_edge_attr(
+            meta_edge_id,
+            "source".to_string(),
+            AttrValue::Int(meta_node_id as i64),
+        )?;
+        graph.set_edge_attr(
+            meta_edge_id,
+            "target".to_string(),
+            AttrValue::Int(target_node as i64),
+        )?;
 
         Ok(())
     }
@@ -1102,10 +1257,10 @@ pub trait SubgraphOperations: GraphEntity {
     }
 
     /// MetaGraph Composer API - Clean interface for meta-node creation
-    /// 
+    ///
     /// This is the new, intuitive way to create meta-nodes with flexible configuration.
     /// It replaces the complex EdgeAggregationConfig system with a simple, discoverable API.
-    /// 
+    ///
     /// # Arguments
     /// * `node_aggs` - Node aggregation specifications (flexible input)
     /// * `edge_aggs` - Edge aggregation specifications  
@@ -1114,10 +1269,10 @@ pub trait SubgraphOperations: GraphEntity {
     /// * `include_edge_count` - Add edge_count attribute to meta-edges
     /// * `mark_entity_type` - Mark meta-nodes/edges with entity_type
     /// * `entity_type` - Entity type to use for marking
-    /// 
+    ///
     /// # Returns
     /// A `MetaNodePlan` that can be previewed, modified, and executed with `.add_to_graph()`
-    /// 
+    ///
     /// # Examples
     /// ```rust
     /// // Basic usage
@@ -1135,7 +1290,7 @@ pub trait SubgraphOperations: GraphEntity {
     fn collapse(
         &self,
         node_aggs: Vec<(String, String, Option<String>)>, // (target, function, source)
-        edge_aggs: Vec<(String, String)>, // (attr_name, function)  
+        edge_aggs: Vec<(String, String)>,                 // (attr_name, function)
         edge_strategy: EdgeStrategy,
         node_strategy: NodeStrategy,
         preset: Option<String>,
@@ -1144,40 +1299,37 @@ pub trait SubgraphOperations: GraphEntity {
         entity_type: String,
     ) -> GraphResult<MetaNodePlan> {
         // Create base plan
-        let mut plan = MetaNodePlan::new(
-            self.node_set().clone(),
-            self.edge_set().clone(),
-        );
-        
+        let mut plan = MetaNodePlan::new(self.node_set().clone(), self.edge_set().clone());
+
         // Set the node strategy
         plan.node_strategy = node_strategy;
-        
+
         // Apply preset if provided
         if let Some(preset_name) = preset {
             plan = plan.with_preset(&preset_name)?;
         }
-        
+
         // Add node aggregations
         for (target, function, source) in node_aggs {
             plan = plan.with_node_agg(target, function, source);
         }
-        
+
         // Add edge aggregations
         for (attr_name, function) in edge_aggs {
             plan = plan.with_edge_agg(attr_name, function);
         }
-        
+
         // Configure plan
         plan.edge_strategy = edge_strategy;
         plan.include_edge_count = include_edge_count;
         plan.mark_entity_type = mark_entity_type;
         plan.entity_type = entity_type;
-        
+
         Ok(plan)
     }
-    
+
     /// Create a VizModule for this subgraph to enable visualization
-    /// 
+    ///
     /// This method creates a thread-safe bridge to the visualization system
     /// by extracting the subgraph data into a DataSource wrapper.
     ///

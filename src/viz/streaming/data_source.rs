@@ -3,34 +3,34 @@
 //! Provides a common interface for all data structures to support streaming,
 //! virtual scrolling, and real-time updates.
 
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use crate::types::AttrValue;
-use crate::viz::display::{DataType, ColumnSchema};
+use crate::viz::display::{ColumnSchema, DataType};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Unified interface that ALL data structures implement via delegation
 pub trait DataSource: Send + Sync + std::fmt::Debug {
     /// Total number of rows in the data source
     fn total_rows(&self) -> usize;
-    
+
     /// Total number of columns in the data source
     fn total_cols(&self) -> usize;
-    
+
     /// Get a window of data for streaming/virtual scrolling
     fn get_window(&self, start: usize, count: usize) -> DataWindow;
-    
+
     /// Get schema information for columns
     fn get_schema(&self) -> DataSchema;
-    
+
     /// Check if this data source supports real-time streaming
     fn supports_streaming(&self) -> bool;
-    
+
     /// Get data types for all columns
     fn get_column_types(&self) -> Vec<DataType>;
-    
+
     /// Get column names
     fn get_column_names(&self) -> Vec<String>;
-    
+
     /// Get a unique identifier for caching
     fn get_cache_key(&self, start: usize, count: usize) -> WindowKey {
         WindowKey {
@@ -40,34 +40,34 @@ pub trait DataSource: Send + Sync + std::fmt::Debug {
             version: self.get_version(),
         }
     }
-    
+
     /// Get source identifier for caching
     fn get_source_id(&self) -> String;
-    
+
     /// Get version for cache invalidation
     fn get_version(&self) -> u64;
-    
+
     // NEW: Graph visualization support
     /// Check if this data source supports graph visualization
     fn supports_graph_view(&self) -> bool {
         false
     }
-    
+
     /// Get graph nodes for visualization
     fn get_graph_nodes(&self) -> Vec<GraphNode> {
         Vec::new()
     }
-    
+
     /// Get graph edges for visualization  
     fn get_graph_edges(&self) -> Vec<GraphEdge> {
         Vec::new()
     }
-    
+
     /// Get graph metadata for visualization
     fn get_graph_metadata(&self) -> GraphMetadata {
         GraphMetadata::default()
     }
-    
+
     /// Compute layout positions for nodes
     fn compute_layout(&self, algorithm: LayoutAlgorithm) -> Vec<NodePosition> {
         Vec::new()
@@ -79,19 +79,19 @@ pub trait DataSource: Send + Sync + std::fmt::Debug {
 pub struct DataWindow {
     /// Column headers
     pub headers: Vec<String>,
-    
+
     /// Rows of data (each row is a vec of values)
     pub rows: Vec<Vec<AttrValue>>,
-    
+
     /// Schema information
     pub schema: DataSchema,
-    
+
     /// Total number of rows in complete dataset
     pub total_rows: usize,
-    
+
     /// Starting offset of this window
     pub start_offset: usize,
-    
+
     /// Metadata for this window
     pub metadata: DataWindowMetadata,
 }
@@ -101,10 +101,10 @@ pub struct DataWindow {
 pub struct DataSchema {
     /// Column schemas
     pub columns: Vec<ColumnSchema>,
-    
+
     /// Primary key column (if any)
     pub primary_key: Option<String>,
-    
+
     /// Source type (table, array, matrix)
     pub source_type: String,
 }
@@ -123,13 +123,13 @@ pub struct WindowKey {
 pub struct DataWindowMetadata {
     /// When this window was created
     pub created_at: std::time::SystemTime,
-    
+
     /// Whether this is a cached result
     pub is_cached: bool,
-    
+
     /// Load time in milliseconds
     pub load_time_ms: u64,
-    
+
     /// Additional metadata
     pub extra: HashMap<String, String>,
 }
@@ -144,7 +144,7 @@ impl DataWindow {
         start_offset: usize,
     ) -> Self {
         let created_at = std::time::SystemTime::now();
-        
+
         Self {
             headers,
             rows,
@@ -159,22 +159,22 @@ impl DataWindow {
             },
         }
     }
-    
+
     /// Check if window is empty
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
     }
-    
+
     /// Get window size
     pub fn size(&self) -> usize {
         self.rows.len()
     }
-    
+
     /// Mark as cached
     pub fn mark_cached(&mut self) {
         self.metadata.is_cached = true;
     }
-    
+
     /// Set load time
     pub fn set_load_time(&mut self, load_time_ms: u64) {
         self.metadata.load_time_ms = load_time_ms;
@@ -255,10 +255,7 @@ pub enum LayoutAlgorithm {
         node_spacing: f64,
     },
     /// Grid layout for regular arrangements
-    Grid {
-        columns: usize,
-        cell_size: f64,
-    },
+    Grid { columns: usize, cell_size: f64 },
     /// Honeycomb layout arranging nodes in hexagonal grid
     Honeycomb {
         cell_size: f64,

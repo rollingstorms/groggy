@@ -12,11 +12,11 @@
 //! - Follows the same pattern as connected_components result structure
 
 use crate::api::graph::Graph;
-use crate::storage::pool::GraphPool;
-use crate::state::space::GraphSpace;
-use crate::traits::{GraphEntity, SubgraphOperations};
-use crate::query::traversal::TraversalEngine;
 use crate::errors::GraphResult;
+use crate::query::traversal::TraversalEngine;
+use crate::state::space::GraphSpace;
+use crate::storage::pool::GraphPool;
+use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::types::{EdgeId, EntityId, NodeId, SubgraphId};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -410,16 +410,17 @@ impl SubgraphOperations for NeighborhoodSubgraph {
         };
         x
     }
-    
+
     /// Create a VizModule for this neighborhood subgraph
     fn viz(&self) -> crate::viz::VizModule {
         use crate::subgraphs::visualization::SubgraphDataSource;
         use std::sync::Arc;
-        
+
         // Create wrapper that extracts current neighborhood data
         let data_source = SubgraphDataSource::from_subgraph_operations(self);
-        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> = Arc::new(data_source);
-        
+        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> =
+            Arc::new(data_source);
+
         crate::viz::VizModule::new(data_source)
     }
 }
@@ -553,7 +554,7 @@ impl NeighborhoodSampler {
         // TODO: Fix graph_ref creation - temporary workaround
         // This is a simplified version to get compilation working
         let graph_ref = Rc::new(RefCell::new(Graph::new()));
-        
+
         // Generate proper SubgraphId using hash of content
         let subgraph_id = {
             use std::collections::hash_map::DefaultHasher;

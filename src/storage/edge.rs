@@ -5,8 +5,8 @@
 //! to edges through the trait system.
 
 use crate::api::graph::Graph;
-use crate::traits::{EdgeOperations, GraphEntity, SubgraphOperations};
 use crate::errors::GraphResult;
+use crate::traits::{EdgeOperations, GraphEntity, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId};
 use std::cell::RefCell;
 use std::collections::HashMap;

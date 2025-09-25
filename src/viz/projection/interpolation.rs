@@ -1,9 +1,9 @@
 //! Smooth interpolation system for real-time projection transitions
 
-use super::{InterpolationConfig, InterpolationMethod, EasingFunction};
-use crate::errors::{GraphResult, GraphError};
+use super::{EasingFunction, InterpolationConfig, InterpolationMethod};
+use crate::errors::{GraphError, GraphResult};
+use crate::viz::projection::honeycomb::{HexCoord, HoneycombGrid};
 use crate::viz::streaming::data_source::Position;
-use crate::viz::projection::honeycomb::{HoneycombGrid, HexCoord};
 use std::collections::HashMap;
 
 /// Interpolation engine for smooth transitions between projections
@@ -26,7 +26,7 @@ impl InterpolationEngine {
     ) -> GraphResult<Vec<Vec<Position>>> {
         if start_positions.len() != end_positions.len() {
             return Err(GraphError::InvalidInput(
-                "Start and end position arrays must have the same length".to_string()
+                "Start and end position arrays must have the same length".to_string(),
             ));
         }
 
@@ -44,9 +44,8 @@ impl InterpolationEngine {
             InterpolationMethod::Spline => {
                 self.spline_interpolation(start_positions, end_positions)
             }
-            InterpolationMethod::SpringPhysics { damping, stiffness } => {
-                self.spring_physics_interpolation(start_positions, end_positions, *damping, *stiffness)
-            }
+            InterpolationMethod::SpringPhysics { damping, stiffness } => self
+                .spring_physics_interpolation(start_positions, end_positions, *damping, *stiffness),
         }
     }
 
@@ -255,7 +254,8 @@ impl InterpolationEngine {
                 } else {
                     let p = 0.3;
                     let s = p / 4.0;
-                    -(2.0_f64.powf(10.0 * (t - 1.0)) * ((t - 1.0 - s) * (2.0 * std::f64::consts::PI) / p).sin())
+                    -(2.0_f64.powf(10.0 * (t - 1.0))
+                        * ((t - 1.0 - s) * (2.0 * std::f64::consts::PI) / p).sin())
                 }
             }
             EasingFunction::Custom { function: _ } => {
@@ -271,7 +271,14 @@ impl InterpolationEngine {
     }
 
     /// Cubic Bezier curve evaluation
-    fn cubic_bezier(&self, p0: &Position, p1: &Position, p2: &Position, p3: &Position, t: f64) -> Position {
+    fn cubic_bezier(
+        &self,
+        p0: &Position,
+        p1: &Position,
+        p2: &Position,
+        p3: &Position,
+        t: f64,
+    ) -> Position {
         let u = 1.0 - t;
         let tt = t * t;
         let uu = u * u;
@@ -285,23 +292,28 @@ impl InterpolationEngine {
     }
 
     /// Catmull-Rom spline evaluation
-    fn catmull_rom_spline(&self, p0: &Position, p1: &Position, p2: &Position, p3: &Position, t: f64) -> Position {
+    fn catmull_rom_spline(
+        &self,
+        p0: &Position,
+        p1: &Position,
+        p2: &Position,
+        p3: &Position,
+        t: f64,
+    ) -> Position {
         let t2 = t * t;
         let t3 = t2 * t;
 
-        let x = 0.5 * (
-            (2.0 * p1.x) +
-            (-p0.x + p2.x) * t +
-            (2.0 * p0.x - 5.0 * p1.x + 4.0 * p2.x - p3.x) * t2 +
-            (-p0.x + 3.0 * p1.x - 3.0 * p2.x + p3.x) * t3
-        );
+        let x = 0.5
+            * ((2.0 * p1.x)
+                + (-p0.x + p2.x) * t
+                + (2.0 * p0.x - 5.0 * p1.x + 4.0 * p2.x - p3.x) * t2
+                + (-p0.x + 3.0 * p1.x - 3.0 * p2.x + p3.x) * t3);
 
-        let y = 0.5 * (
-            (2.0 * p1.y) +
-            (-p0.y + p2.y) * t +
-            (2.0 * p0.y - 5.0 * p1.y + 4.0 * p2.y - p3.y) * t2 +
-            (-p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.y) * t3
-        );
+        let y = 0.5
+            * ((2.0 * p1.y)
+                + (-p0.y + p2.y) * t
+                + (2.0 * p0.y - 5.0 * p1.y + 4.0 * p2.y - p3.y) * t2
+                + (-p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.y) * t3);
 
         Position { x, y }
     }
@@ -391,8 +403,8 @@ impl AnimationState {
                 self.is_active = false;
             } else {
                 // Calculate current frame based on elapsed time
-                self.current_frame = ((progress * self.frames.len() as f64) as usize)
-                    .min(self.frames.len() - 1);
+                self.current_frame =
+                    ((progress * self.frames.len() as f64) as usize).min(self.frames.len() - 1);
             }
 
             Some(&self.frames[self.current_frame])
@@ -426,8 +438,8 @@ impl AnimationState {
     /// Set animation to a specific progress
     pub fn set_progress(&mut self, progress: f64) {
         let progress = progress.clamp(0.0, 1.0);
-        self.current_frame = ((progress * (self.frames.len() - 1) as f64) as usize)
-            .min(self.frames.len() - 1);
+        self.current_frame =
+            ((progress * (self.frames.len() - 1) as f64) as usize).min(self.frames.len() - 1);
     }
 }
 

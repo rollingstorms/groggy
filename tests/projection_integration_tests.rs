@@ -7,14 +7,16 @@ use groggy::api::graph::Graph;
 use groggy::errors::GraphResult;
 use groggy::storage::matrix::GraphMatrix;
 use groggy::viz::embeddings::{EmbeddingConfig, EmbeddingMethod, GraphEmbeddingExt};
-use groggy::viz::projection::{
-    ProjectionConfig, ProjectionMethod, HoneycombConfig, HoneycombLayoutStrategy,
-    QualityConfig, InterpolationConfig, InterpolationMethod, EasingFunction,
-    GraphProjectionExt, ProjectionEngineFactory
+use groggy::viz::projection::honeycomb::{HexCoord, HoneycombGrid};
+use groggy::viz::projection::interpolation::{
+    AnimationManager, AnimationState, InterpolationEngine,
 };
-use groggy::viz::projection::honeycomb::{HoneycombGrid, HexCoord};
-use groggy::viz::projection::interpolation::{InterpolationEngine, AnimationState, AnimationManager};
 use groggy::viz::projection::quality::{QualityEvaluator, QualityOptimizer};
+use groggy::viz::projection::{
+    EasingFunction, GraphProjectionExt, HoneycombConfig, HoneycombLayoutStrategy,
+    InterpolationConfig, InterpolationMethod, ProjectionConfig, ProjectionEngineFactory,
+    ProjectionMethod, QualityConfig,
+};
 use groggy::viz::streaming::data_source::Position;
 use std::collections::HashMap;
 
@@ -98,11 +100,20 @@ fn test_pca_projection() -> GraphResult<()> {
 
     // Check that all positions are finite
     for pos in &positions {
-        assert!(pos.x.is_finite(), "PCA projection X coordinate should be finite");
-        assert!(pos.y.is_finite(), "PCA projection Y coordinate should be finite");
+        assert!(
+            pos.x.is_finite(),
+            "PCA projection X coordinate should be finite"
+        );
+        assert!(
+            pos.y.is_finite(),
+            "PCA projection Y coordinate should be finite"
+        );
     }
 
-    println!("✅ PCA projection: {} nodes projected to 2D", positions.len());
+    println!(
+        "✅ PCA projection: {} nodes projected to 2D",
+        positions.len()
+    );
     Ok(())
 }
 
@@ -119,11 +130,20 @@ fn test_tsne_projection() -> GraphResult<()> {
 
     // Check that positions are finite and spread out
     for pos in &positions {
-        assert!(pos.x.is_finite(), "t-SNE projection X coordinate should be finite");
-        assert!(pos.y.is_finite(), "t-SNE projection Y coordinate should be finite");
+        assert!(
+            pos.x.is_finite(),
+            "t-SNE projection X coordinate should be finite"
+        );
+        assert!(
+            pos.y.is_finite(),
+            "t-SNE projection Y coordinate should be finite"
+        );
     }
 
-    println!("✅ t-SNE projection: {} nodes projected with perplexity 2.0", positions.len());
+    println!(
+        "✅ t-SNE projection: {} nodes projected with perplexity 2.0",
+        positions.len()
+    );
     Ok(())
 }
 
@@ -140,11 +160,20 @@ fn test_umap_projection() -> GraphResult<()> {
 
     // Check positions are valid
     for pos in &positions {
-        assert!(pos.x.is_finite(), "UMAP projection X coordinate should be finite");
-        assert!(pos.y.is_finite(), "UMAP projection Y coordinate should be finite");
+        assert!(
+            pos.x.is_finite(),
+            "UMAP projection X coordinate should be finite"
+        );
+        assert!(
+            pos.y.is_finite(),
+            "UMAP projection Y coordinate should be finite"
+        );
     }
 
-    println!("✅ UMAP projection: {} nodes projected with 3 neighbors", positions.len());
+    println!(
+        "✅ UMAP projection: {} nodes projected with 3 neighbors",
+        positions.len()
+    );
     Ok(())
 }
 
@@ -165,6 +194,8 @@ fn test_custom_projection_config() -> GraphResult<()> {
             snap_to_centers: true,
             grid_padding: 30.0,
             max_grid_size: None,
+            target_avg_occupancy: 4.0,
+            min_cell_size: 6.0,
         },
         quality_config: QualityConfig {
             compute_neighborhood_preservation: true,
@@ -205,6 +236,8 @@ fn test_honeycomb_grid_mapping() -> GraphResult<()> {
             snap_to_centers: true,
             grid_padding: 20.0,
             max_grid_size: None,
+            target_avg_occupancy: 4.0,
+            min_cell_size: 6.0,
         };
 
         let mut grid = HoneycombGrid::new(config);
@@ -256,24 +289,42 @@ fn test_projection_quality_metrics() -> GraphResult<()> {
     let metrics = evaluator.evaluate_projection(&embedding, &positions, &graph)?;
 
     // Validate metric ranges
-    assert!(metrics.neighborhood_preservation >= 0.0 && metrics.neighborhood_preservation <= 1.0,
-        "Neighborhood preservation should be between 0 and 1");
-    assert!(metrics.distance_correlation >= -1.0 && metrics.distance_correlation <= 1.0,
-        "Distance correlation should be between -1 and 1");
+    assert!(
+        metrics.neighborhood_preservation >= 0.0 && metrics.neighborhood_preservation <= 1.0,
+        "Neighborhood preservation should be between 0 and 1"
+    );
+    assert!(
+        metrics.distance_correlation >= -1.0 && metrics.distance_correlation <= 1.0,
+        "Distance correlation should be between -1 and 1"
+    );
     assert!(metrics.stress >= 0.0, "Stress should be non-negative");
-    assert!(metrics.local_continuity >= 0.0, "Local continuity should be non-negative");
-    assert!(metrics.global_structure >= -1.0 && metrics.global_structure <= 1.0,
-        "Global structure should be between -1 and 1");
-    assert!(metrics.overall_score >= 0.0 && metrics.overall_score <= 1.0,
-        "Overall score should be between 0 and 1");
+    assert!(
+        metrics.local_continuity >= 0.0,
+        "Local continuity should be non-negative"
+    );
+    assert!(
+        metrics.global_structure >= -1.0 && metrics.global_structure <= 1.0,
+        "Global structure should be between -1 and 1"
+    );
+    assert!(
+        metrics.overall_score >= 0.0 && metrics.overall_score <= 1.0,
+        "Overall score should be between 0 and 1"
+    );
 
     // Test quality suggestions
     let suggestions = evaluator.suggest_improvements(&metrics);
-    assert!(!suggestions.is_empty(), "Should provide quality suggestions");
+    assert!(
+        !suggestions.is_empty(),
+        "Should provide quality suggestions"
+    );
 
-    println!("✅ Quality metrics - Neighborhood: {:.3}, Distance: {:.3}, Stress: {:.3}, Overall: {:.3}",
-        metrics.neighborhood_preservation, metrics.distance_correlation,
-        metrics.stress, metrics.overall_score);
+    println!(
+        "✅ Quality metrics - Neighborhood: {:.3}, Distance: {:.3}, Stress: {:.3}, Overall: {:.3}",
+        metrics.neighborhood_preservation,
+        metrics.distance_correlation,
+        metrics.stress,
+        metrics.overall_score
+    );
 
     Ok(())
 }
@@ -291,7 +342,10 @@ fn test_interpolation_system() -> GraphResult<()> {
     // Test different interpolation methods
     let methods = [
         InterpolationMethod::Linear,
-        InterpolationMethod::SpringPhysics { damping: 0.8, stiffness: 0.2 },
+        InterpolationMethod::SpringPhysics {
+            damping: 0.8,
+            stiffness: 0.2,
+        },
     ];
 
     for method in &methods {
@@ -307,17 +361,27 @@ fn test_interpolation_system() -> GraphResult<()> {
         let frames = engine.interpolate_positions(&start_positions, &end_positions)?;
 
         assert_eq!(frames.len(), 10, "Should generate correct number of frames");
-        assert_eq!(frames[0].len(), 8, "Each frame should have correct number of nodes");
+        assert_eq!(
+            frames[0].len(),
+            8,
+            "Each frame should have correct number of nodes"
+        );
 
         // Check first and last frames match start and end
         for i in 0..8 {
             let start_diff_x = (frames[0][i].x - start_positions[i].x).abs();
             let start_diff_y = (frames[0][i].y - start_positions[i].y).abs();
-            assert!(start_diff_x < 1e-10 && start_diff_y < 1e-10, "First frame should match start positions");
+            assert!(
+                start_diff_x < 1e-10 && start_diff_y < 1e-10,
+                "First frame should match start positions"
+            );
 
             let end_diff_x = (frames[9][i].x - end_positions[i].x).abs();
             let end_diff_y = (frames[9][i].y - end_positions[i].y).abs();
-            assert!(end_diff_x < 1e-10 && end_diff_y < 1e-10, "Last frame should match end positions");
+            assert!(
+                end_diff_x < 1e-10 && end_diff_y < 1e-10,
+                "Last frame should match end positions"
+            );
         }
 
         println!("✅ Interpolation: {:?} method with 10 frames", method);
@@ -353,18 +417,31 @@ fn test_animation_state() -> GraphResult<()> {
     assert_eq!(animation.progress(), 0.0, "Initial progress should be 0");
 
     animation.start();
-    assert!(animation.is_active(), "Animation should be active after start");
+    assert!(
+        animation.is_active(),
+        "Animation should be active after start"
+    );
 
     // Test manual progress setting
     animation.set_progress(0.5);
-    assert!((animation.progress() - 0.5).abs() < 1e-10, "Progress should be settable");
+    assert!(
+        (animation.progress() - 0.5).abs() < 1e-10,
+        "Progress should be settable"
+    );
 
     if let Some(positions) = animation.current_positions() {
-        assert_eq!(positions.len(), 8, "Current positions should have correct length");
+        assert_eq!(
+            positions.len(),
+            8,
+            "Current positions should have correct length"
+        );
     }
 
     animation.stop();
-    assert!(!animation.is_active(), "Animation should be inactive after stop");
+    assert!(
+        !animation.is_active(),
+        "Animation should be inactive after stop"
+    );
 
     println!("✅ Animation state management: Start/stop/progress control");
     Ok(())
@@ -396,20 +473,39 @@ fn test_animation_manager() -> GraphResult<()> {
     let animation = AnimationState::new(frames, 1000);
     manager.add_animation("test_transition".to_string(), animation);
 
-    assert!(!manager.has_active_animations(), "No animations should be active initially");
+    assert!(
+        !manager.has_active_animations(),
+        "No animations should be active initially"
+    );
 
     // Start animation
-    assert!(manager.start_animation("test_transition"), "Should successfully start animation");
-    assert!(manager.has_active_animations(), "Should have active animations after start");
+    assert!(
+        manager.start_animation("test_transition"),
+        "Should successfully start animation"
+    );
+    assert!(
+        manager.has_active_animations(),
+        "Should have active animations after start"
+    );
 
     // Test getting current positions
     if let Some(positions) = manager.get_current_positions("test_transition") {
-        assert_eq!(positions.len(), 8, "Should return correct number of positions");
+        assert_eq!(
+            positions.len(),
+            8,
+            "Should return correct number of positions"
+        );
     }
 
     // Stop animation
-    assert!(manager.stop_animation("test_transition"), "Should successfully stop animation");
-    assert!(!manager.has_active_animations(), "Should have no active animations after stop");
+    assert!(
+        manager.stop_animation("test_transition"),
+        "Should successfully stop animation"
+    );
+    assert!(
+        !manager.has_active_animations(),
+        "Should have no active animations after stop"
+    );
 
     println!("✅ Animation manager: Multiple animation coordination");
     Ok(())
@@ -435,11 +531,14 @@ fn test_quality_optimization() -> GraphResult<()> {
     let initial_positions = graph.project_pca(&embedding)?;
 
     // Optimize for better quality (with limited iterations for testing)
-    let (optimized_positions, optimized_metrics) = optimizer.optimize_projection(
-        &embedding, &initial_positions, &graph, 5
-    )?;
+    let (optimized_positions, optimized_metrics) =
+        optimizer.optimize_projection(&embedding, &initial_positions, &graph, 5)?;
 
-    assert_eq!(optimized_positions.len(), 8, "Optimized positions should have correct length");
+    assert_eq!(
+        optimized_positions.len(),
+        8,
+        "Optimized positions should have correct length"
+    );
 
     // Check that positions are still finite after optimization
     for pos in &optimized_positions {
@@ -447,7 +546,10 @@ fn test_quality_optimization() -> GraphResult<()> {
         assert!(pos.y.is_finite(), "Optimized Y coordinate should be finite");
     }
 
-    println!("✅ Quality optimization: Overall score {:.3}", optimized_metrics.overall_score);
+    println!(
+        "✅ Quality optimization: Overall score {:.3}",
+        optimized_metrics.overall_score
+    );
     Ok(())
 }
 
@@ -480,8 +582,14 @@ fn test_multi_scale_projection() -> GraphResult<()> {
 
     // Check positions are finite
     for pos in &positions {
-        assert!(pos.x.is_finite(), "Multi-scale X coordinate should be finite");
-        assert!(pos.y.is_finite(), "Multi-scale Y coordinate should be finite");
+        assert!(
+            pos.x.is_finite(),
+            "Multi-scale X coordinate should be finite"
+        );
+        assert!(
+            pos.y.is_finite(),
+            "Multi-scale Y coordinate should be finite"
+        );
     }
 
     println!("✅ Multi-scale projection: PCA (60%) + t-SNE (40%) combination");
@@ -496,8 +604,11 @@ fn test_phase_2_integration_complete() -> GraphResult<()> {
     let graph = create_test_graph();
     let embedding = create_test_embedding();
 
-    println!("📊 Test graph: {} nodes, {} edges",
-        graph.space().node_count(), graph.space().edge_count());
+    println!(
+        "📊 Test graph: {} nodes, {} edges",
+        graph.space().node_count(),
+        graph.space().edge_count()
+    );
     println!("📊 Embedding: {} dimensions", embedding.shape().1);
 
     // 1. Test all projection methods work
@@ -525,7 +636,10 @@ fn test_phase_2_integration_complete() -> GraphResult<()> {
     let mut grid = HoneycombGrid::new(config);
     let honeycomb_positions = grid.map_positions_to_grid(&pca_positions)?;
 
-    println!("✅ Honeycomb mapping: {} cells occupied", grid.get_occupied_coords().len());
+    println!(
+        "✅ Honeycomb mapping: {} cells occupied",
+        grid.get_occupied_coords().len()
+    );
 
     // 3. Test quality evaluation
     println!("📏 Testing quality evaluation...");
@@ -541,8 +655,14 @@ fn test_phase_2_integration_complete() -> GraphResult<()> {
     let metrics = evaluator.evaluate_projection(&embedding, &honeycomb_positions, &graph)?;
 
     println!("✅ Quality metrics computed:");
-    println!("   • Neighborhood preservation: {:.3}", metrics.neighborhood_preservation);
-    println!("   • Distance correlation: {:.3}", metrics.distance_correlation);
+    println!(
+        "   • Neighborhood preservation: {:.3}",
+        metrics.neighborhood_preservation
+    );
+    println!(
+        "   • Distance correlation: {:.3}",
+        metrics.distance_correlation
+    );
     println!("   • Stress: {:.3}", metrics.stress);
     println!("   • Overall score: {:.3}", metrics.overall_score);
 
@@ -563,7 +683,10 @@ fn test_phase_2_integration_complete() -> GraphResult<()> {
     let engine = InterpolationEngine::new(interpolation_config);
     let frames = engine.interpolate_with_honeycomb(&pca_positions, &honeycomb_positions, &grid)?;
 
-    println!("✅ Interpolation: {} frames with honeycomb constraints", frames.len());
+    println!(
+        "✅ Interpolation: {} frames with honeycomb constraints",
+        frames.len()
+    );
 
     // 5. Test animation management
     println!("🎮 Testing animation management...");
@@ -597,8 +720,10 @@ fn test_phase_2_integration_complete() -> GraphResult<()> {
     let engine = ProjectionEngineFactory::create_engine(&factory_config)?;
     let factory_positions = engine.project_embedding(&embedding, &graph)?;
 
-    println!("✅ Factory system: {} created energy-based projection",
-        engine.name());
+    println!(
+        "✅ Factory system: {} created energy-based projection",
+        engine.name()
+    );
 
     println!();
     println!("🎯 Phase 2 Integration Complete!");
@@ -661,7 +786,10 @@ fn test_large_graph_performance() -> GraphResult<()> {
 
     assert_eq!(pca_positions.len(), 25);
     assert_eq!(honeycomb_positions.len(), 25);
-    assert!(pca_time.as_millis() < 1000, "PCA should be fast for 25 nodes");
+    assert!(
+        pca_time.as_millis() < 1000,
+        "PCA should be fast for 25 nodes"
+    );
 
     Ok(())
 }
@@ -671,10 +799,21 @@ fn test_large_graph_performance() -> GraphResult<()> {
 fn test_projection_engines_available() {
     let methods = ProjectionEngineFactory::available_methods();
 
-    let expected_methods = ["pca", "tsne", "umap", "multi_scale", "custom_matrix", "energy_based"];
+    let expected_methods = [
+        "pca",
+        "tsne",
+        "umap",
+        "multi_scale",
+        "custom_matrix",
+        "energy_based",
+    ];
 
     for method in &expected_methods {
-        assert!(methods.contains(method), "Should have {} method available", method);
+        assert!(
+            methods.contains(method),
+            "Should have {} method available",
+            method
+        );
     }
 
     println!("✅ Available projection methods: {:?}", methods);
@@ -696,7 +835,11 @@ fn test_hex_coordinate_system() {
     assert_eq!(neighbors.len(), 6, "Should have 6 neighbors");
 
     for neighbor in &neighbors {
-        assert_eq!(hex1.distance(neighbor), 1, "All neighbors should be distance 1");
+        assert_eq!(
+            hex1.distance(neighbor),
+            1,
+            "All neighbors should be distance 1"
+        );
     }
 
     // Test cube coordinate conversion
@@ -713,8 +856,10 @@ fn test_hex_coordinate_system() {
     let actual_distance = hex1.distance(&midpoint);
 
     // Should be approximately half the distance (allowing for rounding)
-    assert!((actual_distance as i32 - expected_distance).abs() <= 1,
-        "Linear interpolation should give approximately correct distance");
+    assert!(
+        (actual_distance as i32 - expected_distance).abs() <= 1,
+        "Linear interpolation should give approximately correct distance"
+    );
 
     println!("✅ Hex coordinate system: Distance, neighbors, cube conversion, interpolation");
 }

@@ -5,7 +5,7 @@
 //! relationships and enabling smooth real-time transitions.
 
 use crate::api::graph::Graph;
-use crate::errors::{GraphResult, GraphError};
+use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 use crate::types::NodeId;
 use crate::viz::streaming::data_source::Position;
@@ -19,7 +19,11 @@ pub mod quality;
 /// Core trait for projecting high-dimensional embeddings to 2D coordinates
 pub trait ProjectionEngine: std::fmt::Debug {
     /// Project a high-dimensional embedding matrix to 2D coordinates
-    fn project_embedding(&self, embedding: &GraphMatrix, graph: &Graph) -> GraphResult<Vec<Position>>;
+    fn project_embedding(
+        &self,
+        embedding: &GraphMatrix,
+        graph: &Graph,
+    ) -> GraphResult<Vec<Position>>;
 
     /// Whether this projection supports incremental updates
     fn supports_incremental(&self) -> bool;
@@ -34,14 +38,15 @@ pub trait ProjectionEngine: std::fmt::Debug {
     fn validate_embedding(&self, embedding: &GraphMatrix) -> GraphResult<()> {
         if embedding.shape().0 == 0 {
             return Err(GraphError::InvalidInput(
-                "Cannot project empty embedding matrix".to_string()
+                "Cannot project empty embedding matrix".to_string(),
             ));
         }
 
         if embedding.shape().1 < 2 {
-            return Err(GraphError::InvalidInput(
-                format!("Cannot project {}-dimensional embedding to 2D", embedding.shape().1)
-            ));
+            return Err(GraphError::InvalidInput(format!(
+                "Cannot project {}-dimensional embedding to 2D",
+                embedding.shape().1
+            )));
         }
 
         Ok(())
@@ -152,6 +157,12 @@ pub struct HoneycombConfig {
 
     /// Maximum grid dimensions (auto-computed if None)
     pub max_grid_size: Option<(usize, usize)>,
+
+    /// Target average number of nodes per hex cell (used for auto-scaling)
+    pub target_avg_occupancy: f64,
+
+    /// Minimum allowed cell size to avoid degenerate grids
+    pub min_cell_size: f64,
 }
 
 /// Strategy for laying out nodes on the honeycomb grid
@@ -268,6 +279,8 @@ impl Default for HoneycombConfig {
             snap_to_centers: true,
             grid_padding: 20.0,
             max_grid_size: None,
+            target_avg_occupancy: 4.0,
+            min_cell_size: 6.0,
         }
     }
 }
@@ -314,29 +327,43 @@ impl ProjectionEngineFactory {
     /// Create a projection engine from configuration
     pub fn create_engine(config: &ProjectionConfig) -> GraphResult<Box<dyn ProjectionEngine>> {
         match &config.method {
-            ProjectionMethod::PCA { center, standardize } => {
-                Ok(Box::new(algorithms::PCAProjection::new(*center, *standardize)))
-            }
+            ProjectionMethod::PCA {
+                center,
+                standardize,
+            } => Ok(Box::new(algorithms::PCAProjection::new(
+                *center,
+                *standardize,
+            ))),
 
-            ProjectionMethod::TSNE { perplexity, iterations, learning_rate, early_exaggeration } => {
-                Ok(Box::new(algorithms::TSNEProjection::new(
-                    *perplexity,
-                    *iterations,
-                    *learning_rate,
-                    *early_exaggeration,
-                )))
-            }
+            ProjectionMethod::TSNE {
+                perplexity,
+                iterations,
+                learning_rate,
+                early_exaggeration,
+            } => Ok(Box::new(algorithms::TSNEProjection::new(
+                *perplexity,
+                *iterations,
+                *learning_rate,
+                *early_exaggeration,
+            ))),
 
-            ProjectionMethod::UMAP { n_neighbors, min_dist, n_epochs, negative_sample_rate } => {
-                Ok(Box::new(algorithms::UMAPProjection::new(
-                    *n_neighbors,
-                    *min_dist,
-                    *n_epochs,
-                    *negative_sample_rate,
-                )))
-            }
+            ProjectionMethod::UMAP {
+                n_neighbors,
+                min_dist,
+                n_epochs,
+                negative_sample_rate,
+            } => Ok(Box::new(algorithms::UMAPProjection::new(
+                *n_neighbors,
+                *min_dist,
+                *n_epochs,
+                *negative_sample_rate,
+            ))),
 
-            ProjectionMethod::MultiScale { global_method, local_method, global_weight } => {
+            ProjectionMethod::MultiScale {
+                global_method,
+                local_method,
+                global_weight,
+            } => {
                 let global_engine = Self::create_engine(&ProjectionConfig {
                     method: (**global_method).clone(),
                     ..config.clone()
@@ -352,18 +379,21 @@ impl ProjectionEngineFactory {
                 )))
             }
 
-            ProjectionMethod::CustomMatrix { projection_matrix } => {
-                Ok(Box::new(algorithms::CustomMatrixProjection::new(projection_matrix.clone())))
-            }
+            ProjectionMethod::CustomMatrix { projection_matrix } => Ok(Box::new(
+                algorithms::CustomMatrixProjection::new(projection_matrix.clone()),
+            )),
 
-            ProjectionMethod::EnergyBased { attraction_strength, repulsion_strength, iterations, learning_rate } => {
-                Ok(Box::new(algorithms::EnergyBasedProjection::new(
-                    *attraction_strength,
-                    *repulsion_strength,
-                    *iterations,
-                    *learning_rate,
-                )))
-            }
+            ProjectionMethod::EnergyBased {
+                attraction_strength,
+                repulsion_strength,
+                iterations,
+                learning_rate,
+            } => Ok(Box::new(algorithms::EnergyBasedProjection::new(
+                *attraction_strength,
+                *repulsion_strength,
+                *iterations,
+                *learning_rate,
+            ))),
         }
     }
 
@@ -383,7 +413,11 @@ impl ProjectionEngineFactory {
 /// Extension trait to add projection methods to Graph
 pub trait GraphProjectionExt {
     /// Project high-dimensional embedding to 2D honeycomb coordinates
-    fn project_to_honeycomb(&self, embedding: &GraphMatrix, config: &ProjectionConfig) -> GraphResult<Vec<Position>>;
+    fn project_to_honeycomb(
+        &self,
+        embedding: &GraphMatrix,
+        config: &ProjectionConfig,
+    ) -> GraphResult<Vec<Position>>;
 
     /// Project using PCA (quick and simple)
     fn project_pca(&self, embedding: &GraphMatrix) -> GraphResult<Vec<Position>>;
@@ -392,18 +426,29 @@ pub trait GraphProjectionExt {
     fn project_tsne(&self, embedding: &GraphMatrix, perplexity: f64) -> GraphResult<Vec<Position>>;
 
     /// Project using UMAP inspired method (balanced global/local)
-    fn project_umap(&self, embedding: &GraphMatrix, n_neighbors: usize) -> GraphResult<Vec<Position>>;
+    fn project_umap(
+        &self,
+        embedding: &GraphMatrix,
+        n_neighbors: usize,
+    ) -> GraphResult<Vec<Position>>;
 }
 
 impl GraphProjectionExt for Graph {
-    fn project_to_honeycomb(&self, embedding: &GraphMatrix, config: &ProjectionConfig) -> GraphResult<Vec<Position>> {
+    fn project_to_honeycomb(
+        &self,
+        embedding: &GraphMatrix,
+        config: &ProjectionConfig,
+    ) -> GraphResult<Vec<Position>> {
         let engine = ProjectionEngineFactory::create_engine(config)?;
         engine.project_embedding(embedding, self)
     }
 
     fn project_pca(&self, embedding: &GraphMatrix) -> GraphResult<Vec<Position>> {
         let config = ProjectionConfig {
-            method: ProjectionMethod::PCA { center: true, standardize: true },
+            method: ProjectionMethod::PCA {
+                center: true,
+                standardize: true,
+            },
             ..Default::default()
         };
         self.project_to_honeycomb(embedding, &config)
@@ -422,7 +467,11 @@ impl GraphProjectionExt for Graph {
         self.project_to_honeycomb(embedding, &config)
     }
 
-    fn project_umap(&self, embedding: &GraphMatrix, n_neighbors: usize) -> GraphResult<Vec<Position>> {
+    fn project_umap(
+        &self,
+        embedding: &GraphMatrix,
+        n_neighbors: usize,
+    ) -> GraphResult<Vec<Position>> {
         let config = ProjectionConfig {
             method: ProjectionMethod::UMAP {
                 n_neighbors,

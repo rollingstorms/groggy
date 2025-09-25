@@ -455,35 +455,35 @@ impl NumericType {
         match (self, target) {
             // Same types can always convert
             (a, b) if *a == b => true,
-            
+
             // Integer promotions (lossless)
             (Int32, Int64) => true,
-            (Int32, Float64) => true,  // i32 can fit in f64 exactly
+            (Int32, Float64) => true, // i32 can fit in f64 exactly
             (Bool, Int32) | (Bool, Int64) => true,
             (Bool, Float32) | (Bool, Float64) => true,
-            
+
             // Float promotions (lossless)
             (Float32, Float64) => true,
-            
+
             // All other conversions are potentially lossy
             _ => false,
         }
     }
-    
+
     /// Get the "highest" type that can represent both types without loss
     pub fn promote_with(&self, other: NumericType) -> NumericType {
         use NumericType::*;
         match (*self, other) {
             // Same types
             (a, b) if a == b => a,
-            
+
             // Bool promotes to anything
             (Bool, other) | (other, Bool) => other,
-            
+
             // Float64 is the ultimate promotion target
             (Float64, _) | (_, Float64) => Float64,
             (Float32, _) | (_, Float32) => Float32,
-            
+
             // Integer promotions
             (Int64, _) | (_, Int64) => Int64,
             // Note: (Int32, _) | (_, Int32) => Int32 is unreachable due to above patterns
@@ -491,7 +491,7 @@ impl NumericType {
             _ => Int32, // Default fallback for any remaining cases
         }
     }
-    
+
     /// Get the size in bytes of this numeric type
     pub fn size_bytes(&self) -> usize {
         match self {
@@ -502,12 +502,15 @@ impl NumericType {
             NumericType::Float64 => 8,
         }
     }
-    
+
     /// Check if this type is an integer type
     pub fn is_integer(&self) -> bool {
-        matches!(self, NumericType::Int32 | NumericType::Int64 | NumericType::Bool)
+        matches!(
+            self,
+            NumericType::Int32 | NumericType::Int64 | NumericType::Bool
+        )
     }
-    
+
     /// Check if this type is a floating point type
     pub fn is_float(&self) -> bool {
         matches!(self, NumericType::Float32 | NumericType::Float64)
@@ -525,33 +528,39 @@ impl AttrValue {
             _ => None,
         }
     }
-    
+
     /// Check if this AttrValue represents a numeric value
     pub fn is_numeric(&self) -> bool {
         self.numeric_type().is_some()
     }
-    
+
     /// Convert this AttrValue to a specific numeric type, if possible
     #[allow(dead_code)]
     pub fn to_numeric_type(&self, target: NumericType) -> Option<AttrValue> {
         match (self, target) {
             // Bool conversions
             (AttrValue::Bool(b), NumericType::Bool) => Some(AttrValue::Bool(*b)),
-            (AttrValue::Bool(b), NumericType::Int32) => Some(AttrValue::SmallInt(if *b { 1 } else { 0 })),
-            (AttrValue::Bool(b), NumericType::Int64) => Some(AttrValue::Int(if *b { 1 } else { 0 })),
-            (AttrValue::Bool(b), NumericType::Float32) => Some(AttrValue::Float(if *b { 1.0 } else { 0.0 })),
+            (AttrValue::Bool(b), NumericType::Int32) => {
+                Some(AttrValue::SmallInt(if *b { 1 } else { 0 }))
+            }
+            (AttrValue::Bool(b), NumericType::Int64) => {
+                Some(AttrValue::Int(if *b { 1 } else { 0 }))
+            }
+            (AttrValue::Bool(b), NumericType::Float32) => {
+                Some(AttrValue::Float(if *b { 1.0 } else { 0.0 }))
+            }
             (AttrValue::Bool(b), NumericType::Float64) => {
                 // Note: We store f32 in AttrValue, so convert to f32
                 Some(AttrValue::Float(if *b { 1.0 } else { 0.0 }))
-            },
-            
+            }
+
             // SmallInt (i32) conversions
             (AttrValue::SmallInt(i), NumericType::Bool) => Some(AttrValue::Bool(*i != 0)),
             (AttrValue::SmallInt(i), NumericType::Int32) => Some(AttrValue::SmallInt(*i)),
             (AttrValue::SmallInt(i), NumericType::Int64) => Some(AttrValue::Int(*i as i64)),
             (AttrValue::SmallInt(i), NumericType::Float32) => Some(AttrValue::Float(*i as f32)),
             (AttrValue::SmallInt(i), NumericType::Float64) => Some(AttrValue::Float(*i as f32)), // Still stored as f32
-            
+
             // Int (i64) conversions
             (AttrValue::Int(i), NumericType::Bool) => Some(AttrValue::Bool(*i != 0)),
             (AttrValue::Int(i), NumericType::Int32) => {
@@ -560,12 +569,12 @@ impl AttrValue {
                 } else {
                     None // Overflow
                 }
-            },
+            }
             (AttrValue::Int(i), NumericType::Int64) => Some(AttrValue::Int(*i)),
             (AttrValue::Int(i), NumericType::Float32) => Some(AttrValue::Float(*i as f32)), // May lose precision
             (AttrValue::Int(i), NumericType::Float64) => Some(AttrValue::Float(*i as f32)), // Still stored as f32
-            
-            // Float (f32) conversions  
+
+            // Float (f32) conversions
             (AttrValue::Float(f), NumericType::Bool) => Some(AttrValue::Bool(*f != 0.0)),
             (AttrValue::Float(f), NumericType::Int32) => {
                 let rounded = f.round();
@@ -574,7 +583,7 @@ impl AttrValue {
                 } else {
                     None // Overflow
                 }
-            },
+            }
             (AttrValue::Float(f), NumericType::Int64) => {
                 let rounded = f.round();
                 if rounded.is_finite() {
@@ -582,10 +591,10 @@ impl AttrValue {
                 } else {
                     None // Infinity or NaN
                 }
-            },
+            }
             (AttrValue::Float(f), NumericType::Float32) => Some(AttrValue::Float(*f)),
             (AttrValue::Float(f), NumericType::Float64) => Some(AttrValue::Float(*f)), // Still stored as f32
-            
+
             _ => None, // Non-numeric input
         }
     }

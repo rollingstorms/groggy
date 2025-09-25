@@ -3,7 +3,7 @@
 //! This is the core of the "compact mode" - calculates minimum required widths
 //! instead of distributing to full terminal width, with smart truncation.
 
-use crate::viz::display::{DataWindow, DataType, DisplayConfig, TruncationStrategy};
+use crate::viz::display::{DataType, DataWindow, DisplayConfig, TruncationStrategy};
 
 /// Unicode box-drawing characters for table rendering
 #[derive(Clone, Debug)]
@@ -115,16 +115,18 @@ impl CompactFormatter {
             for row in &data.rows {
                 if let Some(cell_value) = row.get(col_idx) {
                     // Get the data type for type-aware truncation
-                    let data_type = data.schema.get_column(col_idx)
+                    let data_type = data
+                        .schema
+                        .get_column(col_idx)
                         .map(|col| &col.data_type)
                         .unwrap_or(&DataType::Unknown);
 
                     // Get the display width after potential truncation
                     let truncated_value = self.truncate_cell_value(
-                        cell_value, 
-                        config.max_cell_width, 
+                        cell_value,
+                        config.max_cell_width,
                         data_type,
-                        &config.truncation_strategy
+                        &config.truncation_strategy,
                     );
                     max_width = max_width.max(truncated_value.len());
                 }
@@ -139,9 +141,14 @@ impl CompactFormatter {
     }
 
     /// Calculate full-width column distribution (legacy mode)
-    fn calculate_full_widths(&self, data: &DataWindow, config: &DisplayConfig, total_width: usize) -> Vec<usize> {
+    fn calculate_full_widths(
+        &self,
+        data: &DataWindow,
+        config: &DisplayConfig,
+        total_width: usize,
+    ) -> Vec<usize> {
         let compact_widths = self.calculate_compact_widths(data, config);
-        
+
         if compact_widths.is_empty() {
             return compact_widths;
         }
@@ -191,7 +198,9 @@ impl CompactFormatter {
                     format!("{}…", value.chars().take(max_width - 1).collect::<String>())
                 }
             }
-            TruncationStrategy::TypeAware => self.type_aware_truncation(value, max_width, data_type),
+            TruncationStrategy::TypeAware => {
+                self.type_aware_truncation(value, max_width, data_type)
+            }
         }
     }
 
@@ -218,14 +227,14 @@ impl CompactFormatter {
                     return formatted;
                 }
             }
-            
+
             // Use scientific notation if still too long
             let scientific = format!("{:.1e}", num);
             if scientific.len() <= max_width {
                 return scientific;
             }
         }
-        
+
         // Fallback to string truncation
         self.truncate_string(value, max_width)
     }
@@ -241,7 +250,7 @@ impl CompactFormatter {
                 }
             }
         }
-        
+
         // Fallback to string truncation
         self.truncate_string(value, max_width)
     }
@@ -264,7 +273,7 @@ impl CompactFormatter {
                 }
             }
         }
-        
+
         self.truncate_string(value, max_width)
     }
 
@@ -272,7 +281,7 @@ impl CompactFormatter {
         if max_width <= 3 {
             return "...".chars().take(max_width).collect();
         }
-        
+
         // Try to preserve JSON structure hints
         if value.starts_with('{') && value.ends_with('}') {
             format!("{{...}}")
@@ -341,17 +350,14 @@ impl CompactFormatter {
             line.push(' ');
 
             // Get data type for alignment
-            let data_type = schema.get_column(i)
+            let data_type = schema
+                .get_column(i)
                 .map(|col| &col.data_type)
                 .unwrap_or(&DataType::Unknown);
 
             // Truncate cell value
-            let truncated = self.truncate_cell_value(
-                cell,
-                width,
-                data_type,
-                &config.truncation_strategy,
-            );
+            let truncated =
+                self.truncate_cell_value(cell, width, data_type, &config.truncation_strategy);
 
             // Apply alignment based on data type
             let aligned = if data_type.is_numeric() {
@@ -423,23 +429,32 @@ impl Default for CompactFormatter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::viz::display::{DataWindow, DataSchema, ColumnSchema, DataType, DisplayConfig};
+    use crate::viz::display::{ColumnSchema, DataSchema, DataType, DataWindow, DisplayConfig};
 
     fn create_test_data() -> DataWindow {
-        let headers = vec![
-            "name".to_string(),
-            "age".to_string(),
-            "score".to_string(),
-        ];
+        let headers = vec!["name".to_string(), "age".to_string(), "score".to_string()];
         let rows = vec![
             vec!["Alice".to_string(), "25".to_string(), "91.50".to_string()],
             vec!["Bob".to_string(), "30".to_string(), "87.00".to_string()],
-            vec!["Charlie with a very long name that should be truncated".to_string(), "35".to_string(), "92.123456789".to_string()],
+            vec![
+                "Charlie with a very long name that should be truncated".to_string(),
+                "35".to_string(),
+                "92.123456789".to_string(),
+            ],
         ];
         let schema = DataSchema::new(vec![
-            ColumnSchema { name: "name".to_string(), data_type: DataType::String },
-            ColumnSchema { name: "age".to_string(), data_type: DataType::Integer },
-            ColumnSchema { name: "score".to_string(), data_type: DataType::Float },
+            ColumnSchema {
+                name: "name".to_string(),
+                data_type: DataType::String,
+            },
+            ColumnSchema {
+                name: "age".to_string(),
+                data_type: DataType::Integer,
+            },
+            ColumnSchema {
+                name: "score".to_string(),
+                data_type: DataType::Float,
+            },
         ]);
 
         DataWindow::new(headers, rows, schema)
@@ -465,7 +480,7 @@ mod tests {
     #[test]
     fn test_float_truncation() {
         let formatter = CompactFormatter::new();
-        
+
         let truncated = formatter.truncate_float("92.123456789", 5);
         assert!(truncated.len() <= 5);
         assert!(truncated.contains('.') || truncated.contains('e'));
@@ -477,10 +492,10 @@ mod tests {
     #[test]
     fn test_integer_truncation() {
         let formatter = CompactFormatter::new();
-        
+
         let truncated = formatter.truncate_integer("123456789", 5);
         assert!(truncated.len() <= 5);
-        
+
         let short_int = formatter.truncate_integer("123", 5);
         assert_eq!(short_int, "123");
     }
@@ -488,7 +503,7 @@ mod tests {
     #[test]
     fn test_string_truncation() {
         let formatter = CompactFormatter::new();
-        
+
         let truncated = formatter.truncate_string("Hello, World!", 8);
         assert_eq!(truncated, "Hello, …");
         assert!(truncated.len() <= 8);
@@ -549,8 +564,14 @@ mod tests {
             vec!["BB".to_string(), "22".to_string()],
         ];
         let schema = DataSchema::new(vec![
-            ColumnSchema { name: "text".to_string(), data_type: DataType::String },
-            ColumnSchema { name: "number".to_string(), data_type: DataType::Integer },
+            ColumnSchema {
+                name: "text".to_string(),
+                data_type: DataType::String,
+            },
+            ColumnSchema {
+                name: "number".to_string(),
+                data_type: DataType::Integer,
+            },
         ]);
         let data = DataWindow::new(headers, rows, schema);
         let config = DisplayConfig::default();
@@ -558,7 +579,7 @@ mod tests {
         let output = formatter.format_minimal_width(&data, &config);
 
         // Numbers should be right-aligned, text left-aligned
-        assert!(output.contains("A ") || output.contains(" A"));  // Left-aligned text
+        assert!(output.contains("A ") || output.contains(" A")); // Left-aligned text
         assert!(output.contains(" 1") || output.contains("  1")); // Right-aligned number
     }
 }

@@ -4,8 +4,8 @@
 //! our existing efficient SubgraphOperations infrastructure. All filter operations
 //! use the same storage pattern with filter-specific metadata and criteria.
 
-use crate::traits::SubgraphOperations;
 use crate::errors::GraphResult;
+use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 
 /// Specialized operations for filtered subgraph entities

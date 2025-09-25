@@ -8,10 +8,10 @@
 
 pub mod config;
 pub mod convert;
-pub mod util;
 pub mod strategies;
+pub mod util;
 
 pub use config::*;
 pub use convert::*;
-pub use util::*;
 pub use strategies::*;
+pub use util::*;

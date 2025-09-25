@@ -296,7 +296,14 @@ pub struct GraphPool {
     */
     /// Stored subgraphs: subgraph_id -> (nodes, edges, type)
     /// STORAGE: Used by hierarchical meta-nodes to reconstruct contained subgraphs
-    stored_subgraphs: HashMap<crate::types::SubgraphId, (std::collections::HashSet<NodeId>, std::collections::HashSet<EdgeId>, String)>,
+    stored_subgraphs: HashMap<
+        crate::types::SubgraphId,
+        (
+            std::collections::HashSet<NodeId>,
+            std::collections::HashSet<EdgeId>,
+            String,
+        ),
+    >,
 
     /*
     === ID MANAGEMENT ===
@@ -812,17 +819,18 @@ impl GraphPool {
         let mut sorted_nodes: Vec<NodeId> = nodes.iter().copied().collect();
         sorted_nodes.sort();
         sorted_nodes.hash(&mut hasher);
-        
+
         let mut sorted_edges: Vec<EdgeId> = edges.iter().copied().collect();
         sorted_edges.sort();
         sorted_edges.hash(&mut hasher);
-        
+
         subgraph_type.hash(&mut hasher);
         let subgraph_id = (hasher.finish() as usize) as crate::types::SubgraphId;
-        
+
         // Store the subgraph data
-        self.stored_subgraphs.insert(subgraph_id, (nodes, edges, subgraph_type));
-        
+        self.stored_subgraphs
+            .insert(subgraph_id, (nodes, edges, subgraph_type));
+
         Ok(subgraph_id)
     }
 
@@ -839,11 +847,10 @@ impl GraphPool {
             Some((nodes, edges, subgraph_type)) => {
                 Ok((nodes.clone(), edges.clone(), subgraph_type.clone()))
             }
-            None => {
-                Err(crate::errors::GraphError::InvalidInput(format!(
-                    "Subgraph with ID {} not found in storage", subgraph_id
-                )))
-            }
+            None => Err(crate::errors::GraphError::InvalidInput(format!(
+                "Subgraph with ID {} not found in storage",
+                subgraph_id
+            ))),
         }
     }
 

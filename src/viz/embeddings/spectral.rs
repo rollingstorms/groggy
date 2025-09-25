@@ -6,10 +6,10 @@
 
 use super::{EmbeddingEngine, GraphEmbeddingExt};
 use crate::api::graph::Graph;
-use crate::errors::{GraphResult, GraphError};
+use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
-use crate::types::NodeId;
 use crate::traits::subgraph_operations::SubgraphOperations;
+use crate::types::NodeId;
 use std::collections::HashMap;
 
 /// Spectral embedding engine using Laplacian eigenvectors
@@ -114,7 +114,11 @@ impl SpectralEmbedding {
     }
 
     /// Compute eigenvectors of the Laplacian
-    fn compute_eigenvectors(&self, laplacian: &GraphMatrix, dimensions: usize) -> GraphResult<GraphMatrix> {
+    fn compute_eigenvectors(
+        &self,
+        laplacian: &GraphMatrix,
+        dimensions: usize,
+    ) -> GraphResult<GraphMatrix> {
         // Use the matrix ecosystem's eigendecomposition
         let (eigenvalues, eigenvectors) = laplacian.eigenvalue_decomposition()?;
 
@@ -140,10 +144,10 @@ impl SpectralEmbedding {
 
         let available_dims = eigen_pairs.len() - skip_count;
         if available_dims < dimensions {
-            return Err(GraphError::InvalidInput(
-                format!("Graph only has {} non-constant eigenvectors, but {} dimensions requested",
-                    available_dims, dimensions)
-            ));
+            return Err(GraphError::InvalidInput(format!(
+                "Graph only has {} non-constant eigenvectors, but {} dimensions requested",
+                available_dims, dimensions
+            )));
         }
 
         // Extract the requested eigenvectors
@@ -166,13 +170,14 @@ impl EmbeddingEngine for SpectralEmbedding {
 
         if dimensions == 0 {
             return Err(GraphError::InvalidInput(
-                "Cannot compute embedding with 0 dimensions".to_string()
+                "Cannot compute embedding with 0 dimensions".to_string(),
             ));
         }
 
         // Check if graph is connected (for meaningful spectral embedding)
         // TODO: Add connectivity check
-        if false { // Skip connectivity check for now
+        if false {
+            // Skip connectivity check for now
             eprintln!("Warning: Graph is not connected. Spectral embedding may not be meaningful.");
         }
 
@@ -208,13 +213,13 @@ impl EmbeddingEngine for SpectralEmbedding {
     fn validate_graph(&self, graph: &Graph) -> GraphResult<()> {
         if graph.space().node_count() == 0 {
             return Err(GraphError::InvalidInput(
-                "Cannot compute spectral embedding for empty graph".to_string()
+                "Cannot compute spectral embedding for empty graph".to_string(),
             ));
         }
 
         if graph.space().node_count() == 1 {
             return Err(GraphError::InvalidInput(
-                "Cannot compute meaningful spectral embedding for single node".to_string()
+                "Cannot compute meaningful spectral embedding for single node".to_string(),
             ));
         }
 
@@ -287,8 +292,8 @@ mod tests {
     fn path_graph(n: usize) -> Graph {
         let mut graph = Graph::new();
         let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
-        for i in 0..n-1 {
-            graph.add_edge(nodes[i], nodes[i+1]).unwrap();
+        for i in 0..n - 1 {
+            graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
         }
         graph
     }
@@ -297,7 +302,7 @@ mod tests {
         let mut graph = path_graph(n);
         let nodes: Vec<_> = graph.space().node_ids();
         if n > 2 {
-            graph.add_edge(nodes[n-1], nodes[0]).unwrap();
+            graph.add_edge(nodes[n - 1], nodes[0]).unwrap();
         }
         graph
     }
@@ -316,7 +321,17 @@ mod tests {
         let mut graph = Graph::new();
         let nodes: Vec<_> = (0..34).map(|_| graph.add_node()).collect();
         // Add some representative edges for karate club
-        let edges = [(0,1), (0,2), (0,3), (1,2), (1,3), (2,3), (1,7), (2,7), (3,7)];
+        let edges = [
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (1, 2),
+            (1, 3),
+            (2, 3),
+            (1, 7),
+            (2, 7),
+            (3, 7),
+        ];
         for (i, j) in edges.iter() {
             graph.add_edge(nodes[*i], nodes[*j]).unwrap();
         }
@@ -350,14 +365,18 @@ mod tests {
         let second_row = embedding.row(1)?;
 
         let distance = first_row.subtract(&second_row)?.norm();
-        assert!(distance > 1e-10, "Different nodes should have different embeddings");
+        assert!(
+            distance > 1e-10,
+            "Different nodes should have different embeddings"
+        );
     }
 
     #[test]
     fn test_spectral_embedding_builder() {
         let graph = cycle_graph(6);
 
-        let embedding = graph.spectral()
+        let embedding = graph
+            .spectral()
             .normalized(false)
             .eigenvalue_threshold(1e-10)
             .skip_constant_eigenvector(true)
@@ -371,11 +390,9 @@ mod tests {
     fn test_normalized_vs_unnormalized() {
         let graph = star_graph(10); // Star with center + 9 leaves
 
-        let normalized = SpectralEmbedding::new(true, 1e-8)
-            .compute_embedding(&graph, 3);
+        let normalized = SpectralEmbedding::new(true, 1e-8).compute_embedding(&graph, 3);
 
-        let unnormalized = SpectralEmbedding::new(false, 1e-8)
-            .compute_embedding(&graph, 3);
+        let unnormalized = SpectralEmbedding::new(false, 1e-8).compute_embedding(&graph, 3);
 
         assert!(normalized.is_ok());
         assert!(unnormalized.is_ok());
@@ -389,7 +406,10 @@ mod tests {
 
         // The embeddings should be different
         let diff = norm_emb.subtract(&unnorm_emb).unwrap().frobenius_norm();
-        assert!(diff > 1e-6, "Normalized and unnormalized embeddings should differ");
+        assert!(
+            diff > 1e-6,
+            "Normalized and unnormalized embeddings should differ"
+        );
     }
 
     #[test]

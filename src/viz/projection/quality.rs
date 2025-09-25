@@ -2,7 +2,7 @@
 
 use super::{QualityConfig, QualityThresholds};
 use crate::api::graph::Graph;
-use crate::errors::{GraphResult, GraphError};
+use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::streaming::data_source::Position;
 use std::collections::HashMap;
@@ -54,7 +54,7 @@ impl QualityEvaluator {
         let n = original_embedding.shape().0;
         if projected_positions.len() != n {
             return Err(GraphError::InvalidInput(
-                "Number of projected positions must match embedding rows".to_string()
+                "Number of projected positions must match embedding rows".to_string(),
             ));
         }
 
@@ -76,21 +76,21 @@ impl QualityEvaluator {
 
         // Compute individual metrics
         if self.config.compute_neighborhood_preservation {
-            metrics.neighborhood_preservation = self.compute_neighborhood_preservation(
-                &hd_distances, &ld_distances
-            )?;
+            metrics.neighborhood_preservation =
+                self.compute_neighborhood_preservation(&hd_distances, &ld_distances)?;
         }
 
         if self.config.compute_distance_preservation {
-            metrics.distance_correlation = self.compute_distance_correlation(
-                &hd_distances, &ld_distances
-            )?;
+            metrics.distance_correlation =
+                self.compute_distance_correlation(&hd_distances, &ld_distances)?;
             metrics.stress = self.compute_stress(&hd_distances, &ld_distances)?;
         }
 
         if self.config.compute_clustering_preservation {
             metrics.clustering_preservation = Some(self.compute_clustering_preservation(
-                original_embedding, projected_positions, graph
+                original_embedding,
+                projected_positions,
+                graph,
             )?);
         }
 
@@ -108,9 +108,9 @@ impl QualityEvaluator {
     pub fn meets_quality_thresholds(&self, metrics: &QualityMetrics) -> bool {
         let thresholds = &self.config.quality_thresholds;
 
-        metrics.neighborhood_preservation >= thresholds.min_neighborhood_preservation &&
-        metrics.distance_correlation >= thresholds.min_distance_correlation &&
-        metrics.stress <= thresholds.max_stress
+        metrics.neighborhood_preservation >= thresholds.min_neighborhood_preservation
+            && metrics.distance_correlation >= thresholds.min_distance_correlation
+            && metrics.stress <= thresholds.max_stress
     }
 
     /// Generate quality improvement suggestions
@@ -152,7 +152,8 @@ impl QualityEvaluator {
         }
 
         if suggestions.is_empty() {
-            suggestions.push("Projection quality is good! No specific improvements needed.".to_string());
+            suggestions
+                .push("Projection quality is good! No specific improvements needed.".to_string());
         }
 
         suggestions
@@ -164,7 +165,7 @@ impl QualityEvaluator {
         let mut distances = GraphMatrix::<f64>::zeros(n, n);
 
         for i in 0..n {
-            for j in i+1..n {
+            for j in i + 1..n {
                 let mut dist_sq = 0.0;
                 for k in 0..d {
                     let diff = embedding.get_checked(i, k)? - embedding.get_checked(j, k)?;
@@ -185,7 +186,7 @@ impl QualityEvaluator {
         let mut distances = GraphMatrix::<f64>::zeros(n, n);
 
         for i in 0..n {
-            for j in i+1..n {
+            for j in i + 1..n {
                 let dx = positions[i].x - positions[j].x;
                 let dy = positions[i].y - positions[j].y;
                 let dist = (dx * dx + dy * dy).sqrt();
@@ -256,7 +257,7 @@ impl QualityEvaluator {
 
         // Collect upper triangular distance values
         for i in 0..n {
-            for j in i+1..n {
+            for j in i + 1..n {
                 hd_values.push(hd_distances.get_checked(i, j)?);
                 ld_values.push(ld_distances.get_checked(i, j)?);
             }
@@ -276,7 +277,7 @@ impl QualityEvaluator {
         let mut denominator = 0.0;
 
         for i in 0..n {
-            for j in i+1..n {
+            for j in i + 1..n {
                 let hd_dist = hd_distances.get_checked(i, j)?;
                 let ld_dist = ld_distances.get_checked(i, j)?;
                 let diff = hd_dist - ld_dist;
@@ -317,7 +318,7 @@ impl QualityEvaluator {
         // Compute cluster agreement (simplified)
         let mut agreement = 0;
         for i in 0..n {
-            for j in i+1..n {
+            for j in i + 1..n {
                 let same_hd_cluster = hd_clusters[i] == hd_clusters[j];
                 let same_ld_cluster = ld_clusters[i] == ld_clusters[j];
                 if same_hd_cluster == same_ld_cluster {
@@ -557,9 +558,9 @@ impl QualityOptimizer {
     ) -> GraphResult<(Vec<Position>, QualityMetrics)> {
         let mut current_positions = initial_positions.to_vec();
         let mut best_positions = current_positions.clone();
-        let mut best_quality = self.evaluator.evaluate_projection(
-            original_embedding, &current_positions, graph
-        )?;
+        let mut best_quality =
+            self.evaluator
+                .evaluate_projection(original_embedding, &current_positions, graph)?;
 
         for iteration in 0..max_iterations {
             // Try small perturbations to improve quality
@@ -570,15 +571,21 @@ impl QualityOptimizer {
                 // Try moving node in different directions
                 let original_pos = current_positions[i];
 
-                for &(dx, dy) in &[(step_size, 0.0), (-step_size, 0.0),
-                                   (0.0, step_size), (0.0, -step_size)] {
+                for &(dx, dy) in &[
+                    (step_size, 0.0),
+                    (-step_size, 0.0),
+                    (0.0, step_size),
+                    (0.0, -step_size),
+                ] {
                     current_positions[i] = Position {
                         x: original_pos.x + dx,
                         y: original_pos.y + dy,
                     };
 
                     let quality = self.evaluator.evaluate_projection(
-                        original_embedding, &current_positions, graph
+                        original_embedding,
+                        &current_positions,
+                        graph,
                     )?;
 
                     if quality.overall_score > best_quality.overall_score {
@@ -752,8 +759,8 @@ mod tests {
 
         let poor_metrics = QualityMetrics {
             neighborhood_preservation: 0.5, // Below default threshold
-            distance_correlation: 0.4, // Below default threshold
-            stress: 0.5, // Above default threshold
+            distance_correlation: 0.4,      // Below default threshold
+            stress: 0.5,                    // Above default threshold
             clustering_preservation: None,
             local_continuity: 0.6,
             global_structure: 0.5,

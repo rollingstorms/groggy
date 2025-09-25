@@ -11,28 +11,30 @@
 //! - HistoryForest = Version Control (immutable snapshots, branching)
 //! - QueryEngine = Read-only Analysis (filtering, aggregation, views)
 
-use crate::utils::config::GraphConfig;
-use crate::storage::adjacency::{AdjacencyMatrix, AdjacencyMatrixBuilder, MatrixFormat, MatrixType};
+use crate::errors::{GraphError, GraphResult};
+use crate::query::query::{EdgeFilter, NodeFilter, QueryEngine};
+use crate::query::traversal::TraversalEngine;
 use crate::state::change_tracker::ChangeTracker;
 use crate::state::history::{CommitDiff, HistoricalView, HistoryForest};
-use crate::subgraphs::neighborhood::NeighborhoodSampler;
-use crate::storage::pool::GraphPool;
-use crate::query::query::{EdgeFilter, NodeFilter, QueryEngine};
-use crate::types::SubgraphId;
 use crate::state::ref_manager::BranchInfo;
 use crate::state::space::GraphSpace;
-use crate::query::traversal::TraversalEngine;
-use crate::errors::{GraphError, GraphResult};
+use crate::storage::adjacency::{
+    AdjacencyMatrix, AdjacencyMatrixBuilder, MatrixFormat, MatrixType,
+};
+use crate::storage::pool::GraphPool;
+use crate::subgraphs::neighborhood::NeighborhoodSampler;
+use crate::types::SubgraphId;
 use crate::types::{
     AttrName, AttrValue, BranchName, CompressionStatistics, EdgeId, MemoryEfficiency,
     MemoryStatistics, NodeId, StateId,
 };
+use crate::utils::config::GraphConfig;
+use crate::viz::VizModule;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
-use crate::viz::VizModule;
 
 /*
 === THE GRAPH: MASTER COORDINATOR ===
@@ -199,24 +201,23 @@ impl Graph {
     pub fn load_from_path(path: &Path) -> Result<Self, GraphError> {
         use std::fs::File;
         use std::io::BufReader;
-        
+
         // Read the JSON file
-        let file = File::open(path)
-            .map_err(|e| GraphError::IoError { 
-                operation: "open_graph_file".to_string(),
-                path: path.to_string_lossy().to_string(),
-                underlying_error: e.to_string(),
-            })?;
+        let file = File::open(path).map_err(|e| GraphError::IoError {
+            operation: "open_graph_file".to_string(),
+            path: path.to_string_lossy().to_string(),
+            underlying_error: e.to_string(),
+        })?;
         let reader = BufReader::new(file);
-        
+
         // Parse the JSON
-        let graph_data: serde_json::Value = serde_json::from_reader(reader)
-            .map_err(|e| GraphError::IoError { 
+        let graph_data: serde_json::Value =
+            serde_json::from_reader(reader).map_err(|e| GraphError::IoError {
                 operation: "parse_graph_json".to_string(),
                 path: path.to_string_lossy().to_string(),
                 underlying_error: e.to_string(),
             })?;
-        
+
         // Create new graph with stored configuration
         let config = if let Some(config_obj) = graph_data.get("config") {
             // Parse graph type from config
@@ -233,9 +234,9 @@ impl Graph {
         } else {
             crate::utils::config::GraphConfig::new()
         };
-        
+
         let mut graph = Self::with_config(config);
-        
+
         // Load nodes
         if let Some(nodes) = graph_data.get("nodes").and_then(|v| v.as_array()) {
             for node in nodes {
@@ -243,12 +244,14 @@ impl Graph {
                     let node_id = node_id as crate::types::NodeId;
                     let added_node_id = graph.add_node();
                     // Note: We assume the loaded node_id matches the added one for now
-                    
+
                     // Load node attributes
                     if let Some(attrs) = node.get("attributes").and_then(|v| v.as_object()) {
                         for (key, value) in attrs {
                             let attr_value = match value {
-                                serde_json::Value::String(s) => crate::types::AttrValue::Text(s.clone()),
+                                serde_json::Value::String(s) => {
+                                    crate::types::AttrValue::Text(s.clone())
+                                }
                                 serde_json::Value::Number(n) => {
                                     if let Some(i) = n.as_i64() {
                                         crate::types::AttrValue::Int(i)
@@ -267,7 +270,7 @@ impl Graph {
                 }
             }
         }
-        
+
         // Load edges
         if let Some(edges) = graph_data.get("edges").and_then(|v| v.as_array()) {
             for edge in edges {
@@ -277,14 +280,16 @@ impl Graph {
                 ) {
                     let source = source as crate::types::NodeId;
                     let target = target as crate::types::NodeId;
-                    
+
                     let edge_id = graph.add_edge(source, target)?;
-                    
+
                     // Load edge attributes
                     if let Some(attrs) = edge.get("attributes").and_then(|v| v.as_object()) {
                         for (key, value) in attrs {
                             let attr_value = match value {
-                                serde_json::Value::String(s) => crate::types::AttrValue::Text(s.clone()),
+                                serde_json::Value::String(s) => {
+                                    crate::types::AttrValue::Text(s.clone())
+                                }
                                 serde_json::Value::Number(n) => {
                                     if let Some(i) = n.as_i64() {
                                         crate::types::AttrValue::Int(i)
@@ -303,7 +308,7 @@ impl Graph {
                 }
             }
         }
-        
+
         Ok(graph)
     }
 
@@ -376,12 +381,16 @@ impl Graph {
         let node_id = self.pool.borrow_mut().add_node(); // Pool creates and stores
         self.space.activate_node(node_id); // Space tracks as active
         self.change_tracker.record_node_addition(node_id); // Track change for commit
-        
+
         // WORF SAFETY: Set entity_type efficiently using direct pool access
         // This bypasses the expensive validation in set_node_attr_internal
         let entity_type_attr: AttrName = "entity_type".into();
-        let _ = self.pool.borrow_mut().set_attr(entity_type_attr, AttrValue::Text("base".to_string()), true);
-        
+        let _ = self.pool.borrow_mut().set_attr(
+            entity_type_attr,
+            AttrValue::Text("base".to_string()),
+            true,
+        );
+
         node_id
     }
 
@@ -402,7 +411,10 @@ impl Graph {
         let entity_type_attr: AttrName = "entity_type".into();
         let base_value = AttrValue::Text("base".to_string());
         for _node_id in &node_ids {
-            let _ = self.pool.borrow_mut().set_attr(entity_type_attr.clone(), base_value.clone(), true);
+            let _ =
+                self.pool
+                    .borrow_mut()
+                    .set_attr(entity_type_attr.clone(), base_value.clone(), true);
         }
 
         node_ids
@@ -535,10 +547,12 @@ impl Graph {
 
         self.change_tracker.record_node_removal(node);
         self.space.deactivate_node(node);
-        
+
         // CONSISTENCY FIX: Update stored subgraphs to remove the deleted node
-        self.pool.borrow_mut().update_stored_subgraphs_remove_node(node);
-        
+        self.pool
+            .borrow_mut()
+            .update_stored_subgraphs_remove_node(node);
+
         Ok(())
     }
 
@@ -554,10 +568,12 @@ impl Graph {
 
         self.change_tracker.record_edge_removal(edge);
         self.space.deactivate_edge(edge);
-        
+
         // CONSISTENCY FIX: Update stored subgraphs to remove the deleted edge
-        self.pool.borrow_mut().update_stored_subgraphs_remove_edge(edge);
-        
+        self.pool
+            .borrow_mut()
+            .update_stored_subgraphs_remove_edge(edge);
+
         Ok(())
     }
 
@@ -566,9 +582,11 @@ impl Graph {
         if self.space.contains_edge(edge) {
             self.change_tracker.record_edge_removal(edge);
             self.space.deactivate_edge(edge);
-            
+
             // CONSISTENCY FIX: Update stored subgraphs to remove the deleted edge
-            self.pool.borrow_mut().update_stored_subgraphs_remove_edge(edge);
+            self.pool
+                .borrow_mut()
+                .update_stored_subgraphs_remove_edge(edge);
         }
         Ok(())
     }
@@ -930,7 +948,8 @@ impl Graph {
     /// Get all validated meta-nodes in the graph
     /// SAFETY: Only returns nodes that pass validation checks
     pub fn get_meta_nodes(&self) -> Vec<NodeId> {
-        self.space.get_active_nodes()
+        self.space
+            .get_active_nodes()
             .into_iter()
             .filter(|&node_id| {
                 self.is_meta_node(node_id) && self.validate_meta_node(node_id).is_ok()
@@ -941,7 +960,8 @@ impl Graph {
     /// Get all validated base nodes in the graph
     /// SAFETY: Only returns nodes that pass validation checks
     pub fn get_base_nodes(&self) -> Vec<NodeId> {
-        self.space.get_active_nodes()
+        self.space
+            .get_active_nodes()
             .into_iter()
             .filter(|&node_id| {
                 self.is_base_node(node_id) && self.validate_base_node(node_id).is_ok()
@@ -954,10 +974,13 @@ impl Graph {
     fn validate_meta_node(&self, node_id: NodeId) -> Result<(), GraphError> {
         // REQUIREMENT 1: Must have entity_type = "meta"
         match self.get_node_attr(node_id, &"entity_type".into())? {
-            Some(AttrValue::Text(entity_type)) if entity_type == "meta" => {},
-            _ => return Err(GraphError::InvalidInput(
-                format!("Node {} does not have entity_type='meta'", node_id)
-            )),
+            Some(AttrValue::Text(entity_type)) if entity_type == "meta" => {}
+            _ => {
+                return Err(GraphError::InvalidInput(format!(
+                    "Node {} does not have entity_type='meta'",
+                    node_id
+                )))
+            }
         }
 
         // REQUIREMENT 2: Must have contains_subgraph reference
@@ -965,10 +988,11 @@ impl Graph {
             Some(AttrValue::SubgraphRef(_subgraph_id)) => {
                 // TODO: Validate subgraph exists in pool
                 Ok(())
-            },
-            _ => Err(GraphError::InvalidInput(
-                format!("Meta-node {} missing required contains_subgraph attribute", node_id)
-            )),
+            }
+            _ => Err(GraphError::InvalidInput(format!(
+                "Meta-node {} missing required contains_subgraph attribute",
+                node_id
+            ))),
         }
     }
 
@@ -979,9 +1003,10 @@ impl Graph {
         match self.get_node_attr(node_id, &"entity_type".into())? {
             Some(AttrValue::Text(entity_type)) if entity_type == "base" => Ok(()),
             None => Ok(()), // Default to base for migration compatibility
-            _ => Err(GraphError::InvalidInput(
-                format!("Node {} has invalid entity_type for base node", node_id)
-            )),
+            _ => Err(GraphError::InvalidInput(format!(
+                "Node {} has invalid entity_type for base node",
+                node_id
+            ))),
         }
     }
 
@@ -992,13 +1017,13 @@ impl Graph {
         let node_id = self.pool.borrow_mut().add_node();
         self.space.activate_node(node_id);
         self.change_tracker.record_node_addition(node_id);
-        
+
         // Step 2: Set all required attributes atomically
         match self.set_meta_node_attributes_atomic(node_id, subgraph_id) {
             Ok(()) => {
                 // Success - node is fully created and validated
                 Ok(node_id)
-            },
+            }
             Err(e) => {
                 // Step 3: On failure, deactivate and clean up
                 // The node ID in pool is already allocated, but we can deactivate it
@@ -1010,16 +1035,28 @@ impl Graph {
 
     /// Atomically set all required meta-node attributes
     /// SAFETY: Either all succeed or all fail
-    fn set_meta_node_attributes_atomic(&mut self, node_id: NodeId, subgraph_id: SubgraphId) -> Result<(), GraphError> {
+    fn set_meta_node_attributes_atomic(
+        &mut self,
+        node_id: NodeId,
+        subgraph_id: SubgraphId,
+    ) -> Result<(), GraphError> {
         // Set entity_type = "meta"
-        self.set_node_attr_internal(node_id, "entity_type".into(), AttrValue::Text("meta".to_string()))?;
-        
+        self.set_node_attr_internal(
+            node_id,
+            "entity_type".into(),
+            AttrValue::Text("meta".to_string()),
+        )?;
+
         // Set contains_subgraph reference
-        self.set_node_attr_internal(node_id, "contains_subgraph".into(), AttrValue::SubgraphRef(subgraph_id))?;
-        
+        self.set_node_attr_internal(
+            node_id,
+            "contains_subgraph".into(),
+            AttrValue::SubgraphRef(subgraph_id),
+        )?;
+
         // Validate the meta-node structure
         self.validate_meta_node_structure_for_id(node_id)?;
-        
+
         Ok(())
     }
 
@@ -1027,7 +1064,7 @@ impl Graph {
     fn validate_meta_node_structure_for_id(&self, _node_id: NodeId) -> Result<(), GraphError> {
         // This is a simplified validation for creation time
         // The full validation in validate_meta_node() requires active nodes
-        
+
         // For now, just ensure the basic structure is correct
         // TODO: Add subgraph existence validation when pool supports it
         Ok(())
@@ -1369,13 +1406,13 @@ impl Graph {
     pub fn incident_edges(&self, node: NodeId) -> GraphResult<Vec<EdgeId>> {
         let pool = self.pool.borrow();
         let all_incident_edges = pool.get_incident_edges(node)?;
-        
+
         // CONSISTENCY FIX: Filter to only return edges that are still active in the space
         let active_incident_edges: Vec<EdgeId> = all_incident_edges
             .into_iter()
             .filter(|&edge_id| self.space.contains_edge(edge_id))
             .collect();
-        
+
         Ok(active_incident_edges)
     }
 
@@ -2007,10 +2044,10 @@ impl Graph {
 
     /// Save graph to persistent storage
     pub fn save_to_path(&self, path: &Path) -> Result<(), GraphError> {
+        use serde_json::json;
         use std::fs::File;
         use std::io::BufWriter;
-        use serde_json::json;
-        
+
         // Create the JSON structure
         let mut graph_data = json!({
             "config": {
@@ -2022,7 +2059,7 @@ impl Graph {
             "nodes": [],
             "edges": []
         });
-        
+
         // Serialize nodes
         let mut nodes = Vec::new();
         for node_id in self.node_ids() {
@@ -2030,14 +2067,16 @@ impl Graph {
                 "id": node_id,
                 "attributes": {}
             });
-            
+
             // Get node attributes
             if let Ok(attrs) = self.get_node_attrs(node_id) {
                 let mut attr_obj = serde_json::Map::new();
                 for (key, value) in attrs {
                     let json_value = match value {
                         crate::types::AttrValue::Text(s) => serde_json::Value::String(s),
-                        crate::types::AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(i)),
+                        crate::types::AttrValue::Int(i) => {
+                            serde_json::Value::Number(serde_json::Number::from(i))
+                        }
                         crate::types::AttrValue::Float(f) => {
                             if let Some(n) = serde_json::Number::from_f64(f as f64) {
                                 serde_json::Value::Number(n)
@@ -2052,11 +2091,11 @@ impl Graph {
                 }
                 node_obj["attributes"] = serde_json::Value::Object(attr_obj);
             }
-            
+
             nodes.push(node_obj);
         }
         graph_data["nodes"] = serde_json::Value::Array(nodes);
-        
+
         // Serialize edges
         let mut edges = Vec::new();
         for edge_id in self.edge_ids() {
@@ -2067,14 +2106,16 @@ impl Graph {
                     "target": target,
                     "attributes": {}
                 });
-                
+
                 // Get edge attributes
                 if let Ok(attrs) = self.get_edge_attrs(edge_id) {
                     let mut attr_obj = serde_json::Map::new();
                     for (key, value) in attrs {
                         let json_value = match value {
                             crate::types::AttrValue::Text(s) => serde_json::Value::String(s),
-                            crate::types::AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(i)),
+                            crate::types::AttrValue::Int(i) => {
+                                serde_json::Value::Number(serde_json::Number::from(i))
+                            }
                             crate::types::AttrValue::Float(f) => {
                                 if let Some(n) = serde_json::Number::from_f64(f as f64) {
                                     serde_json::Value::Number(n)
@@ -2089,28 +2130,26 @@ impl Graph {
                     }
                     edge_obj["attributes"] = serde_json::Value::Object(attr_obj);
                 }
-                
+
                 edges.push(edge_obj);
             }
         }
         graph_data["edges"] = serde_json::Value::Array(edges);
-        
+
         // Write to file
-        let file = File::create(path)
-            .map_err(|e| GraphError::IoError { 
-                operation: "create_graph_file".to_string(),
-                path: path.to_string_lossy().to_string(),
-                underlying_error: e.to_string(),
-            })?;
+        let file = File::create(path).map_err(|e| GraphError::IoError {
+            operation: "create_graph_file".to_string(),
+            path: path.to_string_lossy().to_string(),
+            underlying_error: e.to_string(),
+        })?;
         let writer = BufWriter::new(file);
-        
-        serde_json::to_writer_pretty(writer, &graph_data)
-            .map_err(|e| GraphError::IoError { 
-                operation: "write_graph_json".to_string(),
-                path: path.to_string_lossy().to_string(),
-                underlying_error: e.to_string(),
-            })?;
-        
+
+        serde_json::to_writer_pretty(writer, &graph_data).map_err(|e| GraphError::IoError {
+            operation: "write_graph_json".to_string(),
+            path: path.to_string_lossy().to_string(),
+            underlying_error: e.to_string(),
+        })?;
+
         Ok(())
     }
 
@@ -2361,7 +2400,7 @@ impl Graph {
     pub fn adjacency_matrix(&mut self) -> GraphResult<AdjacencyMatrix> {
         let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
         let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
-        
+
         // Convert edges to (source, target) tuples
         let mut edges = Vec::new();
         for edge_id in edge_ids {
@@ -2369,7 +2408,7 @@ impl Graph {
                 edges.push((source, target));
             }
         }
-        
+
         AdjacencyMatrixBuilder::from_edges(&nodes, &edges)
     }
 
@@ -2381,12 +2420,12 @@ impl Graph {
     // ===== GRAPHMATRIX CONVERSION OPERATIONS =====
 
     /// Convert graph data to GraphMatrix with generic numeric type support
-    pub fn to_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>> 
+    pub fn to_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
     where
-        T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>
+        T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
-        use crate::storage::matrix::{GraphMatrix, FromAttrValue};
-        
+        use crate::storage::matrix::{FromAttrValue, GraphMatrix};
+
         let mut nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
         nodes.sort(); // Sort to ensure consistent ordering (creation order)
         if nodes.is_empty() {
@@ -2395,7 +2434,8 @@ impl Graph {
 
         // Get all node attribute names
         let (node_attr_names, _edge_attr_names) = self.pool.borrow().attribute_names();
-        let attribute_names: Vec<String> = node_attr_names.into_iter().map(|s| s.to_string()).collect();
+        let attribute_names: Vec<String> =
+            node_attr_names.into_iter().map(|s| s.to_string()).collect();
         let col_count = attribute_names.len();
 
         if col_count == 0 {
@@ -2404,19 +2444,19 @@ impl Graph {
 
         // Build matrix data column by column
         let mut matrix_data = Vec::with_capacity(nodes.len() * col_count);
-        
+
         // Phase 1: Detect all numerical attributes and determine LCD type
         use crate::types::AttrValue;
-        
+
         let mut valid_attribute_names = Vec::new();
         let mut has_float = false;
         let mut has_int = false;
         let mut has_bool = false;
-        
+
         for attr_name in &attribute_names {
             let pool_ref = self.pool.borrow();
             let mut is_numeric = false;
-            
+
             // Check ALL values in this attribute to detect type
             for &node_id in &nodes {
                 let value_result = pool_ref.get_node_attribute(node_id, &attr_name);
@@ -2442,33 +2482,35 @@ impl Graph {
                     }
                 }
             }
-            
+
             if is_numeric {
                 valid_attribute_names.push(attr_name.clone());
             }
         }
-        
+
         // LCD Logic: float > int > bool (float can represent all, int can represent bool)
         // If we have mixed types, use the most general type that can represent all
         let _use_float_type = has_float || (has_int && has_bool); // Need float if mixed int/float or int/bool
-        
+
         let valid_col_count = valid_attribute_names.len();
         if valid_col_count == 0 {
             return Ok(GraphMatrix::zeros(nodes.len(), 0));
         }
-        
+
         matrix_data = Vec::with_capacity(nodes.len() * valid_col_count);
-        
+
         // Phase 2: Build matrix data with LCD conversion in ROW-MAJOR order
-        for &node_id in &nodes {  // For each ROW (node)
+        for &node_id in &nodes {
+            // For each ROW (node)
             let pool_ref = self.pool.borrow();
-            for attr_name in &valid_attribute_names {  // For each COLUMN (attribute)
+            for attr_name in &valid_attribute_names {
+                // For each COLUMN (attribute)
                 let value_result = pool_ref.get_node_attribute(node_id, &attr_name);
                 let value = match value_result {
                     Ok(Some(ref attr_val)) => attr_val,
                     _ => &AttrValue::Null,
                 };
-                
+
                 // Convert using LCD logic - all numerical types should convert to T
                 let numeric_value = match value {
                     AttrValue::Int(i) => T::from_attr_value(value)?,
@@ -2485,16 +2527,17 @@ impl Graph {
             }
         }
 
-        let mut matrix = GraphMatrix::from_row_major_data(matrix_data, nodes.len(), valid_col_count, None)?;
+        let mut matrix =
+            GraphMatrix::from_row_major_data(matrix_data, nodes.len(), valid_col_count, None)?;
         matrix.set_column_names(valid_attribute_names);
         Ok(matrix)
     }
-    
+
     /// Convert to f64 matrix (most common use case)
     pub fn to_matrix_f64(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<f64>> {
         self.to_matrix::<f64>()
     }
-    
+
     /// Convert to f32 matrix (memory-efficient for ML)
     pub fn to_matrix_f32(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<f32>> {
         self.to_matrix::<f32>()
@@ -2508,13 +2551,13 @@ impl Graph {
     /// Create GraphMatrix adjacency representation (replaces AdjacencyMatrix)
     pub fn to_adjacency_matrix<T>(&self) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
     where
-        T: crate::storage::advanced_matrix::NumericType
+        T: crate::storage::advanced_matrix::NumericType,
     {
         use crate::storage::matrix::GraphMatrix;
-        
+
         let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
         let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
-        
+
         // Convert edges to (source, target) tuples
         let mut edges = Vec::new();
         for edge_id in edge_ids {
@@ -2522,35 +2565,41 @@ impl Graph {
                 edges.push((source, target));
             }
         }
-        
+
         GraphMatrix::adjacency_from_edges(&nodes, &edges)
     }
 
     /// Create weighted GraphMatrix adjacency representation
-    pub fn to_weighted_adjacency_matrix<T>(&self, weight_attr: &str) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
+    pub fn to_weighted_adjacency_matrix<T>(
+        &self,
+        weight_attr: &str,
+    ) -> GraphResult<crate::storage::matrix::GraphMatrix<T>>
     where
-        T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>
+        T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
-        use crate::storage::matrix::{GraphMatrix, FromAttrValue};
-        
+        use crate::storage::matrix::{FromAttrValue, GraphMatrix};
+
         let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
         let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
-        
+
         // Convert edges to (source, target, weight) tuples using bulk operations
         let mut weighted_edges = Vec::new();
-        
+
         // Prepare bulk input for weight attributes
-        let edge_indices: Vec<(NodeId, Option<usize>)> = edge_ids.iter().map(|&id| (id, None)).collect();
-        
+        let edge_indices: Vec<(NodeId, Option<usize>)> =
+            edge_ids.iter().map(|&id| (id, None)).collect();
+
         // Single bulk operation to get all weight values
         let pool_ref = self.pool.borrow();
-        let weight_values = pool_ref.get_attribute_values(&weight_attr.to_string(), &edge_indices, false);
-        
+        let weight_values =
+            pool_ref.get_attribute_values(&weight_attr.to_string(), &edge_indices, false);
+
         // Create weight lookup map for O(1) access
-        let weight_map: std::collections::HashMap<NodeId, &AttrValue> = weight_values.iter()
+        let weight_map: std::collections::HashMap<NodeId, &AttrValue> = weight_values
+            .iter()
             .filter_map(|(id, val_opt)| val_opt.map(|val| (*id, val)))
             .collect();
-        
+
         // Build weighted edges using bulk results
         for edge_id in edge_ids {
             if let Ok((source, target)) = self.edge_endpoints(edge_id) {
@@ -2559,7 +2608,7 @@ impl Graph {
                 weighted_edges.push((source, target, weight));
             }
         }
-        
+
         GraphMatrix::weighted_adjacency_from_edges(&nodes, &weighted_edges)
     }
 
@@ -2567,7 +2616,7 @@ impl Graph {
     pub fn weighted_adjacency_matrix(&mut self, weight_attr: &str) -> GraphResult<AdjacencyMatrix> {
         let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
         let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
-        
+
         // Convert edges to (source, target, weight) tuples
         let mut weighted_edges = Vec::new();
         for edge_id in edge_ids {
@@ -2579,12 +2628,12 @@ impl Graph {
                         _ => 1.0,
                     },
                     Ok(None) => 1.0, // Attribute doesn't exist
-                    Err(_) => 1.0, // Error getting attribute
+                    Err(_) => 1.0,   // Error getting attribute
                 };
                 weighted_edges.push((source, target, weight));
             }
         }
-        
+
         AdjacencyMatrixBuilder::from_weighted_edges(&nodes, &weighted_edges)
     }
 
@@ -2617,11 +2666,11 @@ impl Graph {
         node_ids: &[NodeId],
     ) -> GraphResult<AdjacencyMatrix> {
         let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
-        
+
         // Filter edges to only include those between the specified nodes
         let node_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
         let mut subgraph_edges = Vec::new();
-        
+
         for edge_id in edge_ids {
             if let Ok((source, target)) = self.edge_endpoints(edge_id) {
                 if node_set.contains(&source) && node_set.contains(&target) {
@@ -2629,16 +2678,16 @@ impl Graph {
                 }
             }
         }
-        
+
         AdjacencyMatrixBuilder::from_edges(node_ids, &subgraph_edges)
     }
 
     /// Generate custom adjacency matrix with full control
     pub fn custom_adjacency_matrix(
         &mut self,
-        _format: MatrixFormat,  // Ignored in unified system
+        _format: MatrixFormat, // Ignored in unified system
         matrix_type: MatrixType,
-        _compact_indexing: bool,  // Ignored in unified system
+        _compact_indexing: bool, // Ignored in unified system
         node_ids: Option<&[NodeId]>,
     ) -> GraphResult<AdjacencyMatrix> {
         // Get the base adjacency matrix for the specified nodes or full graph
@@ -2657,7 +2706,7 @@ impl Graph {
                 } else {
                     base_matrix.to_laplacian()
                 }
-            },
+            }
             MatrixType::Transition => {
                 // TODO: Implement transition matrix transformation
                 // For now, return adjacency matrix
@@ -2743,44 +2792,49 @@ impl Graph {
         // Convert current graph state to GraphTable
         let nodes_table = self.nodes_table()?;
         let edges_table = self.edges_table()?;
-        
+
         // Create GraphTable with nodes and edges
-        Ok(crate::storage::table::GraphTable::new(nodes_table, edges_table))
+        Ok(crate::storage::table::GraphTable::new(
+            nodes_table,
+            edges_table,
+        ))
     }
 
     /// Get a NodesTable representation of graph nodes
     /// Implements: g.nodes.table() (this is called from the accessor)
     pub fn nodes_table(&self) -> crate::errors::GraphResult<crate::storage::table::NodesTable> {
-        use crate::storage::table::{BaseTable, NodesTable};
         use crate::storage::array::BaseArray;
+        use crate::storage::table::{BaseTable, NodesTable};
         use std::collections::HashMap;
 
         // Collect all nodes with their attributes
         let mut node_ids = Vec::new();
         let mut attribute_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
-        
+
         // Initialize with node_id column
         attribute_columns.insert("node_id".to_string(), Vec::new());
 
         // Collect all nodes
         for (node_index, node_id) in self.node_ids().into_iter().enumerate() {
             node_ids.push(node_id);
-            attribute_columns.get_mut("node_id").unwrap().push(crate::types::AttrValue::Int(node_id as i64));
+            attribute_columns
+                .get_mut("node_id")
+                .unwrap()
+                .push(crate::types::AttrValue::Int(node_id as i64));
 
             // Get all attributes for this node
             if let Ok(attrs) = self.get_node_attrs(node_id) {
                 for (attr_name, attr_value) in attrs {
-                    let column = attribute_columns.entry(attr_name)
-                        .or_insert_with(|| {
-                            // Initialize new column with nulls for all previous rows
-                            let mut col = Vec::with_capacity(self.space.node_count());
-                            col.resize(node_index, crate::types::AttrValue::Null);
-                            col
-                        });
+                    let column = attribute_columns.entry(attr_name).or_insert_with(|| {
+                        // Initialize new column with nulls for all previous rows
+                        let mut col = Vec::with_capacity(self.space.node_count());
+                        col.resize(node_index, crate::types::AttrValue::Null);
+                        col
+                    });
                     column.push(attr_value);
                 }
             }
-            
+
             // For any existing columns that didn't get a value for this node, add null
             for (attr_name, column) in attribute_columns.iter_mut() {
                 if attr_name == "node_id" {
@@ -2802,7 +2856,7 @@ impl Graph {
 
         // Convert to BaseArrays and create BaseTable
         let mut columns_map = std::collections::HashMap::new();
-        
+
         for (name, data) in attribute_columns {
             columns_map.insert(name, BaseArray::from_attr_values(data));
         }
@@ -2814,14 +2868,14 @@ impl Graph {
     /// Get an EdgesTable representation of graph edges  
     /// Implements: g.edges.table() (this is called from the accessor)
     pub fn edges_table(&self) -> crate::errors::GraphResult<crate::storage::table::EdgesTable> {
-        use crate::storage::table::{BaseTable, EdgesTable, EdgeConfig};
         use crate::storage::array::BaseArray;
+        use crate::storage::table::{BaseTable, EdgeConfig, EdgesTable};
         use std::collections::HashMap;
 
         // Collect all edges with their attributes
         let mut edge_data = Vec::new();
         let mut attribute_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
-        
+
         // Initialize required columns
         attribute_columns.insert("edge_id".to_string(), Vec::new());
         attribute_columns.insert("source".to_string(), Vec::new());
@@ -2833,24 +2887,32 @@ impl Graph {
             edge_data.push((edge_id, source, target));
 
             // Add required column values
-            attribute_columns.get_mut("edge_id").unwrap().push(crate::types::AttrValue::Int(edge_id as i64));
-            attribute_columns.get_mut("source").unwrap().push(crate::types::AttrValue::Int(source as i64));
-            attribute_columns.get_mut("target").unwrap().push(crate::types::AttrValue::Int(target as i64));
+            attribute_columns
+                .get_mut("edge_id")
+                .unwrap()
+                .push(crate::types::AttrValue::Int(edge_id as i64));
+            attribute_columns
+                .get_mut("source")
+                .unwrap()
+                .push(crate::types::AttrValue::Int(source as i64));
+            attribute_columns
+                .get_mut("target")
+                .unwrap()
+                .push(crate::types::AttrValue::Int(target as i64));
 
             // Get all attributes for this edge
             if let Ok(attrs) = self.get_edge_attrs(edge_id) {
                 for (attr_name, attr_value) in attrs {
-                    let column = attribute_columns.entry(attr_name)
-                        .or_insert_with(|| {
-                            // Initialize new column with nulls for all previous rows
-                            let mut col = Vec::with_capacity(self.space.edge_count());
-                            col.resize(edge_index, crate::types::AttrValue::Null);
-                            col
-                        });
+                    let column = attribute_columns.entry(attr_name).or_insert_with(|| {
+                        // Initialize new column with nulls for all previous rows
+                        let mut col = Vec::with_capacity(self.space.edge_count());
+                        col.resize(edge_index, crate::types::AttrValue::Null);
+                        col
+                    });
                     column.push(attr_value);
                 }
             }
-            
+
             // For any existing columns that didn't get a value for this edge, add null
             for (attr_name, column) in attribute_columns.iter_mut() {
                 if matches!(attr_name.as_str(), "edge_id" | "source" | "target") {
@@ -2872,7 +2934,7 @@ impl Graph {
 
         // Convert to BaseArrays and create BaseTable
         let mut columns_map = std::collections::HashMap::new();
-        
+
         for (name, data) in attribute_columns {
             columns_map.insert(name, BaseArray::from_attr_values(data));
         }
@@ -2882,23 +2944,23 @@ impl Graph {
     }
 
     /// 🎨 Get visualization module for unified rendering
-    /// 
+    ///
     /// This provides a single entry point for all visualization backends:
     /// - Jupyter widgets
     /// - WebSocket streaming servers
     /// - Static file export (HTML, SVG, PNG, PDF)
     /// - Local browser display
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust
     /// use groggy::Graph;
-    /// 
+    ///
     /// let mut graph = Graph::new();
     /// graph.add_node("A", [("label", "Node A")].into());
     /// graph.add_node("B", [("label", "Node B")].into());
     /// graph.add_edge("A", "B", [("weight", 1.0)].into());
-    /// 
+    ///
     /// // Unified API - all use the same core engine
     /// let widget = graph.viz().widget()?;           // Jupyter widget
     /// let server = graph.viz().serve(Some(8080))?;  // Streaming server
@@ -2971,7 +3033,7 @@ impl Default for Graph {
 }
 
 /// Adapter to make Graph compatible with DataSource trait for visualization
-/// 
+///
 /// This adapter bridges the gap between the Graph API and the visualization system
 /// by implementing the DataSource trait required by VizModule.
 #[derive(Debug, Clone)]
@@ -2988,11 +3050,11 @@ pub struct GraphDataSource {
 impl GraphDataSource {
     /// Create a new adapter from a Graph reference with configurable node label attribute
     pub fn new_with_label(graph: &Graph, node_label_attr: &str) -> Self {
-        use crate::viz::streaming::data_source::{GraphNode, GraphEdge, Position};
-        
+        use crate::viz::streaming::data_source::{GraphEdge, GraphNode, Position};
+
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
-        
+
         // Extract nodes with actual attributes
         let node_ids = graph.node_ids();
 
@@ -3005,7 +3067,7 @@ impl GraphDataSource {
                     attributes.insert(attr_name, attr_value);
                 }
             }
-            
+
             // Set default visual attributes if not present
             if !attributes.contains_key("color") {
                 attributes.insert("color".to_string(), AttrValue::Text("#007bff".to_string()));
@@ -3013,26 +3075,22 @@ impl GraphDataSource {
             if !attributes.contains_key("size") {
                 attributes.insert("size".to_string(), AttrValue::Float(8.0f32));
             }
-            
+
             // Use the specified attribute as label if available, otherwise use a generic label
             let label = if let Some(attr_value) = attributes.get(node_label_attr) {
                 // Handle different text attribute types
                 match attr_value {
-                    AttrValue::Text(text) => {
-                        Some(text.clone())
-                    }
+                    AttrValue::Text(text) => Some(text.clone()),
                     AttrValue::CompactText(compact_text) => {
                         let text = compact_text.as_str().to_string();
                         Some(text)
                     }
-                    other => {
-                        Some(format!("{:?}", other))
-                    }
+                    other => Some(format!("{:?}", other)),
                 }
             } else {
                 Some(format!("Node {}", node_id))
             };
-            
+
             nodes.push(GraphNode {
                 id: node_id.to_string(),
                 label,
@@ -3043,19 +3101,19 @@ impl GraphDataSource {
                 }),
             });
         }
-        
+
         // Extract edges with actual attributes
         for edge_id in graph.edge_ids() {
             if let Some((source, target)) = graph.pool.borrow().get_edge_endpoints(edge_id) {
                 let mut attributes = std::collections::HashMap::new();
-                
+
                 // Extract real attributes from the graph
                 if let Ok(edge_attrs) = graph.get_edge_attrs(edge_id) {
                     for (attr_name, attr_value) in edge_attrs {
                         attributes.insert(attr_name, attr_value);
                     }
                 }
-                
+
                 // Set default visual attributes if not present
                 if !attributes.contains_key("color") {
                     attributes.insert("color".to_string(), AttrValue::Text("#999".to_string()));
@@ -3063,14 +3121,14 @@ impl GraphDataSource {
                 if !attributes.contains_key("width") {
                     attributes.insert("width".to_string(), AttrValue::Float(1.0f32));
                 }
-                
+
                 // Extract weight from attributes if available
                 let weight = if let Some(AttrValue::Float(w)) = attributes.get("weight") {
                     Some(*w)
                 } else {
                     Some(1.0)
                 };
-                
+
                 edges.push(GraphEdge {
                     id: edge_id.to_string(),
                     source: source.to_string(),
@@ -3081,7 +3139,7 @@ impl GraphDataSource {
                 });
             }
         }
-        
+
         Self {
             node_count: graph.node_ids().len(),
             edge_count: graph.edge_ids().len(),
@@ -3101,20 +3159,29 @@ impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
     fn total_rows(&self) -> usize {
         self.node_count
     }
-    
+
     fn total_cols(&self) -> usize {
         4 // id, label, x, y
     }
-    
-    fn get_window(&self, start: usize, count: usize) -> crate::viz::streaming::data_source::DataWindow {
+
+    fn get_window(
+        &self,
+        start: usize,
+        count: usize,
+    ) -> crate::viz::streaming::data_source::DataWindow {
         use crate::viz::streaming::data_source::{DataWindow, DataWindowMetadata, Position};
-        
+
         let end = (start + count).min(self.nodes.len());
         let window_nodes = &self.nodes[start..end];
-        
-        let headers = vec!["id".to_string(), "label".to_string(), "x".to_string(), "y".to_string()];
+
+        let headers = vec![
+            "id".to_string(),
+            "label".to_string(),
+            "x".to_string(),
+            "y".to_string(),
+        ];
         let mut rows = Vec::new();
-        
+
         for node in window_nodes {
             let position = node.position.unwrap_or(Position { x: 0.0, y: 0.0 });
             let row = vec![
@@ -3125,7 +3192,7 @@ impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
             ];
             rows.push(row);
         }
-        
+
         DataWindow {
             headers,
             rows,
@@ -3140,12 +3207,12 @@ impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
             },
         }
     }
-    
+
     fn get_schema(&self) -> crate::viz::streaming::data_source::DataSchema {
-        use crate::viz::streaming::data_source::DataSchema;
         use crate::viz::display::ColumnSchema;
         use crate::viz::display::DataType;
-        
+        use crate::viz::streaming::data_source::DataSchema;
+
         DataSchema {
             columns: vec![
                 ColumnSchema {
@@ -3169,44 +3236,54 @@ impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
             source_type: "graph".to_string(),
         }
     }
-    
+
     fn supports_streaming(&self) -> bool {
         true
     }
-    
+
     fn get_column_types(&self) -> Vec<crate::viz::display::DataType> {
         use crate::viz::display::DataType;
-        vec![DataType::String, DataType::String, DataType::Float, DataType::Float]
+        vec![
+            DataType::String,
+            DataType::String,
+            DataType::Float,
+            DataType::Float,
+        ]
     }
-    
+
     fn get_column_names(&self) -> Vec<String> {
-        vec!["id".to_string(), "label".to_string(), "x".to_string(), "y".to_string()]
+        vec![
+            "id".to_string(),
+            "label".to_string(),
+            "x".to_string(),
+            "y".to_string(),
+        ]
     }
-    
+
     fn get_source_id(&self) -> String {
         format!("graph-{}", std::ptr::addr_of!(*self) as usize)
     }
-    
+
     fn get_version(&self) -> u64 {
         1 // Simple version for now
     }
-    
+
     // Graph visualization support
     fn supports_graph_view(&self) -> bool {
         true
     }
-    
+
     fn get_graph_nodes(&self) -> Vec<crate::viz::streaming::data_source::GraphNode> {
         self.nodes.clone()
     }
-    
+
     fn get_graph_edges(&self) -> Vec<crate::viz::streaming::data_source::GraphEdge> {
         self.edges.clone()
     }
-    
+
     fn get_graph_metadata(&self) -> crate::viz::streaming::data_source::GraphMetadata {
         use crate::viz::streaming::data_source::GraphMetadata;
-        
+
         GraphMetadata {
             node_count: self.node_count,
             edge_count: self.edge_count,
@@ -3215,12 +3292,15 @@ impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
             ..Default::default()
         }
     }
-    
-    fn compute_layout(&self, algorithm: crate::viz::streaming::data_source::LayoutAlgorithm) -> Vec<crate::viz::streaming::data_source::NodePosition> {
+
+    fn compute_layout(
+        &self,
+        algorithm: crate::viz::streaming::data_source::LayoutAlgorithm,
+    ) -> Vec<crate::viz::streaming::data_source::NodePosition> {
         use crate::viz::streaming::data_source::{NodePosition, Position};
-        
+
         let mut positions = Vec::new();
-        
+
         match algorithm {
             crate::viz::streaming::data_source::LayoutAlgorithm::ForceDirected { .. } => {
                 // Force-directed layout (circular for now)
@@ -3239,27 +3319,37 @@ impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
             crate::viz::streaming::data_source::LayoutAlgorithm::Honeycomb {
                 cell_size,
                 energy_optimization,
-                iterations
+                iterations,
             } => {
                 // Create VizNodes and VizEdges for the layout engine
                 use crate::viz::layouts::{HoneycombLayout, LayoutEngine};
-                use crate::viz::streaming::data_source::{GraphNode as VizNode, GraphEdge as VizEdge};
+                use crate::viz::streaming::data_source::{
+                    GraphEdge as VizEdge, GraphNode as VizNode,
+                };
 
-                let viz_nodes: Vec<VizNode> = self.nodes.iter().map(|node| VizNode {
-                    id: node.id.clone(),
-                    label: node.label.clone(),
-                    position: node.position.clone(),
-                    attributes: node.attributes.clone(),
-                }).collect();
+                let viz_nodes: Vec<VizNode> = self
+                    .nodes
+                    .iter()
+                    .map(|node| VizNode {
+                        id: node.id.clone(),
+                        label: node.label.clone(),
+                        position: node.position.clone(),
+                        attributes: node.attributes.clone(),
+                    })
+                    .collect();
 
-                let viz_edges: Vec<VizEdge> = self.edges.iter().map(|edge| VizEdge {
-                    id: format!("{}-{}", edge.source, edge.target),
-                    source: edge.source.clone(),
-                    target: edge.target.clone(),
-                    label: edge.label.clone(),
-                    weight: edge.weight,
-                    attributes: edge.attributes.clone(),
-                }).collect();
+                let viz_edges: Vec<VizEdge> = self
+                    .edges
+                    .iter()
+                    .map(|edge| VizEdge {
+                        id: format!("{}-{}", edge.source, edge.target),
+                        source: edge.source.clone(),
+                        target: edge.target.clone(),
+                        label: edge.label.clone(),
+                        weight: edge.weight,
+                        attributes: edge.attributes.clone(),
+                    })
+                    .collect();
 
                 // Create and configure honeycomb layout
                 let mut honeycomb_layout = HoneycombLayout::default();
@@ -3300,7 +3390,7 @@ impl crate::viz::streaming::data_source::DataSource for GraphDataSource {
                 }
             }
         }
-        
+
         positions
     }
 }
@@ -3321,20 +3411,30 @@ impl GraphDataSource {
     /// # Returns
     /// * `Ok(String)` - HTML iframe code for embedding
     /// * `Err(GraphError)` - If server failed to start
-    pub fn interactive_embed_with_layout(&self, layout: crate::viz::streaming::data_source::LayoutAlgorithm) -> GraphResult<String> {
-        println!("🔍 DEBUG: interactive_embed_with_layout called with WORKING STREAMING layout: {:?}", layout);
+    pub fn interactive_embed_with_layout(
+        &self,
+        layout: crate::viz::streaming::data_source::LayoutAlgorithm,
+    ) -> GraphResult<String> {
+        println!(
+            "🔍 DEBUG: interactive_embed_with_layout called with WORKING STREAMING layout: {:?}",
+            layout
+        );
 
         // Create VizModule from this GraphDataSource for unified rendering
         let data_source = Arc::new(self.clone());
         let viz_module = crate::viz::VizModule::new(data_source);
-        
-        println!("🔍 DEBUG: Created VizModule with {} nodes and {} edges", self.nodes.len(), self.edges.len());
+
+        println!(
+            "🔍 DEBUG: Created VizModule with {} nodes and {} edges",
+            self.nodes.len(),
+            self.edges.len()
+        );
 
         // Use the STREAMING backend which actually works and starts a real server
         // We'll enhance it with honeycomb-specific controls
         let render_options = crate::viz::RenderOptions {
             layout: Some(layout),
-            port: Some(0), // Auto-assign port
+            port: Some(0),          // Auto-assign port
             auto_open: Some(false), // Don't auto-open browser
             width: Some(1200),
             height: Some(640),
@@ -3342,17 +3442,21 @@ impl GraphDataSource {
         };
 
         // Create the streaming visualization and enhance it with honeycomb controls
-        println!("🔍 DEBUG: Creating ENHANCED streaming visualization with honeycomb-specific controls");
+        println!(
+            "🔍 DEBUG: Creating ENHANCED streaming visualization with honeycomb-specific controls"
+        );
         let render_result = viz_module.render(crate::viz::VizBackend::Streaming, render_options)?;
-        
+
         match render_result {
             crate::viz::RenderResult::Interactive(interactive_viz) => {
-                println!("🔍 DEBUG: ✨ ENHANCED streaming visualization created, starting server...");
-                
+                println!(
+                    "🔍 DEBUG: ✨ ENHANCED streaming visualization created, starting server..."
+                );
+
                 // Start the interactive visualization server
                 let viz_session = interactive_viz.start(None)?;
                 let port = viz_session.port();
-                
+
                 println!("🔍 DEBUG: ✨ ENHANCED server started on port {} with HONEYCOMB-SPECIFIC CONTROLS", port);
 
                 // Create enhanced iframe HTML with honeycomb-specific controls
@@ -3400,11 +3504,9 @@ impl GraphDataSource {
 
                 Ok(iframe_html)
             }
-            _ => {
-                Err(crate::errors::GraphError::InvalidInput(
-                    "Expected interactive visualization but got different render result".to_string()
-                ))
-            }
+            _ => Err(crate::errors::GraphError::InvalidInput(
+                "Expected interactive visualization but got different render result".to_string(),
+            )),
         }
     }
 
@@ -3439,10 +3541,12 @@ impl GraphDataSource {
 
         // Start server with automatic port assignment
         let addr = std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1));
-        let handle = server.start_background(addr, 0)
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to start graph visualization server: {}", e)
-            ))?;
+        let handle = server.start_background(addr, 0).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!(
+                "Failed to start graph visualization server: {}",
+                e
+            ))
+        })?;
 
         let actual_port = handle.port;
 
@@ -3451,7 +3555,6 @@ impl GraphDataSource {
             r#"<iframe src="http://127.0.0.1:{port}" width="100%" height="640" style="border:0;border-radius:12px;"></iframe>"#,
             port = actual_port
         );
-
 
         // Note: We're not storing the handle here, so the server will be dropped
         // and might stop. In a real implementation, we'd need to store it somewhere.

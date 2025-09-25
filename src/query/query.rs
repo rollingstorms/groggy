@@ -1,8 +1,8 @@
 //! Query Engine - Core filtering operations for graph data.
 
-use crate::storage::pool::GraphPool;
-use crate::state::space::GraphSpace;
 use crate::errors::GraphResult;
+use crate::state::space::GraphSpace;
+use crate::storage::pool::GraphPool;
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 use rayon::prelude::*; // Re-enabled - RefCell eliminated, now safe for parallel processing
 use std::collections::HashSet;

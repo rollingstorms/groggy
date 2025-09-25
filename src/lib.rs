@@ -140,16 +140,16 @@ pub mod errors;
 pub mod types;
 
 // Core functionality
-pub mod core;        // Core data structures and algorithms
+pub mod core; // Core data structures and algorithms
 
 // Reorganized module structure
-pub mod entities;    // Concrete entity implementations (Node, MetaNode, Edge, MetaEdge)
-pub mod subgraphs;   // Subgraph types and operations
-pub mod storage;     // Storage and view types  
-pub mod query;       // Query and traversal functionality
-pub mod state;       // State management
-pub mod utils;       // Utilities and configuration
-pub mod traits;      // Graph entity traits
+pub mod entities; // Concrete entity implementations (Node, MetaNode, Edge, MetaEdge)
+pub mod query; // Query and traversal functionality
+pub mod state; // State management
+pub mod storage; // Storage and view types
+pub mod subgraphs; // Subgraph types and operations
+pub mod traits;
+pub mod utils; // Utilities and configuration // Graph entity traits
 
 // Display formatting (legacy - being replaced by core::display)
 pub mod display;
@@ -164,10 +164,12 @@ pub mod api {
 
 // Re-export commonly used types and the main API
 pub use api::graph::Graph;
-pub use utils::{GraphConfig, convert::*};
-pub use state::{HistoricalView, HistoryForest, ViewSummary};
 pub use errors::{GraphError, GraphResult};
-pub use types::{AttrName, AttrValue, AttrValueType, BranchName, EdgeId, NodeId, NumericType, StateId};
+pub use state::{HistoricalView, HistoryForest, ViewSummary};
+pub use types::{
+    AttrName, AttrValue, AttrValueType, BranchName, EdgeId, NodeId, NumericType, StateId,
+};
+pub use utils::{convert::*, GraphConfig};
 // pub use query::{
 //     AttributeFilter, NumericComparison, StringComparison, MultiCriteria, Criterion,
 //     filter_nodes_by_attributes, filter_edges_by_attributes,
@@ -178,15 +180,17 @@ pub use state::{StateMetadata, StateObject};
 
 // Re-export core types for advanced usage
 pub use storage::{
-    AdjacencyMatrix, AdjacencyMatrixBuilder, MatrixFormat, MatrixType, NumArray, 
-    JoinType, Axis, GraphMatrix, MatrixProperties, GraphPool, BaseTable
+    AdjacencyMatrix, AdjacencyMatrixBuilder, Axis, BaseTable, GraphMatrix, GraphPool, JoinType,
+    MatrixFormat, MatrixProperties, MatrixType, NumArray,
 };
 
 // Backward compatibility alias
-pub use storage::array::NumArray as StatsArray;
 pub use state::{ChangeTracker, ColumnDelta, DeltaObject, GraphSpace};
-pub use subgraphs::{FilteredSubgraph, AggregationFunction, HierarchicalOperations, MetaNode, 
-    NeighborhoodSubgraph, SimilarityMetric, ComponentSubgraph};
+pub use storage::array::NumArray as StatsArray;
+pub use subgraphs::{
+    AggregationFunction, ComponentSubgraph, FilteredSubgraph, HierarchicalOperations, MetaNode,
+    NeighborhoodSubgraph, SimilarityMetric,
+};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

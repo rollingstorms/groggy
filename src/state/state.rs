@@ -11,9 +11,9 @@
 //! - Reconstruction: Algorithms to build snapshots from deltas
 //! - State comparison: Diffing and analysis utilities
 
+use crate::errors::{GraphError, GraphResult};
 use crate::state::delta::DeltaObject;
 use crate::state::history::Delta;
-use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId, StateId};
 use crate::utils::util::timestamp_now;
 use std::collections::HashMap;

@@ -7,10 +7,10 @@
 //! - Memory fusion optimization
 //! - Full backward compatibility
 
-pub mod matrix_core;
 pub mod conversions;
+pub mod matrix_core;
 pub mod slicing;
 
-pub use matrix_core::*;
 pub use conversions::*;
+pub use matrix_core::*;
 pub use slicing::*;

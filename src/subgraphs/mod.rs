@@ -7,18 +7,18 @@
 //! - Filtered subgraphs
 //! - Component subgraphs
 
-pub mod subgraph;
-pub mod hierarchical;
-pub mod neighborhood;
-pub mod filtered;
 pub mod component;
 pub mod composer;
+pub mod filtered;
+pub mod hierarchical;
+pub mod neighborhood;
+pub mod subgraph;
 pub mod visualization;
 
-pub use subgraph::*;
-pub use hierarchical::*;
-pub use neighborhood::*;
-pub use filtered::*;
 pub use component::*;
 pub use composer::*;
+pub use filtered::*;
+pub use hierarchical::*;
+pub use neighborhood::*;
+pub use subgraph::*;
 pub use visualization::*;

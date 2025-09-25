@@ -4,16 +4,16 @@
 //! control commands, and performance metrics to connected clients.
 
 use super::*;
+use crate::viz::streaming::data_source::Position;
 use crate::viz::streaming::server::StreamingServer;
 use crate::viz::streaming::types::StreamingResult;
-use crate::viz::streaming::data_source::Position;
-use serde::{Serialize, Deserialize};
+use futures_util::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use tokio::time::{interval, Duration, Instant};
 use tokio_tungstenite::{tungstenite::Message, WebSocketStream};
-use futures_util::{SinkExt, StreamExt};
 
 /// Real-time streaming manager for position updates
 pub struct RealTimeStreamingManager {
@@ -245,8 +245,8 @@ impl RealTimeStreamingManager {
     /// Start the streaming server
     pub async fn start(&mut self) -> StreamingResult<()> {
         // Create dummy data source for now
-        use crate::api::graph::GraphDataSource;
         use crate::api::graph::Graph;
+        use crate::api::graph::GraphDataSource;
         let graph = Graph::new();
         let data_source = Arc::new(GraphDataSource::new(&graph));
 
@@ -259,18 +259,14 @@ impl RealTimeStreamingManager {
         self.server = Some(server);
 
         // Start position broadcaster
-        let mut position_broadcaster = PositionBroadcaster::new(
-            self.config.clone(),
-            Arc::clone(&self.clients),
-        );
+        let mut position_broadcaster =
+            PositionBroadcaster::new(self.config.clone(), Arc::clone(&self.clients));
         position_broadcaster.start().await?;
         self.position_broadcaster = Some(position_broadcaster);
 
         // Start metrics broadcaster
-        let mut metrics_broadcaster = MetricsBroadcaster::new(
-            self.config.clone(),
-            Arc::clone(&self.clients),
-        );
+        let mut metrics_broadcaster =
+            MetricsBroadcaster::new(self.config.clone(), Arc::clone(&self.clients));
         metrics_broadcaster.start().await?;
         self.metrics_broadcaster = Some(metrics_broadcaster);
 
@@ -380,14 +376,17 @@ impl RealTimeStreamingManager {
         let clients = self.clients.lock().unwrap();
         let connected_clients = clients.len();
 
-        let total_bandwidth: u64 = clients.values()
+        let total_bandwidth: u64 = clients
+            .values()
             .map(|c| c.bandwidth_stats.bytes_per_second)
             .sum();
 
         let average_update_rate = if connected_clients > 0 {
-            clients.values()
+            clients
+                .values()
                 .map(|c| c.bandwidth_stats.updates_per_second as f64)
-                .sum::<f64>() / connected_clients as f64
+                .sum::<f64>()
+                / connected_clients as f64
         } else {
             0.0
         };
@@ -489,7 +488,8 @@ impl PositionBroadcaster {
         client: &ConnectedClient,
     ) -> Vec<PositionUpdate> {
         if let Some(ref filter) = client.subscriptions.node_filter {
-            updates.iter()
+            updates
+                .iter()
                 .filter(|update| self.update_matches_filter(update, filter))
                 .cloned()
                 .collect()
@@ -508,8 +508,11 @@ impl PositionBroadcaster {
 
         // Check spatial bounds filter
         if let Some(ref bounds) = filter.spatial_bounds {
-            if update.position.x < bounds.min_x || update.position.x > bounds.max_x ||
-               update.position.y < bounds.min_y || update.position.y > bounds.max_y {
+            if update.position.x < bounds.min_x
+                || update.position.x > bounds.max_x
+                || update.position.y < bounds.min_y
+                || update.position.y > bounds.max_y
+            {
                 return false;
             }
         }
@@ -549,7 +552,8 @@ impl PositionBroadcaster {
         updates: &[PositionUpdate],
         max_batch_size: usize,
     ) -> Vec<Vec<PositionUpdate>> {
-        updates.chunks(max_batch_size)
+        updates
+            .chunks(max_batch_size)
             .map(|chunk| chunk.to_vec())
             .collect()
     }

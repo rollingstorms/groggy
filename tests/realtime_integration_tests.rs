@@ -8,15 +8,14 @@ use groggy::errors::GraphResult;
 use groggy::storage::matrix::GraphMatrix;
 use groggy::viz::embeddings::{EmbeddingConfig, EmbeddingMethod, GraphEmbeddingExt};
 use groggy::viz::projection::{
-    ProjectionConfig, ProjectionMethod, HoneycombConfig, QualityConfig,
-    InterpolationConfig, GraphProjectionExt
+    GraphProjectionExt, HoneycombConfig, InterpolationConfig, ProjectionConfig, ProjectionMethod,
+    QualityConfig,
 };
 use groggy::viz::realtime::{
-    RealTimeVizConfig, RealTimeVizEngine, RealTimeStreamingManager,
-    InteractiveControlManager, IncrementalUpdateManager, AdvancedPerformanceMonitor,
-    ControlCommand, PositionUpdate, PerformanceMetrics, GraphChange, GraphChangeType,
-    ControlPanelConfig, ParameterValue, StreamingConfig, IncrementalConfig,
-    PerformanceMonitorConfig
+    AdvancedPerformanceMonitor, ControlCommand, ControlPanelConfig, GraphChange, GraphChangeType,
+    IncrementalConfig, IncrementalUpdateManager, InteractiveControlManager, ParameterValue,
+    PerformanceMetrics, PerformanceMonitorConfig, PositionUpdate, RealTimeStreamingManager,
+    RealTimeVizConfig, RealTimeVizEngine, StreamingConfig,
 };
 use groggy::viz::streaming::data_source::Position;
 use std::collections::HashMap;
@@ -33,7 +32,7 @@ fn create_test_graph() -> Graph {
 
     // Community 1: Dense cluster (nodes 0-6)
     for i in 0..7 {
-        for j in (i+1)..7 {
+        for j in (i + 1)..7 {
             if i != j {
                 graph.add_edge(nodes[i], nodes[j]).unwrap();
             }
@@ -48,7 +47,7 @@ fn create_test_graph() -> Graph {
 
     // Community 3: Chain pattern (nodes 14-19)
     for i in 14..19 {
-        graph.add_edge(nodes[i], nodes[i+1]).unwrap();
+        graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
     }
 
     // Inter-community bridges
@@ -119,11 +118,13 @@ async fn test_realtime_streaming_system() -> GraphResult<()> {
 
     // Simulate client connection
     let (client_tx, mut client_rx) = tokio::sync::mpsc::unbounded_channel();
-    streaming_manager.add_client(
-        "test_client".to_string(),
-        groggy::viz::realtime::streaming::ClientCapabilities::default(),
-        client_tx
-    ).await?;
+    streaming_manager
+        .add_client(
+            "test_client".to_string(),
+            groggy::viz::realtime::streaming::ClientCapabilities::default(),
+            client_tx,
+        )
+        .await?;
 
     // Broadcast some position updates
     let updates = vec![
@@ -143,7 +144,9 @@ async fn test_realtime_streaming_system() -> GraphResult<()> {
         },
     ];
 
-    streaming_manager.broadcast_position_updates(updates).await?;
+    streaming_manager
+        .broadcast_position_updates(updates)
+        .await?;
 
     // Verify client received updates
     if let Ok(message) = tokio::time::timeout(Duration::from_millis(100), client_rx.recv()).await {
@@ -170,13 +173,17 @@ async fn test_interactive_controls_system() -> GraphResult<()> {
     control_manager.set_parameter("animation.speed", ParameterValue::Float(1.5))?;
 
     // Verify parameters were set correctly
-    if let Some(ParameterValue::UInteger(dims)) = control_manager.get_parameter("embedding.dimensions") {
+    if let Some(ParameterValue::UInteger(dims)) =
+        control_manager.get_parameter("embedding.dimensions")
+    {
         assert_eq!(*dims, 8);
     } else {
         panic!("Embedding dimensions not set correctly");
     }
 
-    if let Some(ParameterValue::Float(cell_size)) = control_manager.get_parameter("projection.cell_size") {
+    if let Some(ParameterValue::Float(cell_size)) =
+        control_manager.get_parameter("projection.cell_size")
+    {
         assert_eq!(*cell_size, 50.0);
     } else {
         panic!("Cell size not set correctly");
@@ -184,9 +191,18 @@ async fn test_interactive_controls_system() -> GraphResult<()> {
 
     // Test batch parameter changes
     let batch_changes = vec![
-        ("embedding.method".to_string(), ParameterValue::String("energy".to_string())),
-        ("quality.neighborhood_weight".to_string(), ParameterValue::Float(0.6)),
-        ("animation.easing".to_string(), ParameterValue::String("ease-in-out".to_string())),
+        (
+            "embedding.method".to_string(),
+            ParameterValue::String("energy".to_string()),
+        ),
+        (
+            "quality.neighborhood_weight".to_string(),
+            ParameterValue::Float(0.6),
+        ),
+        (
+            "animation.easing".to_string(),
+            ParameterValue::String("ease-in-out".to_string()),
+        ),
     ];
 
     control_manager.apply_batch_changes(batch_changes)?;
@@ -201,7 +217,9 @@ async fn test_interactive_controls_system() -> GraphResult<()> {
     let undo_success = control_manager.undo()?;
     assert!(undo_success);
 
-    if let Some(ParameterValue::Float(cell_size)) = control_manager.get_parameter("projection.cell_size") {
+    if let Some(ParameterValue::Float(cell_size)) =
+        control_manager.get_parameter("projection.cell_size")
+    {
         assert_eq!(*cell_size, 50.0); // Should be restored to previous value
     }
 
@@ -209,7 +227,9 @@ async fn test_interactive_controls_system() -> GraphResult<()> {
     let redo_success = control_manager.redo()?;
     assert!(redo_success);
 
-    if let Some(ParameterValue::Float(cell_size)) = control_manager.get_parameter("projection.cell_size") {
+    if let Some(ParameterValue::Float(cell_size)) =
+        control_manager.get_parameter("projection.cell_size")
+    {
         assert_eq!(*cell_size, 25.0); // Should be changed value again
     }
 
@@ -362,7 +382,10 @@ async fn test_end_to_end_visualization_workflow() -> GraphResult<()> {
 
     // Phase 2: Test projection
     let projection_config = ProjectionConfig {
-        method: ProjectionMethod::PCA { center: true, standardize: true },
+        method: ProjectionMethod::PCA {
+            center: true,
+            standardize: true,
+        },
         honeycomb_config: HoneycombConfig::default(),
         quality_config: QualityConfig::default(),
         interpolation_config: InterpolationConfig::default(),
@@ -421,19 +444,20 @@ async fn test_dynamic_graph_updates() -> GraphResult<()> {
     let commands = vec![
         ControlCommand::AddNodes {
             node_data: vec![
-                HashMap::from([("id".to_string(), serde_json::Value::Number(serde_json::Number::from(10)))]),
-                HashMap::from([("id".to_string(), serde_json::Value::Number(serde_json::Number::from(11)))]),
+                HashMap::from([(
+                    "id".to_string(),
+                    serde_json::Value::Number(serde_json::Number::from(10)),
+                )]),
+                HashMap::from([(
+                    "id".to_string(),
+                    serde_json::Value::Number(serde_json::Number::from(11)),
+                )]),
             ],
         },
         ControlCommand::AddEdges {
-            edge_data: vec![
-                (10, 11, HashMap::new()),
-                (0, 10, HashMap::new()),
-            ],
+            edge_data: vec![(10, 11, HashMap::new()), (0, 10, HashMap::new())],
         },
-        ControlCommand::RemoveNodes {
-            node_ids: vec![4],
-        },
+        ControlCommand::RemoveNodes { node_ids: vec![4] },
     ];
 
     // Test that commands can be processed (engine would handle these in real scenario)
@@ -478,26 +502,28 @@ async fn test_multi_client_streaming() -> GraphResult<()> {
     let mut client_receivers = Vec::new();
     for i in 0..3 {
         let (client_tx, client_rx) = tokio::sync::mpsc::unbounded_channel();
-        streaming_manager.add_client(
-            format!("client_{}", i),
-            groggy::viz::realtime::streaming::ClientCapabilities::default(),
-            client_tx
-        ).await?;
+        streaming_manager
+            .add_client(
+                format!("client_{}", i),
+                groggy::viz::realtime::streaming::ClientCapabilities::default(),
+                client_tx,
+            )
+            .await?;
         client_receivers.push(client_rx);
     }
 
     // Broadcast updates
-    let updates = vec![
-        PositionUpdate {
-            node_id: 0,
-            position: Position { x: 100.0, y: 200.0 },
-            timestamp: 98765,
-            update_type: groggy::viz::realtime::engine::PositionUpdateType::Incremental,
-            quality: None,
-        },
-    ];
+    let updates = vec![PositionUpdate {
+        node_id: 0,
+        position: Position { x: 100.0, y: 200.0 },
+        timestamp: 98765,
+        update_type: groggy::viz::realtime::engine::PositionUpdateType::Incremental,
+        quality: None,
+    }];
 
-    streaming_manager.broadcast_position_updates(updates).await?;
+    streaming_manager
+        .broadcast_position_updates(updates)
+        .await?;
 
     // Verify all clients received updates
     for mut receiver in client_receivers {
@@ -520,9 +546,9 @@ async fn test_performance_under_load() -> GraphResult<()> {
 
     // Simulate varying load conditions
     let load_scenarios = vec![
-        ("light_load", Duration::from_millis(8)),   // 125 FPS
-        ("normal_load", Duration::from_millis(16)), // 62.5 FPS
-        ("heavy_load", Duration::from_millis(33)),  // 30 FPS
+        ("light_load", Duration::from_millis(8)),     // 125 FPS
+        ("normal_load", Duration::from_millis(16)),   // 62.5 FPS
+        ("heavy_load", Duration::from_millis(33)),    // 30 FPS
         ("extreme_load", Duration::from_millis(100)), // 10 FPS
     ];
 
@@ -544,11 +570,14 @@ async fn test_performance_under_load() -> GraphResult<()> {
         assert!(
             (report.current_metrics.fps - expected_fps).abs() < fps_tolerance,
             "FPS measurement incorrect for {}: expected ~{}, got {}",
-            scenario_name, expected_fps, report.current_metrics.fps
+            scenario_name,
+            expected_fps,
+            report.current_metrics.fps
         );
 
         // Verify adaptive quality responds to load
-        if frame_time.as_millis() > 50 { // Poor performance
+        if frame_time.as_millis() > 50 {
+            // Poor performance
             assert!(
                 report.quality_settings.overall_quality < 1.0,
                 "Quality should be reduced under heavy load"
@@ -661,7 +690,10 @@ async fn benchmark_realtime_system() -> GraphResult<()> {
     engine.initialize().await?;
     let init_time = start_time.elapsed();
 
-    println!("Initialization time for 1000 nodes, 5000 edges: {:?}", init_time);
+    println!(
+        "Initialization time for 1000 nodes, 5000 edges: {:?}",
+        init_time
+    );
 
     // Should complete initialization in reasonable time
     assert!(init_time < Duration::from_secs(10));

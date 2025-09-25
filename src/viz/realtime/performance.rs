@@ -4,10 +4,10 @@
 //! for maintaining optimal frame rates and user experience in real-time visualization.
 
 use super::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Advanced performance monitoring and adaptive quality control system
 pub struct AdvancedPerformanceMonitor {
@@ -1064,7 +1064,10 @@ impl AdvancedPerformanceMonitor {
     pub fn get_performance_report(&self) -> PerformanceReport {
         PerformanceReport {
             timestamp: Instant::now(),
-            current_metrics: self.metrics_collector.get_current_metrics().unwrap_or_default(),
+            current_metrics: self
+                .metrics_collector
+                .get_current_metrics()
+                .unwrap_or_default(),
             quality_settings: self.quality_controller.get_current_settings(),
             resource_usage: self.resource_monitor.get_current_usage(),
             recommendations: self.generate_recommendations(),
@@ -1101,14 +1104,18 @@ impl AdvancedPerformanceMonitor {
         let mut recommendations = Vec::new();
 
         // Generate recommendations based on current performance
-        let current_metrics = self.metrics_collector.get_current_metrics().unwrap_or_default();
+        let current_metrics = self
+            .metrics_collector
+            .get_current_metrics()
+            .unwrap_or_default();
 
         if current_metrics.fps < self.config.target_thresholds.target_fps * 0.8 {
             recommendations.push(PerformanceRecommendation {
                 category: RecommendationCategory::Quality,
                 priority: RecommendationPriority::High,
                 title: "Reduce Visual Quality".to_string(),
-                description: "Consider reducing honeycomb cell density or interpolation steps".to_string(),
+                description: "Consider reducing honeycomb cell density or interpolation steps"
+                    .to_string(),
                 action: RecommendationAction::ReduceQuality,
                 estimated_improvement: 0.2,
             });
@@ -1511,13 +1518,23 @@ impl MetricsCollector {
 
         // Update current metrics
         if let Ok(mut metrics) = self.current_metrics.lock() {
-            let avg_frame_time = self.frame_times.iter()
+            let avg_frame_time = self
+                .frame_times
+                .iter()
                 .map(|d| d.as_secs_f64())
-                .sum::<f64>() / self.frame_times.len() as f64;
+                .sum::<f64>()
+                / self.frame_times.len() as f64;
 
-            metrics.fps = if avg_frame_time > 0.0 { 1.0 / avg_frame_time } else { 0.0 };
+            metrics.fps = if avg_frame_time > 0.0 {
+                1.0 / avg_frame_time
+            } else {
+                0.0
+            };
             metrics.frame_time_ms = avg_frame_time * 1000.0;
-            metrics.timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
+            metrics.timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
         }
 
         Ok(())
@@ -1590,14 +1607,20 @@ impl AdaptiveQualityController {
 
         if metrics.fps < 45.0 {
             // Reduce quality
-            self.current_quality.overall_quality = (self.current_quality.overall_quality - 0.1).max(self.config.min_quality);
+            self.current_quality.overall_quality =
+                (self.current_quality.overall_quality - 0.1).max(self.config.min_quality);
             self.current_quality.cell_size *= 1.1; // Larger cells = lower quality
-            self.current_quality.interpolation_steps = (self.current_quality.interpolation_steps * 9 / 10).max(5);
-        } else if metrics.fps > 75.0 && self.current_quality.overall_quality < self.config.max_quality {
+            self.current_quality.interpolation_steps =
+                (self.current_quality.interpolation_steps * 9 / 10).max(5);
+        } else if metrics.fps > 75.0
+            && self.current_quality.overall_quality < self.config.max_quality
+        {
             // Increase quality if performance allows
-            self.current_quality.overall_quality = (self.current_quality.overall_quality + 0.05).min(self.config.max_quality);
+            self.current_quality.overall_quality =
+                (self.current_quality.overall_quality + 0.05).min(self.config.max_quality);
             self.current_quality.cell_size *= 0.95; // Smaller cells = higher quality
-            self.current_quality.interpolation_steps = (self.current_quality.interpolation_steps * 11 / 10).min(100);
+            self.current_quality.interpolation_steps =
+                (self.current_quality.interpolation_steps * 11 / 10).min(100);
         }
 
         // Record adjustment
@@ -1666,7 +1689,10 @@ impl Default for MetricsCollectionConfig {
                 MetricType::FrameTiming,
                 MetricType::MemoryUsage,
                 MetricType::QualityMetrics,
-            ].iter().cloned().collect(),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
         }
     }
 }
@@ -1920,7 +1946,8 @@ impl PerformanceAlertSystem {
         }
 
         // Add to active alerts
-        self.active_alerts.insert(alert.alert_type.clone(), alert.clone());
+        self.active_alerts
+            .insert(alert.alert_type.clone(), alert.clone());
 
         // Add to history
         self.alert_history.push_back(alert.clone());

@@ -4,10 +4,10 @@
 //! through subgraph collapse operations. It replaces the complex EdgeAggregationConfig
 //! system with a simpler, more discoverable interface.
 
-use crate::errors::{GraphError, GraphResult};
-use crate::types::{AttrName, AttrValue, NodeId};
-use crate::traits::{SubgraphOperations, NodeStrategy};
 use crate::entities::MetaNode;
+use crate::errors::{GraphError, GraphResult};
+use crate::traits::{NodeStrategy, SubgraphOperations};
+use crate::types::{AttrName, AttrValue, NodeId};
 use std::collections::HashMap;
 
 /// Edge strategies for meta-node creation
@@ -16,15 +16,15 @@ pub enum EdgeStrategy {
     /// Aggregate parallel edges between subgraph and external nodes (default)
     /// Combine attributes using aggregation functions, create single meta-edge per target
     Aggregate,
-    
+
     /// Keep all external edges as-is, copying them to the meta-node
     /// Preserves original edge attributes and allows multiple edges to same target
     KeepExternal,
-    
+
     /// Drop all edges - isolate the meta-node completely
     /// Useful for pure hierarchical grouping without connectivity
     DropAll,
-    
+
     /// Contract edges through the subgraph (advanced)
     /// External A -> subgraph -> External B becomes A -> B
     /// Subgraph becomes pure aggregation node
@@ -59,11 +59,11 @@ pub enum NodeAggregation {
     /// Simple: target_attr = function applied to same-named source
     /// Example: "salary" -> "mean" means avg_salary = mean(salary)
     Simple(String, String), // (target_attr, function)
-    
+
     /// Tuple: target_attr = function applied to different source_attr
-    /// Example: ("avg_salary", "mean", "salary") 
+    /// Example: ("avg_salary", "mean", "salary")
     Tuple(String, String, String), // (target_attr, function, source_attr)
-    
+
     /// Count: target_attr = count of nodes (no source needed)
     /// Example: "size" -> Count means size = count(nodes)
     Count(String), // (target_attr)
@@ -78,7 +78,7 @@ impl NodeAggregation {
             NodeAggregation::Count(target) => target,
         }
     }
-    
+
     /// Get the aggregation function
     pub fn function(&self) -> &str {
         match self {
@@ -87,7 +87,7 @@ impl NodeAggregation {
             NodeAggregation::Count(_) => "count",
         }
     }
-    
+
     /// Get the source attribute name (defaults to target for Simple)
     pub fn source_attr(&self) -> &str {
         match self {
@@ -122,33 +122,51 @@ pub fn get_preset(name: &str) -> GraphResult<ComposerPreset> {
         "social_network" => Ok(ComposerPreset {
             edge_strategy: EdgeStrategy::Aggregate,
             edge_aggs: vec![
-                EdgeAggregation { attr_name: "weight".into(), function: "mean".to_string() },
-                EdgeAggregation { attr_name: "type".into(), function: "concat".to_string() },
+                EdgeAggregation {
+                    attr_name: "weight".into(),
+                    function: "mean".to_string(),
+                },
+                EdgeAggregation {
+                    attr_name: "type".into(),
+                    function: "concat".to_string(),
+                },
             ],
             include_edge_count: true,
             entity_type: "community".to_string(),
         }),
-        
+
         "org_hierarchy" => Ok(ComposerPreset {
             edge_strategy: EdgeStrategy::Aggregate,
             edge_aggs: vec![
-                EdgeAggregation { attr_name: "reports_to".into(), function: "first".to_string() },
-                EdgeAggregation { attr_name: "weight".into(), function: "sum".to_string() },
+                EdgeAggregation {
+                    attr_name: "reports_to".into(),
+                    function: "first".to_string(),
+                },
+                EdgeAggregation {
+                    attr_name: "weight".into(),
+                    function: "sum".to_string(),
+                },
             ],
             include_edge_count: false,
             entity_type: "department".to_string(),
         }),
-        
+
         "flow_network" => Ok(ComposerPreset {
             edge_strategy: EdgeStrategy::ContractAll,
             edge_aggs: vec![
-                EdgeAggregation { attr_name: "capacity".into(), function: "min".to_string() },
-                EdgeAggregation { attr_name: "flow".into(), function: "sum".to_string() },
+                EdgeAggregation {
+                    attr_name: "capacity".into(),
+                    function: "min".to_string(),
+                },
+                EdgeAggregation {
+                    attr_name: "flow".into(),
+                    function: "sum".to_string(),
+                },
             ],
             include_edge_count: false,
             entity_type: "junction".to_string(),
         }),
-        
+
         _ => Err(GraphError::InvalidInput(format!(
             "Unknown preset: '{}'. Available presets: social_network, org_hierarchy, flow_network",
             name
@@ -157,36 +175,36 @@ pub fn get_preset(name: &str) -> GraphResult<ComposerPreset> {
 }
 
 /// A plan for creating a meta-node (not yet executed)
-/// 
+///
 /// This provides a clean separation between configuration and execution,
 /// allowing users to preview, modify, and validate plans before applying them.
 #[derive(Debug, Clone)]
 pub struct MetaNodePlan {
     /// Node aggregation specifications
     pub node_aggs: Vec<NodeAggregation>,
-    
+
     /// Edge aggregation specifications  
     pub edge_aggs: Vec<EdgeAggregation>,
-    
+
     /// Edge handling strategy
     pub edge_strategy: EdgeStrategy,
-    
+
     /// Node handling strategy  
     pub node_strategy: NodeStrategy,
-    
+
     /// Include edge count in meta-edges
     pub include_edge_count: bool,
-    
+
     /// Mark nodes/edges with entity_type
     pub mark_entity_type: bool,
-    
+
     /// Entity type to use for marking
     pub entity_type: String,
-    
+
     /// Source subgraph node IDs (for validation)
     pub source_nodes: std::collections::HashSet<NodeId>,
-    
-    /// Source subgraph edge IDs (for validation) 
+
+    /// Source subgraph edge IDs (for validation)
     pub source_edges: std::collections::HashSet<crate::types::EdgeId>,
 }
 
@@ -200,7 +218,7 @@ impl MetaNodePlan {
             node_aggs: Vec::new(),
             edge_aggs: Vec::new(),
             edge_strategy: EdgeStrategy::default(),
-            node_strategy: NodeStrategy::default(),  // Default to Extract behavior
+            node_strategy: NodeStrategy::default(), // Default to Extract behavior
             include_edge_count: true,
             mark_entity_type: true,
             entity_type: "meta".to_string(),
@@ -208,7 +226,7 @@ impl MetaNodePlan {
             source_edges,
         }
     }
-    
+
     /// Apply a preset configuration
     pub fn with_preset(mut self, preset_name: &str) -> GraphResult<Self> {
         let preset = get_preset(preset_name)?;
@@ -218,9 +236,14 @@ impl MetaNodePlan {
         self.entity_type = preset.entity_type;
         Ok(self)
     }
-    
+
     /// Add node aggregation
-    pub fn with_node_agg(mut self, target: String, function: String, source: Option<String>) -> Self {
+    pub fn with_node_agg(
+        mut self,
+        target: String,
+        function: String,
+        source: Option<String>,
+    ) -> Self {
         let agg = match (source, function.as_str()) {
             (_, "count") => NodeAggregation::Count(target),
             (Some(src), _) => NodeAggregation::Tuple(target, function, src),
@@ -229,7 +252,7 @@ impl MetaNodePlan {
         self.node_aggs.push(agg);
         self
     }
-    
+
     /// Add edge aggregation
     pub fn with_edge_agg(mut self, attr_name: String, function: String) -> Self {
         self.edge_aggs.push(EdgeAggregation {
@@ -238,23 +261,25 @@ impl MetaNodePlan {
         });
         self
     }
-    
+
     /// Set edge strategy
     pub fn with_edge_strategy(mut self, strategy: EdgeStrategy) -> Self {
         self.edge_strategy = strategy;
         self
     }
-    
+
     /// Set entity type
     pub fn with_entity_type(mut self, entity_type: String) -> Self {
         self.entity_type = entity_type;
         self
     }
-    
+
     /// Preview what the plan will create (without executing)
     pub fn preview(&self) -> ComposerPreview {
         ComposerPreview {
-            meta_node_attributes: self.node_aggs.iter()
+            meta_node_attributes: self
+                .node_aggs
+                .iter()
                 .map(|agg| (agg.target_attr().to_string(), agg.function().to_string()))
                 .collect(),
             meta_edges_count: match self.edge_strategy {
@@ -266,7 +291,7 @@ impl MetaNodePlan {
             entity_type: self.entity_type.clone(),
         }
     }
-    
+
     /// Estimate the number of meta-edges that will be created
     fn estimate_meta_edges_count(&self) -> usize {
         // This is a rough estimate - actual count depends on graph structure
@@ -285,36 +310,36 @@ impl MetaNodePlan {
 pub struct ComposerPreview {
     /// Attributes that will be created on the meta-node
     pub meta_node_attributes: HashMap<String, String>, // attr_name -> function
-    
+
     /// Estimated number of meta-edges
     pub meta_edges_count: usize,
-    
+
     /// Edge strategy being used
     pub edge_strategy: EdgeStrategy,
-    
+
     /// Whether edge count will be included
     pub will_include_edge_count: bool,
-    
+
     /// Entity type that will be assigned
     pub entity_type: String,
 }
 
 impl MetaNodePlan {
     /// Execute the plan and create the meta-node in the graph (strict - fails on missing attributes)
-    /// 
+    ///
     /// This converts the plan into actual graph modifications, creating the meta-node
     /// with aggregated attributes and meta-edges according to the configured strategy.
-    /// 
+    ///
     /// # Arguments
     /// * `subgraph` - The subgraph to collapse (implements SubgraphOperations)
-    /// 
+    ///
     /// # Returns
     /// A `MetaNode` representing the newly created meta-node
     pub fn add_to_graph<T: SubgraphOperations>(&self, subgraph: &T) -> GraphResult<MetaNode> {
-        use std::collections::HashMap;
         use crate::subgraphs::hierarchical::AggregationFunction;
-        use crate::types::{AttrValue, AttrName};
-        
+        use crate::types::{AttrName, AttrValue};
+        use std::collections::HashMap;
+
         let binding = subgraph.graph_ref();
         let mut graph = binding.borrow_mut();
 
@@ -327,8 +352,16 @@ impl MetaNodePlan {
 
         // Create meta-node atomically with all required attributes
         let meta_node_id = graph.add_node();
-        graph.set_node_attr_internal(meta_node_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
-        graph.set_node_attr_internal(meta_node_id, "contains_subgraph".to_string(), AttrValue::SubgraphRef(subgraph_id))?;
+        graph.set_node_attr_internal(
+            meta_node_id,
+            "entity_type".to_string(),
+            AttrValue::Text("meta".to_string()),
+        )?;
+        graph.set_node_attr_internal(
+            meta_node_id,
+            "contains_subgraph".to_string(),
+            AttrValue::SubgraphRef(subgraph_id),
+        )?;
 
         // Mark original nodes as absorbed, but preserve existing meta-nodes
         drop(graph); // Release borrow for bulk operation
@@ -336,12 +369,13 @@ impl MetaNodePlan {
             let binding = subgraph.graph_ref();
             let graph_ref = binding.borrow();
             let mut entity_type_attrs = Vec::new();
-            
+
             for &node_id in subgraph.node_set() {
                 // Check if node is already a meta-node
-                let current_entity_type = graph_ref.get_node_attr(node_id, &"entity_type".into())
+                let current_entity_type = graph_ref
+                    .get_node_attr(node_id, &"entity_type".into())
                     .unwrap_or(None);
-                
+
                 let new_entity_type = match current_entity_type {
                     Some(AttrValue::Text(ref s)) if s == "meta" => {
                         // Preserve meta-nodes
@@ -356,13 +390,13 @@ impl MetaNodePlan {
                         AttrValue::Text("base".to_string())
                     }
                 };
-                
+
                 entity_type_attrs.push((node_id, new_entity_type));
             }
-            
+
             drop(graph_ref);
             drop(binding);
-            
+
             let mut bulk_attrs = HashMap::new();
             bulk_attrs.insert("entity_type".into(), entity_type_attrs);
             subgraph.set_node_attrs(bulk_attrs)?;
@@ -387,16 +421,16 @@ impl MetaNodePlan {
                 let mut values = Vec::new();
                 let binding = subgraph.graph_ref();
                 let graph = binding.borrow();
-                
+
                 for &node_id in subgraph.node_set() {
                     if let Some(value) = graph.get_node_attr(node_id, &source_attr.into())? {
                         values.push(value);
                     }
                 }
-                
+
                 drop(graph);
                 drop(binding);
-                
+
                 if values.is_empty() {
                     // Provide sensible defaults based on aggregation function
                     match function_str {
@@ -413,7 +447,7 @@ impl MetaNodePlan {
 
             aggregated_attrs.push((target_attr.into(), aggregated_value));
         }
-        
+
         // Set all aggregated attributes in bulk
         if !aggregated_attrs.is_empty() {
             let mut bulk_attrs = HashMap::new();
@@ -423,23 +457,26 @@ impl MetaNodePlan {
             }
             subgraph.set_node_attrs(bulk_attrs)?;
         }
-        
+
         // Handle edges with existing edge configuration
         let edge_config = self.convert_to_edge_config()?;
         subgraph.create_meta_edges_with_config(meta_node_id, &edge_config)?;
-        
+
         // Create MetaNode wrapper
         let meta_node = MetaNode::new(meta_node_id, subgraph.graph_ref())?;
-        
+
         Ok(meta_node)
     }
-    
+
     /// Execute the plan with defaults for missing attributes (lenient)
-    pub fn add_to_graph_with_defaults<T: SubgraphOperations>(&self, subgraph: &T) -> GraphResult<MetaNode> {
-        use std::collections::HashMap;
+    pub fn add_to_graph_with_defaults<T: SubgraphOperations>(
+        &self,
+        subgraph: &T,
+    ) -> GraphResult<MetaNode> {
         use crate::subgraphs::hierarchical::AggregationFunction;
-        use crate::types::{AttrValue, AttrName};
-        
+        use crate::types::{AttrName, AttrValue};
+        use std::collections::HashMap;
+
         let binding = subgraph.graph_ref();
         let mut graph = binding.borrow_mut();
 
@@ -452,21 +489,30 @@ impl MetaNodePlan {
 
         // Create meta-node atomically with all required attributes
         let meta_node_id = graph.add_node();
-        graph.set_node_attr_internal(meta_node_id, "entity_type".to_string(), AttrValue::Text("meta".to_string()))?;
-        graph.set_node_attr_internal(meta_node_id, "contains_subgraph".to_string(), AttrValue::SubgraphRef(subgraph_id))?;
+        graph.set_node_attr_internal(
+            meta_node_id,
+            "entity_type".to_string(),
+            AttrValue::Text("meta".to_string()),
+        )?;
+        graph.set_node_attr_internal(
+            meta_node_id,
+            "contains_subgraph".to_string(),
+            AttrValue::SubgraphRef(subgraph_id),
+        )?;
 
-        // Mark original nodes as absorbed, but preserve existing meta-nodes  
+        // Mark original nodes as absorbed, but preserve existing meta-nodes
         drop(graph); // Release borrow for bulk operation
         {
             let binding = subgraph.graph_ref();
             let graph_ref = binding.borrow();
             let mut entity_type_attrs = Vec::new();
-            
+
             for &node_id in subgraph.node_set() {
                 // Check if node is already a meta-node
-                let current_entity_type = graph_ref.get_node_attr(node_id, &"entity_type".into())
+                let current_entity_type = graph_ref
+                    .get_node_attr(node_id, &"entity_type".into())
                     .unwrap_or(None);
-                
+
                 let new_entity_type = match current_entity_type {
                     Some(AttrValue::Text(ref s)) if s == "meta" => {
                         // Preserve meta-nodes
@@ -481,13 +527,13 @@ impl MetaNodePlan {
                         AttrValue::Text("base".to_string())
                     }
                 };
-                
+
                 entity_type_attrs.push((node_id, new_entity_type));
             }
-            
+
             drop(graph_ref);
             drop(binding);
-            
+
             let mut bulk_attrs = HashMap::new();
             bulk_attrs.insert("entity_type".into(), entity_type_attrs);
             subgraph.set_node_attrs(bulk_attrs)?;
@@ -512,16 +558,16 @@ impl MetaNodePlan {
                 let mut values = Vec::new();
                 let binding = subgraph.graph_ref();
                 let graph = binding.borrow();
-                
+
                 for &node_id in subgraph.node_set() {
                     if let Some(value) = graph.get_node_attr(node_id, &source_attr.into())? {
                         values.push(value);
                     }
                 }
-                
+
                 drop(graph);
                 drop(binding);
-                
+
                 if values.is_empty() {
                     // LENIENT MODE: Provide sensible defaults based on aggregation function
                     match function_str {
@@ -538,7 +584,7 @@ impl MetaNodePlan {
 
             aggregated_attrs.push((target_attr.into(), aggregated_value));
         }
-        
+
         // Set all aggregated attributes in bulk
         if !aggregated_attrs.is_empty() {
             let mut bulk_attrs = HashMap::new();
@@ -548,11 +594,11 @@ impl MetaNodePlan {
             }
             subgraph.set_node_attrs(bulk_attrs)?;
         }
-        
+
         // Handle edges with existing edge configuration
         let edge_config = self.convert_to_edge_config()?;
         subgraph.create_meta_edges_with_config(meta_node_id, &edge_config)?;
-        
+
         // Handle original nodes based on node strategy AFTER all processing is complete
         match self.node_strategy {
             NodeStrategy::Extract => {
@@ -563,38 +609,41 @@ impl MetaNodePlan {
                 // Collapse: Remove original nodes from the graph completely
                 let binding = subgraph.graph_ref();
                 let mut graph = binding.borrow_mut();
-                let nodes_to_remove: Vec<crate::types::NodeId> = subgraph.node_set().iter().copied().collect();
+                let nodes_to_remove: Vec<crate::types::NodeId> =
+                    subgraph.node_set().iter().copied().collect();
                 for node_id in nodes_to_remove {
                     graph.remove_node(node_id)?;
                 }
             }
         }
-        
+
         // Create MetaNode wrapper
         let meta_node = MetaNode::new(meta_node_id, subgraph.graph_ref())?;
-        
+
         Ok(meta_node)
     }
-    
+
     /// Convert node aggregations to HashMap format expected by existing code
     fn convert_to_agg_functions(&self) -> HashMap<AttrName, String> {
         let mut result = HashMap::new();
-        
+
         for agg in &self.node_aggs {
             let target = agg.target_attr();
             let function = agg.function();
             result.insert(target.into(), function.to_string());
         }
-        
+
         result
     }
-    
+
     /// Convert to EdgeAggregationConfig for existing implementation
-    fn convert_to_edge_config(&self) -> GraphResult<crate::traits::subgraph_operations::EdgeAggregationConfig> {
+    fn convert_to_edge_config(
+        &self,
+    ) -> GraphResult<crate::traits::subgraph_operations::EdgeAggregationConfig> {
         use crate::traits::subgraph_operations::{
-            EdgeAggregationConfig, ExternalEdgeStrategy, MetaEdgeStrategy, EdgeAggregationFunction
+            EdgeAggregationConfig, EdgeAggregationFunction, ExternalEdgeStrategy, MetaEdgeStrategy,
         };
-        
+
         // Convert edge strategy
         let external_strategy = match self.edge_strategy {
             EdgeStrategy::Aggregate => ExternalEdgeStrategy::Aggregate,
@@ -602,14 +651,14 @@ impl MetaNodePlan {
             EdgeStrategy::DropAll => ExternalEdgeStrategy::None,
             EdgeStrategy::ContractAll => ExternalEdgeStrategy::Aggregate, // TODO: Implement contract properly
         };
-        
+
         // Convert edge aggregations
         let mut edge_aggregation = HashMap::new();
         for edge_agg in &self.edge_aggs {
             let function = EdgeAggregationFunction::from_string(&edge_agg.function)?;
             edge_aggregation.insert(edge_agg.attr_name.clone(), function);
         }
-        
+
         Ok(EdgeAggregationConfig {
             edge_to_external: external_strategy,
             edge_to_meta: MetaEdgeStrategy::Auto,

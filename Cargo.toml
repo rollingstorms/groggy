@@ -38,6 +38,9 @@ tower-http = "0.4" # HTTP utilities for static file serving
 hyper = { version = "0.14", features = ["full"] } # HTTP server
 uuid = { version = "1.0", features = ["v4"] } # Session ID generation
 lazy_static = "1.4" # Global static variables for layout registry
+sha1 = "0.10" # SHA1 hashing for WebSocket handshake
+base64 = "0.21" # Base64 encoding for WebSocket handshake
+ctrlc = "3.4" # Ctrl+C signal handling
 
 [features]
 default = []

@@ -4,8 +4,8 @@
 //! efficient edge storage and algorithms. All edge operations delegate to our
 //! optimized GraphPool/GraphSpace/HistoryForest infrastructure.
 
-use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::errors::GraphResult;
+use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 use std::collections::HashMap;
 

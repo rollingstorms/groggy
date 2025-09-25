@@ -1,5 +1,5 @@
-use super::BaseArray;
 use super::simd_optimizations;
+use super::BaseArray;
 use std::ops::{Add, Mul};
 
 /// NumArray extends BaseArray with statistical and numerical operations.
@@ -12,43 +12,43 @@ pub struct NumArray<T> {
 impl<T> NumArray<T> {
     /// Create a new NumArray from a vector
     pub fn new(data: Vec<T>) -> Self {
-        Self { 
-            base: BaseArray::new(data) 
+        Self {
+            base: BaseArray::new(data),
         }
     }
-    
+
     /// Create a NumArray from an existing BaseArray
     pub fn from_base(base: BaseArray<T>) -> Self {
         Self { base }
     }
-    
+
     // Delegate all basic operations to BaseArray
-    
+
     /// Get the number of elements in the array
-    pub fn len(&self) -> usize { 
-        self.base.len() 
+    pub fn len(&self) -> usize {
+        self.base.len()
     }
-    
+
     /// Check if the array is empty
-    pub fn is_empty(&self) -> bool { 
-        self.base.is_empty() 
+    pub fn is_empty(&self) -> bool {
+        self.base.is_empty()
     }
-    
+
     /// Get a reference to an element at the given index
-    pub fn get(&self, index: usize) -> Option<&T> { 
-        self.base.get(index) 
+    pub fn get(&self, index: usize) -> Option<&T> {
+        self.base.get(index)
     }
-    
+
     /// Get an iterator over the elements
-    pub fn iter(&self) -> impl Iterator<Item = &T> { 
-        self.base.iter() 
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.base.iter()
     }
-    
+
     /// Get the first element
     pub fn first(&self) -> Option<&T> {
         self.base.first()
     }
-    
+
     /// Get the last element
     pub fn last(&self) -> Option<&T> {
         self.base.last()
@@ -56,81 +56,85 @@ impl<T> NumArray<T> {
 }
 
 // Statistical operations - only available for numerical types
-impl<T> NumArray<T> 
-where 
-    T: Copy + Add<Output = T> + Mul<f64, Output = T> + PartialOrd + Into<f64>
+impl<T> NumArray<T>
+where
+    T: Copy + Add<Output = T> + Mul<f64, Output = T> + PartialOrd + Into<f64>,
 {
     /// Calculate the mean (average) of all elements
     pub fn mean(&self) -> Option<f64> {
-        if self.is_empty() { 
-            return None; 
+        if self.is_empty() {
+            return None;
         }
         let sum: f64 = self.iter().map(|&x| x.into()).sum();
         Some(sum / self.len() as f64)
     }
-    
+
     /// Calculate the sum of all elements
     pub fn sum(&self) -> f64 {
         self.iter().map(|&x| x.into()).sum()
     }
-    
+
     /// Find the minimum value
     pub fn min(&self) -> Option<f64> {
         self.iter()
             .map(|&x| x.into())
             .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
     }
-    
+
     /// Find the maximum value
     pub fn max(&self) -> Option<f64> {
         self.iter()
             .map(|&x| x.into())
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
     }
-    
+
     /// Calculate the standard deviation (sample standard deviation)
     pub fn std_dev(&self) -> Option<f64> {
         let mean = self.mean()?;
-        if self.len() <= 1 { 
-            return Some(0.0); 
+        if self.len() <= 1 {
+            return Some(0.0);
         }
-        
-        let variance = self.iter()
+
+        let variance = self
+            .iter()
             .map(|&x| {
                 let diff = x.into() - mean;
                 diff * diff
             })
-            .sum::<f64>() / (self.len() - 1) as f64;
-        
+            .sum::<f64>()
+            / (self.len() - 1) as f64;
+
         Some(variance.sqrt())
     }
-    
+
     /// Calculate the variance (sample variance)
     pub fn variance(&self) -> Option<f64> {
         let mean = self.mean()?;
-        if self.len() <= 1 { 
-            return Some(0.0); 
+        if self.len() <= 1 {
+            return Some(0.0);
         }
-        
-        let variance = self.iter()
+
+        let variance = self
+            .iter()
             .map(|&x| {
                 let diff = x.into() - mean;
                 diff * diff
             })
-            .sum::<f64>() / (self.len() - 1) as f64;
-        
+            .sum::<f64>()
+            / (self.len() - 1) as f64;
+
         Some(variance)
     }
-    
+
     /// Calculate the median value
     pub fn median(&self) -> Option<f64> {
         if self.is_empty() {
             return None;
         }
-        
+
         let mut sorted: Vec<f64> = self.iter().map(|&x| x.into()).collect();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        
+
         let mid = sorted.len() / 2;
         if sorted.len() % 2 == 0 {
             Some((sorted[mid - 1] + sorted[mid]) / 2.0)
@@ -138,27 +142,27 @@ where
             Some(sorted[mid])
         }
     }
-    
+
     /// Calculate the percentile (0.0 to 1.0)
     pub fn percentile(&self, p: f64) -> Option<f64> {
         if self.is_empty() || p < 0.0 || p > 1.0 {
             return None;
         }
-        
+
         let mut sorted: Vec<f64> = self.iter().map(|&x| x.into()).collect();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        
+
         if p == 0.0 {
             return Some(sorted[0]);
         }
         if p == 1.0 {
             return Some(sorted[sorted.len() - 1]);
         }
-        
+
         let index = p * (sorted.len() - 1) as f64;
         let lower = index.floor() as usize;
         let upper = index.ceil() as usize;
-        
+
         if lower == upper {
             Some(sorted[lower])
         } else {
@@ -166,64 +170,62 @@ where
             Some(sorted[lower] * (1.0 - weight) + sorted[upper] * weight)
         }
     }
-    
+
     /// Calculate correlation with another NumArray
     pub fn correlate(&self, other: &Self) -> Option<f64> {
-        if self.len() != other.len() || self.is_empty() { 
-            return None; 
+        if self.len() != other.len() || self.is_empty() {
+            return None;
         }
-        
+
         let self_mean = self.mean()?;
         let other_mean = other.mean()?;
-        
-        let numerator: f64 = self.iter().zip(other.iter())
+
+        let numerator: f64 = self
+            .iter()
+            .zip(other.iter())
             .map(|(&x, &y)| (x.into() - self_mean) * (y.into() - other_mean))
             .sum();
-            
-        let self_var: f64 = self.iter()
-            .map(|&x| (x.into() - self_mean).powi(2))
-            .sum();
-            
-        let other_var: f64 = other.iter()
-            .map(|&y| (y.into() - other_mean).powi(2))
-            .sum();
-        
+
+        let self_var: f64 = self.iter().map(|&x| (x.into() - self_mean).powi(2)).sum();
+
+        let other_var: f64 = other.iter().map(|&y| (y.into() - other_mean).powi(2)).sum();
+
         let denominator = (self_var * other_var).sqrt();
-        if denominator == 0.0 { 
-            None 
-        } else { 
-            Some(numerator / denominator) 
+        if denominator == 0.0 {
+            None
+        } else {
+            Some(numerator / denominator)
         }
     }
-    
+
     /// Element-wise addition with another NumArray
-    pub fn add(&self, other: &Self) -> Option<NumArray<T>> 
-    where 
-        T: Add<Output = T>
+    pub fn add(&self, other: &Self) -> Option<NumArray<T>>
+    where
+        T: Add<Output = T>,
     {
         if self.len() != other.len() {
             return None;
         }
-        
-        let result_data: Vec<T> = self.iter().zip(other.iter())
+
+        let result_data: Vec<T> = self
+            .iter()
+            .zip(other.iter())
             .map(|(&a, &b)| a + b)
             .collect();
-            
+
         Some(NumArray::new(result_data))
     }
-    
+
     /// Multiply all elements by a scalar
-    pub fn multiply(&self, scalar: f64) -> NumArray<T> 
-    where 
-        T: Mul<f64, Output = T>
+    pub fn multiply(&self, scalar: f64) -> NumArray<T>
+    where
+        T: Mul<f64, Output = T>,
     {
-        let result_data: Vec<T> = self.iter()
-            .map(|&x| x * scalar)
-            .collect();
-            
+        let result_data: Vec<T> = self.iter().map(|&x| x * scalar).collect();
+
         NumArray::new(result_data)
     }
-    
+
     /// Calculate descriptive statistics summary
     pub fn describe(&self) -> StatsSummary {
         StatsSummary {
@@ -284,7 +286,7 @@ mod tests {
     fn test_basic_stats() {
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let num_array = NumArray::new(data);
-        
+
         assert_eq!(num_array.len(), 5);
         assert_eq!(num_array.mean(), Some(3.0));
         assert_eq!(num_array.sum(), 15.0);
@@ -292,47 +294,47 @@ mod tests {
         assert_eq!(num_array.max(), Some(5.0));
         assert_eq!(num_array.median(), Some(3.0));
     }
-    
+
     #[test]
     fn test_correlation() {
         let x = NumArray::new(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
         let y = NumArray::new(vec![2.0, 4.0, 6.0, 8.0, 10.0]);
-        
+
         let correlation = x.correlate(&y);
         assert!(correlation.is_some());
         // Perfect positive correlation should be close to 1.0
         assert!((correlation.unwrap() - 1.0).abs() < 0.001);
     }
-    
+
     #[test]
     fn test_element_wise_operations() {
         let a = NumArray::new(vec![1.0, 2.0, 3.0]);
         let b = NumArray::new(vec![4.0, 5.0, 6.0]);
-        
+
         let sum = a.add(&b);
         assert!(sum.is_some());
         assert_eq!(sum.unwrap().base.clone_vec(), vec![5.0, 7.0, 9.0]);
-        
+
         let scaled = a.multiply(2.0);
         assert_eq!(scaled.base.clone_vec(), vec![2.0, 4.0, 6.0]);
     }
-    
+
     #[test]
     fn test_empty_num_array() {
         let empty: NumArray<f64> = NumArray::new(vec![]);
-        
+
         assert!(empty.is_empty());
         assert_eq!(empty.mean(), None);
         assert_eq!(empty.min(), None);
         assert_eq!(empty.max(), None);
     }
-    
+
     #[test]
     fn test_describe() {
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let num_array = NumArray::new(data);
         let summary = num_array.describe();
-        
+
         assert_eq!(summary.count, 5);
         assert!(summary.is_valid());
         assert_eq!(summary.mean, Some(3.0));
@@ -346,47 +348,50 @@ impl NumArray<f64> {
     pub fn sum_simd(&self) -> f64 {
         simd_optimizations::simd_sum(self.base.as_slice())
     }
-    
+
     /// SIMD-optimized mean for f64 arrays
     pub fn mean_simd(&self) -> Option<f64> {
         simd_optimizations::simd_mean(self.base.as_slice())
     }
-    
+
     /// SIMD-optimized standard deviation for f64 arrays
     pub fn std_dev_simd(&self) -> Option<f64> {
         simd_optimizations::simd_std_dev(self.base.as_slice())
     }
-    
+
     /// SIMD-optimized variance for f64 arrays
     pub fn variance_simd(&self) -> Option<f64> {
         if let Some(mean) = self.mean_simd() {
-            Some(simd_optimizations::simd_variance(self.base.as_slice(), mean))
+            Some(simd_optimizations::simd_variance(
+                self.base.as_slice(),
+                mean,
+            ))
         } else {
             None
         }
     }
-    
+
     /// SIMD-optimized min for f64 arrays
     pub fn min_simd(&self) -> Option<f64> {
         simd_optimizations::simd_min(self.base.as_slice())
     }
-    
+
     /// SIMD-optimized max for f64 arrays
     pub fn max_simd(&self) -> Option<f64> {
         simd_optimizations::simd_max(self.base.as_slice())
     }
-    
+
     /// Optimized median using quickselect algorithm for f64 arrays
     pub fn median_optimized(&self) -> Option<f64> {
         if self.is_empty() {
             return None;
         }
-        
+
         // Make a mutable copy for quickselect
         let mut data: Vec<f64> = self.base.as_slice().to_vec();
         simd_optimizations::quickselect_median(&mut data)
     }
-    
+
     /// Auto-choose between regular and SIMD implementations based on array size
     pub fn sum_auto(&self) -> f64 {
         if self.len() >= 8 {
@@ -395,7 +400,7 @@ impl NumArray<f64> {
             self.sum()
         }
     }
-    
+
     /// Auto-choose mean implementation based on array size
     pub fn mean_auto(&self) -> Option<f64> {
         if self.len() >= 8 {
@@ -404,7 +409,7 @@ impl NumArray<f64> {
             self.mean()
         }
     }
-    
+
     /// Auto-choose median implementation based on array size
     pub fn median_auto(&self) -> Option<f64> {
         if self.len() >= 100 {
