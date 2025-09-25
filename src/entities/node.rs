@@ -44,14 +44,15 @@ impl Node {
                 return Err(crate::errors::GraphError::NodeNotFound {
                     node_id: id,
                     operation: "create node entity".to_string(),
-                    suggestion: "Ensure the node exists in the graph before creating a Node entity".to_string(),
+                    suggestion: "Ensure the node exists in the graph before creating a Node entity"
+                        .to_string(),
                 });
             }
         }
-        
+
         Ok(Node { id, graph })
     }
-    
+
     /// Get the NodeId for this node
     ///
     /// # Returns
@@ -65,34 +66,34 @@ impl GraphEntity for Node {
     fn entity_id(&self) -> EntityId {
         EntityId::Node(self.id)
     }
-    
+
     fn entity_type(&self) -> &'static str {
         "node"
     }
-    
+
     fn graph_ref(&self) -> Rc<RefCell<Graph>> {
         self.graph.clone()
     }
-    
+
     fn related_entities(&self) -> GraphResult<Vec<Box<dyn GraphEntity>>> {
         // For regular nodes, related entities are neighbor nodes
         let neighbors = self.neighbors()?;
         let mut entities: Vec<Box<dyn GraphEntity>> = Vec::new();
-        
+
         for neighbor_id in neighbors {
             let neighbor_node = Node::new(neighbor_id, self.graph.clone())?;
             entities.push(Box::new(neighbor_node));
         }
-        
+
         Ok(entities)
     }
-    
+
     fn summary(&self) -> String {
         let graph = self.graph.borrow();
-        
+
         // Get basic node information
         let degree = self.degree().unwrap_or(0);
-        
+
         // Get a few key attributes if available
         let mut attr_summary = String::new();
         if let Ok(attrs) = graph.get_node_attrs(self.id) {
@@ -101,17 +102,20 @@ impl GraphEntity for Node {
                 let attr_strs: Vec<String> = key_attrs
                     .iter()
                     .filter_map(|&key| {
-                        graph.get_node_attr(self.id, key).ok().flatten()
+                        graph
+                            .get_node_attr(self.id, key)
+                            .ok()
+                            .flatten()
                             .map(|value| format!("{}={}", key, value))
                     })
                     .collect();
-                
+
                 if !attr_strs.is_empty() {
                     attr_summary = format!(", {}", attr_strs.join(", "));
                 }
             }
         }
-        
+
         format!("Node(id={}, degree={}{}) ", self.id, degree, attr_summary)
     }
 }
@@ -120,7 +124,7 @@ impl NodeOperations for Node {
     fn node_id(&self) -> NodeId {
         self.id
     }
-    
+
     // NodeOperations trait provides default implementations for degree() and neighbors()
     // that delegate to our graph_ref() and node_id(), so we don't need to override them
 }

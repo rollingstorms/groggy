@@ -4,7 +4,7 @@
 //! in addition to the regular node/edge operations they inherit.
 
 use crate::errors::GraphResult;
-use crate::traits::{NodeOperations, EdgeOperations, SubgraphOperations};
+use crate::traits::{EdgeOperations, NodeOperations, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, EdgeId};
 use std::collections::HashMap;
 
@@ -21,19 +21,19 @@ pub trait MetaNodeOperations: NodeOperations {
     fn has_subgraph(&self) -> bool {
         self.subgraph_id().is_some()
     }
-    
+
     /// Get the ID of the contained subgraph
     ///
     /// # Returns
     /// Optional subgraph ID if this meta-node contains a subgraph
     fn subgraph_id(&self) -> Option<usize>;
-    
+
     /// Get the contained subgraph as a SubgraphOperations trait object
     ///
     /// # Returns
     /// Optional subgraph that can be used for further operations
     fn subgraph(&self) -> GraphResult<Option<Box<dyn SubgraphOperations>>>;
-    
+
     /// Expand meta-node back to its original subgraph
     ///
     /// This is an alias for subgraph() with a more intuitive name
@@ -43,7 +43,7 @@ pub trait MetaNodeOperations: NodeOperations {
     fn expand(&self) -> GraphResult<Option<Box<dyn SubgraphOperations>>> {
         self.subgraph()
     }
-    
+
     /// Get all meta-edges connected to this meta-node
     ///
     /// Meta-edges are edges with entity_type="meta" that were created during
@@ -54,10 +54,10 @@ pub trait MetaNodeOperations: NodeOperations {
     fn meta_edges(&self) -> GraphResult<Vec<EdgeId>> {
         let graph_ref = self.graph_ref();
         let graph = graph_ref.borrow();
-        
-        // Get all incident edges  
+
+        // Get all incident edges
         let incident_edges = graph.incident_edges(self.node_id())?;
-        
+
         // Filter to only meta-edges (those with entity_type="meta")
         let mut meta_edges = Vec::new();
         for edge_id in incident_edges {
@@ -69,10 +69,10 @@ pub trait MetaNodeOperations: NodeOperations {
                 }
             }
         }
-        
+
         Ok(meta_edges)
     }
-    
+
     /// Re-aggregate meta-node attributes with new aggregation functions
     ///
     /// This allows updating the meta-node's aggregated attributes by re-running
@@ -87,9 +87,9 @@ pub trait MetaNodeOperations: NodeOperations {
         // TODO: Implement re-aggregation logic
         // This would need to:
         // 1. Get the original subgraph
-        // 2. Re-run aggregation with new functions  
+        // 2. Re-run aggregation with new functions
         // 3. Update the meta-node's attributes
-        
+
         // For now, return a placeholder
         Err(crate::errors::GraphError::NotImplemented {
             feature: "Meta-node re-aggregation".to_string(),
@@ -113,13 +113,13 @@ pub trait MetaEdgeOperations: EdgeOperations {
     fn is_meta_edge(&self) -> bool {
         let graph_ref = self.graph_ref();
         let graph = graph_ref.borrow();
-        
+
         match graph.get_edge_attr(self.edge_id(), &"entity_type".into()) {
             Ok(Some(attr_value)) => attr_value.as_text() == Some("meta"),
             _ => false,
         }
     }
-    
+
     /// Get the count of original edges this meta-edge aggregates
     ///
     /// During subgraph collapse, multiple original edges may be aggregated
@@ -130,13 +130,13 @@ pub trait MetaEdgeOperations: EdgeOperations {
     fn edge_count(&self) -> Option<i64> {
         let graph_ref = self.graph_ref();
         let graph = graph_ref.borrow();
-        
+
         match graph.get_edge_attr(self.edge_id(), &"edge_count".into()) {
             Ok(Some(attr_value)) => attr_value.as_int(),
             _ => None,
         }
     }
-    
+
     /// Get the IDs of original edges that were aggregated into this meta-edge
     ///
     /// This is a future enhancement - currently original edge IDs are not stored
@@ -149,7 +149,7 @@ pub trait MetaEdgeOperations: EdgeOperations {
         // For now, this information is not preserved
         Ok(None)
     }
-    
+
     /// Expand meta-edge back to original edges
     ///
     /// This is a future enhancement that would recreate the original edges
@@ -165,7 +165,7 @@ pub trait MetaEdgeOperations: EdgeOperations {
         // 3. Remove the meta-edge
         Ok(None)
     }
-    
+
     /// Get meta-edge specific properties as a summary
     ///
     /// Returns a HashMap containing meta-edge specific attributes like
@@ -175,18 +175,24 @@ pub trait MetaEdgeOperations: EdgeOperations {
     /// HashMap of property names to values for this meta-edge
     fn meta_properties(&self) -> GraphResult<HashMap<String, AttrValue>> {
         let mut properties = HashMap::new();
-        
+
         // Add edge count if available
         if let Some(count) = self.edge_count() {
             properties.insert("edge_count".to_string(), AttrValue::Int(count));
         }
-        
+
         // Add entity type
-        properties.insert("entity_type".to_string(), AttrValue::Text("meta".to_string()));
-        
+        properties.insert(
+            "entity_type".to_string(),
+            AttrValue::Text("meta".to_string()),
+        );
+
         // Add is_meta_edge flag
-        properties.insert("is_meta_edge".to_string(), AttrValue::Text("true".to_string()));
-        
+        properties.insert(
+            "is_meta_edge".to_string(),
+            AttrValue::Text("true".to_string()),
+        );
+
         Ok(properties)
     }
 }

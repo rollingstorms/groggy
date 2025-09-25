@@ -2,7 +2,7 @@
 
 use super::{EmbeddingEngine, RandomDistribution};
 use crate::api::graph::Graph;
-use crate::errors::{GraphResult, GraphError};
+use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 use crate::traits::subgraph_operations::SubgraphOperations;
 // Using fastrand instead of rand crate
@@ -26,19 +26,11 @@ impl RandomEmbedding {
     }
 
     pub fn gaussian(mean: f64, stddev: f64) -> Self {
-        Self::new(
-            RandomDistribution::Gaussian { mean, stddev },
-            false,
-            None,
-        )
+        Self::new(RandomDistribution::Gaussian { mean, stddev }, false, None)
     }
 
     pub fn uniform(min: f64, max: f64) -> Self {
-        Self::new(
-            RandomDistribution::Uniform { min, max },
-            false,
-            None,
-        )
+        Self::new(RandomDistribution::Uniform { min, max }, false, None)
     }
 
     pub fn spherical() -> Self {
@@ -74,9 +66,7 @@ impl RandomEmbedding {
             }
 
             RandomDistribution::Uniform { min, max } => {
-                (0..count)
-                    .map(|_| rng.f64() * (max - min) + min)
-                    .collect()
+                (0..count).map(|_| rng.f64() * (max - min) + min).collect()
             }
 
             RandomDistribution::Spherical => {
@@ -102,7 +92,7 @@ impl EmbeddingEngine for RandomEmbedding {
 
         if dimensions == 0 {
             return Err(GraphError::InvalidInput(
-                "Cannot compute embedding with 0 dimensions".to_string()
+                "Cannot compute embedding with 0 dimensions".to_string(),
             ));
         }
 
@@ -195,7 +185,10 @@ pub struct RandomEmbeddingBuilder {
 impl RandomEmbeddingBuilder {
     pub fn new() -> Self {
         Self {
-            distribution: RandomDistribution::Gaussian { mean: 0.0, stddev: 1.0 },
+            distribution: RandomDistribution::Gaussian {
+                mean: 0.0,
+                stddev: 1.0,
+            },
             normalize: false,
             seed: None,
         }
@@ -260,8 +253,8 @@ mod tests {
     fn path_graph(n: usize) -> Graph {
         let mut graph = Graph::new();
         let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
-        for i in 0..n-1 {
-            graph.add_edge(nodes[i], nodes[i+1]).unwrap();
+        for i in 0..n - 1 {
+            graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
         }
         graph
     }
@@ -270,7 +263,7 @@ mod tests {
         let mut graph = path_graph(n);
         let nodes: Vec<_> = graph.space().node_ids();
         if n > 2 {
-            graph.add_edge(nodes[n-1], nodes[0]).unwrap();
+            graph.add_edge(nodes[n - 1], nodes[0]).unwrap();
         }
         graph
     }
@@ -289,7 +282,7 @@ mod tests {
         let mut graph = Graph::new();
         let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
         for i in 0..n {
-            for j in i+1..n {
+            for j in i + 1..n {
                 graph.add_edge(nodes[i], nodes[j]).unwrap();
             }
         }
@@ -332,7 +325,11 @@ mod tests {
         for i in 0..4 {
             for j in 0..2 {
                 let val = matrix.get(i, j).unwrap();
-                assert!(val >= -1.0 && val <= 1.0, "Value {} not in range [-1, 1]", val);
+                assert!(
+                    val >= -1.0 && val <= 1.0,
+                    "Value {} not in range [-1, 1]",
+                    val
+                );
             }
         }
     }
@@ -356,7 +353,12 @@ mod tests {
                 norm_sq += val * val;
             }
             let norm = norm_sq.sqrt();
-            assert!((norm - 1.0).abs() < 1e-10, "Row {} norm is {}, expected 1.0", i, norm);
+            assert!(
+                (norm - 1.0).abs() < 1e-10,
+                "Row {} norm is {}, expected 1.0",
+                i,
+                norm
+            );
         }
     }
 
@@ -380,7 +382,12 @@ mod tests {
                 norm_sq += val * val;
             }
             let norm = norm_sq.sqrt();
-            assert!((norm - 1.0).abs() < 1e-10, "Row {} norm is {}, expected 1.0", i, norm);
+            assert!(
+                (norm - 1.0).abs() < 1e-10,
+                "Row {} norm is {}, expected 1.0",
+                i,
+                norm
+            );
         }
     }
 
@@ -389,7 +396,8 @@ mod tests {
         let graph = path_graph(3);
 
         // Test Gaussian builder
-        let gaussian = graph.random()
+        let gaussian = graph
+            .random()
             .gaussian(1.0, 0.5)
             .normalized(true)
             .seed(42)
@@ -399,7 +407,8 @@ mod tests {
         assert_eq!(gaussian.unwrap().shape(), (3, 4));
 
         // Test uniform builder
-        let uniform = graph.random()
+        let uniform = graph
+            .random()
             .uniform(-2.0, 2.0)
             .seed(42)
             .compute(&graph, 2);
@@ -408,10 +417,7 @@ mod tests {
         assert_eq!(uniform.unwrap().shape(), (3, 2));
 
         // Test spherical builder
-        let spherical = graph.random()
-            .spherical()
-            .seed(42)
-            .compute(&graph, 6);
+        let spherical = graph.random().spherical().seed(42).compute(&graph, 6);
 
         assert!(spherical.is_ok());
         assert_eq!(spherical.unwrap().shape(), (3, 6));
@@ -436,7 +442,10 @@ mod tests {
         let matrix2 = embedding2.unwrap();
 
         let diff = matrix1.subtract(&matrix2).unwrap().frobenius_norm();
-        assert!(diff > 0.1, "Different seeds should produce different results");
+        assert!(
+            diff > 0.1,
+            "Different seeds should produce different results"
+        );
     }
 
     #[test]
@@ -444,14 +453,12 @@ mod tests {
         let graph = path_graph(1);
 
         // Test single node
-        let embedding = RandomEmbedding::gaussian(0.0, 1.0)
-            .compute_embedding(&graph, 5);
+        let embedding = RandomEmbedding::gaussian(0.0, 1.0).compute_embedding(&graph, 5);
         assert!(embedding.is_ok());
         assert_eq!(embedding.unwrap().shape(), (1, 5));
 
         // Test zero dimensions should fail
-        let embedding_zero = RandomEmbedding::gaussian(0.0, 1.0)
-            .compute_embedding(&graph, 0);
+        let embedding_zero = RandomEmbedding::gaussian(0.0, 1.0).compute_embedding(&graph, 0);
         assert!(embedding_zero.is_err());
     }
 }

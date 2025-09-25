@@ -1,11 +1,11 @@
 //! Debug utilities for embedding monitoring and validation
 
+use super::EmbeddingEngine;
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
 use crate::storage::matrix::GraphMatrix;
 use crate::traits::subgraph_operations::SubgraphOperations;
-use super::EmbeddingEngine;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -87,7 +87,13 @@ impl EmbeddingDebugData {
     }
 
     /// Add an embedding snapshot
-    pub fn add_snapshot(&mut self, embedding: &GraphMatrix, iteration: usize, energy: Option<f64>, gradient_norm: Option<f64>) -> GraphResult<()> {
+    pub fn add_snapshot(
+        &mut self,
+        embedding: &GraphMatrix,
+        iteration: usize,
+        energy: Option<f64>,
+        gradient_norm: Option<f64>,
+    ) -> GraphResult<()> {
         let timestamp = current_timestamp();
 
         // Convert matrix to nested array for serialization
@@ -150,7 +156,8 @@ impl EmbeddingDebugData {
 
     /// Create HTML visualization of the debug data
     pub fn create_visualization_html(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let html = format!(r#"
+        let html = format!(
+            r#"
 <!DOCTYPE html>
 <html>
 <head>
@@ -426,7 +433,11 @@ impl<T: super::EmbeddingEngine> DebuggableEmbedding<T> {
         }
     }
 
-    pub fn with_debug(mut self, graph: &Graph, config_info: HashMap<String, String>) -> GraphResult<Self> {
+    pub fn with_debug(
+        mut self,
+        graph: &Graph,
+        config_info: HashMap<String, String>,
+    ) -> GraphResult<Self> {
         self.debug_data = Some(EmbeddingDebugData::new(graph, config_info)?);
         Ok(self)
     }
@@ -476,8 +487,8 @@ mod tests {
     fn path_graph(n: usize) -> Graph {
         let mut graph = Graph::new();
         let nodes: Vec<_> = (0..n).map(|_| graph.add_node()).collect();
-        for i in 0..n-1 {
-            graph.add_edge(nodes[i], nodes[i+1]).unwrap();
+        for i in 0..n - 1 {
+            graph.add_edge(nodes[i], nodes[i + 1]).unwrap();
         }
         graph
     }
@@ -486,7 +497,7 @@ mod tests {
         let mut graph = path_graph(n);
         let nodes: Vec<_> = graph.space().node_ids();
         if n > 2 {
-            graph.add_edge(nodes[n-1], nodes[0]).unwrap();
+            graph.add_edge(nodes[n - 1], nodes[0]).unwrap();
         }
         graph
     }
@@ -505,7 +516,17 @@ mod tests {
         let mut graph = Graph::new();
         let nodes: Vec<_> = (0..34).map(|_| graph.add_node()).collect();
         // Add some representative edges for karate club
-        let edges = [(0,1), (0,2), (0,3), (1,2), (1,3), (2,3), (1,7), (2,7), (3,7)];
+        let edges = [
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (1, 2),
+            (1, 3),
+            (2, 3),
+            (1, 7),
+            (2, 7),
+            (3, 7),
+        ];
         for (i, j) in edges.iter() {
             graph.add_edge(nodes[*i], nodes[*j]).unwrap();
         }
@@ -515,7 +536,10 @@ mod tests {
     #[test]
     fn test_debug_data_creation() {
         let graph = karate_club();
-        let config = [("method".to_string(), "test".to_string())].iter().cloned().collect();
+        let config = [("method".to_string(), "test".to_string())]
+            .iter()
+            .cloned()
+            .collect();
 
         let debug_data = EmbeddingDebugData::new(&graph, config);
         assert!(debug_data.is_ok());
@@ -573,11 +597,13 @@ mod tests {
     #[test]
     fn test_debuggable_embedding() {
         let graph = path_graph(4);
-        let config = [("method".to_string(), "random".to_string())].iter().cloned().collect();
+        let config = [("method".to_string(), "random".to_string())]
+            .iter()
+            .cloned()
+            .collect();
 
         let engine = RandomEmbedding::gaussian(0.0, 1.0).with_seed(42);
-        let debuggable = DebuggableEmbedding::new(engine)
-            .with_debug(&graph, config);
+        let debuggable = DebuggableEmbedding::new(engine).with_debug(&graph, config);
 
         assert!(debuggable.is_ok());
 

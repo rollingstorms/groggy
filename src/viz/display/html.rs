@@ -2,7 +2,7 @@
 //!
 //! Creates professional HTML tables with responsive CSS and theming support.
 
-use crate::viz::display::{DataWindow, Theme, DisplayConfig, DataType};
+use crate::viz::display::{DataType, DataWindow, DisplayConfig, Theme};
 
 /// HTML renderer for semantic table generation
 #[derive(Clone, Debug)]
@@ -33,9 +33,7 @@ impl HtmlRenderer {
             r#"<div class="groggy-display-container" data-theme="{}">"#,
             theme.name
         ));
-        html.push_str(&format!(
-            r#"<div class="groggy-table-container">"#
-        ));
+        html.push_str(&format!(r#"<div class="groggy-table-container">"#));
         // Main table element
         html.push_str(&format!(
             r#"<table class="groggy-table {}">"#,
@@ -57,7 +55,7 @@ impl HtmlRenderer {
         html.push_str("</tbody>");
 
         html.push_str("</table>");
-       
+
         // Table info section (if data is truncated)
         if let Some(info) = data.truncation_info() {
             html.push_str(&self.render_table_info(&info, data, config));
@@ -84,7 +82,8 @@ impl HtmlRenderer {
         let mut row = String::from("<tr>");
 
         for (i, header) in headers.iter().enumerate() {
-            let data_type = schema.get_column(i)
+            let data_type = schema
+                .get_column(i)
                 .map(|col| &col.data_type)
                 .unwrap_or(&DataType::Unknown);
 
@@ -110,13 +109,14 @@ impl HtmlRenderer {
         let mut html_row = String::from("<tr>");
 
         for (i, cell) in row.iter().enumerate() {
-            let data_type = schema.get_column(i)
+            let data_type = schema
+                .get_column(i)
                 .map(|col| &col.data_type)
                 .unwrap_or(&DataType::Unknown);
 
             let cell_class = format!("cell-{}", data_type.to_string().to_lowercase());
             let is_truncated = self.is_cell_truncated(cell, data_type, config);
-            
+
             let full_class = if is_truncated {
                 format!("{} cell-truncated", cell_class)
             } else {
@@ -129,9 +129,9 @@ impl HtmlRenderer {
                 r#"<td class="{}" data-type="{}" title="{}">{}</td>"#,
                 full_class,
                 data_type,
-                if is_truncated { 
-                    format!("Full value: {}", self.escape_html(cell)) 
-                } else { 
+                if is_truncated {
+                    format!("Full value: {}", self.escape_html(cell))
+                } else {
                     format!("{} value", data_type)
                 },
                 self.escape_html(&formatted_value)
@@ -198,12 +198,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <style>{}</style>
             </div>"#,
-            theme.name,
-            theme.css
+            theme.name, theme.css
         )
     }
 
-    fn format_cell_value(&self, value: &str, data_type: &DataType, config: &DisplayConfig) -> String {
+    fn format_cell_value(
+        &self,
+        value: &str,
+        data_type: &DataType,
+        config: &DisplayConfig,
+    ) -> String {
         match data_type {
             DataType::Float => self.format_float_value(value, config),
             DataType::Integer => self.format_integer_value(value),
@@ -279,7 +283,12 @@ document.addEventListener('DOMContentLoaded', function() {
         result.chars().rev().collect()
     }
 
-    fn is_cell_truncated(&self, value: &str, _data_type: &DataType, config: &DisplayConfig) -> bool {
+    fn is_cell_truncated(
+        &self,
+        value: &str,
+        _data_type: &DataType,
+        config: &DisplayConfig,
+    ) -> bool {
         value.len() > config.max_cell_width
     }
 
@@ -306,7 +315,9 @@ impl Default for HtmlRenderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::viz::display::{DataWindow, DataSchema, ColumnSchema, DataType, Theme, DisplayConfig};
+    use crate::viz::display::{
+        ColumnSchema, DataSchema, DataType, DataWindow, DisplayConfig, Theme,
+    };
 
     fn create_test_data() -> DataWindow {
         let headers = vec![
@@ -316,14 +327,36 @@ mod tests {
             "active".to_string(),
         ];
         let rows = vec![
-            vec!["Alice".to_string(), "25".to_string(), "91.50".to_string(), "true".to_string()],
-            vec!["Bob & Co.".to_string(), "30000".to_string(), "87.00".to_string(), "false".to_string()],
+            vec![
+                "Alice".to_string(),
+                "25".to_string(),
+                "91.50".to_string(),
+                "true".to_string(),
+            ],
+            vec![
+                "Bob & Co.".to_string(),
+                "30000".to_string(),
+                "87.00".to_string(),
+                "false".to_string(),
+            ],
         ];
         let schema = DataSchema::new(vec![
-            ColumnSchema { name: "name".to_string(), data_type: DataType::String },
-            ColumnSchema { name: "age".to_string(), data_type: DataType::Integer },
-            ColumnSchema { name: "score".to_string(), data_type: DataType::Float },
-            ColumnSchema { name: "active".to_string(), data_type: DataType::Boolean },
+            ColumnSchema {
+                name: "name".to_string(),
+                data_type: DataType::String,
+            },
+            ColumnSchema {
+                name: "age".to_string(),
+                data_type: DataType::Integer,
+            },
+            ColumnSchema {
+                name: "score".to_string(),
+                data_type: DataType::Float,
+            },
+            ColumnSchema {
+                name: "active".to_string(),
+                data_type: DataType::Boolean,
+            },
         ]);
 
         DataWindow::new(headers, rows, schema)
@@ -396,7 +429,10 @@ mod tests {
     #[test]
     fn test_number_formatting() {
         let renderer = HtmlRenderer::new();
-        let config = DisplayConfig { precision: 2, ..DisplayConfig::default() };
+        let config = DisplayConfig {
+            precision: 2,
+            ..DisplayConfig::default()
+        };
 
         // Float formatting
         assert_eq!(renderer.format_float_value("91.123456", &config), "91.12");
@@ -435,10 +471,10 @@ mod tests {
         let mut data = create_test_data();
         data.total_rows = 1000;
         data.start_offset = 0;
-        
+
         let config = DisplayConfig::default();
         let info = data.truncation_info().unwrap();
-        
+
         let html = renderer.render_table_info(&info, &data, &config);
 
         assert!(html.contains("table-info"));

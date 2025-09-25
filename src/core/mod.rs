@@ -8,19 +8,19 @@
 
 // Re-export key display functionality from viz module for backward compatibility
 pub use crate::viz::display::{
-    DisplayEngine, DisplayConfig, OutputFormat, TruncationStrategy,
-    ColumnSchema, DataType,
-    Theme, ThemeSystem, BuiltInTheme
+    BuiltInTheme, ColumnSchema, DataType, DisplayConfig, DisplayEngine, OutputFormat, Theme,
+    ThemeSystem, TruncationStrategy,
 };
 
 // Re-export key streaming functionality from viz module for backward compatibility
-pub use crate::viz::streaming::{
-    DataSource, VirtualScrollManager, VirtualScrollConfig,
-    UpdateResult, CacheStats
-};
 pub use crate::viz::streaming::server::StreamingServer;
 pub use crate::viz::streaming::types::StreamingConfig;
+pub use crate::viz::streaming::{
+    CacheStats, DataSource, UpdateResult, VirtualScrollConfig, VirtualScrollManager,
+};
 
 // Qualified re-exports to avoid conflicts
-pub use crate::viz::display::{DataWindow as DisplayDataWindow, DataSchema as DisplayDataSchema};
-pub use crate::viz::streaming::{DataWindow as StreamingDataWindow, DataSchema as StreamingDataSchema};
+pub use crate::viz::display::{DataSchema as DisplayDataSchema, DataWindow as DisplayDataWindow};
+pub use crate::viz::streaming::{
+    DataSchema as StreamingDataSchema, DataWindow as StreamingDataWindow,
+};

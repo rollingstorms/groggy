@@ -4,8 +4,8 @@
 //! our existing efficient SubgraphOperations infrastructure. All component operations
 //! use the same storage pattern with component-specific metadata.
 
-use crate::traits::SubgraphOperations;
 use crate::errors::GraphResult;
+use crate::traits::SubgraphOperations;
 use crate::types::NodeId;
 
 /// Specialized operations for connected component entities

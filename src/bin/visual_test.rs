@@ -61,9 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     // Open browser
                     println!("\n🌐 Opening browser for VISUAL INSPECTION...");
-                    let open_result = std::process::Command::new("open")
-                        .arg(&url)
-                        .spawn();
+                    let open_result = std::process::Command::new("open").arg(&url).spawn();
 
                     match open_result {
                         Ok(_) => {
@@ -110,7 +108,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     println!("\n⏰ 3 minutes completed!");
                     println!("✅ Visual test finished!");
-
                 } else {
                     println!("❌ Could not parse port from iframe HTML");
                 }

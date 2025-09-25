@@ -5,8 +5,8 @@
 //! component-specific metadata and operations.
 
 use crate::api::graph::Graph;
-use crate::traits::{ComponentOperations, GraphEntity, SubgraphOperations};
 use crate::errors::GraphResult;
+use crate::traits::{ComponentOperations, GraphEntity, SubgraphOperations};
 use crate::types::{EdgeId, EntityId, NodeId};
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -416,16 +416,17 @@ impl SubgraphOperations for ComponentSubgraph {
 
         Ok(Box::new(edge_component))
     }
-    
+
     /// Create a VizModule for this component subgraph
     fn viz(&self) -> crate::viz::VizModule {
         use crate::subgraphs::visualization::SubgraphDataSource;
         use std::sync::Arc;
-        
+
         // Create wrapper that extracts current component data
         let data_source = SubgraphDataSource::from_subgraph_operations(self);
-        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> = Arc::new(data_source);
-        
+        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> =
+            Arc::new(data_source);
+
         crate::viz::VizModule::new(data_source)
     }
 }

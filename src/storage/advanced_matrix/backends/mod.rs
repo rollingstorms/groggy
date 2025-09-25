@@ -1,16 +1,16 @@
 //! Backend implementations for the advanced matrix system
-//! 
+//!
 //! This module contains various compute backend implementations that provide
 //! optimal performance for different types of operations and hardware.
 
-pub mod numpy;
 pub mod blas;
+pub mod numpy;
 
-pub use numpy::NumPyBackend;
 pub use blas::{BlasBackend, BlasType};
+pub use numpy::NumPyBackend;
 
 /// Re-export for convenience
 pub use crate::storage::advanced_matrix::backend::{
-    ComputeBackend, ComputeBackendExt, BackendHint, BackendSelector, 
-    OperationType, BackendPerformance, BackendError, BackendResult
+    BackendError, BackendHint, BackendPerformance, BackendResult, BackendSelector, ComputeBackend,
+    ComputeBackendExt, OperationType,
 };

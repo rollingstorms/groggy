@@ -4,12 +4,14 @@
 //! including sliders, dropdowns, and real-time feedback mechanisms.
 
 use super::*;
+use crate::storage::matrix::GraphMatrix;
 use crate::viz::embeddings::{EmbeddingMethod, EnergyFunction};
-use crate::viz::projection::{ProjectionMethod, HoneycombLayoutStrategy, InterpolationMethod, EasingFunction};
-use serde::{Serialize, Deserialize};
+use crate::viz::projection::{
+    EasingFunction, HoneycombLayoutStrategy, InterpolationMethod, ProjectionMethod,
+};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use crate::storage::matrix::GraphMatrix;
 
 /// Interactive control panel configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -595,7 +597,12 @@ pub enum ParameterValue {
 
 /// Parameter change listener trait
 pub trait ParameterChangeListener: Send + Sync {
-    fn on_parameter_changed(&self, name: &str, old_value: &ParameterValue, new_value: &ParameterValue);
+    fn on_parameter_changed(
+        &self,
+        name: &str,
+        old_value: &ParameterValue,
+        new_value: &ParameterValue,
+    );
     fn on_batch_changed(&self, changes: &[(String, ParameterValue, ParameterValue)]);
 }
 
@@ -649,7 +656,13 @@ impl InteractiveControlManager {
         if self.config.projection_controls.enable_honeycomb_controls {
             self.set_parameter(
                 "projection.cell_size",
-                ParameterValue::Float(self.config.projection_controls.honeycomb_params.cell_size.value)
+                ParameterValue::Float(
+                    self.config
+                        .projection_controls
+                        .honeycomb_params
+                        .cell_size
+                        .value,
+                ),
             )?;
         }
 
@@ -657,7 +670,7 @@ impl InteractiveControlManager {
         if self.config.animation_controls.enable_animation_controls {
             self.set_parameter(
                 "animation.speed",
-                ParameterValue::Float(self.config.animation_controls.animation_speed.value)
+                ParameterValue::Float(self.config.animation_controls.animation_speed.value),
             )?;
         }
 
@@ -683,7 +696,8 @@ impl InteractiveControlManager {
 
         // Handle debounced updates
         if self.should_debounce_parameter(name) {
-            self.debounce_timers.insert(name.to_string(), Instant::now());
+            self.debounce_timers
+                .insert(name.to_string(), Instant::now());
         }
 
         Ok(())
@@ -700,7 +714,10 @@ impl InteractiveControlManager {
     }
 
     /// Apply a batch of parameter changes
-    pub fn apply_batch_changes(&mut self, changes: Vec<(String, ParameterValue)>) -> GraphResult<()> {
+    pub fn apply_batch_changes(
+        &mut self,
+        changes: Vec<(String, ParameterValue)>,
+    ) -> GraphResult<()> {
         let mut change_records = Vec::new();
 
         for (name, value) in changes {
@@ -849,7 +866,9 @@ impl Default for EnergyParameterControls {
                 options: None,
                 control_type: ControlType::Slider,
                 label: "Attraction Strength".to_string(),
-                help_text: Some("Controls how strongly connected nodes attract each other".to_string()),
+                help_text: Some(
+                    "Controls how strongly connected nodes attract each other".to_string(),
+                ),
                 enabled: true,
                 realtime_update: false,
             },
@@ -1845,7 +1864,12 @@ impl HoneycombInteractionController {
     }
 
     /// Handle canvas drag start
-    pub fn start_canvas_drag(&mut self, screen_pos: (f64, f64), button: MouseButton, modifiers: ModifierKeys) {
+    pub fn start_canvas_drag(
+        &mut self,
+        screen_pos: (f64, f64),
+        button: MouseButton,
+        modifiers: ModifierKeys,
+    ) {
         self.canvas_drag_state.is_dragging = true;
         self.canvas_drag_state.drag_start = screen_pos;
         self.canvas_drag_state.current_position = screen_pos;
@@ -1877,8 +1901,10 @@ impl HoneycombInteractionController {
     pub fn end_canvas_drag(&mut self) {
         if self.canvas_drag_state.is_dragging {
             // Calculate final momentum
-            let total_delta_x = self.canvas_drag_state.current_position.0 - self.canvas_drag_state.drag_start.0;
-            let total_delta_y = self.canvas_drag_state.current_position.1 - self.canvas_drag_state.drag_start.1;
+            let total_delta_x =
+                self.canvas_drag_state.current_position.0 - self.canvas_drag_state.drag_start.0;
+            let total_delta_y =
+                self.canvas_drag_state.current_position.1 - self.canvas_drag_state.drag_start.1;
 
             self.update_momentum(total_delta_x, total_delta_y);
         }
@@ -1888,12 +1914,18 @@ impl HoneycombInteractionController {
     }
 
     /// Handle node drag start
-    pub fn start_node_drag(&mut self, node_id: usize, node_position: Vec<f64>, screen_pos: (f64, f64)) -> GraphResult<()> {
+    pub fn start_node_drag(
+        &mut self,
+        node_id: usize,
+        node_position: Vec<f64>,
+        screen_pos: (f64, f64),
+    ) -> GraphResult<()> {
         if node_position.len() != self.embedding_dimensions {
-            return Err(GraphError::InvalidInput(
-                format!("Node position dimensions ({}) don't match embedding dimensions ({})",
-                       node_position.len(), self.embedding_dimensions)
-            ));
+            return Err(GraphError::InvalidInput(format!(
+                "Node position dimensions ({}) don't match embedding dimensions ({})",
+                node_position.len(),
+                self.embedding_dimensions
+            )));
         }
 
         self.node_drag_state.dragged_node = Some(node_id);
@@ -1946,7 +1978,9 @@ impl HoneycombInteractionController {
         // Update angular velocities for active rotation axes
         for &(dim1, dim2) in &self.canvas_drag_state.active_rotation_axes {
             let angular_velocity = (delta_x + delta_y) * self.rotation_sensitivity / dt_secs;
-            self.rotation_momentum.angular_velocities.insert((dim1, dim2), angular_velocity);
+            self.rotation_momentum
+                .angular_velocities
+                .insert((dim1, dim2), angular_velocity);
         }
 
         self.rotation_momentum.last_update = now;
@@ -1974,7 +2008,10 @@ impl HoneycombInteractionController {
         // Apply collected rotations
         for (dim1, dim2, angle) in rotations_to_apply {
             if let Ok(rotation) = self.create_rotation_matrix(dim1, dim2, angle) {
-                self.rotation_matrix = self.rotation_matrix.multiply(&rotation).unwrap_or(self.rotation_matrix.clone());
+                self.rotation_matrix = self
+                    .rotation_matrix
+                    .multiply(&rotation)
+                    .unwrap_or(self.rotation_matrix.clone());
             }
         }
 
@@ -1986,7 +2023,12 @@ impl HoneycombInteractionController {
     }
 
     /// Create rotation matrix for specific dimension pair
-    fn create_rotation_matrix(&self, dim1: usize, dim2: usize, angle: f64) -> GraphResult<GraphMatrix<f64>> {
+    fn create_rotation_matrix(
+        &self,
+        dim1: usize,
+        dim2: usize,
+        angle: f64,
+    ) -> GraphResult<GraphMatrix<f64>> {
         let mut rotation = GraphMatrix::<f64>::identity(self.embedding_dimensions)?;
 
         let cos_angle = angle.cos();
@@ -2002,7 +2044,11 @@ impl HoneycombInteractionController {
     }
 
     /// Determine rotation axes based on mouse button and modifiers
-    fn get_rotation_axes(&self, button: &MouseButton, modifiers: &ModifierKeys) -> Vec<(usize, usize)> {
+    fn get_rotation_axes(
+        &self,
+        button: &MouseButton,
+        modifiers: &ModifierKeys,
+    ) -> Vec<(usize, usize)> {
         match button {
             MouseButton::Left => {
                 if modifiers.shift {
@@ -2019,7 +2065,7 @@ impl HoneycombInteractionController {
                     // Default rotation in first two dimensions
                     vec![(0, 1)]
                 }
-            },
+            }
             MouseButton::Right => {
                 // Rotate in higher dimensions
                 if self.embedding_dimensions > 2 {
@@ -2027,20 +2073,21 @@ impl HoneycombInteractionController {
                 } else {
                     vec![(0, 1)]
                 }
-            },
+            }
             MouseButton::Middle => {
                 // Multi-dimensional rotation
                 let mut axes = Vec::new();
                 for i in 0..self.embedding_dimensions {
-                    for j in (i+1)..self.embedding_dimensions {
-                        if axes.len() < 2 { // Limit to 2 simultaneous rotations
+                    for j in (i + 1)..self.embedding_dimensions {
+                        if axes.len() < 2 {
+                            // Limit to 2 simultaneous rotations
                             axes.push((i, j));
                         }
                     }
                 }
                 axes
-            },
-            _ => vec![(0, 1)]
+            }
+            _ => vec![(0, 1)],
         }
     }
 
@@ -2054,16 +2101,24 @@ impl HoneycombInteractionController {
 
             // Apply rotation for X movement
             if let Ok(rotation_x) = self.create_rotation_matrix(dim1, dim2, angle_x) {
-                self.rotation_matrix = self.rotation_matrix.multiply(&rotation_x)
+                self.rotation_matrix = self
+                    .rotation_matrix
+                    .multiply(&rotation_x)
                     .unwrap_or(self.rotation_matrix.clone());
                 updated = true;
             }
 
             // Apply rotation for Y movement (different axis if available)
-            let alt_dim2 = if dim2 + 1 < self.embedding_dimensions { dim2 + 1 } else { (dim2 + 1) % self.embedding_dimensions };
+            let alt_dim2 = if dim2 + 1 < self.embedding_dimensions {
+                dim2 + 1
+            } else {
+                (dim2 + 1) % self.embedding_dimensions
+            };
             if alt_dim2 != dim1 && alt_dim2 != dim2 {
                 if let Ok(rotation_y) = self.create_rotation_matrix(dim1, alt_dim2, angle_y) {
-                    self.rotation_matrix = self.rotation_matrix.multiply(&rotation_y)
+                    self.rotation_matrix = self
+                        .rotation_matrix
+                        .multiply(&rotation_y)
                         .unwrap_or(self.rotation_matrix.clone());
                     updated = true;
                 }
@@ -2098,7 +2153,8 @@ impl HoneycombInteractionController {
                     // Distribute change across higher dimensions
                     let higher_dim_factor = 0.005;
                     for i in 2..new_position.len() {
-                        new_position[i] += (screen_delta_x + screen_delta_y) * higher_dim_factor / (i as f64 - 1.0);
+                        new_position[i] += (screen_delta_x + screen_delta_y) * higher_dim_factor
+                            / (i as f64 - 1.0);
                     }
                 }
             }

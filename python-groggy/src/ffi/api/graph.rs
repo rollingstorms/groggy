@@ -2282,27 +2282,30 @@ impl PyGraph {
     }
 
     /// Access visualization module for this graph
+    /// Access visualization methods via VizAccessor
     /// 
-    /// Returns a VizModule that provides interactive and static visualization capabilities.
+    /// Returns a VizAccessor that provides visualization capabilities.
     /// 
     /// # Returns
-    /// PyVizModule: Visualization module with interactive() and static_viz() methods
+    /// VizAccessor: Visualization accessor with show() and other methods
     /// 
     /// # Examples
     /// ```python
-    /// # Interactive visualization
+    /// # Basic visualization
     /// viz = graph.viz()
-    /// session = viz.interactive(port=8080, layout="force-directed")
-    /// print(f"Visualization at: {session.url()}")
+    /// viz.show()  # Opens real-time visualization
     /// 
-    /// # Static export
-    /// viz.static_viz("graph.svg", format="svg", layout="circular", theme="publication")
+    /// # Honeycomb n-dimensional controls
+    /// viz.show_honeycomb()  # Advanced 5D rotation controls
     /// ```
-    pub fn viz(&self) -> PyResult<crate::ffi::viz::PyVizModule> {
-        let viz_module = self.inner.borrow().viz();
-        Ok(crate::ffi::viz::PyVizModule {
-            inner: viz_module,
-        })
+    pub fn viz(&self) -> PyResult<crate::ffi::viz_accessor::VizAccessor> {
+        // Create thread-safe VizAccessor by extracting graph data (like graph_viz() does)
+        // This avoids Rc<RefCell<>> threading issues in .show()
+        let graph_data_source = groggy::api::graph::GraphDataSource::new(&*self.inner.borrow());
+        Ok(crate::ffi::viz_accessor::VizAccessor::with_data_source(
+            graph_data_source,
+            "graph".to_string(),
+        ))
     }
 
     /// Direct access to graph visualization server

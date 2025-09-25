@@ -5,12 +5,12 @@
 
 use super::*;
 use crate::api::graph::Graph;
-use crate::errors::{GraphResult, GraphError};
+use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::embeddings::{EmbeddingEngine, EmbeddingMethod, GraphEmbeddingExt};
-use crate::viz::projection::{ProjectionEngine, GraphProjectionExt};
+use crate::viz::projection::{GraphProjectionExt, ProjectionEngine};
 use crate::viz::streaming::data_source::Position;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
@@ -189,10 +189,7 @@ pub enum IncrementalEmbeddingStrategy {
     },
 
     /// Gradient-based updates
-    GradientBased {
-        learning_rate: f64,
-        momentum: f64,
-    },
+    GradientBased { learning_rate: f64, momentum: f64 },
 
     /// Spectral update using matrix perturbation
     SpectralUpdate {
@@ -217,14 +214,10 @@ pub enum IncrementalEmbeddingStrategy {
 #[derive(Debug, Clone)]
 pub enum IncrementalProjectionStrategy {
     /// Local projection updates
-    LocalProjection {
-        update_radius: usize,
-    },
+    LocalProjection { update_radius: usize },
 
     /// Interpolation-based projection
-    InterpolationBased {
-        interpolation_steps: usize,
-    },
+    InterpolationBased { interpolation_steps: usize },
 
     /// Grid-aware incremental mapping
     GridAware {
@@ -424,7 +417,8 @@ impl IncrementalUpdateManager {
         self.graph_snapshot = GraphSnapshot::from_graph(graph)?;
 
         // Initialize influence graph
-        self.influence_graph.initialize(graph, &self.config.influence_config)?;
+        self.influence_graph
+            .initialize(graph, &self.config.influence_config)?;
 
         // Clear any pending changes
         self.pending_changes.clear();
@@ -478,7 +472,8 @@ impl IncrementalUpdateManager {
         let result = self.process_incremental_batch(&batch, &impact_analysis)?;
 
         // Update performance tracking
-        self.performance_tracker.record_update(start_time.elapsed(), &result);
+        self.performance_tracker
+            .record_update(start_time.elapsed(), &result);
 
         Ok(result)
     }
@@ -573,7 +568,8 @@ impl IncrementalUpdateManager {
         let projection_result = self.update_projections_incrementally(&impact.affected_nodes)?;
 
         // Compute quality preservation
-        let quality_preservation = self.compute_quality_preservation(&embedding_result, &projection_result)?;
+        let quality_preservation =
+            self.compute_quality_preservation(&embedding_result, &projection_result)?;
 
         // Check if quality is acceptable
         if quality_preservation < self.config.quality_config.min_quality_threshold {
@@ -605,21 +601,32 @@ impl IncrementalUpdateManager {
     ) -> GraphResult<EmbeddingUpdateResult> {
         let strategy = self.embedding_strategy.clone(); // Clone the strategy to avoid borrow conflicts
         match strategy {
-            IncrementalEmbeddingStrategy::LocalOptimization { optimization_radius, max_iterations } => {
+            IncrementalEmbeddingStrategy::LocalOptimization {
+                optimization_radius,
+                max_iterations,
+            } => {
                 self.local_optimization_update(affected_nodes, optimization_radius, max_iterations)
             }
-            IncrementalEmbeddingStrategy::GradientBased { learning_rate, momentum } => {
-                self.gradient_based_update(affected_nodes, learning_rate, momentum)
-            }
-            IncrementalEmbeddingStrategy::SpectralUpdate { eigenvalue_tolerance, max_eigenvector_updates } => {
-                self.spectral_update(affected_nodes, eigenvalue_tolerance, max_eigenvector_updates)
-            }
-            IncrementalEmbeddingStrategy::EnergyRelaxation { relaxation_steps, damping_factor } => {
-                self.energy_relaxation_update(affected_nodes, relaxation_steps, damping_factor)
-            }
-            IncrementalEmbeddingStrategy::Hybrid { strategies, strategy_weights } => {
-                self.hybrid_update(affected_nodes, &strategies, &strategy_weights)
-            }
+            IncrementalEmbeddingStrategy::GradientBased {
+                learning_rate,
+                momentum,
+            } => self.gradient_based_update(affected_nodes, learning_rate, momentum),
+            IncrementalEmbeddingStrategy::SpectralUpdate {
+                eigenvalue_tolerance,
+                max_eigenvector_updates,
+            } => self.spectral_update(
+                affected_nodes,
+                eigenvalue_tolerance,
+                max_eigenvector_updates,
+            ),
+            IncrementalEmbeddingStrategy::EnergyRelaxation {
+                relaxation_steps,
+                damping_factor,
+            } => self.energy_relaxation_update(affected_nodes, relaxation_steps, damping_factor),
+            IncrementalEmbeddingStrategy::Hybrid {
+                strategies,
+                strategy_weights,
+            } => self.hybrid_update(affected_nodes, &strategies, &strategy_weights),
         }
     }
 
@@ -633,15 +640,25 @@ impl IncrementalUpdateManager {
             IncrementalProjectionStrategy::LocalProjection { update_radius } => {
                 self.local_projection_update(affected_nodes, update_radius)
             }
-            IncrementalProjectionStrategy::InterpolationBased { interpolation_steps } => {
-                self.interpolation_projection_update(affected_nodes, interpolation_steps)
-            }
-            IncrementalProjectionStrategy::GridAware { grid_optimization, neighbor_preservation } => {
-                self.grid_aware_projection_update(affected_nodes, grid_optimization, neighbor_preservation)
-            }
-            IncrementalProjectionStrategy::ForceBased { force_iterations, cooling_schedule } => {
-                self.force_based_projection_update(affected_nodes, force_iterations, &cooling_schedule)
-            }
+            IncrementalProjectionStrategy::InterpolationBased {
+                interpolation_steps,
+            } => self.interpolation_projection_update(affected_nodes, interpolation_steps),
+            IncrementalProjectionStrategy::GridAware {
+                grid_optimization,
+                neighbor_preservation,
+            } => self.grid_aware_projection_update(
+                affected_nodes,
+                grid_optimization,
+                neighbor_preservation,
+            ),
+            IncrementalProjectionStrategy::ForceBased {
+                force_iterations,
+                cooling_schedule,
+            } => self.force_based_projection_update(
+                affected_nodes,
+                force_iterations,
+                &cooling_schedule,
+            ),
         }
     }
 
@@ -972,9 +989,12 @@ impl IncrementalPerformanceTracker {
 
     fn update_stats(&mut self) {
         if !self.update_times.is_empty() {
-            let average_ms = self.update_times.iter()
+            let average_ms = self
+                .update_times
+                .iter()
                 .map(|d| d.as_secs_f64() * 1000.0)
-                .sum::<f64>() / self.update_times.len() as f64;
+                .sum::<f64>()
+                / self.update_times.len() as f64;
 
             self.stats.average_update_time_ms = average_ms;
 

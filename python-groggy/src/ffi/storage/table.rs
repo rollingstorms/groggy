@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
 use crate::ffi::storage::array::PyBaseArray;
 use crate::ffi::storage::num_array::PyNumArray;
-use crate::ffi::viz::PyVizModule;
+use crate::ffi::viz_accessor::VizAccessor;
 use groggy::storage::{ArrayOps, array::{BaseArray, NumArray}, table::{BaseTable, NodesTable, EdgesTable, Table, TableIterator}};
 use groggy::viz::streaming::data_source::DataSource as VizDataSource;  // Import DataSource trait for streaming methods
 use groggy::viz::VizModule;
@@ -996,16 +996,15 @@ impl PyBaseTable {
     /// * `height` - Canvas height in pixels
     /// 
     /// # Returns
-    /// PyVizModule for launching visualization
+    /// VizAccessor for launching visualization
     /// 
     /// # Examples
     /// ```python
     /// # Launch interactive visualization
     /// viz = table.interactive()
-    /// session = viz.interactive()
-    /// print(f"View at: {session.url()}")
+    /// viz.show()  # Opens visualization
     /// 
-    /// # With custom options
+    /// # With custom options  
     /// viz = table.interactive(port=8080, layout="force-directed", theme="dark")
     /// ```
     pub fn interactive_viz(
@@ -1015,14 +1014,10 @@ impl PyBaseTable {
         theme: Option<String>,
         width: Option<u32>,
         height: Option<u32>
-    ) -> PyResult<PyVizModule> {
-        // Create VizModule from this BaseTable using delegation pattern
-        let data_source: Arc<dyn groggy::viz::streaming::data_source::DataSource> = Arc::new(self.table.clone());
-        let viz_module = VizModule::new(data_source);
-        
-        Ok(PyVizModule {
-            inner: viz_module,
-        })
+    ) -> PyResult<VizAccessor> {
+        // TODO: Convert table to GraphDataSource for VizAccessor
+        // For now, return VizAccessor without data source 
+        Ok(VizAccessor::without_data_source("table".to_string()))
     }
 
 }
@@ -2204,7 +2199,7 @@ impl PyNodesTable {
     /// * `height` - Canvas height in pixels
     /// 
     /// # Returns
-    /// PyVizModule for launching interactive visualization
+    /// VizAccessor for launching interactive visualization
     pub fn interactive_viz(
         &self,
         port: Option<u16>,
@@ -2212,14 +2207,10 @@ impl PyNodesTable {
         theme: Option<String>,
         width: Option<u32>,
         height: Option<u32>
-    ) -> PyResult<PyVizModule> {
-        // Create VizModule from this NodesTable using delegation pattern
-        let data_source: Arc<dyn groggy::viz::streaming::data_source::DataSource> = Arc::new(self.table.clone());
-        let viz_module = VizModule::new(data_source);
-        
-        Ok(PyVizModule {
-            inner: viz_module,
-        })
+    ) -> PyResult<VizAccessor> {
+        // TODO: Convert NodesTable to GraphDataSource for VizAccessor  
+        // For now, return VizAccessor without data source
+        Ok(VizAccessor::without_data_source("nodes_table".to_string()))
     }
 
     /// Get viz accessor for visualization operations (no graph tab)
@@ -2998,7 +2989,7 @@ impl PyEdgesTable {
     /// * `height` - Canvas height in pixels
     /// 
     /// # Returns
-    /// PyVizModule for launching interactive visualization
+    /// VizAccessor for launching interactive visualization
     pub fn interactive_viz(
         &self,
         port: Option<u16>,
@@ -3006,14 +2997,10 @@ impl PyEdgesTable {
         theme: Option<String>,
         width: Option<u32>,
         height: Option<u32>
-    ) -> PyResult<PyVizModule> {
-        // Create VizModule from this EdgesTable using delegation pattern
-        let data_source: Arc<dyn groggy::viz::streaming::data_source::DataSource> = Arc::new(self.table.clone());
-        let viz_module = VizModule::new(data_source);
-        
-        Ok(PyVizModule {
-            inner: viz_module,
-        })
+    ) -> PyResult<VizAccessor> {
+        // TODO: Convert EdgesTable to GraphDataSource for VizAccessor
+        // For now, return VizAccessor without data source  
+        Ok(VizAccessor::without_data_source("edges_table".to_string()))
     }
 
     /// Get viz accessor for visualization operations (no graph tab)

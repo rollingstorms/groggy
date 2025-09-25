@@ -54,9 +54,8 @@ from ._groggy import (
     # Hierarchical subgraph functionality
     AggregationFunction,
     MetaNode,
-    # Visualization system
+    # Visualization system (REMOVED VizModule - use VizAccessor instead)
     VizConfig,
-    VizModule,
     InteractiveViz,
     InteractiveVizSession,
     StaticViz,
@@ -197,10 +196,9 @@ __all__ = [
     "MetaNode",
     # Neural network module
     "neural",
-    # Visualization system
+    # Visualization system (REMOVED VizModule - use VizAccessor instead)
     "viz",
     "VizConfig",
-    "VizModule", 
     "InteractiveViz",
     "InteractiveVizSession",
     "StaticViz",

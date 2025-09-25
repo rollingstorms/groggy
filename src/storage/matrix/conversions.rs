@@ -3,9 +3,9 @@
 //! This module provides conversion traits between Groggy's AttrValue system
 //! and the NumericType trait system used in the advanced matrix backend.
 
-use crate::types::AttrValue;
-use crate::storage::advanced_matrix::NumericType;
 use crate::errors::{GraphError, GraphResult};
+use crate::storage::advanced_matrix::NumericType;
+use crate::types::AttrValue;
 
 /// Trait for converting AttrValue to numeric types
 pub trait FromAttrValue<T: NumericType> {
@@ -19,10 +19,13 @@ impl FromAttrValue<f64> for f64 {
             AttrValue::Int(i) => Ok(*i as f64),
             AttrValue::SmallInt(i) => Ok(*i as f64),
             AttrValue::Bool(b) => Ok(if *b { 1.0 } else { 0.0 }),
-            AttrValue::Text(s) => s.parse().map_err(|_| 
-                GraphError::InvalidInput(format!("Cannot convert '{}' to f64", s))),
+            AttrValue::Text(s) => s
+                .parse()
+                .map_err(|_| GraphError::InvalidInput(format!("Cannot convert '{}' to f64", s))),
             AttrValue::Null => Ok(0.0),
-            _ => Err(GraphError::InvalidInput("Unsupported attribute type for f64".into())),
+            _ => Err(GraphError::InvalidInput(
+                "Unsupported attribute type for f64".into(),
+            )),
         }
     }
 }
@@ -40,10 +43,13 @@ impl FromAttrValue<i64> for i64 {
             AttrValue::SmallInt(i) => Ok(*i as i64),
             AttrValue::Float(f) => Ok(*f as i64),
             AttrValue::Bool(b) => Ok(if *b { 1 } else { 0 }),
-            AttrValue::Text(s) => s.parse().map_err(|_| 
-                GraphError::InvalidInput(format!("Cannot convert '{}' to i64", s))),
+            AttrValue::Text(s) => s
+                .parse()
+                .map_err(|_| GraphError::InvalidInput(format!("Cannot convert '{}' to i64", s))),
             AttrValue::Null => Ok(0),
-            _ => Err(GraphError::InvalidInput("Unsupported attribute type for i64".into())),
+            _ => Err(GraphError::InvalidInput(
+                "Unsupported attribute type for i64".into(),
+            )),
         }
     }
 }
@@ -61,15 +67,18 @@ impl FromAttrValue<bool> for bool {
             AttrValue::Int(i) => Ok(*i != 0),
             AttrValue::SmallInt(i) => Ok(*i != 0),
             AttrValue::Float(f) => Ok(*f != 0.0),
-            AttrValue::Text(s) => {
-                match s.to_lowercase().as_str() {
-                    "true" | "1" | "yes" | "on" => Ok(true),
-                    "false" | "0" | "no" | "off" => Ok(false),
-                    _ => Err(GraphError::InvalidInput(format!("Cannot convert '{}' to bool", s))),
-                }
-            }
+            AttrValue::Text(s) => match s.to_lowercase().as_str() {
+                "true" | "1" | "yes" | "on" => Ok(true),
+                "false" | "0" | "no" | "off" => Ok(false),
+                _ => Err(GraphError::InvalidInput(format!(
+                    "Cannot convert '{}' to bool",
+                    s
+                ))),
+            },
             AttrValue::Null => Ok(false),
-            _ => Err(GraphError::InvalidInput("Unsupported attribute type for bool".into())),
+            _ => Err(GraphError::InvalidInput(
+                "Unsupported attribute type for bool".into(),
+            )),
         }
     }
 }
@@ -80,9 +89,9 @@ pub trait NumericTypeExt<T: NumericType> {
     fn from_attr_value(value: &AttrValue) -> GraphResult<T>;
 }
 
-impl<T: NumericType> NumericTypeExt<T> for T 
-where 
-    T: FromAttrValue<T>
+impl<T: NumericType> NumericTypeExt<T> for T
+where
+    T: FromAttrValue<T>,
 {
     fn from_attr_value(value: &AttrValue) -> GraphResult<T> {
         <T as FromAttrValue<T>>::from_attr_value(value)
@@ -99,7 +108,10 @@ mod tests {
         assert_eq!(f64::from_attr_value(&AttrValue::Int(42)).unwrap(), 42.0);
         assert_eq!(f64::from_attr_value(&AttrValue::Bool(true)).unwrap(), 1.0);
         assert_eq!(f64::from_attr_value(&AttrValue::Bool(false)).unwrap(), 0.0);
-        assert_eq!(f64::from_attr_value(&AttrValue::String("2.5".to_string())).unwrap(), 2.5);
+        assert_eq!(
+            f64::from_attr_value(&AttrValue::String("2.5".to_string())).unwrap(),
+            2.5
+        );
         assert_eq!(f64::from_attr_value(&AttrValue::None).unwrap(), 0.0);
     }
 
@@ -116,7 +128,13 @@ mod tests {
         assert_eq!(bool::from_attr_value(&AttrValue::Bool(true)).unwrap(), true);
         assert_eq!(bool::from_attr_value(&AttrValue::Int(1)).unwrap(), true);
         assert_eq!(bool::from_attr_value(&AttrValue::Int(0)).unwrap(), false);
-        assert_eq!(bool::from_attr_value(&AttrValue::String("true".to_string())).unwrap(), true);
-        assert_eq!(bool::from_attr_value(&AttrValue::String("false".to_string())).unwrap(), false);
+        assert_eq!(
+            bool::from_attr_value(&AttrValue::String("true".to_string())).unwrap(),
+            true
+        );
+        assert_eq!(
+            bool::from_attr_value(&AttrValue::String("false".to_string())).unwrap(),
+            false
+        );
     }
 }

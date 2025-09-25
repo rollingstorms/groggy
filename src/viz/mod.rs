@@ -15,13 +15,13 @@
 //! framework for advanced graph layouts, particularly the honeycomb layout with
 //! programmable projections and energy-based optimization.
 
-use std::sync::Arc;
-use std::net::IpAddr;
-use crate::errors::{GraphResult, GraphError};
+use crate::errors::{GraphError, GraphResult};
 use crate::traits::subgraph_operations::SubgraphOperations;
+use std::net::IpAddr;
+use std::sync::Arc;
+use streaming::data_source::{DataSource, HierarchicalDirection, LayoutAlgorithm};
 use streaming::server::StreamingServer;
 use streaming::types::StreamingConfig;
-use streaming::data_source::{DataSource, LayoutAlgorithm, HierarchicalDirection};
 use streaming::virtual_scroller::VirtualScrollConfig;
 
 pub mod embeddings;
@@ -52,12 +52,13 @@ impl VizBackend {
             "realtime" => Ok(VizBackend::Realtime),
             "file" => Ok(VizBackend::File),
             "local" => Ok(VizBackend::Local),
-            _ => Err(GraphError::InvalidInput(
-                format!("Invalid backend '{}'. Expected: jupyter, streaming, realtime, file, or local", backend)
-            )),
+            _ => Err(GraphError::InvalidInput(format!(
+                "Invalid backend '{}'. Expected: jupyter, streaming, realtime, file, or local",
+                backend
+            ))),
         }
     }
-    
+
     /// Convert to string representation
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -79,13 +80,13 @@ pub struct RenderOptions {
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub title: Option<String>,
-    
+
     // Backend-specific parameters
-    pub port: Option<u16>,              // For streaming backend
-    pub filename: Option<String>,       // For file backend
-    pub format: Option<ExportFormat>,   // For file backend
-    pub dpi: Option<u32>,              // For file backend
-    pub auto_open: Option<bool>,       // For streaming backend
+    pub port: Option<u16>,            // For streaming backend
+    pub filename: Option<String>,     // For file backend
+    pub format: Option<ExportFormat>, // For file backend
+    pub dpi: Option<u32>,             // For file backend
+    pub auto_open: Option<bool>,      // For streaming backend
 }
 
 /// Result of rendering operation (different types for different backends)
@@ -101,9 +102,9 @@ pub enum RenderResult {
 }
 
 // Working visualization modules
-pub mod streaming;  // The working WebSocket + Canvas server
-pub mod display;    // Table/array/matrix formatting (essential for storage)
-pub mod layouts;    // Graph layout algorithms (used by streaming)
+pub mod display; // Table/array/matrix formatting (essential for storage)
+pub mod layouts;
+pub mod streaming; // The working WebSocket + Canvas server // Graph layout algorithms (used by streaming)
 
 // Legacy - deprecated in favor of unified streaming infrastructure
 // pub mod server;
@@ -125,24 +126,25 @@ impl VizModule {
             config: VizConfig::default(),
         }
     }
-    
+
     /// 🎯 CONVENIENCE METHODS - Simplified unified API
     /// These methods provide the same interface as described in UNIFIED_VIZ_MIGRATION_PLAN.md
-    
+
     /// Create Jupyter widget (unified core)
     pub fn widget(&mut self) -> GraphResult<RenderResult> {
         self.render(VizBackend::Jupyter, RenderOptions::default())
     }
-    
-    /// Start streaming server (unified core)
-    pub fn serve(&mut self, port: Option<u16>) -> GraphResult<RenderResult> {
+
+    /// Start realtime visualization server
+    pub fn server(&mut self, port: Option<u16>) -> GraphResult<RenderResult> {
+        eprintln!("🚀 DEBUG: server() called - starting REALTIME backend server!");
         let options = RenderOptions {
             port,
             ..Default::default()
         };
-        self.render(VizBackend::Streaming, options)
+        self.render(VizBackend::Realtime, options)
     }
-    
+
     /// Save to file (unified core)
     pub fn save(&mut self, path: &str) -> GraphResult<RenderResult> {
         let options = RenderOptions {
@@ -151,29 +153,43 @@ impl VizModule {
         };
         self.render(VizBackend::File, options)
     }
-    
+
     /// 🚀 Show interactive real-time visualization
     ///
     /// This is the main visualization method that launches the real-time system with:
-    /// - Interactive controls for all layout algorithms
+    /// - Interactive controls for all layout algorithms including honeycomb n-dimensional rotation
     /// - Real-time parameter adjustment and streaming updates
     /// - Performance monitoring with adaptive quality
     /// - WebSocket broadcasting for live updates
     /// - Support for traditional layouts (force-directed, etc.) and honeycomb layout
+    /// - N-dimensional embeddings with UMAP, t-SNE, PCA projections
+    /// - Advanced physics simulation and momentum-based interactions
     ///
     /// # Returns
-    /// * `RenderResult::RealTime` - Contains the real-time visualization engine
+    /// * `RenderResult::RealTime` - Contains the real-time visualization engine with advanced features
     ///
     /// # Examples
     /// ```rust
     /// use groggy::viz::VizModule;
     ///
     /// let mut viz = graph.viz();
-    /// let result = viz.show()?;
+    /// let result = viz.show()?; // Now uses Realtime backend by default!
     ///
-    /// // Real-time visualization with interactive controls is now running
+    /// // Real-time visualization with n-dimensional honeycomb controls is now running
     /// ```
     pub fn show(&mut self) -> GraphResult<RenderResult> {
+        eprintln!("🚀 DEBUG: show() called - now using REALTIME backend!");
+        eprintln!(
+            "📊 DEBUG: Data source type: {}",
+            self.data_source.get_schema().source_type
+        );
+        if self.data_source.supports_graph_view() {
+            let metadata = self.data_source.get_graph_metadata();
+            eprintln!(
+                "🍯 DEBUG: Graph data - {} nodes, {} edges",
+                metadata.node_count, metadata.edge_count
+            );
+        }
         self.render(VizBackend::Realtime, RenderOptions::default())
     }
 
@@ -192,16 +208,16 @@ impl VizModule {
     /// # Examples
     /// ```rust
     /// use groggy::viz::{VizModule, VizBackend, RenderOptions};
-    /// 
+    ///
     /// // Jupyter notebook embedding
     /// let result = viz_module.render(VizBackend::Jupyter, RenderOptions::default())?;
-    /// 
+    ///
     /// // Interactive server
     /// let result = viz_module.render(VizBackend::Streaming, RenderOptions {
     ///     port: Some(8080),
     ///     ..Default::default()
     /// })?;
-    /// 
+    ///
     /// // Static file export
     /// let result = viz_module.render(VizBackend::File, RenderOptions {
     ///     filename: Some("graph.html".to_string()),
@@ -209,12 +225,28 @@ impl VizModule {
     /// })?;
     /// ```
     pub fn render(&self, backend: VizBackend, options: RenderOptions) -> GraphResult<RenderResult> {
+        eprintln!("🎯 DEBUG: render() called with backend: {:?}", backend);
         match backend {
-            VizBackend::Jupyter => self.render_jupyter(options),
-            VizBackend::Streaming => self.render_streaming(options),
-            VizBackend::Realtime => self.render_realtime(options),
-            VizBackend::File => self.render_file(options),
-            VizBackend::Local => self.render_local(options),
+            VizBackend::Jupyter => {
+                eprintln!("📓 DEBUG: Calling render_jupyter()");
+                self.render_jupyter(options)
+            }
+            VizBackend::Streaming => {
+                eprintln!("🌊 DEBUG: Streaming backend DISABLED - redirecting to realtime");
+                self.render_realtime(options)
+            }
+            VizBackend::Realtime => {
+                eprintln!("⚡ DEBUG: Calling render_realtime()");
+                self.render_realtime(options)
+            }
+            VizBackend::File => {
+                eprintln!("📄 DEBUG: Calling render_file()");
+                self.render_file(options)
+            }
+            VizBackend::Local => {
+                eprintln!("🏠 DEBUG: Calling render_local()");
+                self.render_local(options)
+            }
         }
     }
 
@@ -230,10 +262,10 @@ impl VizModule {
         // Delegate to existing interactive method
         let interactive_opts = InteractiveOptions {
             port: options.port.unwrap_or(8080),
-            layout: options.layout.unwrap_or(LayoutAlgorithm::ForceDirected { 
-                charge: -30.0, 
-                distance: 50.0, 
-                iterations: 100 
+            layout: options.layout.unwrap_or(LayoutAlgorithm::ForceDirected {
+                charge: -30.0,
+                distance: 50.0,
+                iterations: 100,
             }),
             theme: options.theme.unwrap_or_else(|| "light".to_string()),
             width: options.width.unwrap_or(800),
@@ -242,26 +274,43 @@ impl VizModule {
             show_labels: false,
             auto_open: false,
         };
-        
+
         let interactive_viz = self.interactive(Some(interactive_opts))?;
         Ok(RenderResult::Interactive(interactive_viz))
     }
 
     /// Render for advanced real-time visualization with Phase 3 features
     fn render_realtime(&self, options: RenderOptions) -> GraphResult<RenderResult> {
-        use crate::viz::realtime::{RealTimeVizConfig, RealTimeVizEngine, RealTimeConfig, PerformanceMonitorConfig, InteractionConfig, StreamingConfig};
+        eprintln!("🔥 DEBUG: render_realtime() called!");
+        eprintln!("⚙️  DEBUG: Importing realtime modules...");
+
+        // Use fully-qualified paths for realtime types to avoid name collisions with streaming::types::StreamingConfig
         use crate::viz::embeddings::{EmbeddingConfig, EmbeddingMethod};
-        use crate::viz::projection::{ProjectionConfig, ProjectionMethod, HoneycombConfig, QualityConfig, InterpolationConfig};
+        use crate::viz::projection::{
+            HoneycombConfig, InterpolationConfig, ProjectionConfig, ProjectionMethod, QualityConfig,
+        };
+        use crate::viz::realtime::{InteractionConfig, RealTimeConfig, RealTimeVizConfig};
+
+        eprintln!("✅ DEBUG: Realtime modules imported successfully!");
 
         // Determine embedding and projection methods based on layout
         // Default to Honeycomb for real-time backend if no layout specified
-        let layout = options.layout.as_ref().unwrap_or(&LayoutAlgorithm::Honeycomb {
-            cell_size: 40.0,
-            energy_optimization: true,
-            iterations: 500,
-        });
+        let layout = options
+            .layout
+            .as_ref()
+            .unwrap_or(&LayoutAlgorithm::Honeycomb {
+                cell_size: 40.0,
+                energy_optimization: true,
+                iterations: 500,
+            });
+
+        eprintln!("🍯 DEBUG: Layout determined: {:?}", layout);
         let (embedding_method, projection_method, is_honeycomb) = match layout {
             LayoutAlgorithm::Honeycomb { .. } => {
+                eprintln!("🍯 DEBUG: HONEYCOMB LAYOUT DETECTED!");
+                eprintln!("🔥 DEBUG: Setting up N-DIMENSIONAL EMBEDDINGS with EnergyND method");
+                eprintln!("🎯 DEBUG: Setting up UMAP projection for multi-dimensional space");
+                eprintln!("🎮 DEBUG: Honeycomb controls will be ENABLED (is_honeycomb=true)");
                 // For honeycomb layout, use multi-dimensional embedding + honeycomb projection
                 (
                     EmbeddingMethod::EnergyND {
@@ -275,9 +324,9 @@ impl VizModule {
                         n_epochs: 200,
                         negative_sample_rate: 5.0,
                     },
-                    true
+                    true,
                 )
-            },
+            }
             LayoutAlgorithm::ForceDirected { .. } => {
                 // For force-directed, use 2D embedding with PCA projection
                 (
@@ -290,9 +339,9 @@ impl VizModule {
                         center: true,
                         standardize: false,
                     },
-                    false
+                    false,
                 )
-            },
+            }
             LayoutAlgorithm::Circular { .. } => {
                 // For circular layout, use spectral embedding
                 (
@@ -304,9 +353,9 @@ impl VizModule {
                         center: true,
                         standardize: true,
                     },
-                    false
+                    false,
                 )
-            },
+            }
             _ => {
                 // Default to energy-based with PCA projection
                 (
@@ -319,16 +368,24 @@ impl VizModule {
                         center: true,
                         standardize: true,
                     },
-                    false
+                    false,
                 )
             }
         };
 
+        eprintln!("⚙️  DEBUG: Creating real-time configuration...");
+
         // Create real-time configuration with layout-appropriate settings
+        let dimensions = if is_honeycomb { 5 } else { 2 };
+        eprintln!(
+            "📐 DEBUG: Setting embedding dimensions to {} (honeycomb: {})",
+            dimensions, is_honeycomb
+        );
+
         let realtime_config = RealTimeVizConfig {
             embedding_config: EmbeddingConfig {
                 method: embedding_method,
-                dimensions: if is_honeycomb { 5 } else { 2 }, // Multi-D for honeycomb, 2D for others
+                dimensions, // Multi-D for honeycomb, 2D for others
                 energy_function: None,
                 preprocessing: vec![],
                 postprocessing: vec![],
@@ -338,21 +395,33 @@ impl VizModule {
             projection_config: ProjectionConfig {
                 method: projection_method,
                 honeycomb_config: if is_honeycomb {
+                    eprintln!("🍯 DEBUG: Configuring HONEYCOMB GRID with advanced controls!");
+                    let cell_size = options.width.map(|w| w as f64 / 20.0).unwrap_or(40.0);
+                    eprintln!("📏 DEBUG: Honeycomb cell_size: {}", cell_size);
+                    eprintln!("🎯 DEBUG: Using DistancePreserving layout strategy");
+                    eprintln!("📍 DEBUG: snap_to_centers=true, grid_padding=20.0");
                     HoneycombConfig {
-                        cell_size: options.width.map(|w| w as f64 / 20.0).unwrap_or(40.0),
-                        layout_strategy: crate::viz::projection::HoneycombLayoutStrategy::DistancePreserving,
+                        cell_size,
+                        layout_strategy:
+                            crate::viz::projection::HoneycombLayoutStrategy::DistancePreserving,
                         snap_to_centers: true,
                         grid_padding: 20.0,
                         max_grid_size: None,
+                        target_avg_occupancy: 4.0,
+                        min_cell_size: 6.0,
                     }
                 } else {
+                    eprintln!("⚠️  DEBUG: Not honeycomb layout - using default config");
                     // Default honeycomb config for non-honeycomb layouts (will be ignored)
                     HoneycombConfig {
                         cell_size: 40.0,
-                        layout_strategy: crate::viz::projection::HoneycombLayoutStrategy::DistancePreserving,
+                        layout_strategy:
+                            crate::viz::projection::HoneycombLayoutStrategy::DistancePreserving,
                         snap_to_centers: false,
                         grid_padding: 0.0,
                         max_grid_size: None,
+                        target_avg_occupancy: 4.0,
+                        min_cell_size: 6.0,
                     }
                 },
                 quality_config: QualityConfig {
@@ -405,7 +474,7 @@ impl VizModule {
                 selection_config: crate::viz::realtime::SelectionConfig::default(),
                 filter_config: crate::viz::realtime::FilterConfig::default(),
             },
-            streaming_config: StreamingConfig {
+            streaming_config: crate::viz::realtime::StreamingConfig {
                 server_port: options.port.unwrap_or(8080),
                 max_connections: 100,
                 broadcast_interval_ms: 33, // ~30 FPS for updates
@@ -416,21 +485,49 @@ impl VizModule {
             },
         };
 
+        eprintln!("🔧 DEBUG: Creating real-time visualization engine...");
+
         // Create real-time visualization engine with the graph
         // For now, create a simple graph from the data source
         // TODO: Properly extract graph structure from data_source
         let graph = crate::api::graph::Graph::new(); // Placeholder - will be populated from data_source
+        eprintln!("📊 DEBUG: Created placeholder graph for engine");
+
+        eprintln!("⚡ DEBUG: Initializing RealTimeVizEngine with config...");
         let engine = crate::viz::realtime::RealTimeVizEngine::new(graph, realtime_config.clone());
+        eprintln!("✅ DEBUG: RealTimeVizEngine created successfully!");
+
+        let port = options.port.unwrap_or(8080);
+        eprintln!("🌐 DEBUG: Using port {} for visualization server", port);
 
         // Create a real-time visualization session
+        eprintln!(
+            "🎮 DEBUG: Creating RealTimeVisualization with enable_honeycomb_controls={}",
+            is_honeycomb
+        );
         let realtime_viz = RealTimeVisualization {
             config: realtime_config,
             engine,
-            port: options.port.unwrap_or(8080),
-            title: options.title.unwrap_or_else(|| "Real-time Graph Visualization".to_string()),
+            port,
+            title: options
+                .title
+                .unwrap_or_else(|| "Real-time Graph Visualization".to_string()),
             auto_open: options.auto_open.unwrap_or(true),
             enable_honeycomb_controls: is_honeycomb,
         };
+
+        eprintln!("🚀 DEBUG: RealTimeVisualization session created!");
+        if is_honeycomb {
+            eprintln!("🍯 DEBUG: *** HONEYCOMB N-DIMENSIONAL CONTROLS ARE ENABLED! ***");
+            eprintln!("🎯 DEBUG: Expected controls:");
+            eprintln!("   - Left Mouse + Drag: Rotate in dimensions 0-1");
+            eprintln!("   - Left + Ctrl + Drag: Rotate in higher dimensions (2-3)");
+            eprintln!("   - Right Mouse + Drag: Multi-dimensional rotation");
+            eprintln!("   - Middle Mouse + Drag: Rotate across all dimension pairs");
+            eprintln!("   - Node Dragging: Move points in n-dimensional space");
+        } else {
+            eprintln!("⚠️  DEBUG: Honeycomb controls NOT enabled for this layout");
+        }
 
         Ok(RenderResult::RealTime(realtime_viz))
     }
@@ -442,22 +539,22 @@ impl VizModule {
         })?;
 
         let format = options.format.unwrap_or(ExportFormat::HTML);
-        
+
         // Delegate to existing static_viz method
         let static_opts = StaticOptions {
             filename,
             format,
-            layout: options.layout.unwrap_or(LayoutAlgorithm::ForceDirected { 
-                charge: -30.0, 
-                distance: 50.0, 
-                iterations: 100 
+            layout: options.layout.unwrap_or(LayoutAlgorithm::ForceDirected {
+                charge: -30.0,
+                distance: 50.0,
+                iterations: 100,
             }),
             theme: options.theme.unwrap_or_else(|| "light".to_string()),
             dpi: options.dpi.unwrap_or(300),
             width: options.width.unwrap_or(800),
             height: options.height.unwrap_or(600),
         };
-        
+
         let static_viz = self.static_viz(static_opts)?;
         Ok(RenderResult::Static(static_viz))
     }
@@ -472,7 +569,7 @@ impl VizModule {
     /// Launch interactive browser-based visualization using streaming infrastructure
     pub fn interactive(&self, options: Option<InteractiveOptions>) -> GraphResult<InteractiveViz> {
         let opts = options.unwrap_or_default();
-        
+
         // Create streaming configuration from visualization options
         let streaming_config = StreamingConfig {
             port: opts.port,
@@ -487,13 +584,10 @@ impl VizModule {
             auto_broadcast: true,
             update_throttle_ms: 100,
         };
-        
+
         // Create streaming server with the data source
-        let streaming_server = StreamingServer::new(
-            self.data_source.clone(),
-            streaming_config,
-        );
-        
+        let streaming_server = StreamingServer::new(self.data_source.clone(), streaming_config);
+
         Ok(InteractiveViz::Streaming {
             streaming_server,
             config: opts,
@@ -504,37 +598,43 @@ impl VizModule {
     /// Generate static visualization export (PNG, SVG, PDF, HTML)
     pub fn static_viz(&self, options: StaticOptions) -> GraphResult<StaticViz> {
         match options.format {
-            ExportFormat::HTML => {
-                self.generate_static_html(&options)
-            },
-            ExportFormat::SVG => {
-                self.generate_simple_svg(&options)
-            },
-            _ => Err(GraphError::NotImplemented { 
+            ExportFormat::HTML => self.generate_static_html(&options),
+            ExportFormat::SVG => self.generate_simple_svg(&options),
+            _ => Err(GraphError::NotImplemented {
                 feature: format!("{:?} export", options.format),
-                tracking_issue: Some("https://github.com/anthropics/groggy/issues/viz-static".to_string())
-            })
+                tracking_issue: Some(
+                    "https://github.com/anthropics/groggy/issues/viz-static".to_string(),
+                ),
+            }),
         }
     }
-    
+
     /// Generate static HTML file with embedded graph data
     fn generate_static_html(&self, options: &StaticOptions) -> GraphResult<StaticViz> {
         use std::fs;
-        
+
         // Get graph data from the data source
         let nodes = self.data_source.get_graph_nodes();
         let edges = self.data_source.get_graph_edges();
         let metadata = self.data_source.get_graph_metadata();
-        
+
         // Convert to JSON
-        let nodes_json = serde_json::to_string(&nodes)
-            .map_err(|e| GraphError::internal(&format!("Failed to serialize nodes: {}", e), "generate_static_html"))?;
-        let edges_json = serde_json::to_string(&edges)
-            .map_err(|e| GraphError::internal(&format!("Failed to serialize edges: {}", e), "generate_static_html"))?;
-        
+        let nodes_json = serde_json::to_string(&nodes).map_err(|e| {
+            GraphError::internal(
+                &format!("Failed to serialize nodes: {}", e),
+                "generate_static_html",
+            )
+        })?;
+        let edges_json = serde_json::to_string(&edges).map_err(|e| {
+            GraphError::internal(
+                &format!("Failed to serialize edges: {}", e),
+                "generate_static_html",
+            )
+        })?;
+
         // Read the HTML template
         let html_template = self.get_html_template()?;
-        
+
         // Replace template variables
         let html = html_template
             .replace("{{TITLE}}", "Graph Visualization")
@@ -542,31 +642,38 @@ impl VizModule {
             .replace("{{EDGE_COUNT}}", &metadata.edge_count.to_string())
             .replace("{{WIDTH}}", &options.width.to_string())
             .replace("{{HEIGHT}}", &options.height.to_string())
-            .replace("{{LAYOUT}}", &format!("{:?}", options.layout).to_lowercase())
+            .replace(
+                "{{LAYOUT}}",
+                &format!("{:?}", options.layout).to_lowercase(),
+            )
             .replace("{{THEME}}", &options.theme)
             .replace("{{NODES_JSON}}", &nodes_json)
             .replace("{{EDGES_JSON}}", &edges_json)
             .replace("{{USE_WEBSOCKET}}", "false");
-        
+
         // Write to file
-        fs::write(&options.filename, &html)
-            .map_err(|e| GraphError::internal(&format!("Failed to write HTML file: {}", e), "generate_static_html"))?;
-        
+        fs::write(&options.filename, &html).map_err(|e| {
+            GraphError::internal(
+                &format!("Failed to write HTML file: {}", e),
+                "generate_static_html",
+            )
+        })?;
+
         Ok(StaticViz {
             file_path: options.filename.clone(),
             size_bytes: html.len(),
         })
     }
-    
+
     /// Generate simple SVG export
     fn generate_simple_svg(&self, options: &StaticOptions) -> GraphResult<StaticViz> {
         use std::fs;
-        
+
         // Get graph data and positions
         let nodes = self.data_source.get_graph_nodes();
         let edges = self.data_source.get_graph_edges();
         let positions = self.data_source.compute_layout(options.layout.clone());
-        
+
         // Build SVG
         let mut svg = format!(
             r#"<svg width="{}" height="{}" xmlns="http://www.w3.org/2000/svg">
@@ -579,48 +686,53 @@ impl VizModule {
             </defs>"#,
             options.width, options.height
         );
-        
+
         // Draw edges
         for edge in &edges {
             if let (Some(src_pos), Some(dst_pos)) = (
                 positions.iter().find(|p| p.node_id == edge.source),
-                positions.iter().find(|p| p.node_id == edge.target)
+                positions.iter().find(|p| p.node_id == edge.target),
             ) {
                 svg.push_str(&format!(
                     r#"<line x1="{}" y1="{}" x2="{}" y2="{}" class="edge"/>"#,
-                    src_pos.position.x, src_pos.position.y, 
-                    dst_pos.position.x, dst_pos.position.y
+                    src_pos.position.x, src_pos.position.y, dst_pos.position.x, dst_pos.position.y
                 ));
             }
         }
-        
+
         // Draw nodes
         for (node, pos) in nodes.iter().zip(positions.iter()) {
             svg.push_str(&format!(
                 r#"<circle cx="{}" cy="{}" r="8" class="node"/>"#,
                 pos.position.x, pos.position.y
             ));
-            
+
             if let Some(label) = &node.label {
                 svg.push_str(&format!(
                     r#"<text x="{}" y="{}" class="label">{}</text>"#,
-                    pos.position.x, pos.position.y - 15.0, label
+                    pos.position.x,
+                    pos.position.y - 15.0,
+                    label
                 ));
             }
         }
-        
+
         svg.push_str("</svg>");
-        
+
         // Write to file
-        fs::write(&options.filename, &svg)
-            .map_err(|e| GraphError::internal(&format!("Failed to write SVG file: {}", e), "generate_simple_svg"))?;
-        
+        fs::write(&options.filename, &svg).map_err(|e| {
+            GraphError::internal(
+                &format!("Failed to write SVG file: {}", e),
+                "generate_simple_svg",
+            )
+        })?;
+
         Ok(StaticViz {
             file_path: options.filename.clone(),
             size_bytes: svg.len(),
         })
     }
-    
+
     /// Get HTML template with embedded CSS and JS
     fn get_html_template(&self) -> GraphResult<String> {
         // Simple template without complex JavaScript for now
@@ -935,19 +1047,28 @@ impl VizModule {
         let nodes = self.data_source.get_graph_nodes();
         let edges = self.data_source.get_graph_edges();
         let metadata = self.data_source.get_graph_metadata();
-        
+
         // Convert to JSON
-        let nodes_json = serde_json::to_string(&nodes)
-            .map_err(|e| GraphError::internal(&format!("Failed to serialize nodes: {}", e), "generate_jupyter_html"))?;
-        let edges_json = serde_json::to_string(&edges)
-            .map_err(|e| GraphError::internal(&format!("Failed to serialize edges: {}", e), "generate_jupyter_html"))?;
-        
+        let nodes_json = serde_json::to_string(&nodes).map_err(|e| {
+            GraphError::internal(
+                &format!("Failed to serialize nodes: {}", e),
+                "generate_jupyter_html",
+            )
+        })?;
+        let edges_json = serde_json::to_string(&edges).map_err(|e| {
+            GraphError::internal(
+                &format!("Failed to serialize edges: {}", e),
+                "generate_jupyter_html",
+            )
+        })?;
+
         let width = options.width.unwrap_or(800);
         let height = options.height.unwrap_or(600);
         let canvas_id = format!("viz-canvas-{}", std::ptr::addr_of!(*self) as usize);
-        
+
         // Generate Jupyter-optimized HTML (simpler than full template for embedding)
-        let html = format!(r###"
+        let html = format!(
+            r###"
 <div style="width: {}px; height: {}px; border: 1px solid #ddd; position: relative; background: #fafafa;">
     <canvas id="{}" width="{}" height="{}" 
             style="display: block; background: white;"></canvas>
@@ -961,9 +1082,18 @@ impl VizModule {
     console.log('Jupyter viz loaded:', nodes.length, 'nodes', edges.length, 'edges');
     </script>
 </div>
-"###, width, height, canvas_id, width, height, metadata.node_count, metadata.edge_count, 
-             nodes_json, edges_json);
-        
+"###,
+            width,
+            height,
+            canvas_id,
+            width,
+            height,
+            metadata.node_count,
+            metadata.edge_count,
+            nodes_json,
+            edges_json
+        );
+
         Ok(html)
     }
 
@@ -973,22 +1103,42 @@ impl VizModule {
         let nodes = self.data_source.get_graph_nodes();
         let edges = self.data_source.get_graph_edges();
         let metadata = self.data_source.get_graph_metadata();
-        
+
         // Convert to JSON
-        let nodes_json = serde_json::to_string(&nodes)
-            .map_err(|e| GraphError::internal(&format!("Failed to serialize nodes: {}", e), "generate_local_html"))?;
-        let edges_json = serde_json::to_string(&edges)
-            .map_err(|e| GraphError::internal(&format!("Failed to serialize edges: {}", e), "generate_local_html"))?;
-        
+        let nodes_json = serde_json::to_string(&nodes).map_err(|e| {
+            GraphError::internal(
+                &format!("Failed to serialize nodes: {}", e),
+                "generate_local_html",
+            )
+        })?;
+        let edges_json = serde_json::to_string(&edges).map_err(|e| {
+            GraphError::internal(
+                &format!("Failed to serialize edges: {}", e),
+                "generate_local_html",
+            )
+        })?;
+
         // Read the HTML template
         let html_template = self.get_html_template()?;
-        
+
         let width = options.width.unwrap_or(800);
         let height = options.height.unwrap_or(600);
-        let layout = options.layout.as_ref().map(|l| format!("{:?}", l).to_lowercase()).unwrap_or_else(|| "force-directed".to_string());
-        let theme = options.theme.as_ref().map(|s| s.as_str()).unwrap_or("light");
-        let title = options.title.as_ref().map(|s| s.as_str()).unwrap_or("Graph Visualization");
-        
+        let layout = options
+            .layout
+            .as_ref()
+            .map(|l| format!("{:?}", l).to_lowercase())
+            .unwrap_or_else(|| "force-directed".to_string());
+        let theme = options
+            .theme
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or("light");
+        let title = options
+            .title
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or("Graph Visualization");
+
         // Replace template variables
         let html = html_template
             .replace("{{TITLE}}", title)
@@ -1001,7 +1151,7 @@ impl VizModule {
             .replace("{{NODES_JSON}}", &nodes_json)
             .replace("{{EDGES_JSON}}", &edges_json)
             .replace("{{USE_WEBSOCKET}}", "false");
-        
+
         Ok(html)
     }
 
@@ -1010,33 +1160,33 @@ impl VizModule {
         self.config = config;
         self
     }
-    
+
     /// Convenience method to create VizModule from a NodesTable
     pub fn from_nodes_table(nodes_table: Arc<crate::storage::table::NodesTable>) -> Self {
         Self::new(nodes_table as Arc<dyn DataSource>)
     }
-    
+
     /// Convenience method to create VizModule from an EdgesTable
     pub fn from_edges_table(edges_table: Arc<crate::storage::table::EdgesTable>) -> Self {
         Self::new(edges_table as Arc<dyn DataSource>)
     }
-    
+
     /// Convenience method to create VizModule from a GraphTable
     pub fn from_graph_table(graph_table: Arc<crate::storage::table::GraphTable>) -> Self {
         Self::new(graph_table as Arc<dyn DataSource>)
     }
-    
+
     /// Check if the data source supports graph visualization
     pub fn supports_graph_view(&self) -> bool {
         self.data_source.supports_graph_view()
     }
-    
+
     /// Get basic statistics about the data source
     pub fn get_info(&self) -> DataSourceInfo {
         let supports_graph = self.data_source.supports_graph_view();
         let total_rows = self.data_source.total_rows();
         let total_cols = self.data_source.total_cols();
-        
+
         let graph_info = if supports_graph {
             let metadata = self.data_source.get_graph_metadata();
             Some(GraphInfo {
@@ -1048,7 +1198,7 @@ impl VizModule {
         } else {
             None
         };
-        
+
         DataSourceInfo {
             total_rows,
             total_cols,
@@ -1234,12 +1384,23 @@ impl InteractiveViz {
         let addr = bind_addr.unwrap_or_else(|| "127.0.0.1".parse().unwrap());
 
         match self {
-            InteractiveViz::Streaming { streaming_server, config, .. } => {
+            InteractiveViz::Streaming {
+                streaming_server,
+                config,
+                ..
+            } => {
                 let port_hint = if config.port == 0 { 8080 } else { config.port };
 
                 // Start the streaming server in background
-                let server_handle = streaming_server.start_background(addr, port_hint)
-                    .map_err(|e| GraphError::internal(&format!("Failed to start visualization server: {}", e), "VizModule::start"))?;
+                let server_handle =
+                    streaming_server
+                        .start_background(addr, port_hint)
+                        .map_err(|e| {
+                            GraphError::internal(
+                                &format!("Failed to start visualization server: {}", e),
+                                "VizModule::start",
+                            )
+                        })?;
 
                 let actual_port = server_handle.port;
                 let url = format!("http://{}:{}", addr, actual_port);
@@ -1248,12 +1409,16 @@ impl InteractiveViz {
 
                 if streaming_server.data_source.supports_graph_view() {
                     let metadata = streaming_server.data_source.get_graph_metadata();
-                    println!("📊 Graph visualization: {} nodes, {} edges",
-                            metadata.node_count, metadata.edge_count);
+                    println!(
+                        "📊 Graph visualization: {} nodes, {} edges",
+                        metadata.node_count, metadata.edge_count
+                    );
                 } else {
-                    println!("📋 Table visualization: {} rows × {} columns",
-                            streaming_server.data_source.total_rows(),
-                            streaming_server.data_source.total_cols());
+                    println!(
+                        "📋 Table visualization: {} rows × {} columns",
+                        streaming_server.data_source.total_rows(),
+                        streaming_server.data_source.total_cols()
+                    );
                 }
 
                 Ok(InteractiveVizSession {
@@ -1264,41 +1429,44 @@ impl InteractiveViz {
             }
 
             InteractiveViz::RealTime(realtime_viz) => {
-                use tokio::runtime::Runtime;
+                use crate::api::graph::GraphDataSource;
+                use crate::viz::realtime::accessor::DataSourceRealtimeAccessor;
+                use crate::viz::realtime::server::start_realtime_background;
                 use std::sync::Arc;
-
-                // Create tokio runtime for async operations
-                let rt = Runtime::new()
-                    .map_err(|e| GraphError::internal(&format!("Failed to create tokio runtime: {}", e), "InteractiveViz::start"))?;
 
                 let port_hint = realtime_viz.config.streaming_config.server_port;
 
-                // Start the real-time visualization engine
-                let engine = Arc::new(tokio::sync::Mutex::new(realtime_viz.engine));
+                // Create a data source accessor from the engine's graph
+                let graph_arc = realtime_viz.engine.get_graph();
+                let graph_guard = graph_arc.lock().unwrap();
+                let data_source = Arc::new(GraphDataSource::new(&*graph_guard));
+                drop(graph_guard); // Release the lock early
+                let accessor: Arc<dyn crate::viz::realtime::accessor::RealtimeVizAccessor> =
+                    Arc::new(DataSourceRealtimeAccessor::new(data_source));
 
-                rt.block_on(async {
-                    let mut engine_guard = engine.lock().await;
-                    engine_guard.initialize().await
-                        .map_err(|e| GraphError::internal(&format!("Failed to initialize real-time engine: {}", e), "InteractiveViz::start"))?;
+                // Start real-time server in background with proper cancellation support
+                let server_handle =
+                    start_realtime_background(port_hint, accessor).map_err(|e| {
+                        GraphError::internal(
+                            &format!("Failed to start realtime server: {}", e),
+                            "InteractiveViz::start",
+                        )
+                    })?;
 
-                    // Start the engine
-                    engine_guard.start().await
-                        .map_err(|e| GraphError::internal(&format!("Failed to start streaming: {}", e), "InteractiveViz::start"))?;
+                let actual_port = server_handle.port;
+                let url = format!("http://{}:{}", addr, actual_port);
 
-                    Ok::<(), GraphError>(())
-                })?;
-
-                let url = format!("http://{}:{}", addr, port_hint);
-
-                println!("🚀 Real-time visualization engine started at: {}", url);
+                println!("🚀 Real-time visualization server started at: {}", url);
                 println!("✨ Features: Real-time streaming, Interactive controls, Performance monitoring");
-                println!("📊 Phase 3 visualization: Multi-dimensional embeddings with honeycomb projection");
+                println!(
+                    "📊 Phase 4 visualization: N-dimensional embeddings with advanced client UI"
+                );
 
-                // Create a mock server handle for compatibility
+                // Convert RealtimeServerHandle to StreamingServerHandle
                 let server_handle = streaming::types::ServerHandle {
-                    port: port_hint,
-                    cancel: tokio_util::sync::CancellationToken::new(),
-                    thread: None,
+                    port: actual_port,
+                    cancel: server_handle.cancel,
+                    thread: server_handle.thread,
                 };
 
                 Ok(InteractiveVizSession {
@@ -1350,7 +1518,9 @@ impl InteractiveViz {
     /// Get information about the data source
     pub fn get_data_info(&self) -> GraphResult<DataSourceInfo> {
         match self {
-            InteractiveViz::Streaming { streaming_server, .. } => {
+            InteractiveViz::Streaming {
+                streaming_server, ..
+            } => {
                 let supports_graph = streaming_server.data_source.supports_graph_view();
                 let graph_info = if supports_graph {
                     let metadata = streaming_server.data_source.get_graph_metadata();
@@ -1409,12 +1579,12 @@ impl InteractiveVizSession {
     pub fn url(&self) -> &str {
         &self.url
     }
-    
+
     /// Get the port the server is running on
     pub fn port(&self) -> u16 {
         self.server_handle.port
     }
-    
+
     /// Stop the visualization server
     pub fn stop(self) {
         self.server_handle.stop()

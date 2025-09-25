@@ -48,13 +48,13 @@ pub struct ChangeTracker {
     strategy: Box<dyn TemporalStorageStrategy>,
 }
 
+use crate::errors::GraphError;
 use crate::state::delta::DeltaObject;
 use crate::storage::pool::GraphPool;
+use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 use crate::utils::strategies::{
     create_strategy, StorageCharacteristics, StorageStrategyType, TemporalStorageStrategy,
 };
-use crate::errors::GraphError;
-use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 use std::collections::{HashMap, HashSet};
 
 impl ChangeTracker {

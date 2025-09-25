@@ -14,33 +14,40 @@
 //! - Comprehensive monitoring and debugging capabilities
 
 use crate::api::graph::Graph;
-use crate::errors::{GraphResult, GraphError};
+use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::embeddings::{EmbeddingConfig, EmbeddingMethod, GraphEmbeddingExt};
 use crate::viz::projection::{
-    ProjectionConfig, ProjectionMethod, HoneycombConfig, QualityConfig,
-    InterpolationConfig, GraphProjectionExt
+    GraphProjectionExt, HoneycombConfig, InterpolationConfig, ProjectionConfig, ProjectionMethod,
+    QualityConfig,
 };
 use crate::viz::streaming::data_source::Position;
 use crate::viz::streaming::server::StreamingServer;
 use crate::viz::streaming::types::{DataUpdate, UpdateType};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
-pub mod engine;
-pub mod streaming;
+pub mod accessor;
 pub mod controls;
-pub mod performance;
+pub mod engine;
+pub mod engine_sync;
 pub mod incremental;
+pub mod interaction;
+pub mod performance;
+pub mod server;
+pub mod streaming;
 
-pub use engine::*;
-pub use streaming::*;
+pub use accessor::*;
 pub use controls::*;
-pub use performance::*;
+pub use engine::*;
+pub use engine_sync::*;
 pub use incremental::*;
+pub use performance::*;
+pub use server::*;
+pub use streaming::*;
 
 /// Configuration for the real-time visualization system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -211,6 +218,9 @@ pub struct RealTimeVizState {
     /// Current node positions
     pub positions: Vec<Position>,
 
+    /// Fast lookup from node_id to position index
+    pub node_index: HashMap<crate::types::NodeId, usize>,
+
     /// Current embedding matrix
     pub embedding: Option<GraphMatrix>,
 
@@ -228,6 +238,15 @@ pub struct RealTimeVizState {
 
     /// Last update timestamp
     pub last_update: Instant,
+
+    /// Whether position updates need to be broadcast
+    pub needs_position_update: bool,
+
+    /// Current layout algorithm being used
+    pub current_layout_algorithm: String,
+
+    /// Parameters for the current layout algorithm
+    pub current_layout_params: std::collections::HashMap<String, String>,
 }
 
 /// Animation state for smooth transitions
@@ -376,7 +395,10 @@ pub enum AttributeFilterType {
     /// Categorical inclusion filter
     Categorical { included_values: Vec<String> },
     /// Text search filter
-    TextSearch { pattern: String, case_sensitive: bool },
+    TextSearch {
+        pattern: String,
+        case_sensitive: bool,
+    },
     /// Boolean filter
     Boolean { value: bool },
 }

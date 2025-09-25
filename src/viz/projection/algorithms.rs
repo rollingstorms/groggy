@@ -1,8 +1,8 @@
 //! Projection algorithms for mapping high-dimensional embeddings to 2D coordinates
 
-use super::{ProjectionEngine, HoneycombConfig, HoneycombLayoutStrategy};
+use super::{HoneycombConfig, HoneycombLayoutStrategy, ProjectionEngine};
 use crate::api::graph::Graph;
-use crate::errors::{GraphResult, GraphError};
+use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::streaming::data_source::Position;
 use std::collections::HashMap;
@@ -16,7 +16,10 @@ pub struct PCAProjection {
 
 impl PCAProjection {
     pub fn new(center: bool, standardize: bool) -> Self {
-        Self { center, standardize }
+        Self {
+            center,
+            standardize,
+        }
     }
 
     /// Compute PCA projection of embedding matrix
@@ -84,7 +87,11 @@ impl PCAProjection {
 }
 
 impl ProjectionEngine for PCAProjection {
-    fn project_embedding(&self, embedding: &GraphMatrix, graph: &Graph) -> GraphResult<Vec<Position>> {
+    fn project_embedding(
+        &self,
+        embedding: &GraphMatrix,
+        graph: &Graph,
+    ) -> GraphResult<Vec<Position>> {
         self.validate_embedding(embedding)?;
 
         // Compute PCA projection
@@ -103,9 +110,15 @@ impl ProjectionEngine for PCAProjection {
         Ok(positions)
     }
 
-    fn supports_incremental(&self) -> bool { false }
-    fn supports_interpolation(&self) -> bool { true }
-    fn name(&self) -> &str { "pca" }
+    fn supports_incremental(&self) -> bool {
+        false
+    }
+    fn supports_interpolation(&self) -> bool {
+        true
+    }
+    fn name(&self) -> &str {
+        "pca"
+    }
 }
 
 /// t-SNE inspired projection (good for clustering)
@@ -118,8 +131,18 @@ pub struct TSNEProjection {
 }
 
 impl TSNEProjection {
-    pub fn new(perplexity: f64, iterations: usize, learning_rate: f64, early_exaggeration: f64) -> Self {
-        Self { perplexity, iterations, learning_rate, early_exaggeration }
+    pub fn new(
+        perplexity: f64,
+        iterations: usize,
+        learning_rate: f64,
+        early_exaggeration: f64,
+    ) -> Self {
+        Self {
+            perplexity,
+            iterations,
+            learning_rate,
+            early_exaggeration,
+        }
     }
 
     /// Compute pairwise distances in high-dimensional space
@@ -128,7 +151,7 @@ impl TSNEProjection {
         let mut distances = GraphMatrix::<f64>::zeros(n, n);
 
         for i in 0..n {
-            for j in i+1..n {
+            for j in i + 1..n {
                 let mut dist_sq = 0.0;
                 for k in 0..embedding.shape().1 {
                     let diff = embedding.get_checked(i, k)? - embedding.get_checked(j, k)?;
@@ -241,7 +264,11 @@ impl TSNEProjection {
 }
 
 impl ProjectionEngine for TSNEProjection {
-    fn project_embedding(&self, embedding: &GraphMatrix, _graph: &Graph) -> GraphResult<Vec<Position>> {
+    fn project_embedding(
+        &self,
+        embedding: &GraphMatrix,
+        _graph: &Graph,
+    ) -> GraphResult<Vec<Position>> {
         self.validate_embedding(embedding)?;
 
         // Compute pairwise distances
@@ -266,9 +293,15 @@ impl ProjectionEngine for TSNEProjection {
         Ok(positions)
     }
 
-    fn supports_incremental(&self) -> bool { false }
-    fn supports_interpolation(&self) -> bool { true }
-    fn name(&self) -> &str { "tsne" }
+    fn supports_incremental(&self) -> bool {
+        false
+    }
+    fn supports_interpolation(&self) -> bool {
+        true
+    }
+    fn name(&self) -> &str {
+        "tsne"
+    }
 }
 
 /// UMAP-inspired projection (balanced global/local preservation)
@@ -281,8 +314,18 @@ pub struct UMAPProjection {
 }
 
 impl UMAPProjection {
-    pub fn new(n_neighbors: usize, min_dist: f64, n_epochs: usize, negative_sample_rate: f64) -> Self {
-        Self { n_neighbors, min_dist, n_epochs, negative_sample_rate }
+    pub fn new(
+        n_neighbors: usize,
+        min_dist: f64,
+        n_epochs: usize,
+        negative_sample_rate: f64,
+    ) -> Self {
+        Self {
+            n_neighbors,
+            min_dist,
+            n_epochs,
+            negative_sample_rate,
+        }
     }
 
     /// Find k-nearest neighbors for each point
@@ -378,7 +421,11 @@ impl UMAPProjection {
 }
 
 impl ProjectionEngine for UMAPProjection {
-    fn project_embedding(&self, embedding: &GraphMatrix, _graph: &Graph) -> GraphResult<Vec<Position>> {
+    fn project_embedding(
+        &self,
+        embedding: &GraphMatrix,
+        _graph: &Graph,
+    ) -> GraphResult<Vec<Position>> {
         self.validate_embedding(embedding)?;
 
         // Compute k-nearest neighbor graph
@@ -400,9 +447,15 @@ impl ProjectionEngine for UMAPProjection {
         Ok(positions)
     }
 
-    fn supports_incremental(&self) -> bool { false }
-    fn supports_interpolation(&self) -> bool { true }
-    fn name(&self) -> &str { "umap" }
+    fn supports_incremental(&self) -> bool {
+        false
+    }
+    fn supports_interpolation(&self) -> bool {
+        true
+    }
+    fn name(&self) -> &str {
+        "umap"
+    }
 }
 
 /// Multi-scale projection combining global and local methods
@@ -419,12 +472,20 @@ impl MultiScaleProjection {
         local_engine: Box<dyn ProjectionEngine>,
         global_weight: f64,
     ) -> Self {
-        Self { global_engine, local_engine, global_weight }
+        Self {
+            global_engine,
+            local_engine,
+            global_weight,
+        }
     }
 }
 
 impl ProjectionEngine for MultiScaleProjection {
-    fn project_embedding(&self, embedding: &GraphMatrix, graph: &Graph) -> GraphResult<Vec<Position>> {
+    fn project_embedding(
+        &self,
+        embedding: &GraphMatrix,
+        graph: &Graph,
+    ) -> GraphResult<Vec<Position>> {
         self.validate_embedding(embedding)?;
 
         // Get projections from both methods
@@ -450,7 +511,9 @@ impl ProjectionEngine for MultiScaleProjection {
         self.global_engine.supports_interpolation() && self.local_engine.supports_interpolation()
     }
 
-    fn name(&self) -> &str { "multi_scale" }
+    fn name(&self) -> &str {
+        "multi_scale"
+    }
 }
 
 /// Custom matrix projection
@@ -466,7 +529,11 @@ impl CustomMatrixProjection {
 }
 
 impl ProjectionEngine for CustomMatrixProjection {
-    fn project_embedding(&self, embedding: &GraphMatrix, _graph: &Graph) -> GraphResult<Vec<Position>> {
+    fn project_embedding(
+        &self,
+        embedding: &GraphMatrix,
+        _graph: &Graph,
+    ) -> GraphResult<Vec<Position>> {
         self.validate_embedding(embedding)?;
 
         // Apply custom projection matrix
@@ -474,7 +541,7 @@ impl ProjectionEngine for CustomMatrixProjection {
 
         if projected.shape().1 < 2 {
             return Err(GraphError::InvalidInput(
-                "Custom projection matrix must produce at least 2 dimensions".to_string()
+                "Custom projection matrix must produce at least 2 dimensions".to_string(),
             ));
         }
 
@@ -491,9 +558,15 @@ impl ProjectionEngine for CustomMatrixProjection {
         Ok(positions)
     }
 
-    fn supports_incremental(&self) -> bool { true }
-    fn supports_interpolation(&self) -> bool { true }
-    fn name(&self) -> &str { "custom_matrix" }
+    fn supports_incremental(&self) -> bool {
+        true
+    }
+    fn supports_interpolation(&self) -> bool {
+        true
+    }
+    fn name(&self) -> &str {
+        "custom_matrix"
+    }
 }
 
 /// Energy-based projection with custom forces
@@ -506,13 +579,27 @@ pub struct EnergyBasedProjection {
 }
 
 impl EnergyBasedProjection {
-    pub fn new(attraction_strength: f64, repulsion_strength: f64, iterations: usize, learning_rate: f64) -> Self {
-        Self { attraction_strength, repulsion_strength, iterations, learning_rate }
+    pub fn new(
+        attraction_strength: f64,
+        repulsion_strength: f64,
+        iterations: usize,
+        learning_rate: f64,
+    ) -> Self {
+        Self {
+            attraction_strength,
+            repulsion_strength,
+            iterations,
+            learning_rate,
+        }
     }
 }
 
 impl ProjectionEngine for EnergyBasedProjection {
-    fn project_embedding(&self, embedding: &GraphMatrix, graph: &Graph) -> GraphResult<Vec<Position>> {
+    fn project_embedding(
+        &self,
+        embedding: &GraphMatrix,
+        graph: &Graph,
+    ) -> GraphResult<Vec<Position>> {
         self.validate_embedding(embedding)?;
 
         let (n_samples, _) = embedding.shape();
@@ -529,7 +616,7 @@ impl ProjectionEngine for EnergyBasedProjection {
         // Compute pairwise distances in high-dimensional space
         let mut hd_distances = GraphMatrix::<f64>::zeros(n_samples, n_samples);
         for i in 0..n_samples {
-            for j in i+1..n_samples {
+            for j in i + 1..n_samples {
                 let mut dist_sq = 0.0;
                 for k in 0..embedding.shape().1 {
                     let diff = embedding.get_checked(i, k)? - embedding.get_checked(j, k)?;
@@ -597,9 +684,15 @@ impl ProjectionEngine for EnergyBasedProjection {
         Ok(result_positions)
     }
 
-    fn supports_incremental(&self) -> bool { false }
-    fn supports_interpolation(&self) -> bool { true }
-    fn name(&self) -> &str { "energy_based" }
+    fn supports_incremental(&self) -> bool {
+        false
+    }
+    fn supports_interpolation(&self) -> bool {
+        true
+    }
+    fn name(&self) -> &str {
+        "energy_based"
+    }
 }
 
 #[cfg(test)]

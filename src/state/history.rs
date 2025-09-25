@@ -10,10 +10,10 @@
 //! - Git-like branching model (lightweight branches, merge capabilities)
 //! - Efficient diff-based storage (only store what changed)
 
+use crate::errors::{GraphError, GraphResult};
 use crate::state::change_tracker::ChangeSet;
 use crate::state::ref_manager::BranchInfo;
 use crate::state::state::{GraphSnapshot, StateDiff, StateMetadata};
-use crate::errors::{GraphError, GraphResult};
 use crate::types::{AttrName, AttrValue, BranchName, EdgeId, NodeId, StateId};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

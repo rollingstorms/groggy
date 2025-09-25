@@ -1,17 +1,17 @@
 //! BaseTable - unified table implementation built on BaseArray columns
 
 use super::traits::{Table, TableIterator};
-use crate::storage::array::{BaseArray, ArrayOps};
+use crate::core::{DisplayDataSchema, DisplayDataWindow, StreamingDataSchema, StreamingDataWindow};
 use crate::errors::GraphResult;
+use crate::storage::array::{ArrayOps, BaseArray};
 use crate::types::AttrValue;
-use crate::viz::display::{DisplayEngine, DisplayConfig, ColumnSchema, DataType, OutputFormat};
-use crate::core::{DisplayDataWindow, DisplayDataSchema, StreamingDataWindow, StreamingDataSchema};
-use crate::viz::streaming::data_source::{DataWindow, DataSchema};
-use crate::viz::streaming::DataSource;
+use crate::viz::display::{ColumnSchema, DataType, DisplayConfig, DisplayEngine, OutputFormat};
+use crate::viz::streaming::data_source::{DataSchema, DataWindow};
+use crate::viz::streaming::data_source::{GraphNode, LayoutAlgorithm, NodePosition};
 use crate::viz::streaming::server::StreamingServer;
 use crate::viz::streaming::types::StreamingConfig;
-use crate::viz::streaming::data_source::{GraphNode, LayoutAlgorithm, NodePosition};
-use crate::viz::{VizModule, InteractiveOptions};
+use crate::viz::streaming::DataSource;
+use crate::viz::{InteractiveOptions, VizModule};
 use std::collections::HashMap;
 
 /// Unified table implementation using BaseArray columns
@@ -58,8 +58,11 @@ impl BaseTable {
     /// Create a new empty BaseTable
     pub fn new() -> Self {
         use std::time::{SystemTime, UNIX_EPOCH};
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+
         Self {
             columns: HashMap::new(),
             column_order: Vec::new(),
@@ -72,16 +75,16 @@ impl BaseTable {
             version: 1,
         }
     }
-    
+
     /// Create a BaseTable from columns
     pub fn from_columns(columns: HashMap<String, BaseArray<AttrValue>>) -> GraphResult<Self> {
         if columns.is_empty() {
             return Ok(Self::new());
         }
-        
+
         // Find the maximum column length to handle sparse attributes
         let max_len = columns.values().map(|col| col.len()).max().unwrap();
-        
+
         // Pad shorter columns with nulls to handle sparse attribute matrices
         let mut normalized_columns = HashMap::new();
         for (name, column) in columns {
@@ -94,14 +97,17 @@ impl BaseTable {
                 normalized_columns.insert(name, column);
             }
         }
-        
+
         // Sort column names for deterministic ordering (like groupby sorting)
         let mut column_order: Vec<String> = normalized_columns.keys().cloned().collect();
         column_order.sort();
-        
+
         use std::time::{SystemTime, UNIX_EPOCH};
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+
         Ok(Self {
             columns: normalized_columns,
             column_order,
@@ -114,35 +120,45 @@ impl BaseTable {
             version: 1,
         })
     }
-    
+
     /// Create a BaseTable with specific column order
-    pub fn with_column_order(columns: HashMap<String, BaseArray<AttrValue>>, column_order: Vec<String>) -> GraphResult<Self> {
+    pub fn with_column_order(
+        columns: HashMap<String, BaseArray<AttrValue>>,
+        column_order: Vec<String>,
+    ) -> GraphResult<Self> {
         // Validate column order matches available columns
         for col in &column_order {
             if !columns.contains_key(col) {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("Column '{}' specified in order but not found in columns", col)
-                ));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Column '{}' specified in order but not found in columns",
+                    col
+                )));
             }
         }
-        
+
         if columns.is_empty() {
             return Ok(Self::new());
         }
-        
+
         // Validate all columns have same length
         let first_len = columns.values().next().unwrap().len();
         for (name, column) in &columns {
             if column.len() != first_len {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("Column '{}' has length {} but expected {}", name, column.len(), first_len)
-                ));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Column '{}' has length {} but expected {}",
+                    name,
+                    column.len(),
+                    first_len
+                )));
             }
         }
-        
+
         use std::time::{SystemTime, UNIX_EPOCH};
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+
         Ok(Self {
             columns,
             column_order,
@@ -155,17 +171,17 @@ impl BaseTable {
             version: 1,
         })
     }
-    
+
     /// Get internal columns reference (for advanced usage)
     pub fn columns(&self) -> &HashMap<String, BaseArray<AttrValue>> {
         &self.columns
     }
-    
+
     /// Get column order
     pub fn column_order(&self) -> &[String] {
         &self.column_order
     }
-    
+
     /// Convert to NodesTable if appropriate (contains node_id column)
     pub fn as_nodes_table(&self) -> Option<super::nodes::NodesTable> {
         if self.has_column("node_id") {
@@ -174,30 +190,32 @@ impl BaseTable {
             None
         }
     }
-    
+
     /// Convert to NodesTable with UID key validation (Phase 2 plan method)
     pub fn to_nodes(self, uid_key: &str) -> GraphResult<super::nodes::NodesTable> {
         // Validate that the UID key column exists
         if !self.has_column(uid_key) {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("UID column '{}' not found", uid_key)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "UID column '{}' not found",
+                uid_key
+            )));
         }
-        
+
         // If uid_key is not "node_id", we need to rename it
         let table_with_node_id = if uid_key == "node_id" {
             self
         } else {
             // For now, require that the UID column is already named "node_id"
             // Future enhancement could rename the column
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("UID column must be named 'node_id', found '{}'", uid_key)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "UID column must be named 'node_id', found '{}'",
+                uid_key
+            )));
         };
-        
+
         super::nodes::NodesTable::from_base_table(table_with_node_id)
     }
-    
+
     /// Convert to EdgesTable if appropriate (contains edge_id column)  
     pub fn as_edges_table(&self) -> Option<super::edges::EdgesTable> {
         if self.has_column("edge_id") {
@@ -206,53 +224,61 @@ impl BaseTable {
             None
         }
     }
-    
+
     /// Convert to EdgesTable with validation (Phase 3 plan method)
     pub fn to_edges(self) -> GraphResult<super::edges::EdgesTable> {
         // Validate that required edge columns exist
         let required_cols = ["edge_id", "source", "target"];
         for col in &required_cols {
             if !self.has_column(col) {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("EdgesTable requires '{}' column", col)
-                ));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "EdgesTable requires '{}' column",
+                    col
+                )));
             }
         }
-        
+
         super::edges::EdgesTable::from_base_table(self)
     }
-    
+
     // =============================================================================
     // Setting Methods - Comprehensive assignment and modification operations
     // =============================================================================
-    
+
     /// Assign updates to multiple columns at once
-    /// 
+    ///
     /// # Arguments
     /// * `updates` - HashMap mapping column names to new values
-    /// 
+    ///
     /// # Examples
     /// ```
     /// let mut updates = HashMap::new();
     /// updates.insert("bonus".to_string(), vec![AttrValue::Float(1000.0), AttrValue::Float(1500.0)]);
     /// table.assign(updates)?;
     /// ```
-    pub fn assign(&mut self, updates: HashMap<String, Vec<crate::types::AttrValue>>) -> GraphResult<()> {
+    pub fn assign(
+        &mut self,
+        updates: HashMap<String, Vec<crate::types::AttrValue>>,
+    ) -> GraphResult<()> {
         use crate::types::{AttrValue, AttrValueType};
-        
+
         // Validate that all update vectors have the correct length
         for (col_name, values) in &updates {
             if values.len() != self.nrows {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("Column '{}' update has {} values but table has {} rows", col_name, values.len(), self.nrows)
-                ));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Column '{}' update has {} values but table has {} rows",
+                    col_name,
+                    values.len(),
+                    self.nrows
+                )));
             }
         }
-        
+
         // Apply updates
         for (col_name, values) in updates {
             // Infer dtype from the first non-null value
-            let dtype = values.iter()
+            let dtype = values
+                .iter()
                 .find(|v| !matches!(v, AttrValue::Null))
                 .map(|v| match v {
                     AttrValue::Int(_) => AttrValueType::Int,
@@ -267,36 +293,44 @@ impl BaseTable {
                     _ => AttrValueType::Text, // fallback for other types
                 })
                 .unwrap_or(AttrValueType::Text);
-            
+
             let new_column = BaseArray::new(values);
-            
+
             // Add to column order if it's a new column
             if !self.columns.contains_key(&col_name) {
                 self.column_order.push(col_name.clone());
             }
-            
+
             self.columns.insert(col_name, new_column);
         }
-        
+
         Ok(())
     }
-    
+
     /// Set an entire column with new values
-    /// 
+    ///
     /// # Arguments
     /// * `column_name` - Name of the column to set
     /// * `values` - Vector of new values for the column
-    pub fn set_column(&mut self, column_name: &str, values: Vec<crate::types::AttrValue>) -> GraphResult<()> {
+    pub fn set_column(
+        &mut self,
+        column_name: &str,
+        values: Vec<crate::types::AttrValue>,
+    ) -> GraphResult<()> {
         use crate::types::{AttrValue, AttrValueType};
-        
+
         if values.len() != self.nrows {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Column '{}' has {} values but table has {} rows", column_name, values.len(), self.nrows)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Column '{}' has {} values but table has {} rows",
+                column_name,
+                values.len(),
+                self.nrows
+            )));
         }
-        
+
         // Infer dtype from the first non-null value
-        let dtype = values.iter()
+        let dtype = values
+            .iter()
             .find(|v| !matches!(v, AttrValue::Null))
             .map(|v| match v {
                 AttrValue::Int(_) => AttrValueType::Int,
@@ -311,126 +345,159 @@ impl BaseTable {
                 _ => AttrValueType::Text,
             })
             .unwrap_or(AttrValueType::Text);
-        
+
         let new_column = BaseArray::new(values);
-        
+
         // Add to column order if it's a new column
         if !self.columns.contains_key(column_name) {
             self.column_order.push(column_name.to_string());
         }
-        
+
         self.columns.insert(column_name.to_string(), new_column);
         Ok(())
     }
-    
+
     /// Set a single value at a specific row and column
-    /// 
+    ///
     /// # Arguments
     /// * `row` - Row index (0-based)
     /// * `column_name` - Name of the column
     /// * `value` - New value to set
-    pub fn set_value(&mut self, row: usize, column_name: &str, value: crate::types::AttrValue) -> GraphResult<()> {
+    pub fn set_value(
+        &mut self,
+        row: usize,
+        column_name: &str,
+        value: crate::types::AttrValue,
+    ) -> GraphResult<()> {
         if row >= self.nrows {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Row index {} out of bounds (table has {} rows)", row, self.nrows)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Row index {} out of bounds (table has {} rows)",
+                row, self.nrows
+            )));
         }
-        
-        let column = self.columns.get_mut(column_name)
-            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                format!("Column '{}' not found in table", column_name)
-            ))?;
-        
+
+        let column = self.columns.get_mut(column_name).ok_or_else(|| {
+            crate::errors::GraphError::InvalidInput(format!(
+                "Column '{}' not found in table",
+                column_name
+            ))
+        })?;
+
         column.set(row, value)?;
         Ok(())
     }
-    
+
     /// Set values for multiple rows in a column using a boolean mask
-    /// 
+    ///
     /// # Arguments
     /// * `mask` - Boolean vector indicating which rows to update
     /// * `column_name` - Name of the column to update
     /// * `value` - Value to set for all masked rows
-    pub fn set_values_by_mask(&mut self, mask: &[bool], column_name: &str, value: crate::types::AttrValue) -> GraphResult<()> {
+    pub fn set_values_by_mask(
+        &mut self,
+        mask: &[bool],
+        column_name: &str,
+        value: crate::types::AttrValue,
+    ) -> GraphResult<()> {
         if mask.len() != self.nrows {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Mask length {} does not match table rows {}", mask.len(), self.nrows)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Mask length {} does not match table rows {}",
+                mask.len(),
+                self.nrows
+            )));
         }
-        
-        let column = self.columns.get_mut(column_name)
-            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                format!("Column '{}' not found in table", column_name)
-            ))?;
-        
+
+        let column = self.columns.get_mut(column_name).ok_or_else(|| {
+            crate::errors::GraphError::InvalidInput(format!(
+                "Column '{}' not found in table",
+                column_name
+            ))
+        })?;
+
         for (i, &should_update) in mask.iter().enumerate() {
             if should_update {
                 column.set(i, value.clone())?;
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Set values for a range of rows in a column
-    /// 
+    ///
     /// # Arguments
     /// * `start` - Starting row index (inclusive)
     /// * `end` - Ending row index (exclusive)
     /// * `step` - Step size (default 1 for consecutive rows)
     /// * `column_name` - Name of the column to update
     /// * `value` - Value to set for all rows in the range
-    pub fn set_values_by_range(&mut self, start: usize, end: usize, step: usize, column_name: &str, value: crate::types::AttrValue) -> GraphResult<()> {
+    pub fn set_values_by_range(
+        &mut self,
+        start: usize,
+        end: usize,
+        step: usize,
+        column_name: &str,
+        value: crate::types::AttrValue,
+    ) -> GraphResult<()> {
         if start >= self.nrows || end > self.nrows {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Range [{}, {}) is out of bounds for table with {} rows", start, end, self.nrows)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Range [{}, {}) is out of bounds for table with {} rows",
+                start, end, self.nrows
+            )));
         }
-        
+
         if step == 0 {
             return Err(crate::errors::GraphError::InvalidInput(
-                "Step size must be greater than 0".to_string()
+                "Step size must be greater than 0".to_string(),
             ));
         }
-        
-        let column = self.columns.get_mut(column_name)
-            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                format!("Column '{}' not found in table", column_name)
-            ))?;
-        
+
+        let column = self.columns.get_mut(column_name).ok_or_else(|| {
+            crate::errors::GraphError::InvalidInput(format!(
+                "Column '{}' not found in table",
+                column_name
+            ))
+        })?;
+
         let mut i = start;
         while i < end {
             column.set(i, value.clone())?;
             i += step;
         }
-        
+
         Ok(())
     }
-    
+
     /// Set values for multiple columns and multiple rows simultaneously
-    /// 
+    ///
     /// # Arguments
     /// * `row_indices` - Vector of row indices to update
     /// * `column_updates` - HashMap mapping column names to values
-    pub fn set_multiple_values(&mut self, row_indices: &[usize], column_updates: &HashMap<String, crate::types::AttrValue>) -> GraphResult<()> {
+    pub fn set_multiple_values(
+        &mut self,
+        row_indices: &[usize],
+        column_updates: &HashMap<String, crate::types::AttrValue>,
+    ) -> GraphResult<()> {
         // Validate row indices
         for &row_idx in row_indices {
             if row_idx >= self.nrows {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("Row index {} out of bounds (table has {} rows)", row_idx, self.nrows)
-                ));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Row index {} out of bounds (table has {} rows)",
+                    row_idx, self.nrows
+                )));
             }
         }
-        
+
         // Validate columns exist
         for col_name in column_updates.keys() {
             if !self.columns.contains_key(col_name) {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("Column '{}' not found in table", col_name)
-                ));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Column '{}' not found in table",
+                    col_name
+                )));
             }
         }
-        
+
         // Apply updates
         for &row_idx in row_indices {
             for (col_name, value) in column_updates {
@@ -438,7 +505,7 @@ impl BaseTable {
                 column.set(row_idx, value.clone())?;
             }
         }
-        
+
         Ok(())
     }
 }
@@ -453,50 +520,51 @@ impl Table for BaseTable {
     fn nrows(&self) -> usize {
         self.nrows
     }
-    
+
     fn ncols(&self) -> usize {
         self.columns.len()
     }
-    
+
     fn column_names(&self) -> &[String] {
         &self.column_order
     }
-    
+
     fn column(&self, name: &str) -> Option<&BaseArray<AttrValue>> {
         self.columns.get(name)
     }
-    
+
     fn column_by_index(&self, index: usize) -> Option<&BaseArray<AttrValue>> {
-        self.column_order.get(index)
+        self.column_order
+            .get(index)
             .and_then(|name| self.columns.get(name))
     }
-    
+
     fn has_column(&self, name: &str) -> bool {
         self.columns.contains_key(name)
     }
-    
+
     fn head(&self, n: usize) -> Self {
         let end = std::cmp::min(n, self.nrows);
         self.slice(0, end)
     }
-    
+
     fn tail(&self, n: usize) -> Self {
         let start = self.nrows.saturating_sub(n);
         self.slice(start, self.nrows)
     }
-    
+
     fn slice(&self, start: usize, end: usize) -> Self {
         if start >= self.nrows || end <= start {
             return Self::new();
         }
-        
+
         let actual_end = std::cmp::min(end, self.nrows);
         let mut new_columns = HashMap::new();
-        
+
         for (name, column) in &self.columns {
             new_columns.insert(name.clone(), column.slice(start, actual_end));
         }
-        
+
         Self {
             columns: new_columns,
             column_order: self.column_order.clone(),
@@ -509,22 +577,21 @@ impl Table for BaseTable {
             version: self.version + 1, // Increment version for new slice
         }
     }
-    
+
     fn sort_by(&self, column: &str, ascending: bool) -> GraphResult<Self> {
-        let sort_column = self.column(column)
-            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                format!("Column '{}' not found", column)
-            ))?;
-        
+        let sort_column = self.column(column).ok_or_else(|| {
+            crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", column))
+        })?;
+
         // Get sort indices
         let indices = sort_column.sort_indices(ascending);
-        
+
         // Apply indices to all columns
         let mut new_columns = HashMap::new();
         for (name, col) in &self.columns {
             new_columns.insert(name.clone(), col.take_indices(&indices)?);
         }
-        
+
         Ok(Self {
             columns: new_columns,
             column_order: self.column_order.clone(),
@@ -537,19 +604,19 @@ impl Table for BaseTable {
             version: self.version + 1,
         })
     }
-    
+
     fn filter(&self, predicate: &str) -> GraphResult<Self> {
         // Enhanced predicate parsing supporting multiple operators
         let mask = self.evaluate_predicate(predicate)?;
-        
+
         // Apply mask to all columns
         let mut new_columns = HashMap::new();
         for (name, col) in &self.columns {
             new_columns.insert(name.clone(), col.filter_by_mask(&mask)?);
         }
-        
+
         let new_nrows = mask.iter().filter(|&&x| x).count();
-        
+
         Ok(Self {
             columns: new_columns,
             column_order: self.column_order.clone(),
@@ -562,7 +629,7 @@ impl Table for BaseTable {
             version: self.version + 1,
         })
     }
-    
+
     fn group_by(&self, columns: &[String]) -> GraphResult<Vec<Self>> {
         if columns.is_empty() {
             return Ok(vec![self.clone()]);
@@ -571,15 +638,16 @@ impl Table for BaseTable {
         // Validate that all group columns exist
         for col_name in columns {
             if !self.columns.contains_key(col_name) {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("Column '{}' not found in table", col_name)
-                ));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Column '{}' not found in table",
+                    col_name
+                )));
             }
         }
 
         // Create groups by building composite keys
         let mut groups: HashMap<Vec<String>, Vec<usize>> = HashMap::new();
-        
+
         for row_idx in 0..self.nrows {
             // Build composite key for this row
             let mut key = Vec::new();
@@ -594,7 +662,7 @@ impl Table for BaseTable {
                     key.push("NULL".to_string());
                 }
             }
-            
+
             groups.entry(key).or_insert_with(Vec::new).push(row_idx);
         }
 
@@ -608,18 +676,16 @@ impl Table for BaseTable {
         Ok(result)
     }
 
-    
     fn select(&self, column_names: &[String]) -> GraphResult<Self> {
         let mut new_columns = HashMap::new();
-        
+
         for name in column_names {
-            let column = self.column(name)
-                .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                    format!("Column '{}' not found", name)
-                ))?;
+            let column = self.column(name).ok_or_else(|| {
+                crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", name))
+            })?;
             new_columns.insert(name.clone(), column.clone());
         }
-        
+
         Ok(Self {
             columns: new_columns,
             column_order: column_names.to_vec(),
@@ -632,27 +698,33 @@ impl Table for BaseTable {
             version: self.version + 1,
         })
     }
-    
+
     fn with_column(&self, name: String, column: BaseArray<AttrValue>) -> GraphResult<Self> {
         if column.len() != self.nrows && self.nrows > 0 {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("New column has {} rows but table has {} rows", column.len(), self.nrows)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "New column has {} rows but table has {} rows",
+                column.len(),
+                self.nrows
+            )));
         }
-        
+
         let mut new_columns = self.columns.clone();
         let mut new_order = self.column_order.clone();
-        
+
         if !new_columns.contains_key(&name) {
             new_order.push(name.clone());
         }
-        
+
         new_columns.insert(name, column.clone());
-        
+
         Ok(Self {
             columns: new_columns,
             column_order: new_order,
-            nrows: if self.nrows == 0 { column.len() } else { self.nrows },
+            nrows: if self.nrows == 0 {
+                column.len()
+            } else {
+                self.nrows
+            },
             display_engine: self.display_engine.clone(),
             streaming_server: None,
             active_server_handles: Vec::new(),
@@ -661,16 +733,16 @@ impl Table for BaseTable {
             version: self.version + 1,
         })
     }
-    
+
     fn drop_columns(&self, column_names: &[String]) -> GraphResult<Self> {
         let mut new_columns = self.columns.clone();
         let mut new_order = self.column_order.clone();
-        
+
         for name in column_names {
             new_columns.remove(name);
             new_order.retain(|x| x != name);
         }
-        
+
         Ok(Self {
             columns: new_columns,
             column_order: new_order,
@@ -683,7 +755,7 @@ impl Table for BaseTable {
             version: self.version + 1,
         })
     }
-    
+
     fn iter(&self) -> TableIterator<Self> {
         TableIterator::new(self.clone())
     }
@@ -693,19 +765,21 @@ impl BaseTable {
     /// Filter by boolean mask
     pub fn filter_by_mask(&self, mask: &[bool]) -> GraphResult<Self> {
         if mask.len() != self.nrows {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Mask length {} doesn't match table rows {}", mask.len(), self.nrows)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Mask length {} doesn't match table rows {}",
+                mask.len(),
+                self.nrows
+            )));
         }
-        
+
         // Apply mask to all columns
         let mut new_columns = HashMap::new();
         for (name, col) in &self.columns {
             new_columns.insert(name.clone(), col.filter_by_mask(mask)?);
         }
-        
+
         let new_nrows = mask.iter().filter(|&&x| x).count();
-        
+
         Ok(Self {
             columns: new_columns,
             column_order: self.column_order.clone(),
@@ -725,22 +799,20 @@ impl BaseTable {
     /// Convert BaseTable data to unified DataWindow format
     fn to_data_window(&self, config: &DisplayConfig) -> DisplayDataWindow {
         // Check if we should use ellipses truncation pattern
-        if (self.nrows > config.max_rows && config.max_rows > 6) || 
-           (self.column_order.len() > config.max_cols && config.max_cols > 6) {
+        if (self.nrows > config.max_rows && config.max_rows > 6)
+            || (self.column_order.len() > config.max_cols && config.max_cols > 6)
+        {
             // Use ellipses pattern for both dense matrices and large tables
             return self.create_ellipses_data_window(config);
         }
-        
-        // Standard truncation for small tables  
+
+        // Standard truncation for small tables
         let max_rows = config.max_rows.min(self.nrows);
         let max_cols = config.max_cols.min(self.column_order.len());
-        
+
         // Extract headers (limited by max_cols)
-        let headers: Vec<String> = self.column_order.iter()
-            .take(max_cols)
-            .cloned()
-            .collect();
-        
+        let headers: Vec<String> = self.column_order.iter().take(max_cols).cloned().collect();
+
         // Extract rows data
         let mut rows = Vec::with_capacity(max_rows);
         for row_idx in 0..max_rows {
@@ -759,7 +831,7 @@ impl BaseTable {
             }
             rows.push(row);
         }
-        
+
         // Create schema with inferred data types
         let mut columns_schema = Vec::with_capacity(headers.len());
         for col_name in &headers {
@@ -769,50 +841,57 @@ impl BaseTable {
             } else {
                 DataType::Unknown
             };
-            
+
             columns_schema.push(ColumnSchema {
                 name: col_name.clone(),
                 data_type,
             });
         }
-        
+
         let schema = DisplayDataSchema::new(columns_schema);
-        
+
         // Create DataWindow with full dataset info
         DisplayDataWindow::with_window_info(
             headers,
             rows,
             schema,
-            self.nrows,          // total_rows
+            self.nrows,              // total_rows
             self.column_order.len(), // total_cols
-            0                    // start_offset
+            0,                       // start_offset
         )
     }
-    
+
     /// Create data window with ellipses pattern for large tables and matrices
     fn create_ellipses_data_window(&self, config: &DisplayConfig) -> DisplayDataWindow {
         // Calculate how many rows/cols to show at beginning and end
         let display_rows = config.max_rows;
         let display_cols = config.max_cols;
-        
+
         // Show roughly equal parts at start and end, with ellipses in middle
         let rows_per_side = (display_rows - 1) / 2; // -1 for ellipses row
         let cols_per_side = (display_cols - 1) / 2; // -1 for ellipses col
-        
+
         // Extract column names for display (first N, ellipsis marker, last N)
         let mut display_headers = Vec::new();
         let total_cols = self.column_order.len();
-        
+
         // First columns
         for i in 0..cols_per_side.min(total_cols) {
             display_headers.push(self.column_order[i].clone());
         }
-        
+
         // Ellipsis column marker (if needed)
         if total_cols > display_cols {
-            display_headers.push(if config.show_headers { "⋯ (cols)" } else { "⋯" }.to_string());
+            display_headers.push(
+                if config.show_headers {
+                    "⋯ (cols)"
+                } else {
+                    "⋯"
+                }
+                .to_string(),
+            );
         }
-        
+
         // Last columns (only if we have more than can fit in first part)
         if total_cols > cols_per_side {
             let start_last = (total_cols - cols_per_side).max(cols_per_side + 1);
@@ -820,15 +899,15 @@ impl BaseTable {
                 display_headers.push(self.column_order[i].clone());
             }
         }
-        
+
         // Extract rows data with ellipses pattern
         let mut display_rows_data = Vec::new();
         let total_rows = self.nrows;
-        
+
         // Helper closure to create a row of data
         let create_row = |row_idx: usize| -> Vec<String> {
             let mut row = Vec::new();
-            
+
             // First columns
             for i in 0..cols_per_side.min(total_cols) {
                 let col_name = &self.column_order[i];
@@ -843,12 +922,12 @@ impl BaseTable {
                 };
                 row.push(value_str);
             }
-            
+
             // Ellipsis column (if needed)
             if total_cols > display_cols {
                 row.push("⋯".to_string());
             }
-            
+
             // Last columns
             if total_cols > cols_per_side {
                 let start_last = (total_cols - cols_per_side).max(cols_per_side + 1);
@@ -866,23 +945,22 @@ impl BaseTable {
                     row.push(value_str);
                 }
             }
-            
+
             row
         };
-        
+
         // First rows
         for row_idx in 0..rows_per_side.min(total_rows) {
             display_rows_data.push(create_row(row_idx));
         }
-        
+
         // Ellipsis row (if we have truncation)
         if total_rows > display_rows {
-            let ellipsis_row: Vec<String> = display_headers.iter()
-                .map(|_| "⋮".to_string())
-                .collect();
+            let ellipsis_row: Vec<String> =
+                display_headers.iter().map(|_| "⋮".to_string()).collect();
             display_rows_data.push(ellipsis_row);
         }
-        
+
         // Last rows
         if total_rows > rows_per_side {
             let start_last = (total_rows - rows_per_side).max(rows_per_side + 1);
@@ -890,9 +968,10 @@ impl BaseTable {
                 display_rows_data.push(create_row(row_idx));
             }
         }
-        
+
         // Create schema with proper data type inference
-        let columns_schema: Vec<ColumnSchema> = display_headers.iter()
+        let columns_schema: Vec<ColumnSchema> = display_headers
+            .iter()
             .map(|name| ColumnSchema {
                 name: name.clone(),
                 data_type: if name == "⋯" || name.contains("⋮") || name.contains("(cols)") {
@@ -905,9 +984,9 @@ impl BaseTable {
                 },
             })
             .collect();
-        
+
         let schema = DisplayDataSchema::new(columns_schema);
-        
+
         // Create DataWindow with full dataset info
         DisplayDataWindow::with_window_info(
             display_headers,
@@ -915,10 +994,10 @@ impl BaseTable {
             schema,
             self.nrows,              // total_rows
             self.column_order.len(), // total_cols
-            0                        // start_offset
+            0,                       // start_offset
         )
     }
-    
+
     /// Infer data type from AttrValue column
     fn infer_column_data_type(&self, column: &BaseArray<AttrValue>) -> DataType {
         // Look at first few non-null values to infer type
@@ -939,54 +1018,54 @@ impl BaseTable {
         }
         DataType::Unknown
     }
-    
+
     /// Main display method using new unified system (__repr__ equivalent)
     pub fn __repr__(&self) -> String {
         let data_window = self.to_data_window(&self.display_engine.config);
         self.display_engine.format_unicode(&data_window)
     }
-    
-    /// HTML display method (_repr_html_ equivalent) 
+
+    /// HTML display method (_repr_html_ equivalent)
     pub fn _repr_html_(&self) -> String {
         let data_window = self.to_data_window(&self.display_engine.config);
         self.display_engine.format_html(&data_window)
     }
-    
+
     /// Rich display with configurable output format
     pub fn rich_display(&self, config: Option<DisplayConfig>) -> String {
         let config = config.unwrap_or(self.display_engine.config.clone());
         let data_window = self.to_data_window(&config);
-        
+
         match config.output_format {
             OutputFormat::Unicode => {
                 let mut engine = self.display_engine.clone();
                 engine.set_config(config);
                 engine.format_unicode(&data_window)
-            },
+            }
             OutputFormat::Html => {
                 let mut engine = self.display_engine.clone();
                 engine.set_config(config);
                 engine.format_html(&data_window)
-            },
+            }
             OutputFormat::Interactive => {
                 let mut engine = self.display_engine.clone();
                 engine.set_config(config);
                 engine.rich_display(&data_window, OutputFormat::Interactive)
-            },
+            }
         }
     }
-    
+
     /// Interactive display method (placeholder for Phase 3)
     pub fn interactive_display(&self, config: Option<DisplayConfig>) -> String {
         let config = config.unwrap_or_else(|| DisplayConfig::interactive());
         self.rich_display(Some(config))
     }
-    
+
     /// Get display configuration
     pub fn get_display_config(&self) -> &DisplayConfig {
         &self.display_engine.config
     }
-    
+
     /// Set display configuration
     pub fn set_display_config(&mut self, config: DisplayConfig) {
         self.display_engine.set_config(config);
@@ -1007,35 +1086,38 @@ impl BaseTable {
     pub fn evaluate_predicate(&self, predicate: &str) -> GraphResult<Vec<bool>> {
         // Support various operators: ==, !=, <, <=, >, >=
         let operators = [">=", "<=", "!=", "==", ">", "<"];
-        
+
         let mut column_name = "";
         let mut operator = "";
         let mut value_str = "";
-        
+
         // Find the operator
         for op in &operators {
             if let Some(pos) = predicate.find(op) {
                 column_name = predicate[..pos].trim();
                 operator = op;
-                value_str = predicate[pos + op.len()..].trim().trim_matches('"').trim_matches('\'');
+                value_str = predicate[pos + op.len()..]
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'');
                 break;
             }
         }
-        
+
         if operator.is_empty() {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Unsupported predicate format: '{}'. Use operators: ==, !=, <, <=, >, >=", predicate)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Unsupported predicate format: '{}'. Use operators: ==, !=, <, <=, >, >=",
+                predicate
+            )));
         }
-        
-        let filter_column = self.column(column_name)
-            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                format!("Column '{}' not found", column_name)
-            ))?;
-        
+
+        let filter_column = self.column(column_name).ok_or_else(|| {
+            crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", column_name))
+        })?;
+
         // Generate mask based on operator and value type
         let mut mask = Vec::with_capacity(self.nrows);
-        
+
         for i in 0..self.nrows {
             let row_value = filter_column.get(i);
             let matches = match row_value {
@@ -1044,14 +1126,18 @@ impl BaseTable {
             };
             mask.push(matches);
         }
-        
+
         Ok(mask)
     }
-    
+
     /// Compare an AttrValue with a string value using the given operator
-    pub fn compare_attr_value(attr_val: &crate::types::AttrValue, operator: &str, value_str: &str) -> GraphResult<bool> {
+    pub fn compare_attr_value(
+        attr_val: &crate::types::AttrValue,
+        operator: &str,
+        value_str: &str,
+    ) -> GraphResult<bool> {
         use crate::types::AttrValue;
-        
+
         let result = match attr_val {
             AttrValue::Int(i) => {
                 if let Ok(val) = value_str.parse::<i64>() {
@@ -1067,7 +1153,7 @@ impl BaseTable {
                 } else {
                     false
                 }
-            },
+            }
             AttrValue::SmallInt(i) => {
                 if let Ok(val) = value_str.parse::<i32>() {
                     let i_val = *i as i64;
@@ -1084,7 +1170,7 @@ impl BaseTable {
                 } else {
                     false
                 }
-            },
+            }
             AttrValue::Float(f) => {
                 if let Ok(val) = value_str.parse::<f32>() {
                     match operator {
@@ -1099,7 +1185,7 @@ impl BaseTable {
                 } else {
                     false
                 }
-            },
+            }
             AttrValue::Bool(b) => {
                 if let Ok(val) = value_str.parse::<bool>() {
                     match operator {
@@ -1117,17 +1203,15 @@ impl BaseTable {
                         _ => false,
                     }
                 }
-            },
-            AttrValue::Text(s) => {
-                match operator {
-                    "==" => s == value_str,
-                    "!=" => s != value_str,
-                    "<" => s.as_str() < value_str,
-                    "<=" => s.as_str() <= value_str,
-                    ">" => s.as_str() > value_str,
-                    ">=" => s.as_str() >= value_str,
-                    _ => false,
-                }
+            }
+            AttrValue::Text(s) => match operator {
+                "==" => s == value_str,
+                "!=" => s != value_str,
+                "<" => s.as_str() < value_str,
+                "<=" => s.as_str() <= value_str,
+                ">" => s.as_str() > value_str,
+                ">=" => s.as_str() >= value_str,
+                _ => false,
             },
             AttrValue::CompactText(s) => {
                 let s_str = s.as_str();
@@ -1140,7 +1224,7 @@ impl BaseTable {
                     ">=" => s_str >= value_str,
                     _ => false,
                 }
-            },
+            }
             AttrValue::Null => false, // Null values don't match any comparison
             _ => {
                 // For other types, convert to string and compare
@@ -1150,32 +1234,29 @@ impl BaseTable {
                     "!=" => attr_str != value_str,
                     _ => false, // Other operators not supported for complex types
                 }
-            },
+            }
         };
-        
+
         Ok(result)
     }
 }
-
 
 // File I/O Implementation
 impl BaseTable {
     /// Export table to CSV file
     pub fn to_csv<P: AsRef<std::path::Path>>(&self, path: P) -> GraphResult<()> {
         use std::io::Write;
-        
+
         let path = path.as_ref();
-        let mut writer = csv::Writer::from_path(path)
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to create CSV writer: {}", e)
-            ))?;
-            
+        let mut writer = csv::Writer::from_path(path).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!("Failed to create CSV writer: {}", e))
+        })?;
+
         // Write headers
-        writer.write_record(&self.column_order)
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to write CSV headers: {}", e)
-            ))?;
-            
+        writer.write_record(&self.column_order).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!("Failed to write CSV headers: {}", e))
+        })?;
+
         // Write data rows
         for i in 0..self.nrows {
             let mut record = Vec::new();
@@ -1191,46 +1272,55 @@ impl BaseTable {
                     record.push(String::new());
                 }
             }
-            writer.write_record(&record)
-                .map_err(|e| crate::errors::GraphError::InvalidInput(
-                    format!("Failed to write CSV record at row {}: {}", i, e)
-                ))?;
+            writer.write_record(&record).map_err(|e| {
+                crate::errors::GraphError::InvalidInput(format!(
+                    "Failed to write CSV record at row {}: {}",
+                    i, e
+                ))
+            })?;
         }
-        
-        writer.flush()
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to flush CSV writer: {}", e)
-            ))?;
-            
+
+        writer.flush().map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!("Failed to flush CSV writer: {}", e))
+        })?;
+
         Ok(())
     }
-    
+
     /// Import table from CSV file  
     pub fn from_csv<P: AsRef<std::path::Path>>(path: P) -> GraphResult<Self> {
         let path = path.as_ref();
-        let mut reader = csv::Reader::from_path(path)
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to read CSV file '{}': {}", path.display(), e)
-            ))?;
-            
+        let mut reader = csv::Reader::from_path(path).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!(
+                "Failed to read CSV file '{}': {}",
+                path.display(),
+                e
+            ))
+        })?;
+
         // Get headers
-        let headers = reader.headers()
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to read CSV headers: {}", e)
-            ))?;
+        let headers = reader.headers().map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!("Failed to read CSV headers: {}", e))
+        })?;
         let column_names: Vec<String> = headers.iter().map(|h| h.to_string()).collect();
-        
+
         // Initialize column data vectors
-        let mut column_data: std::collections::HashMap<String, Vec<crate::types::AttrValue>> = 
-            column_names.iter().map(|name| (name.clone(), Vec::new())).collect();
-            
+        let mut column_data: std::collections::HashMap<String, Vec<crate::types::AttrValue>> =
+            column_names
+                .iter()
+                .map(|name| (name.clone(), Vec::new()))
+                .collect();
+
         // Read all records
         for (row_idx, result) in reader.records().enumerate() {
-            let record = result
-                .map_err(|e| crate::errors::GraphError::InvalidInput(
-                    format!("Failed to read CSV record at row {}: {}", row_idx + 1, e)
-                ))?;
-                
+            let record = result.map_err(|e| {
+                crate::errors::GraphError::InvalidInput(format!(
+                    "Failed to read CSV record at row {}: {}",
+                    row_idx + 1,
+                    e
+                ))
+            })?;
+
             // Process each field in the record
             for (col_idx, field) in record.iter().enumerate() {
                 if let Some(col_name) = column_names.get(col_idx) {
@@ -1241,50 +1331,65 @@ impl BaseTable {
                 }
             }
         }
-        
+
         // Convert to BaseArrays
         let mut columns = std::collections::HashMap::new();
         for (name, data) in column_data {
-            columns.insert(name, crate::storage::array::BaseArray::from_attr_values(data));
+            columns.insert(
+                name,
+                crate::storage::array::BaseArray::from_attr_values(data),
+            );
         }
-        
+
         Self::with_column_order(columns, column_names)
     }
-    
-    /// Export table to Parquet file 
+
+    /// Export table to Parquet file
     pub fn to_parquet<P: AsRef<std::path::Path>>(&self, path: P) -> GraphResult<()> {
-        // For now, save as JSON instead of Parquet for simplicity 
+        // For now, save as JSON instead of Parquet for simplicity
         // TODO: Implement proper Parquet support
         self.to_json(path)
     }
-    
+
     /// Import table from Parquet file
     pub fn from_parquet<P: AsRef<std::path::Path>>(path: P) -> GraphResult<Self> {
         // For now, load from JSON instead of Parquet for simplicity
         // TODO: Implement proper Parquet support
         Self::from_json(path)
     }
-    
+
     /// Export table to JSON file
     pub fn to_json<P: AsRef<std::path::Path>>(&self, path: P) -> GraphResult<()> {
         use std::fs::File;
         use std::io::Write;
-        
+
         let path = path.as_ref();
-        let mut file = File::create(path)
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to create JSON file '{}': {}", path.display(), e)
-            ))?;
-            
+        let mut file = File::create(path).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!(
+                "Failed to create JSON file '{}': {}",
+                path.display(),
+                e
+            ))
+        })?;
+
         // Create JSON structure with metadata
         let mut json_data = serde_json::Map::new();
-        
+
         // Add metadata
-        json_data.insert("columns".to_string(), serde_json::Value::Array(
-            self.column_order.iter().map(|s| serde_json::Value::String(s.clone())).collect()
-        ));
-        json_data.insert("nrows".to_string(), serde_json::Value::Number(serde_json::Number::from(self.nrows)));
-        
+        json_data.insert(
+            "columns".to_string(),
+            serde_json::Value::Array(
+                self.column_order
+                    .iter()
+                    .map(|s| serde_json::Value::String(s.clone()))
+                    .collect(),
+            ),
+        );
+        json_data.insert(
+            "nrows".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(self.nrows)),
+        );
+
         // Add data rows
         let mut rows = Vec::new();
         for i in 0..self.nrows {
@@ -1302,97 +1407,108 @@ impl BaseTable {
             rows.push(serde_json::Value::Object(row));
         }
         json_data.insert("data".to_string(), serde_json::Value::Array(rows));
-        
+
         // Write to file
-        let json_string = serde_json::to_string_pretty(&json_data)
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to serialize to JSON: {}", e)
-            ))?;
-            
-        file.write_all(json_string.as_bytes())
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to write JSON file: {}", e)
-            ))?;
-            
+        let json_string = serde_json::to_string_pretty(&json_data).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!("Failed to serialize to JSON: {}", e))
+        })?;
+
+        file.write_all(json_string.as_bytes()).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!("Failed to write JSON file: {}", e))
+        })?;
+
         Ok(())
     }
-    
+
     /// Import table from JSON file
     pub fn from_json<P: AsRef<std::path::Path>>(path: P) -> GraphResult<Self> {
         use std::fs::File;
         use std::io::Read;
-        
+
         let path = path.as_ref();
-        let mut file = File::open(path)
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to open JSON file '{}': {}", path.display(), e)
-            ))?;
-            
+        let mut file = File::open(path).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!(
+                "Failed to open JSON file '{}': {}",
+                path.display(),
+                e
+            ))
+        })?;
+
         let mut json_string = String::new();
-        file.read_to_string(&mut json_string)
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to read JSON file: {}", e)
-            ))?;
-            
-        let json_data: serde_json::Value = serde_json::from_str(&json_string)
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to parse JSON: {}", e)
-            ))?;
-            
+        file.read_to_string(&mut json_string).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!("Failed to read JSON file: {}", e))
+        })?;
+
+        let json_data: serde_json::Value = serde_json::from_str(&json_string).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!("Failed to parse JSON: {}", e))
+        })?;
+
         // Extract metadata
-        let json_obj = json_data.as_object()
-            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                "JSON data must be an object".to_string()
-            ))?;
-            
-        let column_names: Vec<String> = json_obj.get("columns")
+        let json_obj = json_data.as_object().ok_or_else(|| {
+            crate::errors::GraphError::InvalidInput("JSON data must be an object".to_string())
+        })?;
+
+        let column_names: Vec<String> = json_obj
+            .get("columns")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                "Missing or invalid 'columns' field in JSON".to_string()
-            ))?
+            .ok_or_else(|| {
+                crate::errors::GraphError::InvalidInput(
+                    "Missing or invalid 'columns' field in JSON".to_string(),
+                )
+            })?
             .iter()
             .map(|v| v.as_str().unwrap_or("").to_string())
             .collect();
-            
-        let rows = json_obj.get("data")
+
+        let rows = json_obj
+            .get("data")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                "Missing or invalid 'data' field in JSON".to_string()
-            ))?;
-            
+            .ok_or_else(|| {
+                crate::errors::GraphError::InvalidInput(
+                    "Missing or invalid 'data' field in JSON".to_string(),
+                )
+            })?;
+
         // Initialize column data
-        let mut column_data: std::collections::HashMap<String, Vec<crate::types::AttrValue>> = 
-            column_names.iter().map(|name| (name.clone(), Vec::new())).collect();
-            
+        let mut column_data: std::collections::HashMap<String, Vec<crate::types::AttrValue>> =
+            column_names
+                .iter()
+                .map(|name| (name.clone(), Vec::new()))
+                .collect();
+
         // Process each row
         for row_value in rows {
-            let row_obj = row_value.as_object()
-                .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                    "Each data row must be an object".to_string()
-                ))?;
-                
+            let row_obj = row_value.as_object().ok_or_else(|| {
+                crate::errors::GraphError::InvalidInput(
+                    "Each data row must be an object".to_string(),
+                )
+            })?;
+
             for col_name in &column_names {
                 let attr_value = if let Some(value) = row_obj.get(col_name) {
                     Self::json_value_to_attr_value(value)
                 } else {
                     crate::types::AttrValue::Null
                 };
-                
+
                 if let Some(col_vec) = column_data.get_mut(col_name) {
                     col_vec.push(attr_value);
                 }
             }
         }
-        
+
         // Convert to BaseArrays
         let mut columns = std::collections::HashMap::new();
         for (name, data) in column_data {
-            columns.insert(name, crate::storage::array::BaseArray::from_attr_values(data));
+            columns.insert(
+                name,
+                crate::storage::array::BaseArray::from_attr_values(data),
+            );
         }
-        
+
         Self::with_column_order(columns, column_names)
     }
-    
+
     /// Helper method to convert AttrValue to CSV string representation
     fn attr_value_to_csv_string(&self, value: &crate::types::AttrValue) -> String {
         match value {
@@ -1406,29 +1522,39 @@ impl BaseTable {
                 } else {
                     s.clone()
                 }
-            },
+            }
             crate::types::AttrValue::CompactText(s) => {
                 let text = s.as_str();
-                if text.contains(',') || text.contains('"') || text.contains('\n') || text.contains('\r') {
+                if text.contains(',')
+                    || text.contains('"')
+                    || text.contains('\n')
+                    || text.contains('\r')
+                {
                     format!("\"{}\"", text.replace("\"", "\"\""))
                 } else {
                     text.to_string()
                 }
-            },
+            }
             crate::types::AttrValue::Bool(b) => b.to_string(),
             crate::types::AttrValue::Null => String::new(),
-            crate::types::AttrValue::FloatVec(v) => format!("[{}]", v.iter().map(|f| f.to_string()).collect::<Vec<_>>().join(",")),
+            crate::types::AttrValue::FloatVec(v) => format!(
+                "[{}]",
+                v.iter()
+                    .map(|f| f.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
             crate::types::AttrValue::Bytes(b) => format!("bytes:{}", b.len()),
             _ => format!("{:?}", value), // Fallback for other types
         }
     }
-    
+
     /// Helper method to parse CSV field to AttrValue
     fn parse_csv_field(field: &str) -> crate::types::AttrValue {
         if field.is_empty() {
             return crate::types::AttrValue::Null;
         }
-        
+
         // Try parsing as different types
         // 1. Boolean
         match field.to_lowercase().as_str() {
@@ -1436,42 +1562,53 @@ impl BaseTable {
             "false" => return crate::types::AttrValue::Bool(false),
             _ => {}
         }
-        
+
         // 2. Integer
         if let Ok(i) = field.parse::<i64>() {
             return crate::types::AttrValue::Int(i);
         }
-        
+
         // 3. Float
         if let Ok(f) = field.parse::<f32>() {
             return crate::types::AttrValue::Float(f);
         }
-        
+
         // 4. Default to text
         crate::types::AttrValue::Text(field.to_string())
     }
-    
+
     /// Helper method to convert AttrValue to JSON value
     fn attr_value_to_json(&self, value: &crate::types::AttrValue) -> serde_json::Value {
         match value {
-            crate::types::AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
-            crate::types::AttrValue::SmallInt(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
-            crate::types::AttrValue::Float(f) => {
-                serde_json::Value::Number(serde_json::Number::from_f64(*f as f64).unwrap_or(serde_json::Number::from(0)))
-            },
+            crate::types::AttrValue::Int(i) => {
+                serde_json::Value::Number(serde_json::Number::from(*i))
+            }
+            crate::types::AttrValue::SmallInt(i) => {
+                serde_json::Value::Number(serde_json::Number::from(*i))
+            }
+            crate::types::AttrValue::Float(f) => serde_json::Value::Number(
+                serde_json::Number::from_f64(*f as f64).unwrap_or(serde_json::Number::from(0)),
+            ),
             crate::types::AttrValue::Text(s) => serde_json::Value::String(s.clone()),
-            crate::types::AttrValue::CompactText(s) => serde_json::Value::String(s.as_str().to_string()),
+            crate::types::AttrValue::CompactText(s) => {
+                serde_json::Value::String(s.as_str().to_string())
+            }
             crate::types::AttrValue::Bool(b) => serde_json::Value::Bool(*b),
             crate::types::AttrValue::Null => serde_json::Value::Null,
-            crate::types::AttrValue::FloatVec(v) => {
-                serde_json::Value::Array(v.iter().map(|f| serde_json::Value::Number(
-                    serde_json::Number::from_f64(*f as f64).unwrap_or(serde_json::Number::from(0))
-                )).collect())
-            },
+            crate::types::AttrValue::FloatVec(v) => serde_json::Value::Array(
+                v.iter()
+                    .map(|f| {
+                        serde_json::Value::Number(
+                            serde_json::Number::from_f64(*f as f64)
+                                .unwrap_or(serde_json::Number::from(0)),
+                        )
+                    })
+                    .collect(),
+            ),
             _ => serde_json::Value::String(format!("{:?}", value)), // Fallback
         }
     }
-    
+
     /// Helper method to convert JSON value to AttrValue  
     fn json_value_to_attr_value(value: &serde_json::Value) -> crate::types::AttrValue {
         match value {
@@ -1485,21 +1622,22 @@ impl BaseTable {
                 } else {
                     crate::types::AttrValue::Null
                 }
-            },
+            }
             serde_json::Value::String(s) => crate::types::AttrValue::Text(s.clone()),
             serde_json::Value::Array(arr) => {
                 // Try to convert to float vector
-                let floats: Result<Vec<f32>, _> = arr.iter().map(|v| {
-                    v.as_f64().map(|f| f as f32).ok_or("Not a number")
-                }).collect();
-                
+                let floats: Result<Vec<f32>, _> = arr
+                    .iter()
+                    .map(|v| v.as_f64().map(|f| f as f32).ok_or("Not a number"))
+                    .collect();
+
                 if let Ok(float_vec) = floats {
                     crate::types::AttrValue::FloatVec(float_vec)
                 } else {
                     // Fallback to string representation
                     crate::types::AttrValue::Text(format!("{:?}", arr))
                 }
-            },
+            }
             serde_json::Value::Object(_) => {
                 // Convert object to string representation
                 crate::types::AttrValue::Text(value.to_string())
@@ -1508,7 +1646,11 @@ impl BaseTable {
     }
 
     /// Group by columns and apply aggregations
-    pub fn group_by_agg(&self, group_cols: &[String], agg_specs: HashMap<String, String>) -> GraphResult<Self> {
+    pub fn group_by_agg(
+        &self,
+        group_cols: &[String],
+        agg_specs: HashMap<String, String>,
+    ) -> GraphResult<Self> {
         if group_cols.is_empty() {
             return self.aggregate(agg_specs);
         }
@@ -1516,15 +1658,16 @@ impl BaseTable {
         // Validate group columns exist
         for col_name in group_cols {
             if !self.columns.contains_key(col_name) {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("Group column '{}' not found in table", col_name)
-                ));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Group column '{}' not found in table",
+                    col_name
+                )));
             }
         }
 
         // Create groups
         let mut groups: HashMap<Vec<String>, Vec<usize>> = HashMap::new();
-        
+
         for row_idx in 0..self.nrows {
             let mut key = Vec::new();
             for col_name in group_cols {
@@ -1601,10 +1744,18 @@ impl BaseTable {
     }
 
     /// Apply aggregation to a subset of rows
-    fn apply_aggregation(&self, row_indices: &[usize], col_name: &str, agg_func: &str) -> GraphResult<crate::types::AttrValue> {
-        let column = self.columns.get(col_name).ok_or_else(|| crate::errors::GraphError::InvalidInput(
-            format!("Column '{}' not found for aggregation", col_name)
-        ))?;
+    fn apply_aggregation(
+        &self,
+        row_indices: &[usize],
+        col_name: &str,
+        agg_func: &str,
+    ) -> GraphResult<crate::types::AttrValue> {
+        let column = self.columns.get(col_name).ok_or_else(|| {
+            crate::errors::GraphError::InvalidInput(format!(
+                "Column '{}' not found for aggregation",
+                col_name
+            ))
+        })?;
 
         match agg_func.to_lowercase().as_str() {
             "count" => Ok(crate::types::AttrValue::Int(row_indices.len() as i64)),
@@ -1667,14 +1818,18 @@ impl BaseTable {
                     if let Some(value) = column.get(idx) {
                         match value {
                             crate::types::AttrValue::Int(_) => {
-                                if min_val.is_none() || self.compare_values(value, min_val.as_ref().unwrap()) < 0 {
+                                if min_val.is_none()
+                                    || self.compare_values(value, min_val.as_ref().unwrap()) < 0
+                                {
                                     min_val = Some(value.clone());
                                 }
                             }
                             crate::types::AttrValue::Float(f) => {
                                 // Skip NaN values (common with meta nodes)
                                 if !f.is_nan() {
-                                    if min_val.is_none() || self.compare_values(value, min_val.as_ref().unwrap()) < 0 {
+                                    if min_val.is_none()
+                                        || self.compare_values(value, min_val.as_ref().unwrap()) < 0
+                                    {
                                         min_val = Some(value.clone());
                                     }
                                 }
@@ -1691,14 +1846,18 @@ impl BaseTable {
                     if let Some(value) = column.get(idx) {
                         match value {
                             crate::types::AttrValue::Int(_) => {
-                                if max_val.is_none() || self.compare_values(value, max_val.as_ref().unwrap()) > 0 {
+                                if max_val.is_none()
+                                    || self.compare_values(value, max_val.as_ref().unwrap()) > 0
+                                {
                                     max_val = Some(value.clone());
                                 }
                             }
                             crate::types::AttrValue::Float(f) => {
                                 // Skip NaN values (common with meta nodes)
                                 if !f.is_nan() {
-                                    if max_val.is_none() || self.compare_values(value, max_val.as_ref().unwrap()) > 0 {
+                                    if max_val.is_none()
+                                        || self.compare_values(value, max_val.as_ref().unwrap()) > 0
+                                    {
                                         max_val = Some(value.clone());
                                     }
                                 }
@@ -1709,9 +1868,10 @@ impl BaseTable {
                 }
                 Ok(max_val.unwrap_or(crate::types::AttrValue::Null))
             }
-            _ => Err(crate::errors::GraphError::InvalidInput(
-                format!("Unknown aggregation function: {}", agg_func)
-            ))
+            _ => Err(crate::errors::GraphError::InvalidInput(format!(
+                "Unknown aggregation function: {}",
+                agg_func
+            ))),
         }
     }
 
@@ -1728,7 +1888,10 @@ impl BaseTable {
             column_order.push(col_name.clone());
             let row_indices: Vec<usize> = (0..self.nrows).collect();
             let agg_result = self.apply_aggregation(&row_indices, col_name, agg_func)?;
-            result_columns.insert(col_name.clone(), BaseArray::from_attr_values(vec![agg_result]));
+            result_columns.insert(
+                col_name.clone(),
+                BaseArray::from_attr_values(vec![agg_result]),
+            );
         }
 
         let mut result = BaseTable::from_columns(result_columns)?;
@@ -1741,9 +1904,17 @@ impl BaseTable {
         use crate::types::AttrValue;
         match (a, b) {
             (AttrValue::Int(a), AttrValue::Int(b)) => a.cmp(b) as i32,
-            (AttrValue::Float(a), AttrValue::Float(b)) => a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal) as i32,
-            (AttrValue::Int(a), AttrValue::Float(b)) => (*a as f32).partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal) as i32,
-            (AttrValue::Float(a), AttrValue::Int(b)) => a.partial_cmp(&(*b as f32)).unwrap_or(std::cmp::Ordering::Equal) as i32,
+            (AttrValue::Float(a), AttrValue::Float(b)) => {
+                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal) as i32
+            }
+            (AttrValue::Int(a), AttrValue::Float(b)) => (*a as f32)
+                .partial_cmp(b)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                as i32,
+            (AttrValue::Float(a), AttrValue::Int(b)) => {
+                a.partial_cmp(&(*b as f32))
+                    .unwrap_or(std::cmp::Ordering::Equal) as i32
+            }
             _ => 0, // Equal for non-comparable types
         }
     }
@@ -1751,7 +1922,7 @@ impl BaseTable {
     /// Select specific rows by indices
     pub fn select_rows(&self, row_indices: &[usize]) -> GraphResult<Self> {
         let mut new_columns = HashMap::new();
-        
+
         for (col_name, column) in &self.columns {
             let mut new_values = Vec::new();
             for &row_idx in row_indices {
@@ -1785,14 +1956,16 @@ impl BaseTable {
     pub fn inner_join(&self, other: &Self, left_on: &str, right_on: &str) -> GraphResult<Self> {
         // Validate join columns exist
         if !self.has_column(left_on) {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Left join column '{}' not found in table", left_on)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Left join column '{}' not found in table",
+                left_on
+            )));
         }
         if !other.has_column(right_on) {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Right join column '{}' not found in other table", right_on)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Right join column '{}' not found in other table",
+                right_on
+            )));
         }
 
         let left_col = self.column(left_on).unwrap();
@@ -1832,7 +2005,7 @@ impl BaseTable {
                 col_name.clone()
             };
             column_order.push(final_name.clone());
-            
+
             let mut new_values = Vec::new();
             if let Some(column) = self.columns.get(col_name) {
                 for &(left_idx, _) in &result_rows {
@@ -1851,14 +2024,14 @@ impl BaseTable {
             if col_name == right_on {
                 continue; // Skip join column from right table
             }
-            
+
             let final_name = if self.has_column(col_name) {
                 format!("right_{}", col_name)
             } else {
                 col_name.clone()
             };
             column_order.push(final_name.clone());
-            
+
             let mut new_values = Vec::new();
             if let Some(column) = other.columns.get(col_name) {
                 for &(_, right_idx) in &result_rows {
@@ -1881,14 +2054,16 @@ impl BaseTable {
     pub fn left_join(&self, other: &Self, left_on: &str, right_on: &str) -> GraphResult<Self> {
         // Validate join columns exist
         if !self.has_column(left_on) {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Left join column '{}' not found in table", left_on)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Left join column '{}' not found in table",
+                left_on
+            )));
         }
         if !other.has_column(right_on) {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Right join column '{}' not found in other table", right_on)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Right join column '{}' not found in other table",
+                right_on
+            )));
         }
 
         let left_col = self.column(left_on).unwrap();
@@ -1932,7 +2107,7 @@ impl BaseTable {
                 col_name.clone()
             };
             column_order.push(final_name.clone());
-            
+
             let mut new_values = Vec::new();
             if let Some(column) = self.columns.get(col_name) {
                 for &(left_idx, _) in &result_rows {
@@ -1951,14 +2126,14 @@ impl BaseTable {
             if col_name == right_on {
                 continue; // Skip join column from right table
             }
-            
+
             let final_name = if self.has_column(col_name) {
                 format!("right_{}", col_name)
             } else {
                 col_name.clone()
             };
             column_order.push(final_name.clone());
-            
+
             let mut new_values = Vec::new();
             if let Some(column) = other.columns.get(col_name) {
                 for &(_, right_idx_opt) in &result_rows {
@@ -1986,7 +2161,7 @@ impl BaseTable {
         // Tables must have the same schema
         if self.column_order != other.column_order {
             return Err(crate::errors::GraphError::InvalidInput(
-                "Union requires tables with identical column schemas".to_string()
+                "Union requires tables with identical column schemas".to_string(),
             ));
         }
 
@@ -2010,7 +2185,7 @@ impl BaseTable {
                     }
                 }
             }
-            
+
             let row_hash = row_key.join("|");
             if unique_rows.insert(row_hash) {
                 // Add this unique row
@@ -2040,7 +2215,7 @@ impl BaseTable {
                     }
                 }
             }
-            
+
             let row_hash = row_key.join("|");
             if unique_rows.insert(row_hash) {
                 // Add this unique row
@@ -2078,7 +2253,7 @@ impl BaseTable {
         // 2. Fill missing columns with AttrValue::Null
         // 3. Concatenate all rows maintaining original order
         // 4. Return new table with combined schema and all rows
-        
+
         // For now, require same schema like union but without deduplication
         if self.column_order != other.column_order {
             return Err(crate::errors::GraphError::InvalidInput(
@@ -2140,11 +2315,11 @@ impl BaseTable {
         // 2. Handle column name conflicts (add suffix like _x, _y)
         // 3. Align rows by index (pad shorter table with nulls)
         // 4. Return new table with combined columns
-        
+
         // Basic implementation for now
         let mut result_columns = self.columns.clone();
         let target_rows = std::cmp::max(self.nrows, other.nrows);
-        
+
         // Add columns from other table, handling conflicts
         for (col_name, column) in &other.columns {
             let final_col_name = if result_columns.contains_key(col_name) {
@@ -2152,16 +2327,16 @@ impl BaseTable {
             } else {
                 col_name.clone()
             };
-            
+
             // Pad column to match target row count
             let mut values = column.data().clone();
             while values.len() < target_rows {
                 values.push(crate::types::AttrValue::Null);
             }
-            
+
             result_columns.insert(final_col_name.clone(), BaseArray::from_attr_values(values));
         }
-        
+
         // Pad existing columns to match target row count
         for column in result_columns.values_mut() {
             let mut values = column.data().clone();
@@ -2173,13 +2348,15 @@ impl BaseTable {
 
         let mut result = BaseTable::from_columns(result_columns)?;
         // TODO: Proper column order management for concatenated tables
-        result.column_order.extend(other.column_order.iter().map(|name| {
-            if self.column_order.contains(name) {
-                format!("{}_y", name)
-            } else {
-                name.clone()
-            }
-        }));
+        result
+            .column_order
+            .extend(other.column_order.iter().map(|name| {
+                if self.column_order.contains(name) {
+                    format!("{}_y", name)
+                } else {
+                    name.clone()
+                }
+            }));
         Ok(result)
     }
 
@@ -2188,7 +2365,7 @@ impl BaseTable {
         // Tables must have the same schema
         if self.column_order != other.column_order {
             return Err(crate::errors::GraphError::InvalidInput(
-                "Intersect requires tables with identical column schemas".to_string()
+                "Intersect requires tables with identical column schemas".to_string(),
             ));
         }
 
@@ -2226,7 +2403,7 @@ impl BaseTable {
                     }
                 }
             }
-            
+
             let row_hash = row_key.join("|");
             if other_rows.contains(&row_hash) && seen_rows.insert(row_hash) {
                 // Add this intersecting row
@@ -2258,19 +2435,19 @@ impl BaseTable {
     // ==================================================================================
     // PHASE 2: STREAMING FUNCTIONALITY (FOUNDATION ONLY - specialized types delegate)
     // ==================================================================================
-    
+
     /// Launch interactive streaming table in browser (FOUNDATION ONLY)
     pub fn interactive(&self, _config: Option<InteractiveConfig>) -> GraphResult<VizModule> {
         use std::sync::Arc;
-        
+
         // Create VizModule from this BaseTable following the delegation pattern
         // This provides unified visualization capabilities for all table types
         let data_source: Arc<dyn DataSource> = Arc::new(self.clone());
         let viz_module = VizModule::new(data_source);
-        
+
         Ok(viz_module)
     }
-    
+
     /// Generate embedded iframe HTML for Jupyter notebooks
     ///
     /// This method bridges table streaming to the unified viz/streaming infrastructure.
@@ -2313,10 +2490,12 @@ impl BaseTable {
 
         // Start server with automatic port assignment if port=0
         let addr = std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1));
-        let handle = server.start_background(addr, config.port)
-            .map_err(|e| crate::errors::GraphError::InvalidInput(
-                format!("Failed to start streaming server: {}", e)
-            ))?;
+        let handle = server.start_background(addr, config.port).map_err(|e| {
+            crate::errors::GraphError::InvalidInput(format!(
+                "Failed to start streaming server: {}",
+                e
+            ))
+        })?;
 
         let actual_port = handle.port;
 
@@ -2351,17 +2530,21 @@ impl BaseTable {
             // Convert all other types to their string representation
             AttrValue::SmallInt(i) => AttrValue::Text(i.to_string()), // Convert to text to avoid enum variant
             AttrValue::CompactText(s) => AttrValue::Text(s.as_str().to_string()),
-            AttrValue::FloatVec(v) => AttrValue::Text(
-                format!("[{}]", v.iter().map(|f| f.to_string()).collect::<Vec<_>>().join(", "))
-            ),
+            AttrValue::FloatVec(v) => AttrValue::Text(format!(
+                "[{}]",
+                v.iter()
+                    .map(|f| f.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
             AttrValue::Bytes(b) => AttrValue::Text(format!("bytes[{}]", b.len())),
-            AttrValue::CompressedText(cd) => {
-                match cd.decompress_text() {
-                    Ok(text) => AttrValue::Text(text),
-                    Err(_) => AttrValue::Text("[compressed text]".to_string()),
-                }
+            AttrValue::CompressedText(cd) => match cd.decompress_text() {
+                Ok(text) => AttrValue::Text(text),
+                Err(_) => AttrValue::Text("[compressed text]".to_string()),
             },
-            AttrValue::CompressedFloatVec(_) => AttrValue::Text("[compressed float vec]".to_string()),
+            AttrValue::CompressedFloatVec(_) => {
+                AttrValue::Text("[compressed float vec]".to_string())
+            }
             AttrValue::SubgraphRef(id) => AttrValue::Text(format!("subgraph:{}", id)),
             AttrValue::NodeArray(nodes) => AttrValue::Text(format!("nodes[{}]", nodes.len())),
             AttrValue::EdgeArray(edges) => AttrValue::Text(format!("edges[{}]", edges.len())),
@@ -2374,31 +2557,37 @@ impl BaseTable {
             // Simple types - convert to JSON primitives
             AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
             AttrValue::SmallInt(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
-            AttrValue::Float(f) => {
-                serde_json::Value::Number(
-                    serde_json::Number::from_f64(*f as f64).unwrap_or(serde_json::Number::from(0))
-                )
-            },
+            AttrValue::Float(f) => serde_json::Value::Number(
+                serde_json::Number::from_f64(*f as f64).unwrap_or(serde_json::Number::from(0)),
+            ),
             AttrValue::Text(s) => serde_json::Value::String(s.clone()),
             AttrValue::CompactText(s) => serde_json::Value::String(s.as_str().to_string()),
             AttrValue::Bool(b) => serde_json::Value::Bool(*b),
             AttrValue::Null => serde_json::Value::Null,
 
             // Complex types - convert to readable strings
-            AttrValue::FloatVec(v) => serde_json::Value::String(
-                format!("[{}]", v.iter().map(|f| f.to_string()).collect::<Vec<_>>().join(", "))
-            ),
+            AttrValue::FloatVec(v) => serde_json::Value::String(format!(
+                "[{}]",
+                v.iter()
+                    .map(|f| f.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
             AttrValue::Bytes(b) => serde_json::Value::String(format!("bytes[{}]", b.len())),
-            AttrValue::CompressedText(cd) => {
-                match cd.decompress_text() {
-                    Ok(text) => serde_json::Value::String(text),
-                    Err(_) => serde_json::Value::String("[compressed text]".to_string()),
-                }
+            AttrValue::CompressedText(cd) => match cd.decompress_text() {
+                Ok(text) => serde_json::Value::String(text),
+                Err(_) => serde_json::Value::String("[compressed text]".to_string()),
             },
-            AttrValue::CompressedFloatVec(_) => serde_json::Value::String("[compressed float vec]".to_string()),
+            AttrValue::CompressedFloatVec(_) => {
+                serde_json::Value::String("[compressed float vec]".to_string())
+            }
             AttrValue::SubgraphRef(id) => serde_json::Value::String(format!("subgraph:{}", id)),
-            AttrValue::NodeArray(nodes) => serde_json::Value::String(format!("nodes[{}]", nodes.len())),
-            AttrValue::EdgeArray(edges) => serde_json::Value::String(format!("edges[{}]", edges.len())),
+            AttrValue::NodeArray(nodes) => {
+                serde_json::Value::String(format!("nodes[{}]", nodes.len()))
+            }
+            AttrValue::EdgeArray(edges) => {
+                serde_json::Value::String(format!("edges[{}]", edges.len()))
+            }
         }
     }
 
@@ -2406,22 +2595,22 @@ impl BaseTable {
     pub fn increment_version(&mut self) {
         self.version += 1;
     }
-    
+
     /// Get streaming configuration
     pub fn streaming_config(&self) -> &StreamingConfig {
         &self.streaming_config
     }
-    
+
     /// Update streaming configuration
     pub fn set_streaming_config(&mut self, config: StreamingConfig) {
         self.streaming_config = config;
     }
-    
+
     /// Stop all active streaming servers
     pub fn stop_all_servers(&mut self) {
         self.active_server_handles.clear(); // Drop will handle cleanup
     }
-    
+
     /// Get number of active streaming servers
     pub fn active_servers_count(&self) -> usize {
         self.active_server_handles.len()
@@ -2436,11 +2625,11 @@ impl DataSource for BaseTable {
     fn total_rows(&self) -> usize {
         self.nrows
     }
-    
+
     fn total_cols(&self) -> usize {
         self.column_order.len()
     }
-    
+
     fn get_window(&self, start: usize, count: usize) -> DataWindow {
         use crate::viz::streaming::data_source::DataWindowMetadata;
 
@@ -2452,10 +2641,14 @@ impl DataSource for BaseTable {
                 headers: self.column_names().to_vec(),
                 rows: vec![],
                 schema: DataSchema {
-                    columns: self.column_order.iter().map(|name| ColumnSchema {
-                        name: name.clone(),
-                        data_type: DataType::String,
-                    }).collect(),
+                    columns: self
+                        .column_order
+                        .iter()
+                        .map(|name| ColumnSchema {
+                            name: name.clone(),
+                            data_type: DataType::String,
+                        })
+                        .collect(),
                     primary_key: None,
                     source_type: "BaseTable".to_string(),
                 },
@@ -2503,17 +2696,21 @@ impl DataSource for BaseTable {
             headers: self.column_names().to_vec(),
             rows,
             schema: DataSchema {
-                columns: self.column_order.iter().map(|name| {
-                    let data_type = if let Some(column) = self.columns.get(name) {
-                        self.infer_column_data_type(column)
-                    } else {
-                        DataType::String
-                    };
-                    ColumnSchema {
-                        name: name.clone(),
-                        data_type,
-                    }
-                }).collect(),
+                columns: self
+                    .column_order
+                    .iter()
+                    .map(|name| {
+                        let data_type = if let Some(column) = self.columns.get(name) {
+                            self.infer_column_data_type(column)
+                        } else {
+                            DataType::String
+                        };
+                        ColumnSchema {
+                            name: name.clone(),
+                            data_type,
+                        }
+                    })
+                    .collect(),
                 primary_key: None,
                 source_type: "BaseTable".to_string(),
             },
@@ -2527,36 +2724,37 @@ impl DataSource for BaseTable {
             },
         }
     }
-    
+
     fn get_schema(&self) -> DataSchema {
         let mut columns = Vec::new();
-        
+
         for col_name in &self.column_order {
             let data_type = if let Some(column) = self.columns.get(col_name) {
                 self.infer_column_data_type(column)
             } else {
                 DataType::String
             };
-            
+
             columns.push(ColumnSchema {
                 name: col_name.clone(),
                 data_type,
             });
         }
-        
+
         DataSchema {
             columns,
             primary_key: None, // BaseTable doesn't enforce primary keys
             source_type: "BaseTable".to_string(),
         }
     }
-    
+
     fn supports_streaming(&self) -> bool {
         true // BaseTable supports real-time streaming
     }
-    
+
     fn get_column_types(&self) -> Vec<DataType> {
-        self.column_order.iter()
+        self.column_order
+            .iter()
             .map(|col_name| {
                 if let Some(column) = self.columns.get(col_name) {
                     self.infer_column_data_type(column)
@@ -2566,66 +2764,79 @@ impl DataSource for BaseTable {
             })
             .collect()
     }
-    
+
     fn get_column_names(&self) -> Vec<String> {
         self.column_order.clone()
     }
-    
+
     fn get_source_id(&self) -> String {
         self.source_id.clone()
     }
-    
+
     fn get_version(&self) -> u64 {
         self.version
     }
-    
+
     /// Get graph nodes representing table rows
     fn get_graph_nodes(&self) -> Vec<GraphNode> {
         let rows = self.nrows();
-        (0..rows).map(|i| GraphNode {
-            id: i.to_string(),
-            label: Some(format!("Row {}", i)),
-            attributes: std::collections::HashMap::new(),
-            position: None,
-        }).collect()
+        (0..rows)
+            .map(|i| GraphNode {
+                id: i.to_string(),
+                label: Some(format!("Row {}", i)),
+                attributes: std::collections::HashMap::new(),
+                position: None,
+            })
+            .collect()
     }
-    
+
     /// Compute layout for table data visualization
     /// Creates a simple grid or circular layout based on table structure
     fn compute_layout(&self, algorithm: LayoutAlgorithm) -> Vec<NodePosition> {
         use crate::viz::streaming::data_source::{NodePosition, Position};
-        
+
         let rows = self.nrows();
         if rows == 0 {
             return Vec::new();
         }
-        
+
         // Create node positions for each row
-        let nodes: Vec<_> = (0..rows).map(|i| GraphNode {
-            id: i.to_string(),
-            label: Some(format!("Row {}", i)),
-            attributes: std::collections::HashMap::new(),
-            position: None,
-        }).collect();
-        
+        let nodes: Vec<_> = (0..rows)
+            .map(|i| GraphNode {
+                id: i.to_string(),
+                label: Some(format!("Row {}", i)),
+                attributes: std::collections::HashMap::new(),
+                position: None,
+            })
+            .collect();
+
         match algorithm {
-            LayoutAlgorithm::Circular { radius, start_angle } => {
+            LayoutAlgorithm::Circular {
+                radius,
+                start_angle,
+            } => {
                 let angle_step = 2.0 * std::f64::consts::PI / nodes.len() as f64;
-                
-                nodes.into_iter().enumerate().map(|(i, node)| {
-                    let angle = start_angle + (i as f64 * angle_step);
-                    let actual_radius = radius.unwrap_or(100.0);
-                    NodePosition {
-                        node_id: node.id,
-                        position: Position {
-                            x: actual_radius * angle.cos(),
-                            y: actual_radius * angle.sin(),
-                        },
-                    }
-                }).collect()
-            },
-            LayoutAlgorithm::Grid { columns, cell_size } => {
-                nodes.into_iter().enumerate().map(|(i, node)| {
+
+                nodes
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, node)| {
+                        let angle = start_angle + (i as f64 * angle_step);
+                        let actual_radius = radius.unwrap_or(100.0);
+                        NodePosition {
+                            node_id: node.id,
+                            position: Position {
+                                x: actual_radius * angle.cos(),
+                                y: actual_radius * angle.sin(),
+                            },
+                        }
+                    })
+                    .collect()
+            }
+            LayoutAlgorithm::Grid { columns, cell_size } => nodes
+                .into_iter()
+                .enumerate()
+                .map(|(i, node)| {
                     let row = i / columns;
                     let col = i % columns;
                     NodePosition {
@@ -2635,28 +2846,31 @@ impl DataSource for BaseTable {
                             y: row as f64 * cell_size,
                         },
                     }
-                }).collect()
-            },
+                })
+                .collect(),
             _ => {
                 // Default circular layout for other algorithms
                 let radius = 200.0;
                 let angle_step = 2.0 * std::f64::consts::PI / nodes.len() as f64;
-                
-                nodes.into_iter().enumerate().map(|(i, node)| {
-                    let angle = i as f64 * angle_step;
-                    NodePosition {
-                        node_id: node.id,
-                        position: Position {
-                            x: radius * angle.cos(),
-                            y: radius * angle.sin(),
-                        },
-                    }
-                }).collect()
+
+                nodes
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, node)| {
+                        let angle = i as f64 * angle_step;
+                        NodePosition {
+                            node_id: node.id,
+                            position: Position {
+                                x: radius * angle.cos(),
+                                y: radius * angle.sin(),
+                            },
+                        }
+                    })
+                    .collect()
             }
         }
     }
 }
-
 
 // ==================================================================================
 // PHASE 2 CONFIGURATION TYPES
@@ -2667,10 +2881,10 @@ impl DataSource for BaseTable {
 pub struct InteractiveConfig {
     /// WebSocket port for streaming server
     pub port: u16,
-    
+
     /// Streaming configuration
     pub streaming_config: StreamingConfig,
-    
+
     /// Browser configuration
     pub browser_config: BrowserConfig,
 }
@@ -2678,7 +2892,7 @@ pub struct InteractiveConfig {
 impl Default for InteractiveConfig {
     fn default() -> Self {
         Self {
-            port: 0,  // Use port 0 for automatic port assignment to avoid conflicts
+            port: 0, // Use port 0 for automatic port assignment to avoid conflicts
             streaming_config: StreamingConfig::default(),
             browser_config: BrowserConfig::default(),
         }
@@ -2687,7 +2901,7 @@ impl Default for InteractiveConfig {
 
 impl InteractiveConfig {
     /// Create InteractiveConfig with a specific port
-    /// 
+    ///
     /// Use port 0 for automatic port assignment (recommended)
     /// or specify a custom port (e.g., 8080, 3000, etc.)
     pub fn with_port(port: u16) -> Self {
@@ -2697,7 +2911,7 @@ impl InteractiveConfig {
             browser_config: BrowserConfig::default(),
         }
     }
-    
+
     /// Create InteractiveConfig with automatic port assignment (same as default)
     pub fn auto_port() -> Self {
         Self::default()
@@ -2709,10 +2923,10 @@ impl InteractiveConfig {
 pub struct BrowserConfig {
     /// Auto-open browser
     pub auto_open: bool,
-    
+
     /// Theme for interface
     pub theme: String,
-    
+
     /// Window title
     pub title: String,
 }

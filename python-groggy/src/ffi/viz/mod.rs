@@ -377,6 +377,32 @@ impl PyVizModule {
 
         Ok(iframe_html)
     }
+
+    /// Show interactive visualization in browser (shortcut for the most common workflow)
+    /// 
+    /// This method provides a convenient shortcut for launching a real-time visualization
+    /// with default settings. It's equivalent to calling the underlying VizModule's show() method.
+    /// 
+    /// # Returns
+    /// None (opens browser automatically)
+    /// 
+    /// # Examples
+    /// ```python
+    /// g = groggy.Graph()
+    /// g.add_node(name="Alice")
+    /// g.add_node(name="Bob") 
+    /// g.add_edge(0, 1)
+    /// g.viz().show()  # Opens browser with real-time visualization
+    /// ```
+    pub fn show(&mut self, py: Python) -> PyResult<()> {
+        py.allow_threads(|| {
+            match self.inner.show() {
+                Ok(_) => Ok(()),
+                Err(e) => Err(PyGraphError::from(e)),
+            }
+        })?;
+        Ok(())
+    }
 }
 
 // =============================================================================

@@ -1,12 +1,14 @@
 //! Specialized typed arrays built on BaseArray foundation
 
-use crate::storage::array::{ArrayOps, ArrayIterator, NodeIdLike, MetaNodeLike, EdgeLike, SubgraphLike};
-use crate::types::{NodeId, EdgeId};
-use crate::entities::meta_node::MetaNode;
-use crate::subgraphs::subgraph::Subgraph;
-use std::rc::Rc;
-use std::cell::RefCell;
 use crate::api::graph::Graph;
+use crate::entities::meta_node::MetaNode;
+use crate::storage::array::{
+    ArrayIterator, ArrayOps, EdgeLike, MetaNodeLike, NodeIdLike, SubgraphLike,
+};
+use crate::subgraphs::subgraph::Subgraph;
+use crate::types::{EdgeId, NodeId};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 // =============================================================================
 // NodesArray - specialized array for NodeId collections
@@ -31,7 +33,7 @@ impl NodesArray {
             name: None,
         }
     }
-    
+
     /// Create a new NodesArray with graph reference
     pub fn with_graph(node_ids: Vec<NodeId>, graph: Rc<RefCell<Graph>>) -> Self {
         Self {
@@ -40,7 +42,7 @@ impl NodesArray {
             name: None,
         }
     }
-    
+
     /// Create a named NodesArray
     pub fn with_name(node_ids: Vec<NodeId>, name: String) -> Self {
         Self {
@@ -49,12 +51,12 @@ impl NodesArray {
             name: Some(name),
         }
     }
-    
+
     /// Get the node IDs
     pub fn node_ids(&self) -> &Vec<NodeId> {
         &self.node_ids
     }
-    
+
     /// Get the name (if any)
     pub fn name(&self) -> Option<&String> {
         self.name.as_ref()
@@ -65,14 +67,14 @@ impl ArrayOps<NodeId> for NodesArray {
     fn len(&self) -> usize {
         self.node_ids.len()
     }
-    
+
     fn get(&self, index: usize) -> Option<&NodeId> {
         self.node_ids.get(index)
     }
-    
-    fn iter(&self) -> ArrayIterator<NodeId> 
-    where 
-        NodeId: Clone + 'static 
+
+    fn iter(&self) -> ArrayIterator<NodeId>
+    where
+        NodeId: Clone + 'static,
     {
         match &self.graph_ref {
             Some(graph) => ArrayIterator::with_graph(self.node_ids.clone(), graph.clone()),
@@ -87,7 +89,7 @@ impl NodeIdLike for NodeId {
 }
 
 // =============================================================================
-// EdgesArray - specialized array for EdgeId collections  
+// EdgesArray - specialized array for EdgeId collections
 // =============================================================================
 
 /// Typed array for EdgeId collections with edge-specific operations
@@ -109,7 +111,7 @@ impl EdgesArray {
             name: None,
         }
     }
-    
+
     /// Create a new EdgesArray with graph reference
     pub fn with_graph(edge_ids: Vec<EdgeId>, graph: Rc<RefCell<Graph>>) -> Self {
         Self {
@@ -118,7 +120,7 @@ impl EdgesArray {
             name: None,
         }
     }
-    
+
     /// Get the edge IDs
     pub fn edge_ids(&self) -> &Vec<EdgeId> {
         &self.edge_ids
@@ -129,14 +131,14 @@ impl ArrayOps<EdgeId> for EdgesArray {
     fn len(&self) -> usize {
         self.edge_ids.len()
     }
-    
+
     fn get(&self, index: usize) -> Option<&EdgeId> {
         self.edge_ids.get(index)
     }
-    
-    fn iter(&self) -> ArrayIterator<EdgeId> 
-    where 
-        EdgeId: Clone + 'static 
+
+    fn iter(&self) -> ArrayIterator<EdgeId>
+    where
+        EdgeId: Clone + 'static,
     {
         match &self.graph_ref {
             Some(graph) => ArrayIterator::with_graph(self.edge_ids.clone(), graph.clone()),
@@ -173,7 +175,7 @@ impl MetaNodeArray {
             name: None,
         }
     }
-    
+
     /// Create a new MetaNodeArray with graph reference
     pub fn with_graph(meta_nodes: Vec<MetaNode>, graph: Rc<RefCell<Graph>>) -> Self {
         Self {
@@ -182,7 +184,7 @@ impl MetaNodeArray {
             name: None,
         }
     }
-    
+
     /// Get the meta-nodes
     pub fn meta_nodes(&self) -> &Vec<MetaNode> {
         &self.meta_nodes
@@ -193,14 +195,14 @@ impl ArrayOps<MetaNode> for MetaNodeArray {
     fn len(&self) -> usize {
         self.meta_nodes.len()
     }
-    
+
     fn get(&self, index: usize) -> Option<&MetaNode> {
         self.meta_nodes.get(index)
     }
-    
-    fn iter(&self) -> ArrayIterator<MetaNode> 
-    where 
-        MetaNode: Clone + 'static 
+
+    fn iter(&self) -> ArrayIterator<MetaNode>
+    where
+        MetaNode: Clone + 'static,
     {
         match &self.graph_ref {
             Some(graph) => ArrayIterator::with_graph(self.meta_nodes.clone(), graph.clone()),
@@ -227,11 +229,13 @@ impl std::fmt::Display for NodesArray {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let name_str = self.name.as_deref().unwrap_or("NodesArray");
         write!(f, "{}[{}]", name_str, self.len())?;
-        
+
         if !self.node_ids.is_empty() {
             write!(f, " [")?;
             for (i, node_id) in self.node_ids.iter().take(5).enumerate() {
-                if i > 0 { write!(f, ", ")?; }
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
                 write!(f, "{}", node_id)?;
             }
             if self.node_ids.len() > 5 {
@@ -239,7 +243,7 @@ impl std::fmt::Display for NodesArray {
             }
             write!(f, "]")?;
         }
-        
+
         Ok(())
     }
 }
@@ -247,11 +251,13 @@ impl std::fmt::Display for NodesArray {
 impl std::fmt::Display for EdgesArray {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "EdgesArray[{}]", self.len())?;
-        
+
         if !self.edge_ids.is_empty() {
             write!(f, " [")?;
             for (i, edge_id) in self.edge_ids.iter().take(5).enumerate() {
-                if i > 0 { write!(f, ", ")?; }
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
                 write!(f, "{}", edge_id)?;
             }
             if self.edge_ids.len() > 5 {
@@ -259,7 +265,7 @@ impl std::fmt::Display for EdgesArray {
             }
             write!(f, "]")?;
         }
-        
+
         Ok(())
     }
 }
@@ -267,11 +273,13 @@ impl std::fmt::Display for EdgesArray {
 impl std::fmt::Display for MetaNodeArray {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "MetaNodeArray[{}]", self.len())?;
-        
+
         if !self.meta_nodes.is_empty() {
             write!(f, " [")?;
             for (i, meta_node) in self.meta_nodes.iter().take(3).enumerate() {
-                if i > 0 { write!(f, ", ")?; }
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
                 write!(f, "MetaNode({})", meta_node.id())?;
             }
             if self.meta_nodes.len() > 3 {
@@ -279,7 +287,7 @@ impl std::fmt::Display for MetaNodeArray {
             }
             write!(f, "]")?;
         }
-        
+
         Ok(())
     }
 }

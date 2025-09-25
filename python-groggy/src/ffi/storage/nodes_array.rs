@@ -6,7 +6,7 @@ use crate::ffi::storage::accessors::PyNodesAccessor;
 use crate::ffi::storage::subgraph_array::PySubgraphArray;
 use crate::ffi::storage::table_array::PyTableArray;
 use groggy::viz::VizModule;
-use crate::ffi::viz::PyVizModule;
+use crate::ffi::viz_accessor::VizAccessor;
 
 /// NodesArray: Collection of NodesAccessor objects with delegation to BaseArray
 /// Provides basic array operations and graph-specific transformations
@@ -214,7 +214,7 @@ impl PyNodesArray {
     /// * `height` - Canvas height in pixels
     /// 
     /// # Returns
-    /// PyVizModule for launching interactive visualization
+    /// VizAccessor for launching interactive visualization
     pub fn interactive(
         &self,
         port: Option<u16>,
@@ -222,7 +222,7 @@ impl PyNodesArray {
         theme: Option<String>,
         width: Option<u32>,
         height: Option<u32>
-    ) -> PyResult<PyVizModule> {
+    ) -> PyResult<VizAccessor> {
         // Convert NodesArray to table for visualization via delegation  
         // For now, delegate through the base interactive method
         // TODO: Implement proper table conversion once table array structure is clarified

@@ -4,8 +4,8 @@
 //! the circular dependency of Rust → Python → Rust calls. All query parsing
 //! logic is implemented in pure Rust for universal multi-language support.
 
-use crate::query::query::{AttributeFilter, EdgeFilter, NodeFilter};
 use crate::errors::GraphError;
+use crate::query::query::{AttributeFilter, EdgeFilter, NodeFilter};
 use crate::types::{AttrName, AttrValue};
 
 /// Result type for query parsing operations

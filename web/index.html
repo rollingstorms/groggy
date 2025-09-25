@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Groggy Realtime Visualization</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>👀 Groggy Realtime Graph Visualization</h1>
+      <div class="status-indicator">
+        <span id="connection-status" class="status-disconnected">●</span>
+        <span id="connection-text">Connecting...</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="embedding-method">Embedding:</label>
+        <select id="embedding-method">
+          <option value="spectral">Spectral</option>
+          <option value="random">Random</option>
+          <option value="node2vec">Node2Vec</option>
+          <option value="deepwalk">DeepWalk</option>
+        </select>
+
+        <label for="dimensions">Dimensions:</label>
+        <select id="dimensions">
+          <option value="2">2D</option>
+          <option value="3">3D</option>
+          <option value="4">4D</option>
+          <option value="8">8D</option>
+          <option value="16">16D</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="layout-algorithm">Layout:</label>
+        <select id="layout-algorithm">
+          <option value="honeycomb">Honeycomb</option>
+          <option value="force_directed">Force-Directed</option>
+          <option value="circular">Circular</option>
+          <option value="grid">Grid</option>
+        </select>
+
+        <button id="play-pause-btn" class="btn">⏸️ Pause</button>
+      </div>
+
+      <div class="control-group">
+        <label for="degree-range">Degree Filter:</label>
+        <input type="range" id="degree-min" min="0" max="50" value="0" class="slider">
+        <span id="degree-min-value">0</span> -
+        <input type="range" id="degree-max" min="0" max="50" value="50" class="slider">
+        <span id="degree-max-value">50</span>
+      </div>
+
+      <div class="control-group">
+        <label for="search-input">Search:</label>
+        <input type="text" id="search-input" placeholder="Node ID or attribute">
+        <button id="search-btn" class="btn">🔍</button>
+        <button id="clear-search-btn" class="btn">✖️</button>
+      </div>
+
+      <div class="control-group">
+        <label for="attribute-filter">Filter by Attribute:</label>
+        <select id="attribute-name">
+          <option value="">None</option>
+        </select>
+        <input type="text" id="attribute-value" placeholder="Value">
+        <button id="apply-filter-btn" class="btn">Apply</button>
+      </div>
+
+      <div class="control-group">
+        <label for="opacity-slider">Opacity:</label>
+        <input type="range" id="opacity-slider" min="0.1" max="1" step="0.1" value="1" class="slider">
+        <span id="opacity-value">1.0</span>
+      </div>
+    </div>
+
+    <div class="canvas-container" style="position:relative;">
+      <canvas id="canvas"></canvas>
+      <div id="attribute-panel" class="attribute-panel">
+        <h3>Node Attributes</h3>
+        <div id="attribute-content">
+          <p>Click on a node to view attributes</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-group">
+        <span class="stat-label">Nodes:</span>
+        <span id="node-count">0</span>
+        <span class="stat-label">Edges:</span>
+        <span id="edge-count">0</span>
+        <span class="stat-label">Visible:</span>
+        <span id="visible-count">0</span>
+      </div>
+      <div class="stat-group">
+        <span class="stat-label">FPS:</span>
+        <span id="fps-counter">60</span>
+        <span class="stat-label">Updates/s:</span>
+        <span id="update-rate">0</span>
+        <span class="stat-label">Latency:</span>
+        <span id="latency">0ms</span>
+      </div>
+    </div>
+
+    <div id="messages" class="messages"></div>
+  </div>
+
+  <script type="module">
+    import { RealtimeViz } from '/static/app.js';
+
+    // Fetch runtime config from the server so no string templating is needed
+    const cfg = await fetch('/realtime/config').then(r => r.json());
+
+    // Create the app
+    new RealtimeViz({
+      wsUrl:
+        (location.protocol === 'https:' ? 'wss:' : 'ws:') +
+        '//' + location.host + cfg.ws_path,  // e.g. "/realtime/ws"
+    });
+  </script>
+</body>
+</html>

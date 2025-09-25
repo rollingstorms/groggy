@@ -45,9 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     // Open browser
                     println!("🌐 Opening browser...");
-                    let _ = std::process::Command::new("open")
-                        .arg(&url)
-                        .spawn();
+                    let _ = std::process::Command::new("open").arg(&url).spawn();
 
                     println!("\n📊 WHAT TO CHECK:");
                     println!("🌐 URL: {}", url);
@@ -68,7 +66,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     println!("✅ Test completed!");
-
                 } else {
                     println!("❌ Could not parse port");
                 }

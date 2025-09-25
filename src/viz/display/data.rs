@@ -3,8 +3,8 @@
 //! This module defines the common data structures that all display types
 //! (tables, arrays, matrices) convert to for unified rendering.
 
-use std::fmt;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 /// Unified data representation for display rendering
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -24,14 +24,10 @@ pub struct DataWindow {
 }
 
 impl DataWindow {
-    pub fn new(
-        headers: Vec<String>,
-        rows: Vec<Vec<String>>,
-        schema: DataSchema,
-    ) -> Self {
+    pub fn new(headers: Vec<String>, rows: Vec<Vec<String>>, schema: DataSchema) -> Self {
         let total_rows = rows.len();
         let total_cols = headers.len();
-        
+
         Self {
             headers,
             rows,
@@ -73,9 +69,9 @@ impl DataWindow {
 
     /// Check if this window shows all available data
     pub fn is_complete(&self) -> bool {
-        self.displayed_rows() == self.total_rows && 
-        self.displayed_cols() == self.total_cols &&
-        self.start_offset == 0
+        self.displayed_rows() == self.total_rows
+            && self.displayed_cols() == self.total_cols
+            && self.start_offset == 0
     }
 
     /// Get truncation info message if data is truncated
@@ -115,7 +111,7 @@ impl DataSchema {
                 data_type: DataType::String,
             })
             .collect();
-        
+
         Self { columns }
     }
 
@@ -219,10 +215,7 @@ mod tests {
         let schema = DataSchema::all_strings(headers.clone());
 
         let window = DataWindow::with_window_info(
-            headers,
-            rows,
-            schema,
-            1000, // total_rows
+            headers, rows, schema, 1000, // total_rows
             5,    // total_cols
             10,   // start_offset
         );

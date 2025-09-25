@@ -1,29 +1,35 @@
 //! Advanced Matrix System - Foundation Infrastructure
-//! 
+//!
 //! This module implements the comprehensive matrix and neural network infrastructure
 //! designed to provide world-class linear algebra performance for Groggy.
-//! 
+//!
 //! This is the foundation infrastructure for Weeks 3-4 of the implementation plan.
 
-pub mod numeric_type;
-pub mod unified_matrix;
 pub mod backend;
 pub mod backends;
-pub mod memory;
-pub mod operations;
 pub mod benchmarks;
+pub mod memory;
 pub mod neural;
+pub mod numeric_type;
+pub mod operations;
+pub mod unified_matrix;
 
-pub use numeric_type::{NumericType, DType};
-pub use unified_matrix::{UnifiedMatrix, Matrix64, Matrix32, MatrixI64, MatrixI32, MatrixError, MatrixResult, Shape, Strides};
-pub use backend::{ComputeBackend, BackendHint, BackendSelector, OperationType, BackendError, BackendResult};
-pub use backends::{NumPyBackend, BlasBackend, BlasType};
-pub use memory::{SharedBuffer, AdvancedMemoryPool, MatrixLayout, MemoryError, MemoryResult};
-pub use operations::{MatrixOperations, ActivationFunctions, MathFunctions, MatrixUtils, MatrixStats};
-pub use benchmarks::{MatrixBenchmarkSuite, BenchmarkConfig, BenchmarkResult, quick_benchmark};
+pub use backend::{
+    BackendError, BackendHint, BackendResult, BackendSelector, ComputeBackend, OperationType,
+};
+pub use backends::{BlasBackend, BlasType, NumPyBackend};
+pub use benchmarks::{quick_benchmark, BenchmarkConfig, BenchmarkResult, MatrixBenchmarkSuite};
+pub use memory::{AdvancedMemoryPool, MatrixLayout, MemoryError, MemoryResult, SharedBuffer};
 pub use neural::{
-    ActivationFunction, ActivationOps, relu, gelu, sigmoid, tanh, softmax,
-    Conv2D, ConvolutionConfig, PaddingMode, im2col_transform,
-    AutoDiffTensor, ComputationGraph, GradientTape, backward_pass,
-    FusionEngine, FusedOperation, FusionPattern, optimize_computation_graph
+    backward_pass, gelu, im2col_transform, optimize_computation_graph, relu, sigmoid, softmax,
+    tanh, ActivationFunction, ActivationOps, AutoDiffTensor, ComputationGraph, Conv2D,
+    ConvolutionConfig, FusedOperation, FusionEngine, FusionPattern, GradientTape, PaddingMode,
+};
+pub use numeric_type::{DType, NumericType};
+pub use operations::{
+    ActivationFunctions, MathFunctions, MatrixOperations, MatrixStats, MatrixUtils,
+};
+pub use unified_matrix::{
+    Matrix32, Matrix64, MatrixError, MatrixI32, MatrixI64, MatrixResult, Shape, Strides,
+    UnifiedMatrix,
 };

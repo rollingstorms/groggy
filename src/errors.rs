@@ -181,6 +181,14 @@ pub enum GraphError {
         estimated_completion: Option<u64>,
     },
 
+    /// Invalid state for the requested operation
+    InvalidState {
+        operation: String,
+        expected_state: String,
+        actual_state: String,
+        suggestion: String,
+    },
+
     /// Lock acquisition failed
     LockContentionError { resource: String, timeout_ms: u64 },
 
@@ -282,6 +290,17 @@ pub enum GraphError {
         expected: String,
         actual: String,
         operation: String,
+    },
+
+    /*
+    === VISUALIZATION/LAYOUT ERRORS ===
+    Problems with layout computation and visualization
+    */
+    /// Layout computation failed
+    LayoutError {
+        operation: String,
+        layout_type: String,
+        error_details: String,
     },
 }
 
@@ -432,7 +451,8 @@ impl GraphError {
             | GraphError::UncommittedChanges { .. }
             | GraphError::AttributeNotFound { .. }
             | GraphError::NoChangesToCommit
-            | GraphError::InvalidQuery { .. } => true,
+            | GraphError::InvalidQuery { .. }
+            | GraphError::LayoutError { .. } => true,
 
             // Definitely not recoverable - system is in bad state
             GraphError::CorruptedHistory { .. }
@@ -480,9 +500,11 @@ impl GraphError {
                 ErrorCategory::Query
             }
 
-            GraphError::OperationInProgress { .. } | GraphError::LockContentionError { .. } => {
-                ErrorCategory::Concurrency
-            }
+            GraphError::OperationInProgress { .. }
+            | GraphError::LockContentionError { .. }
+            | GraphError::InvalidState { .. } => ErrorCategory::Concurrency,
+
+            GraphError::LayoutError { .. } => ErrorCategory::Visualization,
 
             GraphError::InternalError { .. }
             | GraphError::UnexpectedState { .. }
@@ -563,6 +585,7 @@ pub enum ErrorCategory {
     Persistence,
     Query,
     Concurrency,
+    Visualization,
     Internal,
     Other,
 }

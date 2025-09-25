@@ -5,9 +5,9 @@
 //! Subgraph with additional filter-specific metadata and operations.
 
 use crate::api::graph::Graph;
+use crate::errors::GraphResult;
 use crate::traits::filter_operations::FilterCriteria;
 use crate::traits::{FilterOperations, GraphEntity, SubgraphOperations};
-use crate::errors::GraphResult;
 use crate::types::{EdgeId, EntityId, NodeId};
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -453,16 +453,17 @@ impl SubgraphOperations for FilteredSubgraph {
 
         Ok(Box::new(edge_subgraph))
     }
-    
+
     /// Create a VizModule for this filtered subgraph
     fn viz(&self) -> crate::viz::VizModule {
         use crate::subgraphs::visualization::SubgraphDataSource;
         use std::sync::Arc;
-        
+
         // Create wrapper that extracts current filtered data
         let data_source = SubgraphDataSource::from_subgraph_operations(self);
-        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> = Arc::new(data_source);
-        
+        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> =
+            Arc::new(data_source);
+
         crate::viz::VizModule::new(data_source)
     }
 }

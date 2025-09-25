@@ -1,7 +1,7 @@
 //! Honeycomb coordinate system and grid mapping utilities
 
 use super::{HoneycombConfig, HoneycombLayoutStrategy};
-use crate::errors::{GraphResult, GraphError};
+use crate::errors::{GraphError, GraphResult};
 use crate::viz::streaming::data_source::Position;
 use std::collections::HashMap;
 
@@ -29,7 +29,7 @@ impl HexCoord {
     pub fn from_cube(x: i32, y: i32, z: i32) -> Result<Self, GraphError> {
         if x + y + z != 0 {
             return Err(GraphError::InvalidInput(
-                "Invalid cube coordinates: x + y + z must equal 0".to_string()
+                "Invalid cube coordinates: x + y + z must equal 0".to_string(),
             ));
         }
         Ok(Self { q: x, r: z })
@@ -44,12 +44,10 @@ impl HexCoord {
 
     /// Get the 6 neighboring hex coordinates
     pub fn neighbors(&self) -> Vec<HexCoord> {
-        let directions = [
-            (1, 0), (1, -1), (0, -1),
-            (-1, 0), (-1, 1), (0, 1)
-        ];
+        let directions = [(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)];
 
-        directions.iter()
+        directions
+            .iter()
             .map(|(dq, dr)| HexCoord::new(self.q + dq, self.r + dr))
             .collect()
     }
@@ -173,9 +171,7 @@ impl HoneycombGrid {
 
         // Sort positions by density (highest first)
         let mut position_indices: Vec<usize> = (0..positions.len()).collect();
-        position_indices.sort_by(|&a, &b| {
-            density_map[b].partial_cmp(&density_map[a]).unwrap()
-        });
+        position_indices.sort_by(|&a, &b| density_map[b].partial_cmp(&density_map[a]).unwrap());
 
         // Generate hex coordinates in spiral order
         let hex_coords = self.generate_spiral_coordinates(positions.len());
@@ -244,9 +240,8 @@ impl HoneycombGrid {
                         }
 
                         // Compute placement error
-                        let error = self.compute_placement_error(
-                            i, &neighbor_hex, positions, &placed
-                        );
+                        let error =
+                            self.compute_placement_error(i, &neighbor_hex, positions, &placed);
 
                         if error < best_error {
                             best_error = error;
@@ -265,17 +260,16 @@ impl HoneycombGrid {
                 placement_queue.push(node_idx);
             } else {
                 // Fallback: place remaining nodes in spiral order
-                let remaining: Vec<usize> = (0..positions.len())
-                    .filter(|&i| !placed[i])
-                    .collect();
+                let remaining: Vec<usize> = (0..positions.len()).filter(|&i| !placed[i]).collect();
 
                 let spiral_coords = self.generate_spiral_coordinates(remaining.len());
                 let mut spiral_idx = 0;
 
                 for &node_idx in &remaining {
                     // Find next available spiral position
-                    while spiral_idx < spiral_coords.len() &&
-                          self.occupied_cells.contains_key(&spiral_coords[spiral_idx]) {
+                    while spiral_idx < spiral_coords.len()
+                        && self.occupied_cells.contains_key(&spiral_coords[spiral_idx])
+                    {
                         spiral_idx += 1;
                     }
 
@@ -295,7 +289,11 @@ impl HoneycombGrid {
     }
 
     /// Map positions using custom ordering function
-    fn map_custom(&mut self, positions: &[Position], _ordering_fn: &str) -> GraphResult<Vec<Position>> {
+    fn map_custom(
+        &mut self,
+        positions: &[Position],
+        _ordering_fn: &str,
+    ) -> GraphResult<Vec<Position>> {
         // For now, fallback to spiral layout
         // In a full implementation, this would parse and execute the custom function
         self.map_spiral(positions)
@@ -325,8 +323,12 @@ impl HoneycombGrid {
                     }
 
                     let angle = side as f64 * std::f64::consts::PI / 3.0;
-                    let q = (ring as f64 * angle.cos() + i as f64 * (angle + std::f64::consts::PI / 3.0).cos()).round() as i32;
-                    let r = (ring as f64 * angle.sin() + i as f64 * (angle + std::f64::consts::PI / 3.0).sin()).round() as i32;
+                    let q = (ring as f64 * angle.cos()
+                        + i as f64 * (angle + std::f64::consts::PI / 3.0).cos())
+                    .round() as i32;
+                    let r = (ring as f64 * angle.sin()
+                        + i as f64 * (angle + std::f64::consts::PI / 3.0).sin())
+                    .round() as i32;
 
                     coords.push(HexCoord::new(q, r));
                 }
@@ -385,8 +387,13 @@ impl HoneycombGrid {
     }
 
     /// Compute placement error for a node at a given hex position
-    fn compute_placement_error(&self, node_idx: usize, hex_coord: &HexCoord,
-                              positions: &[Position], placed: &[bool]) -> f64 {
+    fn compute_placement_error(
+        &self,
+        node_idx: usize,
+        hex_coord: &HexCoord,
+        positions: &[Position],
+        placed: &[bool],
+    ) -> f64 {
         let mut error = 0.0;
         let target_pixel = self.hex_to_pixel(hex_coord);
 

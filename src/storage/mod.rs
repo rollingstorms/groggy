@@ -8,21 +8,21 @@
 //! - Memory pools
 //! - Node and edge storage
 
-pub mod matrix;
-pub mod table;           // BaseTable system
-pub mod array;           // BaseArray system
 pub mod adjacency;
-pub mod pool;
-pub mod node;
+pub mod advanced_matrix;
+pub mod array; // BaseArray system
 pub mod edge;
-pub mod advanced_matrix; // Advanced Matrix System - Foundation Infrastructure
+pub mod matrix;
+pub mod node;
+pub mod pool;
+pub mod table; // BaseTable system // Advanced Matrix System - Foundation Infrastructure
 
 // Re-export components
-pub use matrix::*;
-pub use table::*;        // Table system
-pub use array::*;        // Array system
 pub use adjacency::*;
-pub use pool::*;
-pub use node::*;
+pub use advanced_matrix::*;
+pub use array::*; // Array system
 pub use edge::*;
-pub use advanced_matrix::*; // Advanced Matrix System
+pub use matrix::*;
+pub use node::*;
+pub use pool::*;
+pub use table::*; // Table system // Advanced Matrix System

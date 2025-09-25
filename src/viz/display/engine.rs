@@ -4,7 +4,7 @@
 //! It's implemented ONLY in BaseTable and BaseArray - all other types delegate.
 
 use crate::viz::display::{
-    CompactFormatter, HtmlRenderer, ThemeSystem, DataWindow, TruncationStrategy
+    CompactFormatter, DataWindow, HtmlRenderer, ThemeSystem, TruncationStrategy,
 };
 
 /// The core display engine - implemented ONLY in foundation classes
@@ -40,7 +40,8 @@ impl DisplayEngine {
     /// Format data as Unicode text (for __repr__, __str__, print())
     pub fn format_unicode(&self, data: &DataWindow) -> String {
         if self.config.compact_mode {
-            self.compact_formatter.format_minimal_width(data, &self.config)
+            self.compact_formatter
+                .format_minimal_width(data, &self.config)
         } else {
             self.compact_formatter.format_full_width(data, &self.config)
         }
@@ -49,7 +50,8 @@ impl DisplayEngine {
     /// Format data as semantic HTML (for _repr_html_(), Jupyter notebooks)
     pub fn format_html(&self, data: &DataWindow) -> String {
         let theme = self.theme_system.get_theme(&self.config.theme);
-        self.html_renderer.render_semantic_table(data, theme, &self.config)
+        self.html_renderer
+            .render_semantic_table(data, theme, &self.config)
     }
 
     /// Rich display with configurable output format
@@ -107,7 +109,7 @@ pub struct DisplayConfig {
     // Truncation behavior
     pub truncation_strategy: TruncationStrategy,
     pub show_truncation_info: bool,
-    
+
     // Header display control
     pub show_headers: bool,
 
@@ -160,7 +162,7 @@ impl DisplayConfig {
         config.max_rows = 20; // Show more rows in HTML
         config
     }
-    
+
     /// Create configuration for dense matrix display (no headers, truncated)
     pub fn dense_matrix() -> Self {
         let mut config = Self::html();
@@ -233,19 +235,32 @@ impl std::fmt::Display for OutputFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::viz::display::{DataWindow, DataSchema, ColumnSchema, DataType};
+    use crate::viz::display::{ColumnSchema, DataSchema, DataType, DataWindow};
 
     fn create_test_data() -> DataWindow {
         let headers = vec!["name".to_string(), "age".to_string(), "score".to_string()];
         let rows = vec![
             vec!["Alice".to_string(), "25".to_string(), "91.5".to_string()],
             vec!["Bob".to_string(), "30".to_string(), "87.2".to_string()],
-            vec!["Charlie with a very long name".to_string(), "35".to_string(), "92.123456789".to_string()],
+            vec![
+                "Charlie with a very long name".to_string(),
+                "35".to_string(),
+                "92.123456789".to_string(),
+            ],
         ];
         let schema = DataSchema::new(vec![
-            ColumnSchema { name: "name".to_string(), data_type: DataType::String },
-            ColumnSchema { name: "age".to_string(), data_type: DataType::Integer },
-            ColumnSchema { name: "score".to_string(), data_type: DataType::Float },
+            ColumnSchema {
+                name: "name".to_string(),
+                data_type: DataType::String,
+            },
+            ColumnSchema {
+                name: "age".to_string(),
+                data_type: DataType::Integer,
+            },
+            ColumnSchema {
+                name: "score".to_string(),
+                data_type: DataType::Float,
+            },
         ]);
 
         DataWindow::new(headers, rows, schema)
@@ -279,7 +294,7 @@ mod tests {
         let output = engine.format_unicode(&data);
 
         // Should produce Unicode table
-        assert!(output.contains("┌"));  // Box drawing characters
+        assert!(output.contains("┌")); // Box drawing characters
         assert!(output.contains("│"));
         assert!(output.contains("name"));
         assert!(output.contains("Alice"));
@@ -307,7 +322,7 @@ mod tests {
         assert!(output.contains("<th"));
         assert!(output.contains("<td"));
         assert!(output.contains("Alice"));
-        
+
         // Should include CSS classes
         assert!(output.contains("groggy-table"));
         assert!(output.contains("theme-light"));
@@ -336,7 +351,7 @@ mod tests {
         assert!(compact_config.compact_mode);
         assert!(!full_width_config.compact_mode);
         assert_eq!(html_config.output_format, OutputFormat::Html);
-        
+
         assert_eq!(compact_config.max_cell_width, 20);
         assert_eq!(full_width_config.max_cell_width, 50);
     }

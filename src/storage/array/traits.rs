@@ -6,25 +6,33 @@ use crate::storage::array::ArrayIterator;
 pub trait ArrayOps<T> {
     /// Get the number of elements in the array
     fn len(&self) -> usize;
-    
+
     /// Check if the array is empty
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
-    
+
     /// Get element at index (None if out of bounds)
     fn get(&self, index: usize) -> Option<&T>;
-    
+
     /// Create an eager iterator for chaining operations (immediate execution)
-    fn iter(&self) -> ArrayIterator<T> where T: Clone + 'static;
-    
+    fn iter(&self) -> ArrayIterator<T>
+    where
+        T: Clone + 'static;
+
     /// Create a lazy iterator for chaining operations (deferred execution with optimization)
-    fn lazy_iter(&self) -> crate::storage::array::LazyArrayIterator<T> where T: Clone + 'static {
+    fn lazy_iter(&self) -> crate::storage::array::LazyArrayIterator<T>
+    where
+        T: Clone + 'static,
+    {
         crate::storage::array::LazyArrayIterator::new(self.to_vec())
     }
-    
+
     /// Convert to Vec (helper for lazy iterator)
-    fn to_vec(&self) -> Vec<T> where T: Clone {
+    fn to_vec(&self) -> Vec<T>
+    where
+        T: Clone,
+    {
         (0..self.len())
             .filter_map(|i| self.get(i).cloned())
             .collect()

@@ -5,10 +5,10 @@
 //! to nodes through the trait system.
 
 use crate::api::graph::Graph;
+use crate::errors::GraphResult;
+use crate::query::traversal::TraversalEngine;
 use crate::subgraphs::neighborhood::NeighborhoodSampler;
 use crate::traits::{GraphEntity, NodeOperations, SubgraphOperations};
-use crate::query::traversal::TraversalEngine;
-use crate::errors::GraphResult;
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId};
 use std::cell::RefCell;
 use std::collections::HashMap;

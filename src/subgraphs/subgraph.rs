@@ -18,9 +18,9 @@
 //! - Performance: operations stay in Rust core
 
 use crate::api::graph::Graph;
-use crate::traits::{GraphEntity, SubgraphOperations};
-use crate::query::traversal::TraversalEngine;
 use crate::errors::{GraphError, GraphResult};
+use crate::query::traversal::TraversalEngine;
+use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId, SubgraphId};
 use crate::viz::VizModule;
 use std::cell::RefCell;
@@ -201,26 +201,30 @@ impl Subgraph {
     /// Get a NodesTable representation of subgraph nodes
     /// Uses new BaseTable system
     pub fn nodes_table(&self) -> crate::errors::GraphResult<crate::storage::table::NodesTable> {
-        use crate::storage::table::{BaseTable, NodesTable};
         use crate::storage::array::BaseArray;
+        use crate::storage::table::{BaseTable, NodesTable};
         use std::collections::HashMap;
 
         let graph = self.graph.borrow();
-        
+
         // Collect nodes with their attributes (only nodes in this subgraph)
         let mut attribute_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
-        
+
         // Initialize with node_id column
         attribute_columns.insert("node_id".to_string(), Vec::new());
 
         // Collect all nodes in this subgraph
         for &node_id in &self.nodes {
-            attribute_columns.get_mut("node_id").unwrap().push(crate::types::AttrValue::Int(node_id as i64));
+            attribute_columns
+                .get_mut("node_id")
+                .unwrap()
+                .push(crate::types::AttrValue::Int(node_id as i64));
 
             // Get all attributes for this node
             if let Ok(attrs) = graph.get_node_attrs(node_id) {
                 for (attr_name, attr_value) in attrs {
-                    attribute_columns.entry(attr_name)
+                    attribute_columns
+                        .entry(attr_name)
                         .or_insert_with(|| Vec::with_capacity(self.nodes.len()))
                         .push(attr_value);
                 }
@@ -237,7 +241,7 @@ impl Subgraph {
 
         // Convert to BaseArrays and create BaseTable
         let mut columns_map = HashMap::new();
-        
+
         for (name, data) in attribute_columns {
             columns_map.insert(name, BaseArray::from_attr_values(data));
         }
@@ -249,15 +253,15 @@ impl Subgraph {
     /// Get an EdgesTable representation of subgraph edges
     /// Uses new BaseTable system
     pub fn edges_table(&self) -> crate::errors::GraphResult<crate::storage::table::EdgesTable> {
-        use crate::storage::table::{BaseTable, EdgesTable};
         use crate::storage::array::BaseArray;
+        use crate::storage::table::{BaseTable, EdgesTable};
         use std::collections::HashMap;
 
         let graph = self.graph.borrow();
-        
+
         // Collect edges with their attributes (only edges in this subgraph)
         let mut attribute_columns: HashMap<String, Vec<crate::types::AttrValue>> = HashMap::new();
-        
+
         // Initialize required columns
         attribute_columns.insert("edge_id".to_string(), Vec::new());
         attribute_columns.insert("source".to_string(), Vec::new());
@@ -268,14 +272,24 @@ impl Subgraph {
             let (source, target) = graph.edge_endpoints(edge_id)?;
 
             // Add required column values
-            attribute_columns.get_mut("edge_id").unwrap().push(crate::types::AttrValue::Int(edge_id as i64));
-            attribute_columns.get_mut("source").unwrap().push(crate::types::AttrValue::Int(source as i64));
-            attribute_columns.get_mut("target").unwrap().push(crate::types::AttrValue::Int(target as i64));
+            attribute_columns
+                .get_mut("edge_id")
+                .unwrap()
+                .push(crate::types::AttrValue::Int(edge_id as i64));
+            attribute_columns
+                .get_mut("source")
+                .unwrap()
+                .push(crate::types::AttrValue::Int(source as i64));
+            attribute_columns
+                .get_mut("target")
+                .unwrap()
+                .push(crate::types::AttrValue::Int(target as i64));
 
             // Get all attributes for this edge
             if let Ok(attrs) = graph.get_edge_attrs(edge_id) {
                 for (attr_name, attr_value) in attrs {
-                    attribute_columns.entry(attr_name)
+                    attribute_columns
+                        .entry(attr_name)
                         .or_insert_with(|| Vec::with_capacity(self.edges.len()))
                         .push(attr_value);
                 }
@@ -292,7 +306,7 @@ impl Subgraph {
 
         // Convert to BaseArrays and create BaseTable
         let mut columns_map = HashMap::new();
-        
+
         for (name, data) in attribute_columns {
             columns_map.insert(name, BaseArray::from_attr_values(data));
         }
@@ -474,9 +488,10 @@ impl Subgraph {
     /// Extracts subgraph data into thread-safe structures and returns VizModule
     pub fn viz(&self) -> VizModule {
         let data_source = crate::subgraphs::visualization::SubgraphDataSource::from_subgraph(self);
-        
+
         use std::sync::Arc;
-        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> = Arc::new(data_source);
+        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> =
+            Arc::new(data_source);
         VizModule::new(data_source)
     }
 }
@@ -941,7 +956,7 @@ impl Subgraph {
         let mut result_subgraphs = Vec::new();
         let mut sorted_groups: Vec<_> = groups.into_iter().collect();
         sorted_groups.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-        
+
         for (attr_value, node_group) in sorted_groups {
             if !node_group.is_empty() {
                 // Find induced edges for this group of nodes
@@ -956,12 +971,8 @@ impl Subgraph {
 
                 // Create subgraph with descriptive name
                 let subgraph_name = format!("{}_group_{:?}", attr_name, attr_value);
-                let subgraph = Subgraph::new(
-                    self.graph.clone(),
-                    node_group,
-                    induced_edges,
-                    subgraph_name,
-                );
+                let subgraph =
+                    Subgraph::new(self.graph.clone(), node_group, induced_edges, subgraph_name);
                 result_subgraphs.push(subgraph);
             }
         }
@@ -1001,7 +1012,7 @@ impl Subgraph {
         let mut result_subgraphs = Vec::new();
         let mut sorted_groups: Vec<_> = groups.into_iter().collect();
         sorted_groups.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-        
+
         for (attr_value, edge_group) in sorted_groups {
             if !edge_group.is_empty() {
                 // Find connected nodes for this group of edges
@@ -1312,21 +1323,21 @@ impl SubgraphOperations for Subgraph {
         };
         x
     }
-    
+
     /// Create a VizModule for this subgraph to enable visualization
     /// Uses the thread-safe SubgraphDataSource wrapper to bridge subgraphs to the viz system
     fn viz(&self) -> crate::viz::VizModule {
         use crate::subgraphs::visualization::SubgraphDataSource;
         use std::sync::Arc;
-        
+
         // Create thread-safe data source wrapper
         let data_source = SubgraphDataSource::from_subgraph_operations(self);
-        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> = Arc::new(data_source);
-        
-        // Create and return VizModule 
+        let data_source: Arc<dyn crate::viz::streaming::data_source::DataSource> =
+            Arc::new(data_source);
+
+        // Create and return VizModule
         crate::viz::VizModule::new(data_source)
     }
-    
 }
 
 #[cfg(test)]

@@ -4,9 +4,9 @@
 //! efficient node storage and algorithms. All node operations delegate to our
 //! optimized GraphPool/GraphSpace/HistoryForest infrastructure.
 
-use crate::traits::{GraphEntity, SubgraphOperations};
-use crate::query::traversal::TraversalEngine;
 use crate::errors::GraphResult;
+use crate::query::traversal::TraversalEngine;
+use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, NodeId};
 use std::collections::HashMap;
 

@@ -20,7 +20,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match graph_data_source.interactive_embed() {
         Ok(iframe_html) => {
             println!("✅ Generated iframe HTML: {} characters", iframe_html.len());
-            println!("📋 Iframe content: {}", &iframe_html[..std::cmp::min(200, iframe_html.len())]);
+            println!(
+                "📋 Iframe content: {}",
+                &iframe_html[..std::cmp::min(200, iframe_html.len())]
+            );
 
             // Extract port from iframe
             if let Some(port_start) = iframe_html.find("127.0.0.1:") {
@@ -41,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Test with curl if available
                     match std::process::Command::new("curl")
                         .arg("-s")
-                        .arg("-I")  // Head request only
+                        .arg("-I") // Head request only
                         .arg("--max-time")
                         .arg("5")
                         .arg(&url)
@@ -55,9 +58,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                                 // Try to open in browser
                                 println!("🌐 Attempting to open browser...");
-                                let _ = std::process::Command::new("open")
-                                    .arg(&url)
-                                    .spawn();
+                                let _ = std::process::Command::new("open").arg(&url).spawn();
 
                                 println!("📊 What you should see:");
                                 println!("   • Karate club social network (34 nodes, 78 edges)");
@@ -65,7 +66,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 println!("   • Graph tab should show interactive nodes and edges");
 
                                 // Keep server running for manual testing
-                                println!("⏸️  Server running for 30 seconds for manual inspection...");
+                                println!(
+                                    "⏸️  Server running for 30 seconds for manual inspection..."
+                                );
                                 std::thread::sleep(std::time::Duration::from_secs(30));
 
                                 println!("✅ Test completed successfully!");

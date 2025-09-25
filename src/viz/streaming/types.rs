@@ -1,8 +1,11 @@
-use serde::{Serialize, Deserialize};
-use super::data_source::{GraphNode, GraphEdge, GraphMetadata, NodePosition, DataWindow, DataSchema, DataWindowMetadata, Position};
+use super::data_source::{
+    DataSchema, DataWindow, DataWindowMetadata, GraphEdge, GraphMetadata, GraphNode, NodePosition,
+    Position,
+};
 use super::virtual_scroller::VirtualScrollConfig;
-use tokio_util::sync::CancellationToken;
+use serde::{Deserialize, Serialize};
 use std::thread::JoinHandle as StdJoinHandle;
+use tokio_util::sync::CancellationToken;
 
 // =============================================================================
 // Graph Visualization Data Structures for WebSocket Communication
@@ -55,25 +58,40 @@ pub struct NodePositionData {
 // Conversion methods from internal types to WebSocket types
 impl From<&GraphNode> for GraphNodeData {
     fn from(node: &GraphNode) -> Self {
-        let attributes: std::collections::HashMap<String, serde_json::Value> = node.attributes
+        let attributes: std::collections::HashMap<String, serde_json::Value> = node
+            .attributes
             .iter()
-            .map(|(k, v)| (k.clone(), serde_json::Value::String(super::util::attr_value_to_display_text(v))))
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    serde_json::Value::String(super::util::attr_value_to_display_text(v)),
+                )
+            })
             .collect();
 
         Self {
             id: node.id.clone(),
             label: node.label.clone(),
             attributes,
-            position: node.position.as_ref().map(|p| PositionData { x: p.x, y: p.y }),
+            position: node
+                .position
+                .as_ref()
+                .map(|p| PositionData { x: p.x, y: p.y }),
         }
     }
 }
 
 impl From<&GraphEdge> for GraphEdgeData {
     fn from(edge: &GraphEdge) -> Self {
-        let attributes: std::collections::HashMap<String, serde_json::Value> = edge.attributes
+        let attributes: std::collections::HashMap<String, serde_json::Value> = edge
+            .attributes
             .iter()
-            .map(|(k, v)| (k.clone(), serde_json::Value::String(super::util::attr_value_to_display_text(v))))
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    serde_json::Value::String(super::util::attr_value_to_display_text(v)),
+                )
+            })
             .collect();
 
         Self {
@@ -103,7 +121,10 @@ impl From<&NodePosition> for NodePositionData {
     fn from(pos: &NodePosition) -> Self {
         Self {
             node_id: pos.node_id.clone(),
-            position: PositionData { x: pos.position.x, y: pos.position.y },
+            position: PositionData {
+                x: pos.position.x,
+                y: pos.position.y,
+            },
         }
     }
 }
@@ -111,7 +132,7 @@ impl From<&NodePosition> for NodePositionData {
 /// Convert AttrValue to display text for HTML rendering
 pub fn attr_value_to_display_text(attr: &crate::types::AttrValue) -> String {
     use crate::types::AttrValue;
-    
+
     match attr {
         AttrValue::Int(i) => i.to_string(),
         AttrValue::Float(f) => f.to_string(),
@@ -133,7 +154,7 @@ pub fn attr_value_to_display_text(attr: &crate::types::AttrValue) -> String {
 /// Convert AttrValue to JSON for WebSocket transmission
 pub fn attr_value_to_json(attr: &crate::types::AttrValue) -> serde_json::Value {
     use crate::types::AttrValue;
-    
+
     match attr {
         AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
         AttrValue::Float(f) => serde_json::Number::from_f64(*f as f64)
@@ -144,34 +165,40 @@ pub fn attr_value_to_json(attr: &crate::types::AttrValue) -> serde_json::Value {
         AttrValue::CompactText(s) => serde_json::Value::String(s.as_str().to_string()),
         AttrValue::SmallInt(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
         AttrValue::FloatVec(v) => {
-            let vec: Vec<serde_json::Value> = v.iter()
-                .map(|&f| serde_json::Number::from_f64(f as f64)
-                    .map(serde_json::Value::Number)
-                    .unwrap_or(serde_json::Value::Null))
+            let vec: Vec<serde_json::Value> = v
+                .iter()
+                .map(|&f| {
+                    serde_json::Number::from_f64(f as f64)
+                        .map(serde_json::Value::Number)
+                        .unwrap_or(serde_json::Value::Null)
+                })
                 .collect();
             serde_json::Value::Array(vec)
-        },
+        }
         AttrValue::Bytes(b) => serde_json::Value::String(format!("[{} bytes]", b.len())),
         AttrValue::CompressedText(_) => serde_json::Value::String("[Compressed Text]".to_string()),
-        AttrValue::CompressedFloatVec(_) => serde_json::Value::String("[Compressed FloatVec]".to_string()),
+        AttrValue::CompressedFloatVec(_) => {
+            serde_json::Value::String("[Compressed FloatVec]".to_string())
+        }
         AttrValue::SubgraphRef(id) => serde_json::Value::String(format!("[Subgraph:{}]", id)),
-        AttrValue::NodeArray(nodes) => serde_json::Value::String(format!("[{} nodes]", nodes.len())),
-        AttrValue::EdgeArray(edges) => serde_json::Value::String(format!("[{} edges]", edges.len())),
+        AttrValue::NodeArray(nodes) => {
+            serde_json::Value::String(format!("[{} nodes]", nodes.len()))
+        }
+        AttrValue::EdgeArray(edges) => {
+            serde_json::Value::String(format!("[{} edges]", edges.len()))
+        }
         AttrValue::Null => serde_json::Value::Null,
     }
 }
 
 /// Convert DataWindow to clean JSON for WebSocket transmission  
 pub fn data_window_to_json(window: &DataWindow) -> JsonDataWindow {
-    
-    let clean_rows: Vec<Vec<WireCell>> = window.rows.iter()
-        .map(|row| {
-            row.iter().map(|attr| {
-                attr_to_wire(attr)
-            }).collect()
-        })
+    let clean_rows: Vec<Vec<WireCell>> = window
+        .rows
+        .iter()
+        .map(|row| row.iter().map(|attr| attr_to_wire(attr)).collect())
         .collect();
-    
+
     JsonDataWindow {
         headers: window.headers.clone(),
         rows: clean_rows,
@@ -187,18 +214,18 @@ pub fn data_window_to_json(window: &DataWindow) -> JsonDataWindow {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum WireCell {
-    N(i64),        // Integers 
-    F(f64),        // Floats
-    S(String),     // Strings
-    B(bool),       // Booleans
+    N(i64),           // Integers
+    F(f64),           // Floats
+    S(String),        // Strings
+    B(bool),          // Booleans
     A(Vec<WireCell>), // Arrays
-    Null,          // Null values
+    Null,             // Null values
 }
 
 /// Convert AttrValue to leak-proof WireCell
 fn attr_to_wire(attr: &crate::types::AttrValue) -> WireCell {
     use crate::types::AttrValue;
-    
+
     match attr {
         AttrValue::Int(i) => WireCell::N(*i),
         AttrValue::SmallInt(i) => WireCell::N(*i as i64),
@@ -222,19 +249,19 @@ fn attr_to_wire(attr: &crate::types::AttrValue) -> WireCell {
 pub struct JsonDataWindow {
     /// Column headers
     pub headers: Vec<String>,
-    
+
     /// Rows of data (each row is a vec of WireCell values - leak-proof)
     pub rows: Vec<Vec<WireCell>>,
-    
+
     /// Schema information
     pub schema: DataSchema,
-    
+
     /// Total number of rows in complete dataset
     pub total_rows: usize,
-    
+
     /// Starting offset of this window
     pub start_offset: usize,
-    
+
     /// Metadata for this window
     pub metadata: DataWindowMetadata,
 }
@@ -249,48 +276,36 @@ pub enum WSMessage {
         total_rows: usize,
         meta: ProtocolMeta,
     },
-    
+
     /// Data update in response to scroll
     DataUpdate {
         new_window: JsonDataWindow,
         offset: usize,
         meta: ProtocolMeta,
     },
-    
+
     /// Client requests scroll to offset
-    ScrollRequest {
-        offset: usize,
-        window_size: usize,
-    },
-    
+    ScrollRequest { offset: usize, window_size: usize },
+
     /// Client requests theme change
-    ThemeChange {
-        theme: String,
-    },
-    
+    ThemeChange { theme: String },
+
     /// Broadcast update to all clients
-    BroadcastUpdate {
-        update: DataUpdate,
-    },
-    
+    BroadcastUpdate { update: DataUpdate },
+
     /// Error message
-    Error {
-        message: String,
-        error_code: String,
-    },
-    
+    Error { message: String, error_code: String },
+
     /// Server status/ping
-    Status {
-        stats: ServerStats,
-    },
-    
+    Status { stats: ServerStats },
+
     // NEW: Graph visualization message types
     /// Client requests graph data
     GraphDataRequest {
         layout_algorithm: Option<String>,
         theme: Option<String>,
     },
-    
+
     /// Server responds with graph data
     GraphDataResponse {
         nodes: Vec<GraphNodeData>,
@@ -298,27 +313,25 @@ pub enum WSMessage {
         metadata: GraphMetadataData,
         layout_positions: Option<Vec<NodePositionData>>,
     },
-    
+
     /// Client requests layout computation
     LayoutRequest {
         algorithm: String,
         parameters: std::collections::HashMap<String, serde_json::Value>,
     },
-    
+
     /// Server responds with layout positions
     LayoutResponse {
         positions: Vec<NodePositionData>,
         algorithm: String,
     },
-    
+
     /// Client requests graph metadata only
     MetadataRequest,
-    
+
     /// Server responds with graph metadata
-    MetadataResponse {
-        metadata: GraphMetadataData,
-    },
-    
+    MetadataResponse { metadata: GraphMetadataData },
+
     // Phase 7: Interactive Features - Node Interactions
     /// Client clicked on a node - request details
     NodeClickRequest {
@@ -326,7 +339,7 @@ pub enum WSMessage {
         position: Option<Position>,
         modifier_keys: Vec<String>, // ctrl, shift, alt
     },
-    
+
     /// Server responds with node details for display panel
     NodeClickResponse {
         node_id: String,
@@ -335,31 +348,26 @@ pub enum WSMessage {
         connected_edges: Vec<GraphEdgeData>,
         analytics: NodeAnalytics,
     },
-    
+
     /// Client hovered over a node - request tooltip data
-    NodeHoverRequest {
-        node_id: String,
-        position: Position,
-    },
-    
+    NodeHoverRequest { node_id: String, position: Position },
+
     /// Server responds with rich tooltip data
     NodeHoverResponse {
         node_id: String,
         tooltip_data: NodeTooltipData,
     },
-    
+
     /// Client stopped hovering over node
-    NodeHoverEnd {
-        node_id: String,
-    },
-    
-    // Phase 7: Interactive Features - Edge Interactions  
+    NodeHoverEnd { node_id: String },
+
+    // Phase 7: Interactive Features - Edge Interactions
     /// Client clicked on an edge
     EdgeClickRequest {
         edge_id: String,
         position: Option<Position>,
     },
-    
+
     /// Server responds with edge details
     EdgeClickResponse {
         edge_id: String,
@@ -368,19 +376,16 @@ pub enum WSMessage {
         target_node: GraphNodeData,
         path_info: Option<PathInfo>,
     },
-    
+
     /// Client hovered over an edge
-    EdgeHoverRequest {
-        edge_id: String,
-        position: Position,
-    },
-    
+    EdgeHoverRequest { edge_id: String, position: Position },
+
     /// Server responds with edge tooltip
     EdgeHoverResponse {
         edge_id: String,
         tooltip_data: EdgeTooltipData,
     },
-    
+
     // Phase 7: Interactive Features - Multi-Node Selection
     /// Client selected multiple nodes (drag-to-select, shift+click, etc.)
     NodesSelectionRequest {
@@ -388,38 +393,38 @@ pub enum WSMessage {
         selection_type: SelectionType,
         bounding_box: Option<BoundingBox>,
     },
-    
+
     /// Server responds with bulk selection data
     NodesSelectionResponse {
         selected_nodes: Vec<GraphNodeData>,
         selection_analytics: SelectionAnalytics,
         bulk_operations: Vec<String>, // Available operations for selected nodes
     },
-    
+
     /// Clear current selection
     ClearSelectionRequest,
-    
+
     // Phase 7: Interactive Features - Keyboard Navigation & Search
     /// Client pressed keyboard shortcut
     KeyboardActionRequest {
         action: KeyboardAction,
         node_id: Option<String>, // Current focus node
     },
-    
+
     /// Server responds to keyboard navigation
     KeyboardActionResponse {
         action: KeyboardAction,
         new_focus_node: Option<String>,
         highlight_changes: Vec<HighlightChange>,
     },
-    
+
     /// Client search query
     SearchRequest {
         query: String,
         search_type: SearchType,
         filters: Vec<SearchFilter>,
     },
-    
+
     /// Server responds with search results
     SearchResponse {
         results: Vec<SearchResult>,
@@ -506,16 +511,16 @@ impl Drop for ServerHandle {
 pub struct StreamingConfig {
     /// Virtual scrolling configuration
     pub scroll_config: VirtualScrollConfig,
-    
+
     /// WebSocket port
     pub port: u16,
-    
+
     /// Maximum concurrent connections
     pub max_connections: usize,
-    
+
     /// Auto-broadcast updates
     pub auto_broadcast: bool,
-    
+
     /// Update throttle in milliseconds
     pub update_throttle_ms: u64,
 }
@@ -524,7 +529,7 @@ impl Default for StreamingConfig {
     fn default() -> Self {
         Self {
             scroll_config: VirtualScrollConfig::default(),
-            port: 0,  // Use port 0 for automatic port assignment to avoid conflicts
+            port: 0, // Use port 0 for automatic port assignment to avoid conflicts
             max_connections: 100,
             auto_broadcast: true,
             update_throttle_ms: 100,
@@ -664,12 +669,12 @@ pub struct PathInfo {
 /// Selection type for multi-node operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SelectionType {
-    Click,           // Single click
-    ShiftClick,      // Shift+click to extend selection
-    CtrlClick,       // Ctrl+click to toggle
-    DragSelect,      // Drag to select multiple
-    LassoSelect,     // Lasso selection
-    BoxSelect,       // Box selection
+    Click,       // Single click
+    ShiftClick,  // Shift+click to extend selection
+    CtrlClick,   // Ctrl+click to toggle
+    DragSelect,  // Drag to select multiple
+    LassoSelect, // Lasso selection
+    BoxSelect,   // Box selection
 }
 
 /// Bounding box for area selection
@@ -699,25 +704,25 @@ pub enum KeyboardAction {
     FocusNext,
     FocusPrevious,
     FocusNeighbor { direction: String },
-    
+
     // Selection
     SelectFocused,
     SelectAll,
     ClearSelection,
     InvertSelection,
-    
+
     // Layout
     ChangeLayout { algorithm: String },
     ZoomIn,
     ZoomOut,
     ZoomToFit,
     ResetView,
-    
+
     // Search
     StartSearch,
     NextSearchResult,
     PrevSearchResult,
-    
+
     // Display
     ToggleLabels,
     ToggleEdges,

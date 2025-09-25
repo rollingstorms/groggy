@@ -8,16 +8,16 @@
 //! - Reference management
 //! - Space management
 
-pub mod state;
-pub mod history;
 pub mod change_tracker;
 pub mod delta;
+pub mod history;
 pub mod ref_manager;
 pub mod space;
+pub mod state;
 
-pub use state::*;
-pub use history::*;
 pub use change_tracker::*;
 pub use delta::*;
+pub use history::*;
 pub use ref_manager::*;
 pub use space::*;
+pub use state::*;
