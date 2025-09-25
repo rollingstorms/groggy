@@ -3,10 +3,8 @@
 //! Provides HTTP + WebSocket transport layer for realtime visualization.
 //! Serves HTML/JS client and bridges engine messages to WebSocket clients.
 
-pub mod client_html;
 pub mod realtime_server;
 pub mod ws_bridge;
 
-pub use client_html::*;
 pub use realtime_server::*;
 pub use ws_bridge::*;

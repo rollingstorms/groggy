@@ -1,9 +1,9 @@
 //! Realtime Server implementation
 //!
 //! HTTP + WebSocket server for realtime visualization.
-//! Serves /realtime/ route with HTML and /realtime/ws WebSocket endpoint.
+//! Serves the UI at `/` with a `/ws` WebSocket endpoint.
 
-use super::{generate_client_html, WsBridge};
+use super::WsBridge;
 use crate::api::graph::Graph;
 use crate::errors::{io_error_to_graph_error, GraphError, GraphResult};
 use crate::viz::realtime::accessor::{
@@ -148,12 +148,9 @@ impl RealtimeServer {
             .map_err(|e| io_error_to_graph_error(e, "bind_tcp_listener", &addr))?;
 
         eprintln!("✅ DEBUG: RealtimeServer listening on {}", addr);
+        eprintln!("🌐 DEBUG: HTTP endpoint: http://127.0.0.1:{}/", self.port);
         eprintln!(
-            "🌐 DEBUG: HTTP endpoint: http://127.0.0.1:{}/realtime/",
-            self.port
-        );
-        eprintln!(
-            "🔌 DEBUG: WebSocket endpoint: ws://127.0.0.1:{}/realtime/ws",
+            "🔌 DEBUG: WebSocket endpoint: ws://127.0.0.1:{}/ws",
             self.port
         );
 
@@ -355,7 +352,7 @@ impl RealtimeServer {
         }
 
         match (method, path) {
-            ("GET", "/realtime/") => {
+            ("GET", "/") | ("GET", "/index.html") => {
                 eprintln!("🌐 DEBUG: Serving static HTML page to {}", addr);
 
                 // Serve the static HTML file from web/index.html
@@ -370,27 +367,26 @@ impl RealtimeServer {
                     }
                     Err(e) => {
                         eprintln!("❌ DEBUG: Failed to serve static HTML: {}", e);
-                        // Fallback to generated HTML
-                        let html = generate_client_html(port);
+
                         let response = format!(
-                            "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{}",
-                            html.len(),
-                            html
+                            "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
+                            e.len(),
+                            e
                         );
 
                         let mut stream = buf_stream.into_inner();
-                        stream.write_all(response.as_bytes()).await.map_err(|e| {
-                            io_error_to_graph_error(e, "write_http_response", "tcp_stream")
+                        stream.write_all(response.as_bytes()).await.map_err(|err| {
+                            io_error_to_graph_error(err, "write_http_response", "tcp_stream")
                         })?;
                     }
                 }
             }
-            ("GET", "/realtime/config") => {
+            ("GET", "/config") => {
                 eprintln!("🔧 DEBUG: Serving config endpoint to {}", addr);
 
                 // Create runtime configuration JSON
                 let config = serde_json::json!({
-                    "ws_path": "/realtime/ws",
+                    "ws_path": "/ws",
                     "port": port,
                     "version": "1.0.0"
                 });
@@ -447,7 +443,7 @@ impl RealtimeServer {
                     }
                 }
             }
-            ("GET", "/realtime/ws") => {
+            ("GET", "/ws") => {
                 // Check for WebSocket upgrade
                 let mut is_websocket = false;
                 let mut sec_websocket_key = None;
@@ -605,12 +601,9 @@ impl RealtimeServer {
             .port();
 
         eprintln!("✅ DEBUG: RealtimeServer listening on {}", actual_port);
+        eprintln!("🌐 DEBUG: HTTP endpoint: http://127.0.0.1:{}/", actual_port);
         eprintln!(
-            "🌐 DEBUG: HTTP endpoint: http://127.0.0.1:{}/realtime/",
-            actual_port
-        );
-        eprintln!(
-            "🔌 DEBUG: WebSocket endpoint: ws://127.0.0.1:{}/realtime/ws",
+            "🔌 DEBUG: WebSocket endpoint: ws://127.0.0.1:{}/ws",
             actual_port
         );
 

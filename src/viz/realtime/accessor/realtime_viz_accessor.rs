@@ -6,6 +6,7 @@
 use super::engine_messages::{ControlMsg, Edge, EngineSnapshot, GraphMeta, Node, NodePosition};
 use crate::errors::GraphResult;
 use crate::types::{AttrValue, EdgeId, NodeId};
+use crate::viz::realtime::LayoutKind;
 use crate::viz::streaming::data_source::{DataSource, LayoutAlgorithm};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -268,37 +269,68 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                     algorithm, params
                 );
 
-                *self.layout_algorithm.write().unwrap() = match algorithm.as_str() {
-                    "honeycomb" => LayoutAlgorithm::Honeycomb {
-                        cell_size: params
-                            .get("cell_size")
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(40.0),
-                        energy_optimization: params
-                            .get("energy_optimization")
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(true),
-                        iterations: params
-                            .get("iterations")
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(500),
-                    },
-                    "force_directed" => LayoutAlgorithm::ForceDirected {
-                        charge: params
-                            .get("charge")
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(-30.0),
-                        distance: params
-                            .get("distance")
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(30.0),
-                        iterations: params
-                            .get("iterations")
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(100),
-                    },
-                    _ => self.layout_algorithm.read().unwrap().clone(),
-                };
+                match algorithm.parse::<LayoutKind>() {
+                    Ok(LayoutKind::Honeycomb) => {
+                        *self.layout_algorithm.write().unwrap() = LayoutAlgorithm::Honeycomb {
+                            cell_size: params
+                                .get("cell_size")
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or(40.0),
+                            energy_optimization: params
+                                .get("energy_optimization")
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or(true),
+                            iterations: params
+                                .get("iterations")
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or(500),
+                        };
+                    }
+                    Ok(LayoutKind::ForceDirected) => {
+                        *self.layout_algorithm.write().unwrap() = LayoutAlgorithm::ForceDirected {
+                            charge: params
+                                .get("charge")
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or(-30.0),
+                            distance: params
+                                .get("distance")
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or(30.0),
+                            iterations: params
+                                .get("iterations")
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or(100),
+                        };
+                    }
+                    Ok(LayoutKind::Circular) => {
+                        *self.layout_algorithm.write().unwrap() = LayoutAlgorithm::Circular {
+                            radius: params.get("radius").and_then(|s| s.parse().ok()),
+                            start_angle: params
+                                .get("start_angle")
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or(0.0),
+                        };
+                    }
+                    Ok(LayoutKind::Grid) => {
+                        *self.layout_algorithm.write().unwrap() = LayoutAlgorithm::Grid {
+                            columns: params
+                                .get("columns")
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or_else(|| {
+                                    (self.data_source.get_graph_nodes().len() as f64)
+                                        .sqrt()
+                                        .ceil() as usize
+                                }),
+                            cell_size: params
+                                .get("cell_size")
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or(80.0),
+                        };
+                    }
+                    Err(err) => {
+                        eprintln!("⚠️  WARNING: {} – ignoring accessor layout change", err);
+                    }
+                }
 
                 // Engine recomputes layout and will stream envelopes downstream.
             }

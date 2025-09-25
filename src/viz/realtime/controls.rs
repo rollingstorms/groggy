@@ -775,6 +775,10 @@ impl InteractiveControlManager {
 
     /// Check if parameter should be debounced
     fn should_debounce_parameter(&self, name: &str) -> bool {
+        if LayoutKind::is_layout_parameter(name) {
+            return false;
+        }
+
         // Check configuration for debounce settings
         name.starts_with("embedding.") || name.starts_with("projection.")
     }
@@ -1074,11 +1078,12 @@ impl Default for HoneycombParameterControls {
                 realtime_update: true,
             },
             layout_strategy: ParameterControl {
-                value: HoneycombLayoutStrategy::Spiral,
+                value: HoneycombLayoutStrategy::EnergyBased,
                 min: None,
                 max: None,
                 step: None,
                 options: Some(vec![
+                    HoneycombLayoutStrategy::EnergyBased,
                     HoneycombLayoutStrategy::Spiral,
                     HoneycombLayoutStrategy::DensityBased,
                     HoneycombLayoutStrategy::DistancePreserving,

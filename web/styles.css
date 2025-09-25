@@ -282,3 +282,9 @@ body {
 .status-connecting span {
   animation: pulse 1.5s infinite;
 }
+
+.layout-params input {
+  padding: 6px 8px;
+  border: 2px solid #ced4da;
+  border-radius: 6px;
+}

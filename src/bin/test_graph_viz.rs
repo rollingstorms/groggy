@@ -31,11 +31,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(port_end) = port_str.find('"') {
                     let port = &port_str[..port_end];
                     println!("✅ Extracted port: {}", port);
-                    println!("🌐 Server should be running at: http://127.0.0.1:{}", port);
+                    println!("🌐 Server should be running at: http://127.0.0.1:{}/", port);
 
                     // Test server with HTTP request
                     println!("🔍 Testing server response...");
-                    let url = format!("http://127.0.0.1:{}", port);
+                    let url = format!("http://127.0.0.1:{}/", port);
 
                     // Wait a moment for server to start
                     println!("⏳ Waiting 3 seconds for server to start...");

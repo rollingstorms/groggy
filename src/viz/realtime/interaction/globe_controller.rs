@@ -1,7 +1,9 @@
 use super::math::{clamp, Quat, Vec3};
 use super::{
-    InteractionController, NodeDragEvent, PointerEvent, PointerPhase, ViewState3D, WheelEvent,
+    InteractionCommand, InteractionController, NodeDragEvent, PointerEvent, PointerPhase,
+    ViewState3D, WheelEvent,
 };
+use std::any::Any;
 
 pub struct GlobeController {
     view: ViewState3D,
@@ -95,7 +97,7 @@ impl InteractionController for GlobeController {
         "globe-3d"
     }
 
-    fn on_pointer(&mut self, ev: PointerEvent) {
+    fn on_pointer(&mut self, ev: PointerEvent) -> Vec<InteractionCommand> {
         match ev.phase {
             PointerPhase::Start => {
                 self.dragging = true;
@@ -111,18 +113,30 @@ impl InteractionController for GlobeController {
             PointerPhase::End => self.dragging = false,
             _ => {}
         }
+        Vec::new()
     }
 
-    fn on_wheel(&mut self, ev: WheelEvent) {
+    fn on_wheel(&mut self, ev: WheelEvent) -> Vec<InteractionCommand> {
         match ev {
             WheelEvent::Zoom { delta } => self.zoom(delta),
             WheelEvent::Rotate { delta } => self.roll(delta),
         }
+        Vec::new()
     }
 
-    fn on_node_drag(&mut self, _ev: NodeDragEvent) {}
+    fn on_node_drag(&mut self, _ev: NodeDragEvent) -> Vec<InteractionCommand> {
+        Vec::new()
+    }
 
     fn view_3d(&self) -> Option<ViewState3D> {
         Some(self.view.clone())
+    }
+
+    fn on_activate(&mut self, _embedding_dims: Option<usize>) -> Vec<InteractionCommand> {
+        Vec::new()
+    }
+
+    fn as_any(&mut self) -> &mut dyn Any {
+        self
     }
 }

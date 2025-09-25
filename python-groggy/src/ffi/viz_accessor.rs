@@ -282,11 +282,11 @@ except Exception as e:
                         // Create iframe HTML pointing to our realtime server (now with static file serving)
                         let iframe_html = format!(
                             r#"<div style="position: relative;">
-    <iframe src="http://127.0.0.1:{}/realtime/" width="100%" height="640" frameborder="0" style="border: 1px solid #ddd;"></iframe>
+    <iframe src="http://127.0.0.1:{}/" width="100%" height="640" frameborder="0" style="border: 1px solid #ddd;"></iframe>
     <div style="font-size: 12px; color: #666; margin-top: 5px;">
         🍯 <strong>Realtime Server</strong> on port {} | 🎮 Static Files + WebSocket + Canvas + Interactive controls
         <div style="margin-top: 3px;">
-            ✅ File-based UI (HTML/JS/CSS) with /realtime/config endpoint | ✅ Layout parameters: {}
+            ✅ File-based UI (HTML/JS/CSS) with /config endpoint | ✅ Layout parameters: {}
         </div>
     </div>
 </div>"#,
@@ -493,18 +493,18 @@ except Exception as e:
                         eprintln!("📝 DEBUG: Registered server on port {} for data source {}", port, data_source_id);
                     }
 
-                    println!("🚀 Realtime visualization server started at http://127.0.0.1:{}/realtime/", port);
-                    println!("🎮 WebSocket endpoint: ws://127.0.0.1:{}/realtime/ws", port);
+                    println!("🚀 Realtime visualization server started at http://127.0.0.1:{}/", port);
+                    println!("🎮 WebSocket endpoint: ws://127.0.0.1:{}/ws", port);
 
                     // Open in browser using Python's webbrowser module
                     py.run(&format!(
-                        "import webbrowser; webbrowser.open('http://127.0.0.1:{}/realtime/')",
+                        "import webbrowser; webbrowser.open('http://127.0.0.1:{}/')",
                         port
                     ), None, None)?;
 
                     // Return a simple server info object
                     let server_info = py.eval(&format!(
-                        "type('ServerInfo', (), {{'port': {}, 'url': 'http://127.0.0.1:{}/realtime/', 'stop': lambda: print('Use Ctrl+C to stop server')}})()",
+                        "type('ServerInfo', (), {{'port': {}, 'url': 'http://127.0.0.1:{}/', 'stop': lambda: print('Use Ctrl+C to stop server')}})()",
                         port, port
                     ), None, None)?;
 
@@ -621,7 +621,7 @@ impl VizAccessor {
 
             rt.block_on(async {
                 // Connect to the existing server's WebSocket endpoint
-                let ws_url = format!("ws://127.0.0.1:{}/realtime/ws", port);
+                let ws_url = format!("ws://127.0.0.1:{}/ws", port);
                 eprintln!("🔗 DEBUG: Connecting to WebSocket: {}", ws_url);
 
                 match connect_async(&ws_url).await {
@@ -728,7 +728,7 @@ impl VizAccessor {
 
             let send_result = rt.block_on(async {
                 // Connect to the existing server's WebSocket endpoint
-                let ws_url = format!("ws://127.0.0.1:{}/realtime/ws", port);
+                let ws_url = format!("ws://127.0.0.1:{}/ws", port);
                 eprintln!("🔗 DEBUG: Connecting to WebSocket: {}", ws_url);
 
                 match connect_async(&ws_url).await {
@@ -779,7 +779,7 @@ impl VizAccessor {
                     // Return iframe HTML that reuses the existing server
                     let iframe_html = format!(
                         r#"<div style="position: relative;">
-    <iframe src="http://127.0.0.1:{}/realtime/" width="100%" height="640" frameborder="0" style="border: 1px solid #ddd;"></iframe>
+    <iframe src="http://127.0.0.1:{}/" width="100%" height="640" frameborder="0" style="border: 1px solid #ddd;"></iframe>
     <div style="font-size: 12px; color: #666; margin-top: 5px;">
         🔄 <strong>Updated Server</strong> on port {} | Layout changed to: {} | Parameters updated
         <div style="margin-top: 3px;">
@@ -847,7 +847,7 @@ mod tests {
 
     #[test]
     fn test_extract_port_from_iframe() {
-        let iframe = r#"<iframe src="http://127.0.0.1:8080" width="100%" height="420"></iframe>"#;
+        let iframe = r#"<iframe src="http://127.0.0.1:8080/" width="100%" height="420"></iframe>"#;
         assert_eq!(extract_port_from_iframe(iframe), Some(8080));
 
         let no_port = r#"<iframe src="http://example.com" width="100%" height="420"></iframe>"#;

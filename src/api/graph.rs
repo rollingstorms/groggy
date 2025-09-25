@@ -3463,7 +3463,7 @@ impl GraphDataSource {
                 let iframe_html = format!(
                     r#"
 <div style="position: relative;">
-    <iframe src="http://127.0.0.1:{port}" width="100%" height="640" frameborder="0" id="groggy-honeycomb-{port}"></iframe>
+    <iframe src="http://127.0.0.1:{port}/" width="100%" height="640" frameborder="0" id="groggy-honeycomb-{port}"></iframe>
     <div style="font-size: 12px; color: #666; margin-top: 5px;">
         🍯 <strong>Enhanced Honeycomb Visualization</strong> on port {port}
         <span style="margin-left: 10px;">🎛️ Custom honeycomb controls + advanced parameters</span>
@@ -3552,7 +3552,7 @@ impl GraphDataSource {
 
         // Generate iframe HTML
         let iframe_html = format!(
-            r#"<iframe src="http://127.0.0.1:{port}" width="100%" height="640" style="border:0;border-radius:12px;"></iframe>"#,
+            r#"<iframe src="http://127.0.0.1:{port}/" width="100%" height="640" style="border:0;border-radius:12px;"></iframe>"#,
             port = actual_port
         );
 

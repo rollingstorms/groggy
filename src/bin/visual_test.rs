@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let port_str = &iframe_html[port_start + 10..];
                 if let Some(port_end) = port_str.find('"') {
                     let port = &port_str[..port_end];
-                    let url = format!("http://127.0.0.1:{}", port);
+                    let url = format!("http://127.0.0.1:{}/", port);
 
                     println!("✅ Extracted port: {}", port);
                     println!("🌐 Server running at: {}", url);

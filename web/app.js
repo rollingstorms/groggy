@@ -107,16 +107,35 @@ export class RealtimeViz {
 
         // Layout algorithm
         const layoutSelect = document.getElementById('layout-algorithm');
-        layoutSelect.addEventListener('change', () => {
-            const layout = layoutSelect.value;
-            this.sendControlMessage('layout', layout);
-            const controllerMode = this.mapLayoutToController(layout);
-            if (controllerMode) {
-                this.sendControlMessage('controller', { mode: controllerMode });
-                if (controllerMode === 'pan-2d') {
-                    this.camera.rotation = 0;
-                }
-            }
+        const honeyCell = document.getElementById('honey-cell');      // <input type="number" ...>
+        const honeyScale = document.getElementById('honey-scale');    // <input type="number" ...>
+        const circleRadius = document.getElementById('circle-radius');// <input type="number" ...>
+        const forceDist = document.getElementById('force-distance');  // <input type="number" ...>
+        const forceCharge = document.getElementById('force-charge');  // <input type="number" ...>
+
+        const sendLayout = () => {
+        const layout = layoutSelect.value;
+        const params = {};
+        if (layout === 'honeycomb') {
+            if (honeyCell && honeyCell.value) params.cell_size = parseFloat(honeyCell.value);
+            if (honeyScale && honeyScale.value) params.scale = parseFloat(honeyScale.value);
+        } else if (layout === 'circular') {
+            if (circleRadius && circleRadius.value) params.radius = parseFloat(circleRadius.value);
+        } else if (layout === 'force_directed' || layout === 'force-directed') {
+            if (forceDist && forceDist.value) params.distance = parseFloat(forceDist.value);
+            if (forceCharge && forceCharge.value) params.charge = parseFloat(forceCharge.value);
+        }
+        this.sendControlMessage('layout', { algorithm: layout, params });
+        const controllerMode = this.mapLayoutToController(layout);
+        if (controllerMode) {
+            this.sendControlMessage('controller', { mode: controllerMode });
+            if (controllerMode === 'pan-2d') this.camera.rotation = 0;
+        }
+        };
+
+        layoutSelect.addEventListener('change', sendLayout);
+        [honeyCell, honeyScale, circleRadius, forceDist, forceCharge].forEach(el => {
+        if (el) el.addEventListener('change', sendLayout);
         });
 
         // Play/pause button
@@ -620,13 +639,15 @@ export class RealtimeViz {
                         params: {},
                     },
                 };
-            case 'layout':
-                return {
-                    ChangeLayout: {
-                        algorithm: typeof data === 'string' ? data : String(data),
-                        params: {},
-                    },
-                };
+            case 'layout': {
+                if (typeof data === 'string') {
+                    return { ChangeLayout: { algorithm: data, params: {} } };
+                }
+                // expect { algorithm, params? }
+                const algorithm = data?.algorithm ?? 'honeycomb';
+                const params = data?.params ?? {};
+                return { ChangeLayout: { algorithm, params } };
+                }
             case 'controller':
                 return {
                     SetInteractionController: {
