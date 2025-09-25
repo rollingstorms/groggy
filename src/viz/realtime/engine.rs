@@ -9,15 +9,16 @@ use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::numeric_type::NumericType;
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::embeddings::{EmbeddingEngine, EmbeddingMethod, GraphEmbeddingExt};
-use crate::viz::projection::{GraphProjectionExt, ProjectionEngine, ProjectionEngineFactory};
+use crate::viz::projection::GraphProjectionExt;
 use crate::viz::realtime::accessor::{
     Edge, EngineSnapshot, EngineUpdate, GraphMeta, GraphPatch, Node, NodePosition,
     PositionsPayload, UpdateEnvelope,
 };
 use crate::viz::realtime::engine_sync::EngineSyncManager;
 use crate::viz::realtime::interaction::{
-    CanvasDragPolicy, GlobeController, HoneycombController, InteractionController, NodeDragEvent,
-    NodeDragPolicy, PanController, PointerEvent, ViewState2D, ViewState3D, WheelEvent,
+    CanvasDragPolicy, GlobeController, HoneycombController, InteractionCommand,
+    InteractionController, NodeDragEvent, NodeDragPolicy, PanController, PointerEvent, ViewState2D,
+    ViewState3D, WheelEvent,
 };
 use crate::viz::streaming::data_source::Position;
 use serde_json::json;
@@ -253,8 +254,9 @@ impl RealTimeVizEngine {
             filters: FilterState::default(),
             last_update: Instant::now(),
             needs_position_update: false,
-            current_layout_algorithm: "honeycomb".to_string(),
+            current_layout: LayoutKind::Honeycomb,
             current_layout_params: std::collections::HashMap::new(),
+            layout_param_cache: std::collections::HashMap::new(),
         }));
 
         // Create broadcast channel for engine updates
@@ -287,10 +289,10 @@ impl RealTimeVizEngine {
 
         let initial_layout = {
             let state = self.state.lock().unwrap();
-            state.current_layout_algorithm.clone()
+            state.current_layout
         };
-        self.configure_controller_for_layout(&initial_layout);
-        self.broadcast_view_state()?;
+        self.configure_controller_for_layout(initial_layout);
+        self.broadcast_view_state().await?;
 
         // Initialize performance monitoring
         self.performance_monitor.start()?;
@@ -386,11 +388,54 @@ impl RealTimeVizEngine {
         let embedding_start = Instant::now();
 
         // Phase 1: Compute embeddings
-        let graph = self.graph.lock().unwrap();
-        let embedding = graph.compute_embedding(&self.config.embedding_config)?;
-        drop(graph);
+        let (embedding, graph_was_empty) = {
+            let graph = self.graph.lock().unwrap();
+            let node_count = graph.space().node_count();
+
+            if node_count == 0 {
+                // Graph is empty, check if we have state positions to work from
+                let state_node_count = self.node_count_from_state();
+                eprintln!("⚠️  DEBUG: Graph is empty but state has {} nodes, generating fallback embedding",
+                         state_node_count);
+
+                if state_node_count > 0 {
+                    // Generate a fallback embedding from current positions
+                    let positions = {
+                        let state = self.state.lock().unwrap();
+                        state.positions.clone()
+                    };
+
+                    // Create embedding matrix from current positions
+                    let mut embedding_data = Vec::with_capacity(state_node_count * 2);
+                    for pos in &positions {
+                        embedding_data.push(pos.x);
+                        embedding_data.push(pos.y);
+                    }
+
+                    let embedding = GraphMatrix::from_row_major_data(
+                        embedding_data,
+                        state_node_count,
+                        2,
+                        None,
+                    )?;
+
+                    (embedding, true)
+                } else {
+                    return Err(GraphError::InvalidInput(
+                        "No graph data and no state positions available".to_string(),
+                    ));
+                }
+            } else {
+                let embedding = graph.compute_embedding(&self.config.embedding_config)?;
+                (embedding, false)
+            }
+        };
 
         let embedding_time = embedding_start.elapsed();
+
+        if graph_was_empty {
+            eprintln!("🔄 DEBUG: Used fallback embedding from state positions");
+        }
 
         let projection_start = Instant::now();
 
@@ -483,17 +528,19 @@ impl RealTimeVizEngine {
 
             ControlCommand::SetInteractionController { mode } => {
                 self.set_interaction_controller(&mode);
-                self.broadcast_view_state()?;
+                self.broadcast_view_state().await?;
             }
 
             ControlCommand::Pointer { event } => {
-                self.active_controller.on_pointer(event);
-                self.broadcast_view_state()?;
+                let commands = self.active_controller.on_pointer(event);
+                self.process_interaction_commands(commands).await?;
+                self.broadcast_view_state().await?;
             }
 
             ControlCommand::Wheel { event } => {
-                self.active_controller.on_wheel(event);
-                self.broadcast_view_state()?;
+                let commands = self.active_controller.on_wheel(event);
+                self.process_interaction_commands(commands).await?;
+                self.broadcast_view_state().await?;
             }
 
             ControlCommand::NodeDrag { event } => {
@@ -509,13 +556,13 @@ impl RealTimeVizEngine {
                     "🔁 DEBUG: Received RotateEmbedding command axis=({}, {}) radians={}",
                     axis_i, axis_j, radians
                 );
-                // TODO: Integrate with N-D embedding rotation pipeline
+                self.apply_nd_rotation(axis_i, axis_j, radians).await?;
             }
 
             ControlCommand::SetViewRotation { radians } => {
                 eprintln!("🔁 DEBUG: SetViewRotation {}", radians);
                 // Controllers that support this should interpret via Pointer/Wheel events.
-                self.broadcast_view_state()?;
+                self.broadcast_view_state().await?;
             }
 
             _ => {
@@ -817,80 +864,139 @@ impl RealTimeVizEngine {
         Ok(())
     }
 
+    /// Translate positions so their bbox center is at (0,0).
+    /// If `target_radius_px` is Some(r), also scale uniformly so
+    /// the bbox half-diagonal ≈ r pixels (simple fit-to-view).
+    fn center_and_fit_positions(
+        mut positions: Vec<Position>,
+        target_radius_px: Option<f64>,
+    ) -> Vec<Position> {
+        if positions.is_empty() {
+            return positions;
+        }
+
+        // bbox
+        let (mut xmin, mut xmax, mut ymin, mut ymax) = (
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+        );
+        for p in &positions {
+            if p.x.is_finite() {
+                xmin = xmin.min(p.x);
+                xmax = xmax.max(p.x);
+            }
+            if p.y.is_finite() {
+                ymin = ymin.min(p.y);
+                ymax = ymax.max(p.y);
+            }
+        }
+        let cx = (xmin + xmax) * 0.5;
+        let cy = (ymin + ymax) * 0.5;
+
+        // translate to origin
+        for p in &mut positions {
+            p.x -= cx;
+            p.y -= cy;
+        }
+
+        if let Some(target) = target_radius_px {
+            // half-diagonal of bbox (farthest corner from origin)
+            let hw = (xmax - xmin) * 0.5;
+            let hh = (ymax - ymin) * 0.5;
+            let half_diag = (hw * hw + hh * hh).sqrt().max(1e-9);
+            let s = target / half_diag;
+            for p in &mut positions {
+                p.x *= s;
+                p.y *= s;
+            }
+        }
+
+        positions
+    }
+
     /// Apply the currently configured layout algorithm to generate positions
     fn apply_layout_algorithm(&mut self, embedding: &GraphMatrix) -> GraphResult<Vec<Position>> {
-        let (algorithm, params) = {
+        let (layout_kind, params) = {
             let state = self.state.lock().unwrap();
-            (
-                state.current_layout_algorithm.clone(),
-                state.current_layout_params.clone(),
-            )
+            (state.current_layout, state.current_layout_params.clone())
         };
 
         eprintln!(
             "📐 DEBUG: Applying layout algorithm: {} with params {:?}",
-            algorithm, params
+            layout_kind, params
         );
 
-        match algorithm.as_str() {
-            "honeycomb" => {
+        let mut positions = match layout_kind {
+            LayoutKind::Honeycomb => {
                 eprintln!("🔶 DEBUG: Using honeycomb layout projection");
 
                 let mut config = self.config.projection_config.clone();
+
+                // Check for explicit cell size first
                 let explicit_cell_size = params
                     .get("honeycomb.cell_size")
                     .or_else(|| params.get("cell_size"))
                     .and_then(|v| v.parse::<f64>().ok())
                     .filter(|v| *v > 0.0);
 
-                if let Some(cell_size) =
-                    explicit_cell_size.or_else(|| self.auto_scale_honeycomb_cell_size(embedding))
-                {
+                if let Some(cell_size) = explicit_cell_size {
                     config.honeycomb_config.cell_size = cell_size;
                     self.update_layout_param_if_changed("honeycomb.cell_size", cell_size);
+                } else {
+                    // Apply bin density calculation as per fix plan
+                    let target_bins = params
+                        .get("bins")
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .unwrap_or(64.0);
+
+                    if let Some(cell_size) =
+                        self.calculate_honeycomb_cell_size_from_bins(embedding, target_bins)
+                    {
+                        config.honeycomb_config.cell_size = cell_size;
+                        self.update_layout_param_if_changed("honeycomb.cell_size", cell_size);
+                        eprintln!(
+                            "🔶 DEBUG: Auto-scaled honeycomb cell size to {:.2} for {} target bins",
+                            cell_size, target_bins
+                        );
+                    } else if let Some(cell_size) = self.auto_scale_honeycomb_cell_size(embedding) {
+                        config.honeycomb_config.cell_size = cell_size;
+                        self.update_layout_param_if_changed("honeycomb.cell_size", cell_size);
+                    }
                 }
 
                 let graph = self.graph.lock().unwrap();
-                graph.project_to_honeycomb(embedding, &config)
+                graph.project_to_honeycomb(embedding, &config)?
             }
-            "force_directed" => {
+            LayoutKind::ForceDirected => {
                 eprintln!("⚡ DEBUG: Using force-directed layout");
                 let graph = self.graph.lock().unwrap();
-                self.apply_force_directed_layout(&graph, embedding, &params)
+                self.apply_force_directed_layout(&graph, embedding, &params)?
             }
-            "circular" => {
+            LayoutKind::Circular => {
                 eprintln!("⭕ DEBUG: Using circular layout");
                 let graph = self.graph.lock().unwrap();
-                self.apply_circular_layout(&graph, &params)
+                self.apply_circular_layout(&graph, embedding, &params)?
             }
-            "grid" => {
+            LayoutKind::Grid => {
                 eprintln!("▦ DEBUG: Using grid layout");
                 let graph = self.graph.lock().unwrap();
-                self.apply_grid_layout(&graph, &params)
+                self.apply_grid_layout(&graph, embedding, &params)?
             }
-            _ => {
-                eprintln!(
-                    "⚠️  DEBUG: Unknown layout algorithm '{}', falling back to honeycomb",
-                    algorithm
-                );
+        };
 
-                let mut config = self.config.projection_config.clone();
-                if let Some(cell_size) = self.auto_scale_honeycomb_cell_size(embedding) {
-                    config.honeycomb_config.cell_size = cell_size;
-                    self.update_layout_param_if_changed("honeycomb.cell_size", cell_size);
-                }
+        // Center & fit to a sensible radius (~350 px)
+        positions = Self::center_and_fit_positions(positions, Some(350.0));
 
-                let graph = self.graph.lock().unwrap();
-                graph.project_to_honeycomb(embedding, &config)
-            }
-        }
+        Ok(positions)
     }
 
     /// Apply force-directed layout algorithm with parameters
     fn apply_force_directed_layout(
         &self,
         graph: &Graph,
-        _embedding: &GraphMatrix,
+        embedding: &GraphMatrix,
         params: &std::collections::HashMap<String, String>,
     ) -> GraphResult<Vec<Position>> {
         eprintln!(
@@ -917,23 +1023,22 @@ impl RealTimeVizEngine {
             iterations, charge, distance
         );
 
-        // Use the graph's built-in force-directed layout
-        let force_layout = crate::viz::layouts::ForceDirectedLayout::new()
-            .with_iterations(iterations)
-            .with_charge(charge)
-            .with_distance(distance);
-
-        let node_count = graph.space().node_count();
+        let node_count = self.node_count_from_state();
         let mut positions = Vec::new();
 
-        // Generate positions using force-directed algorithm
+        // Initialize positions using first 2 dimensions of embedding
         for i in 0..node_count {
-            // For now, use a simple spring layout with some randomization
-            let angle = (i as f64) * 2.0 * std::f64::consts::PI / (node_count as f64);
-            let radius = 100.0 + (i as f64 * 20.0) % 150.0; // Vary radius
-
-            let x = radius * angle.cos() + 300.0; // Center at (300, 300)
-            let y = radius * angle.sin() + 300.0;
+            let (x, y) = if embedding.shape().1 >= 2 {
+                // Use first 2 dimensions of embedding as initial positions
+                let x_val = embedding.get(i, 0).unwrap_or(0.0);
+                let y_val = embedding.get(i, 1).unwrap_or(0.0);
+                (x_val, y_val)
+            } else {
+                // Fallback to circular arrangement if embedding has <2 dimensions
+                let angle = (i as f64) * 2.0 * std::f64::consts::PI / (node_count as f64);
+                let radius = 100.0;
+                (radius * angle.cos(), radius * angle.sin())
+            };
 
             positions.push(Position { x, y });
         }
@@ -951,10 +1056,11 @@ impl RealTimeVizEngine {
         state.node_index.len().max(state.positions.len())
     }
 
-    /// Apply circular layout algorithm with parameters
+    /// Apply circular layout algorithm with parameters using embedding for ordering
     fn apply_circular_layout(
         &self,
         graph: &Graph,
+        embedding: &GraphMatrix,
         params: &std::collections::HashMap<String, String>,
     ) -> GraphResult<Vec<Position>> {
         eprintln!(
@@ -965,15 +1071,15 @@ impl RealTimeVizEngine {
         let node_count = self.node_count_from_state();
         let mut positions = Vec::new();
 
-        // Parse parameters with defaults
+        // Parse parameters with defaults (center around origin)
         let center_x = params
             .get("center_x")
             .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(300.0);
+            .unwrap_or(0.0);
         let center_y = params
             .get("center_y")
             .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(300.0);
+            .unwrap_or(0.0);
         let radius = params
             .get("radius")
             .and_then(|s| s.parse::<f64>().ok())
@@ -984,12 +1090,40 @@ impl RealTimeVizEngine {
             center_x, center_y, radius
         );
 
-        for i in 0..node_count {
-            let angle = (i as f64) * 2.0 * std::f64::consts::PI / (node_count as f64);
-            let x = center_x + radius * angle.cos();
-            let y = center_y + radius * angle.sin();
+        if embedding.shape().1 >= 2 {
+            // Use embedding to determine angular ordering - sort by first principal component
+            let mut node_angles: Vec<(usize, f64)> = (0..node_count)
+                .map(|i| {
+                    let x_val = embedding.get(i, 0).unwrap_or(0.0);
+                    let y_val = embedding.get(i, 1).unwrap_or(0.0);
+                    let angle = y_val.atan2(x_val);
+                    (i, angle)
+                })
+                .collect();
 
-            positions.push(Position { x, y });
+            // Sort by angle to preserve embedding neighborhood structure
+            node_angles.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+
+            // Place nodes on circle in embedding-determined order
+            for (circle_pos, &(node_idx, _)) in node_angles.iter().enumerate() {
+                let angle = (circle_pos as f64) * 2.0 * std::f64::consts::PI / (node_count as f64);
+                let x = center_x + radius * angle.cos();
+                let y = center_y + radius * angle.sin();
+
+                // Ensure positions vector has enough capacity
+                if node_idx >= positions.len() {
+                    positions.resize(node_idx + 1, Position { x: 0.0, y: 0.0 });
+                }
+                positions[node_idx] = Position { x, y };
+            }
+        } else {
+            // Fallback to simple circular arrangement
+            for i in 0..node_count {
+                let angle = (i as f64) * 2.0 * std::f64::consts::PI / (node_count as f64);
+                let x = center_x + radius * angle.cos();
+                let y = center_y + radius * angle.sin();
+                positions.push(Position { x, y });
+            }
         }
 
         eprintln!("⭕ DEBUG: Generated {} circular positions", positions.len());
@@ -1000,6 +1134,7 @@ impl RealTimeVizEngine {
     fn apply_grid_layout(
         &self,
         graph: &Graph,
+        embedding: &GraphMatrix,
         params: &std::collections::HashMap<String, String>,
     ) -> GraphResult<Vec<Position>> {
         eprintln!(
@@ -1010,36 +1145,67 @@ impl RealTimeVizEngine {
         let node_count = self.node_count_from_state();
         let mut positions = Vec::new();
 
-        // Parse parameters with defaults
+        // Calculate grid dimensions first
+        let grid_size = (node_count as f64).sqrt().ceil() as usize;
+
+        // Parse parameters with defaults (center grid around origin)
         let cell_size = params
             .get("cell_size")
             .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(80.0);
+            .unwrap_or(40.0);
         let start_x = params
             .get("start_x")
             .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(100.0);
+            .unwrap_or(-((grid_size as f64 - 1.0) * cell_size) * 0.5);
         let start_y = params
             .get("start_y")
             .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(100.0);
-
-        // Calculate grid dimensions
-        let grid_size = (node_count as f64).sqrt().ceil() as usize;
+            .unwrap_or(-((grid_size as f64 - 1.0) * cell_size) * 0.5);
 
         eprintln!(
             "▦ DEBUG: Grid params: cell_size={}, start=({}, {}), grid_size={}",
             cell_size, start_x, start_y, grid_size
         );
 
-        for i in 0..node_count {
-            let row = i / grid_size;
-            let col = i % grid_size;
+        if embedding.shape().1 >= 2 {
+            // Use embedding coordinates to determine grid ordering
+            // Sort nodes by distance from origin to create a more sensible grid ordering
+            let mut node_distances: Vec<(usize, f64)> = (0..node_count)
+                .map(|i| {
+                    let x_val = embedding.get(i, 0).unwrap_or(0.0);
+                    let y_val = embedding.get(i, 1).unwrap_or(0.0);
+                    let distance = (x_val * x_val + y_val * y_val).sqrt();
+                    (i, distance)
+                })
+                .collect();
 
-            let x = start_x + (col as f64) * cell_size;
-            let y = start_y + (row as f64) * cell_size;
+            // Sort by distance to create radial ordering in grid
+            node_distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
-            positions.push(Position { x, y });
+            // Create positions vector with correct size
+            positions.resize(node_count, Position { x: 0.0, y: 0.0 });
+
+            // Place nodes in grid based on embedding-determined ordering
+            for (grid_pos, &(node_idx, _)) in node_distances.iter().enumerate() {
+                let row = grid_pos / grid_size;
+                let col = grid_pos % grid_size;
+
+                let x = start_x + (col as f64) * cell_size;
+                let y = start_y + (row as f64) * cell_size;
+
+                positions[node_idx] = Position { x, y };
+            }
+        } else {
+            // Fallback to simple grid arrangement
+            for i in 0..node_count {
+                let row = i / grid_size;
+                let col = i % grid_size;
+
+                let x = start_x + (col as f64) * cell_size;
+                let y = start_y + (row as f64) * cell_size;
+
+                positions.push(Position { x, y });
+            }
         }
 
         eprintln!("▦ DEBUG: Generated {} grid positions", positions.len());
@@ -1103,19 +1269,344 @@ impl RealTimeVizEngine {
             map.insert(
                 "layout".to_string(),
                 json!({
-                    "algorithm": state.current_layout_algorithm,
-                    "params": state.current_layout_params,
+                    "algorithm": state.current_layout.to_string(),
+                    "params": state.current_layout_params.clone(),
                 }),
             );
             map
         };
 
+        // Broadcast recomputation result
         self.broadcast_envelope(Some(params_changed), None, None, true)?;
 
         eprintln!(
-            "✅ DEBUG: Projection-only recomputation completed in {:.2}ms",
+            "📐 DEBUG: Projection recomputation completed in {:.2}ms",
             projection_time.as_secs_f64() * 1000.0
         );
+        Ok(())
+    }
+
+    async fn trigger_view_aware_projection(&mut self, view: ViewState3D) -> GraphResult<()> {
+        eprintln!("🌐 DEBUG: Starting view-aware projection with 3D transform");
+
+        // Check if we have a cached embedding to reuse
+        let existing_embedding = {
+            let state = self.state.lock().unwrap();
+            state.embedding.clone()
+        };
+
+        let embedding = match existing_embedding {
+            Some(embedding) => {
+                eprintln!("♻️  DEBUG: Reusing cached embedding for view-aware projection");
+                embedding
+            }
+            None => {
+                eprintln!("🔄 DEBUG: No cached embedding found, computing new embedding first");
+                // If no embedding exists, we need to compute it first
+                let graph = self.graph.lock().unwrap();
+                let embedding = graph.compute_embedding(&self.config.embedding_config)?;
+                drop(graph);
+
+                // Cache the embedding for future projection-only updates
+                {
+                    let mut state = self.state.lock().unwrap();
+                    state.embedding = Some(embedding.clone());
+                }
+                embedding
+            }
+        };
+
+        let projection_start = Instant::now();
+
+        // Apply 3D view transform to embedding before 2D projection
+        let transformed_embedding = self.apply_3d_view_transform(&embedding, &view)?;
+
+        // Phase 2: Project transformed 3D points to 2D coordinates
+        let positions = self.apply_layout_algorithm(&transformed_embedding)?;
+
+        let projection_time = projection_start.elapsed();
+
+        // Update state with new positions and timing
+        {
+            let mut state = self.state.lock().unwrap();
+            state.positions = positions;
+            state.performance.last_projection_time_ms = projection_time.as_secs_f64() * 1000.0;
+            state.last_update = Instant::now();
+            state.needs_position_update = true;
+        }
+
+        // Broadcast the updated positions and view state
+        let view_json = json!({
+            "view_3d": {
+                "center": view.center,
+                "distance": view.distance,
+                "quat": view.quat,
+            }
+        });
+        self.broadcast_envelope(None, None, Some(view_json), true)?;
+
+        Ok(())
+    }
+
+    fn apply_3d_view_transform(
+        &self,
+        embedding: &GraphMatrix,
+        view: &ViewState3D,
+    ) -> GraphResult<GraphMatrix> {
+        use crate::viz::realtime::interaction::math::{Quat, Vec3};
+
+        eprintln!(
+            "🔄 DEBUG: Applying 3D view transform - center: {:?}, distance: {}, quat: {:?}",
+            view.center, view.distance, view.quat
+        );
+
+        // Create quaternion from view state
+        let quat = Quat {
+            w: view.quat[0],
+            x: view.quat[1],
+            y: view.quat[2],
+            z: view.quat[3],
+        };
+
+        // Get embedding dimensions and data
+        let (n_nodes, n_dims) = embedding.shape();
+        // Create a vector to hold the embedding data
+        let mut embedding_data = Vec::with_capacity(n_nodes * n_dims);
+        for row in 0..n_nodes {
+            for col in 0..n_dims {
+                embedding_data.push(embedding.get(row, col).unwrap_or(0.0));
+            }
+        }
+
+        // For 3D transformations, we need at least 3 dimensions
+        // If embedding has fewer than 3 dims, pad with zeros
+        // If it has more, we'll transform the first 3 dimensions
+        let dims_to_transform = std::cmp::min(n_dims, 3);
+
+        let mut transformed_data = embedding_data.clone();
+
+        // Transform each point
+        for node_idx in 0..n_nodes {
+            // Extract 3D point (pad with zeros if needed)
+            let mut point = Vec3::new(0.0, 0.0, 0.0);
+
+            if dims_to_transform >= 1 {
+                point.x = embedding_data[node_idx * n_dims];
+            }
+            if dims_to_transform >= 2 {
+                point.y = embedding_data[node_idx * n_dims + 1];
+            }
+            if dims_to_transform >= 3 {
+                point.z = embedding_data[node_idx * n_dims + 2];
+            }
+
+            // Apply 3D transformation:
+            // 1. Translate by view center
+            point = point.add(Vec3::new(view.center[0], view.center[1], view.center[2]));
+
+            // 2. Apply quaternion rotation
+            point = quat.rotate_vec3(point);
+
+            // 3. Scale by distance (for zoom effect)
+            let distance_scale = view.distance / 600.0; // normalize around default distance
+            point = point.mul(distance_scale);
+
+            // Store transformed coordinates back
+            if dims_to_transform >= 1 {
+                transformed_data[node_idx * n_dims] = point.x;
+            }
+            if dims_to_transform >= 2 {
+                transformed_data[node_idx * n_dims + 1] = point.y;
+            }
+            if dims_to_transform >= 3 {
+                transformed_data[node_idx * n_dims + 2] = point.z;
+            }
+        }
+
+        // Create new GraphMatrix with transformed data
+        Ok(GraphMatrix::from_row_major_data(
+            transformed_data,
+            n_nodes,
+            n_dims,
+            None,
+        )?)
+    }
+
+    async fn apply_nd_rotation(
+        &mut self,
+        axis_i: usize,
+        axis_j: usize,
+        radians: f64,
+    ) -> GraphResult<()> {
+        eprintln!(
+            "🔄 DEBUG: Applying N-D rotation {} radians between axes {} and {}",
+            radians, axis_i, axis_j
+        );
+
+        // Get the current embedding
+        let existing_embedding = {
+            let state = self.state.lock().unwrap();
+            state.embedding.clone()
+        };
+
+        let embedding = match existing_embedding {
+            Some(embedding) => embedding,
+            None => {
+                eprintln!("⚠️  WARNING: No embedding found for N-D rotation, computing new one");
+                let graph = self.graph.lock().unwrap();
+                let embedding = graph.compute_embedding(&self.config.embedding_config)?;
+                drop(graph);
+
+                // Cache the embedding for future operations
+                {
+                    let mut state = self.state.lock().unwrap();
+                    state.embedding = Some(embedding.clone());
+                }
+                embedding
+            }
+        };
+
+        // Apply N-D rotation to embedding
+        let rotated_embedding = self.rotate_embedding_nd(&embedding, axis_i, axis_j, radians)?;
+
+        // Update the cached embedding with rotated version
+        {
+            let mut state = self.state.lock().unwrap();
+            state.embedding = Some(rotated_embedding.clone());
+        }
+
+        // Trigger projection recomputation with the rotated embedding
+        self.trigger_projection_recomputation().await?;
+
+        eprintln!("✅ DEBUG: N-D rotation completed and projection updated");
+        Ok(())
+    }
+
+    fn rotate_embedding_nd(
+        &self,
+        embedding: &GraphMatrix,
+        axis_i: usize,
+        axis_j: usize,
+        radians: f64,
+    ) -> GraphResult<GraphMatrix> {
+        let (n_nodes, n_dims) = embedding.shape();
+
+        // Validate axes
+        if axis_i >= n_dims || axis_j >= n_dims || axis_i == axis_j {
+            return Err(GraphError::InvalidInput(format!(
+                "Invalid rotation axes: axis_i={}, axis_j={}, dims={}",
+                axis_i, axis_j, n_dims
+            )));
+        }
+
+        // Create a vector to hold the embedding data
+        let mut embedding_data = Vec::with_capacity(n_nodes * n_dims);
+        for row in 0..n_nodes {
+            for col in 0..n_dims {
+                embedding_data.push(embedding.get(row, col).unwrap_or(0.0));
+            }
+        }
+        let mut rotated_data = embedding_data.clone();
+
+        // Precompute rotation values
+        let cos_theta = radians.cos();
+        let sin_theta = radians.sin();
+
+        // Apply 2D rotation in the specified plane for each point
+        for node_idx in 0..n_nodes {
+            let base_idx = node_idx * n_dims;
+
+            // Get coordinates for the two axes
+            let xi = embedding_data[base_idx + axis_i];
+            let xj = embedding_data[base_idx + axis_j];
+
+            // Apply 2D rotation matrix
+            let new_xi = xi * cos_theta - xj * sin_theta;
+            let new_xj = xi * sin_theta + xj * cos_theta;
+
+            // Store rotated coordinates
+            rotated_data[base_idx + axis_i] = new_xi;
+            rotated_data[base_idx + axis_j] = new_xj;
+        }
+
+        Ok(GraphMatrix::from_row_major_data(
+            rotated_data,
+            n_nodes,
+            n_dims,
+            None,
+        )?)
+    }
+
+    async fn process_interaction_commands(
+        &mut self,
+        commands: Vec<InteractionCommand>,
+    ) -> GraphResult<()> {
+        for command in commands {
+            match command {
+                InteractionCommand::RotateEmbedding {
+                    axis_i,
+                    axis_j,
+                    radians,
+                } => {
+                    eprintln!("📬 DEBUG: Processing RotateEmbedding command from controller: axes ({}, {}), radians={}",
+                             axis_i, axis_j, radians);
+                    self.apply_nd_rotation(axis_i, axis_j, radians).await?;
+                }
+                InteractionCommand::TriggerRecomputation => {
+                    eprintln!("📬 DEBUG: Processing TriggerRecomputation command from controller");
+                    self.trigger_projection_recomputation().await?;
+                }
+                InteractionCommand::UpdateAutoScale {
+                    target_occupancy,
+                    min_cell_size,
+                } => {
+                    eprintln!("📬 DEBUG: Processing UpdateAutoScale command from controller: occupancy={}, cell_size={}",
+                             target_occupancy, min_cell_size);
+                    // Update honeycomb controller configuration
+                    if let Some(honeycomb) = self
+                        .active_controller
+                        .as_any()
+                        .downcast_mut::<HoneycombController>()
+                    {
+                        honeycomb.configure_auto_scaling(target_occupancy, min_cell_size, true);
+                    }
+                }
+                InteractionCommand::ExposeAutoScaleControls {
+                    target_occupancy,
+                    min_cell_size,
+                    enabled,
+                } => {
+                    eprintln!("🎛️  DEBUG: Exposing auto-scale controls in UI: occupancy={}, cell_size={}, enabled={}",
+                             target_occupancy, min_cell_size, enabled);
+
+                    // Create UI control exposure message
+                    let controls_json = json!({
+                        "auto_scale_controls": {
+                            "target_occupancy": {
+                                "value": target_occupancy,
+                                "min": 0.5,
+                                "max": 2.0,
+                                "step": 0.1,
+                                "label": "Target Occupancy",
+                                "description": "Target nodes per honeycomb cell (1.0 = one node per cell, optimal)"
+                            },
+                            "min_cell_size": {
+                                "value": min_cell_size,
+                                "min": 8.0,
+                                "max": 60.0,
+                                "step": 2.0,
+                                "label": "Min Cell Size",
+                                "description": "Minimum size of honeycomb cells in pixels"
+                            },
+                            "enabled": enabled
+                        }
+                    });
+
+                    // Broadcast the control exposure to clients
+                    self.broadcast_envelope(None, None, Some(controls_json), false)?;
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1457,22 +1948,75 @@ impl RealTimeVizEngine {
             }
             EngineUpdate::LayoutChanged { algorithm, params } => {
                 eprintln!(
-                    "📐 DEBUG: Layout changed to: {} with params {:?}",
+                    "📐 DEBUG: Layout change requested: {} with params {:?}",
                     algorithm, params
                 );
 
-                self.configure_controller_for_layout(&algorithm);
-                self.broadcast_view_state()?;
-
-                // Update the current layout algorithm and params in state
-                {
-                    let mut state = self.state.lock().unwrap();
-                    state.current_layout_algorithm = algorithm.clone();
-                    state.current_layout_params = params.clone();
+                match algorithm.parse::<LayoutKind>() {
+                    Ok(layout_kind) => {
+                        self.apply_layout_change(layout_kind, params).await?;
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "⚠️  WARNING: {} – ignoring layout change and keeping current layout",
+                            err
+                        );
+                    }
                 }
+            }
+            EngineUpdate::EmbeddingChanged { method, dimensions } => {
+                eprintln!(
+                    "🧠 DEBUG: Embedding changed to: {} with {} dimensions",
+                    method, dimensions
+                );
 
-                // Trigger recomputation with the new layout algorithm and params
-                self.trigger_projection_recomputation().await?;
+                // Map method string to EmbeddingMethod enum
+                let embedding_method = match method.as_str() {
+                    "spectral" => EmbeddingMethod::Spectral {
+                        normalized: true,
+                        eigenvalue_threshold: 1e-6,
+                    },
+                    "random" => EmbeddingMethod::RandomND {
+                        distribution: crate::viz::embeddings::RandomDistribution::Gaussian {
+                            mean: 0.0,
+                            stddev: 1.0,
+                        },
+                        normalize: true,
+                    },
+                    "energy" => EmbeddingMethod::EnergyND {
+                        iterations: 1000,
+                        learning_rate: 0.01,
+                        annealing: true,
+                    },
+                    "force_directed" => EmbeddingMethod::ForceDirectedND {
+                        spring_constant: 1.0,
+                        repulsion_strength: 100.0,
+                        iterations: 1000,
+                    },
+                    // Fallback to spectral for unknown methods
+                    _ => {
+                        eprintln!(
+                            "⚠️  WARNING: Unknown embedding method '{}', falling back to spectral",
+                            method
+                        );
+                        EmbeddingMethod::Spectral {
+                            normalized: true,
+                            eigenvalue_threshold: 1e-6,
+                        }
+                    }
+                };
+
+                // Update the current embedding configuration in state
+                self.config.embedding_config.dimensions = dimensions;
+                self.config.embedding_config.method = embedding_method;
+
+                eprintln!(
+                    "🧠 DEBUG: Mapped method '{}' to enum variant, updated config",
+                    method
+                );
+
+                // Trigger full recomputation (embedding + projection)
+                self.trigger_full_recomputation().await?;
             }
             EngineUpdate::UpdateEnvelope(envelope) => {
                 eprintln!(
@@ -1497,7 +2041,89 @@ impl RealTimeVizEngine {
         Ok(())
     }
 
-    fn broadcast_view_state(&mut self) -> GraphResult<()> {
+    async fn apply_layout_change(
+        &mut self,
+        layout_kind: LayoutKind,
+        mut incoming_params: HashMap<String, String>,
+    ) -> GraphResult<()> {
+        eprintln!(
+            "📐 DEBUG: Applying layout change to {} with params {:?}",
+            layout_kind, incoming_params
+        );
+
+        if incoming_params.is_empty() {
+            if let Some(cached) = {
+                let state = self.state.lock().unwrap();
+                state.layout_param_cache.get(&layout_kind).cloned()
+            } {
+                eprintln!(
+                    "📐 DEBUG: Restoring cached params for {}: {:?}",
+                    layout_kind, cached
+                );
+                incoming_params = cached;
+            }
+        }
+
+        self.configure_controller_for_layout(layout_kind);
+        self.broadcast_view_state().await?;
+
+        self.cancel_interpolation();
+        self.reset_layout_config_for(layout_kind);
+
+        {
+            let mut state = self.state.lock().unwrap();
+            let previous_layout = state.current_layout;
+            let previous_snapshot = state.current_layout_params.clone();
+            state
+                .layout_param_cache
+                .insert(previous_layout, previous_snapshot);
+            state.current_layout = layout_kind;
+            state.current_layout_params = incoming_params.clone();
+            state
+                .layout_param_cache
+                .insert(layout_kind, incoming_params.clone());
+            state.needs_position_update = true;
+        }
+
+        {
+            let map = self.pending_params_changed.get_or_insert_with(HashMap::new);
+            map.insert(
+                "layout.algorithm".to_string(),
+                json!(layout_kind.to_string()),
+            );
+        }
+
+        let flushed_updates = self.sync_manager.flush_all_coalesced().await?;
+        if !flushed_updates.is_empty() {
+            eprintln!(
+                "🚨 DEBUG: Discarded {} coalesced updates prior to layout recompute",
+                flushed_updates.len()
+            );
+        }
+
+        self.trigger_projection_recomputation().await?;
+
+        Ok(())
+    }
+
+    fn cancel_interpolation(&mut self) {
+        let mut state = self.state.lock().unwrap();
+        if state.animation_state.is_animating {
+            eprintln!("🛑 DEBUG: Cancelling active interpolation before layout switch");
+        }
+        state.animation_state = AnimationState::default();
+        state.needs_position_update = true;
+    }
+
+    fn reset_layout_config_for(&mut self, layout_kind: LayoutKind) {
+        if let LayoutKind::Honeycomb = layout_kind {
+            eprintln!("🧹 DEBUG: Resetting honeycomb projection config to defaults");
+            self.config.projection_config.honeycomb_config =
+                crate::viz::projection::HoneycombConfig::default();
+        }
+    }
+
+    async fn broadcast_view_state(&mut self) -> GraphResult<()> {
         if let Some(view) = self.active_controller.view_3d() {
             let view_json = json!({
                 "view_3d": {
@@ -1506,7 +2132,16 @@ impl RealTimeVizEngine {
                     "quat": view.quat,
                 }
             });
-            self.broadcast_envelope(None, None, Some(view_json), false)?;
+
+            // For 3D controllers, re-project embedding with view transform to show visible orbiting
+            if self.active_controller.name() == "globe-3d" {
+                eprintln!("🌐 DEBUG: Globe controller view changed, triggering re-projection for orbiting");
+                // Trigger view-aware projection that applies 3D transform before 2D projection
+                self.trigger_view_aware_projection(view.clone()).await?;
+            } else {
+                // For non-globe 3D controllers, just broadcast view state
+                self.broadcast_envelope(None, None, Some(view_json), false)?;
+            }
         } else if let Some(view) = self.active_controller.view_2d() {
             let view_json = json!({
                 "view_2d": {
@@ -1544,15 +2179,106 @@ impl RealTimeVizEngine {
             "🎮 DEBUG: Active interaction controller set to {}",
             self.active_controller.name()
         );
+
+        // Activate the controller and get any commands it wants to send
+        let embedding_dims = {
+            let state = self.state.lock().unwrap();
+            state.embedding.as_ref().map(|emb| emb.shape().1)
+        };
+
+        let activation_commands = self.active_controller.on_activate(embedding_dims);
+
+        // Process activation commands (like exposing auto-scale controls)
+        if !activation_commands.is_empty() {
+            eprintln!(
+                "🔧 DEBUG: Processing {} activation commands from controller",
+                activation_commands.len()
+            );
+            // We need to spawn a task to process async commands, but for now just log them
+            for cmd in activation_commands {
+                match cmd {
+                    InteractionCommand::ExposeAutoScaleControls {
+                        target_occupancy,
+                        min_cell_size,
+                        enabled,
+                    } => {
+                        eprintln!("🎛️  DEBUG: Controller requesting auto-scale UI exposure: occupancy={}, cell_size={}, enabled={}",
+                                 target_occupancy, min_cell_size, enabled);
+                        // TODO: Process this command properly in an async context
+                    }
+                    _ => {
+                        eprintln!("🔧 DEBUG: Other activation command: {:?}", cmd);
+                    }
+                }
+            }
+        }
     }
 
-    fn configure_controller_for_layout(&mut self, algorithm: &str) {
+    fn configure_controller_for_layout(&mut self, algorithm: LayoutKind) {
         let mode = match algorithm {
-            "globe" | "sphere" => "globe-3d",
-            "honeycomb" => "honeycomb-nd",
-            _ => "pan-2d",
+            LayoutKind::Honeycomb => "honeycomb-nd",
+            LayoutKind::ForceDirected | LayoutKind::Circular | LayoutKind::Grid => "pan-2d",
         };
         self.set_interaction_controller(mode);
+    }
+
+    /// Calculate honeycomb cell size based on embedding spread and target bin count
+    /// This implements the bin density calculation from the fix plan
+    fn calculate_honeycomb_cell_size_from_bins(
+        &self,
+        embedding: &GraphMatrix,
+        target_bins: f64,
+    ) -> Option<f64> {
+        let (rows, cols) = embedding.shape();
+        if rows == 0 || cols < 2 {
+            return None;
+        }
+
+        // Compute rough spread on first 2 dimensions
+        let (mut xmin, mut xmax, mut ymin, mut ymax) = (
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+        );
+
+        for i in 0..rows {
+            if let Some(x_val) = embedding.get(i, 0) {
+                let x = x_val.to_f64();
+                if x.is_finite() {
+                    xmin = xmin.min(x);
+                    xmax = xmax.max(x);
+                }
+            }
+            if let Some(y_val) = embedding.get(i, 1) {
+                let y = y_val.to_f64();
+                if y.is_finite() {
+                    ymin = ymin.min(y);
+                    ymax = ymax.max(y);
+                }
+            }
+        }
+
+        if !xmin.is_finite() || !xmax.is_finite() || !ymin.is_finite() || !ymax.is_finite() {
+            return None;
+        }
+
+        let dx = (xmax - xmin).max(1e-9);
+        let dy = (ymax - ymin).max(1e-9);
+
+        // Pick cell size so we get ~target_bins across the larger span
+        let span = dx.max(dy);
+        let cell_size = span / target_bins.max(1.0);
+
+        eprintln!("🔶 DEBUG: Embedding spread: dx={:.3}, dy={:.3}, span={:.3}, target_bins={:.1}, cell_size={:.3}",
+                  dx, dy, span, target_bins, cell_size);
+
+        if cell_size.is_finite() && cell_size > 0.0 {
+            // Apply reasonable bounds
+            Some(cell_size.clamp(1.0, 1000.0))
+        } else {
+            None
+        }
     }
 
     fn auto_scale_honeycomb_cell_size(&self, embedding: &GraphMatrix) -> Option<f64> {
@@ -1577,12 +2303,8 @@ impl RealTimeVizEngine {
                 let x = val_x.to_f64();
                 if x.is_finite() {
                     any_point = true;
-                    if x < min_x {
-                        min_x = x;
-                    }
-                    if x > max_x {
-                        max_x = x;
-                    }
+                    min_x = min_x.min(x);
+                    max_x = max_x.max(x);
                 }
             }
 
@@ -1590,12 +2312,8 @@ impl RealTimeVizEngine {
                 if let Some(val_y) = embedding.get(row, 1) {
                     let y = val_y.to_f64();
                     if y.is_finite() {
-                        if y < min_y {
-                            min_y = y;
-                        }
-                        if y > max_y {
-                            max_y = y;
-                        }
+                        min_y = min_y.min(y);
+                        max_y = max_y.max(y);
                     }
                 }
             }
@@ -1613,8 +2331,24 @@ impl RealTimeVizEngine {
         };
 
         let nodes = rows.max(1) as f64;
-        let config = &self.config.projection_config.honeycomb_config;
-        let target_avg = config.target_avg_occupancy.max(0.1);
+        let cfg = &self.config.projection_config.honeycomb_config;
+
+        if cfg.auto_cell_size && cfg.target_cols > 0 && cfg.target_rows > 0 {
+            let cell_x = width / ((cfg.target_cols as f64).max(1.0) * 1.5);
+            let cell_y = height / ((cfg.target_rows as f64).max(1.0) * (3.0f64).sqrt());
+            let mut cell = cell_x.min(cell_y) * cfg.scale_multiplier.max(0.1);
+            if cfg.min_cell_size > 0.0 {
+                cell = cell.max(cfg.min_cell_size);
+            }
+            return if cell.is_finite() {
+                Some(cell.clamp(4.0, 400.0))
+            } else {
+                None
+            };
+        }
+
+        // Legacy fallback: approximate number of cells from target occupancy
+        let target_avg = cfg.target_avg_occupancy.max(0.1);
         let desired_cells = (nodes / target_avg).max(1.0);
 
         let aspect = (width / height).clamp(0.2, 5.0);
@@ -1623,11 +2357,13 @@ impl RealTimeVizEngine {
 
         let cell_x = width / (width_cells * (3.0f64).sqrt());
         let cell_y = height / (height_cells * 1.5);
-        let mut cell = cell_x.min(cell_y);
-        cell = cell.max(config.min_cell_size);
+        let mut cell = cell_x.min(cell_y) * cfg.scale_multiplier.max(0.1);
+        if cfg.min_cell_size > 0.0 {
+            cell = cell.max(cfg.min_cell_size);
+        }
 
         if cell.is_finite() {
-            Some(cell)
+            Some(cell.clamp(4.0, 400.0))
         } else {
             None
         }
@@ -1646,9 +2382,13 @@ impl RealTimeVizEngine {
             }
 
             if changed {
+                let layout_kind = state.current_layout;
                 state
                     .current_layout_params
-                    .insert(key.to_string(), formatted);
+                    .insert(key.to_string(), formatted.clone());
+
+                let snapshot = state.current_layout_params.clone();
+                state.layout_param_cache.insert(layout_kind, snapshot);
             }
         }
 
@@ -1719,12 +2459,12 @@ impl RealTimeVizEngine {
 
         let (positions_payload, positions_vec) = if include_positions {
             let (layout, params, positions_vec): (
-                String,
+                LayoutKind,
                 HashMap<String, String>,
                 Vec<NodePosition>,
             ) = {
                 let state = self.state.lock().unwrap();
-                let layout = state.current_layout_algorithm.clone();
+                let layout = state.current_layout;
                 let params = state.current_layout_params.clone();
                 let positions = state
                     .node_index
@@ -1739,12 +2479,14 @@ impl RealTimeVizEngine {
                 (layout, params, positions)
             };
 
+            let layout_string = layout.to_string();
+
             let payload = if positions_vec.is_empty() {
                 None
             } else {
                 Some(PositionsPayload {
                     positions: positions_vec.clone(),
-                    layout: Some(layout.clone()),
+                    layout: Some(layout_string.clone()),
                     params: Some(params.clone()),
                 })
             };
@@ -1974,5 +2716,52 @@ mod tests {
         assert_eq!(interpolated[0].y, 10.0);
         assert_eq!(interpolated[1].x, 20.0);
         assert_eq!(interpolated[1].y, 20.0);
+    }
+
+    #[test]
+    fn center_and_fit_positions_centers_and_scales() {
+        let positions = vec![
+            Position { x: 100.0, y: 50.0 },
+            Position { x: 200.0, y: 150.0 },
+            Position { x: 300.0, y: -50.0 },
+        ];
+        let target = 250.0;
+        let out = RealTimeVizEngine::center_and_fit_positions(positions, Some(target));
+
+        // centroid ~ (0,0)
+        let (mut sx, mut sy) = (0.0, 0.0);
+        for p in &out {
+            sx += p.x;
+            sy += p.y;
+        }
+        let n = out.len() as f64;
+        let (mx, my) = (sx / n, sy / n);
+        assert!(mx.abs() < 1e-6, "mx={mx}");
+        assert!(my.abs() < 1e-6, "my={my}");
+
+        // half-diagonal ≤ target + epsilon
+        let (mut xmin, mut xmax, mut ymin, mut ymax) = (
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+        );
+        for p in &out {
+            if p.x.is_finite() {
+                xmin = xmin.min(p.x);
+                xmax = xmax.max(p.x);
+            }
+            if p.y.is_finite() {
+                ymin = ymin.min(p.y);
+                ymax = ymax.max(p.y);
+            }
+        }
+        let hw = (xmax - xmin) * 0.5;
+        let hh = (ymax - ymin) * 0.5;
+        let half_diag = (hw * hw + hh * hh).sqrt();
+        assert!(
+            half_diag <= target * 1.0001,
+            "half_diag={half_diag} > target={target}"
+        );
     }
 }

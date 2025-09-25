@@ -158,7 +158,17 @@ pub struct HoneycombConfig {
     /// Maximum grid dimensions (auto-computed if None)
     pub max_grid_size: Option<(usize, usize)>,
 
-    /// Target average number of nodes per hex cell (used for auto-scaling)
+    /// Enable automatic sizing of hexagonal cells based on embedding extents
+    pub auto_cell_size: bool,
+
+    /// Target grid resolution when auto sizing
+    pub target_cols: usize,
+    pub target_rows: usize,
+
+    /// Multiplier applied after auto sizing (1.0 = exact fit)
+    pub scale_multiplier: f64,
+
+    /// Target average number of nodes per hex cell (legacy fallback for auto scaling)
     pub target_avg_occupancy: f64,
 
     /// Minimum allowed cell size to avoid degenerate grids
@@ -174,6 +184,8 @@ pub enum HoneycombLayoutStrategy {
     DensityBased,
     /// Preserve relative distances as much as possible
     DistancePreserving,
+    /// Energy-based optimization with unique hex assignment
+    EnergyBased,
     /// Custom ordering function
     Custom { ordering_fn: String },
 }
@@ -275,11 +287,15 @@ impl Default for HoneycombConfig {
     fn default() -> Self {
         Self {
             cell_size: 40.0,
-            layout_strategy: HoneycombLayoutStrategy::Spiral,
+            layout_strategy: HoneycombLayoutStrategy::EnergyBased,
             snap_to_centers: true,
             grid_padding: 20.0,
             max_grid_size: None,
-            target_avg_occupancy: 4.0,
+            auto_cell_size: true,
+            target_cols: 64,
+            target_rows: 48,
+            scale_multiplier: 1.1,
+            target_avg_occupancy: 1.0,
             min_cell_size: 6.0,
         }
     }

@@ -1,6 +1,8 @@
 use super::{
-    InteractionController, NodeDragEvent, PointerEvent, PointerPhase, ViewState2D, WheelEvent,
+    InteractionCommand, InteractionController, NodeDragEvent, PointerEvent, PointerPhase,
+    ViewState2D, WheelEvent,
 };
+use std::any::Any;
 
 pub struct PanController {
     view: ViewState2D,
@@ -30,7 +32,7 @@ impl InteractionController for PanController {
         "pan-2d"
     }
 
-    fn on_pointer(&mut self, ev: PointerEvent) {
+    fn on_pointer(&mut self, ev: PointerEvent) -> Vec<InteractionCommand> {
         match ev.phase {
             PointerPhase::Start => self.dragging = true,
             PointerPhase::Move => {
@@ -45,9 +47,10 @@ impl InteractionController for PanController {
             }
             PointerPhase::End => self.dragging = false,
         }
+        Vec::new()
     }
 
-    fn on_wheel(&mut self, ev: WheelEvent) {
+    fn on_wheel(&mut self, ev: WheelEvent) -> Vec<InteractionCommand> {
         match ev {
             WheelEvent::Zoom { delta } => {
                 let factor = if delta < 0.0 { 1.1 } else { 0.9 };
@@ -57,11 +60,22 @@ impl InteractionController for PanController {
                 self.view.rotation += delta * 0.01;
             }
         }
+        Vec::new()
     }
 
-    fn on_node_drag(&mut self, _ev: NodeDragEvent) {}
+    fn on_node_drag(&mut self, _ev: NodeDragEvent) -> Vec<InteractionCommand> {
+        Vec::new()
+    }
 
     fn view_2d(&self) -> Option<ViewState2D> {
         Some(self.view.clone())
+    }
+
+    fn on_activate(&mut self, _embedding_dims: Option<usize>) -> Vec<InteractionCommand> {
+        Vec::new()
+    }
+
+    fn as_any(&mut self) -> &mut dyn Any {
+        self
     }
 }

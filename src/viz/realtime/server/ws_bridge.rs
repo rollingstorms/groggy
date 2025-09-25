@@ -54,6 +54,90 @@ pub struct WsBridge {
 }
 
 impl WsBridge {
+    /// Parse control message with support for both UI and Python formats
+    fn parse_control_message(text: &str) -> Result<ControlMsg, String> {
+        eprintln!("🔍 DEBUG: Attempting to parse control message: {}", text);
+
+        // First, try to parse as the expected WsMessage format (Python format)
+        if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(text) {
+            if let WsMessage::Control { payload, .. } = ws_msg {
+                eprintln!("✅ DEBUG: Parsed as WsMessage::Control format");
+                return Ok(payload);
+            }
+        }
+
+        // If that fails, try to parse as direct JSON formats that UI might send
+
+        // Try parsing as direct ControlMsg JSON
+        if let Ok(control_msg) = serde_json::from_str::<ControlMsg>(text) {
+            eprintln!("✅ DEBUG: Parsed as direct ControlMsg format");
+            return Ok(control_msg);
+        }
+
+        // Try parsing as generic JSON and manually construct ControlMsg
+        if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(text) {
+            eprintln!("🔍 DEBUG: Trying to parse as generic JSON: {}", json_val);
+
+            // Check for common UI formats
+            if let Some(obj) = json_val.as_object() {
+                // Format 1: {"type": "ChangeLayout", "algorithm": "...", "params": {...}}
+                if let Some(msg_type) = obj.get("type").and_then(|v| v.as_str()) {
+                    match msg_type {
+                        "ChangeLayout" => {
+                            let algorithm = obj
+                                .get("algorithm")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("force_directed")
+                                .to_string();
+                            let params = obj
+                                .get("params")
+                                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                                .unwrap_or_default();
+                            eprintln!("✅ DEBUG: Parsed as UI ChangeLayout format");
+                            return Ok(ControlMsg::ChangeLayout { algorithm, params });
+                        }
+                        "ChangeEmbedding" => {
+                            let method = obj
+                                .get("method")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("spectral")
+                                .to_string();
+                            let k = obj.get("k").and_then(|v| v.as_u64()).unwrap_or(2) as usize;
+                            let params = obj
+                                .get("params")
+                                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                                .unwrap_or_default();
+                            eprintln!("✅ DEBUG: Parsed as UI ChangeEmbedding format");
+                            return Ok(ControlMsg::ChangeEmbedding { method, k, params });
+                        }
+                        _ => {
+                            eprintln!("⚠️  DEBUG: Unknown message type: {}", msg_type);
+                        }
+                    }
+                }
+
+                // Format 2: {"layout": "honeycomb", "embedding": "spectral", ...}
+                if let Some(layout) = obj.get("layout").and_then(|v| v.as_str()) {
+                    let params = obj
+                        .iter()
+                        .filter(|(k, _)| *k != "layout")
+                        .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
+                        .collect();
+                    eprintln!("✅ DEBUG: Parsed as simple layout format");
+                    return Ok(ControlMsg::ChangeLayout {
+                        algorithm: layout.to_string(),
+                        params,
+                    });
+                }
+            }
+        }
+
+        Err(format!(
+            "Unable to parse control message in any known format: {}",
+            text
+        ))
+    }
+
     /// Create new WebSocket bridge
     pub fn new() -> Self {
         let (update_tx, _) = broadcast::channel(1000);
@@ -237,21 +321,20 @@ impl WsBridge {
                         eprintln!("📨 DEBUG: Received from client {}: {}", client_id, text);
 
                         // Try to parse as control message
-                        if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
-                            match ws_msg {
-                                WsMessage::Control { payload, .. } => {
-                                    eprintln!("🎮 DEBUG: Control message: {:?}", payload);
-                                    Self::handle_control_message_static(
-                                        client_id,
-                                        payload,
-                                        control_tx_clone.clone(),
-                                        clients_clone.clone(),
-                                    )
-                                    .await;
-                                }
-                                _ => {
-                                    eprintln!("⚠️  DEBUG: Unexpected message type from client");
-                                }
+                        match Self::parse_control_message(&text) {
+                            Ok(control_msg) => {
+                                eprintln!("🎮 DEBUG: Parsed control message: {:?}", control_msg);
+                                Self::handle_control_message_static(
+                                    client_id,
+                                    control_msg,
+                                    control_tx_clone.clone(),
+                                    clients_clone.clone(),
+                                )
+                                .await;
+                            }
+                            Err(e) => {
+                                eprintln!("❌ DEBUG: Failed to parse control message: {}", e);
+                                eprintln!("📝 DEBUG: Raw message: {}", text);
                             }
                         }
                     }
@@ -393,21 +476,20 @@ impl WsBridge {
                         eprintln!("📨 DEBUG: Received from client {}: {}", client_id, text);
 
                         // Try to parse as control message
-                        if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(&text) {
-                            match ws_msg {
-                                WsMessage::Control { payload, .. } => {
-                                    eprintln!("🎮 DEBUG: Control message: {:?}", payload);
-                                    Self::handle_control_message_static(
-                                        client_id,
-                                        payload,
-                                        control_tx_clone.clone(),
-                                        clients_clone.clone(),
-                                    )
-                                    .await;
-                                }
-                                _ => {
-                                    eprintln!("⚠️  DEBUG: Unexpected message type from client");
-                                }
+                        match Self::parse_control_message(&text) {
+                            Ok(control_msg) => {
+                                eprintln!("🎮 DEBUG: Parsed control message: {:?}", control_msg);
+                                Self::handle_control_message_static(
+                                    client_id,
+                                    control_msg,
+                                    control_tx_clone.clone(),
+                                    clients_clone.clone(),
+                                )
+                                .await;
+                            }
+                            Err(e) => {
+                                eprintln!("❌ DEBUG: Failed to parse control message: {}", e);
+                                eprintln!("📝 DEBUG: Raw message: {}", text);
                             }
                         }
                     }

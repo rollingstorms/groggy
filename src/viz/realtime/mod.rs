@@ -26,6 +26,8 @@ use crate::viz::streaming::server::StreamingServer;
 use crate::viz::streaming::types::{DataUpdate, UpdateType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
@@ -38,7 +40,6 @@ pub mod incremental;
 pub mod interaction;
 pub mod performance;
 pub mod server;
-pub mod streaming;
 
 pub use accessor::*;
 pub use controls::*;
@@ -47,7 +48,71 @@ pub use engine_sync::*;
 pub use incremental::*;
 pub use performance::*;
 pub use server::*;
-pub use streaming::*;
+
+/// Supported layout algorithms for the realtime engine
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum LayoutKind {
+    Honeycomb,
+    ForceDirected,
+    Circular,
+    Grid,
+}
+
+impl LayoutKind {
+    /// Canonical lowercase name used across engine/server/UI boundaries
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LayoutKind::Honeycomb => "honeycomb",
+            LayoutKind::ForceDirected => "force_directed",
+            LayoutKind::Circular => "circular",
+            LayoutKind::Grid => "grid",
+        }
+    }
+
+    /// Variants that should bypass control-layer debounce
+    pub fn is_layout_parameter(name: &str) -> bool {
+        name.starts_with("layout.")
+    }
+}
+
+impl fmt::Display for LayoutKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LayoutKindParseError {
+    raw: String,
+}
+
+impl fmt::Display for LayoutKindParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown layout algorithm '{}'", self.raw)
+    }
+}
+
+impl std::error::Error for LayoutKindParseError {}
+
+impl FromStr for LayoutKind {
+    type Err = LayoutKindParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let normalized = s.trim().to_lowercase().replace('-', "_").replace(' ', "_");
+
+        let kind = match normalized.as_str() {
+            "honeycomb" => LayoutKind::Honeycomb,
+            "force_directed" | "force" | "force_directed_layout" => LayoutKind::ForceDirected,
+            "circular" | "circle" => LayoutKind::Circular,
+            "grid" | "matrix" => LayoutKind::Grid,
+            _ => {
+                return Err(LayoutKindParseError { raw: s.to_string() });
+            }
+        };
+
+        Ok(kind)
+    }
+}
 
 /// Configuration for the real-time visualization system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -243,10 +308,14 @@ pub struct RealTimeVizState {
     pub needs_position_update: bool,
 
     /// Current layout algorithm being used
-    pub current_layout_algorithm: String,
+    pub current_layout: LayoutKind,
 
     /// Parameters for the current layout algorithm
     pub current_layout_params: std::collections::HashMap<String, String>,
+
+    /// Cached parameters per layout kind to preserve user tweaks when toggling algorithms
+    pub layout_param_cache:
+        std::collections::HashMap<LayoutKind, std::collections::HashMap<String, String>>,
 }
 
 /// Animation state for smooth transitions

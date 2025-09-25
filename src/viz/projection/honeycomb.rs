@@ -129,6 +129,7 @@ impl HoneycombGrid {
             HoneycombLayoutStrategy::Spiral => self.map_spiral(positions),
             HoneycombLayoutStrategy::DensityBased => self.map_density_based(positions),
             HoneycombLayoutStrategy::DistancePreserving => self.map_distance_preserving(positions),
+            HoneycombLayoutStrategy::EnergyBased => self.map_energy_based(positions),
             HoneycombLayoutStrategy::Custom { ref ordering_fn } => {
                 let ordering_fn_copy = ordering_fn.clone();
                 self.map_custom(positions, &ordering_fn_copy)
@@ -299,6 +300,65 @@ impl HoneycombGrid {
         self.map_spiral(positions)
     }
 
+    /// Map positions using energy-based unique assignment to hex centers
+    /// This is the correct honeycomb approach: positions come from energy optimization,
+    /// we just assign each position to the closest available hex center.
+    fn map_energy_based(&mut self, positions: &[Position]) -> GraphResult<Vec<Position>> {
+        if positions.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Generate all hex centers in a circular region
+        let hex_centers = self.generate_hex_centers_in_circle(positions.len() * 2);
+
+        eprintln!(
+            "🔶 DEBUG: Energy-based honeycomb with {} positions -> {} hex centers",
+            positions.len(),
+            hex_centers.len()
+        );
+
+        // Use unique assignment algorithm (greedy global nearest neighbor)
+        let assignments = self.assign_unique_cells(positions, &hex_centers)?;
+
+        let mut result_positions = Vec::with_capacity(positions.len());
+
+        for (node_idx, &hex_center_idx) in assignments.iter().enumerate() {
+            if hex_center_idx >= hex_centers.len() {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Invalid hex center assignment: {} >= {}",
+                    hex_center_idx,
+                    hex_centers.len()
+                )));
+            }
+
+            let hex_center_pos = hex_centers[hex_center_idx];
+            let hex_coord = self.pixel_to_hex(&hex_center_pos);
+
+            // Track the assignment
+            self.occupied_cells.insert(hex_coord, node_idx);
+            self.node_positions.insert(node_idx, hex_coord);
+
+            let final_pos = if self.config.snap_to_centers {
+                hex_center_pos
+            } else {
+                // Blend between original position and hex center (80% hex, 20% original)
+                Position {
+                    x: 0.8 * hex_center_pos.x + 0.2 * positions[node_idx].x,
+                    y: 0.8 * hex_center_pos.y + 0.2 * positions[node_idx].y,
+                }
+            };
+
+            result_positions.push(final_pos);
+        }
+
+        eprintln!(
+            "🔶 DEBUG: Energy-based assignment completed: {} nodes assigned to hex centers",
+            result_positions.len()
+        );
+
+        Ok(result_positions)
+    }
+
     /// Generate spiral hex coordinates
     fn generate_spiral_coordinates(&self, count: usize) -> Vec<HexCoord> {
         let mut coords = Vec::with_capacity(count);
@@ -456,6 +516,156 @@ impl HoneycombGrid {
         let max_r = coords.iter().map(|c| c.r).max().unwrap();
 
         Some((HexCoord::new(min_q, min_r), HexCoord::new(max_q, max_r)))
+    }
+
+    /// Generate hex centers in a circular pattern (like the Python script)
+    /// Returns pixel positions of hex centers clipped to a unit circle
+    fn generate_hex_centers_in_circle(&self, min_count: usize) -> Vec<Position> {
+        let radius = 1.0; // Unit circle radius
+        let hex_radius = self.config.cell_size / 100.0; // Normalize cell size to reasonable range
+        let margin = 0.02;
+
+        // Hexagonal grid spacing
+        let w = (3_f64).sqrt() * hex_radius; // x spacing
+        let h = 1.5 * hex_radius; // y spacing
+
+        let mut centers = Vec::new();
+        let mut y = -radius + hex_radius;
+
+        while y <= radius - hex_radius {
+            let row = ((y + radius - hex_radius) / h).round() as i32;
+            let x_offset = if row % 2 == 0 { 0.0 } else { w / 2.0 };
+            let mut x = -radius + hex_radius + x_offset;
+
+            while x <= radius - hex_radius {
+                // Check if point is within circle with margin
+                if x * x + y * y <= (radius - margin).powi(2) {
+                    centers.push(Position { x, y });
+                }
+                x += w;
+            }
+            y += h;
+        }
+
+        // If we don't have enough centers, try with smaller hex radius
+        if centers.len() < min_count {
+            eprintln!(
+                "🔶 DEBUG: Not enough hex centers ({} < {}), trying smaller hex radius",
+                centers.len(),
+                min_count
+            );
+            let smaller_hex_radius = hex_radius * 0.8;
+            let w = (3_f64).sqrt() * smaller_hex_radius;
+            let h = 1.5 * smaller_hex_radius;
+
+            centers.clear();
+            let mut y = -radius + smaller_hex_radius;
+
+            while y <= radius - smaller_hex_radius {
+                let row = ((y + radius - smaller_hex_radius) / h).round() as i32;
+                let x_offset = if row % 2 == 0 { 0.0 } else { w / 2.0 };
+                let mut x = -radius + smaller_hex_radius + x_offset;
+
+                while x <= radius - smaller_hex_radius {
+                    if x * x + y * y <= (radius - margin).powi(2) {
+                        centers.push(Position { x, y });
+                    }
+                    x += w;
+                }
+                y += h;
+            }
+        }
+
+        eprintln!(
+            "🔶 DEBUG: Generated {} hex centers in circle",
+            centers.len()
+        );
+        centers
+    }
+
+    /// Greedy global nearest-neighbor assignment of positions to hex centers
+    /// Based on the assign_unique_cells function from the Python script
+    fn assign_unique_cells(
+        &self,
+        positions: &[Position],
+        centers: &[Position],
+    ) -> GraphResult<Vec<usize>> {
+        if positions.is_empty() || centers.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let n_positions = positions.len();
+        let n_centers = centers.len();
+
+        if n_centers < n_positions {
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Not enough hex centers ({}) for positions ({})",
+                n_centers, n_positions
+            )));
+        }
+
+        // Compute distance matrix [positions × centers]
+        let mut distances = Vec::with_capacity(n_positions * n_centers);
+        for pos in positions {
+            for center in centers {
+                let dx = pos.x - center.x;
+                let dy = pos.y - center.y;
+                let dist = (dx * dx + dy * dy).sqrt();
+                distances.push(dist);
+            }
+        }
+
+        // Greedy assignment: for each (position, center) pair in distance order,
+        // assign if both are still available
+        let mut assigned = vec![None; n_positions]; // position -> center index
+        let mut used_centers = std::collections::HashSet::new();
+        let mut assigned_positions = std::collections::HashSet::new();
+
+        // Create sorted list of (distance, position_idx, center_idx)
+        let mut distance_tuples = Vec::with_capacity(n_positions * n_centers);
+        for pos_idx in 0..n_positions {
+            for center_idx in 0..n_centers {
+                let dist = distances[pos_idx * n_centers + center_idx];
+                distance_tuples.push((dist, pos_idx, center_idx));
+            }
+        }
+        distance_tuples.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+        // Greedy assignment
+        for (_dist, pos_idx, center_idx) in distance_tuples {
+            if assigned_positions.contains(&pos_idx) || used_centers.contains(&center_idx) {
+                continue;
+            }
+
+            assigned[pos_idx] = Some(center_idx);
+            assigned_positions.insert(pos_idx);
+            used_centers.insert(center_idx);
+
+            if assigned_positions.len() == n_positions {
+                break;
+            }
+        }
+
+        // Convert to result format
+        let mut result = Vec::with_capacity(n_positions);
+        for assignment in assigned {
+            match assignment {
+                Some(center_idx) => result.push(center_idx),
+                None => {
+                    return Err(crate::errors::GraphError::InvalidInput(
+                        "Failed to assign all positions to hex centers".to_string(),
+                    ));
+                }
+            }
+        }
+
+        eprintln!(
+            "🔶 DEBUG: Unique assignment completed: {} positions assigned to {} different centers",
+            result.len(),
+            used_centers.len()
+        );
+
+        Ok(result)
     }
 }
 

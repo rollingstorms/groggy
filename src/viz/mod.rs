@@ -398,15 +398,19 @@ impl VizModule {
                     eprintln!("🍯 DEBUG: Configuring HONEYCOMB GRID with advanced controls!");
                     let cell_size = options.width.map(|w| w as f64 / 20.0).unwrap_or(40.0);
                     eprintln!("📏 DEBUG: Honeycomb cell_size: {}", cell_size);
-                    eprintln!("🎯 DEBUG: Using DistancePreserving layout strategy");
+                    eprintln!("🎯 DEBUG: Using EnergyBased layout strategy");
                     eprintln!("📍 DEBUG: snap_to_centers=true, grid_padding=20.0");
                     HoneycombConfig {
                         cell_size,
                         layout_strategy:
-                            crate::viz::projection::HoneycombLayoutStrategy::DistancePreserving,
+                            crate::viz::projection::HoneycombLayoutStrategy::EnergyBased,
                         snap_to_centers: true,
                         grid_padding: 20.0,
                         max_grid_size: None,
+                        auto_cell_size: true,
+                        target_cols: 64,
+                        target_rows: 48,
+                        scale_multiplier: 1.1,
                         target_avg_occupancy: 4.0,
                         min_cell_size: 6.0,
                     }
@@ -420,6 +424,10 @@ impl VizModule {
                         snap_to_centers: false,
                         grid_padding: 0.0,
                         max_grid_size: None,
+                        auto_cell_size: true,
+                        target_cols: 64,
+                        target_rows: 48,
+                        scale_multiplier: 1.1,
                         target_avg_occupancy: 4.0,
                         min_cell_size: 6.0,
                     }
@@ -1403,7 +1411,7 @@ impl InteractiveViz {
                         })?;
 
                 let actual_port = server_handle.port;
-                let url = format!("http://{}:{}", addr, actual_port);
+                let url = format!("http://{}:{}/", addr, actual_port);
 
                 println!("🚀 Interactive visualization server started at: {}", url);
 
@@ -1454,7 +1462,7 @@ impl InteractiveViz {
                     })?;
 
                 let actual_port = server_handle.port;
-                let url = format!("http://{}:{}", addr, actual_port);
+                let url = format!("http://{}:{}/", addr, actual_port);
 
                 println!("🚀 Real-time visualization server started at: {}", url);
                 println!("✨ Features: Real-time streaming, Interactive controls, Performance monitoring");

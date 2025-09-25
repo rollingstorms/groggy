@@ -36,7 +36,8 @@
         </select>
       </div>
 
-      <div class="control-group">
+      <!-- Replace your current Layout section in index.html with this block -->
+      <div class="control-row" style="gap:12px; align-items:center;">
         <label for="layout-algorithm">Layout:</label>
         <select id="layout-algorithm">
           <option value="honeycomb">Honeycomb</option>
@@ -44,6 +45,28 @@
           <option value="circular">Circular</option>
           <option value="grid">Grid</option>
         </select>
+
+        <!-- Honeycomb params -->
+        <div id="layout-honeycomb" class="layout-params" style="display:flex; gap:10px; align-items:center;">
+          <label title="Hex cell size">Cell:</label>
+          <input id="honey-cell" type="number" min="1" step="1" value="24" style="width:90px;">
+          <label title="Scale multiplier for N-D→2D projection">Scale:</label>
+          <input id="honey-scale" type="number" min="0.1" step="0.1" value="1.5" style="width:90px;">
+        </div>
+
+        <!-- Circular params -->
+        <div id="layout-circular" class="layout-params" style="display:none; gap:10px; align-items:center;">
+          <label>Radius:</label>
+          <input id="circle-radius" type="number" min="10" step="10" value="250" style="width:110px;">
+        </div>
+
+        <!-- Force-directed params -->
+        <div id="layout-force" class="layout-params" style="display:none; gap:10px; align-items:center;">
+          <label>Dist:</label>
+          <input id="force-distance" type="number" min="10" step="5" value="80" style="width:90px;">
+          <label>Charge:</label>
+          <input id="force-charge" type="number" step="5" value="-100" style="width:90px;">
+        </div>
 
         <button id="play-pause-btn" class="btn">⏸️ Pause</button>
       </div>
@@ -110,18 +133,35 @@
 
     <div id="messages" class="messages"></div>
   </div>
-
+  <script>
+    function updateParamVisibility() {
+      const layout = document.getElementById('layout-algorithm')?.value;
+      document.getElementById('layout-honeycomb').style.display =
+        layout === 'honeycomb' ? 'flex' : 'none';
+      document.getElementById('layout-circular').style.display =
+        layout === 'circular' ? 'flex' : 'none';
+      document.getElementById('layout-force').style.display =
+        (layout === 'force_directed' || layout === 'force-directed') ? 'flex' : 'none';
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      const sel = document.getElementById('layout-algorithm');
+      if (sel) {
+        sel.addEventListener('change', updateParamVisibility);
+        updateParamVisibility();
+      }
+    });
+  </script>
   <script type="module">
     import { RealtimeViz } from '/static/app.js';
 
     // Fetch runtime config from the server so no string templating is needed
-    const cfg = await fetch('/realtime/config').then(r => r.json());
+    const cfg = await fetch('/config').then(r => r.json());
 
     // Create the app
     new RealtimeViz({
       wsUrl:
         (location.protocol === 'https:' ? 'wss:' : 'ws:') +
-        '//' + location.host + cfg.ws_path,  // e.g. "/realtime/ws"
+        '//' + location.host + cfg.ws_path,  // e.g. "/ws"
     });
   </script>
 </body>

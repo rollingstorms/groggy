@@ -74,7 +74,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   • Play/Pause Simulation Controls");
     println!();
     println!("🌐 Open your browser and navigate to:");
-    println!("   http://127.0.0.1:{}/realtime/", actual_port);
+    println!("   http://127.0.0.1:{}/", actual_port);
     println!();
     println!("🧪 Test Instructions:");
     println!("1. 🧠 Try changing embedding methods and dimensions");
@@ -84,10 +84,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("5. ⏸️  Try the pause/play simulation button");
     println!("6. 👀 Watch the real-time performance stats");
     println!();
-    println!(
-        "📡 WebSocket endpoint: ws://127.0.0.1:{}/realtime/ws",
-        actual_port
-    );
+    println!("📡 WebSocket endpoint: ws://127.0.0.1:{}/ws", actual_port);
     println!();
     println!("Press Ctrl+C to stop the server...");
 

@@ -365,7 +365,7 @@ impl PyVizModule {
 
         let port = session.port();
         let iframe_html = format!(
-            r#"<iframe src="http://127.0.0.1:{port}" width="100%" height="420" style="border:0;border-radius:12px;"></iframe>"#,
+            r#"<iframe src="http://127.0.0.1:{port}/" width="100%" height="420" style="border:0;border-radius:12px;"></iframe>"#,
             port = port
         );
 
