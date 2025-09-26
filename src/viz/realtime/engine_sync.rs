@@ -92,11 +92,6 @@ impl EngineSyncManager {
     ) -> GraphResult<Vec<EngineUpdate>> {
         let timestamp = Instant::now();
 
-        eprintln!(
-            "📋 DEBUG: EngineSyncManager queuing snapshot at {:?}",
-            timestamp
-        );
-
         // Clear all pending updates - snapshot takes precedence
         self.pending_updates.clear();
         self.position_coalescing.clear();
@@ -121,11 +116,6 @@ impl EngineSyncManager {
     ) -> GraphResult<()> {
         let timestamp = Instant::now();
 
-        eprintln!(
-            "🔄 DEBUG: EngineSyncManager queuing update {:?} (seq: {})",
-            update, sequence_id
-        );
-
         // Ensure snapshot precedes any update
         if let Some(snapshot_time) = self.last_snapshot_time {
             if timestamp < snapshot_time {
@@ -140,7 +130,6 @@ impl EngineSyncManager {
 
         // Try to coalesce the update
         if self.try_coalesce_update(&update, timestamp) {
-            eprintln!("🔀 DEBUG: Update coalesced");
             return Ok(());
         }
 
@@ -244,10 +233,6 @@ impl EngineSyncManager {
 
         for node_id in expired_positions {
             if let Some(delta) = self.position_coalescing.remove(&node_id) {
-                eprintln!(
-                    "⏰ DEBUG: Flushing coalesced position delta for node {} ({} updates)",
-                    node_id, delta.update_count
-                );
                 ready_updates.push(EngineUpdate::PositionDelta {
                     node_id: delta.node_id,
                     delta: delta.accumulated_delta,
@@ -265,10 +250,6 @@ impl EngineSyncManager {
 
         for key in expired_attributes {
             if let Some(change) = self.attribute_coalescing.remove(&key) {
-                eprintln!(
-                    "⏰ DEBUG: Flushing coalesced attribute change {}.{} ({} updates)",
-                    change.entity_id, change.attr_name, change.update_count
-                );
                 // Convert coalesced attribute change back to appropriate EngineUpdate variant
                 match change.entity_type.as_str() {
                     "node" => {
@@ -291,12 +272,7 @@ impl EngineSyncManager {
                             });
                         }
                     }
-                    _ => {
-                        eprintln!(
-                            "⚠️  DEBUG: Unknown entity type for attribute change: {}",
-                            change.entity_type
-                        );
-                    }
+                    _ => {}
                 }
             }
         }
@@ -311,10 +287,6 @@ impl EngineSyncManager {
             // Check if update is ready (not too recent)
             if now.duration_since(timestamped.timestamp) >= self.coalescing_window {
                 let timestamped = self.pending_updates.pop_front().unwrap();
-                eprintln!(
-                    "📤 DEBUG: Processing queued update (seq: {})",
-                    timestamped.sequence_id
-                );
                 ready_updates.push(timestamped.update);
                 processed_count += 1;
             } else {
@@ -322,20 +294,11 @@ impl EngineSyncManager {
             }
         }
 
-        if !ready_updates.is_empty() {
-            eprintln!("📦 DEBUG: Returning {} ready updates", ready_updates.len());
-        }
-
         Ok(ready_updates)
     }
 
     /// Force flush oldest updates (emergency pressure relief)
     async fn flush_oldest_updates(&mut self) -> GraphResult<()> {
-        eprintln!(
-            "⚠️  DEBUG: Emergency flush of oldest updates (queue size: {})",
-            self.pending_updates.len()
-        );
-
         let flush_count = self.max_batch_size;
         for _ in 0..flush_count {
             if let Some(_) = self.pending_updates.pop_front() {
@@ -350,8 +313,6 @@ impl EngineSyncManager {
 
     /// Force flush all coalesced updates immediately
     pub async fn flush_all_coalesced(&mut self) -> GraphResult<Vec<EngineUpdate>> {
-        eprintln!("🚨 DEBUG: Force flushing all coalesced updates");
-
         let mut updates = Vec::new();
 
         // Flush all position deltas
@@ -386,16 +347,10 @@ impl EngineSyncManager {
                         });
                     }
                 }
-                _ => {
-                    eprintln!(
-                        "⚠️  DEBUG: Unknown entity type for attribute change: {}",
-                        change.entity_type
-                    );
-                }
+                _ => {}
             }
         }
 
-        eprintln!("🚨 DEBUG: Flushed {} coalesced updates", updates.len());
         Ok(updates)
     }
 

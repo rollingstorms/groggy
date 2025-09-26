@@ -1,7 +1,10 @@
 //! Honeycomb coordinate system and grid mapping utilities
 
 use super::{HoneycombConfig, HoneycombLayoutStrategy};
+use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
+use crate::storage::matrix::GraphMatrix;
+use crate::viz::layouts::flat_embedding::{compute_flat_embedding, FlatEmbedConfig};
 use crate::viz::streaming::data_source::Position;
 use std::collections::HashMap;
 
@@ -300,6 +303,22 @@ impl HoneycombGrid {
         self.map_spiral(positions)
     }
 
+    /// Map positions using flat embedding energy optimization + honeycomb assignment
+    /// This solves quantization issues by using gradient descent for continuous optimization
+    /// followed by optimal assignment to hex centers.
+    pub fn map_with_flat_embedding(
+        &mut self,
+        embedding: &GraphMatrix,
+        graph: &Graph,
+    ) -> GraphResult<Vec<Position>> {
+        // Use flat embedding to get optimized 2D positions
+        let flat_config = FlatEmbedConfig::default();
+        let optimized_positions = compute_flat_embedding(embedding, graph, &flat_config)?;
+
+        // Assign optimized positions to honeycomb grid
+        self.assign_to_honeycomb_grid(&optimized_positions)
+    }
+
     /// Map positions using energy-based unique assignment to hex centers
     /// This is the correct honeycomb approach: positions come from energy optimization,
     /// we just assign each position to the closest available hex center.
@@ -310,12 +329,6 @@ impl HoneycombGrid {
 
         // Generate all hex centers in a circular region
         let hex_centers = self.generate_hex_centers_in_circle(positions.len() * 2);
-
-        eprintln!(
-            "🔶 DEBUG: Energy-based honeycomb with {} positions -> {} hex centers",
-            positions.len(),
-            hex_centers.len()
-        );
 
         // Use unique assignment algorithm (greedy global nearest neighbor)
         let assignments = self.assign_unique_cells(positions, &hex_centers)?;
@@ -666,6 +679,179 @@ impl HoneycombGrid {
         );
 
         Ok(result)
+    }
+
+    /// Assign flat embedding positions to honeycomb grid cells
+    fn assign_to_honeycomb_grid(&mut self, positions: &[Position]) -> GraphResult<Vec<Position>> {
+        if positions.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Generate hex centers covering the area of the optimized positions
+        let hex_centers = self.generate_adaptive_hex_centers(positions)?;
+
+        // Use the existing unique assignment algorithm
+        let assignments = self.assign_unique_cells(positions, &hex_centers)?;
+
+        let mut result_positions = Vec::with_capacity(positions.len());
+
+        for (node_idx, &hex_center_idx) in assignments.iter().enumerate() {
+            if hex_center_idx >= hex_centers.len() {
+                return Err(GraphError::InvalidInput(format!(
+                    "Invalid hex center assignment: {} >= {}",
+                    hex_center_idx,
+                    hex_centers.len()
+                )));
+            }
+
+            let hex_center_pos = hex_centers[hex_center_idx];
+            let hex_coord = self.pixel_to_hex(&hex_center_pos);
+
+            // Track the assignment
+            self.occupied_cells.insert(hex_coord, node_idx);
+            self.node_positions.insert(node_idx, hex_coord);
+
+            let final_pos = if self.config.snap_to_centers {
+                hex_center_pos
+            } else {
+                // Blend between optimized position and hex center
+                Position {
+                    x: 0.7 * hex_center_pos.x + 0.3 * positions[node_idx].x,
+                    y: 0.7 * hex_center_pos.y + 0.3 * positions[node_idx].y,
+                }
+            };
+
+            result_positions.push(final_pos);
+        }
+
+        eprintln!(
+            "🔶 DEBUG: Flat embedding + honeycomb assignment completed: {} nodes assigned",
+            result_positions.len()
+        );
+
+        Ok(result_positions)
+    }
+
+    /// Generate hex centers adapted to the bounding box of positions
+    fn generate_adaptive_hex_centers(&self, positions: &[Position]) -> GraphResult<Vec<Position>> {
+        if positions.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Find bounding box of positions
+        let mut min_x = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+
+        for pos in positions {
+            min_x = min_x.min(pos.x);
+            max_x = max_x.max(pos.x);
+            min_y = min_y.min(pos.y);
+            max_y = max_y.max(pos.y);
+        }
+
+        // Compute adaptive parameters
+        let width = max_x - min_x;
+        let height = max_y - min_y;
+        let radius = ((width * width + height * height).sqrt() / 2.0).max(1.0);
+        let center_x = (min_x + max_x) / 2.0;
+        let center_y = (min_y + max_y) / 2.0;
+
+        // Adaptive cell size based on density
+        let area = width * height;
+        let density = positions.len() as f64 / area.max(1.0);
+        let adaptive_cell_size = (self.config.cell_size / 100.0) / (density.sqrt().max(0.1));
+
+        // Generate hex grid within the bounding circle
+        let margin = 0.1; // Larger margin for better coverage
+        let w = (3_f64).sqrt() * adaptive_cell_size; // x spacing
+        let h = 1.5 * adaptive_cell_size; // y spacing
+
+        let mut centers = Vec::new();
+        let mut y = center_y - radius;
+
+        while y <= center_y + radius {
+            let row = ((y - center_y + radius) / h).round() as i32;
+            let x_offset = if row % 2 == 0 { 0.0 } else { w / 2.0 };
+            let mut x = center_x - radius + x_offset;
+
+            while x <= center_x + radius {
+                let dx = x - center_x;
+                let dy = y - center_y;
+
+                // Check if point is within expanded bounding region
+                if dx * dx + dy * dy <= (radius + margin).powi(2) {
+                    centers.push(Position { x, y });
+                }
+                x += w;
+            }
+            y += h;
+        }
+
+        // Ensure we have enough centers
+        if centers.len() < positions.len() {
+            eprintln!(
+                "⚠️  WARNING: Generated {} hex centers for {} positions, increasing density",
+                centers.len(),
+                positions.len()
+            );
+
+            // Fallback: use the original circle generation with smaller cell size
+            let fallback_radius = radius * 1.5;
+            let smaller_cell_size = adaptive_cell_size * 0.7;
+            let fallback_centers = self.generate_hex_centers_in_circle_with_params(
+                fallback_radius,
+                smaller_cell_size,
+                positions.len() * 2
+            );
+
+            if fallback_centers.len() > centers.len() {
+                return Ok(fallback_centers);
+            }
+        }
+
+        Ok(centers)
+    }
+
+    /// Generate hex centers in circle with custom parameters
+    fn generate_hex_centers_in_circle_with_params(
+        &self,
+        radius: f64,
+        hex_radius: f64,
+        min_count: usize
+    ) -> Vec<Position> {
+        let margin = 0.02;
+        let w = (3_f64).sqrt() * hex_radius; // x spacing
+        let h = 1.5 * hex_radius; // y spacing
+
+        let mut centers = Vec::new();
+        let mut y = -radius + hex_radius;
+
+        while y <= radius - hex_radius {
+            let row = ((y + radius - hex_radius) / h).round() as i32;
+            let x_offset = if row % 2 == 0 { 0.0 } else { w / 2.0 };
+            let mut x = -radius + hex_radius + x_offset;
+
+            while x <= radius - hex_radius {
+                if x * x + y * y <= (radius - margin).powi(2) {
+                    centers.push(Position { x, y });
+                }
+                x += w;
+            }
+            y += h;
+        }
+
+        // Try smaller radius if we don't have enough
+        if centers.len() < min_count && hex_radius > 0.01 {
+            return self.generate_hex_centers_in_circle_with_params(
+                radius,
+                hex_radius * 0.8,
+                min_count
+            );
+        }
+
+        centers
     }
 }
 

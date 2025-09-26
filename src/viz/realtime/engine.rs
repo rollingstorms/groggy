@@ -21,6 +21,7 @@ use crate::viz::realtime::interaction::{
     ViewState3D, WheelEvent,
 };
 use crate::viz::streaming::data_source::Position;
+use crate::viz::layouts::flat_embedding::{compute_flat_embedding, FlatEmbedConfig};
 use serde_json::json;
 use std::collections::HashMap;
 use std::fmt;
@@ -40,9 +41,6 @@ pub struct RealTimeVizEngine {
 
     /// Reference to the graph being visualized
     graph: Arc<Mutex<Graph>>,
-
-    /// Channel for sending position updates
-    position_sender: Option<mpsc::UnboundedSender<PositionUpdate>>,
 
     /// Channel for receiving control commands
     control_receiver: Option<mpsc::UnboundedReceiver<ControlCommand>>,
@@ -86,54 +84,6 @@ impl fmt::Debug for RealTimeVizEngine {
 }
 
 static FRAME_ID_SEQ: AtomicU64 = AtomicU64::new(1);
-
-/// Position update message for streaming
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PositionUpdate {
-    /// Node ID
-    pub node_id: usize,
-
-    /// New position
-    pub position: Position,
-
-    /// Update timestamp
-    pub timestamp: u64,
-
-    /// Update type (full, incremental, interpolated)
-    pub update_type: PositionUpdateType,
-
-    /// Quality metrics for this update
-    pub quality: Option<PositionQuality>,
-}
-
-/// Types of position updates
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PositionUpdateType {
-    /// Full recomputation from scratch
-    Full,
-    /// Incremental update from graph changes
-    Incremental,
-    /// Interpolated position during animation
-    Interpolated,
-    /// Predicted position for smooth motion
-    Predicted,
-}
-
-/// Quality metrics for position updates
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PositionQuality {
-    /// Local neighborhood preservation (0.0 - 1.0)
-    pub neighborhood_preservation: f64,
-
-    /// Distance preservation from original embedding
-    pub distance_preservation: f64,
-
-    /// Stress metric for this position
-    pub stress: f64,
-
-    /// Confidence in this position (0.0 - 1.0)
-    pub confidence: f64,
-}
 
 /// Control commands for interactive manipulation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -253,7 +203,6 @@ impl RealTimeVizEngine {
             selection: SelectionState::default(),
             filters: FilterState::default(),
             last_update: Instant::now(),
-            needs_position_update: false,
             current_layout: LayoutKind::Honeycomb,
             current_layout_params: std::collections::HashMap::new(),
             layout_param_cache: std::collections::HashMap::new(),
@@ -266,7 +215,6 @@ impl RealTimeVizEngine {
             config,
             state,
             graph: Arc::new(Mutex::new(graph)),
-            position_sender: None,
             control_receiver: None,
             update_broadcaster,
             sync_manager: EngineSyncManager::new(),
@@ -298,10 +246,8 @@ impl RealTimeVizEngine {
         self.performance_monitor.start()?;
 
         // Setup communication channels
-        let (position_tx, position_rx) = mpsc::unbounded_channel();
         let (control_tx, control_rx) = mpsc::unbounded_channel();
 
-        self.position_sender = Some(position_tx);
         self.control_receiver = Some(control_rx);
 
         // Initialize incremental update manager
@@ -362,9 +308,6 @@ impl RealTimeVizEngine {
                 self.adapt_quality_settings(frame_time)?;
             }
 
-            // Send position updates if needed
-            self.broadcast_position_updates().await?;
-
             // Wait for next frame
             frame_timer.tick().await;
         }
@@ -395,9 +338,6 @@ impl RealTimeVizEngine {
             if node_count == 0 {
                 // Graph is empty, check if we have state positions to work from
                 let state_node_count = self.node_count_from_state();
-                eprintln!("⚠️  DEBUG: Graph is empty but state has {} nodes, generating fallback embedding",
-                         state_node_count);
-
                 if state_node_count > 0 {
                     // Generate a fallback embedding from current positions
                     let positions = {
@@ -452,7 +392,6 @@ impl RealTimeVizEngine {
             state.performance.last_embedding_time_ms = embedding_time.as_secs_f64() * 1000.0;
             state.performance.last_projection_time_ms = projection_time.as_secs_f64() * 1000.0;
             state.last_update = Instant::now();
-            state.needs_position_update = true;
         }
 
         // Notify downstream consumers with a unified envelope snapshot
@@ -552,15 +491,10 @@ impl RealTimeVizEngine {
                 axis_j,
                 radians,
             } => {
-                eprintln!(
-                    "🔁 DEBUG: Received RotateEmbedding command axis=({}, {}) radians={}",
-                    axis_i, axis_j, radians
-                );
                 self.apply_nd_rotation(axis_i, axis_j, radians).await?;
             }
 
             ControlCommand::SetViewRotation { radians } => {
-                eprintln!("🔁 DEBUG: SetViewRotation {}", radians);
                 // Controllers that support this should interpret via Pointer/Wheel events.
                 self.broadcast_view_state().await?;
             }
@@ -630,7 +564,6 @@ impl RealTimeVizEngine {
                 state.positions = state.animation_state.target_positions.clone();
                 state.animation_state.is_animating = false;
                 state.animation_state.progress = 1.0;
-                state.needs_position_update = true;
             } else {
                 // Interpolate positions
                 state.animation_state.progress = progress;
@@ -640,7 +573,6 @@ impl RealTimeVizEngine {
                     progress,
                     &state.animation_state.easing_function,
                 )?;
-                state.needs_position_update = true;
             }
         }
 
@@ -819,51 +751,6 @@ impl RealTimeVizEngine {
         Ok(())
     }
 
-    /// Broadcast position updates to connected clients
-    async fn broadcast_position_updates(&self) -> GraphResult<()> {
-        if let Some(ref sender) = self.position_sender {
-            let state = self.state.lock().unwrap();
-
-            // Only broadcast if we need to update (animation running or position changes)
-            if !state.animation_state.is_animating && !state.needs_position_update {
-                return Ok(());
-            }
-
-            // Create position updates only for nodes that actually changed
-            for (node_id, position) in state.positions.iter().enumerate() {
-                let update = PositionUpdate {
-                    node_id,
-                    position: position.clone(),
-                    timestamp: std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as u64,
-                    update_type: if state.animation_state.is_animating {
-                        PositionUpdateType::Interpolated
-                    } else {
-                        PositionUpdateType::Full
-                    },
-                    quality: Some(PositionQuality {
-                        neighborhood_preservation: 0.8, // TODO: Compute actual metrics
-                        distance_preservation: 0.7,
-                        stress: 0.3,
-                        confidence: state.performance.current_quality_level,
-                    }),
-                };
-
-                if let Err(_) = sender.send(update) {
-                    // Client disconnected, continue with other updates
-                }
-            }
-
-            // Clear the needs update flag
-            drop(state);
-            self.state.lock().unwrap().needs_position_update = false;
-        }
-
-        Ok(())
-    }
-
     /// Translate positions so their bbox center is at (0,0).
     /// If `target_radius_px` is Some(r), also scale uniformly so
     /// the bbox half-diagonal ≈ r pixels (simple fit-to-view).
@@ -923,16 +810,70 @@ impl RealTimeVizEngine {
             (state.current_layout, state.current_layout_params.clone())
         };
 
-        eprintln!(
-            "📐 DEBUG: Applying layout algorithm: {} with params {:?}",
-            layout_kind, params
-        );
-
         let mut positions = match layout_kind {
             LayoutKind::Honeycomb => {
-                eprintln!("🔶 DEBUG: Using honeycomb layout projection");
-
                 let mut config = self.config.projection_config.clone();
+
+                // Check for flat embedding flag
+                let use_flat_embed = params
+                    .get("flat_embed")
+                    .map(|s| s == "true" || s == "1")
+                    .unwrap_or(false);
+
+                // Apply flat embedding preprocessing if requested
+                let flat_embedding_matrix;
+                let embedding_to_use = if use_flat_embed {
+                    println!("🔥 Applying flat embedding preprocessing...");
+
+                    // Create flat embedding configuration
+                    let flat_config = FlatEmbedConfig {
+                        iterations: params.get("flat_embed.iterations")
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(800),
+                        learning_rate: params.get("flat_embed.learning_rate")
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0.03),
+                        edge_cohesion_weight: params.get("flat_embed.edge_cohesion_weight")
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(1.0),
+                        repulsion_weight: params.get("flat_embed.repulsion_weight")
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0.1),
+                        spread_weight: params.get("flat_embed.spread_weight")
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0.05),
+                        ..FlatEmbedConfig::default()
+                    };
+
+                    match compute_flat_embedding(embedding, &*self.graph.lock().unwrap(), &flat_config) {
+                        Ok(flat_positions) => {
+                            println!("✅ Flat embedding computed successfully with {} positions", flat_positions.len());
+
+                            // Convert positions back to GraphMatrix for honeycomb projection
+                            let flat_data: Vec<f64> = flat_positions
+                                .iter()
+                                .flat_map(|pos| vec![pos.x, pos.y])
+                                .collect();
+
+                            match crate::storage::advanced_matrix::unified_matrix::UnifiedMatrix::from_data(flat_data, flat_positions.len(), 2) {
+                                Ok(unified) => {
+                                    flat_embedding_matrix = crate::storage::matrix::GraphMatrix::from_storage(unified);
+                                    &flat_embedding_matrix
+                                }
+                                Err(e) => {
+                                    println!("⚠️ Failed to create matrix from flat positions: {}, using original embedding", e);
+                                    embedding
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            println!("⚠️ Flat embedding failed: {}, using original embedding", e);
+                            embedding
+                        }
+                    }
+                } else {
+                    embedding
+                };
 
                 // Check for explicit cell size first
                 let explicit_cell_size = params
@@ -952,7 +893,7 @@ impl RealTimeVizEngine {
                         .unwrap_or(64.0);
 
                     if let Some(cell_size) =
-                        self.calculate_honeycomb_cell_size_from_bins(embedding, target_bins)
+                        self.calculate_honeycomb_cell_size_from_bins(embedding_to_use, target_bins)
                     {
                         config.honeycomb_config.cell_size = cell_size;
                         self.update_layout_param_if_changed("honeycomb.cell_size", cell_size);
@@ -960,14 +901,14 @@ impl RealTimeVizEngine {
                             "🔶 DEBUG: Auto-scaled honeycomb cell size to {:.2} for {} target bins",
                             cell_size, target_bins
                         );
-                    } else if let Some(cell_size) = self.auto_scale_honeycomb_cell_size(embedding) {
+                    } else if let Some(cell_size) = self.auto_scale_honeycomb_cell_size(embedding_to_use) {
                         config.honeycomb_config.cell_size = cell_size;
                         self.update_layout_param_if_changed("honeycomb.cell_size", cell_size);
                     }
                 }
 
                 let graph = self.graph.lock().unwrap();
-                graph.project_to_honeycomb(embedding, &config)?
+                graph.project_to_honeycomb(embedding_to_use, &config)?
             }
             LayoutKind::ForceDirected => {
                 eprintln!("⚡ DEBUG: Using force-directed layout");
@@ -1018,11 +959,6 @@ impl RealTimeVizEngine {
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(80.0);
 
-        eprintln!(
-            "⚡ DEBUG: Force-directed params: iterations={}, charge={}, distance={}",
-            iterations, charge, distance
-        );
-
         let node_count = self.node_count_from_state();
         let mut positions = Vec::new();
 
@@ -1043,10 +979,6 @@ impl RealTimeVizEngine {
             positions.push(Position { x, y });
         }
 
-        eprintln!(
-            "⚡ DEBUG: Generated {} force-directed positions",
-            positions.len()
-        );
         Ok(positions)
     }
 
@@ -1063,11 +995,6 @@ impl RealTimeVizEngine {
         embedding: &GraphMatrix,
         params: &std::collections::HashMap<String, String>,
     ) -> GraphResult<Vec<Position>> {
-        eprintln!(
-            "⭕ DEBUG: Computing circular layout positions with params {:?}",
-            params
-        );
-
         let node_count = self.node_count_from_state();
         let mut positions = Vec::new();
 
@@ -1084,11 +1011,6 @@ impl RealTimeVizEngine {
             .get("radius")
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(200.0);
-
-        eprintln!(
-            "⭕ DEBUG: Circular params: center=({}, {}), radius={}",
-            center_x, center_y, radius
-        );
 
         if embedding.shape().1 >= 2 {
             // Use embedding to determine angular ordering - sort by first principal component
@@ -1126,7 +1048,6 @@ impl RealTimeVizEngine {
             }
         }
 
-        eprintln!("⭕ DEBUG: Generated {} circular positions", positions.len());
         Ok(positions)
     }
 
@@ -1137,11 +1058,6 @@ impl RealTimeVizEngine {
         embedding: &GraphMatrix,
         params: &std::collections::HashMap<String, String>,
     ) -> GraphResult<Vec<Position>> {
-        eprintln!(
-            "▦ DEBUG: Computing grid layout positions with params {:?}",
-            params
-        );
-
         let node_count = self.node_count_from_state();
         let mut positions = Vec::new();
 
@@ -1161,11 +1077,6 @@ impl RealTimeVizEngine {
             .get("start_y")
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(-((grid_size as f64 - 1.0) * cell_size) * 0.5);
-
-        eprintln!(
-            "▦ DEBUG: Grid params: cell_size={}, start=({}, {}), grid_size={}",
-            cell_size, start_x, start_y, grid_size
-        );
 
         if embedding.shape().1 >= 2 {
             // Use embedding coordinates to determine grid ordering
@@ -1208,7 +1119,6 @@ impl RealTimeVizEngine {
             }
         }
 
-        eprintln!("▦ DEBUG: Generated {} grid positions", positions.len());
         Ok(positions)
     }
 
@@ -1218,8 +1128,6 @@ impl RealTimeVizEngine {
     }
 
     async fn trigger_projection_recomputation(&mut self) -> GraphResult<()> {
-        eprintln!("📐 DEBUG: Starting projection-only recomputation");
-
         // Check if we have a cached embedding to reuse
         let existing_embedding = {
             let state = self.state.lock().unwrap();
@@ -1227,12 +1135,8 @@ impl RealTimeVizEngine {
         };
 
         let embedding = match existing_embedding {
-            Some(embedding) => {
-                eprintln!("♻️  DEBUG: Reusing cached embedding for projection-only recomputation");
-                embedding
-            }
+            Some(embedding) => embedding,
             None => {
-                eprintln!("🔄 DEBUG: No cached embedding found, computing new embedding first");
                 // If no embedding exists, we need to compute it first
                 let graph = self.graph.lock().unwrap();
                 let embedding = graph.compute_embedding(&self.config.embedding_config)?;
@@ -1260,7 +1164,6 @@ impl RealTimeVizEngine {
             state.positions = positions;
             state.performance.last_projection_time_ms = projection_time.as_secs_f64() * 1000.0;
             state.last_update = Instant::now();
-            state.needs_position_update = true;
         }
 
         let params_changed = {
@@ -1279,16 +1182,10 @@ impl RealTimeVizEngine {
         // Broadcast recomputation result
         self.broadcast_envelope(Some(params_changed), None, None, true)?;
 
-        eprintln!(
-            "📐 DEBUG: Projection recomputation completed in {:.2}ms",
-            projection_time.as_secs_f64() * 1000.0
-        );
         Ok(())
     }
 
     async fn trigger_view_aware_projection(&mut self, view: ViewState3D) -> GraphResult<()> {
-        eprintln!("🌐 DEBUG: Starting view-aware projection with 3D transform");
-
         // Check if we have a cached embedding to reuse
         let existing_embedding = {
             let state = self.state.lock().unwrap();
@@ -1296,12 +1193,8 @@ impl RealTimeVizEngine {
         };
 
         let embedding = match existing_embedding {
-            Some(embedding) => {
-                eprintln!("♻️  DEBUG: Reusing cached embedding for view-aware projection");
-                embedding
-            }
+            Some(embedding) => embedding,
             None => {
-                eprintln!("🔄 DEBUG: No cached embedding found, computing new embedding first");
                 // If no embedding exists, we need to compute it first
                 let graph = self.graph.lock().unwrap();
                 let embedding = graph.compute_embedding(&self.config.embedding_config)?;
@@ -1332,7 +1225,6 @@ impl RealTimeVizEngine {
             state.positions = positions;
             state.performance.last_projection_time_ms = projection_time.as_secs_f64() * 1000.0;
             state.last_update = Instant::now();
-            state.needs_position_update = true;
         }
 
         // Broadcast the updated positions and view state
@@ -1354,11 +1246,6 @@ impl RealTimeVizEngine {
         view: &ViewState3D,
     ) -> GraphResult<GraphMatrix> {
         use crate::viz::realtime::interaction::math::{Quat, Vec3};
-
-        eprintln!(
-            "🔄 DEBUG: Applying 3D view transform - center: {:?}, distance: {}, quat: {:?}",
-            view.center, view.distance, view.quat
-        );
 
         // Create quaternion from view state
         let quat = Quat {
@@ -1438,11 +1325,6 @@ impl RealTimeVizEngine {
         axis_j: usize,
         radians: f64,
     ) -> GraphResult<()> {
-        eprintln!(
-            "🔄 DEBUG: Applying N-D rotation {} radians between axes {} and {}",
-            radians, axis_i, axis_j
-        );
-
         // Get the current embedding
         let existing_embedding = {
             let state = self.state.lock().unwrap();
@@ -1452,7 +1334,6 @@ impl RealTimeVizEngine {
         let embedding = match existing_embedding {
             Some(embedding) => embedding,
             None => {
-                eprintln!("⚠️  WARNING: No embedding found for N-D rotation, computing new one");
                 let graph = self.graph.lock().unwrap();
                 let embedding = graph.compute_embedding(&self.config.embedding_config)?;
                 drop(graph);
@@ -1478,7 +1359,6 @@ impl RealTimeVizEngine {
         // Trigger projection recomputation with the rotated embedding
         self.trigger_projection_recomputation().await?;
 
-        eprintln!("✅ DEBUG: N-D rotation completed and projection updated");
         Ok(())
     }
 
@@ -1548,20 +1428,15 @@ impl RealTimeVizEngine {
                     axis_j,
                     radians,
                 } => {
-                    eprintln!("📬 DEBUG: Processing RotateEmbedding command from controller: axes ({}, {}), radians={}",
-                             axis_i, axis_j, radians);
                     self.apply_nd_rotation(axis_i, axis_j, radians).await?;
                 }
                 InteractionCommand::TriggerRecomputation => {
-                    eprintln!("📬 DEBUG: Processing TriggerRecomputation command from controller");
                     self.trigger_projection_recomputation().await?;
                 }
                 InteractionCommand::UpdateAutoScale {
                     target_occupancy,
                     min_cell_size,
                 } => {
-                    eprintln!("📬 DEBUG: Processing UpdateAutoScale command from controller: occupancy={}, cell_size={}",
-                             target_occupancy, min_cell_size);
                     // Update honeycomb controller configuration
                     if let Some(honeycomb) = self
                         .active_controller
@@ -1576,9 +1451,6 @@ impl RealTimeVizEngine {
                     min_cell_size,
                     enabled,
                 } => {
-                    eprintln!("🎛️  DEBUG: Exposing auto-scale controls in UI: occupancy={}, cell_size={}, enabled={}",
-                             target_occupancy, min_cell_size, enabled);
-
                     // Create UI control exposure message
                     let controls_json = json!({
                         "auto_scale_controls": {
@@ -1692,11 +1564,8 @@ impl RealTimeVizEngine {
 
     /// Load a complete snapshot into the engine state
     pub async fn load_snapshot(&mut self, snapshot: EngineSnapshot) -> GraphResult<()> {
-        eprintln!(
-            "🚀 DEBUG: Engine loading snapshot with {} nodes, {} edges",
-            snapshot.node_count(),
-            snapshot.edge_count()
-        );
+        // Use sync manager to handle snapshot ordering
+        let sync_updates = self.sync_manager.queue_snapshot(snapshot.clone()).await?;
 
         // Use sync manager to handle snapshot ordering
         let sync_updates = self.sync_manager.queue_snapshot(snapshot.clone()).await?;
@@ -1727,12 +1596,6 @@ impl RealTimeVizEngine {
                 // Build fast node_id -> position index mapping
                 state.node_index.insert(node_pos.node_id, i);
             }
-            state.needs_position_update = true;
-
-            eprintln!(
-                "📍 DEBUG: Built node index mapping for {} nodes",
-                state.node_index.len()
-            );
 
             // Update last update timestamp
             state.last_update = Instant::now();
@@ -1764,15 +1627,11 @@ impl RealTimeVizEngine {
             }
         }
 
-        eprintln!("✅ DEBUG: Engine snapshot loaded successfully");
-
         Ok(())
     }
 
     /// Apply a delta update to the engine state
     pub async fn apply(&mut self, update: EngineUpdate) -> GraphResult<()> {
-        eprintln!("🔄 DEBUG: Engine applying update: {:?}", update);
-
         // Apply control-style updates immediately (do NOT enqueue)
         match &update {
             EngineUpdate::LayoutChanged { .. }
@@ -1781,7 +1640,6 @@ impl RealTimeVizEngine {
             // | EngineUpdate::UpdateQuality { .. }
             // | EngineUpdate::UpdateAnimation { .. }
             => {
-                eprintln!("⚡ DEBUG: Applying control update immediately (bypass SyncManager)");
                 // Apply directly
                 self.apply_update_directly(update.clone()).await?;
                 // Broadcast the applied update
@@ -1824,37 +1682,24 @@ impl RealTimeVizEngine {
 
         match update {
             EngineUpdate::NodeAdded(node) => {
-                eprintln!("➕ DEBUG: Adding node {}", node.id);
                 // TODO: Add node to graph and update positions
             }
             EngineUpdate::NodeRemoved(node_id) => {
-                eprintln!("➖ DEBUG: Removing node {}", node_id);
                 // TODO: Remove node from graph and positions
             }
             EngineUpdate::EdgeAdded(edge) => {
-                eprintln!("🔗 DEBUG: Adding edge {}→{}", edge.source, edge.target);
                 // TODO: Add edge to graph
             }
             EngineUpdate::EdgeRemoved(edge_id) => {
-                eprintln!("💥 DEBUG: Removing edge {}", edge_id);
                 // TODO: Remove edge from graph
             }
             EngineUpdate::NodeChanged { id, attributes } => {
-                eprintln!(
-                    "📝 DEBUG: Updating node {} attributes: {:?}",
-                    id, attributes
-                );
                 // TODO: Update node attributes in graph
             }
             EngineUpdate::EdgeChanged { id, attributes } => {
-                eprintln!(
-                    "📝 DEBUG: Updating edge {} attributes: {:?}",
-                    id, attributes
-                );
                 // TODO: Update edge attributes in graph
             }
             EngineUpdate::PositionDelta { node_id, delta } => {
-                eprintln!("📍 DEBUG: Moving node {} by {:?}", node_id, delta);
                 // Apply position delta using proper node_id mapping
                 let mut state = self.state.lock().unwrap();
 
@@ -1863,47 +1708,19 @@ impl RealTimeVizEngine {
                         // Apply delta to x,y coordinates
                         if delta.len() > 0 {
                             pos.x += delta[0];
-                            eprintln!(
-                                "🎯 DEBUG: Updated node {} x: {} -> {}",
-                                node_id,
-                                pos.x - delta[0],
-                                pos.x
-                            );
                         }
                         if delta.len() > 1 {
                             pos.y += delta[1];
-                            eprintln!(
-                                "🎯 DEBUG: Updated node {} y: {} -> {}",
-                                node_id,
-                                pos.y - delta[1],
-                                pos.y
-                            );
                         }
                         if delta.len() > 2 {
                             // For 3D/N-D support in the future
-                            eprintln!(
-                                "🎯 DEBUG: Node {} has 3D+ delta, ignoring z+ components",
-                                node_id
-                            );
                         }
-                        state.needs_position_update = true;
-                    } else {
-                        eprintln!(
-                            "❌ DEBUG: Position index {} for node {} is out of bounds",
-                            position_index, node_id
-                        );
                     }
-                } else {
-                    eprintln!("❌ DEBUG: Node {} not found in position index", node_id);
                 }
 
                 state.last_update = Instant::now();
             }
             EngineUpdate::PositionsBatch(position_batch) => {
-                eprintln!(
-                    "📍 DEBUG: Applying position batch with {} positions",
-                    position_batch.len()
-                );
                 let mut state = self.state.lock().unwrap();
 
                 for node_pos in position_batch {
@@ -1916,21 +1733,7 @@ impl RealTimeVizEngine {
                             if node_pos.coords.len() > 1 {
                                 pos.y = node_pos.coords[1];
                             }
-                            eprintln!(
-                                "🎯 DEBUG: Updated node {} position to ({}, {})",
-                                node_pos.node_id, pos.x, pos.y
-                            );
-                        } else {
-                            eprintln!(
-                                "❌ DEBUG: Position index {} for node {} is out of bounds",
-                                position_index, node_pos.node_id
-                            );
                         }
-                    } else {
-                        eprintln!(
-                            "❌ DEBUG: Node {} not found in position index",
-                            node_pos.node_id
-                        );
                     }
                 }
 
@@ -1947,11 +1750,6 @@ impl RealTimeVizEngine {
                 // This is just a synchronization marker
             }
             EngineUpdate::LayoutChanged { algorithm, params } => {
-                eprintln!(
-                    "📐 DEBUG: Layout change requested: {} with params {:?}",
-                    algorithm, params
-                );
-
                 match algorithm.parse::<LayoutKind>() {
                     Ok(layout_kind) => {
                         self.apply_layout_change(layout_kind, params).await?;
@@ -1965,11 +1763,6 @@ impl RealTimeVizEngine {
                 }
             }
             EngineUpdate::EmbeddingChanged { method, dimensions } => {
-                eprintln!(
-                    "🧠 DEBUG: Embedding changed to: {} with {} dimensions",
-                    method, dimensions
-                );
-
                 // Map method string to EmbeddingMethod enum
                 let embedding_method = match method.as_str() {
                     "spectral" => EmbeddingMethod::Spectral {
@@ -2082,7 +1875,6 @@ impl RealTimeVizEngine {
             state
                 .layout_param_cache
                 .insert(layout_kind, incoming_params.clone());
-            state.needs_position_update = true;
         }
 
         {
@@ -2112,7 +1904,6 @@ impl RealTimeVizEngine {
             eprintln!("🛑 DEBUG: Cancelling active interpolation before layout switch");
         }
         state.animation_state = AnimationState::default();
-        state.needs_position_update = true;
     }
 
     fn reset_layout_config_for(&mut self, layout_kind: LayoutKind) {
@@ -2135,7 +1926,6 @@ impl RealTimeVizEngine {
 
             // For 3D controllers, re-project embedding with view transform to show visible orbiting
             if self.active_controller.name() == "globe-3d" {
-                eprintln!("🌐 DEBUG: Globe controller view changed, triggering re-projection for orbiting");
                 // Trigger view-aware projection that applies 3D transform before 2D projection
                 self.trigger_view_aware_projection(view.clone()).await?;
             } else {
@@ -2175,10 +1965,6 @@ impl RealTimeVizEngine {
                 self.canvas_drag_policy = CanvasDragPolicy::PanZoomRotate2D;
             }
         }
-        eprintln!(
-            "🎮 DEBUG: Active interaction controller set to {}",
-            self.active_controller.name()
-        );
 
         // Activate the controller and get any commands it wants to send
         let embedding_dims = {
@@ -2190,10 +1976,6 @@ impl RealTimeVizEngine {
 
         // Process activation commands (like exposing auto-scale controls)
         if !activation_commands.is_empty() {
-            eprintln!(
-                "🔧 DEBUG: Processing {} activation commands from controller",
-                activation_commands.len()
-            );
             // We need to spawn a task to process async commands, but for now just log them
             for cmd in activation_commands {
                 match cmd {
@@ -2201,14 +1983,8 @@ impl RealTimeVizEngine {
                         target_occupancy,
                         min_cell_size,
                         enabled,
-                    } => {
-                        eprintln!("🎛️  DEBUG: Controller requesting auto-scale UI exposure: occupancy={}, cell_size={}, enabled={}",
-                                 target_occupancy, min_cell_size, enabled);
-                        // TODO: Process this command properly in an async context
-                    }
-                    _ => {
-                        eprintln!("🔧 DEBUG: Other activation command: {:?}", cmd);
-                    }
+                    } => {}
+                    _ => {}
                 }
             }
         }
@@ -2269,9 +2045,6 @@ impl RealTimeVizEngine {
         // Pick cell size so we get ~target_bins across the larger span
         let span = dx.max(dy);
         let cell_size = span / target_bins.max(1.0);
-
-        eprintln!("🔶 DEBUG: Embedding spread: dx={:.3}, dy={:.3}, span={:.3}, target_bins={:.1}, cell_size={:.3}",
-                  dx, dy, span, target_bins, cell_size);
 
         if cell_size.is_finite() && cell_size > 0.0 {
             // Apply reasonable bounds
@@ -2413,7 +2186,6 @@ impl RealTimeVizEngine {
                             pos.x = x;
                             pos.y = y;
                         }
-                        state.needs_position_update = true;
                         state.last_update = Instant::now();
                     }
                     drop(state);
@@ -2506,12 +2278,6 @@ impl RealTimeVizEngine {
             view_changed,
         };
 
-        eprintln!(
-            "📦 DEBUG: Broadcasting UpdateEnvelope frame {} (positions: {})",
-            frame_id,
-            positions_vec.len()
-        );
-
         let _ = self
             .update_broadcaster
             .send(EngineUpdate::UpdateEnvelope(envelope));
@@ -2527,13 +2293,11 @@ impl RealTimeVizEngine {
 
     /// Subscribe to engine-generated updates
     pub fn subscribe(&self) -> broadcast::Receiver<EngineUpdate> {
-        eprintln!("📡 DEBUG: New subscription to engine updates");
         self.update_broadcaster.subscribe()
     }
 
     /// Generate engine update (for physics loops, layout iterations, etc.)
     async fn generate_update(&self, update: EngineUpdate) -> GraphResult<()> {
-        eprintln!("🔄 DEBUG: Engine generating update: {:?}", update);
         let _ = self.update_broadcaster.send(update);
         Ok(())
     }
@@ -2543,12 +2307,9 @@ impl RealTimeVizEngine {
         &mut self,
         accessor: &dyn RealtimeVizAccessor,
     ) -> GraphResult<()> {
-        eprintln!("⚠️  DEBUG: Engine layout failed, falling back to accessor layout method");
-
         // Get a fresh snapshot from the accessor which should include proper layout
         match accessor.initial_snapshot() {
             Ok(snapshot) => {
-                eprintln!("🔄 DEBUG: Using accessor's layout as fallback");
                 self.load_snapshot(snapshot).await?;
                 eprintln!("✅ DEBUG: Fallback layout loaded successfully");
                 Ok(())
@@ -2571,7 +2332,6 @@ impl RealTimeVizEngine {
 
     /// Force flush coalesced updates (for emergency scenarios)
     pub async fn force_flush_updates(&mut self) -> GraphResult<()> {
-        eprintln!("🚨 DEBUG: Force flushing all pending updates");
         let flushed_updates = self.sync_manager.flush_all_coalesced().await?;
 
         for update in flushed_updates {

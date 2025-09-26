@@ -492,12 +492,24 @@ impl<T: NumericType> GraphMatrix<T> {
         Ok(Self::from_storage(result_storage))
     }
 
-    /// GELU activation function  
+    /// GELU activation function
     pub fn gelu(&self) -> GraphResult<GraphMatrix<T>> {
         use crate::storage::advanced_matrix::neural::activations::ActivationOps;
         let result_storage = ActivationOps::gelu(&self.storage)
             .map_err(|e| GraphError::InvalidInput(format!("GELU activation failed: {:?}", e)))?;
         Ok(Self::from_storage(result_storage))
+    }
+
+    /// Extract data as a Vec<T> in row-major order
+    pub fn to_vec(&self) -> GraphResult<Vec<T>> {
+        let (rows, cols) = self.shape();
+        let mut data = Vec::with_capacity(rows * cols);
+        for i in 0..rows {
+            for j in 0..cols {
+                data.push(self.get(i, j).unwrap_or_else(|| T::zero()));
+            }
+        }
+        Ok(data)
     }
 
     /// Leaky ReLU activation function

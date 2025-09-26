@@ -55,6 +55,7 @@ pub enum OperationType {
     GEMM, // General Matrix Multiply
     GEMV, // General Matrix-Vector multiply
     ElementwiseAdd,
+    ElementwiseSub,
     ElementwiseMul,
     ElementwiseDiv,
 

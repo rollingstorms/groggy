@@ -369,79 +369,6 @@ def test_visualization_with_comprehensive_graph(graph, graph_name: str):
     
     print(f"Actual stats: {graph.node_count()} nodes, {graph.edge_count()} edges")
     
-    # Test interactive visualization with different configurations
-    print("\n🌐 Testing interactive visualizations:")
-    
-    # Test different layouts
-    layouts = ["force-directed", "circular", "hierarchical", "grid"]
-    themes = ["light", "dark", "publication", "minimal"]
-    
-    for i, (layout, theme) in enumerate(zip(layouts, themes)):
-        try:
-            session = graph.viz().interactive(
-                port=8080 + i,
-                layout=layout,
-                theme=theme,
-                width=1400,
-                height=1000,
-                auto_open=False
-            )
-            print(f"  ✓ {layout} + {theme}: {session.url()}")
-            session.stop()
-        except Exception as e:
-            print(f"  ✗ {layout} + {theme}: {e}")
-    
-    # Test static exports
-    print("\n📊 Testing static exports:")
-    
-    import tempfile
-    import os
-    
-    with tempfile.TemporaryDirectory() as temp_dir:
-        export_configs = [
-            ("overview.svg", "svg", "force-directed", "light"),
-            ("hierarchy.png", "png", "hierarchical", "publication"),
-            ("network.pdf", "pdf", "circular", "dark"),
-            ("analysis.svg", "svg", "grid", "minimal")
-        ]
-        
-        for filename, format, layout, theme in export_configs:
-            try:
-                file_path = os.path.join(temp_dir, filename)
-                result = graph.viz().static(
-                    file_path,
-                    format=format,
-                    layout=layout,
-                    theme=theme,
-                    dpi=300,
-                    width=1600,
-                    height=1200
-                )
-                print(f"  ✓ {filename}: {result.file_path}")
-            except Exception as e:
-                print(f"  ✗ {filename}: {e}")
-    
-    # Test VizConfig
-    print("\n⚙️ Testing VizConfig:")
-    
-    import groggy as gr
-    
-    try:
-        config = gr.VizConfig(
-            port=9000,
-            layout="force-directed",
-            theme="publication",
-            width=1800,
-            height=1400
-        )
-        
-        session = graph.viz().interactive(config=config, auto_open=False)
-        print(f"  ✓ VizConfig integration: {session.url()}")
-        session.stop()
-        
-    except Exception as e:
-        print(f"  ✗ VizConfig integration: {e}")
-    
     return True
 
 
@@ -456,29 +383,10 @@ def performance_benchmark(graph, graph_name: str):
     info_time = time.time() - start_time
     print(f"  info() time: {info_time:.3f}s")
     
-    # Benchmark interactive session creation
-    start_time = time.time()
-    session = graph.viz().interactive(auto_open=False)
-    interactive_time = time.time() - start_time
-    print(f"  interactive() time: {interactive_time:.3f}s")
-    session.stop()
-    
-    # Benchmark static export
-    import tempfile
-    import os
-    
-    with tempfile.TemporaryDirectory() as temp_dir:
-        start_time = time.time()
-        file_path = os.path.join(temp_dir, "benchmark.svg")
-        result = graph.viz().static(file_path)
-        static_time = time.time() - start_time
-        print(f"  static() time: {static_time:.3f}s")
-    
+    print("\n📈 Interactive/static benchmarks skipped (legacy API removed).")
     print(f"  Total nodes: {graph.node_count()}")
     print(f"  Total edges: {graph.edge_count()}")
     print(f"  Nodes per second (info): {graph.node_count() / info_time:.0f}")
-    print(f"  Nodes per second (interactive): {graph.node_count() / interactive_time:.0f}")
-    print(f"  Nodes per second (static): {graph.node_count() / static_time:.0f}")
 
 
 def main():

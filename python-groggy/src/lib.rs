@@ -50,9 +50,6 @@ pub use ffi::subgraphs::composer::{PyEdgeStrategy, PyComposerPreview, PyMetaNode
 // Display system exports
 pub use ffi::display::{PyDisplayConfig, PyTableFormatter};
 
-// Visualization system exports (Phase 6) - REMOVED PyVizModule (use VizAccessor instead)
-pub use ffi::viz::{PyVizConfig, PyInteractiveViz, PyInteractiveVizSession, PyStaticViz};
-
 // Viz accessor for .viz property functionality
 pub use ffi::viz_accessor::VizAccessor;
 
@@ -554,12 +551,6 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
 
     // Use the module registration function (currently empty)
     // module::register_classes(py, m)?;
-
-    // Register visualization classes (Phase 6) - REMOVED PyVizModule (use VizAccessor instead)
-    m.add_class::<ffi::viz::PyVizConfig>()?;
-    m.add_class::<ffi::viz::PyInteractiveViz>()?;
-    m.add_class::<ffi::viz::PyInteractiveVizSession>()?;
-    m.add_class::<ffi::viz::PyStaticViz>()?;
 
     // Register neural network submodule
     let neural_module = PyModule::new(py, "neural")?;

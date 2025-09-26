@@ -45,7 +45,8 @@ impl StreamingServer {
         let accessor: Arc<dyn RealtimeVizAccessor> =
             Arc::new(DataSourceRealtimeAccessor::new(self.data_source.clone()));
 
-        let handle = start_realtime_background(desired_port, accessor).map_err(|e| {
+        let handle = start_realtime_background(desired_port, accessor, 0).map_err(|e| {
+            // Quiet for streaming
             StreamingError::Server(format!("failed to start realtime server: {}", e))
         })?;
 

@@ -217,6 +217,13 @@ pub enum GraphError {
         detected_format: Option<String>,
     },
 
+    /// Failed to convert between different data types or formats
+    ConversionError {
+        from: String,
+        to: String,
+        details: String,
+    },
+
     /*
     === QUERY ERRORS ===
     Problems with filtering and query operations
@@ -826,3 +833,14 @@ TESTING STRATEGY:
 - Test error formatting for user-friendliness
 - Test that internal errors include sufficient debugging context
 */
+
+// Error type conversions
+impl From<crate::storage::advanced_matrix::unified_matrix::MatrixError> for GraphError {
+    fn from(error: crate::storage::advanced_matrix::unified_matrix::MatrixError) -> Self {
+        GraphError::ConversionError {
+            from: "MatrixError".to_string(),
+            to: "GraphError".to_string(),
+            details: format!("{:?}", error),
+        }
+    }
+}

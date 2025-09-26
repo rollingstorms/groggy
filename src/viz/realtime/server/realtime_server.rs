@@ -33,13 +33,14 @@ pub struct RealtimeServerHandle {
 impl RealtimeServerHandle {
     /// Stop the server gracefully
     pub fn stop(mut self) {
-        eprintln!("🛑 DEBUG: Stopping realtime server on port {}", self.port);
+        // Note: RealtimeServerHandle doesn't have verbosity - this is just cleanup
         self.cancel.cancel();
         if let Some(thread) = self.thread.take() {
             if let Err(e) = thread.join() {
-                eprintln!("❌ DEBUG: Failed to join server thread: {:?}", e);
+                // Keep minimal error logging for server handle
+                eprintln!("❌ Failed to join server thread: {:?}", e);
             } else {
-                eprintln!("✅ DEBUG: Server thread stopped cleanly");
+                // Server stopped cleanly - no debug output needed
             }
         }
     }
@@ -55,6 +56,8 @@ pub struct RealtimeServer {
     accessor: Option<Arc<dyn RealtimeVizAccessor>>,
     /// Visualization engine for processing updates (shared with tasks)
     engine: Option<RealTimeVizEngine>,
+    /// Verbosity level for debug output
+    verbose: u8,
 }
 
 impl RealtimeServer {
@@ -65,6 +68,7 @@ impl RealtimeServer {
             ws_bridge: Arc::new(WsBridge::new()),
             accessor: None,
             engine: None,
+            verbose: 0,
         }
     }
 
@@ -74,9 +78,17 @@ impl RealtimeServer {
         self
     }
 
+    /// Set verbosity level
+    pub fn with_verbosity(mut self, verbose: u8) -> Self {
+        self.verbose = verbose;
+        self
+    }
+
     /// Start the server
     pub async fn start(mut self) -> GraphResult<()> {
-        eprintln!("🚀 DEBUG: Starting RealtimeServer on port {}", self.port);
+        if self.verbose >= 3 {
+            eprintln!("🚀 DEBUG: Starting RealtimeServer on port {}", self.port);
+        }
 
         // Create cancellation token for graceful shutdown
         let cancel_token = CancellationToken::new();
@@ -100,9 +112,13 @@ impl RealtimeServer {
                     let engine_config = RealTimeVizConfig::default();
                     let mut engine = RealTimeVizEngine::new(temp_graph, engine_config);
                     if let Err(e) = engine.load_snapshot(snapshot.clone()).await {
-                        eprintln!("⚠️  DEBUG: Failed to load snapshot into engine: {}", e);
+                        if self.verbose >= 1 {
+                            eprintln!("⚠️  INFO: Failed to load snapshot into engine: {}", e);
+                        }
                     } else {
-                        eprintln!("✅ DEBUG: Engine initialized with snapshot");
+                        if self.verbose >= 2 {
+                            eprintln!("✅ VERBOSE: Engine initialized with snapshot");
+                        }
                     }
 
                     // Create control message channel between WebSocket bridge and engine
@@ -122,15 +138,10 @@ impl RealtimeServer {
                     tokio::spawn(async move {
                         let mut engine_rx = engine_rx;
                         while let Ok(update) = engine_rx.recv().await {
-                            eprintln!(
-                                "📡 DEBUG: Forwarding engine update to WebSocket clients: {:?}",
-                                update
-                            );
                             if let Err(e) = ws_bridge_clone.broadcast_update(update).await {
                                 eprintln!("⚠️  DEBUG: WebSocket bridge failed to broadcast engine update: {}", e);
                             }
                         }
-                        eprintln!("📡 DEBUG: Engine update channel closed");
                     });
 
                     self.engine = Some(engine);
@@ -147,12 +158,16 @@ impl RealtimeServer {
             .await
             .map_err(|e| io_error_to_graph_error(e, "bind_tcp_listener", &addr))?;
 
-        eprintln!("✅ DEBUG: RealtimeServer listening on {}", addr);
-        eprintln!("🌐 DEBUG: HTTP endpoint: http://127.0.0.1:{}/", self.port);
-        eprintln!(
-            "🔌 DEBUG: WebSocket endpoint: ws://127.0.0.1:{}/ws",
-            self.port
-        );
+        if self.verbose >= 1 {
+            eprintln!("✅ INFO: RealtimeServer listening on {}", addr);
+        }
+        if self.verbose >= 2 {
+            eprintln!("🌐 VERBOSE: HTTP endpoint: http://127.0.0.1:{}/", self.port);
+            eprintln!(
+                "🔌 VERBOSE: WebSocket endpoint: ws://127.0.0.1:{}/ws",
+                self.port
+            );
+        }
 
         let ws_bridge = Arc::clone(&self.ws_bridge);
 
@@ -166,14 +181,18 @@ impl RealtimeServer {
                 accept_result = listener.accept() => {
                     match accept_result {
                         Ok((stream, addr)) => {
-                            eprintln!("🔗 DEBUG: New connection from {}", addr);
+                            if self.verbose >= 2 {
+                                eprintln!("🔗 VERBOSE: New connection from {}", addr);
+                            }
                             let ws_bridge_clone = Arc::clone(&ws_bridge);
                             let cancel_clone = cancel_token.clone();
                             let port = self.port;
                             tokio::spawn(async move {
                                 tokio::select! {
                                     _ = cancel_clone.cancelled() => {
-                                        eprintln!("🔌 DEBUG: Connection handler cancelled for {}", addr);
+                                        if port > 0 {
+                                            eprintln!("🔌 DEBUG: Connection handler cancelled for {}", addr);
+                                        }
                                     },
                                     result = Self::handle_connection(stream, addr, ws_bridge_clone, port) => {
                                         if let Err(e) = result {
@@ -535,9 +554,13 @@ impl RealtimeServer {
 
                     // Load snapshot into engine
                     if let Err(e) = engine.load_snapshot(snapshot.clone()).await {
-                        eprintln!("⚠️  DEBUG: Failed to load snapshot into engine: {}", e);
+                        if self.verbose >= 1 {
+                            eprintln!("⚠️  INFO: Failed to load snapshot into engine: {}", e);
+                        }
                     } else {
-                        eprintln!("✅ DEBUG: Engine initialized with snapshot");
+                        if self.verbose >= 2 {
+                            eprintln!("✅ VERBOSE: Engine initialized with snapshot");
+                        }
                     }
 
                     // Create control message channel between WebSocket bridge and engine
@@ -856,29 +879,38 @@ pub fn create_realtime_server(
 pub fn start_realtime_background(
     port: u16,
     accessor: Arc<dyn RealtimeVizAccessor>,
+    verbose: u8,
 ) -> GraphResult<RealtimeServerHandle> {
     let cancel = CancellationToken::new();
     let child_cancel = cancel.clone();
     let (ready_tx, ready_rx) = oneshot::channel();
 
-    eprintln!(
-        "🚀 DEBUG: Starting realtime server in background on port {}",
-        port
-    );
+    if verbose >= 3 {
+        eprintln!(
+            "🚀 DEBUG: Starting realtime server in background on port {}",
+            port
+        );
+    }
 
     let thread = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
             // Create and configure server
-            let mut server = RealtimeServer::new(port).with_accessor(accessor);
+            let mut server = RealtimeServer::new(port)
+                .with_accessor(accessor)
+                .with_verbosity(verbose);
 
             // Start server with cancellation support
             match server.start_with_cancellation(child_cancel, ready_tx).await {
                 Ok(()) => {
-                    eprintln!("✅ DEBUG: Realtime server stopped cleanly");
+                    if verbose >= 2 {
+                        eprintln!("✅ VERBOSE: Realtime server stopped cleanly");
+                    }
                 }
                 Err(e) => {
-                    eprintln!("❌ DEBUG: Realtime server error: {}", e);
+                    if verbose >= 1 {
+                        eprintln!("❌ INFO: Realtime server error: {}", e);
+                    }
                 }
             }
         });

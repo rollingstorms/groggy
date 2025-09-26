@@ -84,67 +84,76 @@ export class RealtimeViz {
     setupControls() {
         // Embedding method
         const embeddingSelect = document.getElementById('embedding-method');
-        this.currentEmbeddingMethod = embeddingSelect.value || 'pca';
-        embeddingSelect.addEventListener('change', () => {
-            const method = embeddingSelect.value;
-            this.currentEmbeddingMethod = method;
-            this.sendControlMessage('embedding', method);
-        });
+        if (embeddingSelect) {
+            this.currentEmbeddingMethod = embeddingSelect.value || 'pca';
+            embeddingSelect.addEventListener('change', () => {
+                const method = embeddingSelect.value;
+                this.currentEmbeddingMethod = method;
+                this.sendControlMessage('embedding', method);
+            });
+        }
 
         // Dimensions
         const dimensionsSelect = document.getElementById('dimensions');
-        const initialDimensions = parseInt(dimensionsSelect.value, 10);
-        if (!Number.isNaN(initialDimensions)) {
-            this.currentEmbeddingDimensions = initialDimensions;
-        }
-        dimensionsSelect.addEventListener('change', () => {
-            const value = parseInt(dimensionsSelect.value, 10);
-            if (!Number.isNaN(value)) {
-                this.currentEmbeddingDimensions = value;
+        if (dimensionsSelect) {
+            const initialDimensions = parseInt(dimensionsSelect.value, 10);
+            if (!Number.isNaN(initialDimensions)) {
+                this.currentEmbeddingDimensions = initialDimensions;
             }
-            this.sendControlMessage('dimensions', this.currentEmbeddingDimensions);
-        });
+            dimensionsSelect.addEventListener('change', () => {
+                const value = parseInt(dimensionsSelect.value, 10);
+                if (!Number.isNaN(value)) {
+                    this.currentEmbeddingDimensions = value;
+                }
+                this.sendControlMessage('dimensions', this.currentEmbeddingDimensions);
+            });
+        }
 
         // Layout algorithm
         const layoutSelect = document.getElementById('layout-algorithm');
-        const honeyCell = document.getElementById('honey-cell');      // <input type="number" ...>
-        const honeyScale = document.getElementById('honey-scale');    // <input type="number" ...>
-        const circleRadius = document.getElementById('circle-radius');// <input type="number" ...>
-        const forceDist = document.getElementById('force-distance');  // <input type="number" ...>
-        const forceCharge = document.getElementById('force-charge');  // <input type="number" ...>
+        const honeyCell = document.getElementById('honey-cell');
+        const honeyScale = document.getElementById('honey-scale');
+        const circleRadius = document.getElementById('circle-radius');
+        const forceDist = document.getElementById('force-distance');
+        const forceCharge = document.getElementById('force-charge');
 
-        const sendLayout = () => {
-        const layout = layoutSelect.value;
-        const params = {};
-        if (layout === 'honeycomb') {
-            if (honeyCell && honeyCell.value) params.cell_size = parseFloat(honeyCell.value);
-            if (honeyScale && honeyScale.value) params.scale = parseFloat(honeyScale.value);
-        } else if (layout === 'circular') {
-            if (circleRadius && circleRadius.value) params.radius = parseFloat(circleRadius.value);
-        } else if (layout === 'force_directed' || layout === 'force-directed') {
-            if (forceDist && forceDist.value) params.distance = parseFloat(forceDist.value);
-            if (forceCharge && forceCharge.value) params.charge = parseFloat(forceCharge.value);
-        }
-        this.sendControlMessage('layout', { algorithm: layout, params });
-        const controllerMode = this.mapLayoutToController(layout);
-        if (controllerMode) {
-            this.sendControlMessage('controller', { mode: controllerMode });
-            if (controllerMode === 'pan-2d') this.camera.rotation = 0;
-        }
-        };
+        if (layoutSelect) {
+            const sendLayout = () => {
+                const layout = layoutSelect.value;
+                const params = {};
+                if (layout === 'honeycomb') {
+                    if (honeyCell && honeyCell.value) params.cell_size = parseFloat(honeyCell.value);
+                    if (honeyScale && honeyScale.value) params.scale = parseFloat(honeyScale.value);
+                } else if (layout === 'circular') {
+                    if (circleRadius && circleRadius.value) params.radius = parseFloat(circleRadius.value);
+                } else if (layout === 'force_directed' || layout === 'force-directed') {
+                    if (forceDist && forceDist.value) params.distance = parseFloat(forceDist.value);
+                    if (forceCharge && forceCharge.value) params.charge = parseFloat(forceCharge.value);
+                }
+                this.sendControlMessage('layout', { algorithm: layout, params });
 
-        layoutSelect.addEventListener('change', sendLayout);
-        [honeyCell, honeyScale, circleRadius, forceDist, forceCharge].forEach(el => {
-        if (el) el.addEventListener('change', sendLayout);
-        });
+                const controllerMode = this.mapLayoutToController(layout);
+                if (controllerMode) {
+                    this.sendControlMessage('controller', { mode: controllerMode });
+                    if (controllerMode === 'pan-2d') this.camera.rotation = 0;
+                }
+            };
+
+            layoutSelect.addEventListener('change', sendLayout);
+            [honeyCell, honeyScale, circleRadius, forceDist, forceCharge].forEach(el => {
+                if (el) el.addEventListener('change', sendLayout);
+            });
+        }
 
         // Play/pause button
         const playPauseBtn = document.getElementById('play-pause-btn');
-        playPauseBtn.addEventListener('click', () => {
-            this.isPaused = !this.isPaused;
-            playPauseBtn.textContent = this.isPaused ? '▶️ Play' : '⏸️ Pause';
-            this.sendControlMessage('paused', this.isPaused);
-        });
+        if (playPauseBtn) {
+            playPauseBtn.addEventListener('click', () => {
+                this.isPaused = !this.isPaused;
+                playPauseBtn.textContent = this.isPaused ? '▶️ Play' : '⏸️ Pause';
+                this.sendControlMessage('paused', this.isPaused);
+            });
+        }
 
         // Degree filter sliders
         const degreeMin = document.getElementById('degree-min');
@@ -152,74 +161,79 @@ export class RealtimeViz {
         const degreeMinValue = document.getElementById('degree-min-value');
         const degreeMaxValue = document.getElementById('degree-max-value');
 
-        degreeMin.addEventListener('input', () => {
-            degreeMinValue.textContent = degreeMin.value;
-            this.sendControlMessage('degree_filter', {
-                min: parseInt(degreeMin.value),
-                max: parseInt(degreeMax.value)
-            });
-        });
+        if (degreeMin && degreeMax && degreeMinValue && degreeMaxValue) {
+            const sendDegreeUpdate = () => {
+                degreeMinValue.textContent = degreeMin.value;
+                degreeMaxValue.textContent = degreeMax.value;
+                this.sendControlMessage('degree_filter', {
+                    min: parseInt(degreeMin.value, 10),
+                    max: parseInt(degreeMax.value, 10)
+                });
+            };
 
-        degreeMax.addEventListener('input', () => {
-            degreeMaxValue.textContent = degreeMax.value;
-            this.sendControlMessage('degree_filter', {
-                min: parseInt(degreeMin.value),
-                max: parseInt(degreeMax.value)
-            });
-        });
+            degreeMin.addEventListener('input', sendDegreeUpdate);
+            degreeMax.addEventListener('input', sendDegreeUpdate);
+        }
 
         // Search functionality
         const searchInput = document.getElementById('search-input');
         const searchBtn = document.getElementById('search-btn');
         const clearSearchBtn = document.getElementById('clear-search-btn');
 
-        searchBtn.addEventListener('click', () => {
-            const query = searchInput.value.trim();
-            if (query) {
-                this.sendControlMessage('search', query);
-            }
-        });
+        if (searchBtn && clearSearchBtn && searchInput) {
+            searchBtn.addEventListener('click', () => {
+                const query = searchInput.value.trim();
+                if (query) {
+                    this.sendControlMessage('search', query);
+                }
+            });
 
-        clearSearchBtn.addEventListener('click', () => {
-            searchInput.value = '';
-            this.sendControlMessage('clear_search', true);
-        });
+            clearSearchBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                this.sendControlMessage('clear_search', true);
+            });
 
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                searchBtn.click();
-            }
-        });
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchBtn.click();
+                }
+            });
+        }
 
         // Attribute filter
         const attributeName = document.getElementById('attribute-name');
         const attributeValue = document.getElementById('attribute-value');
         const applyFilterBtn = document.getElementById('apply-filter-btn');
 
-        applyFilterBtn.addEventListener('click', () => {
-            if (attributeName.value && attributeValue.value) {
-                this.sendControlMessage('attribute_filter', {
-                    name: attributeName.value,
-                    value: attributeValue.value
-                });
-            }
-        });
+        if (applyFilterBtn && attributeName && attributeValue) {
+            applyFilterBtn.addEventListener('click', () => {
+                if (attributeName.value && attributeValue.value) {
+                    this.sendControlMessage('attribute_filter', {
+                        name: attributeName.value,
+                        value: attributeValue.value
+                    });
+                }
+            });
+        }
 
         // Opacity slider
         const opacitySlider = document.getElementById('opacity-slider');
         const opacityValue = document.getElementById('opacity-value');
 
-        opacitySlider.addEventListener('input', () => {
-            opacityValue.textContent = parseFloat(opacitySlider.value).toFixed(1);
-            this.sendControlMessage('opacity', parseFloat(opacitySlider.value));
-        });
+        if (opacitySlider && opacityValue) {
+            opacitySlider.addEventListener('input', () => {
+                opacityValue.textContent = parseFloat(opacitySlider.value).toFixed(1);
+                this.sendControlMessage('opacity', parseFloat(opacitySlider.value));
+            });
+        }
 
         console.log('✅ Controls initialized');
 
-        // Inform engine of initial interaction controller
-        const initialController = this.mapLayoutToController(layoutSelect.value);
-        if (initialController) {
-            this.sendControlMessage('controller', { mode: initialController });
+        if (layoutSelect) {
+            const initialController = this.mapLayoutToController(layoutSelect.value);
+            if (initialController) {
+                this.sendControlMessage('controller', { mode: initialController });
+            }
         }
     }
 
