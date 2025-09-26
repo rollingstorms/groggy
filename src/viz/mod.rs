@@ -80,6 +80,7 @@ pub struct RenderOptions {
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub title: Option<String>,
+    pub verbose: Option<u8>, // Verbosity level: 0=quiet, 1=info, 2=verbose, 3=debug
 
     // Backend-specific parameters
     pub port: Option<u16>,            // For streaming backend
@@ -127,23 +128,15 @@ impl VizModule {
         }
     }
 
-    /// 🎯 CONVENIENCE METHODS - Simplified unified API
-    /// These methods provide the same interface as described in UNIFIED_VIZ_MIGRATION_PLAN.md
-
-    /// Create Jupyter widget (unified core)
-    pub fn widget(&mut self) -> GraphResult<RenderResult> {
-        self.render(VizBackend::Jupyter, RenderOptions::default())
-    }
-
     /// Start realtime visualization server
-    pub fn server(&mut self, port: Option<u16>) -> GraphResult<RenderResult> {
-        eprintln!("🚀 DEBUG: server() called - starting REALTIME backend server!");
-        let options = RenderOptions {
-            port,
-            ..Default::default()
-        };
-        self.render(VizBackend::Realtime, options)
-    }
+    // pub fn server(&mut self, port: Option<u16>) -> GraphResult<RenderResult> {
+    //     eprintln!("🚀 INFO: server() called - starting REALTIME backend server!");
+    //     let options = RenderOptions {
+    //         port,
+    //         ..Default::default()
+    //     };
+    //     self.render(VizBackend::Realtime, options)
+    // }
 
     /// Save to file (unified core)
     pub fn save(&mut self, path: &str) -> GraphResult<RenderResult> {
@@ -165,6 +158,9 @@ impl VizModule {
     /// - N-dimensional embeddings with UMAP, t-SNE, PCA projections
     /// - Advanced physics simulation and momentum-based interactions
     ///
+    /// # Arguments
+    /// * `verbose` - Verbosity level (0=quiet, 1=info, 2=verbose, 3=debug). Defaults to 0.
+    ///
     /// # Returns
     /// * `RenderResult::RealTime` - Contains the real-time visualization engine with advanced features
     ///
@@ -173,24 +169,37 @@ impl VizModule {
     /// use groggy::viz::VizModule;
     ///
     /// let mut viz = graph.viz();
-    /// let result = viz.show()?; // Now uses Realtime backend by default!
+    /// let result = viz.show(Some(2))?; // Verbose debug output
+    /// let result = viz.show(Some(0))?; // Quiet mode
+    /// let result = viz.show(None)?; // Quiet mode (default)
     ///
     /// // Real-time visualization with n-dimensional honeycomb controls is now running
     /// ```
-    pub fn show(&mut self) -> GraphResult<RenderResult> {
-        eprintln!("🚀 DEBUG: show() called - now using REALTIME backend!");
-        eprintln!(
-            "📊 DEBUG: Data source type: {}",
-            self.data_source.get_schema().source_type
-        );
-        if self.data_source.supports_graph_view() {
+    pub fn show(&mut self, verbose: Option<u8>) -> GraphResult<RenderResult> {
+        let verbose = verbose.unwrap_or(0);
+
+        if verbose >= 1 {
+            eprintln!("🚀 INFO: show() called - using REALTIME backend");
+        }
+
+        if verbose >= 2 {
+            eprintln!(
+                "📊 VERBOSE: Data source type: {}",
+                self.data_source.get_schema().source_type
+            );
+        }
+
+        if self.data_source.supports_graph_view() && verbose >= 2 {
             let metadata = self.data_source.get_graph_metadata();
             eprintln!(
-                "🍯 DEBUG: Graph data - {} nodes, {} edges",
+                "🍯 VERBOSE: Graph data - {} nodes, {} edges",
                 metadata.node_count, metadata.edge_count
             );
         }
-        self.render(VizBackend::Realtime, RenderOptions::default())
+
+        let mut options = RenderOptions::default();
+        options.verbose = Some(verbose);
+        self.render(VizBackend::Realtime, options)
     }
 
     /// 🎯 UNIFIED VISUALIZATION METHOD - The One Command To Rule Them All
@@ -225,26 +234,40 @@ impl VizModule {
     /// })?;
     /// ```
     pub fn render(&self, backend: VizBackend, options: RenderOptions) -> GraphResult<RenderResult> {
-        eprintln!("🎯 DEBUG: render() called with backend: {:?}", backend);
+        let verbose = options.verbose.unwrap_or(0);
+
+        if verbose >= 3 {
+            eprintln!("🎯 DEBUG: render() called with backend: {:?}", backend);
+        }
         match backend {
             VizBackend::Jupyter => {
-                eprintln!("📓 DEBUG: Calling render_jupyter()");
+                if verbose >= 3 {
+                    eprintln!("📓 DEBUG: Calling render_jupyter()");
+                }
                 self.render_jupyter(options)
             }
             VizBackend::Streaming => {
-                eprintln!("🌊 DEBUG: Streaming backend DISABLED - redirecting to realtime");
+                if verbose >= 2 {
+                    eprintln!("🌊 VERBOSE: Streaming backend DISABLED - redirecting to realtime");
+                }
                 self.render_realtime(options)
             }
             VizBackend::Realtime => {
-                eprintln!("⚡ DEBUG: Calling render_realtime()");
+                if verbose >= 3 {
+                    eprintln!("⚡ DEBUG: Calling render_realtime()");
+                }
                 self.render_realtime(options)
             }
             VizBackend::File => {
-                eprintln!("📄 DEBUG: Calling render_file()");
+                if verbose >= 3 {
+                    eprintln!("📄 DEBUG: Calling render_file()");
+                }
                 self.render_file(options)
             }
             VizBackend::Local => {
-                eprintln!("🏠 DEBUG: Calling render_local()");
+                if verbose >= 3 {
+                    eprintln!("🏠 DEBUG: Calling render_local()");
+                }
                 self.render_local(options)
             }
         }
@@ -281,8 +304,12 @@ impl VizModule {
 
     /// Render for advanced real-time visualization with Phase 3 features
     fn render_realtime(&self, options: RenderOptions) -> GraphResult<RenderResult> {
-        eprintln!("🔥 DEBUG: render_realtime() called!");
-        eprintln!("⚙️  DEBUG: Importing realtime modules...");
+        let verbose = options.verbose.unwrap_or(0);
+
+        if verbose >= 3 {
+            eprintln!("🔥 DEBUG: render_realtime() called!");
+            eprintln!("⚙️  DEBUG: Importing realtime modules...");
+        }
 
         // Use fully-qualified paths for realtime types to avoid name collisions with streaming::types::StreamingConfig
         use crate::viz::embeddings::{EmbeddingConfig, EmbeddingMethod};
@@ -291,7 +318,9 @@ impl VizModule {
         };
         use crate::viz::realtime::{InteractionConfig, RealTimeConfig, RealTimeVizConfig};
 
-        eprintln!("✅ DEBUG: Realtime modules imported successfully!");
+        if verbose >= 3 {
+            eprintln!("✅ DEBUG: Realtime modules imported successfully!");
+        }
 
         // Determine embedding and projection methods based on layout
         // Default to Honeycomb for real-time backend if no layout specified
@@ -304,13 +333,19 @@ impl VizModule {
                 iterations: 500,
             });
 
-        eprintln!("🍯 DEBUG: Layout determined: {:?}", layout);
+        if verbose >= 2 {
+            eprintln!("🍯 VERBOSE: Layout determined: {:?}", layout);
+        }
         let (embedding_method, projection_method, is_honeycomb) = match layout {
             LayoutAlgorithm::Honeycomb { .. } => {
-                eprintln!("🍯 DEBUG: HONEYCOMB LAYOUT DETECTED!");
-                eprintln!("🔥 DEBUG: Setting up N-DIMENSIONAL EMBEDDINGS with EnergyND method");
-                eprintln!("🎯 DEBUG: Setting up UMAP projection for multi-dimensional space");
-                eprintln!("🎮 DEBUG: Honeycomb controls will be ENABLED (is_honeycomb=true)");
+                if verbose >= 2 {
+                    eprintln!("🍯 VERBOSE: HONEYCOMB LAYOUT DETECTED!");
+                    eprintln!(
+                        "🔥 VERBOSE: Setting up N-DIMENSIONAL EMBEDDINGS with EnergyND method"
+                    );
+                    eprintln!("🎯 VERBOSE: Setting up UMAP projection for multi-dimensional space");
+                    eprintln!("🎮 VERBOSE: Honeycomb controls will be ENABLED (is_honeycomb=true)");
+                }
                 // For honeycomb layout, use multi-dimensional embedding + honeycomb projection
                 (
                     EmbeddingMethod::EnergyND {
@@ -373,14 +408,18 @@ impl VizModule {
             }
         };
 
-        eprintln!("⚙️  DEBUG: Creating real-time configuration...");
+        if verbose >= 3 {
+            eprintln!("⚙️  DEBUG: Creating real-time configuration...");
+        }
 
         // Create real-time configuration with layout-appropriate settings
         let dimensions = if is_honeycomb { 5 } else { 2 };
-        eprintln!(
-            "📐 DEBUG: Setting embedding dimensions to {} (honeycomb: {})",
-            dimensions, is_honeycomb
-        );
+        if verbose >= 3 {
+            eprintln!(
+                "📐 DEBUG: Setting embedding dimensions to {} (honeycomb: {})",
+                dimensions, is_honeycomb
+            );
+        }
 
         let realtime_config = RealTimeVizConfig {
             embedding_config: EmbeddingConfig {
@@ -395,11 +434,15 @@ impl VizModule {
             projection_config: ProjectionConfig {
                 method: projection_method,
                 honeycomb_config: if is_honeycomb {
-                    eprintln!("🍯 DEBUG: Configuring HONEYCOMB GRID with advanced controls!");
+                    if verbose >= 2 {
+                        eprintln!("🍯 VERBOSE: Configuring HONEYCOMB GRID with advanced controls!");
+                    }
                     let cell_size = options.width.map(|w| w as f64 / 20.0).unwrap_or(40.0);
-                    eprintln!("📏 DEBUG: Honeycomb cell_size: {}", cell_size);
-                    eprintln!("🎯 DEBUG: Using EnergyBased layout strategy");
-                    eprintln!("📍 DEBUG: snap_to_centers=true, grid_padding=20.0");
+                    if verbose >= 3 {
+                        eprintln!("📏 DEBUG: Honeycomb cell_size: {}", cell_size);
+                        eprintln!("🎯 DEBUG: Using EnergyBased layout strategy");
+                        eprintln!("📍 DEBUG: snap_to_centers=true, grid_padding=20.0");
+                    }
                     HoneycombConfig {
                         cell_size,
                         layout_strategy:
@@ -415,7 +458,9 @@ impl VizModule {
                         min_cell_size: 6.0,
                     }
                 } else {
-                    eprintln!("⚠️  DEBUG: Not honeycomb layout - using default config");
+                    if verbose >= 3 {
+                        eprintln!("⚠️  DEBUG: Not honeycomb layout - using default config");
+                    }
                     // Default honeycomb config for non-honeycomb layouts (will be ignored)
                     HoneycombConfig {
                         cell_size: 40.0,
@@ -493,26 +538,36 @@ impl VizModule {
             },
         };
 
-        eprintln!("🔧 DEBUG: Creating real-time visualization engine...");
+        if verbose >= 3 {
+            eprintln!("🔧 DEBUG: Creating real-time visualization engine...");
+        }
 
         // Create real-time visualization engine with the graph
         // For now, create a simple graph from the data source
         // TODO: Properly extract graph structure from data_source
         let graph = crate::api::graph::Graph::new(); // Placeholder - will be populated from data_source
-        eprintln!("📊 DEBUG: Created placeholder graph for engine");
+        if verbose >= 3 {
+            eprintln!("📊 DEBUG: Created placeholder graph for engine");
 
-        eprintln!("⚡ DEBUG: Initializing RealTimeVizEngine with config...");
+            eprintln!("⚡ DEBUG: Initializing RealTimeVizEngine with config...");
+        }
         let engine = crate::viz::realtime::RealTimeVizEngine::new(graph, realtime_config.clone());
-        eprintln!("✅ DEBUG: RealTimeVizEngine created successfully!");
+        if verbose >= 3 {
+            eprintln!("✅ DEBUG: RealTimeVizEngine created successfully!");
+        }
 
         let port = options.port.unwrap_or(8080);
-        eprintln!("🌐 DEBUG: Using port {} for visualization server", port);
+        if verbose >= 2 {
+            eprintln!("🌐 VERBOSE: Using port {} for visualization server", port);
+        }
 
         // Create a real-time visualization session
-        eprintln!(
-            "🎮 DEBUG: Creating RealTimeVisualization with enable_honeycomb_controls={}",
-            is_honeycomb
-        );
+        if verbose >= 3 {
+            eprintln!(
+                "🎮 DEBUG: Creating RealTimeVisualization with enable_honeycomb_controls={}",
+                is_honeycomb
+            );
+        }
         let realtime_viz = RealTimeVisualization {
             config: realtime_config,
             engine,
@@ -522,19 +577,24 @@ impl VizModule {
                 .unwrap_or_else(|| "Real-time Graph Visualization".to_string()),
             auto_open: options.auto_open.unwrap_or(true),
             enable_honeycomb_controls: is_honeycomb,
+            verbose,
         };
 
-        eprintln!("🚀 DEBUG: RealTimeVisualization session created!");
-        if is_honeycomb {
-            eprintln!("🍯 DEBUG: *** HONEYCOMB N-DIMENSIONAL CONTROLS ARE ENABLED! ***");
-            eprintln!("🎯 DEBUG: Expected controls:");
-            eprintln!("   - Left Mouse + Drag: Rotate in dimensions 0-1");
-            eprintln!("   - Left + Ctrl + Drag: Rotate in higher dimensions (2-3)");
-            eprintln!("   - Right Mouse + Drag: Multi-dimensional rotation");
-            eprintln!("   - Middle Mouse + Drag: Rotate across all dimension pairs");
-            eprintln!("   - Node Dragging: Move points in n-dimensional space");
-        } else {
-            eprintln!("⚠️  DEBUG: Honeycomb controls NOT enabled for this layout");
+        if verbose >= 1 {
+            eprintln!("🚀 INFO: RealTimeVisualization session created!");
+        }
+        if is_honeycomb && verbose >= 2 {
+            eprintln!("🍯 VERBOSE: *** HONEYCOMB N-DIMENSIONAL CONTROLS ARE ENABLED! ***");
+            if verbose >= 3 {
+                eprintln!("🎯 DEBUG: Expected controls:");
+                eprintln!("   - Left Mouse + Drag: Rotate in dimensions 0-1");
+                eprintln!("   - Left + Ctrl + Drag: Rotate in higher dimensions (2-3)");
+                eprintln!("   - Right Mouse + Drag: Multi-dimensional rotation");
+                eprintln!("   - Middle Mouse + Drag: Rotate across all dimension pairs");
+                eprintln!("   - Node Dragging: Move points in n-dimensional space");
+            }
+        } else if verbose >= 2 {
+            eprintln!("⚠️  VERBOSE: Honeycomb controls NOT enabled for this layout");
         }
 
         Ok(RenderResult::RealTime(realtime_viz))
@@ -1384,6 +1444,7 @@ pub struct RealTimeVisualization {
     pub title: String,
     pub auto_open: bool,
     pub enable_honeycomb_controls: bool,
+    pub verbose: u8,
 }
 
 impl InteractiveViz {
@@ -1450,16 +1511,21 @@ impl InteractiveViz {
                 let data_source = Arc::new(GraphDataSource::new(&*graph_guard));
                 drop(graph_guard); // Release the lock early
                 let accessor: Arc<dyn crate::viz::realtime::accessor::RealtimeVizAccessor> =
-                    Arc::new(DataSourceRealtimeAccessor::new(data_source));
+                    Arc::new(DataSourceRealtimeAccessor::with_verbosity(
+                        data_source,
+                        realtime_viz.verbose,
+                    ));
 
                 // Start real-time server in background with proper cancellation support
                 let server_handle =
-                    start_realtime_background(port_hint, accessor).map_err(|e| {
-                        GraphError::internal(
-                            &format!("Failed to start realtime server: {}", e),
-                            "InteractiveViz::start",
-                        )
-                    })?;
+                    start_realtime_background(port_hint, accessor, realtime_viz.verbose).map_err(
+                        |e| {
+                            GraphError::internal(
+                                &format!("Failed to start realtime server: {}", e),
+                                "InteractiveViz::start",
+                            )
+                        },
+                    )?;
 
                 let actual_port = server_handle.port;
                 let url = format!("http://{}:{}/", addr, actual_port);

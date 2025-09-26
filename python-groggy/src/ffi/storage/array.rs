@@ -240,36 +240,6 @@ impl PyBaseArray {
         Ok(result.into_py(py))
     }
 
-    /// Launch interactive streaming table view in browser
-    /// 
-    /// Converts the array into a table format and launches a streaming
-    /// interactive view in the browser. The table will have two columns:
-    /// 'index' and 'value' for easy exploration of the array data.
-    /// 
-    /// Returns:
-    ///     str: URL of the interactive table interface
-    pub fn interactive(&self) -> PyResult<String> {
-        // Convert array to table format for streaming
-        let table = self.to_table()?;
-        
-        // Use the table's interactive method
-        table.interactive()
-    }
-    
-    /// Generate embedded iframe HTML for Jupyter notebooks
-    /// 
-    /// Creates an interactive streaming table representation of the array
-    /// that can be embedded directly in a Jupyter notebook cell.
-    /// 
-    /// Returns:
-    ///     str: HTML iframe code for embedding in Jupyter
-    pub fn interactive_embed(&self) -> PyResult<String> {
-        // Convert array to table format for streaming
-        let mut table = self.to_table()?;
-        
-        // Use the table's interactive_embed method
-        table.interactive_embed()
-    }
     
     /// Rich HTML representation for Jupyter notebooks
     /// 
@@ -947,36 +917,6 @@ impl PyNodesArray {
         })
     }
 
-    /// Launch interactive streaming table view in browser
-    /// 
-    /// Converts the nodes array into a table format and launches a streaming
-    /// interactive view in the browser. The table will have an 'index' column
-    /// and a 'node_id' column for exploring the node data.
-    /// 
-    /// Returns:
-    ///     str: URL of the interactive table interface
-    pub fn interactive(&self) -> PyResult<String> {
-        // Convert array to table format for streaming
-        let table = self.to_table()?;
-        
-        // Use the table's interactive method
-        table.interactive()
-    }
-    
-    /// Generate embedded iframe HTML for Jupyter notebooks
-    /// 
-    /// Creates an interactive streaming table representation of the nodes array.
-    /// 
-    /// Returns:
-    ///     str: HTML iframe code for embedding in Jupyter
-    pub fn interactive_embed(&self) -> PyResult<String> {
-        // Convert array to table format for streaming
-        let mut table = self.to_table()?;
-        
-        // Use the table's interactive_embed method
-        table.interactive_embed()
-    }
-    
     /// Rich HTML representation for Jupyter notebooks
     /// 
     /// Returns beautiful HTML table representation that displays automatically
@@ -1128,36 +1068,6 @@ impl PyEdgesArray {
         })
     }
 
-    /// Launch interactive streaming table view in browser
-    /// 
-    /// Converts the edges array into a table format and launches a streaming
-    /// interactive view in the browser. The table will have an 'index' column
-    /// and an 'edge_id' column for exploring the edge data.
-    /// 
-    /// Returns:
-    ///     str: URL of the interactive table interface
-    pub fn interactive(&self) -> PyResult<String> {
-        // Convert array to table format for streaming
-        let table = self.to_table()?;
-        
-        // Use the table's interactive method
-        table.interactive()
-    }
-    
-    /// Generate embedded iframe HTML for Jupyter notebooks
-    /// 
-    /// Creates an interactive streaming table representation of the edges array.
-    /// 
-    /// Returns:
-    ///     str: HTML iframe code for embedding in Jupyter
-    pub fn interactive_embed(&self) -> PyResult<String> {
-        // Convert array to table format for streaming
-        let mut table = self.to_table()?;
-        
-        // Use the table's interactive_embed method
-        table.interactive_embed()
-    }
-    
     /// Rich HTML representation for Jupyter notebooks
     /// 
     /// Returns beautiful HTML table representation that displays automatically

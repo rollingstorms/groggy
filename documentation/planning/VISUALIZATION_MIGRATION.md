@@ -4,6 +4,8 @@
 
 This document outlines the migration strategy for consolidating Groggy's visualization system to use the **Realtime Backend** as the primary/default visualization engine, deprecating the Streaming Backend. This migration enables advanced n-dimensional interaction controls, modular embedding support, and unified architecture.
 
+> **Note (2024-xx-xx):** The historical Python `VizModule` bindings referenced here have been retired in favour of the lighter `VizAccessor` interface. The plan remains archived for context only.
+
 ## Current Architecture Issues
 
 ### Dual Backend Problem

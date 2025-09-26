@@ -1493,36 +1493,6 @@ impl PyGraphMatrix {
         Ok(array.to_object(py))
     }
 
-    /// Launch interactive streaming table view in browser
-    /// 
-    /// Converts the matrix into a table format and launches a streaming
-    /// interactive view in the browser. The table will show the matrix data
-    /// with row and column indices for easy exploration.
-    /// 
-    /// Returns:
-    ///     str: URL of the interactive table interface
-    pub fn interactive(&self) -> PyResult<String> {
-        // Convert matrix to table format for streaming
-        let table = self.to_table_for_streaming()?;
-        
-        // Use the table's interactive method
-        table.interactive()
-    }
-    
-    /// Generate embedded iframe HTML for Jupyter notebooks
-    /// 
-    /// Creates an interactive streaming table representation of the matrix
-    /// that can be embedded directly in a Jupyter notebook cell.
-    /// 
-    /// Returns:
-    ///     str: HTML iframe code for embedding in Jupyter
-    pub fn interactive_embed(&self) -> PyResult<String> {
-        // Convert matrix to table format for streaming
-        let mut table = self.to_table_for_streaming()?;
-        
-        // Use the table's interactive_embed method
-        table.interactive_embed()
-    }
     
     /// Convert matrix to table format for streaming visualization
     /// 

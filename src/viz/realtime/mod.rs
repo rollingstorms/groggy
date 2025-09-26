@@ -304,9 +304,6 @@ pub struct RealTimeVizState {
     /// Last update timestamp
     pub last_update: Instant,
 
-    /// Whether position updates need to be broadcast
-    pub needs_position_update: bool,
-
     /// Current layout algorithm being used
     pub current_layout: LayoutKind,
 

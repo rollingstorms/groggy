@@ -481,6 +481,53 @@ impl<T: NumericType> UnifiedMatrix<T> {
         Ok(result)
     }
 
+    /// Element-wise subtraction
+    pub fn subtract(&self, other: &Self) -> MatrixResult<Self> {
+        if self.shape != other.shape {
+            return Err(MatrixError::DimensionMismatch {
+                expected: self.shape.as_tuple(),
+                got: other.shape.as_tuple(),
+            });
+        }
+
+        let mut result = Self::new(self.shape.rows, self.shape.cols)?;
+
+        let backend = self.backend_selector.select_backend(
+            OperationType::ElementwiseSub,
+            self.len(),
+            T::DTYPE,
+            self.backend_hint.clone(),
+        );
+
+        match (&self.storage, &other.storage, &mut result.storage) {
+            (
+                MatrixStorage::Dense(a_buf),
+                MatrixStorage::Dense(b_buf),
+                MatrixStorage::Dense(c_buf),
+            ) => {
+                let a_data = a_buf.data()?;
+                let b_data = b_buf.data()?;
+                let mut c_data = c_buf.data_mut()?;
+
+                // If backend doesn't have subtraction, do it manually
+                let a_slice = a_data.as_slice();
+                let b_slice = b_data.as_slice();
+                let c_slice = c_data.as_slice_mut();
+
+                for ((a_val, b_val), c_val) in a_slice.iter().zip(b_slice.iter()).zip(c_slice.iter_mut()) {
+                    *c_val = a_val.sub(*b_val);
+                }
+            }
+            _ => {
+                return Err(MatrixError::UnsupportedOperation(
+                    "Element-wise subtraction for non-dense matrices not implemented".to_string(),
+                ));
+            }
+        }
+
+        Ok(result)
+    }
+
     /// Element-wise multiplication
     pub fn mul(&self, other: &Self) -> MatrixResult<Self> {
         if self.shape != other.shape {
@@ -548,6 +595,11 @@ impl<T: NumericType> UnifiedMatrix<T> {
         }
 
         Ok(result)
+    }
+
+    /// Alias for scale - scalar multiplication (for autodiff compatibility)
+    pub fn scalar_multiply(&self, scalar: T) -> MatrixResult<Self> {
+        self.scale(scalar)
     }
 
     /// Sum all elements

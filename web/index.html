@@ -7,161 +7,215 @@
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>👀 Groggy Realtime Graph Visualization</h1>
+  <div class="container viz-shell">
+    <div class="header">    
+    </div>
+
+    <!-- Minimal main area: just the visualization -->
+    <div class="canvas-container">
+      <canvas id="canvas"></canvas>
+      <div id="attribute-panel" class="attribute-panel">
+        <h3>Node Attributes</h3>
+        <div id="attribute-content"><p>Click on a node to view attributes</p></div>
+      </div>
+    </div>
+
+    <!-- Optional small stats strip -->
+    <div class="stats">
       <div class="status-indicator">
         <span id="connection-status" class="status-disconnected">●</span>
         <span id="connection-text">Connecting...</span>
       </div>
-    </div>
-
-    <div class="controls">
-      <div class="control-group">
-        <label for="embedding-method">Embedding:</label>
-        <select id="embedding-method">
-          <option value="spectral">Spectral</option>
-          <option value="random">Random</option>
-          <option value="node2vec">Node2Vec</option>
-          <option value="deepwalk">DeepWalk</option>
-        </select>
-
-        <label for="dimensions">Dimensions:</label>
-        <select id="dimensions">
-          <option value="2">2D</option>
-          <option value="3">3D</option>
-          <option value="4">4D</option>
-          <option value="8">8D</option>
-          <option value="16">16D</option>
-        </select>
-      </div>
-
-      <!-- Replace your current Layout section in index.html with this block -->
-      <div class="control-row" style="gap:12px; align-items:center;">
-        <label for="layout-algorithm">Layout:</label>
-        <select id="layout-algorithm">
-          <option value="honeycomb">Honeycomb</option>
-          <option value="force_directed">Force-Directed</option>
-          <option value="circular">Circular</option>
-          <option value="grid">Grid</option>
-        </select>
-
-        <!-- Honeycomb params -->
-        <div id="layout-honeycomb" class="layout-params" style="display:flex; gap:10px; align-items:center;">
-          <label title="Hex cell size">Cell:</label>
-          <input id="honey-cell" type="number" min="1" step="1" value="24" style="width:90px;">
-          <label title="Scale multiplier for N-D→2D projection">Scale:</label>
-          <input id="honey-scale" type="number" min="0.1" step="0.1" value="1.5" style="width:90px;">
-        </div>
-
-        <!-- Circular params -->
-        <div id="layout-circular" class="layout-params" style="display:none; gap:10px; align-items:center;">
-          <label>Radius:</label>
-          <input id="circle-radius" type="number" min="10" step="10" value="250" style="width:110px;">
-        </div>
-
-        <!-- Force-directed params -->
-        <div id="layout-force" class="layout-params" style="display:none; gap:10px; align-items:center;">
-          <label>Dist:</label>
-          <input id="force-distance" type="number" min="10" step="5" value="80" style="width:90px;">
-          <label>Charge:</label>
-          <input id="force-charge" type="number" step="5" value="-100" style="width:90px;">
-        </div>
-
-        <button id="play-pause-btn" class="btn">⏸️ Pause</button>
-      </div>
-
-      <div class="control-group">
-        <label for="degree-range">Degree Filter:</label>
-        <input type="range" id="degree-min" min="0" max="50" value="0" class="slider">
-        <span id="degree-min-value">0</span> -
-        <input type="range" id="degree-max" min="0" max="50" value="50" class="slider">
-        <span id="degree-max-value">50</span>
-      </div>
-
-      <div class="control-group">
-        <label for="search-input">Search:</label>
-        <input type="text" id="search-input" placeholder="Node ID or attribute">
-        <button id="search-btn" class="btn">🔍</button>
-        <button id="clear-search-btn" class="btn">✖️</button>
-      </div>
-
-      <div class="control-group">
-        <label for="attribute-filter">Filter by Attribute:</label>
-        <select id="attribute-name">
-          <option value="">None</option>
-        </select>
-        <input type="text" id="attribute-value" placeholder="Value">
-        <button id="apply-filter-btn" class="btn">Apply</button>
-      </div>
-
-      <div class="control-group">
-        <label for="opacity-slider">Opacity:</label>
-        <input type="range" id="opacity-slider" min="0.1" max="1" step="0.1" value="1" class="slider">
-        <span id="opacity-value">1.0</span>
-      </div>
-    </div>
-
-    <div class="canvas-container" style="position:relative;">
-      <canvas id="canvas"></canvas>
-      <div id="attribute-panel" class="attribute-panel">
-        <h3>Node Attributes</h3>
-        <div id="attribute-content">
-          <p>Click on a node to view attributes</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="stats">
       <div class="stat-group">
-        <span class="stat-label">Nodes:</span>
-        <span id="node-count">0</span>
-        <span class="stat-label">Edges:</span>
-        <span id="edge-count">0</span>
-        <span class="stat-label">Visible:</span>
-        <span id="visible-count">0</span>
+        <span class="stat-label">Nodes:</span><span id="node-count">0</span>
+        <span class="stat-label">Edges:</span><span id="edge-count">0</span>
+        <span class="stat-label">Visible:</span><span id="visible-count">0</span>
       </div>
       <div class="stat-group">
-        <span class="stat-label">FPS:</span>
-        <span id="fps-counter">60</span>
-        <span class="stat-label">Updates/s:</span>
-        <span id="update-rate">0</span>
-        <span class="stat-label">Latency:</span>
-        <span id="latency">0ms</span>
+        <span class="stat-label">FPS:</span><span id="fps-counter">60</span>
+        <span class="stat-label">Updates/s:</span><span id="update-rate">0</span>
+        <span class="stat-label">Latency:</span><span id="latency">0ms</span>
       </div>
     </div>
 
     <div id="messages" class="messages"></div>
   </div>
+
+  <!-- Floating eyes button -->
+  <button class="fab-eyes" id="eyes-toggle" aria-expanded="false" aria-controls="control-drawer" title="Show controls">
+    <span class="dot">👀</span>
+  </button>
+
+  <!-- Controls Drawer (tabbed) -->
+  <section class="control-drawer" id="control-drawer" aria-hidden="true">
+      <div class="control-drawer__tabs" role="tablist" aria-label="Visualization controls">
+        <button class="tab-btn" role="tab" aria-selected="true" data-tab="layout">Layout</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="filter">Filter</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="search">Search</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="style">Style</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-tab="embed">Embedding</button>
+      </div>
+    <div class="control-drawer__body">
+      <!-- Layout panel -->
+      <div class="tab-panel active" id="panel-layout">
+        <div class="controls" style="display:grid;">
+          <!-- TODO(flat-embedding): add toggle + sliders for the flat embedding energy once implemented. -->
+          <div class="control-group">
+            <label for="layout-algorithm">Layout:</label>
+            <select id="layout-algorithm">
+              <option value="honeycomb">Honeycomb</option>
+              <option value="force_directed">Force-Directed</option>
+              <option value="circular">Circular</option>
+              <option value="grid">Grid</option>
+            </select>
+          </div>
+
+          <div class="control-row" style="gap:12px; align-items:center;">
+            <div id="layout-honeycomb" class="layout-params" style="display:flex; gap:10px; align-items:center;">
+              <label title="Hex cell size">Cell:</label>
+              <input id="honey-cell" type="number" min="1" step="1" value="24" style="width:90px;">
+              <label title="Scale multiplier for N-D→2D projection">Scale:</label>
+              <input id="honey-scale" type="number" min="0.1" step="0.1" value="1.5" style="width:90px;">
+            </div>
+
+            <div id="layout-circular" class="layout-params" style="display:none; gap:10px; align-items:center;">
+              <label>Radius:</label>
+              <input id="circle-radius" type="number" min="10" step="10" value="250" style="width:110px;">
+            </div>
+
+            <div id="layout-force" class="layout-params" style="display:none; gap:10px; align-items:center;">
+              <label>Dist:</label>
+              <input id="force-distance" type="number" min="10" step="5" value="80" style="width:90px;">
+              <label>Charge:</label>
+              <input id="force-charge" type="number" step="5" value="-100" style="width:90px;">
+            </div>
+
+            <button id="play-pause-btn" class="btn">⏸️ Pause</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter panel -->
+      <div class="tab-panel" id="panel-filter">
+        <div class="controls" style="display:grid;">
+          <div class="control-group">
+            <label>Degree Filter:</label>
+            <input type="range" id="degree-min" min="0" max="50" value="0" class="slider">
+            <span id="degree-min-value">0</span> -
+            <input type="range" id="degree-max" min="0" max="50" value="50" class="slider">
+            <span id="degree-max-value">50</span>
+          </div>
+
+          <div class="control-group">
+            <label>Attribute:</label>
+            <select id="attribute-name"><option value="">None</option></select>
+            <input type="text" id="attribute-value" placeholder="Value">
+            <button id="apply-filter-btn" class="btn">Apply</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search panel -->
+      <div class="tab-panel" id="panel-search">
+        <div class="controls" style="display:grid;">
+          <div class="control-group">
+            <label>Search:</label>
+            <input type="text" id="search-input" placeholder="Node ID or attribute">
+            <button id="search-btn" class="btn">🔍</button>
+            <button id="clear-search-btn" class="btn">✖️</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Style panel -->
+      <div class="tab-panel" id="panel-style">
+        <div class="controls" style="display:grid;">
+          <div class="control-group">
+            <label>Opacity:</label>
+            <input type="range" id="opacity-slider" min="0.1" max="1" step="0.1" value="1" class="slider">
+            <span id="opacity-value">1.0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Embedding panel -->
+      <div class="tab-panel" id="panel-embed">
+        <div class="controls" style="display:grid;">
+          <div class="control-group">
+            <label for="embedding-method">Embedding:</label>
+            <select id="embedding-method">
+              <option value="spectral">Spectral</option>
+              <option value="random">Random</option>
+              <option value="node2vec">Node2Vec</option>
+              <option value="deepwalk">DeepWalk</option>
+            </select>
+
+            <label for="dimensions">Dimensions:</label>
+            <select id="dimensions">
+              <option value="2">2D</option>
+              <option value="3">3D</option>
+              <option value="4">4D</option>
+              <option value="8">8D</option>
+              <option value="16">16D</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <script>
     function updateParamVisibility() {
       const layout = document.getElementById('layout-algorithm')?.value;
-      document.getElementById('layout-honeycomb').style.display =
-        layout === 'honeycomb' ? 'flex' : 'none';
-      document.getElementById('layout-circular').style.display =
-        layout === 'circular' ? 'flex' : 'none';
-      document.getElementById('layout-force').style.display =
-        (layout === 'force_directed' || layout === 'force-directed') ? 'flex' : 'none';
+      document.getElementById('layout-honeycomb').style.display = layout === 'honeycomb' ? 'flex' : 'none';
+      document.getElementById('layout-circular').style.display  = layout === 'circular' ? 'flex' : 'none';
+      document.getElementById('layout-force').style.display     = (layout === 'force_directed' || layout === 'force-directed') ? 'flex' : 'none';
     }
     document.addEventListener('DOMContentLoaded', () => {
       const sel = document.getElementById('layout-algorithm');
-      if (sel) {
-        sel.addEventListener('change', updateParamVisibility);
-        updateParamVisibility();
-      }
+      if (sel) { sel.addEventListener('change', updateParamVisibility); updateParamVisibility(); }
     });
   </script>
+
   <script type="module">
     import { RealtimeViz } from '/static/app.js';
 
-    // Fetch runtime config from the server so no string templating is needed
-    const cfg = await fetch('/config').then(r => r.json());
+    // Drawer + tabs wiring
+    const drawer  = document.getElementById('control-drawer');
+    const fab     = document.getElementById('eyes-toggle');
+    const tabs    = [...document.querySelectorAll('.tab-btn')];
+    const panels  = {
+      layout: document.getElementById('panel-layout'),
+      filter: document.getElementById('panel-filter'),
+      search: document.getElementById('panel-search'),
+      style:  document.getElementById('panel-style'),
+      embed:  document.getElementById('panel-embed'),
+    };
 
-    // Create the app
+    function openDrawer(open) {
+      drawer.classList.toggle('open', open);
+      drawer.setAttribute('aria-hidden', String(!open));
+      fab.setAttribute('aria-expanded', String(open));
+      fab.title = open ? 'Hide controls' : 'Show controls';
+    }
+
+    fab.addEventListener('click', () => {
+      openDrawer(!drawer.classList.contains('open'));
+    });
+
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabs.forEach(b => b.setAttribute('aria-selected', 'false'));
+        Object.values(panels).forEach(p => p.classList.remove('active'));
+        btn.setAttribute('aria-selected', 'true');
+        panels[btn.dataset.tab]?.classList.add('active');
+      });
+    });
+
+    // App bootstrap
+    const cfg = await fetch('/config').then(r => r.json());
     new RealtimeViz({
-      wsUrl:
-        (location.protocol === 'https:' ? 'wss:' : 'ws:') +
-        '//' + location.host + cfg.ws_path,  // e.g. "/ws"
+      wsUrl: (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + cfg.ws_path,
     });
   </script>
 </body>

@@ -1,59 +1,50 @@
 /* Groggy Realtime Visualization Styles */
+html, body { height: 100%; overflow: hidden; }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   margin: 0;
   padding: 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #333;
   min-height: 100vh;
+  background: #eef1f6;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #1f2328;
 }
 
 .container {
-  max-width: 1400px;
   margin: 0 auto;
-  padding: 20px;
-  background: white;
-  border-radius: 15px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-  margin-top: 20px;
-  margin-bottom: 20px;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 25px;
-  padding-bottom: 20px;
-  border-bottom: 3px solid #f8f9fa;
 }
 
 .header h1 {
   margin: 0;
-  color: #2c3e50;
-  font-size: 2.2em;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -.02em;
+  color: #101827;
 }
 
 .status-indicator {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-weight: 600;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  background: #f3f4f6;
+  border: 1px solid #e4e6eb;
+  color: #6a737d;
+  margin-right: 10px;
 }
 
-.status-connected {
-  color: #28a745;
-}
 
-.status-disconnected {
-  color: #dc3545;
-}
-
-.status-connecting {
-  color: #ffc107;
-}
+.status-connected { color: #1f883d; }
+.status-disconnected { color: #dc3545; }
+.status-connecting { color: #d29922; }
 
 .controls {
   display: grid;
@@ -101,40 +92,38 @@ body {
 }
 
 .btn {
-  background: linear-gradient(45deg, #007bff, #0056b3);
-  color: white;
+  background: #3267e3;
+  color: #fff;
   border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.15s ease-in-out;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background .15s ease, transform .15s ease;
 }
 
-.btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
-}
-
-.btn:active {
-  transform: translateY(0);
-}
+.btn:hover { background: #2756c4; }
+.btn:active { transform: translateY(1px); }
 
 .canvas-container {
   position: relative;
-  background: white;
-  border: 3px solid #e9ecef;
-  border-radius: 10px;
+  background: #fcfcfd;
+  border: 2px solid #e3e6eb;
+  border-radius: 14px;
   overflow: hidden;
-  margin-bottom: 20px;
+  height: 100%;
+  margin: 10px
 }
 
 #canvas {
   display: block;
   cursor: crosshair;
   width: 100%;
-  height: 600px;
+  height: 100%;
+  background: radial-gradient(circle at 20% 20%, rgba(50,103,227,0.05), transparent 65%),
+              radial-gradient(circle at 80% 30%, rgba(17,24,39,0.06), transparent 60%),
+              #f9fbfd;
 }
 
 .attribute-panel {
@@ -190,10 +179,13 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: #f6f8fa;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  margin: 10px;
+  font-size: 10px;
+  flex: 0 0 auto;
 }
 
 .stat-group {
@@ -205,6 +197,123 @@ body {
 .stat-label {
   font-weight: 600;
   color: #6c757d;
+}
+
+/* === Minimal rounded shell + floating eyes button + tabbed drawer === */
+
+.viz-shell {
+  position: relative;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height:100%
+}
+
+.viz-shell .canvas-container {
+  border: 0;
+  border-radius: 18px;
+  flex: 1; min-height: 0;
+}
+
+/* Hide the old inline controls area by default (we'll replace it with a drawer) */
+.controls {
+  display: none;
+}
+
+/* Floating "eyes" button (FAB) */
+.fab-eyes {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 0;
+  background: #111827;
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
+  display: grid;
+  place-items: center;
+  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+  z-index: 1200;
+}
+.fab-eyes:hover { transform: translateY(-2px); box-shadow: 0 16px 30px rgba(0,0,0,0.28); }
+.fab-eyes:active { transform: translateY(0); }
+.fab-eyes .dot { font-size: 26px; line-height: 1; }
+
+/* Drawer */
+.control-drawer {
+  position: fixed;
+  right: 20px;
+  bottom: 92px;
+  width: min(92vw, 980px);
+  max-height: min(78vh, 720px);
+  background: rgba(255,255,255,0.98);
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 20px 48px rgba(0,0,0,0.18);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+  transform: translateY(16px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+  z-index: 1100;
+}
+.control-drawer.open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Drawer header with tabs */
+.control-drawer__tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px;
+  background: #f9fafb;
+  border-bottom: 1px solid #eef2f7;
+}
+.tab-btn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: #fff;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+}
+.tab-btn[aria-selected="true"] {
+  background: #111827;
+  color: #fff;
+}
+
+/* Drawer body */
+.control-drawer__body {
+  padding: 14px;
+  overflow: auto;
+  max-height: calc(min(78vh, 720px) - 48px);
+}
+
+/* Panels reuse existing grid layout */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Small screens */
+@media (max-width: 768px) {
+  .control-drawer {
+    right: 10px;
+    left: 10px;
+    width: auto;
+    bottom: 86px;
+    max-height: 75vh;
+  }
+  .fab-eyes { right: 10px; bottom: 10px; }
 }
 
 .stat-group span:not(.stat-label) {

@@ -37,11 +37,18 @@ pub struct DataSourceRealtimeAccessor {
     layout_algorithm: RwLock<LayoutAlgorithm>,
     /// Embedding dimensions
     embedding_dimensions: RwLock<usize>,
+    /// Verbosity level for debug output (0=quiet, 1=info, 2=verbose, 3=debug)
+    verbose: u8,
 }
 
 impl DataSourceRealtimeAccessor {
     /// Create new accessor from DataSource
     pub fn new(data_source: Arc<dyn DataSource>) -> Self {
+        Self::with_verbosity(data_source, 0)
+    }
+
+    /// Create new accessor with verbosity level
+    pub fn with_verbosity(data_source: Arc<dyn DataSource>, verbose: u8) -> Self {
         Self {
             data_source,
             layout_algorithm: RwLock::new(LayoutAlgorithm::ForceDirected {
@@ -50,6 +57,7 @@ impl DataSourceRealtimeAccessor {
                 iterations: 100,
             }),
             embedding_dimensions: RwLock::new(2),
+            verbose,
         }
     }
 
@@ -59,35 +67,46 @@ impl DataSourceRealtimeAccessor {
             data_source,
             layout_algorithm: RwLock::new(layout),
             embedding_dimensions: RwLock::new(2),
+            verbose: 0,
         }
     }
 
     /// Convert DataSource nodes to engine nodes
     fn convert_nodes(&self) -> Vec<Node> {
-        eprintln!(
-            "🔧 DEBUG: Converting nodes - supports_graph_view: {}",
-            self.data_source.supports_graph_view()
-        );
+        if self.verbose >= 3 {
+            eprintln!(
+                "🔧 DEBUG: Converting nodes - supports_graph_view: {}",
+                self.data_source.supports_graph_view()
+            );
+        }
 
         if !self.data_source.supports_graph_view() {
-            eprintln!("⚠️  DEBUG: DataSource does not support graph view, returning empty nodes");
+            if self.verbose >= 2 {
+                eprintln!(
+                    "⚠️  VERBOSE: DataSource does not support graph view, returning empty nodes"
+                );
+            }
             return Vec::new();
         }
 
         let graph_nodes = self.data_source.get_graph_nodes();
-        eprintln!(
-            "📊 DEBUG: DataSource returned {} graph nodes",
-            graph_nodes.len()
-        );
+        if self.verbose >= 3 {
+            eprintln!(
+                "📊 DEBUG: DataSource returned {} graph nodes",
+                graph_nodes.len()
+            );
+        }
 
         let engine_nodes: Vec<Node> = graph_nodes
             .into_iter()
             .map(|graph_node| {
                 let node_id = graph_node.id.parse().unwrap_or(0);
-                eprintln!(
-                    "🔧 DEBUG: Converting node '{}' to id {}",
-                    graph_node.id, node_id
-                );
+                if self.verbose >= 3 {
+                    eprintln!(
+                        "🔧 DEBUG: Converting node '{}' to id {}",
+                        graph_node.id, node_id
+                    );
+                }
                 Node {
                     id: node_id,
                     attributes: graph_node.attributes,
@@ -95,30 +114,40 @@ impl DataSourceRealtimeAccessor {
             })
             .collect();
 
-        eprintln!(
-            "✅ DEBUG: Converted {} nodes for engine",
-            engine_nodes.len()
-        );
+        if self.verbose >= 2 {
+            eprintln!(
+                "✅ VERBOSE: Converted {} nodes for engine",
+                engine_nodes.len()
+            );
+        }
         engine_nodes
     }
 
     /// Convert DataSource edges to engine edges
     fn convert_edges(&self) -> Vec<Edge> {
-        eprintln!(
-            "🔧 DEBUG: Converting edges - supports_graph_view: {}",
-            self.data_source.supports_graph_view()
-        );
+        if self.verbose >= 3 {
+            eprintln!(
+                "🔧 DEBUG: Converting edges - supports_graph_view: {}",
+                self.data_source.supports_graph_view()
+            );
+        }
 
         if !self.data_source.supports_graph_view() {
-            eprintln!("⚠️  DEBUG: DataSource does not support graph view, returning empty edges");
+            if self.verbose >= 2 {
+                eprintln!(
+                    "⚠️  VERBOSE: DataSource does not support graph view, returning empty edges"
+                );
+            }
             return Vec::new();
         }
 
         let graph_edges = self.data_source.get_graph_edges();
-        eprintln!(
-            "📊 DEBUG: DataSource returned {} graph edges",
-            graph_edges.len()
-        );
+        if self.verbose >= 3 {
+            eprintln!(
+                "📊 DEBUG: DataSource returned {} graph edges",
+                graph_edges.len()
+            );
+        }
 
         let engine_edges: Vec<Edge> = graph_edges
             .into_iter()
@@ -126,10 +155,12 @@ impl DataSourceRealtimeAccessor {
             .map(|(idx, graph_edge)| {
                 let source_id = graph_edge.source.parse().unwrap_or(0);
                 let target_id = graph_edge.target.parse().unwrap_or(0);
-                eprintln!(
-                    "🔧 DEBUG: Converting edge {} '{}' -> '{}' to {} -> {}",
-                    idx, graph_edge.source, graph_edge.target, source_id, target_id
-                );
+                if self.verbose >= 3 {
+                    eprintln!(
+                        "🔧 DEBUG: Converting edge {} '{}' -> '{}' to {} -> {}",
+                        idx, graph_edge.source, graph_edge.target, source_id, target_id
+                    );
+                }
                 Edge {
                     id: idx as EdgeId,
                     source: source_id,
@@ -139,10 +170,12 @@ impl DataSourceRealtimeAccessor {
             })
             .collect();
 
-        eprintln!(
-            "✅ DEBUG: Converted {} edges for engine",
-            engine_edges.len()
-        );
+        if self.verbose >= 2 {
+            eprintln!(
+                "✅ VERBOSE: Converted {} edges for engine",
+                engine_edges.len()
+            );
+        }
         engine_edges
     }
 
@@ -207,7 +240,9 @@ impl DataSourceRealtimeAccessor {
 
 impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
     fn initial_snapshot(&self) -> GraphResult<EngineSnapshot> {
-        eprintln!("🔧 DEBUG: DataSourceRealtimeAccessor creating initial snapshot");
+        if self.verbose >= 3 {
+            eprintln!("🔧 DEBUG: DataSourceRealtimeAccessor creating initial snapshot");
+        }
 
         // Convert DataSource data to engine format
         let nodes = self.convert_nodes();
@@ -216,12 +251,14 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
         let has_positions = !positions.is_empty();
         let meta = self.create_meta(nodes.len(), edges.len(), has_positions);
 
-        eprintln!(
-            "✅ DEBUG: Snapshot created - {} nodes, {} edges, {} positions",
-            nodes.len(),
-            edges.len(),
-            positions.len()
-        );
+        if self.verbose >= 1 {
+            eprintln!(
+                "✅ INFO: Snapshot created - {} nodes, {} edges, {} positions",
+                nodes.len(),
+                edges.len(),
+                positions.len()
+            );
+        }
 
         Ok(EngineSnapshot {
             nodes,
@@ -232,18 +269,22 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
     }
 
     fn apply_control(&self, control: ControlMsg) -> GraphResult<()> {
-        eprintln!(
-            "🎮 DEBUG: DataSourceRealtimeAccessor received control: {:?}",
-            control
-        );
+        if self.verbose >= 3 {
+            eprintln!(
+                "🎮 DEBUG: DataSourceRealtimeAccessor received control: {:?}",
+                control
+            );
+        }
 
         match control {
             ControlMsg::ChangeEmbedding { method, k, params } => {
                 *self.embedding_dimensions.write().unwrap() = k;
-                eprintln!(
-                    "📐 DEBUG: Updated embedding to {} with {} dimensions",
-                    method, k
-                );
+                if self.verbose >= 2 {
+                    eprintln!(
+                        "📐 VERBOSE: Updated embedding to {} with {} dimensions",
+                        method, k
+                    );
+                }
 
                 if method == "rotation" {
                     let rotation_x = params
@@ -255,19 +296,23 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                         .and_then(|s| s.parse::<f64>().ok())
                         .unwrap_or(0.0);
 
-                    eprintln!(
-                        "🔄 DEBUG: Rotation control acknowledged (x={}, y={})",
-                        rotation_x, rotation_y
-                    );
+                    if self.verbose >= 3 {
+                        eprintln!(
+                            "🔄 DEBUG: Rotation control acknowledged (x={}, y={})",
+                            rotation_x, rotation_y
+                        );
+                    }
                 }
 
                 // Engine is authoritative for runtime updates; accessor only acknowledges control inputs.
             }
             ControlMsg::ChangeLayout { algorithm, params } => {
-                eprintln!(
-                    "🎯 DEBUG: Layout control received for {} with params {:?}",
-                    algorithm, params
-                );
+                if self.verbose >= 2 {
+                    eprintln!(
+                        "🎯 VERBOSE: Layout control received for {} with params {:?}",
+                        algorithm, params
+                    );
+                }
 
                 match algorithm.parse::<LayoutKind>() {
                     Ok(LayoutKind::Honeycomb) => {
@@ -328,17 +373,21 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                         };
                     }
                     Err(err) => {
-                        eprintln!("⚠️  WARNING: {} – ignoring accessor layout change", err);
+                        if self.verbose >= 1 {
+                            eprintln!("⚠️  WARNING: {} – ignoring accessor layout change", err);
+                        }
                     }
                 }
 
                 // Engine recomputes layout and will stream envelopes downstream.
             }
             _ => {
-                eprintln!(
-                    "⚠️  DEBUG: Accessor received unsupported control message: {:?}",
-                    control
-                );
+                if self.verbose >= 2 {
+                    eprintln!(
+                        "⚠️  VERBOSE: Accessor received unsupported control message: {:?}",
+                        control
+                    );
+                }
             }
         }
 
