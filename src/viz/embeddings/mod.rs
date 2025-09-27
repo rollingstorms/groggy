@@ -12,6 +12,7 @@ use std::collections::HashMap;
 
 pub mod debug;
 pub mod energy;
+pub mod flat_embedding;
 pub mod random;
 pub mod spectral;
 

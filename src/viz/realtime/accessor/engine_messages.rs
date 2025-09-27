@@ -154,23 +154,6 @@ pub enum ControlMsg {
         algorithm: String,
         params: HashMap<String, String>,
     },
-    /// Filter nodes/edges
-    ApplyFilter {
-        attribute: String,
-        operator: String,
-        value: String,
-    },
-    /// Clear all filters
-    ClearFilters,
-    /// Select nodes
-    SelectNodes(Vec<NodeId>),
-    /// Clear selection
-    ClearSelection,
-
-    /// Apply a direct position delta to a node (typically from drag)
-    /// This is forwarded to the engine as an EngineUpdate::PositionDelta
-    PositionDelta { node_id: NodeId, delta: Vec<f64> },
-
     /// Switch interaction controller
     SetInteractionController { mode: String },
 
@@ -182,16 +165,6 @@ pub enum ControlMsg {
 
     /// Node drag gesture event
     NodeDrag { event: NodeDragEvent },
-
-    /// Rotate embedding axes
-    RotateEmbedding {
-        axis_i: usize,
-        axis_j: usize,
-        radians: f64,
-    },
-
-    /// Explicit view rotation (2D)
-    SetViewRotation { radians: f64 },
 }
 
 impl EngineSnapshot {

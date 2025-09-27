@@ -87,7 +87,7 @@ impl PySubgraph {
     /// Get viz accessor for visualization operations
     #[getter]
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
-        use groggy::api::graph::GraphDataSource;
+        use groggy::viz::streaming::GraphDataSource;
 
         // Create a subgraph from this subgraph's data
         let mut viz_graph = groggy::api::graph::Graph::new();

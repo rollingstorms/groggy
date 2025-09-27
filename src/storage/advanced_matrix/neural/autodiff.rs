@@ -442,17 +442,17 @@ impl<T: NumericType> ComputationGraph<T> {
     ) -> MatrixResult<UnifiedMatrix<T>> {
         let (rows, cols) = (input.shape().rows, input.shape().cols);
         let data = input.to_vec()?; // row-major
-    
+
         match axis {
             None => {
                 // Sum all elements -> (1,1)
                 let mut acc_f = 0.0f64;
                 for v in &data {
-                    acc_f += v.to_f64();                   // <-- removed .unwrap_or(0.0)
+                    acc_f += v.to_f64(); // <-- removed .unwrap_or(0.0)
                 }
-                let acc_t = T::from_f64(acc_f).ok_or_else(|| 
+                let acc_t = T::from_f64(acc_f).ok_or_else(|| {
                     MatrixError::ComputationError("reduce_sum: from_f64 failed".into())
-                )?;
+                })?;
                 UnifiedMatrix::from_data(vec![acc_t], 1, 1)
             }
             Some(0) => {
@@ -460,14 +460,14 @@ impl<T: NumericType> ComputationGraph<T> {
                 let mut out_f = vec![0.0f64; cols];
                 for r in 0..rows {
                     for c in 0..cols {
-                        out_f[c] += data[r * cols + c].to_f64();  // <-- removed .unwrap_or(0.0)
+                        out_f[c] += data[r * cols + c].to_f64(); // <-- removed .unwrap_or(0.0)
                     }
                 }
                 let mut out_t = Vec::with_capacity(cols);
                 for f in out_f {
-                    out_t.push(T::from_f64(f).ok_or_else(|| 
+                    out_t.push(T::from_f64(f).ok_or_else(|| {
                         MatrixError::ComputationError("reduce_sum axis=0: from_f64 failed".into())
-                    )?);
+                    })?);
                 }
                 UnifiedMatrix::from_data(out_t, 1, cols)
             }
@@ -477,15 +477,15 @@ impl<T: NumericType> ComputationGraph<T> {
                 for r in 0..rows {
                     let mut acc_f = 0.0f64;
                     for c in 0..cols {
-                        acc_f += data[r * cols + c].to_f64();     // <-- removed .unwrap_or(0.0)
+                        acc_f += data[r * cols + c].to_f64(); // <-- removed .unwrap_or(0.0)
                     }
                     out_f[r] = acc_f;
                 }
                 let mut out_t = Vec::with_capacity(rows);
                 for f in out_f {
-                    out_t.push(T::from_f64(f).ok_or_else(|| 
+                    out_t.push(T::from_f64(f).ok_or_else(|| {
                         MatrixError::ComputationError("reduce_sum axis=1: from_f64 failed".into())
-                    )?);
+                    })?);
                 }
                 UnifiedMatrix::from_data(out_t, rows, 1)
             }
@@ -502,7 +502,7 @@ impl<T: NumericType> ComputationGraph<T> {
             let mut n = node_arc.lock().unwrap();
             n.gradient = None;
         }
-    
+
         // 2) Seed the output grad with 1s (scalar or same shape)
         if let Some(node_arc) = self.nodes.get(&output_node) {
             let mut node = node_arc.lock().unwrap();
@@ -511,21 +511,29 @@ impl<T: NumericType> ComputationGraph<T> {
                 node.set_gradient(grad)?;
             }
         } else {
-            return Err(MatrixError::ComputationError("Output node not found".to_string()));
+            return Err(MatrixError::ComputationError(
+                "Output node not found".to_string(),
+            ));
         }
-    
+
         // 3) Propagate in reverse topological order up to output_node
         for &node_id in self.execution_order.iter().rev() {
-            if node_id > output_node { continue; }
+            if node_id > output_node {
+                continue;
+            }
             if let Some(node_arc) = self.nodes.get(&node_id).map(Arc::clone) {
                 self.compute_backward_operation(&node_arc)?;
             }
         }
-    
+
         Ok(())
     }
 
-    fn elementwise_pow_u32(&self, base: &UnifiedMatrix<T>, exp: u32) -> MatrixResult<UnifiedMatrix<T>> {
+    fn elementwise_pow_u32(
+        &self,
+        base: &UnifiedMatrix<T>,
+        exp: u32,
+    ) -> MatrixResult<UnifiedMatrix<T>> {
         if exp == 0 {
             return UnifiedMatrix::ones(base.shape().rows, base.shape().cols);
         }
@@ -555,7 +563,7 @@ impl<T: NumericType> ComputationGraph<T> {
             Operation::Add => {
                 if node.inputs.len() == 2 {
                     let ids = [node.inputs[0], node.inputs[1]];
-                    let gs  = vec![grad_output.clone(), grad_output.clone()];
+                    let gs = vec![grad_output.clone(), grad_output.clone()];
                     drop(node);
                     return self.accumulate_per_input(&ids, gs);
                 }
@@ -566,7 +574,7 @@ impl<T: NumericType> ComputationGraph<T> {
                 if node.inputs.len() == 2 {
                     let neg = grad_output.scalar_multiply(T::from_f64(-1.0).unwrap())?;
                     let ids = [node.inputs[0], node.inputs[1]];
-                    let gs  = vec![grad_output.clone(), neg];
+                    let gs = vec![grad_output.clone(), neg];
                     drop(node);
                     return self.accumulate_per_input(&ids, gs);
                 }
@@ -577,7 +585,7 @@ impl<T: NumericType> ComputationGraph<T> {
                 // Upstream gradient shape matches sum output.
                 // We need to broadcast it back to the input shape with ones.
                 let grad_out = grad_output.clone();
-            
+
                 // Input node (single input)
                 if let Some(&inp_id) = node.inputs.first() {
                     if let Some(inp_arc) = self.nodes.get(&inp_id) {
@@ -594,7 +602,9 @@ impl<T: NumericType> ComputationGraph<T> {
                                     // (1, in_c) -> tile along rows
                                     let row = grad_out.to_vec()?;
                                     let mut out = Vec::with_capacity(in_r * in_c);
-                                    for _r in 0..in_r { out.extend_from_slice(&row); }
+                                    for _r in 0..in_r {
+                                        out.extend_from_slice(&row);
+                                    }
                                     UnifiedMatrix::from_data(out, in_r, in_c)?
                                 }
                                 Some(1) => {
@@ -608,9 +618,11 @@ impl<T: NumericType> ComputationGraph<T> {
                                     }
                                     UnifiedMatrix::from_data(out, in_r, in_c)?
                                 }
-                                Some(_) => return Err(MatrixError::UnsupportedOperation(
-                                    "Only axis 0 and 1 supported for 2D matrices".to_string()
-                                )),
+                                Some(_) => {
+                                    return Err(MatrixError::UnsupportedOperation(
+                                        "Only axis 0 and 1 supported for 2D matrices".to_string(),
+                                    ))
+                                }
                             };
                             inp.accumulate_gradient(broadcasted)?;
                         }
@@ -623,15 +635,15 @@ impl<T: NumericType> ComputationGraph<T> {
                 if node.inputs.len() == 2 {
                     let ids = [node.inputs[0], node.inputs[1]];
                     let vals = self.get_input_values(&ids)?;
-            
+
                     // g0 -> grad wrt first input: g * b
                     // g1 -> grad wrt second input: g * a
                     let g0 = grad_output.elementwise_multiply(&vals[1])?;
                     let g1 = grad_output.elementwise_multiply(&vals[0])?;
-            
+
                     // Release the lock on the current node before mutating others
                     drop(node);
-            
+
                     // This handles both distinct and duplicate ids (e.g., x*x) correctly.
                     return self.accumulate_per_input(&ids, vec![g0, g1]);
                 }
@@ -643,13 +655,18 @@ impl<T: NumericType> ComputationGraph<T> {
                     if let Some(input_arc) = self.nodes.get(&node.inputs[0]) {
                         let mut input_node = input_arc.lock().unwrap();
                         if input_node.requires_grad {
-                            let a = input_node.value.as_ref().ok_or_else(|| 
-                                MatrixError::ComputationError("Missing forward value for Power input".to_string())
-                            )?;
+                            let a = input_node.value.as_ref().ok_or_else(|| {
+                                MatrixError::ComputationError(
+                                    "Missing forward value for Power input".to_string(),
+                                )
+                            })?;
                             match *exponent {
                                 0 => {
                                     // d(1)/da = 0
-                                    let z = UnifiedMatrix::zeros(grad_output.shape().rows, grad_output.shape().cols)?;
+                                    let z = UnifiedMatrix::zeros(
+                                        grad_output.shape().rows,
+                                        grad_output.shape().cols,
+                                    )?;
                                     input_node.accumulate_gradient(z)?;
                                 }
                                 1 => {
@@ -660,7 +677,7 @@ impl<T: NumericType> ComputationGraph<T> {
                                     // d(a^n)/da = n * a^(n-1) * grad_out
                                     let a_pow = self.elementwise_pow_u32(a, n - 1)?;
                                     let n_scalar = T::from_f64(n as f64).unwrap();
-                                    let da = a_pow.scale(n_scalar)?;               // n * a^(n-1)
+                                    let da = a_pow.scale(n_scalar)?; // n * a^(n-1)
                                     let g = grad_output.elementwise_multiply(&da)?; // chain rule
                                     input_node.accumulate_gradient(g)?;
                                 }
@@ -790,6 +807,68 @@ impl<T: NumericType> AutoDiffTensor<T> {
         Ok(Self::new(matrix, requires_grad))
     }
 
+    /// Create a leaf in an existing graph (same semantics as `new`, but bound to `graph`)
+    pub fn new_in_graph(
+        graph: &Arc<Mutex<ComputationGraph<T>>>,
+        data: UnifiedMatrix<T>,
+        requires_grad: bool,
+    ) -> Self {
+        let mut g = graph.lock().unwrap();
+        let id = g.create_leaf(data.clone(), requires_grad);
+        drop(g);
+        Self {
+            data,
+            node_id: id,
+            graph: Arc::clone(graph),
+            requires_grad,
+        }
+    }
+
+    /// Clone this tensor into `target` graph, preserving requires_grad (explicit on purpose).
+    pub fn clone_to_graph(&self, target: &Arc<Mutex<ComputationGraph<T>>>) -> MatrixResult<Self> {
+        let mut g = target.lock().unwrap();
+        let id = g.create_leaf(self.data.clone(), self.requires_grad);
+        drop(g);
+        Ok(Self {
+            data: self.data.clone(),
+            node_id: id,
+            graph: Arc::clone(target),
+            requires_grad: self.requires_grad,
+        })
+    }
+
+    /// Convenience: make a sibling leaf (same graph as `self`)
+    pub fn like_new(&self, data: UnifiedMatrix<T>, requires_grad: bool) -> Self {
+        Self::new_in_graph(&self.graph, data, requires_grad)
+    }
+
+    /// Create a tensor from raw data in an existing graph
+    pub fn from_data_in_graph(
+        graph: &Arc<Mutex<ComputationGraph<T>>>,
+        data: Vec<T>,
+        shape: (usize, usize),
+        requires_grad: bool,
+    ) -> MatrixResult<Self> {
+        let matrix = UnifiedMatrix::from_data(data, shape.0, shape.1)?;
+        Ok(Self::new_in_graph(graph, matrix, requires_grad))
+    }
+
+    /// Convenience: create a sibling tensor from raw data (same graph as `self`)
+    pub fn like_from_data(
+        &self,
+        data: Vec<T>,
+        shape: (usize, usize),
+        requires_grad: bool,
+    ) -> MatrixResult<Self> {
+        let matrix = UnifiedMatrix::from_data(data, shape.0, shape.1)?;
+        Ok(self.like_new(matrix, requires_grad))
+    }
+
+    /// (Optional) expose the graph so engines can bind to it
+    pub fn graph_arc(&self) -> Arc<Mutex<ComputationGraph<T>>> {
+        Arc::clone(&self.graph)
+    }
+
     fn ensure_same_graph(&self, other: &Self) -> MatrixResult<()> {
         if !Arc::ptr_eq(&self.graph, &other.graph) {
             return Err(MatrixError::ComputationError(
@@ -799,10 +878,7 @@ impl<T: NumericType> AutoDiffTensor<T> {
         Ok(())
     }
 
-    fn to_graph_const_only(
-        &self,
-        target: &Arc<Mutex<ComputationGraph<T>>>,
-    ) -> MatrixResult<Self> {
+    fn to_graph_const_only(&self, target: &Arc<Mutex<ComputationGraph<T>>>) -> MatrixResult<Self> {
         if self.requires_grad {
             return Err(MatrixError::ComputationError(
                 "Cross-graph op with a grad-requiring tensor is not supported. \
@@ -835,7 +911,7 @@ impl<T: NumericType> AutoDiffTensor<T> {
                 requires_grad: other.requires_grad,
             });
         }
-    
+
         // Different graphs: import constants; error if other needs grad
         if other.requires_grad {
             return Err(MatrixError::ComputationError(
@@ -850,7 +926,7 @@ impl<T: NumericType> AutoDiffTensor<T> {
         let other_in_self = self.ensure_same_graph_or_import_const(other)?;
         let result_data = self.data.add(&other_in_self.data)?;
         let result_shape = result_data.shape();
-    
+
         let mut graph = self.graph.lock().unwrap();
         let result_requires_grad = self.requires_grad || other_in_self.requires_grad;
         let result_node_id = graph.create_operation(
@@ -869,12 +945,12 @@ impl<T: NumericType> AutoDiffTensor<T> {
             requires_grad: result_requires_grad,
         })
     }
-    
+
     pub fn subtract(&self, other: &Self) -> MatrixResult<Self> {
         let other_in_self = self.ensure_same_graph_or_import_const(other)?;
         let result_data = self.data.subtract(&other_in_self.data)?;
         let result_shape = result_data.shape();
-    
+
         let mut graph = self.graph.lock().unwrap();
         let result_requires_grad = self.requires_grad || other_in_self.requires_grad;
         let result_node_id = graph.create_operation(
@@ -893,13 +969,15 @@ impl<T: NumericType> AutoDiffTensor<T> {
             requires_grad: result_requires_grad,
         })
     }
-    
+
     pub fn multiply(&self, other: &Self) -> MatrixResult<Self> {
         let other_in_self = self.ensure_same_graph_or_import_const(other)?;
 
         println!(
             "[mul:pre-op] self_id={}, other_in_self_id={}, same_graph={}",
-            self.node_id, other_in_self.node_id, Arc::ptr_eq(&self.graph, &other_in_self.graph)
+            self.node_id,
+            other_in_self.node_id,
+            Arc::ptr_eq(&self.graph, &other_in_self.graph)
         );
         // debug_assert_ne!(
         //     self.node_id, other_in_self.node_id,
@@ -932,12 +1010,12 @@ impl<T: NumericType> AutoDiffTensor<T> {
             requires_grad: result_requires_grad,
         })
     }
-    
+
     pub fn matmul(&self, other: &Self) -> MatrixResult<Self> {
         let other_in_self = self.ensure_same_graph_or_import_const(other)?;
         let result_data = self.data.matmul(&other_in_self.data)?;
         let result_shape = result_data.shape();
-    
+
         let mut graph = self.graph.lock().unwrap();
         let result_requires_grad = self.requires_grad || other_in_self.requires_grad;
         let result_node_id = graph.create_operation(
@@ -961,14 +1039,16 @@ impl<T: NumericType> AutoDiffTensor<T> {
     pub fn sum(&self, axis: Option<usize>) -> MatrixResult<Self> {
         let (rows, cols) = (self.data.shape().rows, self.data.shape().cols);
         let result_shape = match axis {
-            None    => Shape::new(1, 1),
+            None => Shape::new(1, 1),
             Some(0) => Shape::new(1, cols),
             Some(1) => Shape::new(rows, 1),
-            Some(_) => return Err(MatrixError::UnsupportedOperation(
-                "Only axis 0, 1, or None supported for sum".to_string()
-            )),
+            Some(_) => {
+                return Err(MatrixError::UnsupportedOperation(
+                    "Only axis 0, 1, or None supported for sum".to_string(),
+                ))
+            }
         };
-    
+
         // Use the graph op so forward/backward stay consistent with the node graph
         let mut graph = self.graph.lock().unwrap();
         let node_id = graph.create_operation(
@@ -977,14 +1057,14 @@ impl<T: NumericType> AutoDiffTensor<T> {
             result_shape,
             self.requires_grad,
         )?;
-    
+
         // Compute forward value here via the same reduction logic
         let result_data = graph.reduce_sum(&self.data, axis)?;
         if let Some(node_arc) = graph.get_node(node_id) {
             let mut node = node_arc.lock().unwrap();
             node.value = Some(result_data.clone());
         }
-    
+
         Ok(Self {
             data: result_data,
             node_id,
@@ -1125,8 +1205,12 @@ mod tests {
 
     #[test]
     fn test_node_creation() {
-        let node: ComputationNode<f64> =
-            ComputationNode::new(0, Operation::ReLU, crate::storage::advanced_matrix::unified_matrix::Shape::new(10, 10), true);
+        let node: ComputationNode<f64> = ComputationNode::new(
+            0,
+            Operation::ReLU,
+            crate::storage::advanced_matrix::unified_matrix::Shape::new(10, 10),
+            true,
+        );
 
         assert_eq!(node.id, 0);
         assert!(node.requires_grad);
@@ -1383,12 +1467,18 @@ mod tests {
         let numerical_grad_y = (f_plus_y - f_minus_y) / (2.0 * h);
 
         // Check that autodiff and numerical gradients are close
-        assert!((autodiff_grad_x - numerical_grad_x).abs() < 1e-3,
-                "Gradient mismatch for x: autodiff={}, numerical={}",
-                autodiff_grad_x, numerical_grad_x);
-        assert!((autodiff_grad_y - numerical_grad_y).abs() < 1e-3,
-                "Gradient mismatch for y: autodiff={}, numerical={}",
-                autodiff_grad_y, numerical_grad_y);
+        assert!(
+            (autodiff_grad_x - numerical_grad_x).abs() < 1e-3,
+            "Gradient mismatch for x: autodiff={}, numerical={}",
+            autodiff_grad_x,
+            numerical_grad_x
+        );
+        assert!(
+            (autodiff_grad_y - numerical_grad_y).abs() < 1e-3,
+            "Gradient mismatch for y: autodiff={}, numerical={}",
+            autodiff_grad_y,
+            numerical_grad_y
+        );
     }
 
     #[test]
@@ -1410,31 +1500,31 @@ mod tests {
 
     #[test]
     fn grad_scalar_times_scalar_const() {
-        let x   = AutoDiffTensor::from_data(vec![1.5], (1,1), true).unwrap();
-        let two = AutoDiffTensor::from_data(vec![2.0], (1,1), false).unwrap();
-        let u   = x.multiply(&two).unwrap(); // u = 2x
+        let x = AutoDiffTensor::from_data(vec![1.5], (1, 1), true).unwrap();
+        let two = AutoDiffTensor::from_data(vec![2.0], (1, 1), false).unwrap();
+        let u = x.multiply(&two).unwrap(); // u = 2x
         u.backward().unwrap();
-        let g = x.grad().unwrap().get(0,0).unwrap().to_f64();
+        let g = x.grad().unwrap().get(0, 0).unwrap().to_f64();
         assert!((g - 2.0).abs() < 1e-12);
     }
 
     #[test]
     fn grad_square_via_duplicate_input() {
-        let x  = AutoDiffTensor::from_data(vec![3.0], (1,1), true).unwrap();
-        let y  = x.multiply(&x).unwrap(); // y = x^2
+        let x = AutoDiffTensor::from_data(vec![3.0], (1, 1), true).unwrap();
+        let y = x.multiply(&x).unwrap(); // y = x^2
         y.backward().unwrap();
-        let g = x.grad().unwrap().get(0,0).unwrap().to_f64();
+        let g = x.grad().unwrap().get(0, 0).unwrap().to_f64();
         assert!((g - 6.0).abs() < 1e-12); // 2x at x=3
     }
 
     #[test]
     fn dbg_mul_scalar_grad() {
         use super::AutoDiffTensor;
-        let x   = AutoDiffTensor::from_data(vec![1.5], (1,1), true).unwrap();
-        let two = AutoDiffTensor::from_data(vec![2.0], (1,1), false).unwrap();
-        let u   = x.multiply(&two).unwrap();
+        let x = AutoDiffTensor::from_data(vec![1.5], (1, 1), true).unwrap();
+        let two = AutoDiffTensor::from_data(vec![2.0], (1, 1), false).unwrap();
+        let u = x.multiply(&two).unwrap();
         u.backward().unwrap();
-        let g = x.grad().unwrap().get(0,0).unwrap();
+        let g = x.grad().unwrap().get(0, 0).unwrap();
         eprintln!("[DBG Mul] du/dx = {}", g);
         assert!((g.to_f64() - 2.0).abs() < 1e-12);
     }

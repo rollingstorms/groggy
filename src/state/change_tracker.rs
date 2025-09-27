@@ -416,6 +416,10 @@ impl ChangeTracker {
                     AttrValue::EdgeArray(edges) => {
                         edges.len() * std::mem::size_of::<crate::types::EdgeId>()
                     }
+                    AttrValue::IntVec(v) => v.len() * std::mem::size_of::<i64>(),
+                    AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
+                    AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
+                    AttrValue::Json(s) => s.len(),
                 };
             }
             total += match new_val {
@@ -433,6 +437,10 @@ impl ChangeTracker {
                 AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
                 AttrValue::NodeArray(v) => v.len() * std::mem::size_of::<crate::types::NodeId>(),
                 AttrValue::EdgeArray(v) => v.len() * std::mem::size_of::<crate::types::EdgeId>(),
+                AttrValue::IntVec(v) => v.len() * std::mem::size_of::<i64>(),
+                AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
+                AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
+                AttrValue::Json(s) => s.len(),
             };
         }
 
@@ -459,6 +467,10 @@ impl ChangeTracker {
                     AttrValue::EdgeArray(edges) => {
                         edges.len() * std::mem::size_of::<crate::types::EdgeId>()
                     }
+                    AttrValue::IntVec(v) => v.len() * std::mem::size_of::<i64>(),
+                    AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
+                    AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
+                    AttrValue::Json(s) => s.len(),
                 };
             }
             total += match new_val {
@@ -476,6 +488,10 @@ impl ChangeTracker {
                 AttrValue::SubgraphRef(_) => std::mem::size_of::<crate::types::SubgraphId>(),
                 AttrValue::NodeArray(v) => v.len() * std::mem::size_of::<crate::types::NodeId>(),
                 AttrValue::EdgeArray(v) => v.len() * std::mem::size_of::<crate::types::EdgeId>(),
+                AttrValue::IntVec(v) => v.len() * std::mem::size_of::<i64>(),
+                AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
+                AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
+                AttrValue::Json(s) => s.len(),
             };
         }
 

@@ -14,6 +14,19 @@ use crate::viz::streaming::DataSource;
 use crate::viz::{InteractiveOptions, VizModule};
 use std::collections::HashMap;
 
+/// Statistics calculated for a single column in describe() method
+#[derive(Debug, Clone)]
+struct ColumnStatistics {
+    count: usize,
+    mean: f64,
+    std: f64,
+    min: AttrValue,
+    q25: AttrValue,
+    q50: AttrValue,
+    q75: AttrValue,
+    max: AttrValue,
+}
+
 /// Unified table implementation using BaseArray columns
 /// This provides the foundation for all table types in the system
 #[derive(Debug)]
@@ -507,6 +520,292 @@ impl BaseTable {
         }
 
         Ok(())
+    }
+
+    /// Comprehensive random sampling method
+    ///
+    /// # Parameters
+    /// - `n`: Number of rows to sample (mutually exclusive with `fraction`)
+    /// - `fraction`: Fraction of rows to sample (0.0 to 1.0, mutually exclusive with `n`)
+    /// - `weights`: Optional weights for each row (must match table length)
+    /// - `subset`: Optional subset of columns to consider for sampling
+    /// - `class_weights`: Optional mapping of column values to weights for stratified sampling
+    /// - `replace`: Whether to sample with replacement (default: false)
+    ///
+    /// # Examples
+    /// ```
+    /// // Sample 10 rows
+    /// let sample = table.sample(Some(10), None, None, None, None, false)?;
+    ///
+    /// // Sample 20% of rows
+    /// let sample = table.sample(None, Some(0.2), None, None, None, false)?;
+    ///
+    /// // Weighted sampling
+    /// let weights = vec![1.0, 2.0, 1.0, 3.0]; // Higher weight for certain rows
+    /// let sample = table.sample(Some(5), None, Some(weights), None, None, true)?;
+    ///
+    /// // Stratified sampling by 'category' column
+    /// let mut class_weights = HashMap::new();
+    /// class_weights.insert("category", vec![("A", 2.0), ("B", 1.0), ("C", 3.0)]);
+    /// let sample = table.sample(Some(10), None, None, None, Some(class_weights), false)?;
+    /// ```
+    pub fn sample(
+        &self,
+        n: Option<usize>,
+        fraction: Option<f64>,
+        weights: Option<Vec<f64>>,
+        subset: Option<Vec<String>>,
+        class_weights: Option<HashMap<String, Vec<(String, f64)>>>,
+        replace: bool,
+    ) -> GraphResult<Self> {
+        use std::collections::HashMap;
+
+        // Validate input parameters
+        if n.is_some() && fraction.is_some() {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Cannot specify both n and fraction".to_string(),
+            ));
+        }
+
+        if n.is_none() && fraction.is_none() {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Must specify either n or fraction".to_string(),
+            ));
+        }
+
+        if let Some(frac) = fraction {
+            if frac < 0.0 || frac > 1.0 {
+                return Err(crate::errors::GraphError::InvalidInput(
+                    "Fraction must be between 0.0 and 1.0".to_string(),
+                ));
+            }
+        }
+
+        let total_rows = self.nrows();
+        if total_rows == 0 {
+            return Ok(self.clone());
+        }
+
+        // Calculate actual number of rows to sample
+        let sample_size = if let Some(n_val) = n {
+            if !replace && n_val > total_rows {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Cannot sample {} rows without replacement from {} total rows",
+                    n_val, total_rows
+                )));
+            }
+            n_val
+        } else if let Some(frac) = fraction {
+            ((frac * total_rows as f64).round() as usize).min(total_rows)
+        } else {
+            unreachable!()
+        };
+
+        if sample_size == 0 {
+            return Ok(BaseTable::new());
+        }
+
+        // Prepare row weights
+        let row_weights = self.calculate_row_weights(weights, subset, class_weights)?;
+
+        // Sample row indices
+        let sampled_indices = if replace {
+            // Sample with replacement using weighted random selection
+            self.weighted_sample_with_replacement(sample_size, &row_weights)?
+        } else {
+            // Sample without replacement
+            self.weighted_sample_without_replacement(sample_size, &row_weights)?
+        };
+
+        // Create sampled table
+        self.select_rows(&sampled_indices)
+    }
+
+    /// Calculate row weights combining all weighting strategies
+    fn calculate_row_weights(
+        &self,
+        weights: Option<Vec<f64>>,
+        subset: Option<Vec<String>>,
+        class_weights: Option<HashMap<String, Vec<(String, f64)>>>,
+    ) -> GraphResult<Vec<f64>> {
+        let total_rows = self.nrows();
+        let mut final_weights = vec![1.0; total_rows];
+
+        // Apply manual weights if provided
+        if let Some(manual_weights) = weights {
+            if manual_weights.len() != total_rows {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Weights length {} does not match table rows {}",
+                    manual_weights.len(),
+                    total_rows
+                )));
+            }
+
+            for (i, weight) in manual_weights.iter().enumerate() {
+                if *weight < 0.0 {
+                    return Err(crate::errors::GraphError::InvalidInput(
+                        "Weights must be non-negative".to_string(),
+                    ));
+                }
+                final_weights[i] *= weight;
+            }
+        }
+
+        // Apply subset-based weights (rows with non-null values in subset columns get higher weight)
+        if let Some(subset_cols) = subset {
+            for row_idx in 0..total_rows {
+                let mut non_null_count = 0;
+                let mut total_cols = 0;
+
+                for col_name in &subset_cols {
+                    if let Some(column) = self.columns().get(col_name) {
+                        total_cols += 1;
+                        if let Some(value) = column.get(row_idx) {
+                            if !matches!(value, AttrValue::Null) {
+                                non_null_count += 1;
+                            }
+                        }
+                    }
+                }
+
+                if total_cols > 0 {
+                    let completeness_ratio = non_null_count as f64 / total_cols as f64;
+                    final_weights[row_idx] *= 1.0 + completeness_ratio; // Bonus for completeness
+                }
+            }
+        }
+
+        // Apply class-based weights (stratified sampling)
+        if let Some(class_weight_map) = class_weights {
+            for (col_name, value_weights) in class_weight_map {
+                if let Some(column) = self.columns().get(&col_name) {
+                    // Create lookup map for faster access
+                    let weight_lookup: HashMap<String, f64> = value_weights.into_iter().collect();
+
+                    for row_idx in 0..total_rows {
+                        if let Some(value) = column.get(row_idx) {
+                            let value_str = match value {
+                                AttrValue::Text(s) => s.clone(),
+                                AttrValue::Int(i) => i.to_string(),
+                                AttrValue::SmallInt(i) => i.to_string(),
+                                AttrValue::Float(f) => f.to_string(),
+                                AttrValue::Bool(b) => b.to_string(),
+                                _ => continue,
+                            };
+
+                            if let Some(&class_weight) = weight_lookup.get(&value_str) {
+                                final_weights[row_idx] *= class_weight;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Ensure all weights are valid
+        for weight in &final_weights {
+            if weight.is_nan() || weight.is_infinite() {
+                return Err(crate::errors::GraphError::InvalidInput(
+                    "Invalid weight calculated".to_string(),
+                ));
+            }
+        }
+
+        Ok(final_weights)
+    }
+
+    /// Weighted sampling with replacement using fastrand
+    fn weighted_sample_with_replacement(
+        &self,
+        sample_size: usize,
+        weights: &[f64],
+    ) -> GraphResult<Vec<usize>> {
+        // Calculate cumulative weights for weighted sampling
+        let total_weight: f64 = weights.iter().sum();
+        if total_weight <= 0.0 {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Total weight must be positive".to_string(),
+            ));
+        }
+
+        let mut cumulative_weights = Vec::with_capacity(weights.len());
+        let mut cumsum = 0.0;
+        for &weight in weights {
+            cumsum += weight;
+            cumulative_weights.push(cumsum);
+        }
+
+        let mut sampled_indices = Vec::with_capacity(sample_size);
+        for _ in 0..sample_size {
+            let random_value = fastrand::f64() * total_weight;
+
+            // Binary search for the selected index
+            let selected_idx = match cumulative_weights.binary_search_by(|&x| {
+                if x < random_value {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Greater
+                }
+            }) {
+                Ok(idx) => idx,
+                Err(idx) => idx,
+            };
+
+            sampled_indices.push(selected_idx.min(weights.len() - 1));
+        }
+
+        Ok(sampled_indices)
+    }
+
+    /// Weighted sampling without replacement using fastrand
+    fn weighted_sample_without_replacement(
+        &self,
+        sample_size: usize,
+        weights: &[f64],
+    ) -> GraphResult<Vec<usize>> {
+        let mut sampled_indices = Vec::new();
+        let mut available_indices: Vec<usize> = (0..weights.len()).collect();
+        let mut available_weights = weights.to_vec();
+
+        for _ in 0..sample_size {
+            if available_indices.is_empty() {
+                break;
+            }
+
+            // Calculate total weight for remaining items
+            let total_weight: f64 = available_weights.iter().sum();
+            if total_weight <= 0.0 {
+                // All remaining weights are zero, do uniform sampling
+                let selected_pos = fastrand::usize(..available_indices.len());
+                let selected_idx = available_indices[selected_pos];
+                sampled_indices.push(selected_idx);
+                available_indices.remove(selected_pos);
+                available_weights.remove(selected_pos);
+                continue;
+            }
+
+            // Weighted selection using cumulative distribution
+            let random_value = fastrand::f64() * total_weight;
+            let mut cumsum = 0.0;
+            let mut selected_pos = 0;
+
+            for (pos, &weight) in available_weights.iter().enumerate() {
+                cumsum += weight;
+                if cumsum >= random_value {
+                    selected_pos = pos;
+                    break;
+                }
+            }
+
+            let selected_idx = available_indices[selected_pos];
+            sampled_indices.push(selected_idx);
+
+            // Remove selected item from available pool
+            available_indices.remove(selected_pos);
+            available_weights.remove(selected_pos);
+        }
+
+        Ok(sampled_indices)
     }
 }
 
@@ -1239,6 +1538,22 @@ impl BaseTable {
 
         Ok(result)
     }
+
+    // ==================================================================================
+    // STRING OPERATIONS - PHASE 2.3b
+    // ==================================================================================
+
+    /// Get column by name (public interface)
+    /// Enables table["column_name"] syntax via Index trait
+    ///
+    /// # Examples
+    /// ```rust
+    /// let name_column = table.get_column("name")?;
+    /// let upper_names = name_column.str().upper();
+    /// ```
+    pub fn get_column(&self, name: &str) -> Option<&BaseArray<AttrValue>> {
+        self.columns.get(name)
+    }
 }
 
 // File I/O Implementation
@@ -1923,20 +2238,10 @@ impl BaseTable {
     pub fn select_rows(&self, row_indices: &[usize]) -> GraphResult<Self> {
         let mut new_columns = HashMap::new();
 
+        // Delegate to BaseArray take_indices operation for each column
         for (col_name, column) in &self.columns {
-            let mut new_values = Vec::new();
-            for &row_idx in row_indices {
-                if row_idx < self.nrows {
-                    if let Some(value) = column.get(row_idx) {
-                        new_values.push(value.clone());
-                    } else {
-                        new_values.push(crate::types::AttrValue::Null);
-                    }
-                } else {
-                    new_values.push(crate::types::AttrValue::Null);
-                }
-            }
-            new_columns.insert(col_name.clone(), BaseArray::from_attr_values(new_values));
+            let selected_column = column.take_indices(row_indices)?;
+            new_columns.insert(col_name.clone(), selected_column);
         }
 
         Ok(Self {
@@ -2432,6 +2737,726 @@ impl BaseTable {
         Ok(result)
     }
 
+    /// Generate descriptive statistics for all numeric columns
+    ///
+    /// Returns a summary table with statistics like count, mean, std, min, max, etc.
+    /// Similar to pandas.DataFrame.describe()
+    ///
+    /// Creates a table where:
+    /// - Columns are the original numeric column names
+    /// - Rows are statistics (count, mean, std, min, 25%, 50%, 75%, max)
+    pub fn describe(&self) -> GraphResult<BaseTable> {
+        use std::collections::HashMap;
+
+        // Find all numeric columns first
+        let numeric_columns: Vec<String> = self
+            .column_order
+            .iter()
+            .filter(|col_name| {
+                if let Some(column) = self.columns.get(*col_name) {
+                    column.data().iter().any(|v| {
+                        matches!(
+                            v,
+                            AttrValue::Int(_) | AttrValue::SmallInt(_) | AttrValue::Float(_)
+                        )
+                    })
+                } else {
+                    false
+                }
+            })
+            .cloned()
+            .collect();
+
+        // If no numeric columns, return empty table
+        if numeric_columns.is_empty() {
+            return Ok(BaseTable::new());
+        }
+
+        // Statistics to calculate
+        let stats = vec!["count", "mean", "std", "min", "25%", "50%", "75%", "max"];
+
+        // Initialize result columns - one column per original numeric column
+        let mut result_columns: HashMap<String, Vec<AttrValue>> = HashMap::new();
+        for col_name in &numeric_columns {
+            result_columns.insert(col_name.clone(), Vec::new());
+        }
+
+        // Calculate statistics for each numeric column
+        for stat in &stats {
+            for col_name in &numeric_columns {
+                if let Some(column) = self.columns.get(col_name) {
+                    let stats_result = self.calculate_column_statistics(column)?;
+
+                    let stat_value = match stat.as_ref() {
+                        "count" => AttrValue::Float(stats_result.count as f32),
+                        "mean" => AttrValue::Float(stats_result.mean as f32),
+                        "std" => AttrValue::Float(stats_result.std as f32),
+                        "min" => stats_result.min,
+                        "25%" => stats_result.q25,
+                        "50%" => stats_result.q50,
+                        "75%" => stats_result.q75,
+                        "max" => stats_result.max,
+                        _ => AttrValue::Null,
+                    };
+
+                    result_columns.get_mut(col_name).unwrap().push(stat_value);
+                }
+            }
+        }
+
+        // Convert to BaseArray columns
+        let mut base_columns = HashMap::new();
+        for (col_name, values) in result_columns {
+            if !values.is_empty() {
+                base_columns.insert(col_name, BaseArray::from_attr_values(values));
+            }
+        }
+
+        // Create result table
+        let mut result = BaseTable::from_columns(base_columns)?;
+        result.column_order = numeric_columns;
+
+        Ok(result)
+    }
+
+    /// Helper function to calculate statistics for a single column
+    fn calculate_column_statistics(
+        &self,
+        column: &BaseArray<AttrValue>,
+    ) -> GraphResult<ColumnStatistics> {
+        // Extract numeric values
+        let mut numeric_values: Vec<f64> = Vec::new();
+
+        for value in column.data() {
+            match value {
+                AttrValue::Int(i) => numeric_values.push(*i as f64),
+                AttrValue::SmallInt(i) => numeric_values.push(*i as f64),
+                AttrValue::Float(f) => numeric_values.push(*f as f64),
+                AttrValue::Null => {} // Skip nulls
+                _ => {}               // Skip non-numeric
+            }
+        }
+
+        if numeric_values.is_empty() {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "No numeric values found in column".to_string(),
+            ));
+        }
+
+        // Sort for percentiles
+        numeric_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Calculate basic statistics
+        let count = numeric_values.len();
+        let sum: f64 = numeric_values.iter().sum();
+        let mean = sum / count as f64;
+
+        // Calculate standard deviation
+        let variance = numeric_values
+            .iter()
+            .map(|x| (x - mean).powi(2))
+            .sum::<f64>()
+            / count as f64;
+        let std = variance.sqrt();
+
+        // Calculate percentiles
+        let min = numeric_values[0];
+        let max = numeric_values[count - 1];
+        let q25 = Self::percentile(&numeric_values, 0.25);
+        let q50 = Self::percentile(&numeric_values, 0.50); // median
+        let q75 = Self::percentile(&numeric_values, 0.75);
+
+        Ok(ColumnStatistics {
+            count,
+            mean,
+            std,
+            min: AttrValue::Float(min as f32),
+            q25: AttrValue::Float(q25 as f32),
+            q50: AttrValue::Float(q50 as f32),
+            q75: AttrValue::Float(q75 as f32),
+            max: AttrValue::Float(max as f32),
+        })
+    }
+
+    /// Calculate percentile from sorted numeric values
+    fn percentile(sorted_values: &[f64], p: f64) -> f64 {
+        let n = sorted_values.len();
+        if n == 0 {
+            return 0.0;
+        }
+        if n == 1 {
+            return sorted_values[0];
+        }
+
+        let index = p * (n - 1) as f64;
+        let lower = index.floor() as usize;
+        let upper = index.ceil() as usize;
+
+        if lower == upper {
+            sorted_values[lower]
+        } else {
+            let weight = index - lower as f64;
+            sorted_values[lower] * (1.0 - weight) + sorted_values[upper] * weight
+        }
+    }
+
+    // ==================================================================================
+    // MISSING VALUE HANDLING METHODS
+    // ==================================================================================
+
+    /// Remove rows with any null values
+    /// Returns a new table with rows containing null values removed
+    /// Similar to pandas DataFrame.dropna()
+    pub fn dropna(&self) -> GraphResult<BaseTable> {
+        // Create a mask for rows that have no null values
+        let mut row_mask = vec![true; self.nrows];
+
+        // Check each column for null values
+        for (_, column) in &self.columns {
+            for (row_idx, value) in column.data().iter().enumerate() {
+                if matches!(value, AttrValue::Null) && row_idx < row_mask.len() {
+                    row_mask[row_idx] = false;
+                }
+            }
+        }
+
+        // Filter all columns using the row mask
+        let mut filtered_columns = HashMap::new();
+        for (col_name, column) in &self.columns {
+            let filtered_data: Vec<AttrValue> = column
+                .data()
+                .iter()
+                .zip(row_mask.iter())
+                .filter_map(|(value, &keep)| if keep { Some(value.clone()) } else { None })
+                .collect();
+
+            filtered_columns.insert(col_name.clone(), BaseArray::from_attr_values(filtered_data));
+        }
+
+        let mut result = BaseTable::from_columns(filtered_columns)?;
+        result.column_order = self.column_order.clone();
+        Ok(result)
+    }
+
+    /// Remove rows with null values in specified columns
+    /// Similar to pandas DataFrame.dropna(subset=['col1', 'col2'])
+    pub fn dropna_subset(&self, subset: &[&str]) -> GraphResult<BaseTable> {
+        // Create a mask for rows that have no null values in specified columns
+        let mut row_mask = vec![true; self.nrows];
+
+        // Check only the specified columns for null values
+        for col_name in subset {
+            if let Some(column) = self.columns.get(*col_name) {
+                for (row_idx, value) in column.data().iter().enumerate() {
+                    if matches!(value, AttrValue::Null) && row_idx < row_mask.len() {
+                        row_mask[row_idx] = false;
+                    }
+                }
+            }
+        }
+
+        // Filter all columns using the row mask
+        let mut filtered_columns = HashMap::new();
+        for (col_name, column) in &self.columns {
+            let filtered_data: Vec<AttrValue> = column
+                .data()
+                .iter()
+                .zip(row_mask.iter())
+                .filter_map(|(value, &keep)| if keep { Some(value.clone()) } else { None })
+                .collect();
+
+            filtered_columns.insert(col_name.clone(), BaseArray::from_attr_values(filtered_data));
+        }
+
+        let mut result = BaseTable::from_columns(filtered_columns)?;
+        result.column_order = self.column_order.clone();
+        Ok(result)
+    }
+
+    /// Detect missing values in the entire table
+    /// Returns a new table of the same shape with boolean values indicating null positions
+    /// Similar to pandas DataFrame.isna()
+    pub fn isna(&self) -> GraphResult<BaseTable> {
+        let mut null_mask_columns = HashMap::new();
+
+        for (col_name, column) in &self.columns {
+            let null_mask: Vec<AttrValue> = column
+                .data()
+                .iter()
+                .map(|val| AttrValue::Bool(matches!(val, AttrValue::Null)))
+                .collect();
+
+            null_mask_columns.insert(col_name.clone(), BaseArray::from_attr_values(null_mask));
+        }
+
+        let mut result = BaseTable::from_columns(null_mask_columns)?;
+        result.column_order = self.column_order.clone();
+        Ok(result)
+    }
+
+    /// Detect non-missing values in the entire table
+    /// Returns a new table of the same shape with boolean values indicating non-null positions
+    /// Similar to pandas DataFrame.notna()
+    pub fn notna(&self) -> GraphResult<BaseTable> {
+        let mut not_null_mask_columns = HashMap::new();
+
+        for (col_name, column) in &self.columns {
+            let not_null_mask: Vec<AttrValue> = column
+                .data()
+                .iter()
+                .map(|val| AttrValue::Bool(!matches!(val, AttrValue::Null)))
+                .collect();
+
+            not_null_mask_columns
+                .insert(col_name.clone(), BaseArray::from_attr_values(not_null_mask));
+        }
+
+        let mut result = BaseTable::from_columns(not_null_mask_columns)?;
+        result.column_order = self.column_order.clone();
+        Ok(result)
+    }
+
+    /// Check if the table contains any null values
+    pub fn has_nulls(&self) -> bool {
+        for (_, column) in &self.columns {
+            if column.has_nulls() {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Count null values in each column
+    /// Returns a HashMap with column names and their null counts
+    pub fn null_counts(&self) -> HashMap<String, usize> {
+        let mut null_counts = HashMap::new();
+
+        for (col_name, column) in &self.columns {
+            null_counts.insert(col_name.clone(), column.null_count());
+        }
+
+        null_counts
+    }
+
+    /// Fill null values with specified values per column
+    /// Returns a new table with nulls replaced by the fill values
+    /// Similar to pandas DataFrame.fillna()
+    pub fn fillna(&self, fill_values: HashMap<String, AttrValue>) -> GraphResult<BaseTable> {
+        let mut filled_columns = HashMap::new();
+
+        for (col_name, column) in &self.columns {
+            let filled_column = if let Some(fill_value) = fill_values.get(col_name) {
+                column.fillna(fill_value.clone())
+            } else {
+                column.clone()
+            };
+
+            filled_columns.insert(col_name.clone(), filled_column);
+        }
+
+        let mut result = BaseTable::from_columns(filled_columns)?;
+        result.column_order = self.column_order.clone();
+        Ok(result)
+    }
+
+    /// Fill null values with a single value for all columns
+    pub fn fillna_all(&self, fill_value: AttrValue) -> GraphResult<BaseTable> {
+        let mut filled_columns = HashMap::new();
+
+        for (col_name, column) in &self.columns {
+            filled_columns.insert(col_name.clone(), column.fillna(fill_value.clone()));
+        }
+
+        let mut result = BaseTable::from_columns(filled_columns)?;
+        result.column_order = self.column_order.clone();
+        Ok(result)
+    }
+
+    // ==================================================================================
+    // GROUPBY OPERATIONS
+    // ==================================================================================
+
+    /// Group table by one or more columns, returning a TableArray
+    /// This enables powerful fluent operations like groupby().sum(), groupby().agg()
+    ///
+    /// # Arguments
+    /// * `by` - Column names to group by
+    ///
+    /// # Returns
+    /// A TableArray where each table represents one group, with group keys attached
+    ///
+    /// # Examples
+    /// ```rust
+    /// // Group by single column
+    /// let grouped = table.groupby(&["category"])?;
+    /// let sums = grouped.sum()?;  // Sum each group
+    ///
+    /// // Group by multiple columns
+    /// let grouped = table.groupby(&["category", "region"])?;
+    /// let aggregated = grouped.agg(hashmap!{
+    ///     "sales" => "sum",
+    ///     "price" => "mean"
+    /// })?;
+    /// ```
+    pub fn groupby(&self, by: &[&str]) -> GraphResult<super::TableArray> {
+        use super::TableArray;
+
+        // Validate that all groupby columns exist
+        for col_name in by {
+            if !self.columns.contains_key(*col_name) {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Column '{}' not found in table",
+                    col_name
+                )));
+            }
+        }
+
+        // Create group keys by iterating through rows
+        let mut groups: HashMap<Vec<AttrValue>, Vec<usize>> = HashMap::new();
+
+        for row_idx in 0..self.nrows {
+            let mut key = Vec::new();
+
+            // Build group key from specified columns
+            for col_name in by {
+                if let Some(column) = self.columns.get(*col_name) {
+                    if let Some(value) = column.get(row_idx) {
+                        key.push(value.clone());
+                    } else {
+                        key.push(AttrValue::Null);
+                    }
+                }
+            }
+
+            groups.entry(key).or_insert_with(Vec::new).push(row_idx);
+        }
+
+        // Create tables for each group
+        let mut group_tables = Vec::new();
+        let mut group_keys = Vec::new();
+
+        for (group_key, row_indices) in groups {
+            // Create a table for this group by selecting the relevant rows
+            let group_table = self.select_rows(&row_indices)?;
+
+            // Create group key mapping
+            let mut key_map = HashMap::new();
+            for (i, col_name) in by.iter().enumerate() {
+                key_map.insert(col_name.to_string(), group_key[i].clone());
+            }
+
+            group_tables.push(group_table);
+            group_keys.push(key_map);
+        }
+
+        Ok(TableArray::from_tables_with_keys(group_tables, group_keys))
+    }
+
+    /// Group by single column (convenience method)
+    pub fn groupby_single(&self, column: &str) -> GraphResult<super::TableArray> {
+        self.groupby(&[column])
+    }
+
+    // ==================================================================================
+    // PHASE 2.1: COLUMN MANAGEMENT OPERATIONS
+    // ==================================================================================
+
+    /// Rename columns using a mapping
+    pub fn rename(&self, columns: HashMap<String, String>) -> GraphResult<Self> {
+        let mut new_columns = HashMap::new();
+        let mut new_column_order = Vec::new();
+
+        // Process each column according to the mapping
+        for col_name in &self.column_order {
+            let new_name = columns
+                .get(col_name)
+                .cloned()
+                .unwrap_or_else(|| col_name.clone());
+
+            // Check for duplicate new names
+            if new_columns.contains_key(&new_name) {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Duplicate column name after rename: '{}'",
+                    new_name
+                )));
+            }
+
+            if let Some(column) = self.columns.get(col_name) {
+                new_columns.insert(new_name.clone(), column.clone());
+                new_column_order.push(new_name);
+            }
+        }
+
+        let mut result = self.clone();
+        result.columns = new_columns;
+        result.column_order = new_column_order;
+        result.version += 1;
+
+        Ok(result)
+    }
+
+    /// Add prefix to all column names
+    pub fn add_prefix(&self, prefix: &str) -> GraphResult<Self> {
+        let mut new_columns = HashMap::new();
+        let mut new_column_order = Vec::new();
+
+        for col_name in &self.column_order {
+            let new_name = format!("{}{}", prefix, col_name);
+
+            if let Some(column) = self.columns.get(col_name) {
+                new_columns.insert(new_name.clone(), column.clone());
+                new_column_order.push(new_name);
+            }
+        }
+
+        let mut result = self.clone();
+        result.columns = new_columns;
+        result.column_order = new_column_order;
+        result.version += 1;
+
+        Ok(result)
+    }
+
+    /// Add suffix to all column names
+    pub fn add_suffix(&self, suffix: &str) -> GraphResult<Self> {
+        let mut new_columns = HashMap::new();
+        let mut new_column_order = Vec::new();
+
+        for col_name in &self.column_order {
+            let new_name = format!("{}{}", col_name, suffix);
+
+            if let Some(column) = self.columns.get(col_name) {
+                new_columns.insert(new_name.clone(), column.clone());
+                new_column_order.push(new_name);
+            }
+        }
+
+        let mut result = self.clone();
+        result.columns = new_columns;
+        result.column_order = new_column_order;
+        result.version += 1;
+
+        Ok(result)
+    }
+
+    /// Reorder columns according to specified order
+    pub fn reorder_columns(&self, new_order: Vec<String>) -> GraphResult<Self> {
+        // Validate that all columns in new_order exist
+        for col_name in &new_order {
+            if !self.columns.contains_key(col_name) {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Column '{}' does not exist",
+                    col_name
+                )));
+            }
+        }
+
+        // Check for duplicates in new_order
+        let mut seen = std::collections::HashSet::new();
+        for col_name in &new_order {
+            if !seen.insert(col_name) {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Duplicate column name in reorder: '{}'",
+                    col_name
+                )));
+            }
+        }
+
+        // Check that all existing columns are included
+        if new_order.len() != self.column_order.len() {
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "New order must include all {} columns, got {}",
+                self.column_order.len(),
+                new_order.len()
+            )));
+        }
+
+        let mut result = self.clone();
+        result.column_order = new_order;
+        result.version += 1;
+
+        Ok(result)
+    }
+
+    // ==================================================================================
+    // PHASE 2.2: ROW OPERATIONS
+    // ==================================================================================
+
+    /// Append a single row to the table
+    pub fn append_row(&self, row: HashMap<String, AttrValue>) -> GraphResult<Self> {
+        // Validate that all columns in the table are present in the row
+        for col_name in &self.column_order {
+            if !row.contains_key(col_name) {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Missing value for column '{}'",
+                    col_name
+                )));
+            }
+        }
+
+        // Check for unexpected columns
+        for key in row.keys() {
+            if !self.columns.contains_key(key) {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Unknown column '{}'",
+                    key
+                )));
+            }
+        }
+
+        let mut new_columns = HashMap::new();
+        for col_name in &self.column_order {
+            // Delegate to BaseArray append_element operation
+            let new_array = self.columns[col_name].append_element(row[col_name].clone());
+            new_columns.insert(col_name.clone(), new_array);
+        }
+
+        let mut result = self.clone();
+        result.columns = new_columns;
+        result.nrows += 1;
+        result.version += 1;
+
+        Ok(result)
+    }
+
+    /// Extend table with multiple rows
+    pub fn extend_rows(&self, rows: Vec<HashMap<String, AttrValue>>) -> GraphResult<Self> {
+        if rows.is_empty() {
+            return Ok(self.clone());
+        }
+
+        // Validate all rows first
+        for (i, row) in rows.iter().enumerate() {
+            for col_name in &self.column_order {
+                if !row.contains_key(col_name) {
+                    return Err(crate::errors::GraphError::InvalidInput(format!(
+                        "Row {} missing value for column '{}'",
+                        i, col_name
+                    )));
+                }
+            }
+
+            for key in row.keys() {
+                if !self.columns.contains_key(key) {
+                    return Err(crate::errors::GraphError::InvalidInput(format!(
+                        "Row {} has unknown column '{}'",
+                        i, key
+                    )));
+                }
+            }
+        }
+
+        let mut new_columns = HashMap::new();
+        for col_name in &self.column_order {
+            // Collect all values for this column from the rows
+            let new_values: Vec<AttrValue> = rows.iter().map(|row| row[col_name].clone()).collect();
+
+            // Delegate to BaseArray extend_elements operation
+            let new_array = self.columns[col_name].extend_elements(new_values);
+            new_columns.insert(col_name.clone(), new_array);
+        }
+
+        let mut result = self.clone();
+        result.columns = new_columns;
+        result.nrows += rows.len();
+        result.version += 1;
+
+        Ok(result)
+    }
+
+    /// Drop rows by indices
+    pub fn drop_rows(&self, indices: &[usize]) -> GraphResult<Self> {
+        if indices.is_empty() {
+            return Ok(self.clone());
+        }
+
+        // Validate indices
+        for &idx in indices {
+            if idx >= self.nrows {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Index {} out of range for table with {} rows",
+                    idx, self.nrows
+                )));
+            }
+        }
+
+        let mut new_columns = HashMap::new();
+        for col_name in &self.column_order {
+            // Delegate to BaseArray drop_elements operation
+            let new_array = self.columns[col_name].drop_elements(indices)?;
+            new_columns.insert(col_name.clone(), new_array);
+        }
+
+        let new_nrows = self.nrows - indices.len();
+        let mut result = self.clone();
+        result.columns = new_columns;
+        result.nrows = new_nrows;
+        result.version += 1;
+
+        Ok(result)
+    }
+
+    /// Drop duplicate rows based on specified columns (or all columns if none specified)
+    pub fn drop_duplicates(&self, subset: Option<&[String]>) -> GraphResult<Self> {
+        let columns_to_check = match subset {
+            Some(cols) => {
+                // Validate that all specified columns exist
+                for col in cols {
+                    if !self.columns.contains_key(col) {
+                        return Err(crate::errors::GraphError::InvalidInput(format!(
+                            "Column '{}' does not exist",
+                            col
+                        )));
+                    }
+                }
+                cols.to_vec()
+            }
+            None => self.column_order.clone(),
+        };
+
+        let mut seen_rows = std::collections::HashSet::new();
+        let mut keep_indices = Vec::new();
+
+        for i in 0..self.nrows {
+            // Create a tuple of values for the columns we're checking
+            let mut row_key = Vec::new();
+            for col_name in &columns_to_check {
+                if let Some(val) = self.columns[col_name].get(i) {
+                    // Convert AttrValue to a hashable representation
+                    let key_part = match val {
+                        AttrValue::Int(x) => format!("i:{}", x),
+                        AttrValue::SmallInt(x) => format!("si:{}", x),
+                        AttrValue::Float(x) => format!("f:{}", x),
+                        AttrValue::Text(x) => format!("t:{}", x),
+                        AttrValue::CompactText(x) => format!("ct:{:?}", x),
+                        AttrValue::Bool(x) => format!("b:{}", x),
+                        AttrValue::Null => "null".to_string(),
+                        AttrValue::FloatVec(v) => format!("fv:{:?}", v),
+                        AttrValue::Bytes(b) => format!("by:{:?}", b),
+                        _ => format!("other:{:?}", val),
+                    };
+                    row_key.push(key_part);
+                }
+            }
+
+            let row_signature = row_key.join("|");
+            if seen_rows.insert(row_signature) {
+                keep_indices.push(i);
+            }
+        }
+
+        // If all rows are unique, return clone
+        if keep_indices.len() == self.nrows {
+            return Ok(self.clone());
+        }
+
+        // Delegate to select_rows which uses BaseArray take_indices
+        let mut result = self.select_rows(&keep_indices)?;
+        result.version += 1;
+
+        Ok(result)
+    }
+
     // ==================================================================================
     // PHASE 2: STREAMING FUNCTIONALITY (FOUNDATION ONLY - specialized types delegate)
     // ==================================================================================
@@ -2548,6 +3573,28 @@ impl BaseTable {
             AttrValue::SubgraphRef(id) => AttrValue::Text(format!("subgraph:{}", id)),
             AttrValue::NodeArray(nodes) => AttrValue::Text(format!("nodes[{}]", nodes.len())),
             AttrValue::EdgeArray(edges) => AttrValue::Text(format!("edges[{}]", edges.len())),
+            AttrValue::IntVec(v) => AttrValue::Text(format!(
+                "[{}]",
+                v.iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
+            AttrValue::TextVec(v) => AttrValue::Text(format!(
+                "[{}]",
+                v.iter()
+                    .map(|s| format!("\"{}\"", s))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
+            AttrValue::BoolVec(v) => AttrValue::Text(format!(
+                "[{}]",
+                v.iter()
+                    .map(|b| b.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
+            AttrValue::Json(s) => AttrValue::Text(s.clone()),
         }
     }
 
@@ -2587,6 +3634,23 @@ impl BaseTable {
             }
             AttrValue::EdgeArray(edges) => {
                 serde_json::Value::String(format!("edges[{}]", edges.len()))
+            }
+            AttrValue::IntVec(v) => serde_json::Value::Array(
+                v.iter()
+                    .map(|&i| serde_json::Value::Number(i.into()))
+                    .collect(),
+            ),
+            AttrValue::TextVec(v) => serde_json::Value::Array(
+                v.iter()
+                    .map(|s| serde_json::Value::String(s.clone()))
+                    .collect(),
+            ),
+            AttrValue::BoolVec(v) => {
+                serde_json::Value::Array(v.iter().map(|&b| serde_json::Value::Bool(b)).collect())
+            }
+            AttrValue::Json(s) => {
+                // Try to parse as JSON, fallback to string if invalid
+                serde_json::from_str(s).unwrap_or_else(|_| serde_json::Value::String(s.clone()))
             }
         }
     }
@@ -2938,6 +4002,16 @@ impl Default for BrowserConfig {
             theme: "sleek".to_string(),
             title: "Groggy Interactive Table".to_string(),
         }
+    }
+}
+
+/// Implement Index trait for BaseTable to enable table["column_name"] syntax
+impl std::ops::Index<&str> for BaseTable {
+    type Output = BaseArray<AttrValue>;
+
+    fn index(&self, column_name: &str) -> &Self::Output {
+        self.get_column(column_name)
+            .unwrap_or_else(|| panic!("Column '{}' not found in table", column_name))
     }
 }
 

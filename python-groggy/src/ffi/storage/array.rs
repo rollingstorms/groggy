@@ -189,6 +189,104 @@ impl PyBaseArray {
         Ok(dict.into())
     }
 
+    /// Calculate sum of numeric values in the array
+    fn sum(&self, py: Python) -> PyResult<PyObject> {
+        match self.inner.sum() {
+            Ok(result) => attr_value_to_python_value(py, &result),
+            Err(e) => Err(PyValueError::new_err(format!("Sum calculation failed: {}", e))),
+        }
+    }
+
+    /// Calculate mean of numeric values in the array
+    fn mean(&self) -> PyResult<f64> {
+        match self.inner.mean() {
+            Ok(result) => Ok(result),
+            Err(e) => Err(PyValueError::new_err(format!("Mean calculation failed: {}", e))),
+        }
+    }
+
+    /// Find minimum value in the array
+    fn min(&self, py: Python) -> PyResult<PyObject> {
+        match self.inner.min() {
+            Ok(result) => attr_value_to_python_value(py, &result),
+            Err(e) => Err(PyValueError::new_err(format!("Min calculation failed: {}", e))),
+        }
+    }
+
+    /// Find maximum value in the array
+    fn max(&self, py: Python) -> PyResult<PyObject> {
+        match self.inner.max() {
+            Ok(result) => attr_value_to_python_value(py, &result),
+            Err(e) => Err(PyValueError::new_err(format!("Max calculation failed: {}", e))),
+        }
+    }
+
+    /// Count non-null values in the array
+    fn count(&self) -> usize {
+        self.inner.count()
+    }
+
+    /// Count unique non-null values in the array
+    fn nunique(&self) -> usize {
+        self.inner.nunique()
+    }
+
+    /// Detect missing/null values in the array
+    /// Returns a boolean BaseArray where True indicates a null value
+    /// Similar to pandas Series.isna()
+    fn isna(&self) -> PyBaseArray {
+        let bool_array = self.inner.isna();
+        let attr_values: Vec<RustAttrValue> = bool_array.into_iter()
+            .map(|b| RustAttrValue::Bool(b))
+            .collect();
+        PyBaseArray {
+            inner: BaseArray::new(attr_values),
+        }
+    }
+
+    /// Detect non-missing/non-null values in the array
+    /// Returns a boolean BaseArray where True indicates a non-null value
+    /// Similar to pandas Series.notna()
+    fn notna(&self) -> PyBaseArray {
+        let bool_array = self.inner.notna();
+        let attr_values: Vec<RustAttrValue> = bool_array.into_iter()
+            .map(|b| RustAttrValue::Bool(b))
+            .collect();
+        PyBaseArray {
+            inner: BaseArray::new(attr_values),
+        }
+    }
+
+    /// Remove missing/null values from the array
+    /// Returns a new array with null values filtered out
+    /// Similar to pandas Series.dropna()
+    fn dropna(&self) -> PyBaseArray {
+        PyBaseArray {
+            inner: self.inner.dropna(),
+        }
+    }
+
+    /// Check if the array contains any null values
+    /// Similar to pandas Series.hasnans
+    fn has_nulls(&self) -> bool {
+        self.inner.has_nulls()
+    }
+
+    /// Count the number of null values in the array
+    fn null_count(&self) -> usize {
+        self.inner.null_count()
+    }
+
+    /// Fill null values with a specified value
+    /// Returns a new array with nulls replaced by the fill value
+    /// Similar to pandas Series.fillna()
+    fn fillna(&self, fill_value: PyObject, py: Python) -> PyResult<PyBaseArray> {
+        let rust_fill_value = python_value_to_attr_value(fill_value.as_ref(py))?;
+        Ok(PyBaseArray {
+            inner: self.inner.fillna(rust_fill_value),
+        })
+    }
+
     /// NEW: Enable fluent chaining with .iter() method
     fn iter(slf: PyRef<Self>) -> PyResult<PyBaseArrayIterator> {
         // Use our ArrayOps implementation to create the iterator
@@ -750,6 +848,125 @@ impl PyBaseArray {
         }
         
         Ok(info.to_object(py))
+    }
+
+    // ==================================================================================
+    // COLUMN MANAGEMENT OPERATIONS FOR TABLE CONVERSION
+    // ==================================================================================
+
+    /// Convert array to single-column table with specified column name
+    ///
+    /// # Arguments
+    /// * `column_name` - Name for the column when converting to table
+    ///
+    /// # Examples
+    /// ```python
+    /// table = array.to_table_with_name("scores")
+    /// ```
+    pub fn to_table_with_name(&self, column_name: &str) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let result = self.inner.to_table_with_name(column_name)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Table conversion failed: {}", e)))?;
+
+        Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
+    }
+
+    /// Convert array to single-column table with prefix added to default column name
+    ///
+    /// # Arguments
+    /// * `prefix` - Prefix to add to the default 'values' column name
+    ///
+    /// # Examples
+    /// ```python
+    /// table = array.to_table_with_prefix("old_")  # Creates column "old_values"
+    /// ```
+    pub fn to_table_with_prefix(&self, prefix: &str) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let result = self.inner.to_table_with_prefix(prefix)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Table conversion failed: {}", e)))?;
+
+        Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
+    }
+
+    /// Convert array to single-column table with suffix added to default column name
+    ///
+    /// # Arguments
+    /// * `suffix` - Suffix to add to the default 'values' column name
+    ///
+    /// # Examples
+    /// ```python
+    /// table = array.to_table_with_suffix("_v1")  # Creates column "values_v1"
+    /// ```
+    pub fn to_table_with_suffix(&self, suffix: &str) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let result = self.inner.to_table_with_suffix(suffix)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Table conversion failed: {}", e)))?;
+
+        Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
+    }
+
+    // ==================================================================================
+    // PHASE 2.2: ELEMENT OPERATIONS (Array equivalent of row operations)
+    // ==================================================================================
+
+    /// Append a single element to the array
+    ///
+    /// # Arguments
+    /// * `element` - Value to append to the array
+    ///
+    /// # Examples
+    /// ```python
+    /// new_array = array.append_element(42)
+    /// ```
+    pub fn append_element(&self, element: PyObject, py: Python) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(element.as_ref(py))?;
+        let result = self.inner.append_element(attr_value);
+
+        Ok(Self { inner: result })
+    }
+
+    /// Extend array with multiple elements
+    ///
+    /// # Arguments
+    /// * `elements` - List of values to append to the array
+    ///
+    /// # Examples
+    /// ```python
+    /// new_array = array.extend_elements([42, "hello", 3.14])
+    /// ```
+    pub fn extend_elements(&self, elements: Vec<PyObject>, py: Python) -> PyResult<Self> {
+        let mut attr_elements = Vec::new();
+        for element in elements {
+            let attr_value = crate::ffi::utils::python_value_to_attr_value(element.as_ref(py))?;
+            attr_elements.push(attr_value);
+        }
+
+        let result = self.inner.extend_elements(attr_elements);
+        Ok(Self { inner: result })
+    }
+
+    /// Drop elements by indices
+    ///
+    /// # Arguments
+    /// * `indices` - List of indices to drop from the array
+    ///
+    /// # Examples
+    /// ```python
+    /// new_array = array.drop_elements([0, 2, 4])  # Drop elements at indices 0, 2, and 4
+    /// ```
+    pub fn drop_elements(&self, indices: Vec<usize>) -> PyResult<Self> {
+        let result = self.inner.drop_elements(&indices)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Drop elements failed: {}", e)))?;
+
+        Ok(Self { inner: result })
+    }
+
+    /// Drop duplicate elements
+    ///
+    /// # Examples
+    /// ```python
+    /// new_array = array.drop_duplicates_elements()
+    /// ```
+    pub fn drop_duplicates_elements(&self) -> Self {
+        let result = self.inner.drop_duplicates_elements();
+        Self { inner: result }
     }
 }
 

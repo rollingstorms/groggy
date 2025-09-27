@@ -713,7 +713,7 @@ def test_table_creation(gr):
     """Test standalone table creation"""
     set_section("Standalone Table Creation")
     
-    # Test gr.table() creation
+    # Test gr.table() creation from dict of lists
     try:
         data = {
             'name': ['Alice', 'Bob', 'Charlie'],
@@ -722,10 +722,24 @@ def test_table_creation(gr):
         }
         table = gr.table(data)
         log_test(f"Create table from dict: {type(table)}", success=True)
-        return table
     except Exception as e:
         log_test("Create table from dict", success=False,
                 error_msg=str(e), code_snippet="gr.table(data)")
+        return None
+
+    # Test gr.table() creation from array of dictionaries
+    try:
+        array_data = [
+            {'name': 'Alice', 'age': 30, 'department': 'Engineering'},
+            {'name': 'Bob', 'age': 25, 'department': 'Design'},
+            {'name': 'Charlie', 'age': 35, 'department': 'Management'}
+        ]
+        table2 = gr.table(array_data)
+        log_test(f"Create table from array of dicts: {type(table2)}", success=True)
+        return table2
+    except Exception as e:
+        log_test("Create table from array of dicts", success=False,
+                error_msg=str(e), code_snippet="gr.table(array_data)")
         return None
 
 def test_array_creation(gr):

@@ -532,6 +532,91 @@ impl PyNodesAccessor {
         }
     }
 
+    /// Support column assignment: g.nodes['attr'] = array
+    /// Implements MVP column assignment with array length validation
+    fn __setitem__(&self, py: Python, key: &PyAny, value: &PyAny) -> PyResult<()> {
+        // Extract column name from key
+        let attr_name = if let Ok(name) = key.extract::<String>() {
+            name
+        } else {
+            return Err(PyTypeError::new_err(
+                "Column key must be a string. Use g.nodes['column_name'] = values"
+            ));
+        };
+
+        // Convert Python value to BaseArray<AttrValue>
+        let attr_array = self.convert_python_to_base_array(py, value)?;
+
+        // Get all node IDs (constrained or full)
+        let node_ids = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            let graph = self.graph.borrow();
+            graph.node_ids()
+        };
+
+        // Validate array length matches node count
+        if attr_array.len() != node_ids.len() {
+            return Err(PyValueError::new_err(format!(
+                "Array length ({}) must match number of nodes ({})",
+                attr_array.len(),
+                node_ids.len()
+            )));
+        }
+
+        // Optimize: Use existing set_attrs bulk method for better performance on larger datasets
+        if node_ids.len() > 10 {
+            // For larger datasets, use existing set_attrs bulk infrastructure (inherently atomic)
+            // Create a Python dict with the format: {attr_name: {node_id: value, ...}}
+            let py_dict = PyDict::new(py);
+            let node_values_dict = PyDict::new(py);
+
+            // Build the inner dict mapping node_id -> value
+            for (i, &node_id) in node_ids.iter().enumerate() {
+                if let Some(value) = attr_array.get(i) {
+                    let py_value = attr_value_to_python_value(py, value)?;
+                    node_values_dict.set_item(node_id, py_value)?;
+                }
+            }
+
+            py_dict.set_item(&attr_name, node_values_dict)?;
+            // The set_attrs_internal method provides atomic transaction semantics
+            self.set_attrs_internal(py, py_dict)?;
+        } else {
+            // For small datasets, implement atomic transaction semantics manually
+            // Phase 1: Pre-validate all operations will succeed (fail-fast)
+            let mut updates = Vec::new();
+            for (i, &node_id) in node_ids.iter().enumerate() {
+                if let Some(value) = attr_array.get(i) {
+                    // Pre-validate node exists
+                    {
+                        let graph = self.graph.borrow();
+                        if !graph.contains_node(node_id) {
+                            return Err(PyRuntimeError::new_err(format!(
+                                "Node {} not found during atomic validation",
+                                node_id
+                            )));
+                        }
+                    }
+                    updates.push((node_id, value.clone()));
+                }
+            }
+
+            // Phase 2: Apply all updates atomically (all-or-nothing)
+            let mut graph = self.graph.borrow_mut();
+            for (node_id, value) in updates {
+                graph.set_node_attr(node_id, attr_name.clone(), value)
+                    .map_err(|e| PyRuntimeError::new_err(format!(
+                        "Atomic transaction failed at node {}: {}",
+                        node_id, e
+                    )))?;
+            }
+            // If we reach here, all updates succeeded atomically
+        }
+
+        Ok(())
+    }
+
     /// String representation
     fn __str__(&self, _py: Python) -> PyResult<String> {
         let graph = self.graph.borrow();
@@ -990,7 +1075,7 @@ impl PyNodesAccessor {
             // TODO: Copy attributes from original nodes
         }
 
-        let graph_data_source = groggy::api::graph::GraphDataSource::new(&viz_graph);
+        let graph_data_source = groggy::viz::streaming::GraphDataSource::new(&viz_graph);
         let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
             graph_data_source,
             "NodesAccessor".to_string()
@@ -1284,6 +1369,42 @@ impl PyNodesAccessor {
         };
         Ok(edges_accessor)
     }
+
+    /// Convert Python value to BaseArray<AttrValue> for column assignment
+    fn convert_python_to_base_array(&self, py: Python, value: &PyAny) -> PyResult<BaseArray<AttrValue>> {
+        // Handle BaseArray directly
+        if let Ok(base_array) = value.extract::<PyRef<PyBaseArray>>() {
+            return Ok(base_array.inner.clone());
+        }
+
+        // Handle Python list
+        if let Ok(list) = value.extract::<Vec<PyObject>>() {
+            let mut attr_values = Vec::new();
+            for py_obj in list {
+                let attr_value = python_value_to_attr_value(py_obj.as_ref(py))
+                    .map_err(|e| PyValueError::new_err(format!("Failed to convert list element: {}", e)))?;
+                attr_values.push(attr_value);
+            }
+            return Ok(BaseArray::from_attr_values(attr_values));
+        }
+
+        // Handle scalar broadcasting (single value for all nodes)
+        let attr_value = python_value_to_attr_value(value)
+            .map_err(|e| PyValueError::new_err(format!("Failed to convert scalar value: {}", e)))?;
+
+        // Get node count for broadcasting
+        let node_count = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.len()
+        } else {
+            let graph = self.graph.borrow();
+            graph.node_ids().len()
+        };
+
+        // Create array with repeated value
+        let attr_values = vec![attr_value; node_count];
+        Ok(BaseArray::from_attr_values(attr_values))
+    }
+
 }
 
 /// Iterator for edges that yields EdgeViews
@@ -1633,6 +1754,91 @@ impl PyEdgesAccessor {
             let graph = self.graph.borrow();
             Ok(graph.edge_ids().len())
         }
+    }
+
+    /// Support column assignment: g.edges['attr'] = array
+    /// Implements MVP column assignment with array length validation
+    fn __setitem__(&self, py: Python, key: &PyAny, value: &PyAny) -> PyResult<()> {
+        // Extract column name from key
+        let attr_name = if let Ok(name) = key.extract::<String>() {
+            name
+        } else {
+            return Err(PyTypeError::new_err(
+                "Column key must be a string. Use g.edges['column_name'] = values"
+            ));
+        };
+
+        // Convert Python value to BaseArray<AttrValue>
+        let attr_array = self.convert_python_to_base_array(py, value)?;
+
+        // Get all edge IDs (constrained or full)
+        let edge_ids = if let Some(ref constrained) = self.constrained_edges {
+            constrained.clone()
+        } else {
+            let graph = self.graph.borrow();
+            graph.edge_ids()
+        };
+
+        // Validate array length matches edge count
+        if attr_array.len() != edge_ids.len() {
+            return Err(PyValueError::new_err(format!(
+                "Array length ({}) must match number of edges ({})",
+                attr_array.len(),
+                edge_ids.len()
+            )));
+        }
+
+        // Optimize: Use existing set_attrs bulk method for better performance on larger datasets
+        if edge_ids.len() > 10 {
+            // For larger datasets, use existing set_attrs bulk infrastructure (inherently atomic)
+            // Create a Python dict with the format: {attr_name: {edge_id: value, ...}}
+            let py_dict = PyDict::new(py);
+            let edge_values_dict = PyDict::new(py);
+
+            // Build the inner dict mapping edge_id -> value
+            for (i, &edge_id) in edge_ids.iter().enumerate() {
+                if let Some(value) = attr_array.get(i) {
+                    let py_value = attr_value_to_python_value(py, value)?;
+                    edge_values_dict.set_item(edge_id, py_value)?;
+                }
+            }
+
+            py_dict.set_item(&attr_name, edge_values_dict)?;
+            // The set_attrs_internal method provides atomic transaction semantics
+            self.set_attrs_internal(py, py_dict)?;
+        } else {
+            // For small datasets, implement atomic transaction semantics manually
+            // Phase 1: Pre-validate all operations will succeed (fail-fast)
+            let mut updates = Vec::new();
+            for (i, &edge_id) in edge_ids.iter().enumerate() {
+                if let Some(value) = attr_array.get(i) {
+                    // Pre-validate edge exists
+                    {
+                        let graph = self.graph.borrow();
+                        if !graph.contains_edge(edge_id) {
+                            return Err(PyRuntimeError::new_err(format!(
+                                "Edge {} not found during atomic validation",
+                                edge_id
+                            )));
+                        }
+                    }
+                    updates.push((edge_id, value.clone()));
+                }
+            }
+
+            // Phase 2: Apply all updates atomically (all-or-nothing)
+            let mut graph = self.graph.borrow_mut();
+            for (edge_id, value) in updates {
+                graph.set_edge_attr(edge_id, attr_name.clone(), value)
+                    .map_err(|e| PyRuntimeError::new_err(format!(
+                        "Atomic transaction failed at edge {}: {}",
+                        edge_id, e
+                    )))?;
+            }
+            // If we reach here, all updates succeeded atomically
+        }
+
+        Ok(())
     }
 
     /// String representation
@@ -2079,7 +2285,7 @@ impl PyEdgesAccessor {
             }
         }
 
-        let graph_data_source = groggy::api::graph::GraphDataSource::new(&viz_graph);
+        let graph_data_source = groggy::viz::streaming::GraphDataSource::new(&viz_graph);
         let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
             graph_data_source,
             "EdgesAccessor".to_string()
@@ -2424,4 +2630,40 @@ impl PyEdgesAccessor {
             "EdgesAccessor to SubgraphArray conversion not yet implemented."
         ))
     }
+
+    /// Convert Python value to BaseArray<AttrValue> for column assignment
+    fn convert_python_to_base_array(&self, py: Python, value: &PyAny) -> PyResult<BaseArray<AttrValue>> {
+        // Handle BaseArray directly
+        if let Ok(base_array) = value.extract::<PyRef<PyBaseArray>>() {
+            return Ok(base_array.inner.clone());
+        }
+
+        // Handle Python list
+        if let Ok(list) = value.extract::<Vec<PyObject>>() {
+            let mut attr_values = Vec::new();
+            for py_obj in list {
+                let attr_value = python_value_to_attr_value(py_obj.as_ref(py))
+                    .map_err(|e| PyValueError::new_err(format!("Failed to convert list element: {}", e)))?;
+                attr_values.push(attr_value);
+            }
+            return Ok(BaseArray::from_attr_values(attr_values));
+        }
+
+        // Handle scalar broadcasting (single value for all edges)
+        let attr_value = python_value_to_attr_value(value)
+            .map_err(|e| PyValueError::new_err(format!("Failed to convert scalar value: {}", e)))?;
+
+        // Get edge count for broadcasting
+        let edge_count = if let Some(ref constrained) = self.constrained_edges {
+            constrained.len()
+        } else {
+            let graph = self.graph.borrow();
+            graph.edge_ids().len()
+        };
+
+        // Create array with repeated value
+        let attr_values = vec![attr_value; edge_count];
+        Ok(BaseArray::from_attr_values(attr_values))
+    }
+
 }

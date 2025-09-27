@@ -8,6 +8,7 @@ use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::numeric_type::NumericType;
 use crate::storage::matrix::GraphMatrix;
+use crate::viz::embeddings::flat_embedding::{compute_flat_embedding, FlatEmbedConfig};
 use crate::viz::embeddings::{EmbeddingEngine, EmbeddingMethod, GraphEmbeddingExt};
 use crate::viz::projection::GraphProjectionExt;
 use crate::viz::realtime::accessor::{
@@ -21,7 +22,6 @@ use crate::viz::realtime::interaction::{
     ViewState3D, WheelEvent,
 };
 use crate::viz::streaming::data_source::Position;
-use crate::viz::layouts::flat_embedding::{compute_flat_embedding, FlatEmbedConfig};
 use serde_json::json;
 use std::collections::HashMap;
 use std::fmt;
@@ -827,27 +827,39 @@ impl RealTimeVizEngine {
 
                     // Create flat embedding configuration
                     let flat_config = FlatEmbedConfig {
-                        iterations: params.get("flat_embed.iterations")
+                        iterations: params
+                            .get("flat_embed.iterations")
                             .and_then(|s| s.parse().ok())
                             .unwrap_or(800),
-                        learning_rate: params.get("flat_embed.learning_rate")
+                        learning_rate: params
+                            .get("flat_embed.learning_rate")
                             .and_then(|s| s.parse().ok())
                             .unwrap_or(0.03),
-                        edge_cohesion_weight: params.get("flat_embed.edge_cohesion_weight")
+                        edge_cohesion_weight: params
+                            .get("flat_embed.edge_cohesion_weight")
                             .and_then(|s| s.parse().ok())
                             .unwrap_or(1.0),
-                        repulsion_weight: params.get("flat_embed.repulsion_weight")
+                        repulsion_weight: params
+                            .get("flat_embed.repulsion_weight")
                             .and_then(|s| s.parse().ok())
                             .unwrap_or(0.1),
-                        spread_weight: params.get("flat_embed.spread_weight")
+                        spread_weight: params
+                            .get("flat_embed.spread_weight")
                             .and_then(|s| s.parse().ok())
                             .unwrap_or(0.05),
                         ..FlatEmbedConfig::default()
                     };
 
-                    match compute_flat_embedding(embedding, &*self.graph.lock().unwrap(), &flat_config) {
+                    match compute_flat_embedding(
+                        embedding,
+                        &*self.graph.lock().unwrap(),
+                        &flat_config,
+                    ) {
                         Ok(flat_positions) => {
-                            println!("✅ Flat embedding computed successfully with {} positions", flat_positions.len());
+                            println!(
+                                "✅ Flat embedding computed successfully with {} positions",
+                                flat_positions.len()
+                            );
 
                             // Convert positions back to GraphMatrix for honeycomb projection
                             let flat_data: Vec<f64> = flat_positions
@@ -901,7 +913,9 @@ impl RealTimeVizEngine {
                             "🔶 DEBUG: Auto-scaled honeycomb cell size to {:.2} for {} target bins",
                             cell_size, target_bins
                         );
-                    } else if let Some(cell_size) = self.auto_scale_honeycomb_cell_size(embedding_to_use) {
+                    } else if let Some(cell_size) =
+                        self.auto_scale_honeycomb_cell_size(embedding_to_use)
+                    {
                         config.honeycomb_config.cell_size = cell_size;
                         self.update_layout_param_if_changed("honeycomb.cell_size", cell_size);
                     }

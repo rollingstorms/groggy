@@ -25,6 +25,14 @@ export class RealtimeViz {
         this.updateCount = 0;
         this.currentEmbeddingMethod = null;
         this.currentEmbeddingDimensions = 2;
+        this.opacity = 1.0;
+        this.filters = {
+            degreeMin: 0,
+            degreeMax: Number.POSITIVE_INFINITY,
+            attributeName: '',
+            attributeValue: ''
+        };
+        this.nodeDegrees = {};
 
         // Camera/viewport
         this.camera = {
@@ -151,7 +159,9 @@ export class RealtimeViz {
             playPauseBtn.addEventListener('click', () => {
                 this.isPaused = !this.isPaused;
                 playPauseBtn.textContent = this.isPaused ? '▶️ Play' : '⏸️ Pause';
-                this.sendControlMessage('paused', this.isPaused);
+                if (!this.isPaused) {
+                    this.draw();
+                }
             });
         }
 
@@ -162,17 +172,22 @@ export class RealtimeViz {
         const degreeMaxValue = document.getElementById('degree-max-value');
 
         if (degreeMin && degreeMax && degreeMinValue && degreeMaxValue) {
-            const sendDegreeUpdate = () => {
+            const applyDegreeFilter = () => {
+                const min = parseInt(degreeMin.value, 10);
+                const max = parseInt(degreeMax.value, 10);
+                this.filters.degreeMin = Number.isNaN(min) ? 0 : min;
+                this.filters.degreeMax = Number.isNaN(max)
+                    ? Number.POSITIVE_INFINITY
+                    : max;
                 degreeMinValue.textContent = degreeMin.value;
                 degreeMaxValue.textContent = degreeMax.value;
-                this.sendControlMessage('degree_filter', {
-                    min: parseInt(degreeMin.value, 10),
-                    max: parseInt(degreeMax.value, 10)
-                });
+                this.applyFilters();
             };
 
-            degreeMin.addEventListener('input', sendDegreeUpdate);
-            degreeMax.addEventListener('input', sendDegreeUpdate);
+            degreeMin.addEventListener('input', applyDegreeFilter);
+            degreeMax.addEventListener('input', applyDegreeFilter);
+            degreeMinValue.textContent = degreeMin.value;
+            degreeMaxValue.textContent = degreeMax.value;
         }
 
         // Search functionality
@@ -184,13 +199,15 @@ export class RealtimeViz {
             searchBtn.addEventListener('click', () => {
                 const query = searchInput.value.trim();
                 if (query) {
-                    this.sendControlMessage('search', query);
+                    this.handleSearch(query);
                 }
             });
 
             clearSearchBtn.addEventListener('click', () => {
                 searchInput.value = '';
-                this.sendControlMessage('clear_search', true);
+                this.selectedNode = null;
+                this.hideAttributePanel();
+                this.draw();
             });
 
             searchInput.addEventListener('keypress', (e) => {
@@ -207,12 +224,9 @@ export class RealtimeViz {
 
         if (applyFilterBtn && attributeName && attributeValue) {
             applyFilterBtn.addEventListener('click', () => {
-                if (attributeName.value && attributeValue.value) {
-                    this.sendControlMessage('attribute_filter', {
-                        name: attributeName.value,
-                        value: attributeValue.value
-                    });
-                }
+                this.filters.attributeName = attributeName.value || '';
+                this.filters.attributeValue = attributeValue.value.trim();
+                this.applyFilters();
             });
         }
 
@@ -222,9 +236,12 @@ export class RealtimeViz {
 
         if (opacitySlider && opacityValue) {
             opacitySlider.addEventListener('input', () => {
-                opacityValue.textContent = parseFloat(opacitySlider.value).toFixed(1);
-                this.sendControlMessage('opacity', parseFloat(opacitySlider.value));
+                const value = parseFloat(opacitySlider.value);
+                this.opacity = Number.isNaN(value) ? 1.0 : value;
+                opacityValue.textContent = this.opacity.toFixed(1);
+                this.draw();
             });
+            opacityValue.textContent = parseFloat(opacitySlider.value).toFixed(1);
         }
 
         console.log('✅ Controls initialized');
@@ -301,78 +318,12 @@ export class RealtimeViz {
                     console.log('✅ Control ack:', message);
                     break;
 
-                // Legacy format support
-                case 'graph_update':
-                    this.handleGraphUpdate(message.data);
-                    this.updateCount++;
-                    break;
-
-                case 'node_positions':
-                    this.handleNodePositions(message.data);
-                    break;
-
-                case 'attributes_update':
-                    this.handleAttributesUpdate(message.data);
-                    break;
-
-                case 'stats_update':
-                    this.handleStatsUpdate(message.data);
-                    break;
-
-                case 'message':
-                    this.addMessage(message.data);
-                    break;
-
                 default:
                     console.warn('Unknown message type:', message.type, message);
             }
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
         }
-    }
-
-    handleGraphUpdate(data) {
-        if (data.nodes) {
-            this.nodes = data.nodes;
-            this.stats.nodeCount = this.nodes.length;
-        }
-
-        if (data.edges) {
-            this.edges = data.edges;
-            this.stats.edgeCount = this.edges.length;
-        }
-
-        if (data.visible_nodes) {
-            this.visibleNodes = data.visible_nodes;
-            this.stats.visibleCount = this.visibleNodes.length;
-        }
-
-        // Update attribute dropdown if needed
-        if (data.attributes) {
-            this.updateAttributeDropdown(data.attributes);
-        }
-    }
-
-    handleNodePositions(positions) {
-        // Update node positions
-        for (const [nodeId, position] of Object.entries(positions)) {
-            const node = this.nodes.find(n => n.id === nodeId);
-            if (node) {
-                node.x = position.x;
-                node.y = position.y;
-            }
-        }
-    }
-
-    handleAttributesUpdate(attributes) {
-        // Update the attribute panel if a node is selected
-        if (this.selectedNode && attributes[this.selectedNode.id]) {
-            this.updateAttributePanel(this.selectedNode.id, attributes[this.selectedNode.id]);
-        }
-    }
-
-    handleStatsUpdate(stats) {
-        Object.assign(this.stats, stats);
     }
 
     handleSnapshot(snapshot) {
@@ -424,10 +375,6 @@ export class RealtimeViz {
             // Could use this for additional info display
         }
 
-        // All visible by default
-        this.visibleNodes = this.nodes.map(n => n.id);
-        this.stats.visibleCount = this.visibleNodes.length;
-
         // Update attribute dropdown
         if (this.nodes.length > 0) {
             const attributes = new Set();
@@ -436,6 +383,37 @@ export class RealtimeViz {
             });
             this.updateAttributeDropdown(Array.from(attributes));
         }
+
+        // Reset derived state for filters and recompute visibility
+        this.filters.degreeMin = 0;
+        this.filters.degreeMax = Number.POSITIVE_INFINITY;
+        this.filters.attributeName = '';
+        this.filters.attributeValue = '';
+
+        const degreeMinInput = document.getElementById('degree-min');
+        const degreeMaxInput = document.getElementById('degree-max');
+        if (degreeMinInput) {
+            const min = parseInt(degreeMinInput.value, 10);
+            if (!Number.isNaN(min)) {
+                this.filters.degreeMin = min;
+            }
+        }
+        if (degreeMaxInput) {
+            const max = parseInt(degreeMaxInput.value, 10);
+            if (!Number.isNaN(max)) {
+                this.filters.degreeMax = max;
+            }
+        }
+
+        const attributeNameInput = document.getElementById('attribute-name');
+        const attributeValueInput = document.getElementById('attribute-value');
+        if (attributeNameInput && attributeValueInput) {
+            this.filters.attributeName = attributeNameInput.value || '';
+            this.filters.attributeValue = attributeValueInput.value.trim();
+        }
+
+        this.computeNodeDegrees();
+        this.applyFilters();
 
         console.log('✅ Snapshot processed successfully');
     }
@@ -599,6 +577,9 @@ export class RealtimeViz {
             default:
                 console.log('❌ DEBUG: Unhandled engine update type:', update);
         }
+
+        this.computeNodeDegrees();
+        this.applyFilters();
     }
 
     generateRandomPositions() {
@@ -887,6 +868,7 @@ export class RealtimeViz {
         const nodeRadius = 8;
         return this.nodes.find(node => {
             if (node.x === undefined || node.y === undefined) return false;
+            if (this.visibleNodes.length && !this.visibleNodes.includes(node.id)) return false;
             const dx = node.x - x;
             const dy = node.y - y;
             return Math.sqrt(dx * dx + dy * dy) <= nodeRadius;
@@ -955,30 +937,119 @@ export class RealtimeViz {
         });
     }
 
-    addMessage(message) {
-        const messagesDiv = document.getElementById('messages');
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'message';
-        messageDiv.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+    computeNodeDegrees() {
+        const degrees = {};
+        this.nodes.forEach(node => {
+            degrees[node.id] = 0;
+        });
 
-        messagesDiv.appendChild(messageDiv);
+        this.edges.forEach(edge => {
+            if (degrees[edge.source] !== undefined) {
+                degrees[edge.source] += 1;
+            }
+            if (degrees[edge.target] !== undefined) {
+                degrees[edge.target] += 1;
+            }
+        });
 
-        // Keep only last 50 messages
-        while (messagesDiv.children.length > 50) {
-            messagesDiv.removeChild(messagesDiv.firstChild);
+        this.nodeDegrees = degrees;
+    }
+
+    applyFilters() {
+        if (!this.nodes.length) {
+            this.visibleNodes = [];
+            this.stats.visibleCount = 0;
+            this.updateStatsDisplay();
+            this.draw();
+            return;
         }
 
-        // Scroll to bottom
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        const visible = [];
+        const degrees = this.nodeDegrees || {};
+        const attributeName = this.filters.attributeName;
+        const attributeValue = this.filters.attributeValue.toLowerCase();
+
+        this.nodes.forEach(node => {
+            const degree = degrees[node.id] ?? 0;
+            if (degree < this.filters.degreeMin) {
+                return;
+            }
+            if (degree > this.filters.degreeMax) {
+                return;
+            }
+
+            if (attributeName && attributeValue) {
+                const rawValue = node.attributes?.[attributeName];
+                const valueString = rawValue === undefined || rawValue === null
+                    ? ''
+                    : String(rawValue).toLowerCase();
+
+                if (!valueString.includes(attributeValue)) {
+                    return;
+                }
+            }
+
+            visible.push(node.id);
+        });
+
+        this.visibleNodes = visible;
+
+        if (this.selectedNode && !this.visibleNodes.includes(this.selectedNode.id)) {
+            this.selectedNode = null;
+            this.hideAttributePanel();
+        }
+        this.stats.visibleCount = this.visibleNodes.length;
+        this.updateStatsDisplay();
+        this.draw();
+    }
+
+    handleSearch(query) {
+        const lowerQuery = query.toLowerCase();
+
+        const match = this.nodes.find(node => {
+            if (node.id.toString() === query) {
+                return true;
+            }
+            if (node.label && node.label.toLowerCase().includes(lowerQuery)) {
+                return true;
+            }
+            return Object.values(node.attributes || {}).some(value => {
+                if (value === undefined || value === null) {
+                    return false;
+                }
+                return String(value).toLowerCase().includes(lowerQuery);
+            });
+        });
+
+        if (match) {
+            this.selectedNode = match;
+            this.showAttributePanel(match);
+            this.centerOnNode(match);
+        } else {
+            this.selectedNode = null;
+            this.hideAttributePanel();
+            this.draw();
+        }
+    }
+
+    centerOnNode(node) {
+        if (node.x === undefined || node.y === undefined) {
+            return;
+        }
+        this.camera.x = node.x;
+        this.camera.y = node.y;
+        this.draw();
     }
 
     startAnimationLoop() {
         const animate = () => {
-            this.render();
-            this.frameCount++;
+            if (!this.isPaused) {
+                this.render();
+                this.frameCount++;
+            }
             this.animationId = requestAnimationFrame(animate);
         };
-        animate();
+        this.animationId = requestAnimationFrame(animate);
     }
 
     draw() {
@@ -1005,50 +1076,73 @@ export class RealtimeViz {
         }
         ctx.translate(-this.camera.x, -this.camera.y);
 
+        const visibleSet = this.visibleNodes.length
+            ? new Set(this.visibleNodes)
+            : null;
+        const nodeIndex = new Map(this.nodes.map(node => [node.id, node]));
+
         // Draw edges
         ctx.strokeStyle = '#cccccc';
         ctx.lineWidth = 1 / this.camera.zoom;
+        ctx.globalAlpha = this.opacity;
 
         this.edges.forEach(edge => {
-            const sourceNode = this.nodes.find(n => n.id === edge.source);
-            const targetNode = this.nodes.find(n => n.id === edge.target);
-
-            if (sourceNode && targetNode &&
-                sourceNode.x !== undefined && sourceNode.y !== undefined &&
-                targetNode.x !== undefined && targetNode.y !== undefined) {
-
-                ctx.beginPath();
-                ctx.moveTo(sourceNode.x, sourceNode.y);
-                ctx.lineTo(targetNode.x, targetNode.y);
-                ctx.stroke();
+            if (visibleSet && (!visibleSet.has(edge.source) || !visibleSet.has(edge.target))) {
+                return;
             }
+
+            const sourceNode = nodeIndex.get(edge.source);
+            const targetNode = nodeIndex.get(edge.target);
+
+            if (!sourceNode || !targetNode) {
+                return;
+            }
+            if (
+                sourceNode.x === undefined ||
+                sourceNode.y === undefined ||
+                targetNode.x === undefined ||
+                targetNode.y === undefined
+            ) {
+                return;
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(sourceNode.x, sourceNode.y);
+            ctx.lineTo(targetNode.x, targetNode.y);
+            ctx.stroke();
         });
 
         // Draw nodes
         this.nodes.forEach(node => {
-            if (node.x === undefined || node.y === undefined) return;
-
-            // Determine node color
-            let color = '#007bff';
-            if (this.selectedNode && this.selectedNode.id === node.id) {
-                color = '#ff6b6b';
-            } else if (!this.visibleNodes.includes(node.id)) {
-                color = '#cccccc';
+            if (node.x === undefined || node.y === undefined) {
+                return;
+            }
+            if (visibleSet && !visibleSet.has(node.id)) {
+                return;
             }
 
-            ctx.fillStyle = color;
+            ctx.fillStyle = '#007bff';
+            if (this.selectedNode && this.selectedNode.id === node.id) {
+                ctx.fillStyle = '#ff6b6b';
+            }
+
             ctx.beginPath();
             ctx.arc(node.x, node.y, 6 / this.camera.zoom, 0, 2 * Math.PI);
             ctx.fill();
 
             // Draw node label if zoomed in enough
             if (this.camera.zoom > 0.5 && node.label) {
+                ctx.save();
+                ctx.globalAlpha = 1.0;
                 ctx.fillStyle = '#333333';
                 ctx.font = `${12 / this.camera.zoom}px Arial`;
                 ctx.textAlign = 'center';
                 ctx.fillText(node.label, node.x, node.y - 10 / this.camera.zoom);
+                ctx.restore();
             }
         });
+
+        ctx.globalAlpha = 1.0;
 
         // Restore context
         ctx.restore();

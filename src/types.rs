@@ -132,6 +132,12 @@ pub enum AttrValue {
     /// Vector of floats (embeddings, coordinates, feature vectors)
     /// PERFORMANCE: Vec<f32> is more cache-friendly than Vec<AttrValue>
     FloatVec(Vec<f32>),
+    /// Vector of integers (IDs, counts, indices)
+    IntVec(Vec<i64>),
+    /// Vector of strings (tags, labels, categories)
+    TextVec(Vec<String>),
+    /// Vector of booleans (flags, masks, selections)
+    BoolVec(Vec<bool>),
     /// Boolean flag (active, enabled, etc.)
     Bool(bool),
     /// Memory-optimized compact string for short text values (Memory Optimization 1)
@@ -153,6 +159,8 @@ pub enum AttrValue {
     NodeArray(Vec<NodeId>),
     /// Array of edge IDs (for storing edge collections as attributes)
     EdgeArray(Vec<EdgeId>),
+    /// JSON-serialized complex data (lists, dicts, nested structures)
+    Json(String),
 }
 
 /// Custom PartialEq implementation that compares logical content across storage variants
@@ -167,7 +175,11 @@ impl PartialEq for AttrValue {
             (Bool(a), Bool(b)) => a == b,
             (SmallInt(a), SmallInt(b)) => a == b,
             (FloatVec(a), FloatVec(b)) => a == b,
+            (IntVec(a), IntVec(b)) => a == b,
+            (TextVec(a), TextVec(b)) => a == b,
+            (BoolVec(a), BoolVec(b)) => a == b,
             (Bytes(a), Bytes(b)) => a == b,
+            (Json(a), Json(b)) => a == b,
 
             // Cross-type integer comparisons
             (Int(a), SmallInt(b)) => *a == *b as i64,
@@ -310,47 +322,63 @@ impl Hash for AttrValue {
                     f.to_bits().hash(state); // Hash each float using to_bits()
                 }
             }
+            AttrValue::IntVec(v) => {
+                4u8.hash(state); // Discriminant for IntVec variant
+                v.hash(state);
+            }
+            AttrValue::TextVec(v) => {
+                5u8.hash(state); // Discriminant for TextVec variant
+                v.hash(state);
+            }
+            AttrValue::BoolVec(v) => {
+                6u8.hash(state); // Discriminant for BoolVec variant
+                v.hash(state);
+            }
             AttrValue::Bool(b) => {
-                4u8.hash(state); // Discriminant for Bool variant
+                7u8.hash(state); // Discriminant for Bool variant
                 b.hash(state);
             }
             AttrValue::CompactText(cs) => {
-                5u8.hash(state); // Discriminant for CompactText variant
+                8u8.hash(state); // Discriminant for CompactText variant
                 cs.as_str().hash(state);
             }
             AttrValue::SmallInt(i) => {
-                6u8.hash(state); // Discriminant for SmallInt variant
+                9u8.hash(state); // Discriminant for SmallInt variant
                 i.hash(state);
             }
             AttrValue::Bytes(bytes) => {
-                7u8.hash(state); // Discriminant for Bytes variant
+                10u8.hash(state); // Discriminant for Bytes variant
                 bytes.hash(state);
             }
             AttrValue::CompressedText(cd) => {
-                8u8.hash(state); // Discriminant for CompressedText variant
+                11u8.hash(state); // Discriminant for CompressedText variant
                 cd.data.hash(state);
                 cd.original_size.hash(state);
             }
             AttrValue::CompressedFloatVec(cd) => {
-                9u8.hash(state); // Discriminant for CompressedFloatVec variant
+                12u8.hash(state); // Discriminant for CompressedFloatVec variant
                 cd.data.hash(state);
                 cd.original_size.hash(state);
             }
             AttrValue::Null => {
-                10u8.hash(state); // Discriminant for Null variant
+                13u8.hash(state); // Discriminant for Null variant
                                   // No additional data to hash for Null
             }
             AttrValue::SubgraphRef(id) => {
-                11u8.hash(state); // Discriminant for SubgraphRef variant
+                14u8.hash(state); // Discriminant for SubgraphRef variant
                 id.hash(state);
             }
             AttrValue::NodeArray(nodes) => {
-                12u8.hash(state); // Discriminant for NodeArray variant
+                15u8.hash(state); // Discriminant for NodeArray variant
                 nodes.hash(state);
             }
             AttrValue::EdgeArray(edges) => {
-                13u8.hash(state); // Discriminant for EdgeArray variant
+                16u8.hash(state); // Discriminant for EdgeArray variant
                 edges.hash(state);
+            }
+            AttrValue::Json(json_str) => {
+                17u8.hash(state); // Discriminant for Json variant
+                json_str.hash(state);
             }
         }
     }
@@ -416,10 +444,14 @@ impl AttrValue {
             AttrValue::Bool(_) => 3,
             AttrValue::Text(_) | AttrValue::CompactText(_) | AttrValue::CompressedText(_) => 4,
             AttrValue::FloatVec(_) | AttrValue::CompressedFloatVec(_) => 5,
-            AttrValue::Bytes(_) => 6,
-            AttrValue::SubgraphRef(_) => 7,
-            AttrValue::NodeArray(_) => 8,
-            AttrValue::EdgeArray(_) => 9,
+            AttrValue::IntVec(_) => 6,
+            AttrValue::TextVec(_) => 7,
+            AttrValue::BoolVec(_) => 8,
+            AttrValue::Bytes(_) => 9,
+            AttrValue::SubgraphRef(_) => 10,
+            AttrValue::NodeArray(_) => 11,
+            AttrValue::EdgeArray(_) => 12,
+            AttrValue::Json(_) => 13,
         }
     }
 }
@@ -799,6 +831,9 @@ pub enum AttrValueType {
     Int,
     Text,
     FloatVec,
+    IntVec,
+    TextVec,
+    BoolVec,
     Bool,
     CompactText,
     SmallInt,
@@ -809,6 +844,7 @@ pub enum AttrValueType {
     SubgraphRef,
     NodeArray,
     EdgeArray,
+    Json,
 }
 
 impl AttrValueType {
@@ -837,6 +873,9 @@ impl std::fmt::Display for AttrValue {
             AttrValue::SmallInt(val) => write!(f, "{}", val),
             AttrValue::CompactText(val) => write!(f, "{}", val.as_str()),
             AttrValue::FloatVec(val) => write!(f, "{:?}", val),
+            AttrValue::IntVec(val) => write!(f, "{:?}", val),
+            AttrValue::TextVec(val) => write!(f, "{:?}", val),
+            AttrValue::BoolVec(val) => write!(f, "{:?}", val),
             AttrValue::Bytes(val) => write!(f, "{:?}", val),
             AttrValue::CompressedText(val) => match val.decompress_text() {
                 Ok(text) => write!(f, "{}", text),
@@ -850,6 +889,7 @@ impl std::fmt::Display for AttrValue {
             AttrValue::SubgraphRef(id) => write!(f, "SubgraphRef({})", id),
             AttrValue::NodeArray(nodes) => write!(f, "NodeArray({:?})", nodes),
             AttrValue::EdgeArray(edges) => write!(f, "EdgeArray({:?})", edges),
+            AttrValue::Json(json) => write!(f, "Json({})", json),
         }
     }
 }
@@ -862,6 +902,9 @@ impl AttrValue {
             AttrValue::Int(_) => "Int",
             AttrValue::Text(_) => "Text",
             AttrValue::FloatVec(_) => "FloatVec",
+            AttrValue::IntVec(_) => "IntVec",
+            AttrValue::TextVec(_) => "TextVec",
+            AttrValue::BoolVec(_) => "BoolVec",
             AttrValue::Bool(_) => "Bool",
             AttrValue::CompactText(_) => "CompactText",
             AttrValue::SmallInt(_) => "SmallInt",
@@ -872,6 +915,7 @@ impl AttrValue {
             AttrValue::SubgraphRef(_) => "SubgraphRef",
             AttrValue::NodeArray(_) => "NodeArray",
             AttrValue::EdgeArray(_) => "EdgeArray",
+            AttrValue::Json(_) => "Json",
         }
     }
 
@@ -882,6 +926,9 @@ impl AttrValue {
             AttrValue::Int(_) => AttrValueType::Int,
             AttrValue::Text(_) => AttrValueType::Text,
             AttrValue::FloatVec(_) => AttrValueType::FloatVec,
+            AttrValue::IntVec(_) => AttrValueType::IntVec,
+            AttrValue::TextVec(_) => AttrValueType::TextVec,
+            AttrValue::BoolVec(_) => AttrValueType::BoolVec,
             AttrValue::Bool(_) => AttrValueType::Bool,
             AttrValue::CompactText(_) => AttrValueType::CompactText,
             AttrValue::SmallInt(_) => AttrValueType::SmallInt,
@@ -892,6 +939,7 @@ impl AttrValue {
             AttrValue::SubgraphRef(_) => AttrValueType::SubgraphRef,
             AttrValue::NodeArray(_) => AttrValueType::NodeArray,
             AttrValue::EdgeArray(_) => AttrValueType::EdgeArray,
+            AttrValue::Json(_) => AttrValueType::Json,
         }
     }
 
@@ -903,6 +951,18 @@ impl AttrValue {
             AttrValue::Text(s) => std::mem::size_of::<String>() + s.capacity(),
             AttrValue::FloatVec(v) => {
                 std::mem::size_of::<Vec<f32>>() + v.capacity() * std::mem::size_of::<f32>()
+            }
+            AttrValue::IntVec(v) => {
+                std::mem::size_of::<Vec<i64>>() + v.capacity() * std::mem::size_of::<i64>()
+            }
+            AttrValue::TextVec(v) => {
+                std::mem::size_of::<Vec<String>>()
+                    + v.iter()
+                        .map(|s| std::mem::size_of::<String>() + s.capacity())
+                        .sum::<usize>()
+            }
+            AttrValue::BoolVec(v) => {
+                std::mem::size_of::<Vec<bool>>() + v.capacity() * std::mem::size_of::<bool>()
             }
             AttrValue::Bool(_) => std::mem::size_of::<bool>(),
             AttrValue::CompactText(cs) => cs.memory_size(),
@@ -920,6 +980,7 @@ impl AttrValue {
                 std::mem::size_of::<Vec<crate::types::EdgeId>>()
                     + edges.capacity() * std::mem::size_of::<crate::types::EdgeId>()
             }
+            AttrValue::Json(s) => std::mem::size_of::<String>() + s.capacity(),
         }
     }
 

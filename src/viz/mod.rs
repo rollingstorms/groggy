@@ -1498,9 +1498,9 @@ impl InteractiveViz {
             }
 
             InteractiveViz::RealTime(realtime_viz) => {
-                use crate::api::graph::GraphDataSource;
                 use crate::viz::realtime::accessor::DataSourceRealtimeAccessor;
                 use crate::viz::realtime::server::start_realtime_background;
+                use crate::viz::streaming::GraphDataSource;
                 use std::sync::Arc;
 
                 let port_hint = realtime_viz.config.streaming_config.server_port;

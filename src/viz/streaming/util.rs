@@ -18,6 +18,10 @@ pub fn attr_value_to_display_text(attr: &crate::types::AttrValue) -> String {
         AttrValue::NodeArray(nodes) => format!("[{} nodes]", nodes.len()),
         AttrValue::EdgeArray(edges) => format!("[{} edges]", edges.len()),
         AttrValue::Null => "null".to_string(),
+        AttrValue::Json(json_str) => json_str.clone(),
+        AttrValue::IntVec(v) => format!("[{} ints]", v.len()),
+        AttrValue::TextVec(v) => format!("[{} strings]", v.len()),
+        AttrValue::BoolVec(v) => format!("[{} bools]", v.len()),
     }
 }
 
@@ -57,5 +61,23 @@ fn attr_value_to_json(attr: &crate::types::AttrValue) -> serde_json::Value {
             serde_json::Value::String(format!("[{} edges]", edges.len()))
         }
         AttrValue::Null => serde_json::Value::Null,
+        AttrValue::Json(json_str) => {
+            // Try to parse as JSON, fallback to string if invalid
+            serde_json::from_str(json_str)
+                .unwrap_or_else(|_| serde_json::Value::String(json_str.clone()))
+        }
+        AttrValue::IntVec(v) => serde_json::Value::Array(
+            v.iter()
+                .map(|&i| serde_json::Value::Number(i.into()))
+                .collect(),
+        ),
+        AttrValue::TextVec(v) => serde_json::Value::Array(
+            v.iter()
+                .map(|s| serde_json::Value::String(s.clone()))
+                .collect(),
+        ),
+        AttrValue::BoolVec(v) => {
+            serde_json::Value::Array(v.iter().map(|&b| serde_json::Value::Bool(b)).collect())
+        }
     }
 }

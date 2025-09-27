@@ -5,7 +5,7 @@
 
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use groggy::api::graph::GraphDataSource;
+use groggy::viz::streaming::GraphDataSource;
 use groggy::errors::GraphResult;
 use std::net::TcpListener;
 use std::collections::HashMap;
@@ -308,6 +308,23 @@ r#"<div style="position: relative;">
         {
             let mut registry = SERVER_REGISTRY.lock().unwrap();
             registry.insert(port, ServerInfo { port, data_source_id });
+        }
+
+        // Apply requested layout to freshly started server
+        if let Err(e) = self.send_control_message_to_server(
+            py,
+            verbose,
+            port,
+            layout.to_string(),
+            layout_params.clone(),
+        ) {
+            debug_print!(
+                verbose,
+                1,
+                "⚠️ Failed to apply initial layout '{}': {}",
+                layout,
+                e
+            );
         }
 
         if open_browser {

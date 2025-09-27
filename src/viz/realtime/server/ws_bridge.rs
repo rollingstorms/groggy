@@ -9,7 +9,7 @@ use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, Mutex};
-use tokio_tungstenite::{accept_async, tungstenite::Message, WebSocketStream};
+use tokio_tungstenite::WebSocketStream;
 
 /// Client ID type
 pub type ClientId = usize;
@@ -174,21 +174,8 @@ impl WsBridge {
         let client_count = self.clients.lock().await.len();
         eprintln!("📡 DEBUG: Broadcasting update to {} clients", client_count);
 
-        // Send to broadcast channel
-        let _ = self.update_tx.send(update.clone());
-
-        // Send directly to clients (fallback)
-        let clients = self.clients.lock().await;
-        let message = WsMessage::Update {
-            version: 1,
-            payload: update,
-        };
-
-        for (client_id, sender) in clients.iter() {
-            if let Err(e) = sender.send(message.clone()) {
-                eprintln!("⚠️  DEBUG: Failed to send to client {}: {}", client_id, e);
-            }
-        }
+        // Send to broadcast channel; websocket tasks fan-out to clients
+        let _ = self.update_tx.send(update);
 
         Ok(())
     }
@@ -203,7 +190,6 @@ impl WsBridge {
 
         // Convert to WebSocket stream (skip handshake since we already did it)
         use futures_util::{SinkExt, StreamExt};
-        use tokio_tungstenite::WebSocketStream;
 
         let ws_stream = WebSocketStream::from_raw_socket(
             stream,
@@ -357,181 +343,6 @@ impl WsBridge {
         Ok(())
     }
 
-    /// Handle new WebSocket connection
-    pub async fn handle_connection(
-        &self,
-        stream: tokio::net::TcpStream,
-        addr: std::net::SocketAddr,
-    ) -> GraphResult<()> {
-        eprintln!("🔗 DEBUG: New WebSocket connection from {}", addr);
-
-        let ws_stream = accept_async(stream).await.map_err(|e| {
-            io_error_to_graph_error(
-                std::io::Error::new(std::io::ErrorKind::InvalidData, e),
-                "websocket_handshake",
-                "tcp_stream",
-            )
-        })?;
-
-        let (ws_sender, mut ws_receiver) = ws_stream.split();
-        let ws_sender: Arc<
-            Mutex<futures_util::stream::SplitSink<WebSocketStream<tokio::net::TcpStream>, Message>>,
-        > = Arc::new(Mutex::new(ws_sender));
-
-        // Generate client ID
-        let client_id = {
-            let mut next_id = self.next_client_id.lock().await;
-            let id = *next_id;
-            *next_id += 1;
-            id
-        };
-
-        eprintln!("👤 DEBUG: Assigned client ID: {}", client_id);
-
-        // Create message channel for this client
-        let (client_tx, mut client_rx) = mpsc::unbounded_channel();
-
-        // Add client to bridge
-        {
-            let mut clients = self.clients.lock().await;
-            clients.insert(client_id, client_tx);
-        }
-
-        // Send initial snapshot if available
-        if let Some(snapshot) = self.latest_snapshot.lock().await.clone() {
-            eprintln!("📊 DEBUG: Sending initial snapshot to client {}", client_id);
-            let snapshot_msg = WsMessage::Snapshot {
-                version: 1,
-                payload: snapshot,
-            };
-
-            if let Ok(json) = serde_json::to_string(&snapshot_msg) {
-                let ws_sender_clone = ws_sender.clone();
-                tokio::spawn(async move {
-                    let mut sender = ws_sender_clone.lock().await;
-                    use futures_util::SinkExt;
-                    let _ = sender.send(Message::Text(json)).await;
-                });
-            }
-        }
-
-        // Subscribe to broadcast updates
-        let mut update_rx = self.update_tx.subscribe();
-
-        // Handle messages from this client
-        let clients_clone = self.clients.clone();
-        let ws_sender_clone = ws_sender.clone();
-
-        // Spawn task to handle outgoing messages
-        tokio::spawn(async move {
-            use futures_util::SinkExt;
-
-            loop {
-                tokio::select! {
-                    // Messages from client channel
-                    msg = client_rx.recv() => {
-                        if let Some(message) = msg {
-                            if let Ok(json) = serde_json::to_string(&message) {
-                                let mut sender = ws_sender_clone.lock().await;
-                                if sender.send(Message::Text(json)).await.is_err() {
-                                    break;
-                                }
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-                    // Broadcast updates
-                    update = update_rx.recv() => {
-                        if let Ok(update) = update {
-                            let message = WsMessage::Update {
-                                version: 1,
-                                payload: update,
-                            };
-                            if let Ok(json) = serde_json::to_string(&message) {
-                                let mut sender = ws_sender_clone.lock().await;
-                                if sender.send(Message::Text(json)).await.is_err() {
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Remove client on disconnect
-            eprintln!("🔌 DEBUG: Client {} disconnected", client_id);
-            clients_clone.lock().await.remove(&client_id);
-        });
-
-        // Handle incoming messages from WebSocket
-        let clients_clone = self.clients.clone();
-        let control_tx_clone = self.control_tx.clone();
-        tokio::spawn(async move {
-            use futures_util::StreamExt;
-
-            while let Some(msg) = ws_receiver.next().await {
-                match msg {
-                    Ok(Message::Text(text)) => {
-                        eprintln!("📨 DEBUG: Received from client {}: {}", client_id, text);
-
-                        // Try to parse as control message
-                        match Self::parse_control_message(&text) {
-                            Ok(control_msg) => {
-                                eprintln!("🎮 DEBUG: Parsed control message: {:?}", control_msg);
-                                Self::handle_control_message_static(
-                                    client_id,
-                                    control_msg,
-                                    control_tx_clone.clone(),
-                                    clients_clone.clone(),
-                                )
-                                .await;
-                            }
-                            Err(e) => {
-                                eprintln!("❌ DEBUG: Failed to parse control message: {}", e);
-                                eprintln!("📝 DEBUG: Raw message: {}", text);
-                            }
-                        }
-                    }
-                    Ok(Message::Close(_)) => {
-                        eprintln!("🔌 DEBUG: Client {} sent close", client_id);
-                        break;
-                    }
-                    Err(e) => {
-                        eprintln!("❌ DEBUG: WebSocket error for client {}: {}", client_id, e);
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-
-            // Remove client on disconnect
-            clients_clone.lock().await.remove(&client_id);
-        });
-
-        Ok(())
-    }
-
-    /// Get number of connected clients
-    pub async fn client_count(&self) -> usize {
-        self.clients.lock().await.len()
-    }
-
-    /// Get update channel sender for engine integration
-    pub fn get_update_sender(&self) -> mpsc::UnboundedSender<EngineUpdate> {
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        let bridge_tx = self.update_tx.clone();
-
-        // Bridge mpsc to broadcast
-        tokio::spawn(async move {
-            while let Some(update) = rx.recv().await {
-                let _ = bridge_tx.send(update);
-            }
-        });
-
-        tx
-    }
-
     /// Handle control message from client (static version for tokio spawn)
     async fn handle_control_message_static(
         client_id: ClientId,
@@ -565,17 +376,6 @@ impl WsBridge {
         Self::send_control_ack_static(client_id, true, "Control message processed", clients).await;
     }
 
-    /// Handle control message from client (instance method)
-    async fn handle_control_message(&self, client_id: ClientId, control_msg: ControlMsg) {
-        Self::handle_control_message_static(
-            client_id,
-            control_msg,
-            self.control_tx.clone(),
-            self.clients.clone(),
-        )
-        .await;
-    }
-
     /// Send control acknowledgment to client (static version)
     async fn send_control_ack_static(
         client_id: ClientId,
@@ -598,10 +398,5 @@ impl WsBridge {
                 );
             }
         }
-    }
-
-    /// Send control acknowledgment to client (instance method)
-    async fn send_control_ack(&self, client_id: ClientId, success: bool, message: &str) {
-        Self::send_control_ack_static(client_id, success, message, self.clients.clone()).await;
     }
 }

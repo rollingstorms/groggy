@@ -21,8 +21,6 @@ pub trait LayoutEngine {
     }
 }
 
-pub mod flat_embedding;
-
 /// Advanced Force-directed layout with comprehensive physics simulation
 /// Based on Fruchterman-Reingold and Barnes-Hut optimizations
 #[derive(Clone)]

@@ -4,7 +4,7 @@ use super::{HoneycombConfig, HoneycombLayoutStrategy};
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
-use crate::viz::layouts::flat_embedding::{compute_flat_embedding, FlatEmbedConfig};
+use crate::viz::embeddings::flat_embedding::{compute_flat_embedding, FlatEmbedConfig};
 use crate::viz::streaming::data_source::Position;
 use std::collections::HashMap;
 
@@ -803,7 +803,7 @@ impl HoneycombGrid {
             let fallback_centers = self.generate_hex_centers_in_circle_with_params(
                 fallback_radius,
                 smaller_cell_size,
-                positions.len() * 2
+                positions.len() * 2,
             );
 
             if fallback_centers.len() > centers.len() {
@@ -819,7 +819,7 @@ impl HoneycombGrid {
         &self,
         radius: f64,
         hex_radius: f64,
-        min_count: usize
+        min_count: usize,
     ) -> Vec<Position> {
         let margin = 0.02;
         let w = (3_f64).sqrt() * hex_radius; // x spacing
@@ -847,7 +847,7 @@ impl HoneycombGrid {
             return self.generate_hex_centers_in_circle_with_params(
                 radius,
                 hex_radius * 0.8,
-                min_count
+                min_count,
             );
         }
 

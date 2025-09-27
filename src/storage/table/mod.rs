@@ -5,6 +5,7 @@ pub mod edges;
 pub mod graph_table;
 pub mod integration_tests;
 pub mod nodes;
+pub mod table_array;
 pub mod traits;
 
 // Re-export core types
@@ -15,4 +16,5 @@ pub use graph_table::{
     ValidationStrictness,
 };
 pub use nodes::NodesTable;
+pub use table_array::TableArray;
 pub use traits::{Table, TableIterator, TableOperation};

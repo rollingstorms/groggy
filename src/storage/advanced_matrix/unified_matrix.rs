@@ -514,7 +514,9 @@ impl<T: NumericType> UnifiedMatrix<T> {
                 let b_slice = b_data.as_slice();
                 let c_slice = c_data.as_slice_mut();
 
-                for ((a_val, b_val), c_val) in a_slice.iter().zip(b_slice.iter()).zip(c_slice.iter_mut()) {
+                for ((a_val, b_val), c_val) in
+                    a_slice.iter().zip(b_slice.iter()).zip(c_slice.iter_mut())
+                {
                     *c_val = a_val.sub(*b_val);
                 }
             }

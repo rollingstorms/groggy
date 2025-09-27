@@ -224,29 +224,37 @@ impl RealtimeServer {
 
                         // Engine-directed controls - apply ALL control messages to engine
                         if let Some(ref mut engine) = self.engine {
-                            match control_msg {
-                                ControlMsg::PositionDelta { node_id, delta } => {
-                                    eprintln!("📍 DEBUG: Forwarding PositionDelta to engine: node_id={}, delta={:?}", node_id, delta);
-                                    if let Err(e) = engine.apply(EngineUpdate::PositionDelta { node_id, delta }).await {
-                                        eprintln!("❌ DEBUG: Engine failed to apply PositionDelta: {}", e);
-                                    }
-                                }
-                                ControlMsg::ChangeEmbedding { method, k, params } => {
+                            match &control_msg {
+                                ControlMsg::ChangeEmbedding { method, k, .. } => {
                                     eprintln!("🧠 DEBUG: Forwarding ChangeEmbedding to engine: method={}, k={}", method, k);
-                                    if let Err(e) = engine.apply(EngineUpdate::EmbeddingChanged { method: method.clone(), dimensions: k }).await {
+                                    if let Err(e) = engine
+                                        .apply(EngineUpdate::EmbeddingChanged {
+                                            method: method.clone(),
+                                            dimensions: *k,
+                                        })
+                                        .await
+                                    {
                                         eprintln!("❌ DEBUG: Engine failed to apply EmbeddingChanged: {}", e);
                                     }
                                 }
                                 ControlMsg::ChangeLayout { algorithm, params } => {
                                     eprintln!("📐 DEBUG: Forwarding ChangeLayout to engine: algorithm={}", algorithm);
-                                    if let Err(e) = engine.apply(EngineUpdate::LayoutChanged { algorithm: algorithm.clone(), params: params.clone() }).await {
+                                    if let Err(e) = engine
+                                        .apply(EngineUpdate::LayoutChanged {
+                                            algorithm: algorithm.clone(),
+                                            params: params.clone(),
+                                        })
+                                        .await
+                                    {
                                         eprintln!("❌ DEBUG: Engine failed to apply LayoutChanged: {}", e);
                                     }
                                 }
                                 ControlMsg::SetInteractionController { mode } => {
                                     eprintln!("🎮 DEBUG: Switching interaction controller to {}", mode);
                                     if let Err(e) = engine
-                                        .handle_control_command(ControlCommand::SetInteractionController { mode: mode.clone() })
+                                        .handle_control_command(ControlCommand::SetInteractionController {
+                                            mode: mode.clone(),
+                                        })
                                         .await
                                     {
                                         eprintln!("❌ DEBUG: Engine failed to set controller: {}", e);
@@ -254,7 +262,9 @@ impl RealtimeServer {
                                 }
                                 ControlMsg::Pointer { event } => {
                                     if let Err(e) = engine
-                                        .handle_control_command(ControlCommand::Pointer { event: event.clone() })
+                                        .handle_control_command(ControlCommand::Pointer {
+                                            event: event.clone(),
+                                        })
                                         .await
                                     {
                                         eprintln!("❌ DEBUG: Engine failed to apply pointer event: {}", e);
@@ -262,7 +272,9 @@ impl RealtimeServer {
                                 }
                                 ControlMsg::Wheel { event } => {
                                     if let Err(e) = engine
-                                        .handle_control_command(ControlCommand::Wheel { event: event.clone() })
+                                        .handle_control_command(ControlCommand::Wheel {
+                                            event: event.clone(),
+                                        })
                                         .await
                                     {
                                         eprintln!("❌ DEBUG: Engine failed to apply wheel event: {}", e);
@@ -270,42 +282,13 @@ impl RealtimeServer {
                                 }
                                 ControlMsg::NodeDrag { event } => {
                                     if let Err(e) = engine
-                                        .handle_control_command(ControlCommand::NodeDrag { event: event.clone() })
+                                        .handle_control_command(ControlCommand::NodeDrag {
+                                            event: event.clone(),
+                                        })
                                         .await
                                     {
                                         eprintln!("❌ DEBUG: Engine failed to apply node drag event: {}", e);
                                     }
-                                }
-                                ControlMsg::RotateEmbedding { axis_i, axis_j, radians } => {
-                                    if let Err(e) = engine
-                                        .handle_control_command(ControlCommand::RotateEmbedding { axis_i, axis_j, radians })
-                                        .await
-                                    {
-                                        eprintln!("❌ DEBUG: Engine failed to rotate embedding: {}", e);
-                                    }
-                                }
-                                ControlMsg::SetViewRotation { radians } => {
-                                    if let Err(e) = engine
-                                        .handle_control_command(ControlCommand::SetViewRotation { radians })
-                                        .await
-                                    {
-                                        eprintln!("❌ DEBUG: Engine failed to set view rotation: {}", e);
-                                    }
-                                }
-                                ControlMsg::SelectNodes(node_ids) => {
-                                    eprintln!("🎯 DEBUG: Forwarding SelectNodes to engine: {:?}", node_ids);
-                                    if let Err(e) = engine.apply(EngineUpdate::SelectionChanged { selected: node_ids.clone(), deselected: vec![] }).await {
-                                        eprintln!("❌ DEBUG: Engine failed to apply SelectionChanged: {}", e);
-                                    }
-                                }
-                                ControlMsg::ClearSelection => {
-                                    eprintln!("🎯 DEBUG: Forwarding ClearSelection to engine");
-                                    if let Err(e) = engine.apply(EngineUpdate::SelectionChanged { selected: vec![], deselected: vec![] }).await {
-                                        eprintln!("❌ DEBUG: Engine failed to apply ClearSelection: {}", e);
-                                    }
-                                }
-                                _ => {
-                                    eprintln!("⚠️  DEBUG: Control message type not implemented for engine: {:?}", control_msg);
                                 }
                             }
                         }
@@ -688,39 +671,71 @@ impl RealtimeServer {
                         }
                         // Engine-directed controls - apply ALL control messages to engine
                         if let Some(ref mut engine) = self.engine {
-                            match control_msg {
-                                ControlMsg::PositionDelta { node_id, delta } => {
-                                    eprintln!("📍 DEBUG: Forwarding PositionDelta to engine: node_id={}, delta={:?}", node_id, delta);
-                                    if let Err(e) = engine.apply(EngineUpdate::PositionDelta { node_id, delta }).await {
-                                        eprintln!("❌ DEBUG: Engine failed to apply PositionDelta: {}", e);
-                                    }
-                                }
-                                ControlMsg::ChangeEmbedding { method, k, params } => {
+                            match &control_msg {
+                                ControlMsg::ChangeEmbedding { method, k, .. } => {
                                     eprintln!("🧠 DEBUG: Forwarding ChangeEmbedding to engine: method={}, k={}", method, k);
-                                    if let Err(e) = engine.apply(EngineUpdate::EmbeddingChanged { method: method.clone(), dimensions: k }).await {
+                                    if let Err(e) = engine
+                                        .apply(EngineUpdate::EmbeddingChanged {
+                                            method: method.clone(),
+                                            dimensions: *k,
+                                        })
+                                        .await
+                                    {
                                         eprintln!("❌ DEBUG: Engine failed to apply EmbeddingChanged: {}", e);
                                     }
                                 }
                                 ControlMsg::ChangeLayout { algorithm, params } => {
                                     eprintln!("📐 DEBUG: Forwarding ChangeLayout to engine: algorithm={}", algorithm);
-                                    if let Err(e) = engine.apply(EngineUpdate::LayoutChanged { algorithm: algorithm.clone(), params: params.clone() }).await {
+                                    if let Err(e) = engine
+                                        .apply(EngineUpdate::LayoutChanged {
+                                            algorithm: algorithm.clone(),
+                                            params: params.clone(),
+                                        })
+                                        .await
+                                    {
                                         eprintln!("❌ DEBUG: Engine failed to apply LayoutChanged: {}", e);
                                     }
                                 }
-                                ControlMsg::SelectNodes(node_ids) => {
-                                    eprintln!("🎯 DEBUG: Forwarding SelectNodes to engine: {:?}", node_ids);
-                                    if let Err(e) = engine.apply(EngineUpdate::SelectionChanged { selected: node_ids.clone(), deselected: vec![] }).await {
-                                        eprintln!("❌ DEBUG: Engine failed to apply SelectionChanged: {}", e);
+                                ControlMsg::SetInteractionController { mode } => {
+                                    eprintln!("🎮 DEBUG: Switching interaction controller to {}", mode);
+                                    if let Err(e) = engine
+                                        .handle_control_command(ControlCommand::SetInteractionController {
+                                            mode: mode.clone(),
+                                        })
+                                        .await
+                                    {
+                                        eprintln!("❌ DEBUG: Engine failed to set controller: {}", e);
                                     }
                                 }
-                                ControlMsg::ClearSelection => {
-                                    eprintln!("🎯 DEBUG: Forwarding ClearSelection to engine");
-                                    if let Err(e) = engine.apply(EngineUpdate::SelectionChanged { selected: vec![], deselected: vec![] }).await {
-                                        eprintln!("❌ DEBUG: Engine failed to apply ClearSelection: {}", e);
+                                ControlMsg::Pointer { event } => {
+                                    if let Err(e) = engine
+                                        .handle_control_command(ControlCommand::Pointer {
+                                            event: event.clone(),
+                                        })
+                                        .await
+                                    {
+                                        eprintln!("❌ DEBUG: Engine failed to apply pointer event: {}", e);
                                     }
                                 }
-                                _ => {
-                                    eprintln!("⚠️  DEBUG: Control message type not implemented for engine: {:?}", control_msg);
+                                ControlMsg::Wheel { event } => {
+                                    if let Err(e) = engine
+                                        .handle_control_command(ControlCommand::Wheel {
+                                            event: event.clone(),
+                                        })
+                                        .await
+                                    {
+                                        eprintln!("❌ DEBUG: Engine failed to apply wheel event: {}", e);
+                                    }
+                                }
+                                ControlMsg::NodeDrag { event } => {
+                                    if let Err(e) = engine
+                                        .handle_control_command(ControlCommand::NodeDrag {
+                                            event: event.clone(),
+                                        })
+                                        .await
+                                    {
+                                        eprintln!("❌ DEBUG: Engine failed to apply node drag event: {}", e);
+                                    }
                                 }
                             }
                         }
@@ -791,31 +806,6 @@ impl RealtimeServer {
             ControlMsg::ChangeLayout { algorithm, .. } => {
                 eprintln!("📐 DEBUG: Processing layout change: {}", algorithm);
             }
-            ControlMsg::ApplyFilter {
-                attribute,
-                operator,
-                value,
-            } => {
-                eprintln!(
-                    "🔍 DEBUG: Processing filter: {} {} {}",
-                    attribute, operator, value
-                );
-            }
-            ControlMsg::ClearFilters => {
-                eprintln!("🗑️  DEBUG: Processing clear filters");
-            }
-            ControlMsg::SelectNodes(node_ids) => {
-                eprintln!("🎯 DEBUG: Processing node selection: {:?}", node_ids);
-            }
-            ControlMsg::ClearSelection => {
-                eprintln!("🎯 DEBUG: Processing clear selection");
-            }
-            ControlMsg::PositionDelta { node_id, delta } => {
-                eprintln!(
-                    "📍 DEBUG: Received PositionDelta control: node_id={}, delta={:?}",
-                    node_id, delta
-                );
-            }
             ControlMsg::SetInteractionController { mode } => {
                 eprintln!("🎮 DEBUG: Requested controller mode {}", mode);
             }
@@ -827,19 +817,6 @@ impl RealtimeServer {
             }
             ControlMsg::NodeDrag { event } => {
                 eprintln!("🖱️  DEBUG: Node drag event {:?}", event);
-            }
-            ControlMsg::RotateEmbedding {
-                axis_i,
-                axis_j,
-                radians,
-            } => {
-                eprintln!(
-                    "🔁 DEBUG: RotateEmbedding control axis=({}, {}) radians={}",
-                    axis_i, axis_j, radians
-                );
-            }
-            ControlMsg::SetViewRotation { radians } => {
-                eprintln!("🔁 DEBUG: SetViewRotation control {}", radians);
             }
         }
 

@@ -88,11 +88,7 @@ pub fn compute_flat_embedding(
     let positions_tensor = AutoDiffTensor::from_data(initial_positions, (n_nodes, 2), true)?;
 
     // Run optimization loop
-    let optimized_positions = optimize_flat_positions(
-        positions_tensor,
-        &edges,
-        config,
-    )?;
+    let optimized_positions = optimize_flat_positions(positions_tensor, &edges, config)?;
 
     // Convert result to Position vector
     let result_data = optimized_positions.data.to_vec()?;
@@ -145,7 +141,6 @@ fn optimize_flat_positions(
     edges: &[(usize, usize)],
     config: &FlatEmbedConfig,
 ) -> GraphResult<AutoDiffTensor<f64>> {
-
     for iteration in 0..config.iterations {
         // Apply radial clipping to keep positions within unit circle
         positions = clip_to_circle(positions, config.radius_clip)?;
@@ -161,11 +156,13 @@ fn optimize_flat_positions(
         })?;
 
         // Get gradients
-        let grad = positions.grad().ok_or_else(|| GraphError::ConversionError {
-            from: "Tensor".to_string(),
-            to: "Gradient".to_string(),
-            details: "No gradient computed".to_string(),
-        })?;
+        let grad = positions
+            .grad()
+            .ok_or_else(|| GraphError::ConversionError {
+                from: "Tensor".to_string(),
+                to: "Gradient".to_string(),
+                details: "No gradient computed".to_string(),
+            })?;
 
         // Update positions (gradient descent step)
         let step_size_tensor = AutoDiffTensor::from_data(
@@ -180,8 +177,11 @@ fn optimize_flat_positions(
 
         // Print progress occasionally
         if iteration % 200 == 0 {
-            eprintln!("🔶 DEBUG: Flat embedding iteration {}: optimizing {} nodes",
-                     iteration, positions.data.rows());
+            eprintln!(
+                "🔶 DEBUG: Flat embedding iteration {}: optimizing {} nodes",
+                iteration,
+                positions.data.rows()
+            );
         }
     }
 
@@ -221,16 +221,13 @@ fn compute_flat_energy(
 
     // Apply mean over edges for stability
     if !edges.is_empty() {
-        let edge_count_tensor = AutoDiffTensor::from_data(
-            vec![edges.len() as f64], (1, 1), false
-        )?;
+        let edge_count_tensor = AutoDiffTensor::from_data(vec![edges.len() as f64], (1, 1), false)?;
         edge_energy = edge_energy.multiply(&edge_count_tensor)?; // Normalize by edge count
     }
 
     // Scale by edge cohesion weight
-    let cohesion_weight_tensor = AutoDiffTensor::from_data(
-        vec![config.edge_cohesion_weight], (1, 1), false
-    )?;
+    let cohesion_weight_tensor =
+        AutoDiffTensor::from_data(vec![config.edge_cohesion_weight], (1, 1), false)?;
     let cohesion_term = edge_energy.multiply(&cohesion_weight_tensor)?;
 
     // 2. Repulsion: pushes all nodes apart (simplified O(N^2) version)
@@ -242,7 +239,9 @@ fn compute_flat_energy(
 
     for i in 0..n_nodes {
         for j in (i + 1)..n_nodes {
-            if pair_count >= max_pairs { break; }
+            if pair_count >= max_pairs {
+                break;
+            }
 
             let pos_i = positions.data.slice(i, i + 1, 0, 2)?;
             let pos_j = positions.data.slice(j, j + 1, 0, 2)?;
@@ -266,13 +265,14 @@ fn compute_flat_energy(
             repulsion_energy = repulsion_energy.add(&inv_dist)?;
             pair_count += 1;
         }
-        if pair_count >= max_pairs { break; }
+        if pair_count >= max_pairs {
+            break;
+        }
     }
 
     // Scale by repulsion weight
-    let repulsion_weight_tensor = AutoDiffTensor::from_data(
-        vec![config.repulsion_weight], (1, 1), false
-    )?;
+    let repulsion_weight_tensor =
+        AutoDiffTensor::from_data(vec![config.repulsion_weight], (1, 1), false)?;
     let repulsion_term = repulsion_energy.multiply(&repulsion_weight_tensor)?;
 
     // 3. Spread: maximize variance to encourage full use of space
@@ -283,7 +283,8 @@ fn compute_flat_energy(
 
     // Compute variance (simplified - should be proper covariance determinant)
     let mut variance_energy = AutoDiffTensor::from_data(vec![0.0], (1, 1), false)?;
-    for i in 0..std::cmp::min(n_nodes, 50) { // Limit for computation
+    for i in 0..std::cmp::min(n_nodes, 50) {
+        // Limit for computation
         let pos_i = positions.data.slice(i, i + 1, 0, 2)?;
         let pos_i_tensor = AutoDiffTensor::new(pos_i, false);
 
@@ -296,7 +297,9 @@ fn compute_flat_energy(
 
     // Spread term: we want to maximize variance, so negate it in energy
     let spread_weight_tensor = AutoDiffTensor::from_data(
-        vec![-config.spread_weight], (1, 1), false // Negative to maximize
+        vec![-config.spread_weight],
+        (1, 1),
+        false, // Negative to maximize
     )?;
     let spread_term = variance_energy.multiply(&spread_weight_tensor)?;
 
@@ -307,10 +310,7 @@ fn compute_flat_energy(
 }
 
 /// Clip positions to unit circle (radial projection)
-fn clip_to_circle(
-    positions: AutoDiffTensor<f64>,
-    radius: f64,
-) -> GraphResult<AutoDiffTensor<f64>> {
+fn clip_to_circle(positions: AutoDiffTensor<f64>, radius: f64) -> GraphResult<AutoDiffTensor<f64>> {
     // For now, return positions unchanged
     // In full implementation, this would compute norms and clip
     // This requires more sophisticated tensor operations
@@ -443,8 +443,8 @@ mod tests {
     fn test_compute_flat_embedding_simple_graph() {
         // Create a simple 2-node graph with 2D embedding
         let embedding_data = vec![
-            1.0, 0.0,  // Node 0: (1, 0)
-            0.0, 1.0,  // Node 1: (0, 1)
+            1.0, 0.0, // Node 0: (1, 0)
+            0.0, 1.0, // Node 1: (0, 1)
         ];
         let embedding = GraphMatrix::from_row_major_data(embedding_data, 2, 2).unwrap();
 
@@ -478,9 +478,9 @@ mod tests {
     fn test_energy_function_shapes() {
         // Test that energy function can handle different matrix shapes
         let positions_data = vec![
-            0.0, 0.0,   // Node 0: (0, 0)
-            1.0, 0.0,   // Node 1: (1, 0)
-            0.5, 0.5,   // Node 2: (0.5, 0.5)
+            0.0, 0.0, // Node 0: (0, 0)
+            1.0, 0.0, // Node 1: (1, 0)
+            0.5, 0.5, // Node 2: (0.5, 0.5)
         ];
         let positions_tensor = AutoDiffTensor::from_data(positions_data, (3, 2), true).unwrap();
 
@@ -504,12 +504,13 @@ mod tests {
         let mut positions = AutoDiffTensor::from_data(
             vec![0.1, 0.1, -0.1, 0.1, 0.0, -0.1], // 3 nodes
             (3, 2),
-            true
-        ).unwrap();
+            true,
+        )
+        .unwrap();
 
         let edges = vec![(0, 1), (1, 2)]; // Simple chain
         let config = FlatEmbedConfig {
-            iterations: 5, // Very few iterations to test stability
+            iterations: 5,       // Very few iterations to test stability
             learning_rate: 0.01, // Small learning rate
             ..FlatEmbedConfig::default()
         };
@@ -533,8 +534,9 @@ mod tests {
         let large_positions = AutoDiffTensor::from_data(
             vec![10.0, 10.0, -5.0, 8.0], // Large positions outside unit circle
             (2, 2),
-            true
-        ).unwrap();
+            true,
+        )
+        .unwrap();
 
         let result = clip_to_circle(large_positions, 1.0);
         assert!(result.is_ok());
@@ -613,8 +615,18 @@ mod tests {
         for (i, pos) in positions.iter().enumerate() {
             assert!(pos.x.is_finite(), "Node {} x-position is not finite", i);
             assert!(pos.y.is_finite(), "Node {} y-position is not finite", i);
-            assert!(pos.x.abs() < 100.0, "Node {} x-position too large: {}", i, pos.x);
-            assert!(pos.y.abs() < 100.0, "Node {} y-position too large: {}", i, pos.y);
+            assert!(
+                pos.x.abs() < 100.0,
+                "Node {} x-position too large: {}",
+                i,
+                pos.x
+            );
+            assert!(
+                pos.y.abs() < 100.0,
+                "Node {} y-position too large: {}",
+                i,
+                pos.y
+            );
         }
     }
 }

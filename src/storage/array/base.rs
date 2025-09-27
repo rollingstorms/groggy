@@ -350,6 +350,224 @@ impl BaseArray {
         counts
     }
 
+    /// Calculate sum of numeric values in the array
+    pub fn sum(&self) -> crate::errors::GraphResult<AttrValue> {
+        let mut sum_int: i64 = 0;
+        let mut sum_float: f64 = 0.0;
+        let mut has_float = false;
+        let mut count = 0;
+
+        for val in &self.data {
+            match val {
+                AttrValue::Int(i) => {
+                    if has_float {
+                        sum_float += *i as f64;
+                    } else {
+                        sum_int += i;
+                    }
+                    count += 1;
+                }
+                AttrValue::SmallInt(i) => {
+                    if has_float {
+                        sum_float += *i as f64;
+                    } else {
+                        sum_int += *i as i64;
+                    }
+                    count += 1;
+                }
+                AttrValue::Float(f) => {
+                    if !has_float {
+                        // Convert previous int sum to float
+                        sum_float = sum_int as f64 + *f as f64;
+                        has_float = true;
+                    } else {
+                        sum_float += *f as f64;
+                    }
+                    count += 1;
+                }
+                AttrValue::Null => {} // Skip null values
+                _ => {
+                    return Err(crate::errors::GraphError::InvalidInput(format!(
+                        "Cannot compute sum of non-numeric data type: {:?}",
+                        val
+                    )));
+                }
+            }
+        }
+
+        if count == 0 {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Cannot compute sum of empty array".to_string(),
+            ));
+        }
+
+        if has_float {
+            Ok(AttrValue::Float(sum_float as f32))
+        } else {
+            Ok(AttrValue::Int(sum_int))
+        }
+    }
+
+    /// Calculate mean of numeric values in the array
+    pub fn mean(&self) -> crate::errors::GraphResult<f64> {
+        let mut sum: f64 = 0.0;
+        let mut count = 0;
+
+        for val in &self.data {
+            match val {
+                AttrValue::Int(i) => {
+                    sum += *i as f64;
+                    count += 1;
+                }
+                AttrValue::SmallInt(i) => {
+                    sum += *i as f64;
+                    count += 1;
+                }
+                AttrValue::Float(f) => {
+                    sum += *f as f64;
+                    count += 1;
+                }
+                AttrValue::Null => {} // Skip null values
+                _ => {
+                    return Err(crate::errors::GraphError::InvalidInput(format!(
+                        "Cannot compute mean of non-numeric data type: {:?}",
+                        val
+                    )));
+                }
+            }
+        }
+
+        if count == 0 {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Cannot compute mean of empty array".to_string(),
+            ));
+        }
+
+        Ok(sum / count as f64)
+    }
+
+    /// Find minimum value in the array
+    pub fn min(&self) -> crate::errors::GraphResult<AttrValue> {
+        let mut min_val: Option<AttrValue> = None;
+
+        for val in &self.data {
+            match val {
+                AttrValue::Null => continue, // Skip null values
+                _ => match &min_val {
+                    None => min_val = Some(val.clone()),
+                    Some(current_min) => {
+                        if Self::compare_values(val, current_min)? < 0 {
+                            min_val = Some(val.clone());
+                        }
+                    }
+                },
+            }
+        }
+
+        min_val.ok_or_else(|| {
+            crate::errors::GraphError::InvalidInput(
+                "Cannot find minimum of empty array".to_string(),
+            )
+        })
+    }
+
+    /// Find maximum value in the array
+    pub fn max(&self) -> crate::errors::GraphResult<AttrValue> {
+        let mut max_val: Option<AttrValue> = None;
+
+        for val in &self.data {
+            match val {
+                AttrValue::Null => continue, // Skip null values
+                _ => match &max_val {
+                    None => max_val = Some(val.clone()),
+                    Some(current_max) => {
+                        if Self::compare_values(val, current_max)? > 0 {
+                            max_val = Some(val.clone());
+                        }
+                    }
+                },
+            }
+        }
+
+        max_val.ok_or_else(|| {
+            crate::errors::GraphError::InvalidInput(
+                "Cannot find maximum of empty array".to_string(),
+            )
+        })
+    }
+
+    /// Count non-null values in the array
+    pub fn count(&self) -> usize {
+        self.data
+            .iter()
+            .filter(|val| !matches!(val, AttrValue::Null))
+            .count()
+    }
+
+    /// Count unique non-null values in the array
+    pub fn nunique(&self) -> usize {
+        let mut seen = std::collections::HashSet::new();
+        for val in &self.data {
+            if !matches!(val, AttrValue::Null) {
+                seen.insert(val);
+            }
+        }
+        seen.len()
+    }
+
+    /// Helper function to compare two AttrValues for ordering
+    fn compare_values(a: &AttrValue, b: &AttrValue) -> crate::errors::GraphResult<i32> {
+        use std::cmp::Ordering;
+
+        let ordering = match (a, b) {
+            // Numeric comparisons
+            (AttrValue::Int(a), AttrValue::Int(b)) => a.cmp(b),
+            (AttrValue::SmallInt(a), AttrValue::SmallInt(b)) => a.cmp(b),
+            (AttrValue::Float(a), AttrValue::Float(b)) => {
+                a.partial_cmp(b).unwrap_or(Ordering::Equal)
+            }
+
+            // Mixed numeric comparisons
+            (AttrValue::Int(a), AttrValue::SmallInt(b)) => (*a).cmp(&(*b as i64)),
+            (AttrValue::SmallInt(a), AttrValue::Int(b)) => (*a as i64).cmp(b),
+            (AttrValue::Int(a), AttrValue::Float(b)) => {
+                (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal)
+            }
+            (AttrValue::Float(a), AttrValue::Int(b)) => {
+                a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal)
+            }
+            (AttrValue::SmallInt(a), AttrValue::Float(b)) => {
+                (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal)
+            }
+            (AttrValue::Float(a), AttrValue::SmallInt(b)) => {
+                a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal)
+            }
+
+            // String comparisons
+            (AttrValue::Text(a), AttrValue::Text(b)) => a.cmp(b),
+            (AttrValue::CompactText(a), AttrValue::CompactText(b)) => a.as_str().cmp(b.as_str()),
+            (AttrValue::Text(a), AttrValue::CompactText(b)) => a.as_str().cmp(b.as_str()),
+            (AttrValue::CompactText(a), AttrValue::Text(b)) => a.as_str().cmp(b.as_str()),
+
+            // Boolean comparisons
+            (AttrValue::Bool(a), AttrValue::Bool(b)) => a.cmp(b),
+
+            // Incompatible types
+            _ => {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Cannot compare incompatible types: {:?} and {:?}",
+                    a, b
+                )));
+            }
+        };
+
+        Ok(match ordering {
+            Ordering::Less => -1,
+            Ordering::Equal => 0,
+            Ordering::Greater => 1,
+        })
+    }
+
     /// Calculate basic statistics for numeric data
     pub fn describe(&self) -> std::collections::HashMap<String, f64> {
         let mut stats = std::collections::HashMap::new();

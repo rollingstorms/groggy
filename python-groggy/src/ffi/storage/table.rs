@@ -754,6 +754,245 @@ impl PyBaseTable {
         self.aggregate(agg_specs)
     }
 
+    /// Generate descriptive statistics for numeric columns
+    ///
+    /// Returns a table with summary statistics including count, mean, std, min,
+    /// percentiles (25%, 50%, 75%), and max for all numeric columns.
+    /// Similar to pandas DataFrame.describe()
+    ///
+    /// # Returns
+    /// PyBaseTable: A table where each row represents a statistic and each column
+    /// represents a numeric column from the original table
+    ///
+    /// # Examples
+    /// ```python
+    /// # Generate descriptive statistics
+    /// stats = table.describe()
+    /// print(stats)
+    /// #          age    salary
+    /// # count   5.0    5.0
+    /// # mean   30.0  65000.3
+    /// # std     4.1   15201.2
+    /// # min    25.0   45000.0
+    /// # 25%    27.0   55000.0
+    /// # 50%    30.0   68000.0
+    /// # 75%    32.0   75000.0
+    /// # max    35.0   82000.0
+    /// ```
+    pub fn describe(&self) -> PyResult<Self> {
+        let result = self.table.describe()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Describe failed: {}", e)))?;
+
+        Ok(PyBaseTable {
+            table: result,
+            server_guards: RefCell::new(Vec::new())
+        })
+    }
+
+    /// Remove rows with any null values
+    /// Returns a new table with rows containing null values removed
+    /// Similar to pandas DataFrame.dropna()
+    pub fn dropna(&self) -> PyResult<Self> {
+        let result = self.table.dropna()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Dropna failed: {}", e)))?;
+
+        Ok(PyBaseTable {
+            table: result,
+            server_guards: RefCell::new(Vec::new())
+        })
+    }
+
+    /// Remove rows with null values in specified columns
+    /// Similar to pandas DataFrame.dropna(subset=['col1', 'col2'])
+    pub fn dropna_subset(&self, subset: Vec<&str>) -> PyResult<Self> {
+        let result = self.table.dropna_subset(&subset)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Dropna subset failed: {}", e)))?;
+
+        Ok(PyBaseTable {
+            table: result,
+            server_guards: RefCell::new(Vec::new())
+        })
+    }
+
+    /// Detect missing values in the entire table
+    /// Returns a new table of the same shape with boolean values indicating null positions
+    /// Similar to pandas DataFrame.isna()
+    pub fn isna(&self) -> PyResult<Self> {
+        let result = self.table.isna()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Isna failed: {}", e)))?;
+
+        Ok(PyBaseTable {
+            table: result,
+            server_guards: RefCell::new(Vec::new())
+        })
+    }
+
+    /// Detect non-missing values in the entire table
+    /// Returns a new table of the same shape with boolean values indicating non-null positions
+    /// Similar to pandas DataFrame.notna()
+    pub fn notna(&self) -> PyResult<Self> {
+        let result = self.table.notna()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Notna failed: {}", e)))?;
+
+        Ok(PyBaseTable {
+            table: result,
+            server_guards: RefCell::new(Vec::new())
+        })
+    }
+
+    /// Check if the table contains any null values
+    pub fn has_nulls(&self) -> bool {
+        self.table.has_nulls()
+    }
+
+    /// Count null values in each column
+    /// Returns a dictionary with column names and their null counts
+    pub fn null_counts(&self, py: Python) -> PyResult<PyObject> {
+        let null_counts = self.table.null_counts();
+        let dict = pyo3::types::PyDict::new(py);
+
+        for (col_name, count) in null_counts {
+            dict.set_item(col_name, count)?;
+        }
+
+        Ok(dict.into())
+    }
+
+    /// Fill null values with specified values per column
+    /// Returns a new table with nulls replaced by the fill values
+    /// Similar to pandas DataFrame.fillna()
+    pub fn fillna(&self, fill_values: std::collections::HashMap<String, PyObject>, py: Python) -> PyResult<Self> {
+        // Convert Python values to AttrValues
+        let mut rust_fill_values = std::collections::HashMap::new();
+        for (col_name, py_value) in fill_values {
+            let attr_value = crate::ffi::utils::python_value_to_attr_value(py_value.as_ref(py))?;
+            rust_fill_values.insert(col_name, attr_value);
+        }
+
+        let result = self.table.fillna(rust_fill_values)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Fillna failed: {}", e)))?;
+
+        Ok(PyBaseTable {
+            table: result,
+            server_guards: RefCell::new(Vec::new())
+        })
+    }
+
+    /// Fill null values with a single value for all columns
+    pub fn fillna_all(&self, fill_value: PyObject, py: Python) -> PyResult<Self> {
+        let rust_fill_value = crate::ffi::utils::python_value_to_attr_value(fill_value.as_ref(py))?;
+
+        let result = self.table.fillna_all(rust_fill_value)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Fillna all failed: {}", e)))?;
+
+        Ok(PyBaseTable {
+            table: result,
+            server_guards: RefCell::new(Vec::new())
+        })
+    }
+
+    /// Group table by one or more columns, returning a TableArray for fluent operations
+    /// This enables powerful operations like table.groupby(['category']).sum()
+    ///
+    /// # Arguments
+    /// * `by` - Column name(s) to group by. Can be string or list of strings.
+    ///
+    /// # Returns
+    /// A TableArray where each table represents one group
+    ///
+    /// # Examples
+    /// ```python
+    /// # Group by single column and sum
+    /// result = table.groupby('category').sum()
+    ///
+    /// # Group by multiple columns with custom aggregation
+    /// result = table.groupby(['category', 'region']).agg({
+    ///     'sales': 'sum',
+    ///     'price': 'mean'
+    /// })
+    /// ```
+    pub fn groupby(&self, by: PyObject, py: Python) -> PyResult<crate::ffi::storage::table_array_core::PyTableArrayCore> {
+        // Parse the 'by' parameter - can be string or list of strings
+        let column_names: Vec<String> = if let Ok(single_col) = by.extract::<String>(py) {
+            vec![single_col]
+        } else if let Ok(col_list) = by.extract::<Vec<String>>(py) {
+            col_list
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "groupby 'by' parameter must be a string or list of strings"
+            ));
+        };
+
+        // Convert to &str references for the core method
+        let column_refs: Vec<&str> = column_names.iter().map(|s| s.as_str()).collect();
+
+        // Call core groupby method
+        let result = self.table.groupby(&column_refs)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Groupby failed: {}", e)))?;
+
+        Ok(crate::ffi::storage::table_array_core::PyTableArrayCore {
+            inner: result,
+        })
+    }
+
+    /// Convenience method for grouping by a single column
+    pub fn groupby_single(&self, column: String) -> PyResult<crate::ffi::storage::table_array_core::PyTableArrayCore> {
+        let result = self.table.groupby_single(&column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Groupby failed: {}", e)))?;
+
+        Ok(crate::ffi::storage::table_array_core::PyTableArrayCore {
+            inner: result,
+        })
+    }
+
+    /// Comprehensive random sampling method
+    ///
+    /// # Parameters
+    /// - `n`: Number of rows to sample (mutually exclusive with `fraction`)
+    /// - `fraction`: Fraction of rows to sample (0.0 to 1.0, mutually exclusive with `n`)
+    /// - `weights`: Optional weights for each row (must match table length)
+    /// - `subset`: Optional subset of columns to consider for sampling
+    /// - `class_weights`: Optional mapping of column values to weights for stratified sampling
+    /// - `replace`: Whether to sample with replacement (default: false)
+    ///
+    /// # Examples
+    /// ```python
+    /// # Sample 10 rows
+    /// sample = table.sample(n=10)
+    ///
+    /// # Sample 20% of rows
+    /// sample = table.sample(fraction=0.2)
+    ///
+    /// # Weighted sampling with replacement
+    /// weights = [1.0, 2.0, 1.0, 3.0]  # Higher weight for certain rows
+    /// sample = table.sample(n=5, weights=weights, replace=True)
+    ///
+    /// # Stratified sampling by 'category' column
+    /// class_weights = {"category": [("A", 2.0), ("B", 1.0), ("C", 3.0)]}
+    /// sample = table.sample(n=10, class_weights=class_weights)
+    ///
+    /// # Focus on complete rows in subset of columns
+    /// sample = table.sample(n=20, subset=["age", "income"])
+    /// ```
+    #[pyo3(signature = (n=None, fraction=None, weights=None, subset=None, class_weights=None, replace=false))]
+    pub fn sample(
+        &self,
+        n: Option<usize>,
+        fraction: Option<f64>,
+        weights: Option<Vec<f64>>,
+        subset: Option<Vec<String>>,
+        class_weights: Option<std::collections::HashMap<String, Vec<(String, f64)>>>,
+        replace: bool,
+    ) -> PyResult<Self> {
+        let result = self.table.sample(n, fraction, weights, subset, class_weights, replace)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Sampling failed: {}", e)))?;
+
+        Ok(Self {
+            table: result,
+            server_guards: RefCell::new(Vec::new()),
+        })
+    }
+
     // =============================================================================
     // Phase 2 Features: Multi-table Operations (Unified Join Interface)
     // =============================================================================
@@ -920,6 +1159,10 @@ impl PyBaseTable {
                         AttrValue::SubgraphRef(_) => { is_all_numeric = false; "subgraph_ref" },
                         AttrValue::NodeArray(_) => { is_all_numeric = false; "node_array" },
                         AttrValue::EdgeArray(_) => { is_all_numeric = false; "edge_array" },
+                        AttrValue::IntVec(_) => { is_all_numeric = false; "int_vec" },
+                        AttrValue::TextVec(_) => { is_all_numeric = false; "text_vec" },
+                        AttrValue::BoolVec(_) => { is_all_numeric = false; "bool_vec" },
+                        AttrValue::Json(_) => { is_all_numeric = false; "json" },
                     };
                     
                     *type_counts.entry(type_name.to_string()).or_insert(0) += 1;
@@ -982,128 +1225,7 @@ impl PyBaseTable {
             ))
         }
     }
-    
-    /// Launch interactive visualization for this table
-    /// 
-    /// Creates a VizModule for interactive browser-based visualization
-    /// with support for both table and graph views.
-    /// 
-    /// # Arguments
-    /// * `port` - Optional port number (0 for auto-assign)
-    /// * `layout` - Layout algorithm: "force-directed", "circular", "grid", "hierarchical"
-    /// * `theme` - Visual theme: "light", "dark", "publication", "minimal"
-    /// * `width` - Canvas width in pixels
-    /// * `height` - Canvas height in pixels
-    /// 
-    /// # Returns
-    /// VizAccessor for launching visualization
-    /// 
-    /// # Examples
-    /// ```python
-    /// # Launch interactive visualization
-    /// viz = table.interactive()
-    /// viz.show()  # Opens visualization
-    /// 
-    /// # With custom options  
-    /// viz = table.interactive(port=8080, layout="force-directed", theme="dark")
-    /// ```
-    pub fn interactive_viz(
-        &self,
-        port: Option<u16>,
-        layout: Option<String>,
-        theme: Option<String>,
-        width: Option<u32>,
-        height: Option<u32>
-    ) -> PyResult<VizAccessor> {
-        // TODO: Convert table to GraphDataSource for VizAccessor
-        // For now, return VizAccessor without data source 
-        Ok(VizAccessor::without_data_source("table".to_string()))
-    }
 
-}
-
-// Implement display data conversion for PyBaseTable
-impl PyBaseTable {
-    /// Convert table to display data format expected by Rust formatter
-    fn to_display_data(&self) -> HashMap<String, Value> {
-        let mut data = HashMap::new();
-        
-        // Get table dimensions
-        let nrows = self.table.nrows();
-        let ncols = self.table.ncols();
-        data.insert("shape".to_string(), Value::Array(vec![Value::from(nrows), Value::from(ncols)]));
-        
-        // Get column names
-        let column_names = self.table.column_names();
-        let columns_json: Vec<Value> = column_names.iter().map(|s| Value::String(s.clone())).collect();
-        data.insert("columns".to_string(), Value::Array(columns_json));
-        
-        // Get data types for each column
-        let mut dtypes_map = Map::new();
-        for col_name in column_names {
-            if let Some(column) = self.table.column(col_name) {
-                let dtype = match column.data().first() {
-                    Some(groggy::AttrValue::Int(_)) => "int64",
-                    Some(groggy::AttrValue::SmallInt(_)) => "int32", 
-                    Some(groggy::AttrValue::Float(_)) => "float64",
-                    Some(groggy::AttrValue::Text(_)) => "string",
-                    Some(groggy::AttrValue::CompactText(_)) => "string",
-                    Some(groggy::AttrValue::Bool(_)) => "bool",
-                    _ => "object",
-                };
-                dtypes_map.insert(col_name.clone(), Value::String(dtype.to_string()));
-            }
-        }
-        data.insert("dtypes".to_string(), Value::Object(dtypes_map));
-        
-        // Get sample data (first 10 rows for display)
-        let sample_size = std::cmp::min(10, nrows);
-        let mut data_rows = Vec::new();
-        
-        for row_idx in 0..sample_size {
-            let mut row_values = Vec::new();
-            for col_name in column_names {
-                if let Some(column) = self.table.column(col_name) {
-                    let attr_values = column.data();
-                    if let Some(value) = attr_values.get(row_idx) {
-                        let json_value = match value {
-                            groggy::AttrValue::Int(i) => Value::Number(serde_json::Number::from(*i)),
-                            groggy::AttrValue::SmallInt(i) => Value::Number(serde_json::Number::from(*i as i64)),
-                            groggy::AttrValue::Float(f) => Value::Number(serde_json::Number::from_f64((*f).into()).unwrap_or(serde_json::Number::from(0))),
-                            groggy::AttrValue::Text(s) => Value::String(s.clone()),
-                            groggy::AttrValue::CompactText(s) => Value::String(s.as_str().to_string()),
-                            groggy::AttrValue::Bool(b) => Value::Bool(*b),
-                            groggy::AttrValue::FloatVec(v) => Value::String(format!("{:?}", v)),
-                            groggy::AttrValue::Bytes(b) => Value::String(format!("{:?}", b)),
-                            groggy::AttrValue::CompressedText(cd) => {
-                                match cd.decompress_text() {
-                                    Ok(text) => Value::String(text),
-                                    Err(_) => Value::String("[compressed text]".to_string()),
-                                }
-                            },
-                            groggy::AttrValue::CompressedFloatVec(_) => Value::String("[compressed float vec]".to_string()),
-                            groggy::AttrValue::Null => Value::Null,
-                            groggy::AttrValue::SubgraphRef(id) => Value::String(format!("subgraph:{}", id)),
-                            groggy::AttrValue::NodeArray(nodes) => Value::String(format!("{:?}", nodes)),
-                            groggy::AttrValue::EdgeArray(edges) => Value::String(format!("{:?}", edges)),
-                        };
-                        row_values.push(json_value);
-                    } else {
-                        row_values.push(Value::Null);
-                    }
-                } else {
-                    row_values.push(Value::Null);
-                }
-            }
-            data_rows.push(Value::Array(row_values));
-        }
-        data.insert("data".to_string(), Value::Array(data_rows));
-        
-        // Set index type
-        data.insert("index_type".to_string(), Value::String("int64".to_string()));
-        
-        data
-    }
 
     // =============================================================================
     // Phase 2 Features: Group By Operations
@@ -1180,96 +1302,268 @@ impl PyBaseTable {
         ))
     }
 
-    /// Launch interactive streaming table in browser
-    /// 
-    /// Returns a URL where the interactive table can be accessed.
-    /// The server starts automatically and serves the table data via WebSocket.
-    /// 
+    // ==================================================================================
+    // PHASE 2.1: COLUMN MANAGEMENT OPERATIONS
+    // ==================================================================================
+
+    /// Rename columns using a dictionary mapping
+    ///
+    /// # Arguments
+    /// * `columns` - Dictionary mapping old column names to new column names
+    ///
     /// # Examples
     /// ```python
-    /// table = BaseTable.from_dict({'a': [1, 2, 3], 'b': [4, 5, 6]})
-    /// interface = table.interactive()
-    /// print(f"View table at: {interface}")
+    /// renamed = table.rename({"old_name": "new_name", "score": "final_score"})
     /// ```
-    pub fn interactive(&self) -> PyResult<String> {
-        match self.table.interactive(None) {
-            Ok(viz_module) => {
-                // Launch the interactive visualization and get the session
-                let interactive_viz = viz_module.interactive(None)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create interactive viz: {}", e)))?;
-                
-                let session = interactive_viz.start(None)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to start viz session: {}", e)))?;
-                
-                let url = session.url().to_string();
-                println!("🚀 Interactive table launched at: {}", url);
-                println!("📊 Streaming {} rows × {} columns", 
-                        VizDataSource::total_rows(&self.table), 
-                        VizDataSource::total_cols(&self.table));
-                Ok(url)
-            }
-            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(
-                format!("Failed to start interactive table: {}", e)
-            ))
-        }
+    pub fn rename(&self, columns: std::collections::HashMap<String, String>) -> PyResult<Self> {
+        let result = self.table.rename(columns)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Rename failed: {}", e)))?;
+
+        Ok(Self::from_table(result))
     }
-    
-    /// Generate embedded iframe HTML for Jupyter notebooks
-    /// 
-    /// Creates an interactive streaming table that can be embedded directly
-    /// in a Jupyter notebook cell, eliminating the need for a separate browser tab.
-    /// Use this with `IPython.display.HTML()` for best results.
-    /// 
-    /// Returns:
-    ///     str: HTML iframe code for embedding in Jupyter
-    /// 
-    /// Example:
+
+    /// Add prefix to all column names
+    ///
+    /// # Arguments
+    /// * `prefix` - String prefix to add to all column names
+    ///
+    /// # Examples
     /// ```python
-    /// from IPython.display import HTML, display
-    /// table = BaseTable.from_dict({'a': [1, 2, 3], 'b': [4, 5, 6]})
-    /// iframe_html = table.interactive_embed()
-    /// display(HTML(iframe_html))
+    /// prefixed = table.add_prefix("old_")
     /// ```
-    pub fn interactive_embed(&self) -> PyResult<String> {
-        // Create the streaming server
-        use groggy::viz::streaming::server::StreamingServer;
-        use groggy::viz::streaming::types::StreamingConfig;
-        use std::sync::Arc;
-        
-        let data_source: Arc<dyn groggy::viz::streaming::DataSource> = Arc::new(self.table.clone());
-        let config = StreamingConfig::default();
-        let server = StreamingServer::new(data_source, config);
-        
-        // Start the server on a background thread
-        let handle = server
-            .start_background("127.0.0.1".parse().unwrap(), 0) // Use port 0 for ephemeral port
-            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(
-                format!("Failed to start streaming server: {}", e)
-            ))?;
-        
-        let port = handle.port;
-        
-        // Store the handle to keep the server alive
-        self.server_guards.borrow_mut().push(handle);
-        
-        // Generate iframe HTML
-        let iframe_html = format!(
-            r#"<iframe src="http://127.0.0.1:{port}/" width="100%" height="420" style="border:0;border-radius:12px;"></iframe>"#
-        );
-        
-        println!("🖼️  Interactive table iframe generated");
-        Ok(iframe_html)
+    pub fn add_prefix(&self, prefix: &str) -> PyResult<Self> {
+        let result = self.table.add_prefix(prefix)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Add prefix failed: {}", e)))?;
+
+        Ok(Self::from_table(result))
     }
-    
-    /// Close all streaming servers started by this table
-    /// 
-    /// This method allows manual cleanup of streaming servers. Servers are
-    /// automatically cleaned up when the table is dropped, but this method
-    /// can be used for explicit cleanup between tests or operations.
-    pub fn close_streaming(&self) {
-        self.server_guards.borrow_mut().clear(); // drops handles -> cancels/joins
-        println!("🛑 Closed all streaming servers for table");
+
+    /// Add suffix to all column names
+    ///
+    /// # Arguments
+    /// * `suffix` - String suffix to add to all column names
+    ///
+    /// # Examples
+    /// ```python
+    /// suffixed = table.add_suffix("_v1")
+    /// ```
+    pub fn add_suffix(&self, suffix: &str) -> PyResult<Self> {
+        let result = self.table.add_suffix(suffix)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Add suffix failed: {}", e)))?;
+
+        Ok(Self::from_table(result))
     }
+
+    /// Reorder columns according to specified order
+    ///
+    /// # Arguments
+    /// * `new_order` - List of column names in the desired order
+    ///
+    /// # Examples
+    /// ```python
+    /// reordered = table.reorder_columns(["name", "age", "score"])
+    /// ```
+    pub fn reorder_columns(&self, new_order: Vec<String>) -> PyResult<Self> {
+        let result = self.table.reorder_columns(new_order)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Reorder failed: {}", e)))?;
+
+        Ok(Self::from_table(result))
+    }
+
+    // ==================================================================================
+    // PHASE 2.2: ROW OPERATIONS
+    // ==================================================================================
+
+    /// Append a single row to the table
+    ///
+    /// # Arguments
+    /// * `row` - Dictionary mapping column names to values
+    ///
+    /// # Examples
+    /// ```python
+    /// new_table = table.append_row({"name": "David", "age": 40, "score": 95})
+    /// ```
+    pub fn append_row(&self, row: std::collections::HashMap<String, PyObject>, py: Python) -> PyResult<Self> {
+        let mut attr_row = std::collections::HashMap::new();
+
+        for (key, value) in row {
+            let attr_value = crate::ffi::utils::python_value_to_attr_value(value.as_ref(py))?;
+            attr_row.insert(key, attr_value);
+        }
+
+        let result = self.table.append_row(attr_row)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Append row failed: {}", e)))?;
+
+        Ok(Self::from_table(result))
+    }
+
+    /// Extend table with multiple rows
+    ///
+    /// # Arguments
+    /// * `rows` - List of dictionaries, each mapping column names to values
+    ///
+    /// # Examples
+    /// ```python
+    /// new_table = table.extend_rows([
+    ///     {"name": "David", "age": 40, "score": 95},
+    ///     {"name": "Eve", "age": 35, "score": 88}
+    /// ])
+    /// ```
+    pub fn extend_rows(&self, rows: Vec<std::collections::HashMap<String, PyObject>>, py: Python) -> PyResult<Self> {
+        let mut attr_rows = Vec::new();
+
+        for row in rows {
+            let mut attr_row = std::collections::HashMap::new();
+            for (key, value) in row {
+                let attr_value = crate::ffi::utils::python_value_to_attr_value(value.as_ref(py))?;
+                attr_row.insert(key, attr_value);
+            }
+            attr_rows.push(attr_row);
+        }
+
+        let result = self.table.extend_rows(attr_rows)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Extend rows failed: {}", e)))?;
+
+        Ok(Self::from_table(result))
+    }
+
+    /// Drop rows by indices
+    ///
+    /// # Arguments
+    /// * `indices` - List of row indices to drop
+    ///
+    /// # Examples
+    /// ```python
+    /// new_table = table.drop_rows([0, 2, 4])  # Drop rows at indices 0, 2, and 4
+    /// ```
+    pub fn drop_rows(&self, indices: Vec<usize>) -> PyResult<Self> {
+        let result = self.table.drop_rows(&indices)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Drop rows failed: {}", e)))?;
+
+        Ok(Self::from_table(result))
+    }
+
+    /// Drop duplicate rows based on specified columns (or all columns if none specified)
+    ///
+    /// # Arguments
+    /// * `subset` - Optional list of column names to check for duplicates
+    ///
+    /// # Examples
+    /// ```python
+    /// # Drop duplicates based on all columns
+    /// new_table = table.drop_duplicates()
+    ///
+    /// # Drop duplicates based only on 'name' and 'age' columns
+    /// new_table = table.drop_duplicates(["name", "age"])
+    /// ```
+    pub fn drop_duplicates(&self, subset: Option<Vec<String>>) -> PyResult<Self> {
+        let subset_slice = subset.as_ref().map(|v| v.as_slice());
+        let result = self.table.drop_duplicates(subset_slice)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Drop duplicates failed: {}", e)))?;
+
+        Ok(Self::from_table(result))
+    }
+}
+
+// Implement display data conversion for PyBaseTable
+impl PyBaseTable {
+    /// Convert table to display data format expected by Rust formatter
+    fn to_display_data(&self) -> HashMap<String, Value> {
+        let mut data = HashMap::new();
+        
+        // Get table dimensions
+        let nrows = self.table.nrows();
+        let ncols = self.table.ncols();
+        data.insert("shape".to_string(), Value::Array(vec![Value::from(nrows), Value::from(ncols)]));
+        
+        // Get column names
+        let column_names = self.table.column_names();
+        let columns_json: Vec<Value> = column_names.iter().map(|s| Value::String(s.clone())).collect();
+        data.insert("columns".to_string(), Value::Array(columns_json));
+        
+        // Get data types for each column
+        let mut dtypes_map = Map::new();
+        for col_name in column_names {
+            if let Some(column) = self.table.column(col_name) {
+                let dtype = match column.data().first() {
+                    Some(groggy::AttrValue::Int(_)) => "int64",
+                    Some(groggy::AttrValue::SmallInt(_)) => "int32", 
+                    Some(groggy::AttrValue::Float(_)) => "float64",
+                    Some(groggy::AttrValue::Text(_)) => "string",
+                    Some(groggy::AttrValue::CompactText(_)) => "string",
+                    Some(groggy::AttrValue::Bool(_)) => "bool",
+                    _ => "object",
+                };
+                dtypes_map.insert(col_name.clone(), Value::String(dtype.to_string()));
+            }
+        }
+        data.insert("dtypes".to_string(), Value::Object(dtypes_map));
+        
+        // Get sample data (first 10 rows for display)
+        let sample_size = std::cmp::min(10, nrows);
+        let mut data_rows = Vec::new();
+        
+        for row_idx in 0..sample_size {
+            let mut row_values = Vec::new();
+            for col_name in column_names {
+                if let Some(column) = self.table.column(col_name) {
+                    let attr_values = column.data();
+                    if let Some(value) = attr_values.get(row_idx) {
+                        let json_value = match value {
+                            groggy::AttrValue::Int(i) => Value::Number(serde_json::Number::from(*i)),
+                            groggy::AttrValue::SmallInt(i) => Value::Number(serde_json::Number::from(*i as i64)),
+                            groggy::AttrValue::Float(f) => Value::Number(serde_json::Number::from_f64((*f).into()).unwrap_or(serde_json::Number::from(0))),
+                            groggy::AttrValue::Text(s) => Value::String(s.clone()),
+                            groggy::AttrValue::CompactText(s) => Value::String(s.as_str().to_string()),
+                            groggy::AttrValue::Bool(b) => Value::Bool(*b),
+                            groggy::AttrValue::FloatVec(v) => Value::String(format!("{:?}", v)),
+                            groggy::AttrValue::Bytes(b) => Value::String(format!("{:?}", b)),
+                            groggy::AttrValue::CompressedText(cd) => {
+                                match cd.decompress_text() {
+                                    Ok(text) => Value::String(text),
+                                    Err(_) => Value::String("[compressed text]".to_string()),
+                                }
+                            },
+                            groggy::AttrValue::CompressedFloatVec(_) => Value::String("[compressed float vec]".to_string()),
+                            groggy::AttrValue::Null => Value::Null,
+                            groggy::AttrValue::SubgraphRef(id) => Value::String(format!("subgraph:{}", id)),
+                            groggy::AttrValue::NodeArray(nodes) => Value::String(format!("{:?}", nodes)),
+                            groggy::AttrValue::EdgeArray(edges) => Value::String(format!("{:?}", edges)),
+                            groggy::AttrValue::IntVec(v) => {
+                                let json_array: Vec<Value> = v.iter().map(|&i| Value::Number(serde_json::Number::from(i))).collect();
+                                Value::Array(json_array)
+                            },
+                            groggy::AttrValue::TextVec(v) => {
+                                let json_array: Vec<Value> = v.iter().map(|s| Value::String(s.clone())).collect();
+                                Value::Array(json_array)
+                            },
+                            groggy::AttrValue::BoolVec(v) => {
+                                let json_array: Vec<Value> = v.iter().map(|&b| Value::Bool(b)).collect();
+                                Value::Array(json_array)
+                            },
+                            groggy::AttrValue::Json(s) => {
+                                // Try to parse as JSON, fallback to string
+                                serde_json::from_str(s).unwrap_or(Value::String(s.clone()))
+                            },
+                        };
+                        row_values.push(json_value);
+                    } else {
+                        row_values.push(Value::Null);
+                    }
+                } else {
+                    row_values.push(Value::Null);
+                }
+            }
+            data_rows.push(Value::Array(row_values));
+        }
+        data.insert("data".to_string(), Value::Array(data_rows));
+        
+        // Set index type
+        data.insert("index_type".to_string(), Value::String("int64".to_string()));
+        
+        data
+    }
+
 }
 
 // Internal helper methods (not exposed to Python)
@@ -2216,7 +2510,7 @@ impl PyNodesTable {
     /// Get viz accessor for visualization operations (no graph tab)
     #[getter]
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
-        use groggy::api::graph::GraphDataSource;
+        use groggy::viz::streaming::GraphDataSource;
         
         // Create a graph with only nodes from the NodesTable
         let mut viz_graph = groggy::api::graph::Graph::new();
@@ -3006,7 +3300,7 @@ impl PyEdgesTable {
     /// Get viz accessor for visualization operations (no graph tab)
     #[getter]
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
-        use groggy::api::graph::GraphDataSource;
+        use groggy::viz::streaming::GraphDataSource;
         
         // Create a graph from the EdgesTable's edges and their nodes
         let mut viz_graph = groggy::api::graph::Graph::new();
@@ -3652,7 +3946,7 @@ impl PyGraphTable {
     /// Get viz accessor for visualization operations
     #[getter]
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
-        use groggy::api::graph::GraphDataSource;
+        use groggy::viz::streaming::GraphDataSource;
         
         // Create a graph from the GraphTable's nodes and edges
         let mut viz_graph = groggy::api::graph::Graph::new();

@@ -524,6 +524,10 @@ impl GraphSnapshot {
                     AttrValue::EdgeArray(v) => {
                         v.len() * std::mem::size_of::<crate::types::EdgeId>()
                     }
+                    AttrValue::IntVec(v) => v.len() * std::mem::size_of::<i64>(),
+                    AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
+                    AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
+                    AttrValue::Json(s) => s.len(),
                 };
             }
         }
@@ -552,6 +556,10 @@ impl GraphSnapshot {
                     AttrValue::EdgeArray(v) => {
                         v.len() * std::mem::size_of::<crate::types::EdgeId>()
                     }
+                    AttrValue::IntVec(v) => v.len() * std::mem::size_of::<i64>(),
+                    AttrValue::TextVec(v) => v.iter().map(|s| s.len()).sum::<usize>(),
+                    AttrValue::BoolVec(v) => v.len() * std::mem::size_of::<bool>(),
+                    AttrValue::Json(s) => s.len(),
                 };
             }
         }

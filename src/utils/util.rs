@@ -149,6 +149,30 @@ pub fn attr_value_hash(value: &AttrValue) -> u64 {
             edges.hash(&mut hasher);
             hasher.finish()
         }
+        AttrValue::IntVec(v) => {
+            // Hash integer vector
+            let mut hasher = DefaultHasher::new();
+            v.hash(&mut hasher);
+            hasher.finish()
+        }
+        AttrValue::TextVec(v) => {
+            // Hash text vector
+            let mut hasher = DefaultHasher::new();
+            v.hash(&mut hasher);
+            hasher.finish()
+        }
+        AttrValue::BoolVec(v) => {
+            // Hash boolean vector
+            let mut hasher = DefaultHasher::new();
+            v.hash(&mut hasher);
+            hasher.finish()
+        }
+        AttrValue::Json(s) => {
+            // Hash JSON string
+            let mut hasher = DefaultHasher::new();
+            s.hash(&mut hasher);
+            hasher.finish()
+        }
     }
 }
 

@@ -761,12 +761,17 @@ impl PyNumArray {
         }
     }
     
+    /// Count non-null values (for NumArray, all values are non-null by default)
+    fn count(&self) -> usize {
+        self.inner.len()
+    }
+
     /// Count unique values
     fn nunique(&self) -> usize {
         // Convert to string representation for uniqueness check
         use std::collections::HashSet;
         let mut unique = HashSet::new();
-        
+
         for i in 0..self.inner.len() {
             Python::with_gil(|py| {
                 if let Some(val) = self.inner.get_element(i, py) {
@@ -774,7 +779,7 @@ impl PyNumArray {
                 }
             });
         }
-        
+
         unique.len()
     }
     

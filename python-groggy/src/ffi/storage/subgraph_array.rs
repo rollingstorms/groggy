@@ -159,7 +159,7 @@ impl PySubgraphArray {
     /// Get viz accessor for visualization operations
     #[getter]
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
-        use groggy::api::graph::GraphDataSource;
+        use groggy::viz::streaming::GraphDataSource;
         
         // For SubgraphArray, create a graph that contains all subgraphs
         let mut viz_graph = groggy::api::graph::Graph::new();

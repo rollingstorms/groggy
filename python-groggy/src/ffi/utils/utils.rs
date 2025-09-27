@@ -158,6 +158,10 @@ pub fn attr_value_to_python_value(py: Python, attr_value: &RustAttrValue) -> PyR
         RustAttrValue::SubgraphRef(subgraph_id) => subgraph_id.to_object(py),
         RustAttrValue::NodeArray(node_ids) => node_ids.to_object(py),
         RustAttrValue::EdgeArray(edge_ids) => edge_ids.to_object(py),
+        RustAttrValue::IntVec(v) => v.to_object(py),
+        RustAttrValue::TextVec(v) => v.to_object(py),
+        RustAttrValue::BoolVec(v) => v.to_object(py),
+        RustAttrValue::Json(s) => s.to_object(py),
         RustAttrValue::Null => py.None(),
     };
     Ok(py_value)

@@ -100,6 +100,19 @@ impl From<&AttrValue> for NetworkXValue {
                 let formatted = format!("{:?}", edges);
                 NetworkXValue::String(formatted)
             }
+            AttrValue::IntVec(v) => {
+                let formatted = format!("{:?}", v);
+                NetworkXValue::String(formatted)
+            }
+            AttrValue::TextVec(v) => {
+                let formatted = format!("{:?}", v);
+                NetworkXValue::String(formatted)
+            }
+            AttrValue::BoolVec(v) => {
+                let formatted = format!("{:?}", v);
+                NetworkXValue::String(formatted)
+            }
+            AttrValue::Json(s) => NetworkXValue::String(s.clone()),
         }
     }
 }

@@ -53,18 +53,16 @@ g.viz.show(node_color="component")
 
 ## **A Little Graph Theory:**
 
-A graph is composed of nodes and edges…
-- or is it vertices and edges?
-- or maybe nodes and links?
-Well, let's start over.
+A graph is composed of nodes and edges…or is it vertices and edges? or maybe nodes and links?
+Let's start over.
 
-At its core, a *graph is a network* - a collection of entities (nodes) and the relationships (edges) between them. That's the first truth of graph theory: 
+At its core, **a graph is a network** - a collection of entities (nodes) and the relationships (edges) between them. That's the first truth of graph theory: 
 
-*Everything is connected.* 
+**Everything is connected.** 
 
 The second truth is more interesting: 
 
-*Connections carry meaning.*
+**Connections carry meaning.**
 
 Edges aren't just lines on a diagram — they represent interactions, flows, dependencies, or influence. And when you map those connections, entire hidden structures begin to reveal themselves:
 - Communities of related entities
@@ -75,9 +73,9 @@ Groggy builds on these ideas and takes them further: every node and edge can hav
 That means your "graph" isn't just dots and lines — it's a rich, living dataset:
 - Nodes can store labels, features, embeddings, or metadata
 - Edges can carry weights, timestamps, permissions, or scores
-- You can analyze both structure and data together — seamlessly
+- You can analyze both structure and data, as a graph or as a table, together.
 
-Whether you're exploring dynamic networks, running graph algorithms, or building machine learning pipelines, Groggy provides a modular, high-performance foundation that feels natural to use. It's designed for thinking in graphs — not just visualizing them, but querying, transforming, simulating, and learning from them.
+Whether you're exploring dynamic networks, running graph algorithms, or building machine learning pipelines, Groggy aims to be a modular, high-performance foundation. It's designed for thinking in graphs — not only visualizing them, but querying, transforming, and learning from them.
 
 ⸻
 

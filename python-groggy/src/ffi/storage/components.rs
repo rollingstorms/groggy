@@ -244,7 +244,7 @@ impl PyComponentsArray {
     /// Get viz accessor for visualization
     #[getter]
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
-        use groggy::api::graph::GraphDataSource;
+        use groggy::viz::streaming::GraphDataSource;
         
         // Create a combined graph from all components
         let mut viz_graph = groggy::api::graph::Graph::new();
