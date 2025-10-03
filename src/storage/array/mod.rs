@@ -7,8 +7,10 @@
 //! ## Architecture:
 //! - `BaseArray<T>`: Fundamental array operations (len, get, iter)
 //! - `NumArray<T>`: Statistical operations layer on top of BaseArray
+//! - `ArrayArray<T>`: Array of arrays with aggregation support
 //! - Specialized arrays delegate to appropriate base classes
 
+pub mod array_array;
 pub mod base;
 pub mod base_array;
 pub mod benchmark;
@@ -24,7 +26,7 @@ pub mod simd_optimizations;
 pub mod specialized;
 pub mod traits;
 
-pub use base::*;
+pub use array_array::ArrayArray;
 pub use base_array::BaseArray;
 pub use benchmark::{quick_benchmark, BenchmarkConfig, Benchmarker};
 pub use bool_array::BoolArray;

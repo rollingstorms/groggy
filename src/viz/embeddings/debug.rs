@@ -1,10 +1,8 @@
 //! Debug utilities for embedding monitoring and validation
 
-use super::EmbeddingEngine;
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
 use crate::storage::matrix::GraphMatrix;
-use crate::traits::subgraph_operations::SubgraphOperations;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};

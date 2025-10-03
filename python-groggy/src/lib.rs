@@ -15,10 +15,12 @@ pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
 // Re-enabled accessor exports for table integration
 pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
 pub use ffi::storage::array::{PyBaseArray, PyNodesArray, PyEdgesArray, PyMetaNodeArray};
+pub use ffi::storage::array_array::PyArrayArray;
 pub use ffi::storage::num_array::{PyNumArray, PyNumArrayIterator, PyStatsArray, PyStatsArrayIterator};
 // BoolArray and SimpleStatsArray functionality integrated into unified NumArray
-pub use ffi::storage::subgraph_array::{PySubgraphArray, PySubgraphArrayIterator, PySubgraphArrayChainIterator};
+pub use ffi::storage::subgraph_array::{PySubgraphArray, PySubgraphArrayIterator};
 pub use ffi::storage::table_array::{PyTableArray, PyTableArrayIterator, PyTableArrayChainIterator};
+pub use ffi::storage::table_array_core::{PyTableArrayCore, PyTableArrayCoreIterator};
 pub use ffi::storage::nodes_array::{PyNodesArray as PyNodesArrayNew, PyNodesArrayIterator};
 pub use ffi::storage::edges_array::{PyEdgesArray as PyEdgesArrayNew, PyEdgesArrayIterator};
 pub use ffi::storage::matrix_array::{PyMatrixArray, PyMatrixArrayIterator};
@@ -435,23 +437,27 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
 
     // Register array and matrix types
     m.add_class::<PyBaseArray>()?;
+    m.add_class::<PyArrayArray>()?;
+    // TODO: Add PyArrayArrayIterator once we implement proper PyBaseArray conversion
+    // m.add_class::<ffi::storage::array_array::PyArrayArrayIterator>()?;
     m.add_class::<PyNodesArray>()?;
     m.add_class::<PyEdgesArray>()?;
     m.add_class::<PyMetaNodeArray>()?;
     m.add_class::<PyComponentsArray>()?;
     m.add_class::<ffi::storage::components::PyComponentsArrayIterator>()?;
     m.add_class::<PyGraphMatrix>()?;
-    
+
     // Register specialized arrays (Phase 2 - Unified Delegation Architecture)
     m.add_class::<PySubgraphArray>()?;
     m.add_class::<PySubgraphArrayIterator>()?;
-    m.add_class::<PySubgraphArrayChainIterator>()?;
     // Unified Numerical array API (supports all numeric types with dtype)
     m.add_class::<PyNumArray>()?;
     m.add_class::<PyNumArrayIterator>()?;
     m.add_class::<PyTableArray>()?;
     m.add_class::<PyTableArrayIterator>()?;
     m.add_class::<PyTableArrayChainIterator>()?;
+    m.add_class::<PyTableArrayCore>()?;
+    m.add_class::<PyTableArrayCoreIterator>()?;
     m.add_class::<PyNodesArrayNew>()?;
     m.add_class::<PyNodesArrayIterator>()?;
     m.add_class::<PyEdgesArrayNew>()?;

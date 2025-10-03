@@ -4,13 +4,11 @@
 //! operations into single kernels to reduce memory bandwidth and improve performance.
 
 use crate::storage::advanced_matrix::{
-    backend::{BackendHint, ComputeBackendExt, OperationType},
-    neural::autodiff::{ComputationGraph, ComputationNode, NodeId, Operation},
+    neural::autodiff::{ComputationGraph, NodeId, Operation},
     numeric_type::NumericType,
     unified_matrix::{MatrixError, MatrixResult, Shape, UnifiedMatrix},
 };
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::{Arc, Mutex};
+use std::collections::{HashMap, HashSet};
 
 /// Fusable operation patterns commonly found in neural networks
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

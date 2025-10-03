@@ -26,6 +26,26 @@ pub struct EngineSnapshot {
 pub struct Node {
     pub id: NodeId,
     pub attributes: HashMap<String, AttrValue>,
+
+    // Visual styling fields (from VizConfig)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shape: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opacity: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub border_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub border_width: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_size: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_color: Option<String>,
 }
 
 /// Edge data for engine
@@ -35,6 +55,23 @@ pub struct Edge {
     pub source: NodeId,
     pub target: NodeId,
     pub attributes: HashMap<String, AttrValue>,
+
+    // Visual styling fields (from VizConfig)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opacity: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style: Option<String>,
+    pub curvature: Option<f64>,  // 0 = straight, positive = curve right, negative = curve left
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_size: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label_color: Option<String>,
 }
 
 /// N-dimensional position for a node
@@ -165,6 +202,66 @@ pub enum ControlMsg {
 
     /// Node drag gesture event
     NodeDrag { event: NodeDragEvent },
+
+    /// Request table data window
+    RequestTableData {
+        offset: usize,
+        window_size: usize,
+        data_type: TableDataType,
+    },
+}
+
+/// Type of table data to request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TableDataType {
+    /// Node table data
+    Nodes,
+    /// Edge table data
+    Edges,
+}
+
+impl Node {
+    /// Create a new node with just id and attributes (no styling)
+    pub fn new(id: NodeId, attributes: HashMap<String, AttrValue>) -> Self {
+        Self {
+            id,
+            attributes,
+            color: None,
+            size: None,
+            shape: None,
+            opacity: None,
+            border_color: None,
+            border_width: None,
+            label: None,
+            label_size: None,
+            label_color: None,
+        }
+    }
+}
+
+impl Edge {
+    /// Create a new edge with just id, source, target, and attributes (no styling)
+    pub fn new(
+        id: EdgeId,
+        source: NodeId,
+        target: NodeId,
+        attributes: HashMap<String, AttrValue>,
+    ) -> Self {
+        Self {
+            id,
+            source,
+            target,
+            attributes,
+            color: None,
+            width: None,
+            opacity: None,
+            style: None,
+            curvature: None,
+            label: None,
+            label_size: None,
+            label_color: None,
+        }
+    }
 }
 
 impl EngineSnapshot {

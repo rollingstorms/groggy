@@ -6,8 +6,7 @@
 
 use crate::errors::{GraphError, GraphResult};
 use crate::subgraphs::composer::{
-    ComposerPreview, EdgeAggregation, EdgeStrategy, MetaNodePlan, NodeAggregation,
-};
+    EdgeStrategy, MetaNodePlan, };
 use crate::traits::GraphEntity;
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 use std::collections::{HashMap, HashSet};

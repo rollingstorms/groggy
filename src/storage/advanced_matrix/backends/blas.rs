@@ -5,7 +5,7 @@
 
 use crate::storage::advanced_matrix::{
     backend::{BackendError, BackendPerformance, BackendResult, ComputeBackend, OperationType},
-    numeric_type::{DType, NumericType},
+    numeric_type::DType,
 };
 
 /// BLAS backend stub that would provide high-performance linear algebra operations

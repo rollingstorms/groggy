@@ -3,7 +3,7 @@
 //! eager and lazy iterator implementations.
 
 use crate::errors::GraphResult;
-use crate::storage::array::{ArrayIterator, ArrayOps, LazyArrayIterator};
+use crate::storage::array::{ArrayIterator, ArrayOps};
 use crate::types::AttrValue;
 use std::time::{Duration, Instant};
 

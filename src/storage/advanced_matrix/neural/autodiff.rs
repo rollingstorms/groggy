@@ -4,7 +4,6 @@
 //! gradients efficiently in neural network training and optimization.
 
 use crate::storage::advanced_matrix::{
-    backend::{ComputeBackendExt, OperationType},
     numeric_type::NumericType,
     unified_matrix::{MatrixError, MatrixResult, Shape, UnifiedMatrix},
 };

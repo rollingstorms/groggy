@@ -2424,7 +2424,7 @@ impl Graph {
     where
         T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
-        use crate::storage::matrix::{FromAttrValue, GraphMatrix};
+        use crate::storage::matrix::{GraphMatrix};
 
         let mut nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
         nodes.sort(); // Sort to ensure consistent ordering (creation order)
@@ -2577,7 +2577,7 @@ impl Graph {
     where
         T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
-        use crate::storage::matrix::{FromAttrValue, GraphMatrix};
+        use crate::storage::matrix::{GraphMatrix};
 
         let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
         let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();
@@ -2869,7 +2869,7 @@ impl Graph {
     /// Implements: g.edges.table() (this is called from the accessor)
     pub fn edges_table(&self) -> crate::errors::GraphResult<crate::storage::table::EdgesTable> {
         use crate::storage::array::BaseArray;
-        use crate::storage::table::{BaseTable, EdgeConfig, EdgesTable};
+        use crate::storage::table::{BaseTable, EdgesTable};
         use std::collections::HashMap;
 
         // Collect all edges with their attributes

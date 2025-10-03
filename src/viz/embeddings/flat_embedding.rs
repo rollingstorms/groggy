@@ -12,13 +12,12 @@
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::{
-    neural::autodiff::{AutoDiffTensor, ComputationGraph, Operation},
+    neural::autodiff::{AutoDiffTensor},
     operations::MatrixOperations,
     unified_matrix::UnifiedMatrix,
 };
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::streaming::data_source::Position;
-use std::collections::HashMap;
 
 /// Configuration for the flat embedding optimization.
 #[derive(Debug, Clone)]
@@ -177,11 +176,7 @@ fn optimize_flat_positions(
 
         // Print progress occasionally
         if iteration % 200 == 0 {
-            eprintln!(
-                "🔶 DEBUG: Flat embedding iteration {}: optimizing {} nodes",
-                iteration,
-                positions.data.rows()
-            );
+            // Progress logging for flat embedding iteration
         }
     }
 

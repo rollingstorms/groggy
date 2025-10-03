@@ -20,7 +20,7 @@ pub mod table; // BaseTable system // Advanced Matrix System - Foundation Infras
 // Re-export components
 pub use adjacency::*;
 pub use advanced_matrix::*;
-pub use array::*; // Array system
+pub use array::*;
 pub use edge::*;
 pub use matrix::*;
 pub use node::*;

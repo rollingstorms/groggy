@@ -66,6 +66,12 @@ pub trait Table {
     where
         Self: Sized;
 
+    /// Sort the table by multiple columns with mixed ascending/descending order
+    /// Pandas-style multi-column sorting with priority order
+    fn sort_values(&self, columns: Vec<String>, ascending: Vec<bool>) -> GraphResult<Self>
+    where
+        Self: Sized;
+
     /// Filter rows using a query expression
     fn filter(&self, predicate: &str) -> GraphResult<Self>
     where
@@ -88,6 +94,42 @@ pub trait Table {
 
     /// Drop columns from the table
     fn drop_columns(&self, column_names: &[String]) -> GraphResult<Self>
+    where
+        Self: Sized;
+
+    // =================================================================
+    // Data reshaping operations
+    // =================================================================
+
+    /// Pandas-style pivot table operation for data reshaping
+    ///
+    /// Creates a pivot table that spreads unique values from one column (columns_col)
+    /// into new columns, grouping by index columns (index_cols), and aggregating
+    /// values (values_col) using the specified aggregation function.
+    fn pivot_table(
+        &self,
+        index_cols: &[String],
+        columns_col: &str,
+        values_col: &str,
+        agg_func: &str,
+    ) -> GraphResult<Self>
+    where
+        Self: Sized;
+
+    /// Pandas-style melt operation for data unpivoting
+    ///
+    /// Transforms wide-format data to long-format by unpivoting columns into rows.
+    /// - id_vars: Column(s) to use as identifier variables (remain unchanged)
+    /// - value_vars: Column(s) to unpivot (if None, uses all columns except id_vars)
+    /// - var_name: Name for the new variable column (default: "variable")
+    /// - value_name: Name for the new value column (default: "value")
+    fn melt(
+        &self,
+        id_vars: Option<&[String]>,
+        value_vars: Option<&[String]>,
+        var_name: Option<String>,
+        value_name: Option<String>,
+    ) -> GraphResult<Self>
     where
         Self: Sized;
 
@@ -119,9 +161,12 @@ pub enum TableOperation {
     Tail(usize),
     Slice(usize, usize),
     SortBy(String, bool),
+    SortValues(Vec<String>, Vec<bool>),
     Filter(String),
     Select(Vec<String>),
     DropColumns(Vec<String>),
+    PivotTable(Vec<String>, String, String, String),
+    Melt(Option<Vec<String>>, Option<Vec<String>>, Option<String>, Option<String>),
 }
 
 impl<T: Table + Clone> TableIterator<T> {
@@ -158,6 +203,13 @@ impl<T: Table + Clone> TableIterator<T> {
         self
     }
 
+    /// Add a multi-column sort operation to the chain
+    pub fn sort_values(mut self, columns: Vec<String>, ascending: Vec<bool>) -> Self {
+        self.operations
+            .push(TableOperation::SortValues(columns, ascending));
+        self
+    }
+
     /// Add a filter operation to the chain
     pub fn filter(mut self, predicate: &str) -> Self {
         self.operations
@@ -179,6 +231,40 @@ impl<T: Table + Clone> TableIterator<T> {
         self
     }
 
+    /// Add a pivot table operation to the chain
+    pub fn pivot_table(
+        mut self,
+        index_cols: &[String],
+        columns_col: &str,
+        values_col: &str,
+        agg_func: &str,
+    ) -> Self {
+        self.operations.push(TableOperation::PivotTable(
+            index_cols.to_vec(),
+            columns_col.to_string(),
+            values_col.to_string(),
+            agg_func.to_string(),
+        ));
+        self
+    }
+
+    /// Add a melt operation to the chain
+    pub fn melt(
+        mut self,
+        id_vars: Option<&[String]>,
+        value_vars: Option<&[String]>,
+        var_name: Option<String>,
+        value_name: Option<String>,
+    ) -> Self {
+        self.operations.push(TableOperation::Melt(
+            id_vars.map(|v| v.to_vec()),
+            value_vars.map(|v| v.to_vec()),
+            var_name,
+            value_name,
+        ));
+        self
+    }
+
     /// Execute all chained operations and return the result
     pub fn collect(self) -> GraphResult<T> {
         let mut result = self.table;
@@ -189,9 +275,21 @@ impl<T: Table + Clone> TableIterator<T> {
                 TableOperation::Tail(n) => result.tail(n),
                 TableOperation::Slice(start, end) => result.slice(start, end),
                 TableOperation::SortBy(column, ascending) => result.sort_by(&column, ascending)?,
+                TableOperation::SortValues(columns, ascending) => result.sort_values(columns, ascending)?,
                 TableOperation::Filter(predicate) => result.filter(&predicate)?,
                 TableOperation::Select(columns) => result.select(&columns)?,
                 TableOperation::DropColumns(columns) => result.drop_columns(&columns)?,
+                TableOperation::PivotTable(index_cols, columns_col, values_col, agg_func) => {
+                    result.pivot_table(&index_cols, &columns_col, &values_col, &agg_func)?
+                },
+                TableOperation::Melt(id_vars, value_vars, var_name, value_name) => {
+                    result.melt(
+                        id_vars.as_deref(),
+                        value_vars.as_deref(),
+                        var_name,
+                        value_name
+                    )?
+                },
             };
         }
 

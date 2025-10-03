@@ -205,6 +205,30 @@ impl PyBaseArray {
         }
     }
 
+    /// Calculate median of numeric values in the array
+    fn median(&self) -> PyResult<f64> {
+        match self.inner.median() {
+            Ok(result) => Ok(result),
+            Err(e) => Err(PyValueError::new_err(format!("Median calculation failed: {}", e))),
+        }
+    }
+
+    /// Calculate standard deviation of numeric values in the array
+    fn std(&self) -> PyResult<f64> {
+        match self.inner.std() {
+            Ok(result) => Ok(result),
+            Err(e) => Err(PyValueError::new_err(format!("Standard deviation calculation failed: {}", e))),
+        }
+    }
+
+    /// Calculate variance of numeric values in the array
+    fn var(&self) -> PyResult<f64> {
+        match self.inner.var() {
+            Ok(result) => Ok(result),
+            Err(e) => Err(PyValueError::new_err(format!("Variance calculation failed: {}", e))),
+        }
+    }
+
     /// Find minimum value in the array
     fn min(&self, py: Python) -> PyResult<PyObject> {
         match self.inner.min() {
@@ -626,7 +650,7 @@ impl PyBaseArray {
     }
     
     /// Convert BaseArray to different numeric types when possible
-    fn astype(&self, py: Python, dtype: &str) -> PyResult<PyObject> {
+    fn to_type(&self, py: Python, dtype: &str) -> PyResult<PyObject> {
         match dtype {
             "int64" | "i64" => {
                 // Try to convert all elements to i64
@@ -967,6 +991,631 @@ impl PyBaseArray {
     pub fn drop_duplicates_elements(&self) -> Self {
         let result = self.inner.drop_duplicates_elements();
         Self { inner: result }
+    }
+
+    /// Get the length of the array (standard Python method)
+    ///
+    /// # Returns
+    /// The number of elements in the array
+    ///
+    /// # Examples
+    /// ```python
+    /// size = array.len()
+    /// ```
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Get element at specific index
+    ///
+    /// # Arguments
+    /// * `index` - Index to retrieve (0-based)
+    ///
+    /// # Returns
+    /// The element at the specified index
+    ///
+    /// # Examples
+    /// ```python
+    /// element = array.get(0)  # Get first element
+    /// ```
+    pub fn get(&self, index: usize, py: Python) -> PyResult<PyObject> {
+        use crate::ffi::utils::attr_value_to_python_value;
+
+        if let Some(value) = self.inner.get(index) {
+            attr_value_to_python_value(py, value)
+        } else {
+            Err(pyo3::exceptions::PyIndexError::new_err(format!(
+                "Index {} out of bounds for array of length {}",
+                index,
+                self.inner.len()
+            )))
+        }
+    }
+
+    /// Append a single element (standard Python method)
+    ///
+    /// # Arguments
+    /// * `element` - Value to append to the array
+    ///
+    /// # Returns
+    /// New array with the element appended
+    ///
+    /// # Examples
+    /// ```python
+    /// new_array = array.append(42)
+    /// ```
+    pub fn append(&self, element: PyObject, py: Python) -> PyResult<Self> {
+        let attr_value = crate::ffi::utils::python_value_to_attr_value(element.as_ref(py))?;
+        let result = self.inner.append_element(attr_value);
+        Ok(Self { inner: result })
+    }
+
+    /// Extend array with multiple elements (standard Python method)
+    ///
+    /// # Arguments
+    /// * `elements` - List of values to append to the array
+    ///
+    /// # Returns
+    /// New array with all elements appended
+    ///
+    /// # Examples
+    /// ```python
+    /// new_array = array.extend([42, "hello", 3.14])
+    /// ```
+    pub fn extend(&self, elements: Vec<PyObject>, py: Python) -> PyResult<Self> {
+        let mut attr_elements = Vec::new();
+        for element in elements {
+            let attr_value = crate::ffi::utils::python_value_to_attr_value(element.as_ref(py))?;
+            attr_elements.push(attr_value);
+        }
+        let result = self.inner.extend_elements(attr_elements);
+        Ok(Self { inner: result })
+    }
+
+    /// Insert element at specific index
+    ///
+    /// # Arguments
+    /// * `index` - Index to insert at
+    /// * `element` - Value to insert
+    ///
+    /// # Returns
+    /// New array with element inserted
+    ///
+    /// # Examples
+    /// ```python
+    /// new_array = array.insert(2, "new_value")
+    /// ```
+    pub fn insert(&self, index: usize, element: PyObject, py: Python) -> PyResult<Self> {
+        use crate::ffi::utils::python_value_to_attr_value;
+
+        let attr_value = python_value_to_attr_value(element.as_ref(py))?;
+
+        // Insert by creating new array with element at specified position
+        let mut new_values = Vec::new();
+
+        // Add elements before insertion point
+        for i in 0..index.min(self.inner.len()) {
+            if let Some(val) = self.inner.get(i) {
+                new_values.push(val.clone());
+            }
+        }
+
+        // Add the new element
+        new_values.push(attr_value);
+
+        // Add remaining elements
+        for i in index..self.inner.len() {
+            if let Some(val) = self.inner.get(i) {
+                new_values.push(val.clone());
+            }
+        }
+
+        Ok(Self {
+            inner: groggy::storage::array::BaseArray::new(new_values),
+        })
+    }
+
+    /// Remove element at specific index
+    ///
+    /// # Arguments
+    /// * `index` - Index to remove
+    ///
+    /// # Returns
+    /// New array with element removed
+    ///
+    /// # Examples
+    /// ```python
+    /// new_array = array.remove(0)  # Remove first element
+    /// ```
+    pub fn remove(&self, index: usize) -> PyResult<Self> {
+        if index >= self.inner.len() {
+            return Err(pyo3::exceptions::PyIndexError::new_err(format!(
+                "Index {} out of bounds for array of length {}",
+                index,
+                self.inner.len()
+            )));
+        }
+
+        let result = self.inner.drop_elements(&[index])
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Remove failed: {}", e)))?;
+
+        Ok(Self { inner: result })
+    }
+
+    /// Filter elements using a Python function
+    ///
+    /// # Arguments
+    /// * `predicate` - Python function that returns True/False for each element
+    ///
+    /// # Returns
+    /// New array with elements where predicate returns True
+    ///
+    /// # Examples
+    /// ```python
+    /// filtered = array.filter(lambda x: x > 5)
+    /// ```
+    pub fn filter(&self, predicate: PyObject, py: Python) -> PyResult<Self> {
+        use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
+
+        let mut filtered_values = Vec::new();
+
+        for value in self.inner.data().iter() {
+            // Convert AttrValue to Python object
+            let py_value = attr_value_to_python_value(py, value)?;
+
+            // Call Python predicate function
+            let result = predicate.call1(py, (py_value,))?;
+
+            // Check if result is truthy
+            if result.is_true(py)? {
+                filtered_values.push(value.clone());
+            }
+        }
+
+        Ok(Self {
+            inner: groggy::storage::array::BaseArray::new(filtered_values),
+        })
+    }
+
+    /// Map elements using a Python function
+    ///
+    /// # Arguments
+    /// * `func` - Python function to apply to each element
+    ///
+    /// # Returns
+    /// New array with transformed elements
+    ///
+    /// # Examples
+    /// ```python
+    /// mapped = array.map(lambda x: x * 2)
+    /// ```
+    pub fn map(&self, func: PyObject, py: Python) -> PyResult<Self> {
+        use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
+
+        let mut mapped_values = Vec::new();
+
+        for value in self.inner.data().iter() {
+            // Convert AttrValue to Python object
+            let py_value = attr_value_to_python_value(py, value)?;
+
+            // Call Python function
+            let result = func.call1(py, (py_value,))?;
+
+            // Convert result back to AttrValue
+            let attr_result = python_value_to_attr_value(result.as_ref(py))?;
+            mapped_values.push(attr_result);
+        }
+
+        Ok(Self {
+            inner: groggy::storage::array::BaseArray::new(mapped_values),
+        })
+    }
+
+    /// Sort the array elements
+    ///
+    /// # Arguments
+    /// * `ascending` - Whether to sort in ascending order (default: true)
+    ///
+    /// # Returns
+    /// New array with sorted elements
+    ///
+    /// # Examples
+    /// ```python
+    /// sorted_asc = array.sort()
+    /// sorted_desc = array.sort(ascending=False)
+    /// ```
+    pub fn sort(&self, ascending: Option<bool>) -> PyResult<Self> {
+        let ascending = ascending.unwrap_or(true);
+
+        let mut indexed_values: Vec<(usize, groggy::types::AttrValue)> = self.inner.data()
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (i, v.clone()))
+            .collect();
+
+        // Sort by AttrValue comparison
+        indexed_values.sort_by(|(_, a), (_, b)| {
+            use std::cmp::Ordering;
+            match (a, b) {
+                // Numeric comparisons
+                (groggy::types::AttrValue::Int(a), groggy::types::AttrValue::Int(b)) => {
+                    if ascending { a.cmp(b) } else { b.cmp(a) }
+                }
+                (groggy::types::AttrValue::Float(a), groggy::types::AttrValue::Float(b)) => {
+                    let ord = a.partial_cmp(b).unwrap_or(Ordering::Equal);
+                    if ascending { ord } else { ord.reverse() }
+                }
+                (groggy::types::AttrValue::Int(a), groggy::types::AttrValue::Float(b)) => {
+                    let ord = (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal);
+                    if ascending { ord } else { ord.reverse() }
+                }
+                (groggy::types::AttrValue::Float(a), groggy::types::AttrValue::Int(b)) => {
+                    let ord = a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal);
+                    if ascending { ord } else { ord.reverse() }
+                }
+                // String comparisons
+                (groggy::types::AttrValue::Text(a), groggy::types::AttrValue::Text(b)) => {
+                    if ascending { a.cmp(b) } else { b.cmp(a) }
+                }
+                // Default case - maintain original order
+                _ => Ordering::Equal,
+            }
+        });
+
+        let sorted_values: Vec<groggy::types::AttrValue> = indexed_values
+            .into_iter()
+            .map(|(_, v)| v)
+            .collect();
+
+        Ok(Self {
+            inner: groggy::storage::array::BaseArray::new(sorted_values),
+        })
+    }
+
+    /// Reverse the order of elements
+    ///
+    /// # Returns
+    /// New array with elements in reverse order
+    ///
+    /// # Examples
+    /// ```python
+    /// reversed_array = array.reverse()
+    /// ```
+    pub fn reverse(&self) -> Self {
+        let mut reversed_values: Vec<groggy::types::AttrValue> = self.inner.data().iter().cloned().collect();
+        reversed_values.reverse();
+
+        Self {
+            inner: groggy::storage::array::BaseArray::new(reversed_values),
+        }
+    }
+
+    /// Count the frequency of unique values (pandas-style value_counts)
+    ///
+    /// # Arguments
+    /// * `sort` - Whether to sort results by count (default: true)
+    /// * `ascending` - Sort order when sort=true (default: false, most frequent first)
+    /// * `dropna` - Whether to exclude null values (default: true)
+    ///
+    /// # Returns
+    /// Table with 'value' and 'count' columns showing frequency of each unique value
+    ///
+    /// # Examples
+    /// ```python
+    /// # Basic usage
+    /// counts = array.value_counts()
+    ///
+    /// # Custom sorting
+    /// counts = array.value_counts(sort=True, ascending=True)
+    ///
+    /// # Include null values
+    /// counts = array.value_counts(dropna=False)
+    /// ```
+    pub fn value_counts(
+        &self,
+        sort: Option<bool>,
+        ascending: Option<bool>,
+        dropna: Option<bool>
+    ) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let sort = sort.unwrap_or(true);
+        let ascending = ascending.unwrap_or(false);
+        let dropna = dropna.unwrap_or(true);
+
+        let result = self.inner.value_counts(sort, ascending, dropna)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
+    }
+
+    /// Apply a Python function to each element in the array (pandas-style apply)
+    ///
+    /// # Arguments
+    /// * `func` - Python function to apply to each element
+    ///
+    /// # Returns
+    /// New BaseArray with transformed values
+    ///
+    /// # Examples
+    /// ```python
+    /// # Square each number
+    /// def square(x):
+    ///     if isinstance(x, (int, float)):
+    ///         return x * x
+    ///     return x
+    ///
+    /// squared = array.apply(square)
+    ///
+    /// # Using lambda
+    /// doubled = array.apply(lambda x: x * 2 if isinstance(x, (int, float)) else x)
+    /// ```
+    pub fn apply(&self, func: PyObject) -> PyResult<Self> {
+        Python::with_gil(|py| {
+            let transformed_data: PyResult<Vec<RustAttrValue>> = self.inner
+                .iter()
+                .map(|value| {
+                    // Convert AttrValue to Python object
+                    let py_value = attr_value_to_python_value(py, value)?;
+
+                    // Call the Python function
+                    let result = func.call1(py, (py_value,))?;
+
+                    // Convert result back to AttrValue
+                    python_value_to_attr_value(result.as_ref(py))
+                })
+                .collect();
+
+            let transformed_data = transformed_data?;
+            Ok(PyBaseArray {
+                inner: BaseArray::from_attr_values(transformed_data),
+            })
+        })
+    }
+
+    /// Compute quantile for the array (pandas-style quantile)
+    ///
+    /// # Arguments
+    /// * `q` - Quantile to compute (0.0 to 1.0)
+    /// * `interpolation` - Method for interpolation ("linear", "lower", "higher", "midpoint", "nearest")
+    ///
+    /// # Returns
+    /// AttrValue containing the computed quantile
+    ///
+    /// # Examples
+    /// ```python
+    /// # Get median (50th percentile)
+    /// median = array.quantile(0.5, "linear")
+    ///
+    /// # Get 95th percentile with nearest interpolation
+    /// p95 = array.quantile(0.95, "nearest")
+    /// ```
+    pub fn quantile(&self, q: f64, interpolation: Option<&str>) -> PyResult<PyObject> {
+        use crate::ffi::utils::attr_value_to_python_value;
+
+        let interpolation = interpolation.unwrap_or("linear");
+
+        let result = self.inner.quantile(q, interpolation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Python::with_gil(|py| attr_value_to_python_value(py, &result))
+    }
+
+    /// Compute multiple quantiles for the array
+    ///
+    /// # Arguments
+    /// * `quantiles` - List of quantiles to compute (each 0.0 to 1.0)
+    /// * `interpolation` - Method for interpolation
+    ///
+    /// # Returns
+    /// BaseArray containing the computed quantiles
+    pub fn quantiles(&self, quantiles: Vec<f64>, interpolation: Option<&str>) -> PyResult<Self> {
+        let interpolation = interpolation.unwrap_or("linear");
+
+        let result = self.inner.quantiles(&quantiles, interpolation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseArray { inner: result })
+    }
+
+    /// Compute percentile for the array (equivalent to quantile * 100)
+    ///
+    /// # Arguments
+    /// * `percentile` - Percentile to compute (0.0 to 100.0)
+    /// * `interpolation` - Method for interpolation
+    ///
+    /// # Examples
+    /// ```python
+    /// # Get median (50th percentile)
+    /// median = array.percentile(50.0, "linear")
+    ///
+    /// # Get quartiles
+    /// q1 = array.percentile(25.0)
+    /// q3 = array.percentile(75.0)
+    /// ```
+    pub fn percentile(&self, percentile: f64, interpolation: Option<&str>) -> PyResult<PyObject> {
+        use crate::ffi::utils::attr_value_to_python_value;
+
+        let interpolation = interpolation.unwrap_or("linear");
+
+        let result = self.inner.get_percentile(percentile, interpolation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Python::with_gil(|py| attr_value_to_python_value(py, &result))
+    }
+
+    /// Compute specific percentile for the array (direct method for consistency)
+    ///
+    /// # Arguments
+    /// * `percentile` - Percentile to compute (0.0 to 100.0)
+    /// * `interpolation` - Method for interpolation
+    ///
+    /// # Returns
+    /// The computed percentile as PyObject
+    ///
+    /// # Examples
+    /// ```python
+    /// # Get median (50th percentile)
+    /// median = array.get_percentile(50.0)
+    ///
+    /// # Get 95th percentile with nearest interpolation
+    /// p95 = array.get_percentile(95.0, "nearest")
+    /// ```
+    pub fn get_percentile(&self, percentile: f64, interpolation: Option<&str>) -> PyResult<PyObject> {
+        use crate::ffi::utils::attr_value_to_python_value;
+
+        let interpolation = interpolation.unwrap_or("linear");
+
+        let result = self.inner.get_percentile(percentile, interpolation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Python::with_gil(|py| attr_value_to_python_value(py, &result))
+    }
+
+    /// Compute multiple percentiles for the array
+    ///
+    /// # Arguments
+    /// * `percentiles` - List of percentiles to compute (each 0.0 to 100.0)
+    /// * `interpolation` - Method for interpolation
+    ///
+    /// # Returns
+    /// BaseArray containing the computed percentiles
+    pub fn percentiles(&self, percentiles: Vec<f64>, interpolation: Option<&str>) -> PyResult<Self> {
+        let interpolation = interpolation.unwrap_or("linear");
+
+        let result = self.inner.percentiles(&percentiles, interpolation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseArray { inner: result })
+    }
+
+    /// Compute correlation coefficient with another array
+    ///
+    /// # Arguments
+    /// * `other` - The other array to compute correlation with
+    /// * `method` - Correlation method: "pearson" (default), "spearman", or "kendall"
+    ///
+    /// # Returns
+    /// Correlation coefficient as a Python float
+    pub fn corr(&self, other: &PyBaseArray, method: Option<&str>) -> PyResult<PyObject> {
+        let method = method.unwrap_or("pearson");
+
+        let result = self.inner.corr(&other.inner, method)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Python::with_gil(|py| attr_value_to_python_value(py, &result))
+    }
+
+    /// Compute covariance with another array
+    ///
+    /// # Arguments
+    /// * `other` - The other array to compute covariance with
+    /// * `ddof` - Delta degrees of freedom (default: 1)
+    ///
+    /// # Returns
+    /// Covariance as a Python float
+    pub fn cov(&self, other: &PyBaseArray, ddof: Option<i32>) -> PyResult<PyObject> {
+        let ddof = ddof.unwrap_or(1);
+
+        let result = self.inner.cov(&other.inner, ddof)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Python::with_gil(|py| attr_value_to_python_value(py, &result))
+    }
+
+    /// Rolling window operation with specified window size
+    ///
+    /// # Arguments
+    /// * `window` - Window size for rolling operations
+    /// * `operation` - Function to apply to each window (e.g., "mean", "sum", "min", "max", "std")
+    ///
+    /// # Returns
+    /// New BaseArray with rolling operation results
+    pub fn rolling(&self, window: usize, operation: &str) -> PyResult<Self> {
+        let result = self.inner.rolling(window, operation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseArray { inner: result })
+    }
+
+    /// Expanding window operation (cumulative from start)
+    ///
+    /// # Arguments
+    /// * `operation` - Function to apply to expanding window (e.g., "mean", "sum", "min", "max", "std")
+    ///
+    /// # Returns
+    /// New BaseArray with expanding operation results
+    pub fn expanding(&self, operation: &str) -> PyResult<Self> {
+        let result = self.inner.expanding(operation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseArray { inner: result })
+    }
+
+    /// Cumulative sum operation
+    ///
+    /// # Returns
+    /// New BaseArray with cumulative sum values
+    pub fn cumsum(&self) -> PyResult<Self> {
+        let result = self.inner.cumsum()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseArray { inner: result })
+    }
+
+    /// Cumulative minimum operation
+    ///
+    /// # Returns
+    /// New BaseArray with cumulative minimum values
+    pub fn cummin(&self) -> PyResult<Self> {
+        let result = self.inner.cummin()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseArray { inner: result })
+    }
+
+    /// Cumulative maximum operation
+    ///
+    /// # Returns
+    /// New BaseArray with cumulative maximum values
+    pub fn cummax(&self) -> PyResult<Self> {
+        let result = self.inner.cummax()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseArray { inner: result })
+    }
+
+    /// Shift operation - shift values by specified periods
+    ///
+    /// # Arguments
+    /// * `periods` - Number of periods to shift (positive = shift right, negative = shift left)
+    /// * `fill_value` - Value to use for filling gaps (default: Null)
+    ///
+    /// # Returns
+    /// New BaseArray with shifted values
+    pub fn shift(&self, periods: i32, fill_value: Option<PyObject>) -> PyResult<Self> {
+        let rust_fill_value = if let Some(py_value) = fill_value {
+            Python::with_gil(|py| python_value_to_attr_value(&py_value.as_ref(py)))?
+        } else {
+            groggy::AttrValue::Null
+        };
+
+        let result = self.inner.shift(periods, Some(rust_fill_value))
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseArray { inner: result })
+    }
+
+    /// Percentage change operation
+    ///
+    /// # Arguments
+    /// * `periods` - Number of periods to use for comparison (default: 1)
+    ///
+    /// # Returns
+    /// New BaseArray with percentage change values
+    pub fn pct_change(&self, periods: Option<usize>) -> PyResult<Self> {
+        let result = self.inner.pct_change(periods)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseArray { inner: result })
     }
 }
 

@@ -364,10 +364,10 @@ impl HoneycombGrid {
             result_positions.push(final_pos);
         }
 
-        eprintln!(
-            "🔶 DEBUG: Energy-based assignment completed: {} nodes assigned to hex centers",
-            result_positions.len()
-        );
+        // 
+// Debug message
+// Debug parameters
+// Debug parameters
 
         Ok(result_positions)
     }
@@ -562,11 +562,11 @@ impl HoneycombGrid {
 
         // If we don't have enough centers, try with smaller hex radius
         if centers.len() < min_count {
-            eprintln!(
-                "🔶 DEBUG: Not enough hex centers ({} < {}), trying smaller hex radius",
-                centers.len(),
-                min_count
-            );
+            // 
+// Debug message
+// Debug parameters
+// Debug parameters
+// Debug parameters
             let smaller_hex_radius = hex_radius * 0.8;
             let w = (3_f64).sqrt() * smaller_hex_radius;
             let h = 1.5 * smaller_hex_radius;
@@ -589,10 +589,10 @@ impl HoneycombGrid {
             }
         }
 
-        eprintln!(
-            "🔶 DEBUG: Generated {} hex centers in circle",
-            centers.len()
-        );
+        // 
+// Debug message
+// Debug parameters
+// Debug parameters
         centers
     }
 
@@ -672,11 +672,11 @@ impl HoneycombGrid {
             }
         }
 
-        eprintln!(
-            "🔶 DEBUG: Unique assignment completed: {} positions assigned to {} different centers",
-            result.len(),
-            used_centers.len()
-        );
+        // 
+// Debug message
+// Debug parameters
+// Debug parameters
+// Debug parameters
 
         Ok(result)
     }
@@ -724,10 +724,10 @@ impl HoneycombGrid {
             result_positions.push(final_pos);
         }
 
-        eprintln!(
-            "🔶 DEBUG: Flat embedding + honeycomb assignment completed: {} nodes assigned",
-            result_positions.len()
-        );
+        // 
+// Debug message
+// Debug parameters
+// Debug parameters
 
         Ok(result_positions)
     }
@@ -791,11 +791,11 @@ impl HoneycombGrid {
 
         // Ensure we have enough centers
         if centers.len() < positions.len() {
-            eprintln!(
-                "⚠️  WARNING: Generated {} hex centers for {} positions, increasing density",
-                centers.len(),
-                positions.len()
-            );
+            // 
+// Debug message
+// Debug parameters
+// Debug parameters
+// Debug parameters
 
             // Fallback: use the original circle generation with smaller cell size
             let fallback_radius = radius * 1.5;

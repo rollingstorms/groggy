@@ -70,8 +70,8 @@ impl VizAccessor {
     fn show(&self, py: Python, layout: String, verbose: Option<u8>, kwargs: Option<&pyo3::types::PyDict>) -> PyResult<PyObject> {
         let verbose = verbose.unwrap_or(0);
         debug_print!(verbose, 2, "📺 VizAccessor.show()");
-        let (alg, params) = self.parse_layout_kwargs_typed(kwargs, &layout, verbose)?;
-        self.ensure_server_and_display_iframe(py, verbose, &alg, &params, /*open_browser=*/false)
+        let (alg, viz_config) = self.parse_layout_kwargs_typed(kwargs, &layout, verbose)?;
+        self.ensure_server_and_display_iframe(py, verbose, &alg, &viz_config, /*open_browser=*/false)
     }
 
 
@@ -80,9 +80,9 @@ impl VizAccessor {
     fn server(&self, py: Python, verbose: Option<u8>) -> PyResult<PyObject> {
         let verbose = verbose.unwrap_or(0);
         debug_print!(verbose, 2, "🖥️ VizAccessor.server()");
-        // No kwargs here, so use default honeycomb and empty params
-        let (alg, params) = self.parse_layout_kwargs_typed(None, "honeycomb", verbose)?;
-        self.ensure_server_and_display_iframe(py, verbose, &alg, &params, /*open_browser=*/true)
+        // No kwargs here, so use default honeycomb and empty viz_config
+        let (alg, viz_config) = self.parse_layout_kwargs_typed(None, "honeycomb", verbose)?;
+        self.ensure_server_and_display_iframe(py, verbose, &alg, &viz_config, /*open_browser=*/true)
     }
 
     /// Update visualization parameters - sends control message to existing server
@@ -91,9 +91,9 @@ impl VizAccessor {
         let verbose = verbose.unwrap_or(0);
         debug_print!(verbose, 2, "🔄 VizAccessor.update()");
 
-        let (layout, params) = self.parse_layout_kwargs_typed(kwargs, "honeycomb", verbose)?;
+        let (layout, viz_config) = self.parse_layout_kwargs_typed(kwargs, "honeycomb", verbose)?;
         if let Some(info) = self.get_server_info() {
-            self.send_control_message_to_server(py, verbose, info.port, layout, params)?;
+            self.send_control_message_to_server(py, verbose, info.port, layout, viz_config.layout_params)?;
             debug_print!(verbose, 1, "✅ Visualization parameters updated successfully");
             Ok(())
         } else {
@@ -173,48 +173,289 @@ impl VizAccessor {
         kwargs: Option<&PyDict>,
         fallback_layout: &str, // e.g. "honeycomb"
         verbose: u8,
-    ) -> PyResult<(String, HashMap<String, String>)> {
+    ) -> PyResult<(String, groggy::viz::realtime::VizConfig)> {
+        use groggy::viz::realtime::{VizConfig, VizParameter};
+        use pyo3::types::{PyList, PyTuple};
+
         let mut layout = self.normalize_layout_name(fallback_layout);
-        let mut layout_params: HashMap<String, String> = HashMap::new();
+        let mut viz_config = VizConfig::new();
 
         if let Some(kw) = kwargs {
-            debug_print!(verbose, 3, "📝 Processing layout parameters from kwargs...");
+            debug_print!(verbose, 3, "📝 Processing visualization parameters from kwargs...");
+
             for (k, v) in kw.iter() {
                 let key = k.extract::<String>().unwrap_or_else(|_| k.to_string());
-                if key == "layout" {
-                    // Prefer common textual forms
-                    if let Ok(s) = v.extract::<String>() {
-                        layout = self.normalize_layout_name(&s);
-                    } else {
-                        layout = self.normalize_layout_name(&v.to_string());
-                    }
-                    continue;
-                }
 
-                // Try types in order: bool, i64, f64, String (cleanly serialized)
-                if let Ok(b) = v.extract::<bool>() {
-                    layout_params.insert(key.clone(), b.to_string());
-                    debug_print!(verbose, 3, "  🔧 {}={}", key, b);
-                } else if let Ok(i) = v.extract::<i64>() {
-                    layout_params.insert(key.clone(), i.to_string());
-                    debug_print!(verbose, 3, "  🔧 {}={}", key, i);
-                } else if let Ok(f) = v.extract::<f64>() {
-                    layout_params.insert(key.clone(), f.to_string());
-                    debug_print!(verbose, 3, "  🔧 {}={}", key, f);
-                } else if let Ok(s) = v.extract::<String>() {
-                    layout_params.insert(key.clone(), s.clone());
-                    debug_print!(verbose, 3, "  🔧 {}={}", key, s);
-                } else {
-                    // Fallback to repr/to_string
-                    let s = v.to_string();
-                    layout_params.insert(key.clone(), s.clone());
-                    debug_print!(verbose, 3, "  🔧 {}={}", key, s);
+                match key.as_str() {
+                    // Layout algorithm
+                    "layout" | "layout_algorithm" => {
+                        if let Ok(s) = v.extract::<String>() {
+                            layout = self.normalize_layout_name(&s);
+                            viz_config.layout_algorithm = Some(s);
+                        } else {
+                            let s = v.to_string();
+                            layout = self.normalize_layout_name(&s);
+                            viz_config.layout_algorithm = Some(s);
+                        }
+                        debug_print!(verbose, 3, "  🎯 layout={}", layout);
+                    }
+
+                    // Node styling parameters
+                    "node_color" => {
+                        viz_config.node_color = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  🎨 node_color parameter set");
+                    }
+                    "node_size" => {
+                        viz_config.node_size = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  📏 node_size parameter set");
+                    }
+                    "node_shape" => {
+                        viz_config.node_shape = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  🔶 node_shape parameter set");
+                    }
+                    "node_opacity" => {
+                        viz_config.node_opacity = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  👻 node_opacity parameter set");
+                    }
+                    "node_border_color" => {
+                        viz_config.node_border_color = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  🖍️ node_border_color parameter set");
+                    }
+                    "node_border_width" => {
+                        viz_config.node_border_width = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  📐 node_border_width parameter set");
+                    }
+
+                    // Edge styling parameters
+                    "edge_color" => {
+                        viz_config.edge_color = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  🎨 edge_color parameter set");
+                    }
+                    "edge_width" => {
+                        viz_config.edge_width = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  📏 edge_width parameter set");
+                    }
+                    "edge_opacity" => {
+                        viz_config.edge_opacity = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  👻 edge_opacity parameter set");
+                    }
+                    "edge_style" => {
+                        viz_config.edge_style = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  ➖ edge_style parameter set");
+                    }
+
+                    // Label parameters
+                    "label" | "node_label" => {
+                        viz_config.node_label = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  🏷️ node_label parameter set");
+                    }
+                    "edge_label" => {
+                        viz_config.edge_label = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  🏷️ edge_label parameter set");
+                    }
+                    "label_size" => {
+                        viz_config.label_size = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  📏 label_size parameter set");
+                    }
+                    "label_color" => {
+                        viz_config.label_color = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  🎨 label_color parameter set");
+                    }
+                    "edge_label_size" => {
+                        viz_config.edge_label_size = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  📏 edge_label_size parameter set");
+                    }
+                    "edge_label_color" => {
+                        viz_config.edge_label_color = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  🎨 edge_label_color parameter set");
+                    }
+
+                    // Position parameters
+                    "x" => {
+                        viz_config.x = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  📍 x parameter set");
+                    }
+                    "y" => {
+                        viz_config.y = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  📍 y parameter set");
+                    }
+                    "z" => {
+                        viz_config.z = self.parse_viz_parameter(v, verbose)?;
+                        debug_print!(verbose, 3, "  📍 z parameter set");
+                    }
+
+                    // Filtering parameters
+                    "show_nodes_where" => {
+                        if let Ok(s) = v.extract::<String>() {
+                            viz_config.show_nodes_where = Some(s);
+                            debug_print!(verbose, 3, "  🔍 show_nodes_where filter set");
+                        }
+                    }
+                    "show_edges_where" => {
+                        if let Ok(s) = v.extract::<String>() {
+                            viz_config.show_edges_where = Some(s);
+                            debug_print!(verbose, 3, "  🔍 show_edges_where filter set");
+                        }
+                    }
+                    "highlight_nodes_where" => {
+                        if let Ok(s) = v.extract::<String>() {
+                            viz_config.highlight_nodes_where = Some(s);
+                            debug_print!(verbose, 3, "  ✨ highlight_nodes_where filter set");
+                        }
+                    }
+                    "highlight_edges_where" => {
+                        if let Ok(s) = v.extract::<String>() {
+                            viz_config.highlight_edges_where = Some(s);
+                            debug_print!(verbose, 3, "  ✨ highlight_edges_where filter set");
+                        }
+                    }
+
+                    // Scaling parameters
+                    "node_size_range" => {
+                        if let Ok(tuple) = v.downcast::<PyTuple>() {
+                            if tuple.len() == 2 {
+                                if let (Ok(min), Ok(max)) = (tuple.get_item(0)?.extract::<f64>(), tuple.get_item(1)?.extract::<f64>()) {
+                                    viz_config.node_size_range = Some((min, max));
+                                    debug_print!(verbose, 3, "  📏 node_size_range=[{}, {}]", min, max);
+                                }
+                            }
+                        }
+                    }
+                    "edge_width_range" => {
+                        if let Ok(tuple) = v.downcast::<PyTuple>() {
+                            if tuple.len() == 2 {
+                                if let (Ok(min), Ok(max)) = (tuple.get_item(0)?.extract::<f64>(), tuple.get_item(1)?.extract::<f64>()) {
+                                    viz_config.edge_width_range = Some((min, max));
+                                    debug_print!(verbose, 3, "  📏 edge_width_range=[{}, {}]", min, max);
+                                }
+                            }
+                        }
+                    }
+
+                    // Color parameters
+                    "color_palette" => {
+                        if let Ok(list) = v.downcast::<PyList>() {
+                            let palette: Result<Vec<String>, _> = list.iter().map(|item| item.extract::<String>()).collect();
+                            if let Ok(palette) = palette {
+                                viz_config.color_palette = Some(palette);
+                                debug_print!(verbose, 3, "  🎨 color_palette with {} colors", viz_config.color_palette.as_ref().unwrap().len());
+                            }
+                        }
+                    }
+                    "color_scale_type" => {
+                        if let Ok(s) = v.extract::<String>() {
+                            viz_config.color_scale_type = Some(s);
+                            debug_print!(verbose, 3, "  📊 color_scale_type set");
+                        }
+                    }
+
+                    // Tooltip parameters
+                    "tooltip_columns" => {
+                        if let Ok(list) = v.downcast::<PyList>() {
+                            let columns: Result<Vec<String>, _> = list.iter().map(|item| item.extract::<String>()).collect();
+                            if let Ok(columns) = columns {
+                                viz_config.tooltip_columns = columns;
+                                debug_print!(verbose, 3, "  💬 tooltip_columns with {} columns", viz_config.tooltip_columns.len());
+                            }
+                        }
+                    }
+
+                    // Interaction parameters
+                    "click_behavior" => {
+                        if let Ok(s) = v.extract::<String>() {
+                            viz_config.click_behavior = Some(s);
+                            debug_print!(verbose, 3, "  🖱️ click_behavior set");
+                        }
+                    }
+                    "hover_behavior" => {
+                        if let Ok(s) = v.extract::<String>() {
+                            viz_config.hover_behavior = Some(s);
+                            debug_print!(verbose, 3, "  🖱️ hover_behavior set");
+                        }
+                    }
+                    "selection_mode" => {
+                        if let Ok(s) = v.extract::<String>() {
+                            viz_config.selection_mode = Some(s);
+                            debug_print!(verbose, 3, "  ✅ selection_mode set");
+                        }
+                    }
+                    "zoom_behavior" => {
+                        if let Ok(s) = v.extract::<String>() {
+                            viz_config.zoom_behavior = Some(s);
+                            debug_print!(verbose, 3, "  🔍 zoom_behavior set");
+                        }
+                    }
+
+                    // Layout parameters (legacy support)
+                    _ => {
+                        // For any other parameter, treat it as a layout parameter
+                        if let Ok(s) = v.extract::<String>() {
+                            viz_config.layout_params.insert(key.clone(), s.clone());
+                            debug_print!(verbose, 3, "  🔧 layout param {}={}", key, s);
+                        } else if let Ok(f) = v.extract::<f64>() {
+                            viz_config.layout_params.insert(key.clone(), f.to_string());
+                            debug_print!(verbose, 3, "  🔧 layout param {}={}", key, f);
+                        } else if let Ok(i) = v.extract::<i64>() {
+                            viz_config.layout_params.insert(key.clone(), i.to_string());
+                            debug_print!(verbose, 3, "  🔧 layout param {}={}", key, i);
+                        } else if let Ok(b) = v.extract::<bool>() {
+                            viz_config.layout_params.insert(key.clone(), b.to_string());
+                            debug_print!(verbose, 3, "  🔧 layout param {}={}", key, b);
+                        } else {
+                            let s = v.to_string();
+                            viz_config.layout_params.insert(key.clone(), s.clone());
+                            debug_print!(verbose, 3, "  🔧 layout param {}={}", key, s);
+                        }
+                    }
                 }
             }
         }
 
-        debug_print!(verbose, 3, "📊 Final layout parameters: algorithm='{}', params={:?}", layout, layout_params);
-        Ok((layout, layout_params))
+        debug_print!(verbose, 3, "📊 Final visualization config: algorithm='{}', styled parameters parsed", layout);
+        Ok((layout, viz_config))
+    }
+
+    /// Parse a Python value into a VizParameter (array, column name, or single value)
+    fn parse_viz_parameter<T>(&self, py_value: &PyAny, verbose: u8) -> PyResult<groggy::viz::realtime::VizParameter<T>>
+    where
+        for<'a> T: pyo3::FromPyObject<'a>,
+    {
+        use groggy::viz::realtime::VizParameter;
+        use pyo3::types::{PyList, PyTuple};
+
+        // Try to extract as a string first (column name)
+        if let Ok(column_name) = py_value.extract::<String>() {
+            debug_print!(verbose, 3, "    📝 Parsed as column: {}", column_name);
+            return Ok(VizParameter::Column(column_name));
+        }
+
+        // Try to extract as a list (array of values)
+        if let Ok(py_list) = py_value.downcast::<PyList>() {
+            let values: Result<Vec<T>, _> = py_list.iter().map(|item| item.extract::<T>()).collect();
+            if let Ok(values) = values {
+                debug_print!(verbose, 3, "    📊 Parsed as array with {} values", values.len());
+                return Ok(VizParameter::Array(values));
+            }
+        }
+
+        // Try to extract as a tuple (array of values)
+        if let Ok(py_tuple) = py_value.downcast::<PyTuple>() {
+            let values: Result<Vec<T>, _> = py_tuple.iter().map(|item| item.extract::<T>()).collect();
+            if let Ok(values) = values {
+                debug_print!(verbose, 3, "    📊 Parsed as tuple array with {} values", values.len());
+                return Ok(VizParameter::Array(values));
+            }
+        }
+
+        // Try to extract as a single value
+        if let Ok(value) = py_value.extract::<T>() {
+            debug_print!(verbose, 3, "    🎯 Parsed as single value");
+            return Ok(VizParameter::Value(value));
+        }
+
+        // If all parsing fails, return None
+        debug_print!(verbose, 3, "    ❌ Could not parse parameter, using None");
+        Ok(VizParameter::None)
     }
 
     /// Boot (or reuse) the realtime server in background and display iframe.
@@ -224,12 +465,12 @@ impl VizAccessor {
         py: Python,
         verbose: u8,
         layout: &str,
-        layout_params: &HashMap<String, String>,
+        viz_config: &groggy::viz::realtime::VizConfig,
         open_browser: bool,   // true for `.server()`, false for `.show()`
     ) -> PyResult<PyObject> {
         if let Some(info) = self.get_server_info() {
             // Reuse: just send a control message and re-display iframe
-            self.send_control_message_to_server(py, verbose, info.port, layout.to_string(), layout_params.clone())?;
+            self.send_control_message_to_server(py, verbose, info.port, layout.to_string(), viz_config.layout_params.clone())?;
             let html = format!(
 r#"<div style="position: relative;">
 <iframe src="http://127.0.0.1:{}/" width="100%" height="640" frameborder="0" style="border: 1px solid #ddd;"></iframe>
@@ -261,31 +502,36 @@ display(HTML(r'''{html}'''))
             // Build layout algorithm from normalized layout + params (keep same rules as before)
             let algo = match layout {
                 "force_directed" => {
-                    let iterations = layout_params.get("iterations").and_then(|s| s.parse().ok()).unwrap_or(100);
-                    let charge = layout_params.get("charge").and_then(|s| s.parse().ok()).unwrap_or(-300.0);
-                    let distance = layout_params.get("distance").and_then(|s| s.parse().ok()).unwrap_or(50.0);
+                    let iterations = viz_config.layout_params.get("iterations").and_then(|s| s.parse().ok()).unwrap_or(100);
+                    let charge = viz_config.layout_params.get("charge").and_then(|s| s.parse().ok()).unwrap_or(-300.0);
+                    let distance = viz_config.layout_params.get("distance").and_then(|s| s.parse().ok()).unwrap_or(50.0);
                     LayoutAlgorithm::ForceDirected { charge, distance, iterations }
                 }
                 "circular" => {
-                    let radius = layout_params.get("radius").and_then(|s| s.parse::<f64>().ok());
-                    let start_angle = layout_params.get("start_angle").and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                    let radius = viz_config.layout_params.get("radius").and_then(|s| s.parse::<f64>().ok());
+                    let start_angle = viz_config.layout_params.get("start_angle").and_then(|s| s.parse().ok()).unwrap_or(0.0);
                     LayoutAlgorithm::Circular { radius, start_angle }
                 }
                 "grid" => {
-                    let columns = layout_params.get("columns").and_then(|s| s.parse().ok()).unwrap_or(5);
-                    let cell_size = layout_params.get("cell_size").and_then(|s| s.parse().ok()).unwrap_or(100.0);
+                    let columns = viz_config.layout_params.get("columns").and_then(|s| s.parse().ok()).unwrap_or(5);
+                    let cell_size = viz_config.layout_params.get("cell_size").and_then(|s| s.parse().ok()).unwrap_or(100.0);
                     LayoutAlgorithm::Grid { columns, cell_size }
                 }
                 _ => { // honeycomb default
-                    let cell_size = layout_params.get("cell_size").and_then(|s| s.parse().ok()).unwrap_or(40.0);
-                    let energy_optimization = layout_params.get("energy_optimization").and_then(|s| s.parse().ok()).unwrap_or(true);
-                    let iterations = layout_params.get("iterations").and_then(|s| s.parse().ok()).unwrap_or(100);
+                    let cell_size = viz_config.layout_params.get("cell_size").and_then(|s| s.parse().ok()).unwrap_or(40.0);
+                    let energy_optimization = viz_config.layout_params.get("energy_optimization").and_then(|s| s.parse().ok()).unwrap_or(true);
+                    let iterations = viz_config.layout_params.get("iterations").and_then(|s| s.parse().ok()).unwrap_or(100);
                     LayoutAlgorithm::Honeycomb { cell_size, energy_optimization, iterations }
                 }
             };
 
             let ds_arc = Arc::new(ds);
-            let accessor = DataSourceRealtimeAccessor::with_layout(ds_arc, algo);
+
+            let accessor = DataSourceRealtimeAccessor::with_layout_and_config(
+                ds_arc,
+                algo,
+                Some(viz_config.clone())
+            );
 
             // Validate data access once (snapshot)
             accessor.initial_snapshot().map_err(|e| format!("Snapshot creation failed: {}", e))?;
@@ -316,7 +562,7 @@ r#"<div style="position: relative;">
             verbose,
             port,
             layout.to_string(),
-            layout_params.clone(),
+            viz_config.layout_params.clone(),
         ) {
             debug_print!(
                 verbose,

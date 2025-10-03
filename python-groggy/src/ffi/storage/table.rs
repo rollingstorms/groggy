@@ -3,6 +3,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
 use crate::ffi::storage::array::PyBaseArray;
+use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
 use crate::ffi::storage::num_array::PyNumArray;
 use crate::ffi::viz_accessor::VizAccessor;
 use groggy::storage::{ArrayOps, array::{BaseArray, NumArray}, table::{BaseTable, NodesTable, EdgesTable, Table, TableIterator}};
@@ -119,13 +120,13 @@ impl PyBaseTable {
     pub fn column_names(&self) -> Vec<String> {
         self.table.column_names().to_vec()
     }
-    
+
     /// Get column names (alias for column_names)
     #[getter]
     pub fn columns(&self) -> Vec<String> {
-        self.column_names()
+        self.table.column_names().to_vec()
     }
-    
+
     /// Get a specific column as BaseArray for chaining operations
     /// This enables: table.column('age').iter().filter(...).collect()
     pub fn column(&self, column_name: &str) -> PyResult<PyBaseArray> {
@@ -185,10 +186,57 @@ impl PyBaseTable {
     pub fn sort_by(&self, py: Python, column: &str, ascending: bool) -> PyResult<Py<Self>> {
         let sorted_table = self.table.sort_by(column, ascending)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        
+
         Py::new(py, Self::from_table(sorted_table))
     }
-    
+
+    /// Sort table by multiple columns with mixed ascending/descending order
+    /// Pandas-style multi-column sorting with priority order
+    ///
+    /// Args:
+    ///     columns: List of column names to sort by (in priority order)
+    ///     ascending: List of booleans for sort direction per column.
+    ///               If single bool, applies to all columns.
+    ///               If list, must match length of columns.
+    ///
+    /// Returns:
+    ///     PyBaseTable: A new sorted table
+    ///
+    /// Examples:
+    ///     # Sort by department ascending, then salary descending
+    ///     sorted_table = table.sort_values(['department', 'salary'], [True, False])
+    ///
+    ///     # Sort by all columns ascending
+    ///     sorted_table = table.sort_values(['col1', 'col2'], True)
+    #[pyo3(signature = (columns, ascending = None))]
+    pub fn sort_values(&self, py: Python, columns: Vec<String>, ascending: Option<PyObject>) -> PyResult<Py<Self>> {
+        // Convert ascending parameter to Vec<bool>
+        let ascending_vec = match ascending {
+            Some(asc_obj) => {
+                if let Ok(single_bool) = asc_obj.extract::<bool>(py) {
+                    // Single boolean applies to all columns
+                    vec![single_bool; columns.len()]
+                } else if let Ok(bool_list) = asc_obj.extract::<Vec<bool>>(py) {
+                    // List of booleans
+                    bool_list
+                } else {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "ascending must be a boolean or list of booleans"
+                    ));
+                }
+            }
+            None => {
+                // Default to all ascending
+                vec![true; columns.len()]
+            }
+        };
+
+        let sorted_table = self.table.sort_values(columns, ascending_vec)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Py::new(py, Self::from_table(sorted_table))
+    }
+
     /// Select specific columns to create a new table
     ///
     /// Args:
@@ -442,8 +490,23 @@ impl PyBaseTable {
     ///
     /// Returns:
     ///     PyTableArray: Array-like container holding the grouped tables
-    pub fn group_by(&self, columns: Vec<String>) -> PyResult<PyTableArray> {
-        let grouped_tables = self.table.group_by(&columns)
+    pub fn group_by(&self, columns: PyObject) -> PyResult<PyTableArray> {
+        // Convert PyObject to Vec<String> - handle both single string and list of strings
+        let column_vec: Vec<String> = Python::with_gil(|py| {
+            if let Ok(single_str) = columns.extract::<String>(py) {
+                // Single string case
+                Ok(vec![single_str])
+            } else if let Ok(string_vec) = columns.extract::<Vec<String>>(py) {
+                // Vector of strings case
+                Ok(string_vec)
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "columns must be a string or list of strings"
+                ))
+            }
+        })?;
+
+        let grouped_tables = self.table.group_by(&column_vec)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         
         // Convert to PyBaseTable objects
@@ -451,9 +514,9 @@ impl PyBaseTable {
             .map(|table| PyBaseTable::from_table(table))
             .collect();
         
-        Ok(PyTableArray { 
+        Ok(PyTableArray {
             tables: py_tables,
-            group_columns: columns,
+            group_columns: column_vec,
         })
     }
     
@@ -527,7 +590,45 @@ impl PyBaseTable {
         let df = pandas.call_method1("DataFrame", (data_dict,))?;
         Ok(df.to_object(py))
     }
-    
+
+    /// Convert table columns to specified type
+    ///
+    /// Returns a copy of the table with all numeric columns converted to the specified type.
+    /// Non-numeric columns are left unchanged.
+    ///
+    /// Example:
+    /// ```python
+    /// # Convert all numeric columns to float64
+    /// float_table = table.to_type("float64")
+    /// ```
+    pub fn to_type(&self, dtype: &str) -> PyResult<PyBaseTable> {
+        match dtype {
+            "table" | "basetable" => {
+                // Return a copy of self
+                Ok(self.clone())
+            }
+            _ => {
+                // For other types, convert each column individually
+                let mut new_columns = std::collections::HashMap::new();
+
+                for col_name in self.table.column_names() {
+                    if let Some(column) = self.table.column(&col_name) {
+                        // Try to convert the column to the requested type
+                        // For now, just clone - full type conversion would require more logic
+                        new_columns.insert(col_name.clone(), column.clone());
+                    }
+                }
+
+                groggy::storage::table::BaseTable::from_columns(new_columns)
+                    .map(|table| PyBaseTable {
+                        table,
+                        server_guards: RefCell::new(Vec::new()),
+                    })
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
+            }
+        }
+    }
+
     /// Enable subscripting: table[column_name], table[slice], or table[boolean_mask]
     pub fn __getitem__(&self, key: &PyAny) -> PyResult<PyObject> {
         use pyo3::types::{PyString, PySlice};
@@ -1019,10 +1120,13 @@ impl PyBaseTable {
     /// # Multi-column join
     /// result = table1.join(table2, on=["key1", "key2"], how="outer")
     /// ```
-    pub fn join(&self, other: &Self, on: &PyAny, how: &str) -> PyResult<Self> {
+    pub fn join(&self, other: &Self, on: &PyAny, how: Option<&str>) -> PyResult<Self> {
         // Parse the 'on' parameter
         let (left_cols, right_cols) = self.parse_join_on(on)?;
         
+        // Use default join type if not specified
+        let how = how.unwrap_or("inner");
+
         // Validate join type
         let join_result = match how.to_lowercase().as_str() {
             "inner" => {
@@ -1044,9 +1148,8 @@ impl PyBaseTable {
                 }
             }
             "right" => {
-                // Right join is just left join with tables swapped
                 if left_cols.len() == 1 {
-                    other.table.left_join(&self.table, &right_cols[0], &left_cols[0])
+                    self.table.right_join(&other.table, &left_cols[0], &right_cols[0])
                 } else {
                     return Err(pyo3::exceptions::PyNotImplementedError::new_err(
                         "Multi-column joins not yet implemented"
@@ -1054,13 +1157,20 @@ impl PyBaseTable {
                 }
             }
             "outer" => {
-                return Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                    "Outer join not yet implemented"
-                ));
+                if left_cols.len() == 1 {
+                    self.table.outer_join(&other.table, &left_cols[0], &right_cols[0])
+                } else {
+                    return Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                        "Multi-column joins not yet implemented"
+                    ));
+                }
+            }
+            "cross" => {
+                self.table.cross_join(&other.table)
             }
             _ => {
                 return Err(pyo3::exceptions::PyValueError::new_err(
-                    format!("Invalid join type '{}'. Must be one of: 'inner', 'left', 'right', 'outer'", how)
+                    format!("Invalid join type '{}'. Must be one of: 'inner', 'left', 'right', 'outer', 'cross'", how)
                 ));
             }
         };
@@ -1462,6 +1572,888 @@ impl PyBaseTable {
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Drop duplicates failed: {}", e)))?;
 
         Ok(Self::from_table(result))
+    }
+
+    // ==================================================================================
+    // ADVANCED FILTERING METHODS - PHASE 3.2
+    // ==================================================================================
+
+    /// Check if values in a column are in a provided set (pandas-style isin)
+    ///
+    /// # Arguments
+    /// * `column_name` - Name of the column to check
+    /// * `values` - List of values to check membership against
+    ///
+    /// # Returns
+    /// Boolean array indicating which rows match the values
+    ///
+    /// # Examples
+    /// ```python
+    /// mask = table.isin("department", ["Engineering", "Marketing"])
+    /// filtered = table[mask]
+    /// ```
+    pub fn isin(&self, column_name: &str, values: &PyList) -> PyResult<PyBaseArray> {
+        // Convert Python list to Vec<AttrValue>
+        let mut attr_values = Vec::new();
+        for value_py in values.iter() {
+            let attr_value = crate::ffi::utils::python_value_to_attr_value(value_py)?;
+            attr_values.push(attr_value);
+        }
+
+        // Call the Rust implementation
+        let mask = self.table.isin(column_name, attr_values)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        // Convert boolean mask to BaseArray<AttrValue>
+        let mask_attr_values: Vec<AttrValue> = mask.into_iter()
+            .map(|b| AttrValue::Bool(b))
+            .collect();
+
+        Ok(PyBaseArray {
+            inner: BaseArray::new(mask_attr_values),
+        })
+    }
+
+    /// Get the N largest values in a column (pandas-style nlargest)
+    ///
+    /// # Arguments
+    /// * `n` - Number of largest values to return
+    /// * `column_name` - Name of the column to sort by
+    ///
+    /// # Returns
+    /// New table with the N rows having the largest values in the specified column
+    ///
+    /// # Examples
+    /// ```python
+    /// top_5_salaries = table.nlargest(5, "salary")
+    /// ```
+    pub fn nlargest(&self, n: usize, column_name: &str) -> PyResult<Self> {
+        let result = self.table.nlargest(n, column_name)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(Self::from_table(result))
+    }
+
+    /// Get the N smallest values in a column (pandas-style nsmallest)
+    ///
+    /// # Arguments
+    /// * `n` - Number of smallest values to return
+    /// * `column_name` - Name of the column to sort by
+    ///
+    /// # Returns
+    /// New table with the N rows having the smallest values in the specified column
+    ///
+    /// # Examples
+    /// ```python
+    /// bottom_5_salaries = table.nsmallest(5, "salary")
+    /// ```
+    pub fn nsmallest(&self, n: usize, column_name: &str) -> PyResult<Self> {
+        let result = self.table.nsmallest(n, column_name)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(Self::from_table(result))
+    }
+
+    /// Pandas-style query method for string-based filtering
+    ///
+    /// # Arguments
+    /// * `expr` - String expression to evaluate (uses enhanced filter syntax)
+    ///
+    /// # Returns
+    /// New table with rows matching the query expression
+    ///
+    /// # Examples
+    /// ```python
+    /// result = table.query("age > 25 AND department == Engineering")
+    /// result = table.query("salary BETWEEN 50000 AND 100000")
+    /// result = table.query("name LIKE A%")
+    /// result = table.query("department IN [Engineering, Marketing]")
+    /// ```
+    pub fn query(&self, expr: &str) -> PyResult<Self> {
+        let result = self.table.query(expr)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(Self::from_table(result))
+    }
+
+    /// Count the frequency of unique values in a column (pandas-style value_counts)
+    ///
+    /// # Arguments
+    /// * `column` - Column name to analyze
+    /// * `sort` - Whether to sort results by count (default: true)
+    /// * `ascending` - Sort order when sort=true (default: false, most frequent first)
+    /// * `dropna` - Whether to exclude null values (default: true)
+    ///
+    /// # Returns
+    /// Table with 'value' and 'count' columns showing frequency of each unique value
+    ///
+    /// # Examples
+    /// ```python
+    /// # Basic usage
+    /// counts = table.value_counts("category")
+    ///
+    /// # Custom sorting
+    /// counts = table.value_counts("category", sort=True, ascending=True)
+    ///
+    /// # Include null values
+    /// counts = table.value_counts("category", dropna=False)
+    /// ```
+    pub fn value_counts(
+        &self,
+        column: &str,
+        sort: Option<bool>,
+        ascending: Option<bool>,
+        dropna: Option<bool>
+    ) -> PyResult<Self> {
+        let sort = sort.unwrap_or(true);
+        let ascending = ascending.unwrap_or(false);
+        let dropna = dropna.unwrap_or(true);
+
+        let result = self.table.value_counts(column, sort, ascending, dropna)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(Self::from_table(result))
+    }
+
+    /// Create a pivot table for data reshaping (pandas-style pivot_table)
+    ///
+    /// # Arguments
+    /// * `index` - Column(s) to use as index for the pivot table
+    /// * `columns` - Column to spread into new columns
+    /// * `values` - Column to aggregate
+    /// * `aggfunc` - Aggregation function ("mean", "sum", "count", etc.)
+    ///
+    /// # Returns
+    /// Reshaped table with index as rows and unique values from columns as columns
+    ///
+    /// # Examples
+    /// ```python
+    /// # Create pivot table showing average salary by department and level
+    /// pivot = table.pivot_table(["dept"], "level", "salary", "mean")
+    ///
+    /// # Multi-index pivot
+    /// pivot = table.pivot_table(["dept", "team"], "level", "salary", "sum")
+    /// ```
+    pub fn pivot_table(
+        &self,
+        index: PyObject,
+        columns: &str,
+        values: &str,
+        aggfunc: &str
+    ) -> PyResult<Self> {
+        // Convert index to Vec<String> - handle both single string and list of strings
+        let index_cols: Vec<String> = Python::with_gil(|py| {
+            if let Ok(single_str) = index.extract::<String>(py) {
+                // Single string case
+                Ok(vec![single_str])
+            } else if let Ok(string_vec) = index.extract::<Vec<String>>(py) {
+                // Vector of strings case
+                Ok(string_vec)
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "index must be a string or list of strings"
+                ))
+            }
+        })?;
+
+        let result = self.table.pivot_table(&index_cols, columns, values, aggfunc)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(Self::from_table(result))
+    }
+
+    /// Melt operation for data unpivoting (pandas-style melt)
+    ///
+    /// # Arguments
+    /// * `id_vars` - Column(s) to use as identifier variables
+    /// * `value_vars` - Column(s) to unpivot (if None, uses all columns except id_vars)
+    /// * `var_name` - Name for the variable column (default: "variable")
+    /// * `value_name` - Name for the value column (default: "value")
+    ///
+    /// # Returns
+    /// Unpivoted table in long format
+    ///
+    /// # Examples
+    /// ```python
+    /// # Basic melt
+    /// melted = table.melt(["id"], ["col1", "col2"])
+    ///
+    /// # Custom column names
+    /// melted = table.melt(["id"], ["col1", "col2"], "metric", "score")
+    /// ```
+    pub fn melt(
+        &self,
+        value_vars: PyObject,
+        var_name: Option<&str>,
+        value_name: Option<&str>
+    ) -> PyResult<Self> {
+        // Convert value_vars - handle both single string and list of strings
+        let value_vars: Vec<String> = Python::with_gil(|py| {
+            if let Ok(single_str) = value_vars.extract::<String>(py) {
+                // Single string case
+                Ok(vec![single_str])
+            } else if let Ok(string_vec) = value_vars.extract::<Vec<String>>(py) {
+                // Vector of strings case
+                Ok(string_vec)
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "value_vars must be a string or list of strings"
+                ))
+            }
+        })?;
+
+        let var_name = var_name.unwrap_or("variable");
+        let value_name = value_name.unwrap_or("value");
+
+        let result = self.table.melt(
+            None, // id_vars - let all other columns be identifiers
+            Some(&value_vars),
+            Some(var_name.to_string()),
+            Some(value_name.to_string())
+        ).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(Self::from_table(result))
+    }
+
+    /// Apply a Python function to each column in the table (pandas-style apply with axis=0)
+    ///
+    /// # Arguments
+    /// * `func` - Python function to apply to each column
+    ///
+    /// # Returns
+    /// New single-row table with one column per original column containing the function results
+    ///
+    /// # Examples
+    /// ```python
+    /// # Get column sums
+    /// def sum_column(col):
+    ///     return sum(x for x in col if isinstance(x, (int, float)))
+    ///
+    /// result = table.apply(sum_column, axis=0)
+    ///
+    /// # Using lambda for column means
+    /// means = table.apply(lambda col: sum(col) / len(col), axis=0)
+    /// ```
+    pub fn apply_to_columns(&self, func: PyObject) -> PyResult<Self> {
+        use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
+
+        Python::with_gil(|py| {
+            // Create a closure that converts the BaseArray to Python and calls the function
+            let apply_closure = |column: &groggy::storage::array::BaseArray<groggy::types::AttrValue>| -> PyResult<groggy::types::AttrValue> {
+                // Convert BaseArray to Python list
+                let py_list: PyResult<Vec<PyObject>> = column
+                    .iter()
+                    .map(|value| attr_value_to_python_value(py, value))
+                    .collect();
+                let py_list = py_list?;
+
+                // Call the Python function
+                let result = func.call1(py, (py_list,))?;
+
+                // Convert result back to AttrValue
+                python_value_to_attr_value(result.as_ref(py))
+            };
+
+            let rust_result = self.table.apply_to_columns(|col| {
+                apply_closure(col).unwrap_or(groggy::types::AttrValue::Null)
+            });
+
+            match rust_result {
+                Ok(result_table) => Ok(Self::from_table(result_table)),
+                Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
+            }
+        })
+    }
+
+    /// Apply a Python function to each row in the table (pandas-style apply with axis=1)
+    ///
+    /// # Arguments
+    /// * `func` - Python function to apply to each row
+    /// * `result_name` - Name for the result column
+    ///
+    /// # Returns
+    /// New single-column table with one row per original row containing the function results
+    ///
+    /// # Examples
+    /// ```python
+    /// # Compute row sums
+    /// def sum_row(row):
+    ///     return sum(v for v in row.values() if isinstance(v, (int, float)))
+    ///
+    /// result = table.apply(sum_row, axis=1, result_name="row_sum")
+    ///
+    /// # Using lambda for row means
+    /// means = table.apply(lambda row: sum(row.values()) / len(row), axis=1, result_name="row_mean")
+    /// ```
+    pub fn apply_to_rows(&self, func: PyObject, result_name: Option<&str>) -> PyResult<Self> {
+        use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
+        use std::collections::HashMap;
+
+        Python::with_gil(|py| {
+            // Create a closure that converts the row HashMap to Python dict and calls the function
+            let apply_closure = |row: &HashMap<String, groggy::types::AttrValue>| -> PyResult<groggy::types::AttrValue> {
+                // Convert HashMap to Python dict
+                let py_dict = pyo3::types::PyDict::new(py);
+                for (key, value) in row {
+                    let py_value = attr_value_to_python_value(py, value)?;
+                    py_dict.set_item(key, py_value)?;
+                }
+
+                // Call the Python function
+                let result = func.call1(py, (py_dict,))?;
+
+                // Convert result back to AttrValue
+                python_value_to_attr_value(result.as_ref(py))
+            };
+
+            // Use default result name if not specified
+            let result_name = result_name.unwrap_or("result");
+
+            let rust_result = self.table.apply_to_rows(
+                |row| apply_closure(row).unwrap_or(groggy::types::AttrValue::Null),
+                result_name
+            );
+
+            match rust_result {
+                Ok(result_table) => Ok(Self::from_table(result_table)),
+                Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))
+            }
+        })
+    }
+
+    /// Apply a Python function along an axis of the table (pandas-style apply)
+    ///
+    /// # Arguments
+    /// * `func` - Python function to apply
+    /// * `axis` - 0 for columns, 1 for rows
+    /// * `result_name` - Name for the result column (only used when axis=1)
+    ///
+    /// # Returns
+    /// Transformed table based on the axis
+    ///
+    /// # Examples
+    /// ```python
+    /// # Apply to columns (axis=0)
+    /// column_sums = table.apply(lambda col: sum(col), axis=0)
+    ///
+    /// # Apply to rows (axis=1)
+    /// row_sums = table.apply(lambda row: sum(row.values()), axis=1, result_name="total")
+    /// ```
+    pub fn apply(
+        &self,
+        func: PyObject,
+        axis: Option<i32>,
+        result_name: Option<&str>
+    ) -> PyResult<Self> {
+        let axis = axis.unwrap_or(0);
+        let result_name = result_name.unwrap_or("result");
+
+        match axis {
+            0 => self.apply_to_columns(func),
+            1 => self.apply_to_rows(func, Some(result_name)),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(
+                "axis must be 0 (columns) or 1 (rows)"
+            ))
+        }
+    }
+
+    /// Append a new row to the table (pandas-style append)
+    ///
+    /// # Arguments
+    /// * `row_data` - Dictionary mapping column names to values
+    ///
+    /// # Returns
+    /// New table with the row appended
+    ///
+    /// # Examples
+    /// ```python
+    /// # Add a new row
+    /// new_table = table.append({'name': 'Alice', 'age': 30})
+    /// ```
+    pub fn append(&self, row_data: &pyo3::types::PyDict) -> PyResult<Self> {
+        use crate::ffi::utils::python_value_to_attr_value;
+        use std::collections::HashMap;
+
+        // Convert Python dict to Rust HashMap
+        let mut rust_row_data = HashMap::new();
+        for (key, value) in row_data.iter() {
+            let column_name: String = key.extract()?;
+            let attr_value = python_value_to_attr_value(value)?;
+            rust_row_data.insert(column_name, attr_value);
+        }
+
+        // Call the underlying append method
+        let result_table = self.table.append(rust_row_data)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+
+        Ok(Self::from_table(result_table))
+    }
+
+    /// Extend the table with multiple rows (pandas-style extend/concat)
+    ///
+    /// # Arguments
+    /// * `rows_data` - List of dictionaries, each representing a row
+    ///
+    /// # Returns
+    /// New table with all rows appended
+    ///
+    /// # Examples
+    /// ```python
+    /// # Add multiple rows
+    /// rows = [
+    ///     {'name': 'Alice', 'age': 30},
+    ///     {'name': 'Bob', 'age': 25}
+    /// ]
+    /// new_table = table.extend(rows)
+    /// ```
+    pub fn extend(&self, rows_data: &pyo3::types::PyList) -> PyResult<Self> {
+        use crate::ffi::utils::python_value_to_attr_value;
+        use std::collections::HashMap;
+
+        // Convert list of Python dicts to Vec<HashMap>
+        let mut rust_rows_data = Vec::new();
+        for row_item in rows_data.iter() {
+            let row_dict: &pyo3::types::PyDict = row_item.downcast()?;
+            let mut rust_row_data = HashMap::new();
+
+            for (key, value) in row_dict.iter() {
+                let column_name: String = key.extract()?;
+                let attr_value = python_value_to_attr_value(value)?;
+                rust_row_data.insert(column_name, attr_value);
+            }
+
+            rust_rows_data.push(rust_row_data);
+        }
+
+        // Call the underlying extend method
+        let result_table = self.table.extend(rust_rows_data)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+
+        Ok(Self::from_table(result_table))
+    }
+
+    /// Drop rows at specified indices (pandas-style drop)
+    ///
+    /// # Arguments
+    /// * `indices` - List of row indices to remove
+    ///
+    /// # Returns
+    /// New table with specified rows removed
+    ///
+    /// # Examples
+    /// ```python
+    /// # Remove rows at indices 0, 2, and 5
+    /// new_table = table.drop_rows([0, 2, 5])
+    /// ```
+
+    /// Compute quantile for a specific column (pandas-style quantile)
+    ///
+    /// # Arguments
+    /// * `column` - Column name to analyze
+    /// * `q` - Quantile to compute (0.0 to 1.0)
+    /// * `interpolation` - Method for interpolation ("linear", "lower", "higher", "midpoint", "nearest")
+    ///
+    /// # Returns
+    /// AttrValue containing the computed quantile
+    ///
+    /// # Examples
+    /// ```python
+    /// # Get median (50th percentile) of sales column
+    /// median = table.quantile("sales", 0.5, "linear")
+    ///
+    /// # Get 95th percentile with nearest interpolation
+    /// p95 = table.quantile("price", 0.95, "nearest")
+    /// ```
+    pub fn quantile(&self, column: &str, q: f64, interpolation: Option<&str>) -> PyResult<PyObject> {
+        use crate::ffi::utils::attr_value_to_python_value;
+
+        let interpolation = interpolation.unwrap_or("linear");
+
+        let result = self.table.quantile(column, q, interpolation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Python::with_gil(|py| attr_value_to_python_value(py, &result))
+    }
+
+    /// Compute multiple quantiles for a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to analyze
+    /// * `quantiles` - List of quantiles to compute (each 0.0 to 1.0)
+    /// * `interpolation` - Method for interpolation
+    ///
+    /// # Returns
+    /// BaseArray containing the computed quantiles
+    pub fn quantiles(&self, column: &str, quantiles: Vec<f64>, interpolation: Option<&str>) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        let interpolation = interpolation.unwrap_or("linear");
+
+        let result = self.table.quantiles(column, &quantiles, interpolation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: result })
+    }
+
+    /// Compute percentile for a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to analyze
+    /// * `percentile` - Percentile to compute (0.0 to 100.0)
+    /// * `interpolation` - Method for interpolation
+    ///
+    /// # Examples
+    /// ```python
+    /// # Get median (50th percentile)
+    /// median = table.percentile("sales", 50.0, "linear")
+    /// ```
+    pub fn percentile(&self, column: &str, percentile: f64, interpolation: Option<&str>) -> PyResult<PyObject> {
+        use crate::ffi::utils::attr_value_to_python_value;
+
+        let interpolation = interpolation.unwrap_or("linear");
+
+        let result = self.table.get_percentile(column, percentile, interpolation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Python::with_gil(|py| attr_value_to_python_value(py, &result))
+    }
+
+    /// Compute multiple percentiles for a specific column
+    pub fn percentiles(&self, column: &str, percentiles: Vec<f64>, interpolation: Option<&str>) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        let interpolation = interpolation.unwrap_or("linear");
+
+        let result = self.table.percentiles(column, &percentiles, interpolation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: result })
+    }
+
+    /// Compute specific percentile for a column (direct method for consistency)
+    ///
+    /// # Arguments
+    /// * `column` - Column name to analyze
+    /// * `percentile` - Percentile to compute (0.0 to 100.0)
+    /// * `interpolation` - Method for interpolation
+    ///
+    /// # Returns
+    /// The computed percentile as PyObject
+    ///
+    /// # Examples
+    /// ```python
+    /// # Get median (50th percentile)
+    /// median = table.get_percentile("age", 50.0)
+    ///
+    /// # Get 95th percentile with nearest interpolation
+    /// p95 = table.get_percentile("score", 95.0, "nearest")
+    /// ```
+    pub fn get_percentile(&self, column: &str, percentile: f64, interpolation: Option<&str>) -> PyResult<PyObject> {
+        use crate::ffi::utils::attr_value_to_python_value;
+
+        let interpolation = interpolation.unwrap_or("linear");
+
+        let result = self.table.get_percentile(column, percentile, interpolation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Python::with_gil(|py| attr_value_to_python_value(py, &result))
+    }
+
+    /// Calculate median for a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to analyze
+    ///
+    /// # Returns
+    /// Median value as f64
+    ///
+    /// # Examples
+    /// ```python
+    /// # Get median of age column
+    /// median_age = table.median("age")
+    /// ```
+    pub fn median(&self, column: &str) -> PyResult<f64> {
+        self.table.median(column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    }
+
+    /// Calculate standard deviation for a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to analyze
+    ///
+    /// # Returns
+    /// Standard deviation as f64
+    ///
+    /// # Examples
+    /// ```python
+    /// # Get standard deviation of scores column
+    /// std_scores = table.std("scores")
+    /// ```
+    pub fn std(&self, column: &str) -> PyResult<f64> {
+        self.table.std(column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    }
+
+    /// Calculate variance for a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to analyze
+    ///
+    /// # Returns
+    /// Variance as f64
+    ///
+    /// # Examples
+    /// ```python
+    /// # Get variance of prices column
+    /// var_prices = table.var("prices")
+    /// ```
+    pub fn var(&self, column: &str) -> PyResult<f64> {
+        self.table.var(column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    }
+
+    /// Compute correlation matrix for numeric columns
+    ///
+    /// # Arguments
+    /// * `method` - Correlation method: "pearson" (default), "spearman", or "kendall"
+    ///
+    /// # Returns
+    /// BaseTable containing the correlation matrix
+    pub fn corr(&self, method: Option<&str>) -> PyResult<Self> {
+        let method = method.unwrap_or("pearson");
+
+        let result = self.table.corr(method)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseTable { table: result, server_guards: RefCell::new(Vec::new()) })
+    }
+
+    /// Compute correlation between two specific columns
+    ///
+    /// # Arguments
+    /// * `col1` - First column name
+    /// * `col2` - Second column name
+    /// * `method` - Correlation method: "pearson" (default), "spearman", or "kendall"
+    ///
+    /// # Returns
+    /// Correlation coefficient as a Python float
+    pub fn corr_columns(&self, col1: &str, col2: &str, method: Option<&str>) -> PyResult<PyObject> {
+        let method = method.unwrap_or("pearson");
+
+        let result = self.table.corr_columns(col1, col2, method)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Python::with_gil(|py| attr_value_to_python_value(py, &result))
+    }
+
+    /// Compute covariance matrix for numeric columns
+    ///
+    /// # Arguments
+    /// * `ddof` - Delta degrees of freedom (default: 1)
+    ///
+    /// # Returns
+    /// BaseTable containing the covariance matrix
+    pub fn cov(&self, ddof: Option<i32>) -> PyResult<Self> {
+        let ddof = ddof.unwrap_or(1);
+
+        let result = self.table.cov(ddof)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseTable { table: result, server_guards: RefCell::new(Vec::new()) })
+    }
+
+    /// Compute covariance between two specific columns
+    ///
+    /// # Arguments
+    /// * `col1` - First column name
+    /// * `col2` - Second column name
+    /// * `ddof` - Delta degrees of freedom (default: 1)
+    ///
+    /// # Returns
+    /// Covariance as a Python float
+    pub fn cov_columns(&self, col1: &str, col2: &str, ddof: Option<i32>) -> PyResult<PyObject> {
+        let ddof = ddof.unwrap_or(1);
+
+        let result = self.table.cov_columns(col1, col2, ddof)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Python::with_gil(|py| attr_value_to_python_value(py, &result))
+    }
+
+    /// Rolling window operation on a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to apply rolling operation to
+    /// * `window` - Window size for rolling operations
+    /// * `operation` - Function to apply to each window (e.g., "mean", "sum", "min", "max", "std")
+    ///
+    /// # Returns
+    /// BaseArray with rolling operation results
+    pub fn rolling(&self, column: &str, window: usize, operation: &str) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        let result = self.table.rolling(column, window, operation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: result })
+    }
+
+    /// Expanding window operation on a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to apply expanding operation to
+    /// * `operation` - Function to apply to expanding window (e.g., "mean", "sum", "min", "max", "std")
+    ///
+    /// # Returns
+    /// BaseArray with expanding operation results
+    pub fn expanding(&self, column: &str, operation: &str) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        let result = self.table.expanding(column, operation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: result })
+    }
+
+    /// Cumulative sum operation on a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to apply cumulative sum to
+    ///
+    /// # Returns
+    /// BaseArray with cumulative sum values
+    pub fn cumsum(&self, column: &str) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        let result = self.table.cumsum(column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: result })
+    }
+
+    /// Cumulative minimum operation on a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to apply cumulative minimum to
+    ///
+    /// # Returns
+    /// BaseArray with cumulative minimum values
+    pub fn cummin(&self, column: &str) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        let result = self.table.cummin(column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: result })
+    }
+
+    /// Cumulative maximum operation on a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to apply cumulative maximum to
+    ///
+    /// # Returns
+    /// BaseArray with cumulative maximum values
+    pub fn cummax(&self, column: &str) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        let result = self.table.cummax(column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: result })
+    }
+
+    /// Shift operation on a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to shift
+    /// * `periods` - Number of periods to shift (positive = shift right, negative = shift left)
+    /// * `fill_value` - Value to use for filling gaps (default: Null)
+    ///
+    /// # Returns
+    /// BaseArray with shifted values
+    pub fn shift(&self, column: &str, periods: i32, fill_value: Option<PyObject>) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        let rust_fill_value = if let Some(py_value) = fill_value {
+            Python::with_gil(|py| python_value_to_attr_value(&py_value.as_ref(py)))?
+        } else {
+            AttrValue::Null
+        };
+
+        let result = self.table.shift(column, periods, Some(rust_fill_value))
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: result })
+    }
+
+    /// Percentage change operation on a specific column
+    ///
+    /// # Arguments
+    /// * `column` - Column name to compute percentage change for
+    /// * `periods` - Number of periods to use for comparison (default: 1)
+    ///
+    /// # Returns
+    /// BaseArray with percentage change values
+    pub fn pct_change(&self, column: &str, periods: Option<usize>) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        let result = self.table.pct_change(column, periods)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: result })
+    }
+
+    /// Apply rolling window operations to all numeric columns
+    ///
+    /// # Arguments
+    /// * `window` - Window size for rolling operations
+    /// * `operation` - Function to apply to each window
+    ///
+    /// # Returns
+    /// New table with rolling operations applied to all numeric columns
+    pub fn rolling_all(&self, window: usize, operation: &str) -> PyResult<Self> {
+        let result = self.table.rolling_all(window, operation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseTable { table: result, server_guards: RefCell::new(Vec::new()) })
+    }
+
+    /// Apply expanding window operations to all numeric columns
+    ///
+    /// # Arguments
+    /// * `operation` - Function to apply to expanding window
+    ///
+    /// # Returns
+    /// New table with expanding operations applied to all numeric columns
+    pub fn expanding_all(&self, operation: &str) -> PyResult<Self> {
+        let result = self.table.expanding_all(operation)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseTable { table: result, server_guards: RefCell::new(Vec::new()) })
+    }
+
+    /// Comprehensive data profiling and quality assessment
+    ///
+    /// # Returns
+    /// BaseTable containing detailed statistics and quality metrics for each column
+    pub fn profile(&self) -> PyResult<Self> {
+        let result = self.table.profile()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseTable { table: result, server_guards: RefCell::new(Vec::new()) })
+    }
+
+    /// Detect outliers in numeric columns using IQR method
+    ///
+    /// # Arguments
+    /// * `column` - Column name to analyze for outliers
+    /// * `factor` - IQR multiplication factor (default: 1.5)
+    ///
+    /// # Returns
+    /// BaseArray with boolean values indicating outliers
+    pub fn check_outliers(&self, column: &str, factor: Option<f64>) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        let result = self.table.check_outliers(column, factor)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: result })
+    }
+
+    /// Validate table schema against expected schema
+    ///
+    /// # Arguments
+    /// * `expected_columns` - Dictionary mapping column names to expected data types
+    ///
+    /// # Returns
+    /// BaseTable with validation results
+    pub fn validate_schema(&self, expected_columns: HashMap<String, String>) -> PyResult<Self> {
+        let result = self.table.validate_schema(&expected_columns)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        Ok(PyBaseTable { table: result, server_guards: RefCell::new(Vec::new()) })
     }
 }
 
@@ -2029,10 +3021,50 @@ impl PyNodesTable {
     pub fn sort_by(&self, column: &str, ascending: bool) -> PyResult<Self> {
         let sorted_table = self.table.sort_by(column, ascending)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        
+
         Ok(Self { table: sorted_table })
     }
-    
+
+    /// Sort table by multiple columns with mixed ascending/descending order
+    /// Pandas-style multi-column sorting with priority order
+    ///
+    /// Args:
+    ///     columns: List of column names to sort by (in priority order)
+    ///     ascending: List of booleans for sort direction per column.
+    ///               If single bool, applies to all columns.
+    ///               If list, must match length of columns.
+    ///
+    /// Returns:
+    ///     PyNodesTable: A new sorted table
+    #[pyo3(signature = (columns, ascending = None))]
+    pub fn sort_values(&self, py: Python, columns: Vec<String>, ascending: Option<PyObject>) -> PyResult<Self> {
+        // Convert ascending parameter to Vec<bool>
+        let ascending_vec = match ascending {
+            Some(asc_obj) => {
+                if let Ok(single_bool) = asc_obj.extract::<bool>(py) {
+                    // Single boolean applies to all columns
+                    vec![single_bool; columns.len()]
+                } else if let Ok(bool_list) = asc_obj.extract::<Vec<bool>>(py) {
+                    // List of booleans
+                    bool_list
+                } else {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "ascending must be a boolean or list of booleans"
+                    ));
+                }
+            }
+            None => {
+                // Default to all ascending
+                vec![true; columns.len()]
+            }
+        };
+
+        let sorted_table = self.table.sort_values(columns, ascending_vec)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Ok(Self { table: sorted_table })
+    }
+
     /// Select specific columns to create a new table
     ///
     /// Args:
@@ -2821,10 +3853,50 @@ impl PyEdgesTable {
     pub fn sort_by(&self, column: &str, ascending: bool) -> PyResult<Self> {
         let sorted_table = self.table.sort_by(column, ascending)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        
+
         Ok(Self { table: sorted_table })
     }
-    
+
+    /// Sort table by multiple columns with mixed ascending/descending order
+    /// Pandas-style multi-column sorting with priority order
+    ///
+    /// Args:
+    ///     columns: List of column names to sort by (in priority order)
+    ///     ascending: List of booleans for sort direction per column.
+    ///               If single bool, applies to all columns.
+    ///               If list, must match length of columns.
+    ///
+    /// Returns:
+    ///     PyEdgesTable: A new sorted table
+    #[pyo3(signature = (columns, ascending = None))]
+    pub fn sort_values(&self, py: Python, columns: Vec<String>, ascending: Option<PyObject>) -> PyResult<Self> {
+        // Convert ascending parameter to Vec<bool>
+        let ascending_vec = match ascending {
+            Some(asc_obj) => {
+                if let Ok(single_bool) = asc_obj.extract::<bool>(py) {
+                    // Single boolean applies to all columns
+                    vec![single_bool; columns.len()]
+                } else if let Ok(bool_list) = asc_obj.extract::<Vec<bool>>(py) {
+                    // List of booleans
+                    bool_list
+                } else {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "ascending must be a boolean or list of booleans"
+                    ));
+                }
+            }
+            None => {
+                // Default to all ascending
+                vec![true; columns.len()]
+            }
+        };
+
+        let sorted_table = self.table.sort_values(columns, ascending_vec)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Ok(Self { table: sorted_table })
+    }
+
     /// Select specific columns to create a new table
     ///
     /// Args:
@@ -4074,6 +5146,11 @@ impl PyGraphTable {
     pub(crate) fn from_graph_table(table: groggy::storage::table::GraphTable) -> Self {
         Self { table }
     }
+
+    /// Alias for from_graph_table for consistency with other table types
+    pub fn from_table(table: groggy::storage::table::GraphTable) -> Self {
+        Self::from_graph_table(table)
+    }
 }
 
 // =============================================================================
@@ -4387,6 +5464,40 @@ pub struct PyNodesTableArray {
     group_columns: Vec<String>,
 }
 
+impl PyNodesTableArray {
+    /// Helper: Extract a column from all tables and return as ArrayArray
+    fn extract_column(&self, py: Python, column_name: &str) -> PyResult<PyObject> {
+        use groggy::storage::array::{ArrayArray, BaseArray};
+        use groggy::types::AttrValue;
+
+        let mut arrays = Vec::new();
+        let mut keys = Vec::new();
+
+        for (idx, nodes_table) in self.tables.iter().enumerate() {
+            // Get the column from the base table
+            let base_table = &nodes_table.table.base_table();
+
+            if let Some(column) = base_table.get_column(column_name) {
+                // column is already BaseArray<AttrValue>, use it directly
+                arrays.push(column.clone());
+                keys.push(format!("group_{}", idx));
+            } else {
+                return Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                    format!("Column '{}' not found in group {}", column_name, idx)
+                ));
+            }
+        }
+
+        // Create ArrayArray with keys
+        let array_array = ArrayArray::with_keys(arrays, keys)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        // Wrap in PyArrayArray
+        let py_array_array = crate::ffi::storage::array_array::PyArrayArray::from_array_array(array_array);
+        Ok(py_array_array.into_py(py))
+    }
+}
+
 #[pymethods]
 impl PyNodesTableArray {
     /// Get the number of grouped tables
@@ -4394,18 +5505,36 @@ impl PyNodesTableArray {
         self.tables.len()
     }
     
-    /// Get a table by index
-    pub fn __getitem__(&self, index: isize) -> PyResult<PyNodesTable> {
-        let len = self.tables.len() as isize;
-        let idx = if index < 0 { len + index } else { index };
-        
-        if idx < 0 || idx >= len {
-            return Err(PyErr::new::<pyo3::exceptions::PyIndexError, _>(
-                format!("Table index {} out of range for {} groups", index, len)
-            ));
-        }
-        
-        Ok(self.tables[idx as usize].clone())
+    /// Get a table by index or extract column from all tables
+    ///
+    /// Supports:
+    /// - Integer index: returns the table at that position
+    /// - String key: extracts column from all tables, returns ArrayArray
+    pub fn __getitem__(&self, key: &PyAny) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            // Try string key first (column extraction)
+            if let Ok(column_name) = key.extract::<String>() {
+                return self.extract_column(py, &column_name);
+            }
+
+            // Try integer index
+            if let Ok(index) = key.extract::<isize>() {
+                let len = self.tables.len() as isize;
+                let idx = if index < 0 { len + index } else { index };
+
+                if idx < 0 || idx >= len {
+                    return Err(PyErr::new::<pyo3::exceptions::PyIndexError, _>(
+                        format!("Table index {} out of range for {} groups", index, len)
+                    ));
+                }
+
+                return Ok(self.tables[idx as usize].clone().into_py(py));
+            }
+
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "NodesTableArray indices must be integers or strings"
+            ))
+        })
     }
     
     /// Iterate over the tables

@@ -6,13 +6,13 @@ use super::edges::{EdgeConfig, EdgesTable};
 use super::nodes::NodesTable;
 use super::traits::{Table, TableIterator};
 use crate::errors::{GraphError, GraphResult};
-use crate::storage::array::{ArrayOps, BaseArray};
+use crate::storage::array::{BaseArray};
 use crate::types::{AttrValue, EdgeId, NodeId};
 use crate::viz::display::{ColumnSchema, DataType};
 use crate::viz::streaming::data_source::{
-    DataSchema, DataSource, DataWindow, GraphEdge, GraphMetadata, GraphNode, LayoutAlgorithm,
-    NodePosition, Position, WindowKey,
-};
+    DataSchema, DataSource, DataWindow, GraphEdge, GraphMetadata, GraphNode, LayoutAlgorithm};
+use crate::viz::streaming::NodePosition;
+use crate::entities::Node;
 use crate::viz::VizModule;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -1079,6 +1079,41 @@ impl Table for GraphTable {
         }
     }
 
+    fn sort_values(&self, columns: Vec<String>, ascending: Vec<bool>) -> GraphResult<Self> {
+        // Check which component has all the required columns
+        let nodes_has_all = columns.iter().all(|col| self.nodes.has_column(col));
+        let edges_has_all = columns.iter().all(|col| self.edges.has_column(col));
+
+        if nodes_has_all && !edges_has_all {
+            // Sort nodes only
+            Ok(Self {
+                nodes: self.nodes.sort_values(columns, ascending)?,
+                edges: self.edges.clone(),
+                policy: self.policy.clone(),
+            })
+        } else if edges_has_all && !nodes_has_all {
+            // Sort edges only
+            Ok(Self {
+                nodes: self.nodes.clone(),
+                edges: self.edges.sort_values(columns, ascending)?,
+                policy: self.policy.clone(),
+            })
+        } else if nodes_has_all && edges_has_all {
+            // Both have the columns - prefer nodes
+            Ok(Self {
+                nodes: self.nodes.sort_values(columns, ascending)?,
+                edges: self.edges.clone(),
+                policy: self.policy.clone(),
+            })
+        } else {
+            // Neither has all columns
+            Err(GraphError::InvalidInput(format!(
+                "Columns {:?} not found in GraphTable",
+                columns
+            )))
+        }
+    }
+
     fn filter(&self, predicate: &str) -> GraphResult<Self> {
         // Apply filter to both components
         // This is a simplified approach - in practice, filtering might be more complex
@@ -1179,6 +1214,113 @@ impl Table for GraphTable {
             edges: self.edges.drop_columns(column_names)?,
             policy: self.policy.clone(),
         })
+    }
+
+    fn pivot_table(
+        &self,
+        index_cols: &[String],
+        columns_col: &str,
+        values_col: &str,
+        agg_func: &str,
+    ) -> GraphResult<Self> {
+        // Check which component has all the required columns
+        let nodes_has_all = index_cols.iter().all(|col| self.nodes.has_column(col))
+            && self.nodes.has_column(columns_col)
+            && self.nodes.has_column(values_col);
+        let edges_has_all = index_cols.iter().all(|col| self.edges.has_column(col))
+            && self.edges.has_column(columns_col)
+            && self.edges.has_column(values_col);
+
+        if nodes_has_all && !edges_has_all {
+            // Pivot nodes only
+            Ok(Self {
+                nodes: self.nodes.pivot_table(index_cols, columns_col, values_col, agg_func)?,
+                edges: self.edges.clone(),
+                policy: self.policy.clone(),
+            })
+        } else if edges_has_all && !nodes_has_all {
+            // Pivot edges only
+            Ok(Self {
+                nodes: self.nodes.clone(),
+                edges: self.edges.pivot_table(index_cols, columns_col, values_col, agg_func)?,
+                policy: self.policy.clone(),
+            })
+        } else if nodes_has_all && edges_has_all {
+            // Both have the columns - prefer nodes (consistent with other operations)
+            Ok(Self {
+                nodes: self.nodes.pivot_table(index_cols, columns_col, values_col, agg_func)?,
+                edges: self.edges.clone(),
+                policy: self.policy.clone(),
+            })
+        } else {
+            // Neither has all columns
+            Err(crate::errors::GraphError::InvalidInput(format!(
+                "Required columns for pivot not found in GraphTable. Index cols: {:?}, Columns col: {}, Values col: {}",
+                index_cols, columns_col, values_col
+            )))
+        }
+    }
+
+    fn melt(
+        &self,
+        id_vars: Option<&[String]>,
+        value_vars: Option<&[String]>,
+        var_name: Option<String>,
+        value_name: Option<String>,
+    ) -> GraphResult<Self> {
+        // For melt, we need to determine which component to melt
+        // Check if specified columns exist in nodes or edges
+        let mut melt_nodes = false;
+        let mut melt_edges = false;
+
+        // Check id_vars
+        if let Some(id_vars) = id_vars {
+            let nodes_has_id_vars = id_vars.iter().all(|col| self.nodes.has_column(col));
+            let edges_has_id_vars = id_vars.iter().all(|col| self.edges.has_column(col));
+
+            if nodes_has_id_vars && !edges_has_id_vars {
+                melt_nodes = true;
+            } else if edges_has_id_vars && !nodes_has_id_vars {
+                melt_edges = true;
+            } else if nodes_has_id_vars && edges_has_id_vars {
+                // Both have id_vars - prefer nodes
+                melt_nodes = true;
+            }
+        }
+
+        // Check value_vars if specified
+        if let Some(value_vars) = value_vars {
+            let nodes_has_value_vars = value_vars.iter().all(|col| self.nodes.has_column(col));
+            let edges_has_value_vars = value_vars.iter().all(|col| self.edges.has_column(col));
+
+            if nodes_has_value_vars && !edges_has_value_vars {
+                melt_nodes = true;
+            } else if edges_has_value_vars && !nodes_has_value_vars {
+                melt_edges = true;
+            } else if nodes_has_value_vars && edges_has_value_vars {
+                // Both have value_vars - prefer nodes
+                melt_nodes = true;
+            }
+        }
+
+        // If neither id_vars nor value_vars specified, prefer nodes
+        if !melt_nodes && !melt_edges {
+            melt_nodes = true;
+        }
+
+        if melt_nodes {
+            Ok(Self {
+                nodes: self.nodes.melt(id_vars, value_vars, var_name, value_name)?,
+                edges: self.edges.clone(),
+                policy: self.policy.clone(),
+            })
+        } else {
+            Ok(Self {
+                nodes: self.nodes.clone(),
+                edges: self.edges.melt(id_vars, value_vars, var_name, value_name)?,
+                policy: self.policy.clone(),
+            })
+        }
     }
 
     fn iter(&self) -> TableIterator<Self> {

@@ -604,6 +604,47 @@ impl BaseArray {
 
         stats
     }
+
+    /// Check if values in this array are in a provided set (pandas-style isin)
+    ///
+    /// # Arguments
+    /// * `values` - Vector of values to check membership against
+    ///
+    /// # Returns
+    /// Boolean array indicating which elements match the values
+    ///
+    /// # Examples
+    /// ```rust
+    /// use crate::storage::array::BaseArray;
+    /// use crate::types::{AttrValue, AttrValueType};
+    ///
+    /// let array = BaseArray::new(vec![
+    ///     AttrValue::Text("Engineering".to_string()),
+    ///     AttrValue::Text("Marketing".to_string()),
+    ///     AttrValue::Text("Sales".to_string())
+    /// ], AttrValueType::Text);
+    ///
+    /// let check_values = vec![
+    ///     AttrValue::Text("Engineering".to_string()),
+    ///     AttrValue::Text("Marketing".to_string())
+    /// ];
+    ///
+    /// let mask = array.isin(check_values)?;
+    /// // mask will be [true, true, false]
+    /// ```
+    pub fn isin(&self, values: Vec<AttrValue>) -> crate::errors::GraphResult<BaseArray> {
+        // Create a set for efficient lookup - use direct AttrValue comparison
+        let value_set: std::collections::HashSet<&AttrValue> = values.iter().collect();
+
+        let mut mask_data = Vec::with_capacity(self.data.len());
+
+        for attr_val in &self.data {
+            let matches = value_set.contains(attr_val);
+            mask_data.push(AttrValue::Bool(matches));
+        }
+
+        Ok(BaseArray::new(mask_data, AttrValueType::Bool))
+    }
 }
 
 // =============================================================================

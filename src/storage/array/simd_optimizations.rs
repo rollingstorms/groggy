@@ -3,7 +3,7 @@
 //! This module provides vectorized implementations of statistical operations
 //! for improved performance on numerical data arrays.
 
-use wide::{f64x4, CmpGt, CmpLt}; // 4-way SIMD for f64
+use wide::{f64x4}; // 4-way SIMD for f64
 
 /// SIMD-optimized sum calculation
 pub fn simd_sum(data: &[f64]) -> f64 {

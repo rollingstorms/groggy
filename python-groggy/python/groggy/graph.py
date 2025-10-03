@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 from .types import NodeId, EdgeId, AttrName, AttrValue, StateId, BranchName
 from .errors import GroggyError, NodeNotFoundError, EdgeNotFoundError, NotImplementedError
 from ._groggy import Graph as _RustGraph, AttrValue as _RustAttrValue
@@ -313,7 +313,7 @@ class Graph:
         """
         DEPRECATED: Use set_node_attrs() instead for 3-5x better performance.
         
-        This method will be removed in v0.4.0. The new set_node_attrs() method
+        This method will be removed in v0.6.0. The new set_node_attrs() method
         provides significantly better performance through columnar bulk operations.
         
         Args:
@@ -334,7 +334,7 @@ class Graph:
         """
         import warnings
         warnings.warn(
-            "set_node_attributes() is deprecated and will be removed in v0.4.0. "
+            "set_node_attributes() is deprecated and will be removed in v0.6.0. "
             "Use set_node_attrs() for 3-5x better performance with columnar operations.",
             DeprecationWarning,
             stacklevel=2
@@ -360,7 +360,7 @@ class Graph:
         """
         DEPRECATED: Use set_edge_attrs() instead for 3-5x better performance.
         
-        This method will be removed in v0.4.0. The new set_edge_attrs() method
+        This method will be removed in v0.6.0. The new set_edge_attrs() method
         provides significantly better performance through columnar bulk operations.
         
         Args:
@@ -381,7 +381,7 @@ class Graph:
         """
         import warnings
         warnings.warn(
-            "set_edge_attributes() is deprecated and will be removed in v0.4.0. "
+            "set_edge_attributes() is deprecated and will be removed in v0.6.0. "
             "Use set_edge_attrs() for 3-5x better performance with columnar operations.",
             DeprecationWarning,
             stacklevel=2

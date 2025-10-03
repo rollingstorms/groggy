@@ -16,10 +16,10 @@
 //! programmable projections and energy-based optimization.
 
 use crate::errors::{GraphError, GraphResult};
-use crate::traits::subgraph_operations::SubgraphOperations;
+// use ; // TODO: add missing import
 use std::net::IpAddr;
 use std::sync::Arc;
-use streaming::data_source::{DataSource, HierarchicalDirection, LayoutAlgorithm};
+use streaming::data_source::{DataSource, LayoutAlgorithm};
 use streaming::server::StreamingServer;
 use streaming::types::StreamingConfig;
 use streaming::virtual_scroller::VirtualScrollConfig;

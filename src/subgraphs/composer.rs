@@ -7,7 +7,7 @@
 use crate::entities::MetaNode;
 use crate::errors::{GraphError, GraphResult};
 use crate::traits::{NodeStrategy, SubgraphOperations};
-use crate::types::{AttrName, AttrValue, NodeId};
+use crate::types::{AttrName, NodeId};
 use std::collections::HashMap;
 
 /// Edge strategies for meta-node creation
@@ -337,7 +337,7 @@ impl MetaNodePlan {
     /// A `MetaNode` representing the newly created meta-node
     pub fn add_to_graph<T: SubgraphOperations>(&self, subgraph: &T) -> GraphResult<MetaNode> {
         use crate::subgraphs::hierarchical::AggregationFunction;
-        use crate::types::{AttrName, AttrValue};
+        use crate::types::{AttrValue};
         use std::collections::HashMap;
 
         let binding = subgraph.graph_ref();
@@ -474,7 +474,7 @@ impl MetaNodePlan {
         subgraph: &T,
     ) -> GraphResult<MetaNode> {
         use crate::subgraphs::hierarchical::AggregationFunction;
-        use crate::types::{AttrName, AttrValue};
+        use crate::types::{AttrValue};
         use std::collections::HashMap;
 
         let binding = subgraph.graph_ref();

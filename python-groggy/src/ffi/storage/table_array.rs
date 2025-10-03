@@ -40,26 +40,83 @@ impl PyTableArray {
         self.inner.is_empty()
     }
     
-    /// Get table at index with bounds checking
-    fn __getitem__(&self, index: isize) -> PyResult<PyObject> {
-        let len = self.inner.len() as isize;
-        
-        // Handle negative indexing
-        let actual_index = if index < 0 {
-            (len + index) as usize
-        } else {
-            index as usize
-        };
-        
-        if actual_index >= self.inner.len() {
-            return Err(pyo3::exceptions::PyIndexError::new_err(format!(
-                "Table index {} out of range (0-{})",
-                index,
-                self.inner.len() - 1
-            )));
+    /// Get table at index or extract column as ArrayArray
+    ///
+    /// Supports two modes:
+    /// - Integer index: returns the table at that position
+    /// - String key: extracts column from all tables, returns ArrayArray
+    fn __getitem__(&self, key: &PyAny) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            // Try string key first (column extraction)
+            if let Ok(column_name) = key.extract::<String>() {
+                return self.extract_column(py, &column_name);
+            }
+
+            // Try integer index
+            if let Ok(index) = key.extract::<isize>() {
+                let len = self.inner.len() as isize;
+
+                // Handle negative indexing
+                let actual_index = if index < 0 {
+                    (len + index) as usize
+                } else {
+                    index as usize
+                };
+
+                if actual_index >= self.inner.len() {
+                    return Err(pyo3::exceptions::PyIndexError::new_err(format!(
+                        "Table index {} out of range (0-{})",
+                        index,
+                        self.inner.len() - 1
+                    )));
+                }
+
+                return Ok(self.inner[actual_index].clone());
+            }
+
+            Err(pyo3::exceptions::PyTypeError::new_err(
+                "TableArray indices must be integers or strings"
+            ))
+        })
+    }
+
+    /// Extract a column from all tables and return as ArrayArray
+    fn extract_column(&self, py: Python, column_name: &str) -> PyResult<PyObject> {
+        use groggy::storage::array::{ArrayArray, BaseArray};
+        use groggy::types::AttrValue;
+        use crate::ffi::storage::array::PyBaseArray;
+
+        let mut arrays = Vec::new();
+        let mut keys = Vec::new();
+
+        for (idx, table_obj) in self.inner.iter().enumerate() {
+            // Try to get the column from each table
+            if let Ok(column) = table_obj.getattr(py, column_name) {
+                // Try to extract as PyBaseArray
+                if let Ok(py_array) = column.extract::<PyBaseArray>(py) {
+                    arrays.push(py_array.inner.clone());
+                    keys.push(format!("table_{}", idx));
+                } else {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                        "Column '{}' in table {} is not a BaseArray",
+                        column_name, idx
+                    )));
+                }
+            } else {
+                return Err(pyo3::exceptions::PyKeyError::new_err(format!(
+                    "Column '{}' not found in table {}",
+                    column_name, idx
+                )));
+            }
         }
-        
-        Ok(self.inner[actual_index].clone())
+
+        // Create ArrayArray with keys
+        let array_array = ArrayArray::with_keys(arrays, keys)
+            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
+
+        // Wrap in PyArrayArray
+        let py_array_array = crate::PyArrayArray::from_array_array(array_array);
+        Ok(py_array_array.into_py(py))
     }
     
     /// Iterate over tables
@@ -124,6 +181,57 @@ impl PyTableArray {
         }
         
         Ok(PyTableArray::new(filtered))
+    }
+
+    /// Map a function over all tables and return a BaseArray
+    ///
+    /// Args:
+    ///     func: Python callable that takes a table and returns a numeric value
+    ///
+    /// Returns:
+    ///     BaseArray containing the results
+    ///
+    /// Example:
+    /// ```python
+    /// # Get row count for each table
+    /// row_counts = table_array.map(lambda t: len(t))
+    ///
+    /// # Get average of a column
+    /// avgs = table_array.map(lambda t: t['value'].mean())
+    /// ```
+    fn map(&self, py: Python, func: PyObject) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        use groggy::storage::array::BaseArray;
+        use groggy::types::AttrValue;
+
+        let mut results = Vec::new();
+
+        for table in self.inner.iter() {
+            // Call function with table
+            let result = func.call1(py, (table.clone(),))?;
+
+            // Convert result to AttrValue
+            let attr_value = if let Ok(f) = result.extract::<f64>(py) {
+                AttrValue::Float(f as f32)
+            } else if let Ok(i) = result.extract::<i64>(py) {
+                AttrValue::Int(i)
+            } else if let Ok(s) = result.extract::<String>(py) {
+                AttrValue::Text(s)
+            } else if let Ok(b) = result.extract::<bool>(py) {
+                AttrValue::Bool(b)
+            } else {
+                return Err(pyo3::exceptions::PyTypeError::new_err(
+                    "Map function must return int, float, str, or bool"
+                ));
+            };
+
+            results.push(attr_value);
+        }
+
+        // Create BaseArray from results and wrap in PyBaseArray
+        let base_array = BaseArray::from_attr_values(results);
+        Ok(crate::ffi::storage::array::PyBaseArray {
+            inner: base_array,
+        })
     }
 }
 

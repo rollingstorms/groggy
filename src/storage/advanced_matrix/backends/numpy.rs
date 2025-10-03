@@ -5,7 +5,7 @@
 
 use crate::storage::advanced_matrix::{
     backend::{BackendError, BackendPerformance, BackendResult, ComputeBackend, OperationType},
-    numeric_type::{DType, NumericType},
+    numeric_type::DType,
 };
 
 /// NumPy backend stub that would leverage Python's scientific computing ecosystem

@@ -205,6 +205,208 @@ impl PyTableArrayCore {
             index: 0,
         }
     }
+
+    /// Get first n rows from each table
+    fn head(&self, n: usize) -> Self {
+        Self {
+            inner: self.inner.head(n),
+        }
+    }
+
+    /// Get last n rows from each table
+    fn tail(&self, n: usize) -> Self {
+        Self {
+            inner: self.inner.tail(n),
+        }
+    }
+
+    /// Sample n rows from each table
+    fn sample(&self, n: usize) -> PyResult<Self> {
+        let result = self.inner.sample(n)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Sample failed: {}", e)))?;
+
+        Ok(Self { inner: result })
+    }
+
+    /// Select specific columns from each table
+    fn select(&self, columns: Vec<String>) -> PyResult<Self> {
+        let result = self.inner.select(&columns)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Select failed: {}", e)))?;
+
+        Ok(Self { inner: result })
+    }
+
+    /// Sort each table by column
+    fn sort_by(&self, column: String, ascending: Option<bool>) -> PyResult<Self> {
+        let ascending = ascending.unwrap_or(true);
+        let result = self.inner.sort_by(&column, ascending)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Sort failed: {}", e)))?;
+
+        Ok(Self { inner: result })
+    }
+
+    /// Drop columns from each table
+    fn drop_columns(&self, columns: Vec<String>) -> PyResult<Self> {
+        let result = self.inner.drop_columns(&columns)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Drop columns failed: {}", e)))?;
+
+        Ok(Self { inner: result })
+    }
+
+    /// Rename columns in each table
+    fn rename(&self, mapping: &PyDict) -> PyResult<Self> {
+        let mut rename_map = HashMap::new();
+
+        for (key, value) in mapping.iter() {
+            let old_name: String = key.extract()?;
+            let new_name: String = value.extract()?;
+            rename_map.insert(old_name, new_name);
+        }
+
+        let result = self.inner.rename(&rename_map)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Rename failed: {}", e)))?;
+
+        Ok(Self { inner: result })
+    }
+
+    /// Apply function to each table (returns TableArray)
+    fn apply(&self, func: PyObject, py: Python) -> PyResult<Self> {
+        let result = self.inner.apply(|table| {
+            let py_table = crate::ffi::storage::table::PyBaseTable::from_table(table.clone());
+
+            match func.call1(py, (py_table,)) {
+                Ok(result) => {
+                    if let Ok(result_table) = result.extract::<crate::ffi::storage::table::PyBaseTable>(py) {
+                        Ok(result_table.table)
+                    } else {
+                        Err(groggy::errors::GraphError::InvalidInput(
+                            "Function must return a BaseTable".to_string()
+                        ))
+                    }
+                }
+                Err(e) => Err(groggy::errors::GraphError::InvalidInput(
+                    format!("Function call failed: {}", e)
+                ))
+            }
+        }).map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Apply failed: {}", e)))?;
+
+        Ok(Self { inner: result })
+    }
+
+    /// Apply function to each table and return list of results
+    fn apply_to_list(&self, func: PyObject, py: Python) -> PyResult<Vec<PyObject>> {
+        let mut results = Vec::new();
+
+        for table in self.inner.iter() {
+            let py_table = crate::ffi::storage::table::PyBaseTable::from_table(table.clone());
+
+            match func.call1(py, (py_table,)) {
+                Ok(result) => results.push(result),
+                Err(e) => return Err(pyo3::exceptions::PyValueError::new_err(
+                    format!("Function call failed: {}", e)
+                ))
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Apply function to each table and return BaseArray of results
+    fn apply_to_array(&self, func: PyObject, py: Python) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
+        let result = self.inner.apply_to_array(|table| {
+            let py_table = crate::ffi::storage::table::PyBaseTable::from_table(table.clone());
+
+            match func.call1(py, (py_table,)) {
+                Ok(result) => {
+                    // Convert Python result to AttrValue
+                    crate::ffi::utils::python_value_to_attr_value(result.as_ref(py))
+                        .map_err(|e| groggy::errors::GraphError::InvalidInput(format!("Conversion failed: {}", e)))
+                }
+                Err(e) => Err(groggy::errors::GraphError::InvalidInput(
+                    format!("Function call failed: {}", e)
+                ))
+            }
+        }).map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Apply to array failed: {}", e)))?;
+
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: result })
+    }
+
+    /// Apply function to each table and reduce to single value
+    fn apply_reduce(&self, func: PyObject, reduce_func: PyObject, init: PyObject, py: Python) -> PyResult<PyObject> {
+        let mut accumulator = init;
+
+        for table in self.inner.iter() {
+            let py_table = crate::ffi::storage::table::PyBaseTable::from_table(table.clone());
+
+            // Call the function on the table
+            let table_result = func.call1(py, (py_table,))?;
+
+            // Call the reduce function with accumulator and new result
+            accumulator = reduce_func.call1(py, (accumulator, table_result))?;
+        }
+
+        Ok(accumulator)
+    }
+
+    /// Get total row count across all tables
+    fn total_count(&self) -> usize {
+        self.inner.total_count()
+    }
+
+    /// Get detailed shape (num_tables, total_rows, num_cols)
+    fn shape_detailed(&self) -> (usize, usize, Option<usize>) {
+        self.inner.shape_detailed()
+    }
+
+    /// Describe statistics for each table
+    fn describe(&self) -> PyResult<Self> {
+        let result = self.inner.describe()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Describe failed: {}", e)))?;
+
+        Ok(Self { inner: result })
+    }
+
+    /// Sum values in a column across all tables
+    fn sum_column(&self, column: String) -> PyResult<PyObject> {
+        let result = self.inner.sum_column(&column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Sum column failed: {}", e)))?;
+
+        Python::with_gil(|py| {
+            crate::ffi::utils::attr_value_to_python_value(py, &result)
+        })
+    }
+
+    /// Mean of values in a column across all tables
+    fn mean_column(&self, column: String) -> PyResult<f64> {
+        self.inner.mean_column(&column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Mean column failed: {}", e)))
+    }
+
+    /// Minimum value in a column across all tables
+    fn min_column(&self, column: String) -> PyResult<PyObject> {
+        let result = self.inner.min_column(&column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Min column failed: {}", e)))?;
+
+        Python::with_gil(|py| {
+            crate::ffi::utils::attr_value_to_python_value(py, &result)
+        })
+    }
+
+    /// Maximum value in a column across all tables
+    fn max_column(&self, column: String) -> PyResult<PyObject> {
+        let result = self.inner.max_column(&column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Max column failed: {}", e)))?;
+
+        Python::with_gil(|py| {
+            crate::ffi::utils::attr_value_to_python_value(py, &result)
+        })
+    }
+
+    /// Standard deviation of values in a column across all tables
+    fn std_column(&self, column: String) -> PyResult<f64> {
+        self.inner.std_column(&column)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Std column failed: {}", e)))
+    }
 }
 
 /// Python iterator for core TableArray

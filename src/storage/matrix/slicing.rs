@@ -9,7 +9,7 @@
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::BoolArray;
 use crate::storage::{
-    array::{AdvancedIndexing, NumArray, SliceIndex},
+    array::{NumArray, SliceIndex},
     GraphMatrix,
 };
 

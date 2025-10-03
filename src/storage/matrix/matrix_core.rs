@@ -16,10 +16,9 @@ use crate::storage::advanced_matrix::{
 };
 use crate::storage::array::NumArray;
 use crate::storage::table::BaseTable;
-use crate::types::{AttrValue, AttrValueType, NodeId};
-use crate::viz::display::{DisplayConfig, DisplayEngine};
+use crate::types::{AttrValue, NodeId};
+use crate::viz::display::{DisplayConfig};
 use std::collections::HashMap;
-use std::fmt;
 use std::sync::Arc;
 
 /// Matrix properties that can be computed and cached

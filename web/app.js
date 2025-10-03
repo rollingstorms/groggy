@@ -20,12 +20,16 @@ export class RealtimeViz {
         this.edges = [];
         this.visibleNodes = [];
         this.selectedNode = null;
+        this.selectedEdge = null;
+        this.hoveredNode = null;
+        this.hoveredEdge = null;
         this.lastUpdateTime = Date.now();
         this.frameCount = 0;
         this.updateCount = 0;
         this.currentEmbeddingMethod = null;
         this.currentEmbeddingDimensions = 2;
         this.opacity = 1.0;
+        this.curvatureMultiplier = 0.25;  // Match slider default
         this.filters = {
             degreeMin: 0,
             degreeMax: Number.POSITIVE_INFINITY,
@@ -68,6 +72,9 @@ export class RealtimeViz {
         this.setupWebSocket();
         this.startAnimationLoop();
         this.startStatsUpdater();
+
+        // Initialize view manager for table/graph switching
+        this.viewManager = new ViewManager(this);
     }
 
     setupCanvas() {
@@ -244,6 +251,26 @@ export class RealtimeViz {
             opacityValue.textContent = parseFloat(opacitySlider.value).toFixed(1);
         }
 
+        // Curvature slider
+        const curvatureSlider = document.getElementById('curvature-slider');
+        const curvatureValue = document.getElementById('curvature-value');
+
+        if (curvatureSlider && curvatureValue) {
+            curvatureSlider.addEventListener('input', () => {
+                const value = parseFloat(curvatureSlider.value);
+                this.curvatureMultiplier = Number.isNaN(value) ? 1.0 : value;
+                curvatureValue.textContent = this.curvatureMultiplier.toFixed(1);
+                this.draw();
+            });
+            curvatureValue.textContent = parseFloat(curvatureSlider.value).toFixed(1);
+        }
+
+        // Autofit button
+        const autofitBtn = document.getElementById('autofit-btn');
+        if (autofitBtn) {
+            autofitBtn.addEventListener('click', () => this.autoFitGraph());
+        }
+
         console.log('✅ Controls initialized');
 
         if (layoutSelect) {
@@ -314,6 +341,18 @@ export class RealtimeViz {
                     this.updateCount++;
                     break;
 
+                case 'table_data':
+                    console.log('📋 Received table_data message:', message);
+                    console.log('  - ViewManager exists?', !!this.viewManager);
+                    console.log('  - TableRenderer exists?', !!this.viewManager?.tableRenderer);
+                    if (this.viewManager && this.viewManager.tableRenderer) {
+                        console.log('  - Calling handleTableData...');
+                        this.viewManager.tableRenderer.handleTableData(message.payload);
+                    } else {
+                        console.error('  - ❌ ViewManager or TableRenderer not available!');
+                    }
+                    break;
+
                 case 'control_ack':
                     console.log('✅ Control ack:', message);
                     break;
@@ -334,24 +373,72 @@ export class RealtimeViz {
             this.nodes = snapshot.nodes.map(node => ({
                 id: node.id,
                 attributes: node.attributes,
-                label: node.attributes.label || node.id.toString(),
+                label: node.label || node.attributes?.label || node.id.toString(),
                 x: 0,
-                y: 0
+                y: 0,
+                // Copy VizConfig styling fields
+                color: node.color,
+                size: node.size,
+                shape: node.shape,
+                opacity: node.opacity,
+                border_color: node.border_color,
+                border_width: node.border_width,
+                label_color: node.label_color,
+                label_size: node.label_size
             }));
             this.stats.nodeCount = this.nodes.length;
             console.log(`📊 Loaded ${this.nodes.length} nodes`);
+            console.log('🎨 First node styling:', this.nodes[0]);
         }
 
         // Load edges
         if (snapshot.edges) {
+            // Debug: check raw snapshot edges
+            console.log('🔍 Raw snapshot edges sample:', snapshot.edges.slice(126, 128));
+            console.log('🔍 First edge from snapshot:', JSON.stringify(snapshot.edges[0]));
+
             this.edges = snapshot.edges.map(edge => ({
                 id: edge.id,
                 source: edge.source,
                 target: edge.target,
-                attributes: edge.attributes
+                attributes: edge.attributes,
+                // Copy VizConfig styling fields
+                color: edge.color,
+                width: edge.width,
+                opacity: edge.opacity,
+                style: edge.style,
+                curvature: edge.curvature,
+                label: edge.label,
+                label_size: edge.label_size,
+                label_color: edge.label_color
             }));
             this.stats.edgeCount = this.edges.length;
             console.log(`📊 Loaded ${this.edges.length} edges`);
+
+            // Log edges with curvature for debugging
+            const curvedEdges = this.edges.filter(e => e.curvature);
+            if (curvedEdges.length > 0) {
+                console.log(`🌊 Found ${curvedEdges.length} edges with curvature:`, curvedEdges.map(e => ({id: e.id, curvature: e.curvature})));
+            }
+
+            // Log edges with labels for debugging
+            console.log('🔍 UPDATED CODE LOADED - Checking first 3 edges for labels:', this.edges.slice(0, 3).map(e => ({
+                id: e.id,
+                label: e.label,
+                hasLabel: !!e.label
+            })));
+
+            const labeledEdges = this.edges.filter(e => e.label);
+            if (labeledEdges.length > 0) {
+                console.log(`🏷️  Found ${labeledEdges.length} edges with labels:`, labeledEdges.slice(0, 5).map(e => ({
+                    id: e.id,
+                    label: e.label,
+                    label_size: e.label_size,
+                    label_color: e.label_color
+                })));
+            } else {
+                console.log('⚠️  No edges with labels found! Checking raw snapshot first edge:', snapshot.edges[0]);
+            }
         }
 
         // Apply positions if available
@@ -716,23 +803,69 @@ export class RealtimeViz {
         const rect = this.canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-        const worldX = (x - this.canvas.width / 2) / this.camera.zoom + this.camera.x;
-        const worldY = (y - this.canvas.height / 2) / this.camera.zoom + this.camera.y;
+
+        // Canvas transformation order:
+        // 1. translate(width/2, height/2) - center
+        // 2. scale(zoom, zoom)
+        // 3. rotate(rotation)
+        // 4. translate(-camera.x, -camera.y)
+
+        // Inverse transformation (reverse order):
+        // Start with screen coords, subtract canvas center
+        let relX = x - this.canvas.width / 2;
+        let relY = y - this.canvas.height / 2;
+
+        // Inverse: divide by zoom (undo scale)
+        relX /= this.camera.zoom;
+        relY /= this.camera.zoom;
+
+        // Inverse: rotate backwards (undo rotate)
+        if (this.camera.rotation) {
+            const cos = Math.cos(-this.camera.rotation);
+            const sin = Math.sin(-this.camera.rotation);
+            const rotX = relX * cos - relY * sin;
+            const rotY = relX * sin + relY * cos;
+            relX = rotX;
+            relY = rotY;
+        }
+
+        // Inverse: add camera position (undo translate(-camera))
+        const worldX = relX + this.camera.x;
+        const worldY = relY + this.camera.y;
+
         return { screenX: x, screenY: y, worldX, worldY };
     }
 
     handleCanvasClick(event) {
         const { worldX, worldY } = this.screenToWorld(event);
-        const clickedNode = this.findNodeAtPosition(worldX, worldY);
 
+        // Try to click node first (higher priority)
+        const clickedNode = this.findNodeAtPosition(worldX, worldY);
         if (clickedNode) {
             this.selectedNode = clickedNode;
-            this.showAttributePanel(clickedNode);
+            this.selectedEdge = null;
+            this.showAttributePanel(clickedNode, 'node');
             console.log('🎯 Selected node:', clickedNode.id);
-        } else {
-            this.selectedNode = null;
-            this.hideAttributePanel();
+            this.draw();
+            return;
         }
+
+        // Try to click edge
+        const clickedEdge = this.findEdgeAtPosition(worldX, worldY);
+        if (clickedEdge) {
+            this.selectedEdge = clickedEdge;
+            this.selectedNode = null;
+            this.showAttributePanel(clickedEdge, 'edge');
+            console.log('🎯 Selected edge:', clickedEdge.id);
+            this.draw();
+            return;
+        }
+
+        // Clicked empty space
+        this.selectedNode = null;
+        this.selectedEdge = null;
+        this.hideAttributePanel();
+        this.draw();
     }
 
     handleMouseDown(event) {
@@ -760,7 +893,19 @@ export class RealtimeViz {
     }
 
     handleMouseMove(event) {
+        const coords = this.screenToWorld(event);
+
         if (!this.lastPointer) {
+            // Not dragging, update hover state
+            const hoveredNode = this.findNodeAtPosition(coords.worldX, coords.worldY);
+            const hoveredEdge = hoveredNode ? null : this.findEdgeAtPosition(coords.worldX, coords.worldY);
+
+            if (hoveredNode !== this.hoveredNode || hoveredEdge !== this.hoveredEdge) {
+                this.hoveredNode = hoveredNode;
+                this.hoveredEdge = hoveredEdge;
+                this.canvas.style.cursor = (hoveredNode || hoveredEdge) ? 'pointer' : 'default';
+                this.draw();
+            }
             return;
         }
 
@@ -769,7 +914,6 @@ export class RealtimeViz {
         this.lastPointer = { x: event.clientX, y: event.clientY };
 
         if (this.draggedNode) {
-            const coords = this.screenToWorld(event);
             this.draggedNode.x = coords.worldX;
             this.draggedNode.y = coords.worldY;
             this.sendControlMessage('node_drag', {
@@ -865,7 +1009,8 @@ export class RealtimeViz {
     }
 
     findNodeAtPosition(x, y) {
-        const nodeRadius = 8;
+        // Larger hit detection radius for easier hovering (15px in screen space)
+        const nodeRadius = 15 / this.camera.zoom;
         return this.nodes.find(node => {
             if (node.x === undefined || node.y === undefined) return false;
             if (this.visibleNodes.length && !this.visibleNodes.includes(node.id)) return false;
@@ -875,26 +1020,171 @@ export class RealtimeViz {
         });
     }
 
-    showAttributePanel(node) {
+    findEdgeAtPosition(x, y) {
+        // More forgiving hit detection radius (15px in screen space)
+        const clickRadius = 15 / this.camera.zoom;
+
+        let closestEdge = null;
+        let closestDistance = Infinity;
+
+        for (const edge of this.edges) {
+            const sourceNode = this.nodes.find(n => n.id === edge.source);
+            const targetNode = this.nodes.find(n => n.id === edge.target);
+
+            if (!sourceNode || !targetNode) continue;
+            if (sourceNode.x === undefined || targetNode.x === undefined) continue;
+
+            const edgeCurvature = edge.curvature || 0;
+            const curvature = this.curvatureMultiplier + edgeCurvature;
+
+            let edgeDistance;
+
+            if (curvature !== 0) {
+                // For curved edges, sample points along the Bezier curve
+                const dx = targetNode.x - sourceNode.x;
+                const dy = targetNode.y - sourceNode.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                const midX = (sourceNode.x + targetNode.x) / 2;
+                const midY = (sourceNode.y + targetNode.y) / 2;
+
+                const perpX = -dy / dist;
+                const perpY = dx / dist;
+
+                const offset = curvature * dist * 0.2;
+                const controlX = midX + perpX * offset;
+                const controlY = midY + perpY * offset;
+
+                // Sample points along the curve with finer resolution
+                let minDistance = Infinity;
+                for (let t = 0; t <= 1; t += 0.02) {
+                    const px = (1 - t) * (1 - t) * sourceNode.x +
+                               2 * (1 - t) * t * controlX +
+                               t * t * targetNode.x;
+                    const py = (1 - t) * (1 - t) * sourceNode.y +
+                               2 * (1 - t) * t * controlY +
+                               t * t * targetNode.y;
+
+                    const d = Math.sqrt((x - px) * (x - px) + (y - py) * (y - py));
+                    if (d < minDistance) minDistance = d;
+                }
+
+                edgeDistance = minDistance;
+            } else {
+                // Straight edge - calculate distance from point to line segment
+                const x1 = sourceNode.x, y1 = sourceNode.y;
+                const x2 = targetNode.x, y2 = targetNode.y;
+
+                const A = x - x1;
+                const B = y - y1;
+                const C = x2 - x1;
+                const D = y2 - y1;
+
+                const dot = A * C + B * D;
+                const lenSq = C * C + D * D;
+                let param = -1;
+
+                if (lenSq != 0) param = dot / lenSq;
+
+                let xx, yy;
+
+                if (param < 0) {
+                    xx = x1;
+                    yy = y1;
+                } else if (param > 1) {
+                    xx = x2;
+                    yy = y2;
+                } else {
+                    xx = x1 + param * C;
+                    yy = y1 + param * D;
+                }
+
+                const dx = x - xx;
+                const dy = y - yy;
+                edgeDistance = Math.sqrt(dx * dx + dy * dy);
+            }
+
+            // Track the closest edge within the click radius
+            if (edgeDistance <= clickRadius && edgeDistance < closestDistance) {
+                closestDistance = edgeDistance;
+                closestEdge = edge;
+            }
+        }
+
+        return closestEdge;
+    }
+
+    showAttributePanel(item, type) {
         const panel = document.getElementById('attribute-panel');
         const content = document.getElementById('attribute-content');
 
-        if (node.attributes) {
-            let html = '';
-            for (const [key, value] of Object.entries(node.attributes)) {
-                html += `
-                    <div class="attribute-row">
-                        <span class="attribute-key">${key}:</span>
+        let html = '';
+
+        if (type === 'edge') {
+            // Show edge information
+            html += `<div class="attribute-row"><strong>Edge ${item.id}</strong></div>`;
+            html += `<div class="attribute-row"><span class="attribute-key">Source:</span> <span class="attribute-value">${item.source}</span></div>`;
+            html += `<div class="attribute-row"><span class="attribute-key">Target:</span> <span class="attribute-value">${item.target}</span></div>`;
+
+            // Add curvature slider
+            const currentCurvature = item.curvature || 0;
+            html += `
+                <div class="attribute-row" style="margin-top: 10px;">
+                    <strong>Edge Curvature:</strong>
+                </div>
+                <div class="attribute-row" style="display: flex; align-items: center; gap: 8px;">
+                    <input type="range" id="edge-curvature-slider" min="-2" max="2" step="0.1" value="${currentCurvature}" style="flex: 1;">
+                    <span id="edge-curvature-value" style="min-width: 40px;">${currentCurvature.toFixed(1)}</span>
+                </div>
+            `;
+
+            if (item.attributes) {
+                html += `<div class="attribute-row" style="margin-top: 10px;"><strong>Attributes:</strong></div>`;
+                for (const [key, value] of Object.entries(item.attributes)) {
+                    html += `
+                        <div class="attribute-row">
+                            <span class="attribute-key">${key}:</span>
+                            <span class="attribute-value">${value}</span>
+                        </div>
+                    `;
+                }
+            }
+        } else {
+            // Show node information (existing code)
+            html += `<div class="attribute-row"><strong>Node ${item.id}</strong></div>`;
+            if (item.attributes) {
+                for (const [key, value] of Object.entries(item.attributes)) {
+                    html += `
+                        <div class="attribute-row">
+                            <span class="attribute-key">${key}:</span>
                         <span class="attribute-value">${value}</span>
                     </div>
                 `;
+                }
             }
-            content.innerHTML = html;
-        } else {
-            content.innerHTML = '<p>No attributes available</p>';
         }
 
+        content.innerHTML = html || '<p>No attributes available</p>';
         panel.classList.add('visible');
+
+        // Add event listener for edge curvature slider
+        if (type === 'edge') {
+            const slider = document.getElementById('edge-curvature-slider');
+            const valueDisplay = document.getElementById('edge-curvature-value');
+
+            if (slider && valueDisplay) {
+                slider.addEventListener('input', (e) => {
+                    const newCurvature = parseFloat(e.target.value);
+                    valueDisplay.textContent = newCurvature.toFixed(1);
+
+                    // Update the edge's curvature in the local data
+                    item.curvature = newCurvature;
+
+                    // Redraw the canvas to show the new curvature
+                    this.draw();
+                });
+            }
+        }
     }
 
     hideAttributePanel() {
@@ -1056,6 +1346,61 @@ export class RealtimeViz {
         this.render();
     }
 
+    pause() {
+        this.isPaused = true;
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        if (playPauseBtn) {
+            playPauseBtn.textContent = '▶️ Play';
+        }
+    }
+
+    resume() {
+        this.isPaused = false;
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        if (playPauseBtn) {
+            playPauseBtn.textContent = '⏸️ Pause';
+        }
+        this.draw();
+    }
+
+    autoFitGraph() {
+        // Calculate bounding box of all nodes
+        if (this.nodes.length === 0) return;
+
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+
+        this.nodes.forEach(node => {
+            const x = node.coords?.[0] ?? 0;
+            const y = node.coords?.[1] ?? 0;
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+        });
+
+        // Calculate center and size
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const width = maxX - minX;
+        const height = maxY - minY;
+
+        // Calculate zoom to fit with 10% padding
+        const canvasWidth = this.canvas.width;
+        const canvasHeight = this.canvas.height;
+        const zoomX = (canvasWidth * 0.9) / width;
+        const zoomY = (canvasHeight * 0.9) / height;
+        const zoom = Math.min(zoomX, zoomY, 5); // Max zoom of 5
+
+        // Apply camera transform
+        this.camera.x = centerX;
+        this.camera.y = centerY;
+        this.camera.zoom = zoom || 1;
+        this.camera.targetZoom = zoom || 1;
+
+        this.draw();
+    }
+
     render() {
         const ctx = this.ctx;
         const width = this.canvas.width;
@@ -1082,11 +1427,9 @@ export class RealtimeViz {
         const nodeIndex = new Map(this.nodes.map(node => [node.id, node]));
 
         // Draw edges
-        ctx.strokeStyle = '#cccccc';
-        ctx.lineWidth = 1 / this.camera.zoom;
         ctx.globalAlpha = this.opacity;
 
-        this.edges.forEach(edge => {
+        this.edges.forEach((edge, idx) => {
             if (visibleSet && (!visibleSet.has(edge.source) || !visibleSet.has(edge.target))) {
                 return;
             }
@@ -1106,10 +1449,190 @@ export class RealtimeViz {
                 return;
             }
 
+            // Check if edge is selected or hovered
+            const isSelected = this.selectedEdge && this.selectedEdge.id === edge.id;
+            const isHovered = this.hoveredEdge && this.hoveredEdge.id === edge.id;
+
+            // Apply edge styling from VizConfig with selection/hover highlight
+            if (isSelected) {
+                ctx.strokeStyle = '#ff6b6b'; // Red for selection
+                ctx.lineWidth = 3 / this.camera.zoom;
+            } else if (isHovered) {
+                ctx.strokeStyle = '#ffa500'; // Orange for hover
+                ctx.lineWidth = 2 / this.camera.zoom;
+            } else {
+                ctx.strokeStyle = edge.color || '#cccccc';
+                ctx.lineWidth = (edge.width || 1) / this.camera.zoom;
+            }
+
+            if (edge.opacity !== undefined) {
+                ctx.globalAlpha = edge.opacity * this.opacity;
+            }
+
             ctx.beginPath();
-            ctx.moveTo(sourceNode.x, sourceNode.y);
-            ctx.lineTo(targetNode.x, targetNode.y);
+
+            // Handle edge styles (solid, dashed, dotted)
+            if (edge.style === 'dashed') {
+                ctx.setLineDash([5 / this.camera.zoom, 5 / this.camera.zoom]);
+            } else if (edge.style === 'dotted') {
+                ctx.setLineDash([2 / this.camera.zoom, 3 / this.camera.zoom]);
+            } else {
+                ctx.setLineDash([]);
+            }
+
+            // Draw edge with curvature support
+            // Global curvatureMultiplier applies to all edges
+            // Individual edge curvature (from multi-edge detection) is added on top
+            const edgeCurvature = edge.curvature || 0;
+            const curvature = this.curvatureMultiplier + edgeCurvature;
+
+            // Check if this is a self-loop
+            const isSelfLoop = edge.source === edge.target;
+
+            if (isSelfLoop) {
+                // Draw self-loop as a circle, positioned based on curvature for multi-self-loops
+                const baseRadius = 20 / this.camera.zoom;
+                const loopRadius = baseRadius + Math.abs(edgeCurvature) * 5 / this.camera.zoom;
+
+                // Angle offset for multiple self-loops (use curvature to determine angle)
+                const angleOffset = edgeCurvature * Math.PI / 4; // Up to 45 degrees per curvature unit
+                const angle = -Math.PI / 2 + angleOffset; // Start at top, offset by curvature
+
+                const loopCenterX = sourceNode.x + Math.cos(angle) * (loopRadius + 5 / this.camera.zoom);
+                const loopCenterY = sourceNode.y + Math.sin(angle) * (loopRadius + 5 / this.camera.zoom);
+
+                ctx.arc(loopCenterX, loopCenterY, loopRadius, 0, Math.PI * 2);
+            } else if (curvature !== 0) {
+                // Draw curved edge using quadratic Bezier curve
+                const dx = targetNode.x - sourceNode.x;
+                const dy = targetNode.y - sourceNode.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                // Control point perpendicular to the edge
+                const midX = (sourceNode.x + targetNode.x) / 2;
+                const midY = (sourceNode.y + targetNode.y) / 2;
+
+                // Perpendicular vector
+                const perpX = -dy / dist;
+                const perpY = dx / dist;
+
+                // Offset control point by curvature amount
+                const offset = curvature * dist * 0.2; // 0.2 is curvature strength factor
+                const controlX = midX + perpX * offset;
+                const controlY = midY + perpY * offset;
+
+                ctx.moveTo(sourceNode.x, sourceNode.y);
+                ctx.quadraticCurveTo(controlX, controlY, targetNode.x, targetNode.y);
+            } else {
+                // Draw straight edge
+                ctx.moveTo(sourceNode.x, sourceNode.y);
+                ctx.lineTo(targetNode.x, targetNode.y);
+            }
             ctx.stroke();
+
+            // Draw edge label
+            const edgeLabel = edge.label;
+            if (edgeLabel) {
+                ctx.save();
+                ctx.globalAlpha = 1.0;
+
+                const edgeFontSize = edge.label_size || 10;
+                ctx.font = `${edgeFontSize / this.camera.zoom}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Calculate label position and rotation
+                let labelX, labelY, labelAngle = 0;
+
+                if (isSelfLoop) {
+                    // For self-loops, place label on the loop circle
+                    const baseRadius = 20 / this.camera.zoom;
+                    const loopRadius = baseRadius + Math.abs(edgeCurvature) * 5 / this.camera.zoom;
+                    const angleOffset = edgeCurvature * Math.PI / 4;
+                    const angle = -Math.PI / 2 + angleOffset;
+
+                    const loopCenterX = sourceNode.x + Math.cos(angle) * (loopRadius + 5 / this.camera.zoom);
+                    const loopCenterY = sourceNode.y + Math.sin(angle) * (loopRadius + 5 / this.camera.zoom);
+
+                    // Place label at top of loop circle
+                    labelX = loopCenterX;
+                    labelY = loopCenterY - loopRadius - 3 / this.camera.zoom;
+                    labelAngle = 0; // Horizontal text for self-loops
+                } else if (curvature !== 0) {
+                    // For curved edges, calculate exact position on the Bezier curve
+                    const dx = targetNode.x - sourceNode.x;
+                    const dy = targetNode.y - sourceNode.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const midX = (sourceNode.x + targetNode.x) / 2;
+                    const midY = (sourceNode.y + targetNode.y) / 2;
+                    const perpX = -dy / dist;
+                    const perpY = dx / dist;
+
+                    // Calculate control point (same as edge drawing)
+                    const offset = curvature * dist * 0.2;
+                    const controlX = midX + perpX * offset;
+                    const controlY = midY + perpY * offset;
+
+                    // Quadratic Bezier at t=0.5 (midpoint of curve)
+                    // B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2
+                    // At t=0.5: B(0.5) = 0.25*P0 + 0.5*P1 + 0.25*P2
+                    const t = 0.5;
+                    labelX = (1-t)*(1-t)*sourceNode.x + 2*(1-t)*t*controlX + t*t*targetNode.x;
+                    labelY = (1-t)*(1-t)*sourceNode.y + 2*(1-t)*t*controlY + t*t*targetNode.y;
+
+                    // Calculate tangent at t=0.5 for rotation
+                    // B'(t) = 2(1-t)(P1-P0) + 2t(P2-P1)
+                    const tangentX = 2*(1-t)*(controlX - sourceNode.x) + 2*t*(targetNode.x - controlX);
+                    const tangentY = 2*(1-t)*(controlY - sourceNode.y) + 2*t*(targetNode.y - controlY);
+                    labelAngle = Math.atan2(tangentY, tangentX);
+
+                    // Keep text upright (don't flip it upside down)
+                    if (labelAngle > Math.PI / 2 || labelAngle < -Math.PI / 2) {
+                        labelAngle += Math.PI;
+                    }
+                } else {
+                    // For straight edges, place label at midpoint
+                    labelX = (sourceNode.x + targetNode.x) / 2;
+                    labelY = (sourceNode.y + targetNode.y) / 2;
+
+                    // Calculate angle along the edge
+                    const dx = targetNode.x - sourceNode.x;
+                    const dy = targetNode.y - sourceNode.y;
+                    labelAngle = Math.atan2(dy, dx);
+
+                    // Keep text upright (don't flip it upside down)
+                    if (labelAngle > Math.PI / 2 || labelAngle < -Math.PI / 2) {
+                        labelAngle += Math.PI;
+                    }
+                }
+
+                // Rotate text to align with edge
+                ctx.translate(labelX, labelY);
+                ctx.rotate(labelAngle);
+
+                // Draw label with white background for readability
+                const textMetrics = ctx.measureText(edgeLabel);
+                const textWidth = textMetrics.width;
+                const textHeight = edgeFontSize / this.camera.zoom;
+                const padding = 2 / this.camera.zoom;
+
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.fillRect(
+                    -textWidth / 2 - padding,
+                    -textHeight / 2 - padding,
+                    textWidth + padding * 2,
+                    textHeight + padding * 2
+                );
+
+                // Draw label text
+                ctx.fillStyle = edge.label_color || '#333333';
+                ctx.fillText(edgeLabel, 0, 0);
+                ctx.restore();
+            }
+
+            // Reset line dash and alpha
+            ctx.setLineDash([]);
+            ctx.globalAlpha = this.opacity;
         });
 
         // Draw nodes
@@ -1121,25 +1644,73 @@ export class RealtimeViz {
                 return;
             }
 
-            ctx.fillStyle = '#007bff';
-            if (this.selectedNode && this.selectedNode.id === node.id) {
-                ctx.fillStyle = '#ff6b6b';
+            // Check if node is selected or hovered
+            const isSelected = this.selectedNode && this.selectedNode.id === node.id;
+            const isHovered = this.hoveredNode && this.hoveredNode.id === node.id;
+
+            // Apply node styling from VizConfig with selection/hover highlight
+            const nodeColor = node.color || '#007bff';
+            const nodeSize = (node.size || 6) / this.camera.zoom;
+            const nodeOpacity = node.opacity !== undefined ? node.opacity : 1.0;
+            const nodeShape = node.shape || 'circle';
+
+            if (isSelected) {
+                ctx.fillStyle = '#ff6b6b'; // Red for selection
+            } else if (isHovered) {
+                ctx.fillStyle = '#ffa500'; // Orange for hover
+            } else {
+                ctx.fillStyle = nodeColor;
             }
+            ctx.globalAlpha = nodeOpacity * this.opacity;
 
             ctx.beginPath();
-            ctx.arc(node.x, node.y, 6 / this.camera.zoom, 0, 2 * Math.PI);
+
+            // Draw different shapes
+            if (nodeShape === 'square' || nodeShape === 'rectangle') {
+                const size = nodeSize * 1.5;
+                ctx.rect(node.x - size, node.y - size, size * 2, size * 2);
+            } else if (nodeShape === 'triangle') {
+                const size = nodeSize * 1.8;
+                ctx.moveTo(node.x, node.y - size);
+                ctx.lineTo(node.x - size, node.y + size);
+                ctx.lineTo(node.x + size, node.y + size);
+                ctx.closePath();
+            } else if (nodeShape === 'diamond') {
+                const size = nodeSize * 1.5;
+                ctx.moveTo(node.x, node.y - size);
+                ctx.lineTo(node.x + size, node.y);
+                ctx.lineTo(node.x, node.y + size);
+                ctx.lineTo(node.x - size, node.y);
+                ctx.closePath();
+            } else {
+                // Default circle
+                ctx.arc(node.x, node.y, nodeSize, 0, 2 * Math.PI);
+            }
+
             ctx.fill();
 
-            // Draw node label if zoomed in enough
-            if (this.camera.zoom > 0.5 && node.label) {
+            // Draw border if specified
+            if (node.border_width && node.border_width > 0) {
+                ctx.strokeStyle = node.border_color || '#000000';
+                ctx.lineWidth = node.border_width / this.camera.zoom;
+                ctx.stroke();
+            }
+
+            // Draw node label
+            const label = node.label !== undefined ? node.label : (this.camera.zoom > 0.5 ? node.attributes?.label : null);
+            if (label) {
                 ctx.save();
                 ctx.globalAlpha = 1.0;
-                ctx.fillStyle = '#333333';
-                ctx.font = `${12 / this.camera.zoom}px Arial`;
+                ctx.fillStyle = node.label_color || '#333333';
+                const fontSize = node.label_size || 12;
+                ctx.font = `${fontSize / this.camera.zoom}px Arial`;
                 ctx.textAlign = 'center';
-                ctx.fillText(node.label, node.x, node.y - 10 / this.camera.zoom);
+                ctx.fillText(label, node.x, node.y - (nodeSize + 4 / this.camera.zoom));
                 ctx.restore();
             }
+
+            // Reset alpha
+            ctx.globalAlpha = this.opacity;
         });
 
         ctx.globalAlpha = 1.0;
@@ -1184,3 +1755,294 @@ export class RealtimeViz {
         document.getElementById('latency').textContent = `${this.stats.latency}ms`;
     }
 }
+
+// ============================================================================
+// View Switching & Table Renderer
+// ============================================================================
+
+class ViewManager {
+    constructor(app) {
+        this.app = app;
+        this.currentView = 'graph'; // 'graph' or 'table'
+        this.tableRenderer = new TableRenderer(app);
+        this.initViewToggle();
+    }
+
+    initViewToggle() {
+        const toggleBtn = document.getElementById('view-toggle');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => this.toggleView());
+        }
+    }
+
+    toggleView() {
+        if (this.currentView === 'graph') {
+            this.switchToTable();
+        } else {
+            this.switchToGraph();
+        }
+    }
+
+    switchToTable() {
+        this.currentView = 'table';
+
+        // Pause graph animation/physics
+        this.app.pause();
+
+        // Hide graph view
+        const canvasView = document.getElementById('canvas-view');
+        if (canvasView) canvasView.style.display = 'none';
+
+        // Show table view
+        const tableView = document.getElementById('table-view');
+        if (tableView) tableView.style.display = 'flex';
+
+        // Update toggle button
+        const toggleBtn = document.getElementById('view-toggle');
+        if (toggleBtn) {
+            toggleBtn.querySelector('.view-icon').textContent = '📈';
+            toggleBtn.querySelector('.view-label').textContent = 'Graph';
+            toggleBtn.title = 'Switch to graph view';
+        }
+
+        // Request table data from server
+        this.tableRenderer.requestTableData();
+    }
+
+    switchToGraph() {
+        this.currentView = 'graph';
+
+        // Resume graph animation/physics
+        this.app.resume();
+
+        // Show graph view
+        const canvasView = document.getElementById('canvas-view');
+        if (canvasView) canvasView.style.display = 'block';
+
+        // Hide table view
+        const tableView = document.getElementById('table-view');
+        if (tableView) tableView.style.display = 'none';
+
+        // Update toggle button
+        const toggleBtn = document.getElementById('view-toggle');
+        if (toggleBtn) {
+            toggleBtn.querySelector('.view-icon').textContent = '📊';
+            toggleBtn.querySelector('.view-label').textContent = 'Table';
+            toggleBtn.title = 'Switch to table view';
+        }
+    }
+}
+
+class TableRenderer {
+    constructor(app) {
+        this.app = app;
+        this.currentData = null;
+        this.currentOffset = 0;
+        this.windowSize = 100; // Number of rows to load at once
+        this.totalRows = 0;
+        this.currentDataType = 'nodes'; // 'nodes' or 'edges'
+        this.initTableNavigation();
+        this.initTableTypeToggle();
+    }
+
+    initTableNavigation() {
+        const prevBtn = document.getElementById('table-prev');
+        const nextBtn = document.getElementById('table-next');
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => this.loadPreviousPage());
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => this.loadNextPage());
+        }
+    }
+
+    initTableTypeToggle() {
+        const nodesBtn = document.getElementById('table-nodes-btn');
+        const edgesBtn = document.getElementById('table-edges-btn');
+
+        if (nodesBtn) {
+            nodesBtn.addEventListener('click', () => this.switchToNodes());
+        }
+
+        if (edgesBtn) {
+            edgesBtn.addEventListener('click', () => this.switchToEdges());
+        }
+    }
+
+    switchToNodes() {
+        this.currentDataType = 'nodes';
+        this.currentOffset = 0;
+
+        // Update button states
+        document.getElementById('table-nodes-btn')?.classList.add('active');
+        document.getElementById('table-edges-btn')?.classList.remove('active');
+
+        this.requestTableData();
+    }
+
+    switchToEdges() {
+        this.currentDataType = 'edges';
+        this.currentOffset = 0;
+
+        // Update button states
+        document.getElementById('table-nodes-btn')?.classList.remove('active');
+        document.getElementById('table-edges-btn')?.classList.add('active');
+
+        this.requestTableData();
+    }
+
+    requestTableData(offset = 0) {
+        this.currentOffset = offset;
+
+        // Send WebSocket request for table data
+        if (this.app.ws && this.app.ws.readyState === WebSocket.OPEN) {
+            const message = {
+                type: "RequestTableData",
+                offset: offset,
+                window_size: this.windowSize,
+                data_type: this.currentDataType
+            };
+
+            console.log('📤 Requesting table data:', message);
+            this.app.ws.send(JSON.stringify(message));
+        } else {
+            console.warn('WebSocket not connected, showing placeholder');
+            this.renderPlaceholder();
+        }
+    }
+
+    handleTableData(data) {
+        // Handle incoming table data from WebSocket
+        console.log('🎯 TableRenderer.handleTableData called with:', data);
+        console.log('  - Headers:', data.headers);
+        console.log('  - Rows:', data.rows?.length || 0);
+        console.log('  - Total rows:', data.total_rows);
+
+        this.currentData = data;
+        this.totalRows = data.total_rows;
+        this.renderTableData(data);
+    }
+
+    renderPlaceholder() {
+        const tableBody = document.getElementById('table-body');
+        const tableHeader = document.getElementById('table-header').querySelector('tr');
+        
+        if (!tableBody || !tableHeader) return;
+        
+        // Clear existing content
+        tableBody.innerHTML = '';
+        tableHeader.innerHTML = '';
+        
+        // Add placeholder headers
+        const headers = ['ID', 'Name', 'Type', 'Degree', 'Attributes'];
+        headers.forEach(header => {
+            const th = document.createElement('th');
+            th.textContent = header;
+            tableHeader.appendChild(th);
+        });
+        
+        // Add placeholder rows
+        for (let i = 0; i < 10; i++) {
+            const tr = document.createElement('tr');
+            headers.forEach(() => {
+                const td = document.createElement('td');
+                td.textContent = '...';
+                tr.appendChild(td);
+            });
+            tableBody.appendChild(tr);
+        }
+        
+        // Update footer
+        const rowInfo = document.getElementById('table-row-info');
+        if (rowInfo) {
+            rowInfo.textContent = 'Waiting for data...';
+        }
+    }
+
+    renderTableData(data) {
+        this.currentData = data;
+        this.totalRows = data.total_rows;
+        
+        const tableBody = document.getElementById('table-body');
+        const tableHeader = document.getElementById('table-header').querySelector('tr');
+        
+        if (!tableBody || !tableHeader) return;
+        
+        // Clear existing content
+        tableBody.innerHTML = '';
+        tableHeader.innerHTML = '';
+        
+        // Render headers
+        data.headers.forEach(header => {
+            const th = document.createElement('th');
+            th.textContent = header;
+            tableHeader.appendChild(th);
+        });
+        
+        // Render rows
+        data.rows.forEach(row => {
+            const tr = document.createElement('tr');
+            row.forEach(cell => {
+                const td = document.createElement('td');
+                td.textContent = this.formatCellValue(cell);
+                tr.appendChild(td);
+            });
+            tableBody.appendChild(tr);
+        });
+        
+        // Update footer
+        this.updateTableFooter();
+    }
+
+    formatCellValue(value) {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'object') return JSON.stringify(value);
+        return String(value);
+    }
+
+    updateTableFooter() {
+        const rowInfo = document.getElementById('table-row-info');
+        const prevBtn = document.getElementById('table-prev');
+        const nextBtn = document.getElementById('table-next');
+        
+        if (!rowInfo) return;
+        
+        const startRow = this.currentOffset + 1;
+        const endRow = Math.min(this.currentOffset + this.windowSize, this.totalRows);
+        
+        rowInfo.textContent = `Rows: ${startRow}-${endRow} of ${this.totalRows}`;
+        
+        // Enable/disable navigation buttons
+        if (prevBtn) {
+            prevBtn.disabled = this.currentOffset === 0;
+        }
+        
+        if (nextBtn) {
+            nextBtn.disabled = this.currentOffset + this.windowSize >= this.totalRows;
+        }
+    }
+
+    loadPreviousPage() {
+        if (this.currentOffset > 0) {
+            this.currentOffset = Math.max(0, this.currentOffset - this.windowSize);
+            this.requestTableData(this.currentOffset);
+        }
+    }
+
+    loadNextPage() {
+        if (this.currentOffset + this.windowSize < this.totalRows) {
+            this.currentOffset += this.windowSize;
+            this.requestTableData(this.currentOffset);
+        }
+    }
+
+    handleTableDataMessage(data) {
+        // Handle incoming table data from WebSocket
+        this.renderTableData(data.window);
+    }
+}
+
+// Initialize view manager when app is ready
+// This will be called from the existing initialization code

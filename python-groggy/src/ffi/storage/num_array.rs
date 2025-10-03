@@ -605,7 +605,7 @@ impl PyNumArray {
     }
     
     /// Convert to different numeric type
-    fn astype(&self, dtype: &str) -> PyResult<PyObject> {
+    fn to_type(&self, dtype: &str) -> PyResult<PyObject> {
         match dtype {
             "bool" => {
                 let bool_values = match &self.inner {
@@ -921,7 +921,7 @@ impl PyNumArray {
     /// Matrix Integration: Reshape NumArray into a GraphMatrix
     fn reshape(&self, py: Python, rows: usize, cols: usize) -> PyResult<PyObject> {
         // Convert to float64 for matrix operations (matrices are typically float)
-        let float_array = self.astype("float64")?;
+        let float_array = self.to_type("float64")?;
         let float_array = float_array.extract::<PyNumArray>(py)?;
         
         let matrix = crate::ffi::storage::matrix::PyGraphMatrix::from_flattened(py, &float_array, rows, cols)?;

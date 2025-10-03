@@ -5,9 +5,8 @@
 //! highly optimized matrix multiplications.
 
 use crate::storage::advanced_matrix::{
-    backend::{BackendHint, ComputeBackendExt, OperationType},
     numeric_type::NumericType,
-    unified_matrix::{MatrixError, MatrixResult, Shape, UnifiedMatrix},
+    unified_matrix::{MatrixError, MatrixResult, UnifiedMatrix},
 };
 
 /// Padding mode for convolution operations

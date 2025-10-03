@@ -9,17 +9,16 @@ use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::numeric_type::NumericType;
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::embeddings::flat_embedding::{compute_flat_embedding, FlatEmbedConfig};
-use crate::viz::embeddings::{EmbeddingEngine, EmbeddingMethod, GraphEmbeddingExt};
+use crate::viz::embeddings::{EmbeddingMethod, GraphEmbeddingExt};
 use crate::viz::projection::GraphProjectionExt;
 use crate::viz::realtime::accessor::{
-    Edge, EngineSnapshot, EngineUpdate, GraphMeta, GraphPatch, Node, NodePosition,
+    EngineSnapshot, EngineUpdate,
     PositionsPayload, UpdateEnvelope,
 };
 use crate::viz::realtime::engine_sync::EngineSyncManager;
 use crate::viz::realtime::interaction::{
     CanvasDragPolicy, GlobeController, HoneycombController, InteractionCommand,
-    InteractionController, NodeDragEvent, NodeDragPolicy, PanController, PointerEvent, ViewState2D,
-    ViewState3D, WheelEvent,
+    NodeDragEvent, NodeDragPolicy, PanController, PointerEvent,     ViewState3D, WheelEvent,
 };
 use crate::viz::streaming::data_source::Position;
 use serde_json::json;
@@ -374,7 +373,7 @@ impl RealTimeVizEngine {
         let embedding_time = embedding_start.elapsed();
 
         if graph_was_empty {
-            eprintln!("🔄 DEBUG: Used fallback embedding from state positions");
+            // Used fallback embedding from state positions
         }
 
         let projection_start = Instant::now();
@@ -823,7 +822,7 @@ impl RealTimeVizEngine {
                 // Apply flat embedding preprocessing if requested
                 let flat_embedding_matrix;
                 let embedding_to_use = if use_flat_embed {
-                    println!("🔥 Applying flat embedding preprocessing...");
+                    // Applying flat embedding preprocessing
 
                     // Create flat embedding configuration
                     let flat_config = FlatEmbedConfig {
@@ -856,10 +855,7 @@ impl RealTimeVizEngine {
                         &flat_config,
                     ) {
                         Ok(flat_positions) => {
-                            println!(
-                                "✅ Flat embedding computed successfully with {} positions",
-                                flat_positions.len()
-                            );
+                            // Flat embedding computed successfully
 
                             // Convert positions back to GraphMatrix for honeycomb projection
                             let flat_data: Vec<f64> = flat_positions
@@ -873,13 +869,13 @@ impl RealTimeVizEngine {
                                     &flat_embedding_matrix
                                 }
                                 Err(e) => {
-                                    println!("⚠️ Failed to create matrix from flat positions: {}, using original embedding", e);
+                                    // Failed to create matrix from flat positions, using original embedding
                                     embedding
                                 }
                             }
                         }
                         Err(e) => {
-                            println!("⚠️ Flat embedding failed: {}, using original embedding", e);
+                            // Flat embedding failed, using original embedding
                             embedding
                         }
                     }
@@ -925,17 +921,17 @@ impl RealTimeVizEngine {
                 graph.project_to_honeycomb(embedding_to_use, &config)?
             }
             LayoutKind::ForceDirected => {
-                eprintln!("⚡ DEBUG: Using force-directed layout");
+                // Using force-directed layout
                 let graph = self.graph.lock().unwrap();
                 self.apply_force_directed_layout(&graph, embedding, &params)?
             }
             LayoutKind::Circular => {
-                eprintln!("⭕ DEBUG: Using circular layout");
+                // Using circular layout
                 let graph = self.graph.lock().unwrap();
                 self.apply_circular_layout(&graph, embedding, &params)?
             }
             LayoutKind::Grid => {
-                eprintln!("▦ DEBUG: Using grid layout");
+                // Using grid layout
                 let graph = self.graph.lock().unwrap();
                 self.apply_grid_layout(&graph, embedding, &params)?
             }
@@ -954,10 +950,7 @@ impl RealTimeVizEngine {
         embedding: &GraphMatrix,
         params: &std::collections::HashMap<String, String>,
     ) -> GraphResult<Vec<Position>> {
-        eprintln!(
-            "⚡ DEBUG: Computing force-directed layout positions with params {:?}",
-            params
-        );
+        // Computing force-directed layout positions
 
         // Parse parameters with defaults
         let iterations = params
@@ -1838,7 +1831,7 @@ impl RealTimeVizEngine {
                 // Engine-generated envelopes are observational; no state mutation required here.
             }
             _ => {
-                eprintln!("⚠️  DEBUG: Unhandled update type");
+                // Unhandled update type
             }
         }
 
@@ -1915,14 +1908,14 @@ impl RealTimeVizEngine {
     fn cancel_interpolation(&mut self) {
         let mut state = self.state.lock().unwrap();
         if state.animation_state.is_animating {
-            eprintln!("🛑 DEBUG: Cancelling active interpolation before layout switch");
+            // Cancelling active interpolation before layout switch
         }
         state.animation_state = AnimationState::default();
     }
 
     fn reset_layout_config_for(&mut self, layout_kind: LayoutKind) {
         if let LayoutKind::Honeycomb = layout_kind {
-            eprintln!("🧹 DEBUG: Resetting honeycomb projection config to defaults");
+            // Resetting honeycomb projection config to defaults
             self.config.projection_config.honeycomb_config =
                 crate::viz::projection::HoneycombConfig::default();
         }
@@ -2325,11 +2318,11 @@ impl RealTimeVizEngine {
         match accessor.initial_snapshot() {
             Ok(snapshot) => {
                 self.load_snapshot(snapshot).await?;
-                eprintln!("✅ DEBUG: Fallback layout loaded successfully");
+                // Fallback layout loaded successfully
                 Ok(())
             }
             Err(e) => {
-                eprintln!("❌ DEBUG: Fallback also failed: {}", e);
+                // Fallback also failed
                 Err(GraphError::LayoutError {
                     operation: "fallback_layout".to_string(),
                     layout_type: "accessor_fallback".to_string(),

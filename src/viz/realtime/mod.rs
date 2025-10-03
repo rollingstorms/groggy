@@ -13,24 +13,21 @@
 //! - Adaptive quality controls for performance optimization
 //! - Comprehensive monitoring and debugging capabilities
 
-use crate::api::graph::Graph;
-use crate::errors::{GraphError, GraphResult};
+use crate::errors::{};
 use crate::storage::matrix::GraphMatrix;
-use crate::viz::embeddings::{EmbeddingConfig, EmbeddingMethod, GraphEmbeddingExt};
+use crate::viz::embeddings::{EmbeddingConfig};
 use crate::viz::projection::{
-    GraphProjectionExt, HoneycombConfig, InterpolationConfig, ProjectionConfig, ProjectionMethod,
+    HoneycombConfig, InterpolationConfig, ProjectionConfig, ProjectionMethod,
     QualityConfig,
 };
 use crate::viz::streaming::data_source::Position;
-use crate::viz::streaming::server::StreamingServer;
-use crate::viz::streaming::types::{DataUpdate, UpdateType};
+use crate::viz::streaming::types::{};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::{};
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc;
 
 pub mod accessor;
 pub mod engine;
@@ -681,6 +678,282 @@ impl Default for FilterTransitionState {
             fading_out: Vec::new(),
             progress: 0.0,
         }
+    }
+}
+
+/// Parameter value that can be either an array of values or a column name
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum VizParameter<T> {
+    /// Direct array of values - must match the number of nodes/edges
+    Array(Vec<T>),
+    /// Column name to extract values from
+    Column(String),
+    /// Single value to apply to all elements
+    Value(T),
+    /// No value specified (use defaults)
+    None,
+}
+
+impl<T> Default for VizParameter<T> {
+    fn default() -> Self {
+        VizParameter::None
+    }
+}
+
+impl<T> VizParameter<T> {
+    /// Check if this parameter has a value
+    pub fn is_some(&self) -> bool {
+        !matches!(self, VizParameter::None)
+    }
+
+    /// Get the column name if this is a column parameter
+    pub fn as_column(&self) -> Option<&str> {
+        match self {
+            VizParameter::Column(name) => Some(name),
+            _ => None,
+        }
+    }
+
+    /// Get the array if this is an array parameter
+    pub fn as_array(&self) -> Option<&Vec<T>> {
+        match self {
+            VizParameter::Array(arr) => Some(arr),
+            _ => None,
+        }
+    }
+
+    /// Get the single value if this is a value parameter
+    pub fn as_value(&self) -> Option<&T> {
+        match self {
+            VizParameter::Value(val) => Some(val),
+            _ => None,
+        }
+    }
+}
+
+/// Comprehensive visualization configuration supporting all styling parameters
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VizConfig {
+    // === Node Styling ===
+    /// Node colors - can be array of colors, column name, or single color
+    pub node_color: VizParameter<String>,
+    /// Node sizes - can be array of sizes, column name, or single size
+    pub node_size: VizParameter<f64>,
+    /// Node shapes - can be array of shapes, column name, or single shape
+    pub node_shape: VizParameter<String>,
+    /// Node opacity values (0.0-1.0)
+    pub node_opacity: VizParameter<f64>,
+    /// Node border colors
+    pub node_border_color: VizParameter<String>,
+    /// Node border widths
+    pub node_border_width: VizParameter<f64>,
+
+    // === Edge Styling ===
+    /// Edge colors - can be array of colors, column name, or single color
+    pub edge_color: VizParameter<String>,
+    /// Edge widths - can be array of widths, column name, or single width
+    pub edge_width: VizParameter<f64>,
+    /// Edge opacity values (0.0-1.0)
+    pub edge_opacity: VizParameter<f64>,
+    /// Edge styles (solid, dashed, dotted)
+    pub edge_style: VizParameter<String>,
+
+    // === Labels & Text ===
+    /// Node labels - can be array of labels, column name, or single label
+    pub node_label: VizParameter<String>,
+    /// Edge labels - can be array of labels, column name, or single label
+    pub edge_label: VizParameter<String>,
+    /// Label font sizes
+    pub label_size: VizParameter<f64>,
+    /// Label colors
+    pub label_color: VizParameter<String>,
+    /// Edge label font sizes
+    pub edge_label_size: VizParameter<f64>,
+    /// Edge label colors
+    pub edge_label_color: VizParameter<String>,
+    /// Columns to show in tooltips (list of column names)
+    pub tooltip_columns: Vec<String>,
+
+    // === Positioning ===
+    /// X coordinates for fixed positioning
+    pub x: VizParameter<f64>,
+    /// Y coordinates for fixed positioning
+    pub y: VizParameter<f64>,
+    /// Z coordinates for 3D positioning
+    pub z: VizParameter<f64>,
+
+    // === Filtering & Visibility ===
+    /// Query expression for showing nodes (e.g., "degree > 3")
+    pub show_nodes_where: Option<String>,
+    /// Query expression for showing edges
+    pub show_edges_where: Option<String>,
+    /// Query expression for highlighting nodes
+    pub highlight_nodes_where: Option<String>,
+    /// Query expression for highlighting edges
+    pub highlight_edges_where: Option<String>,
+
+    // === Scaling & Ranges ===
+    /// Range for mapping values to node sizes [min_size, max_size]
+    pub node_size_range: Option<(f64, f64)>,
+    /// Range for mapping values to edge widths [min_width, max_width]
+    pub edge_width_range: Option<(f64, f64)>,
+    /// Color palette for categorical data or gradient endpoints
+    pub color_palette: Option<Vec<String>>,
+    /// Color scale type ("linear", "log", "categorical")
+    pub color_scale_type: Option<String>,
+
+    // === Layout & Algorithm ===
+    /// Layout algorithm to use
+    pub layout_algorithm: Option<String>,
+    /// Additional layout parameters
+    pub layout_params: HashMap<String, String>,
+
+    // === Interaction ===
+    /// Click behavior ("select", "info", "none")
+    pub click_behavior: Option<String>,
+    /// Hover behavior ("highlight", "tooltip", "none")
+    pub hover_behavior: Option<String>,
+    /// Selection mode ("single", "multiple", "none")
+    pub selection_mode: Option<String>,
+    /// Zoom behavior ("enabled", "disabled", "focus")
+    pub zoom_behavior: Option<String>,
+}
+
+impl Default for VizConfig {
+    fn default() -> Self {
+        Self {
+            // Node styling
+            node_color: VizParameter::default(),
+            node_size: VizParameter::default(),
+            node_shape: VizParameter::default(),
+            node_opacity: VizParameter::default(),
+            node_border_color: VizParameter::default(),
+            node_border_width: VizParameter::default(),
+
+            // Edge styling
+            edge_color: VizParameter::default(),
+            edge_width: VizParameter::default(),
+            edge_opacity: VizParameter::default(),
+            edge_style: VizParameter::default(),
+
+            // Labels & text
+            node_label: VizParameter::default(),
+            edge_label: VizParameter::default(),
+            label_size: VizParameter::default(),
+            label_color: VizParameter::default(),
+            edge_label_size: VizParameter::default(),
+            edge_label_color: VizParameter::default(),
+            tooltip_columns: Vec::new(),
+
+            // Positioning
+            x: VizParameter::default(),
+            y: VizParameter::default(),
+            z: VizParameter::default(),
+
+            // Filtering
+            show_nodes_where: None,
+            show_edges_where: None,
+            highlight_nodes_where: None,
+            highlight_edges_where: None,
+
+            // Scaling
+            node_size_range: None,
+            edge_width_range: None,
+            color_palette: None,
+            color_scale_type: None,
+
+            // Layout
+            layout_algorithm: None,
+            layout_params: HashMap::new(),
+
+            // Interaction
+            click_behavior: None,
+            hover_behavior: None,
+            selection_mode: None,
+            zoom_behavior: None,
+        }
+    }
+}
+
+impl VizConfig {
+    /// Create a new VizConfig with default values
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set node color parameter
+    pub fn with_node_color(mut self, color: VizParameter<String>) -> Self {
+        self.node_color = color;
+        self
+    }
+
+    /// Set node size parameter
+    pub fn with_node_size(mut self, size: VizParameter<f64>) -> Self {
+        self.node_size = size;
+        self
+    }
+
+    /// Set edge color parameter
+    pub fn with_edge_color(mut self, color: VizParameter<String>) -> Self {
+        self.edge_color = color;
+        self
+    }
+
+    /// Set layout algorithm
+    pub fn with_layout_algorithm(mut self, algorithm: String) -> Self {
+        self.layout_algorithm = Some(algorithm);
+        self
+    }
+
+    /// Add a layout parameter
+    pub fn with_layout_param(mut self, key: String, value: String) -> Self {
+        self.layout_params.insert(key, value);
+        self
+    }
+
+    /// Set tooltip columns
+    pub fn with_tooltip_columns(mut self, columns: Vec<String>) -> Self {
+        self.tooltip_columns = columns;
+        self
+    }
+
+    /// Validate that array parameters have the correct length
+    pub fn validate_array_lengths(&self, node_count: usize, edge_count: usize) -> Result<(), String> {
+        // Validate node-related arrays
+        if let VizParameter::Array(arr) = &self.node_color {
+            if arr.len() != node_count {
+                return Err(format!("node_color array length {} doesn't match node count {}", arr.len(), node_count));
+            }
+        }
+        if let VizParameter::Array(arr) = &self.node_size {
+            if arr.len() != node_count {
+                return Err(format!("node_size array length {} doesn't match node count {}", arr.len(), node_count));
+            }
+        }
+        if let VizParameter::Array(arr) = &self.x {
+            if arr.len() != node_count {
+                return Err(format!("x array length {} doesn't match node count {}", arr.len(), node_count));
+            }
+        }
+        if let VizParameter::Array(arr) = &self.y {
+            if arr.len() != node_count {
+                return Err(format!("y array length {} doesn't match node count {}", arr.len(), node_count));
+            }
+        }
+
+        // Validate edge-related arrays
+        if let VizParameter::Array(arr) = &self.edge_color {
+            if arr.len() != edge_count {
+                return Err(format!("edge_color array length {} doesn't match edge count {}", arr.len(), edge_count));
+            }
+        }
+        if let VizParameter::Array(arr) = &self.edge_width {
+            if arr.len() != edge_count {
+                return Err(format!("edge_width array length {} doesn't match edge count {}", arr.len(), edge_count));
+            }
+        }
+
+        Ok(())
     }
 }
 

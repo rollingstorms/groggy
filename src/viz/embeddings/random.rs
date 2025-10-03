@@ -4,9 +4,7 @@ use super::{EmbeddingEngine, RandomDistribution};
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
-use crate::traits::subgraph_operations::SubgraphOperations;
 // Using fastrand instead of rand crate
-use std::sync::Mutex;
 
 /// Random embedding engine for testing and baseline comparisons
 #[derive(Debug)]

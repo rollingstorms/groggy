@@ -3,7 +3,7 @@
 //! HTTP + WebSocket server for realtime visualization.
 //! Serves the UI at `/` with a `/ws` WebSocket endpoint.
 
-use super::WsBridge;
+use super::{WsBridge, WsMessage};
 use crate::api::graph::Graph;
 use crate::errors::{io_error_to_graph_error, GraphError, GraphResult};
 use crate::viz::realtime::accessor::{
@@ -19,6 +19,13 @@ use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
+
+// When building from python-groggy, CARGO_MANIFEST_DIR points to python-groggy/, so we need ../web/
+// Embed static web assets at compile time
+// CARGO_MANIFEST_DIR points to the groggy root when compiling this crate
+const INDEX_HTML: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/web/index.html"));
+const APP_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/web/app.js"));
+const STYLES_CSS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/web/styles.css"));
 
 /// Handle for controlling a background realtime server
 pub struct RealtimeServerHandle {
@@ -87,7 +94,7 @@ impl RealtimeServer {
     /// Start the server
     pub async fn start(mut self) -> GraphResult<()> {
         if self.verbose >= 3 {
-            eprintln!("🚀 DEBUG: Starting RealtimeServer on port {}", self.port);
+            // Starting RealtimeServer
         }
 
         // Create cancellation token for graceful shutdown
@@ -113,11 +120,11 @@ impl RealtimeServer {
                     let mut engine = RealTimeVizEngine::new(temp_graph, engine_config);
                     if let Err(e) = engine.load_snapshot(snapshot.clone()).await {
                         if self.verbose >= 1 {
-                            eprintln!("⚠️  INFO: Failed to load snapshot into engine: {}", e);
+                            // Failed to load snapshot into engine
                         }
                     } else {
                         if self.verbose >= 2 {
-                            eprintln!("✅ VERBOSE: Engine initialized with snapshot");
+                            // Engine initialized with snapshot
                         }
                     }
 
@@ -139,7 +146,7 @@ impl RealtimeServer {
                         let mut engine_rx = engine_rx;
                         while let Ok(update) = engine_rx.recv().await {
                             if let Err(e) = ws_bridge_clone.broadcast_update(update).await {
-                                eprintln!("⚠️  DEBUG: WebSocket bridge failed to broadcast engine update: {}", e);
+                                // ⚠️  DEBUG: WebSocket bridge failed to broadcast engine update: {}
                             }
                         }
                     });
@@ -148,7 +155,7 @@ impl RealtimeServer {
                     self.ws_bridge.set_snapshot(snapshot).await;
                 }
                 Err(e) => {
-                    eprintln!("⚠️  DEBUG: Failed to load initial snapshot: {}", e);
+                    // ⚠️  DEBUG: Failed to load initial snapshot: {}
                 }
             }
         }
@@ -175,7 +182,7 @@ impl RealtimeServer {
         loop {
             tokio::select! {
                 _ = cancel_token.cancelled() => {
-                    eprintln!("🛑 DEBUG: Server cancellation requested, stopping accept loop");
+                    // 🛑 DEBUG: Server cancellation requested, stopping accept loop
                     break;
                 },
                 accept_result = listener.accept() => {
@@ -191,19 +198,19 @@ impl RealtimeServer {
                                 tokio::select! {
                                     _ = cancel_clone.cancelled() => {
                                         if port > 0 {
-                                            eprintln!("🔌 DEBUG: Connection handler cancelled for {}", addr);
+                                            // 🔌 DEBUG: Connection handler cancelled for {}
                                         }
                                     },
                                     result = Self::handle_connection(stream, addr, ws_bridge_clone, port) => {
                                         if let Err(e) = result {
-                                            eprintln!("❌ DEBUG: Connection error for {}: {}", addr, e);
+                                            // ❌ DEBUG: Connection error for {}: {}
                                         }
                                     }
                                 }
                             });
                         }
                         Err(e) => {
-                            eprintln!("❌ DEBUG: Accept error: {}", e);
+                            // ❌ DEBUG: Accept error: {}
                             // Continue accepting connections
                         }
                     }
@@ -215,10 +222,32 @@ impl RealtimeServer {
                     }
                 }, if control_rx_opt.is_some() => {
                     if let Some((client_id, control_msg)) = control {
-                        eprintln!("🎮 DEBUG: Processing control message from client {}: {:?}", client_id, control_msg);
+                        // Handle RequestTableData before processing other controls
+                        if let ControlMsg::RequestTableData { offset, window_size, data_type } = &control_msg {
+                            if let Some(ref accessor) = self.accessor {
+                                match accessor.get_table_data(data_type.clone(), *offset, *window_size) {
+                                    Ok(table_window) => {
+                                        let table_msg = WsMessage::TableData {
+                                            version: 1,
+                                            payload: table_window,
+                                        };
+                                        if let Err(e) = self.ws_bridge.send_to_client(client_id, table_msg).await {
+                                            eprintln!("❌ Failed to send table data to client {}: {}", client_id, e);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        eprintln!("❌ Failed to fetch table data: {}", e);
+                                    }
+                                }
+                            }
+                            // Skip other control processing for table data requests
+                            continue;
+                        }
+
+                        // 🎮 DEBUG: Processing control message from client {}: {:?}
                         if let Some(ref accessor) = self.accessor {
                             if let Err(e) = Self::process_control_message(accessor, control_msg.clone()).await {
-                                eprintln!("❌ DEBUG: Accessor failed to process control message: {}", e);
+                                // ❌ DEBUG: Accessor failed to process control message: {}
                             }
                         }
 
@@ -226,7 +255,7 @@ impl RealtimeServer {
                         if let Some(ref mut engine) = self.engine {
                             match &control_msg {
                                 ControlMsg::ChangeEmbedding { method, k, .. } => {
-                                    eprintln!("🧠 DEBUG: Forwarding ChangeEmbedding to engine: method={}, k={}", method, k);
+                                    // 🧠 DEBUG: Forwarding ChangeEmbedding to engine: method={}, k={}
                                     if let Err(e) = engine
                                         .apply(EngineUpdate::EmbeddingChanged {
                                             method: method.clone(),
@@ -234,11 +263,11 @@ impl RealtimeServer {
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to apply EmbeddingChanged: {}", e);
+                                        // ❌ DEBUG: Engine failed to apply EmbeddingChanged: {}
                                     }
                                 }
                                 ControlMsg::ChangeLayout { algorithm, params } => {
-                                    eprintln!("📐 DEBUG: Forwarding ChangeLayout to engine: algorithm={}", algorithm);
+                                    // 📐 DEBUG: Forwarding ChangeLayout to engine: algorithm={}
                                     if let Err(e) = engine
                                         .apply(EngineUpdate::LayoutChanged {
                                             algorithm: algorithm.clone(),
@@ -246,18 +275,18 @@ impl RealtimeServer {
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to apply LayoutChanged: {}", e);
+                                        // ❌ DEBUG: Engine failed to apply LayoutChanged: {}
                                     }
                                 }
                                 ControlMsg::SetInteractionController { mode } => {
-                                    eprintln!("🎮 DEBUG: Switching interaction controller to {}", mode);
+                                    // 🎮 DEBUG: Switching interaction controller to {}
                                     if let Err(e) = engine
                                         .handle_control_command(ControlCommand::SetInteractionController {
                                             mode: mode.clone(),
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to set controller: {}", e);
+                                        // ❌ DEBUG: Engine failed to set controller: {}
                                     }
                                 }
                                 ControlMsg::Pointer { event } => {
@@ -267,7 +296,7 @@ impl RealtimeServer {
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to apply pointer event: {}", e);
+                                        // ❌ DEBUG: Engine failed to apply pointer event: {}
                                     }
                                 }
                                 ControlMsg::Wheel { event } => {
@@ -277,7 +306,7 @@ impl RealtimeServer {
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to apply wheel event: {}", e);
+                                        // ❌ DEBUG: Engine failed to apply wheel event: {}
                                     }
                                 }
                                 ControlMsg::NodeDrag { event } => {
@@ -287,20 +316,48 @@ impl RealtimeServer {
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to apply node drag event: {}", e);
+                                        // ❌ DEBUG: Engine failed to apply node drag event: {}
+                                    }
+                                }
+                                ControlMsg::RequestTableData { offset, window_size, data_type } => {
+                                    eprintln!("🔍 RequestTableData received: offset={}, window_size={}, data_type={:?}", offset, window_size, data_type);
+                                    // Fetch table data from accessor
+                                    if let Some(ref accessor) = self.accessor {
+                                        eprintln!("  ✓ Accessor available");
+                                        match accessor.get_table_data(data_type.clone(), *offset, *window_size) {
+                                            Ok(table_window) => {
+                                                eprintln!("  ✓ Table data fetched: {} headers, {} rows", table_window.headers.len(), table_window.rows.len());
+                                                // Send table data response to requesting client
+                                                let table_msg = WsMessage::TableData {
+                                                    version: 1,
+                                                    payload: table_window,
+                                                };
+                                                eprintln!("  → Sending table data to client {}", client_id);
+                                                if let Err(e) = self.ws_bridge.send_to_client(client_id, table_msg).await {
+                                                    eprintln!("  ❌ Failed to send table data: {}", e);
+                                                } else {
+                                                    eprintln!("  ✓ Table data sent successfully");
+                                                }
+                                            }
+                                            Err(e) => {
+                                                eprintln!("  ❌ Failed to fetch table data: {}", e);
+                                            }
+                                        }
+                                    } else {
+                                        eprintln!("  ❌ No accessor available!");
                                     }
                                 }
                             }
                         }
                     } else {
-                        eprintln!("🎮 DEBUG: Control message channel closed");
+                        // 🎮 DEBUG: Control message channel closed
                         control_rx_opt = None; // stop selecting on it
                     }
                 }
             }
         }
 
-        eprintln!("🛑 DEBUG: RealtimeServer stopped");
+        // 🛑 DEBUG: RealtimeServer stopped
         Ok(())
     }
 
@@ -323,7 +380,7 @@ impl RealtimeServer {
             .await
             .map_err(|e| io_error_to_graph_error(e, "read_http_request_line", "tcp_stream"))?;
 
-        eprintln!("📋 DEBUG: Request: {}", request_line.trim());
+        // 📋 DEBUG: Request handling
 
         // Parse the request
         let parts: Vec<&str> = request_line.split_whitespace().collect();
@@ -355,36 +412,26 @@ impl RealtimeServer {
 
         match (method, path) {
             ("GET", "/") | ("GET", "/index.html") => {
-                eprintln!("🌐 DEBUG: Serving static HTML page to {}", addr);
+                // 🌐 DEBUG: Serving static HTML page to {}
 
-                // Serve the static HTML file from web/index.html
-                match Self::serve_static_file("web/index.html", "text/html").await {
-                    Ok(response) => {
-                        let mut stream = buf_stream.into_inner();
-                        stream.write_all(response.as_bytes()).await.map_err(|e| {
-                            io_error_to_graph_error(e, "write_http_response", "tcp_stream")
-                        })?;
+                let mut stream = buf_stream.into_inner();
+                let header = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n",
+                    INDEX_HTML.len()
+                );
+                stream
+                    .write_all(header.as_bytes())
+                    .await
+                    .map_err(|e| io_error_to_graph_error(e, "write_http_response", "tcp_stream"))?;
+                stream
+                    .write_all(INDEX_HTML.as_bytes())
+                    .await
+                    .map_err(|e| io_error_to_graph_error(e, "write_http_response", "tcp_stream"))?;
 
-                        eprintln!("✅ DEBUG: Static HTML page served to {}", addr);
-                    }
-                    Err(e) => {
-                        eprintln!("❌ DEBUG: Failed to serve static HTML: {}", e);
-
-                        let response = format!(
-                            "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n{}",
-                            e.len(),
-                            e
-                        );
-
-                        let mut stream = buf_stream.into_inner();
-                        stream.write_all(response.as_bytes()).await.map_err(|err| {
-                            io_error_to_graph_error(err, "write_http_response", "tcp_stream")
-                        })?;
-                    }
-                }
+                // ✅ DEBUG: Embedded HTML page served to {}
             }
             ("GET", "/config") => {
-                eprintln!("🔧 DEBUG: Serving config endpoint to {}", addr);
+                // 🔧 DEBUG: Serving config endpoint to {}
 
                 // Create runtime configuration JSON
                 let config = serde_json::json!({
@@ -405,43 +452,53 @@ impl RealtimeServer {
                     .await
                     .map_err(|e| io_error_to_graph_error(e, "write_http_response", "tcp_stream"))?;
 
-                eprintln!("✅ DEBUG: Config served to {}", addr);
+                // ✅ DEBUG: Config served to {}
             }
             ("GET", path) if path.starts_with("/static/") => {
-                eprintln!("📁 DEBUG: Serving static file {} to {}", path, addr);
+                // 📁 DEBUG: Serving embedded static file {} to {}
 
-                // Extract filename from path (remove /static/ prefix)
                 let filename = path.strip_prefix("/static/").unwrap_or("");
-                let file_path = format!("web/{}", filename);
-
-                // Determine content type
-                let content_type = match filename.split('.').last() {
-                    Some("css") => "text/css",
-                    Some("js") => "application/javascript",
-                    Some("html") => "text/html",
-                    Some("json") => "application/json",
-                    Some("png") => "image/png",
-                    Some("jpg") | Some("jpeg") => "image/jpeg",
-                    Some("svg") => "image/svg+xml",
-                    _ => "text/plain",
+                let (content_opt, content_type) = match filename {
+                    "styles.css" => (Some(STYLES_CSS.as_bytes()), "text/css"),
+                    "app.js" => (Some(APP_JS.as_bytes()), "application/javascript"),
+                    _ => {
+                        // ❌ DEBUG: Unknown static asset requested: {}
+                        (None, "text/plain")
+                    }
                 };
 
-                match Self::serve_static_file(&file_path, content_type).await {
-                    Ok(response) => {
-                        let mut stream = buf_stream.into_inner();
-                        stream.write_all(response.as_bytes()).await.map_err(|e| {
-                            io_error_to_graph_error(e, "write_http_response", "tcp_stream")
-                        })?;
-
-                        eprintln!("✅ DEBUG: Static file {} served to {}", filename, addr);
+                let mut stream = buf_stream.into_inner();
+                match content_opt {
+                    Some(content) => {
+                        let header = format!(
+                            "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-cache, no-store, must-revalidate\r\n\r\n",
+                            content_type,
+                            content.len()
+                        );
+                        stream
+                            .write_all(header.as_bytes())
+                            .await
+                            .map_err(|e| io_error_to_graph_error(e, "write_http_response", "tcp_stream"))?;
+                        stream
+                            .write_all(content)
+                            .await
+                            .map_err(|e| io_error_to_graph_error(e, "write_http_response", "tcp_stream"))?;
+                        // ✅ DEBUG: Embedded static file {} served to {}
                     }
-                    Err(e) => {
-                        eprintln!("❌ DEBUG: Failed to serve static file {}: {}", filename, e);
-                        let response = "HTTP/1.1 404 Not Found\r\n\r\nFile not found";
-                        let mut stream = buf_stream.into_inner();
-                        stream.write_all(response.as_bytes()).await.map_err(|e| {
-                            io_error_to_graph_error(e, "write_http_response", "tcp_stream")
-                        })?;
+                    None => {
+                        let body = format!("File {} not found", filename);
+                        let header = format!(
+                            "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n",
+                            body.len()
+                        );
+                        stream
+                            .write_all(header.as_bytes())
+                            .await
+                            .map_err(|e| io_error_to_graph_error(e, "write_http_response", "tcp_stream"))?;
+                        stream
+                            .write_all(body.as_bytes())
+                            .await
+                            .map_err(|e| io_error_to_graph_error(e, "write_http_response", "tcp_stream"))?;
                     }
                 }
             }
@@ -461,7 +518,7 @@ impl RealtimeServer {
                 }
 
                 if is_websocket && sec_websocket_key.is_some() {
-                    eprintln!("🔌 DEBUG: WebSocket upgrade request from {}", addr);
+                    // 🔌 DEBUG: WebSocket upgrade request from {}
 
                     // Perform WebSocket handshake manually
                     let websocket_key = sec_websocket_key.unwrap();
@@ -491,8 +548,236 @@ impl RealtimeServer {
                     })?;
                 }
             }
+            ("GET", "/debug/nodes") => {
+                // 🔍 DEBUG: Serving debug nodes endpoint
+
+                let snapshot = ws_bridge.get_snapshot().await;
+                let nodes_json = match snapshot {
+                    Some(snapshot) => {
+                        serde_json::to_string_pretty(&snapshot.nodes).unwrap_or_else(|e| {
+                            format!("{{\"error\": \"Failed to serialize nodes: {}\"}}", e)
+                        })
+                    }
+                    None => "{\"error\": \"No snapshot available\"}".to_string()
+                };
+
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
+                    nodes_json.len(),
+                    nodes_json
+                );
+
+                let mut stream = buf_stream.into_inner();
+                stream.write_all(response.as_bytes()).await.map_err(|e| {
+                    io_error_to_graph_error(e, "write_debug_nodes", "tcp_stream")
+                })?;
+            }
+            ("GET", "/debug/edges") => {
+                // 🔍 DEBUG: Serving debug edges endpoint
+
+                let snapshot = ws_bridge.get_snapshot().await;
+                let edges_json = match snapshot {
+                    Some(snapshot) => {
+                        serde_json::to_string_pretty(&snapshot.edges).unwrap_or_else(|e| {
+                            format!("{{\"error\": \"Failed to serialize edges: {}\"}}", e)
+                        })
+                    }
+                    None => "{\"error\": \"No snapshot available\"}".to_string()
+                };
+
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
+                    edges_json.len(),
+                    edges_json
+                );
+
+                let mut stream = buf_stream.into_inner();
+                stream.write_all(response.as_bytes()).await.map_err(|e| {
+                    io_error_to_graph_error(e, "write_debug_edges", "tcp_stream")
+                })?;
+            }
+            ("GET", "/debug/snapshot") => {
+                // 🔍 DEBUG: Serving complete debug snapshot
+
+                let snapshot = ws_bridge.get_snapshot().await;
+                let snapshot_json = match snapshot {
+                    Some(snapshot) => {
+                        // Create a simplified view for debugging with string attributes
+                        let debug_data = serde_json::json!({
+                            "nodes_count": snapshot.nodes.len(),
+                            "edges_count": snapshot.edges.len(),
+                            "nodes": snapshot.nodes.iter().map(|node| {
+                                // Convert AttrValue to simple strings for browser display
+                                let simple_attrs: std::collections::HashMap<String, String> = node.attributes.iter().map(|(key, attr_value)| {
+                                    let simple_value = match attr_value {
+                                        crate::types::AttrValue::Float(f) => f.to_string(),
+                                        crate::types::AttrValue::Int(i) => i.to_string(),
+                                        crate::types::AttrValue::Text(s) => s.clone(),
+                                        crate::types::AttrValue::Bool(b) => b.to_string(),
+                                        crate::types::AttrValue::SmallInt(i) => i.to_string(),
+                                        crate::types::AttrValue::CompactText(s) => s.as_str().to_string(),
+                                        crate::types::AttrValue::Null => "null".to_string(),
+                                        crate::types::AttrValue::FloatVec(vec) => {
+                                            if vec.len() <= 10 {
+                                                format!("[{}]", vec.iter().map(|f| format!("{:.2}", f)).collect::<Vec<_>>().join(", "))
+                                            } else {
+                                                format!("[{} values: {:.2}..{:.2}]", vec.len(), vec.first().unwrap_or(&0.0), vec.last().unwrap_or(&0.0))
+                                            }
+                                        },
+                                        crate::types::AttrValue::IntVec(vec) => {
+                                            if vec.len() <= 10 {
+                                                format!("[{}]", vec.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(", "))
+                                            } else {
+                                                format!("[{} values: {}..{}]", vec.len(), vec.first().unwrap_or(&0), vec.last().unwrap_or(&0))
+                                            }
+                                        },
+                                        crate::types::AttrValue::TextVec(vec) => {
+                                            if vec.len() <= 5 {
+                                                format!("[{}]", vec.join(", "))
+                                            } else {
+                                                format!("[{} items: {}, ...]", vec.len(), vec.first().map(|s| s.as_str()).unwrap_or(""))
+                                            }
+                                        },
+                                        crate::types::AttrValue::BoolVec(vec) => {
+                                            let true_count = vec.iter().filter(|&&b| b).count();
+                                            format!("[{} bools: {} true, {} false]", vec.len(), true_count, vec.len() - true_count)
+                                        },
+                                        crate::types::AttrValue::SubgraphRef(id) => format!("Subgraph({})", id),
+                                        crate::types::AttrValue::NodeArray(ref arr) => format!("NodeArray({} nodes)", arr.len()),
+                                        crate::types::AttrValue::EdgeArray(ref arr) => format!("EdgeArray({} edges)", arr.len()),
+                                        crate::types::AttrValue::Bytes(ref bytes) => format!("Bytes({} bytes)", bytes.len()),
+                                        crate::types::AttrValue::CompressedText(ref data) => {
+                                            let ratio = data.compression_ratio();
+                                            format!("CompressedText({} bytes, {:.1}x compression)", data.data.len(), 1.0 / ratio)
+                                        },
+                                        crate::types::AttrValue::CompressedFloatVec(ref data) => {
+                                            let ratio = data.compression_ratio();
+                                            format!("CompressedFloatVec({} bytes, {:.1}x compression)", data.data.len(), 1.0 / ratio)
+                                        },
+                                        crate::types::AttrValue::Json(ref json) => {
+                                            match serde_json::to_string(json) {
+                                                Ok(json_str) => {
+                                                    if json_str.len() <= 100 {
+                                                        json_str
+                                                    } else {
+                                                        format!("JSON({} chars)", json_str.len())
+                                                    }
+                                                }
+                                                Err(_) => "JSON(parse error)".to_string(),
+                                            }
+                                        }
+                                    };
+                                    (key.clone(), simple_value)
+                                }).collect();
+
+                                let mut node_json = serde_json::json!({
+                                    "id": node.id,
+                                    "attributes": simple_attrs
+                                });
+
+                                // Add styling fields if present
+                                let obj = node_json.as_object_mut().unwrap();
+                                if let Some(color) = &node.color {
+                                    obj.insert("color".to_string(), serde_json::json!(color));
+                                }
+                                if let Some(size) = node.size {
+                                    obj.insert("size".to_string(), serde_json::json!(size));
+                                }
+                                if let Some(shape) = &node.shape {
+                                    obj.insert("shape".to_string(), serde_json::json!(shape));
+                                }
+                                if let Some(opacity) = node.opacity {
+                                    obj.insert("opacity".to_string(), serde_json::json!(opacity));
+                                }
+                                if let Some(border_color) = &node.border_color {
+                                    obj.insert("border_color".to_string(), serde_json::json!(border_color));
+                                }
+                                if let Some(border_width) = node.border_width {
+                                    obj.insert("border_width".to_string(), serde_json::json!(border_width));
+                                }
+                                if let Some(label) = &node.label {
+                                    obj.insert("label".to_string(), serde_json::json!(label));
+                                }
+                                if let Some(label_color) = &node.label_color {
+                                    obj.insert("label_color".to_string(), serde_json::json!(label_color));
+                                }
+                                if let Some(label_size) = node.label_size {
+                                    obj.insert("label_size".to_string(), serde_json::json!(label_size));
+                                }
+
+                                node_json
+                            }).collect::<Vec<_>>(),
+                            "edges": snapshot.edges.iter().map(|edge| {
+                                // Convert AttrValue to simple strings for browser display
+                                let simple_attrs: std::collections::HashMap<String, String> = edge.attributes.iter().map(|(key, attr_value)| {
+                                    let simple_value = match attr_value {
+                                        crate::types::AttrValue::Float(f) => f.to_string(),
+                                        crate::types::AttrValue::Int(i) => i.to_string(),
+                                        crate::types::AttrValue::Text(s) => s.clone(),
+                                        crate::types::AttrValue::Bool(b) => b.to_string(),
+                                        crate::types::AttrValue::SmallInt(i) => i.to_string(),
+                                        _ => format!("{:?}", attr_value) // Fallback for other types
+                                    };
+                                    (key.clone(), simple_value)
+                                }).collect();
+
+                                let mut edge_json = serde_json::json!({
+                                    "id": edge.id,
+                                    "source": edge.source,
+                                    "target": edge.target,
+                                    "attributes": simple_attrs
+                                });
+
+                                // Add styling fields if present
+                                let obj = edge_json.as_object_mut().unwrap();
+                                if let Some(color) = &edge.color {
+                                    obj.insert("color".to_string(), serde_json::json!(color));
+                                }
+                                if let Some(width) = edge.width {
+                                    obj.insert("width".to_string(), serde_json::json!(width));
+                                }
+                                if let Some(opacity) = edge.opacity {
+                                    obj.insert("opacity".to_string(), serde_json::json!(opacity));
+                                }
+                                if let Some(style) = &edge.style {
+                                    obj.insert("style".to_string(), serde_json::json!(style));
+                                }
+                                if let Some(curvature) = edge.curvature {
+                                    obj.insert("curvature".to_string(), serde_json::json!(curvature));
+                                }
+                                if let Some(label) = &edge.label {
+                                    obj.insert("label".to_string(), serde_json::json!(label));
+                                }
+                                if let Some(label_size) = edge.label_size {
+                                    obj.insert("label_size".to_string(), serde_json::json!(label_size));
+                                }
+                                if let Some(label_color) = &edge.label_color {
+                                    obj.insert("label_color".to_string(), serde_json::json!(label_color));
+                                }
+
+                                edge_json
+                            }).collect::<Vec<_>>()
+                        });
+                        serde_json::to_string_pretty(&debug_data).unwrap_or_else(|e| {
+                            format!("{{\"error\": \"Failed to serialize snapshot: {}\"}}", e)
+                        })
+                    }
+                    None => "{\"error\": \"No snapshot available\"}".to_string()
+                };
+
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
+                    snapshot_json.len(),
+                    snapshot_json
+                );
+
+                let mut stream = buf_stream.into_inner();
+                stream.write_all(response.as_bytes()).await.map_err(|e| {
+                    io_error_to_graph_error(e, "write_debug_snapshot", "tcp_stream")
+                })?;
+            }
             _ => {
-                eprintln!("❌ DEBUG: 404 for {} {}", method, path);
+                // ❌ DEBUG: 404 for {} {}
                 let response = "HTTP/1.1 404 Not Found\r\n\r\nNot Found";
                 let mut stream = buf_stream.into_inner();
                 stream
@@ -511,11 +796,6 @@ impl RealtimeServer {
         cancel_token: CancellationToken,
         ready_tx: oneshot::Sender<u16>,
     ) -> GraphResult<()> {
-        eprintln!(
-            "🚀 DEBUG: Starting RealtimeServer on port {} with cancellation",
-            self.port
-        );
-
         // Optional control receiver (present when accessor exists)
         let mut control_rx_opt: Option<tokio::sync::mpsc::UnboundedReceiver<(usize, ControlMsg)>> =
             None;
@@ -524,11 +804,6 @@ impl RealtimeServer {
         if let Some(ref accessor) = self.accessor {
             match accessor.initial_snapshot() {
                 Ok(snapshot) => {
-                    eprintln!(
-                        "📊 DEBUG: Loaded initial snapshot with {} nodes, {} edges",
-                        snapshot.node_count(),
-                        snapshot.edge_count()
-                    );
 
                     // Create visualization engine with the snapshot data
                     let temp_graph = crate::api::graph::Graph::new();
@@ -538,11 +813,11 @@ impl RealtimeServer {
                     // Load snapshot into engine
                     if let Err(e) = engine.load_snapshot(snapshot.clone()).await {
                         if self.verbose >= 1 {
-                            eprintln!("⚠️  INFO: Failed to load snapshot into engine: {}", e);
+                            // Failed to load snapshot into engine
                         }
                     } else {
                         if self.verbose >= 2 {
-                            eprintln!("✅ VERBOSE: Engine initialized with snapshot");
+                            // Engine initialized with snapshot
                         }
                     }
 
@@ -566,19 +841,19 @@ impl RealtimeServer {
                         loop {
                             tokio::select! {
                                 _ = cancel_clone.cancelled() => {
-                                    eprintln!("📡 DEBUG: Engine update task cancelled");
+                                    // 📡 DEBUG: Engine update task cancelled
                                     break;
                                 },
                                 update_result = engine_rx.recv() => {
                                     match update_result {
                                         Ok(update) => {
-                                            eprintln!("📡 DEBUG: Forwarding engine update to WebSocket clients: {:?}", update);
+                                            // 📡 DEBUG: Forwarding engine update to WebSocket clients: {:?}
                                             if let Err(e) = ws_bridge_clone.broadcast_update(update).await {
-                                                eprintln!("⚠️  DEBUG: WebSocket bridge failed to broadcast engine update: {}", e);
+                                                // ⚠️  DEBUG: WebSocket bridge failed to broadcast engine update: {}
                                             }
                                         },
                                         Err(_) => {
-                                            eprintln!("📡 DEBUG: Engine update channel closed");
+                                            // 📡 DEBUG: Engine update channel closed
                                             break;
                                         }
                                     }
@@ -591,7 +866,7 @@ impl RealtimeServer {
                     self.ws_bridge.set_snapshot(snapshot).await;
                 }
                 Err(e) => {
-                    eprintln!("⚠️  DEBUG: Failed to load initial snapshot: {}", e);
+                    // ⚠️  DEBUG: Failed to load initial snapshot: {}
                 }
             }
         }
@@ -606,16 +881,12 @@ impl RealtimeServer {
             .map_err(|e| io_error_to_graph_error(e, "get_local_addr", "tcp_listener"))?
             .port();
 
-        eprintln!("✅ DEBUG: RealtimeServer listening on {}", actual_port);
-        eprintln!("🌐 DEBUG: HTTP endpoint: http://127.0.0.1:{}/", actual_port);
-        eprintln!(
-            "🔌 DEBUG: WebSocket endpoint: ws://127.0.0.1:{}/ws",
-            actual_port
-        );
+        // Print server URL for user
+        eprintln!("Visualization server: http://127.0.0.1:{}/", actual_port);
 
         // Notify that the server is ready
         if let Err(_) = ready_tx.send(actual_port) {
-            eprintln!("⚠️  DEBUG: Failed to send ready signal");
+            // ⚠️  DEBUG: Failed to send ready signal
         }
 
         let ws_bridge = Arc::clone(&self.ws_bridge);
@@ -624,13 +895,13 @@ impl RealtimeServer {
         loop {
             tokio::select! {
                 _ = cancel_token.cancelled() => {
-                    eprintln!("🛑 DEBUG: Server cancellation requested, stopping accept loop");
+                    // 🛑 DEBUG: Server cancellation requested, stopping accept loop
                     break;
                 },
                 accept_result = listener.accept() => {
                     match accept_result {
                         Ok((stream, addr)) => {
-                            eprintln!("🔗 DEBUG: New connection from {}", addr);
+                            // 🔗 DEBUG: New connection from {}
 
                             let ws_bridge_clone = Arc::clone(&ws_bridge);
                             let cancel_clone = cancel_token.clone();
@@ -639,18 +910,18 @@ impl RealtimeServer {
                             tokio::spawn(async move {
                                 tokio::select! {
                                     _ = cancel_clone.cancelled() => {
-                                        eprintln!("🔌 DEBUG: Connection handler cancelled for {}", addr);
+                                        // 🔌 DEBUG: Connection handler cancelled for {}
                                     },
                                     result = Self::handle_connection(stream, addr, ws_bridge_clone, port) => {
                                         if let Err(e) = result {
-                                            eprintln!("❌ DEBUG: Connection error for {}: {}", addr, e);
+                                            // ❌ DEBUG: Connection error for {}: {}
                                         }
                                     }
                                 }
                             });
                         }
                         Err(e) => {
-                            eprintln!("❌ DEBUG: Accept error: {}", e);
+                            // ❌ DEBUG: Accept error: {}
                             // Continue accepting connections despite errors
                         }
                     }
@@ -662,18 +933,40 @@ impl RealtimeServer {
                     }
                 }, if control_rx_opt.is_some() => {
                     if let Some((client_id, control_msg)) = control {
-                        eprintln!("🎮 DEBUG: Processing control message from client {}: {:?}", client_id, control_msg);
+                        // Handle RequestTableData before processing other controls
+                        if let ControlMsg::RequestTableData { offset, window_size, data_type } = &control_msg {
+                            if let Some(ref accessor) = self.accessor {
+                                match accessor.get_table_data(data_type.clone(), *offset, *window_size) {
+                                    Ok(table_window) => {
+                                        let table_msg = WsMessage::TableData {
+                                            version: 1,
+                                            payload: table_window,
+                                        };
+                                        if let Err(e) = self.ws_bridge.send_to_client(client_id, table_msg).await {
+                                            eprintln!("❌ Failed to send table data to client {}: {}", client_id, e);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        eprintln!("❌ Failed to fetch table data: {}", e);
+                                    }
+                                }
+                            }
+                            // Skip other control processing for table data requests
+                            continue;
+                        }
+
+                        // 🎮 DEBUG: Processing control message from client {}: {:?}
                         // Accessor reactions
                         if let Some(ref accessor) = self.accessor {
                             if let Err(e) = Self::process_control_message(accessor, control_msg.clone()).await {
-                                eprintln!("❌ DEBUG: Accessor failed to process control message: {}", e);
+                                // ❌ DEBUG: Accessor failed to process control message: {}
                             }
                         }
                         // Engine-directed controls - apply ALL control messages to engine
                         if let Some(ref mut engine) = self.engine {
                             match &control_msg {
                                 ControlMsg::ChangeEmbedding { method, k, .. } => {
-                                    eprintln!("🧠 DEBUG: Forwarding ChangeEmbedding to engine: method={}, k={}", method, k);
+                                    // 🧠 DEBUG: Forwarding ChangeEmbedding to engine: method={}, k={}
                                     if let Err(e) = engine
                                         .apply(EngineUpdate::EmbeddingChanged {
                                             method: method.clone(),
@@ -681,11 +974,11 @@ impl RealtimeServer {
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to apply EmbeddingChanged: {}", e);
+                                        // ❌ DEBUG: Engine failed to apply EmbeddingChanged: {}
                                     }
                                 }
                                 ControlMsg::ChangeLayout { algorithm, params } => {
-                                    eprintln!("📐 DEBUG: Forwarding ChangeLayout to engine: algorithm={}", algorithm);
+                                    // 📐 DEBUG: Forwarding ChangeLayout to engine: algorithm={}
                                     if let Err(e) = engine
                                         .apply(EngineUpdate::LayoutChanged {
                                             algorithm: algorithm.clone(),
@@ -693,18 +986,18 @@ impl RealtimeServer {
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to apply LayoutChanged: {}", e);
+                                        // ❌ DEBUG: Engine failed to apply LayoutChanged: {}
                                     }
                                 }
                                 ControlMsg::SetInteractionController { mode } => {
-                                    eprintln!("🎮 DEBUG: Switching interaction controller to {}", mode);
+                                    // 🎮 DEBUG: Switching interaction controller to {}
                                     if let Err(e) = engine
                                         .handle_control_command(ControlCommand::SetInteractionController {
                                             mode: mode.clone(),
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to set controller: {}", e);
+                                        // ❌ DEBUG: Engine failed to set controller: {}
                                     }
                                 }
                                 ControlMsg::Pointer { event } => {
@@ -714,7 +1007,7 @@ impl RealtimeServer {
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to apply pointer event: {}", e);
+                                        // ❌ DEBUG: Engine failed to apply pointer event: {}
                                     }
                                 }
                                 ControlMsg::Wheel { event } => {
@@ -724,7 +1017,7 @@ impl RealtimeServer {
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to apply wheel event: {}", e);
+                                        // ❌ DEBUG: Engine failed to apply wheel event: {}
                                     }
                                 }
                                 ControlMsg::NodeDrag { event } => {
@@ -734,20 +1027,48 @@ impl RealtimeServer {
                                         })
                                         .await
                                     {
-                                        eprintln!("❌ DEBUG: Engine failed to apply node drag event: {}", e);
+                                        // ❌ DEBUG: Engine failed to apply node drag event: {}
+                                    }
+                                }
+                                ControlMsg::RequestTableData { offset, window_size, data_type } => {
+                                    eprintln!("🔍 RequestTableData received: offset={}, window_size={}, data_type={:?}", offset, window_size, data_type);
+                                    // Fetch table data from accessor
+                                    if let Some(ref accessor) = self.accessor {
+                                        eprintln!("  ✓ Accessor available");
+                                        match accessor.get_table_data(data_type.clone(), *offset, *window_size) {
+                                            Ok(table_window) => {
+                                                eprintln!("  ✓ Table data fetched: {} headers, {} rows", table_window.headers.len(), table_window.rows.len());
+                                                // Send table data response to requesting client
+                                                let table_msg = WsMessage::TableData {
+                                                    version: 1,
+                                                    payload: table_window,
+                                                };
+                                                eprintln!("  → Sending table data to client {}", client_id);
+                                                if let Err(e) = self.ws_bridge.send_to_client(client_id, table_msg).await {
+                                                    eprintln!("  ❌ Failed to send table data: {}", e);
+                                                } else {
+                                                    eprintln!("  ✓ Table data sent successfully");
+                                                }
+                                            }
+                                            Err(e) => {
+                                                eprintln!("  ❌ Failed to fetch table data: {}", e);
+                                            }
+                                        }
+                                    } else {
+                                        eprintln!("  ❌ No accessor available!");
                                     }
                                 }
                             }
                         }
                     } else {
-                        eprintln!("🎮 DEBUG: Control message channel closed");
+                        // 🎮 DEBUG: Control message channel closed
                         control_rx_opt = None; // stop selecting on it
                     }
                 },
             }
         }
 
-        eprintln!("🛑 DEBUG: RealtimeServer stopped");
+        // 🛑 DEBUG: RealtimeServer stopped
         Ok(())
     }
 
@@ -759,24 +1080,6 @@ impl RealtimeServer {
         hasher.update(WEBSOCKET_MAGIC.as_bytes());
         let hash = hasher.finalize();
         general_purpose::STANDARD.encode(hash)
-    }
-
-    /// Serve static files from the filesystem
-    async fn serve_static_file(file_path: &str, content_type: &str) -> Result<String, String> {
-        use tokio::fs;
-
-        match fs::read_to_string(file_path).await {
-            Ok(content) => {
-                let response = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n{}",
-                    content_type,
-                    content.len(),
-                    content
-                );
-                Ok(response)
-            }
-            Err(e) => Err(format!("Failed to read file {}: {}", file_path, e)),
-        }
     }
 
     /// Get WebSocket bridge for integration
@@ -798,37 +1101,35 @@ impl RealtimeServer {
 
         match &control_msg {
             ControlMsg::ChangeEmbedding { method, k, .. } => {
-                eprintln!(
-                    "🧠 DEBUG: Processing embedding change: {} with {} dimensions",
-                    method, k
-                );
+                // 🧠 DEBUG: Processing embedding change
             }
             ControlMsg::ChangeLayout { algorithm, .. } => {
-                eprintln!("📐 DEBUG: Processing layout change: {}", algorithm);
+                // 📐 DEBUG: Processing layout change: {}
             }
             ControlMsg::SetInteractionController { mode } => {
-                eprintln!("🎮 DEBUG: Requested controller mode {}", mode);
+                // 🎮 DEBUG: Requested controller mode {}
             }
             ControlMsg::Pointer { event } => {
-                eprintln!("🖱️  DEBUG: Pointer event {:?}", event);
+                // 🖱️  DEBUG: Pointer event {:?}
             }
             ControlMsg::Wheel { event } => {
-                eprintln!("🖱️  DEBUG: Wheel event {:?}", event);
+                // 🖱️  DEBUG: Wheel event {:?}
             }
             ControlMsg::NodeDrag { event } => {
-                eprintln!("🖱️  DEBUG: Node drag event {:?}", event);
+                // 🖱️  DEBUG: Node drag event {:?}
+            }
+            ControlMsg::RequestTableData { offset, window_size, data_type } => {
+                // 📊 DEBUG: Table data request: offset={}, window_size={}, type={:?}
             }
         }
 
         // Apply the control message through the accessor
         match accessor.apply_control(control_msg) {
             Ok(()) => {
-                eprintln!(
-                    "✅ DEBUG: Control message acknowledged by accessor (engine will emit updates)"
-                );
+                // ✅ DEBUG: Control message acknowledged by accessor
             }
             Err(e) => {
-                eprintln!("❌ DEBUG: Failed to apply control message: {}", e);
+                // ❌ DEBUG: Failed to apply control message: {}
                 return Err(e);
             }
         }

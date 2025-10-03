@@ -4,11 +4,10 @@
 //! of the graph Laplacian to embed nodes in high-dimensional space while
 //! preserving graph structure.
 
-use super::{EmbeddingEngine, GraphEmbeddingExt};
+use super::{EmbeddingEngine};
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
-use crate::traits::subgraph_operations::SubgraphOperations;
 use crate::types::NodeId;
 use std::collections::HashMap;
 

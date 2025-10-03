@@ -387,6 +387,12 @@ impl Hash for AttrValue {
 // Manual Eq implementation to handle f32 comparison
 impl Eq for AttrValue {}
 
+impl Default for AttrValue {
+    fn default() -> Self {
+        AttrValue::Null
+    }
+}
+
 impl PartialOrd for AttrValue {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))

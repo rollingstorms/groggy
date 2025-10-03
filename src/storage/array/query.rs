@@ -1,7 +1,7 @@
 //! Simple query parser for lazy array filtering operations
 //! Supports basic filtering expressions like "value > 100", "length > 5", etc.
 
-use crate::errors::{GraphError, GraphResult};
+use crate::errors::{GraphResult};
 use crate::types::AttrValue;
 
 /// Simple query evaluator for AttrValue filtering

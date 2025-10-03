@@ -9,10 +9,8 @@ This module provides functions to generate different types of graphs including:
 """
 
 import random
-import math
-from typing import List, Dict, Any, Optional, Tuple, Union
+from typing import List, Optional
 from . import Graph
-from .types import NodeId, EdgeId
 
 def complete_graph(n: int, **node_attrs) -> Graph:
     """

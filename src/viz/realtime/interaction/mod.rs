@@ -273,7 +273,7 @@ impl InteractionController for HoneycombController {
         match ev.phase {
             PointerPhase::Start => {
                 self.drag_start = Some((0.0, 0.0)); // Will be updated with actual position
-                eprintln!("🫸 DEBUG: Honeycomb pointer start");
+                // 🫸 DEBUG: Honeycomb pointer start, 
             }
             PointerPhase::Move => {
                 if self.drag_start.is_some() {
@@ -314,7 +314,7 @@ impl InteractionController for HoneycombController {
                                     axis_j: 1,
                                     radians: rotation_amount,
                                 });
-                                eprintln!("🔄 DEBUG: Honeycomb regular drag rotation: axes (0,1) by {:.4} radians", rotation_amount);
+                                // 🔄 DEBUG: Honeycomb regular drag rotation: axes (0,1) by {:.4} radians", rotation_amount);
                             }
                         }
                     }
@@ -323,7 +323,7 @@ impl InteractionController for HoneycombController {
             PointerPhase::End => {
                 self.drag_start = None;
                 self.dragging_node = None;
-                eprintln!("🫸 DEBUG: Honeycomb pointer end");
+                // 🫸 DEBUG: Honeycomb pointer end, 
             }
         }
         commands
@@ -335,7 +335,7 @@ impl InteractionController for HoneycombController {
             WheelEvent::Zoom { delta: _ } => {
                 // Zoom could trigger auto-scaling adjustments
                 if self.auto_scale_enabled {
-                    eprintln!("🔍 DEBUG: Honeycomb zoom - considering auto-scale adjustments");
+                    // 🔍 DEBUG: Honeycomb zoom - considering auto-scale adjustments, 
                 }
             }
             WheelEvent::Rotate { delta } => {
@@ -372,8 +372,7 @@ impl InteractionController for HoneycombController {
                     let (constrained_x, constrained_y) =
                         self.constrain_drag_position(node_id, x, y);
                     if (constrained_x - x).abs() > 0.1 || (constrained_y - y).abs() > 0.1 {
-                        eprintln!("⚠️  DEBUG: Honeycomb drag constrained: ({:.1}, {:.1}) -> ({:.1}, {:.1})",
-                                 x, y, constrained_x, constrained_y);
+                        // Honeycomb drag constrained
                     }
                     // The engine would use the constrained position for actual updates
                 }
@@ -382,7 +381,7 @@ impl InteractionController for HoneycombController {
                 if self.dragging_node == Some(node_id) {
                     self.dragging_node = None;
                     self.drag_start = None;
-                    eprintln!("🎯 DEBUG: Honeycomb node drag end: node={}", node_id);
+                    // Honeycomb node drag end
                 }
             }
         }
@@ -407,8 +406,7 @@ impl InteractionController for HoneycombController {
             enabled: self.auto_scale_enabled,
         });
 
-        eprintln!("🎛️  DEBUG: Honeycomb auto-scale controls exposed - occupancy: {}, cell_size: {}, enabled: {}",
-                 self.target_occupancy, self.min_cell_size, self.auto_scale_enabled);
+        // Honeycomb auto-scale controls exposed
 
         commands
     }

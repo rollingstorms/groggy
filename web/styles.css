@@ -223,34 +223,11 @@ body {
   display: none;
 }
 
-/* Floating "eyes" button (FAB) */
-.fab-eyes {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: 0;
-  background: #111827;
-  color: #fff;
-  font-size: 24px;
-  cursor: pointer;
-  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
-  display: grid;
-  place-items: center;
-  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
-  z-index: 1200;
-}
-.fab-eyes:hover { transform: translateY(-2px); box-shadow: 0 16px 30px rgba(0,0,0,0.28); }
-.fab-eyes:active { transform: translateY(0); }
-.fab-eyes .dot { font-size: 26px; line-height: 1; }
-
 /* Drawer */
 .control-drawer {
   position: fixed;
   right: 20px;
-  bottom: 92px;
+  bottom: 60px;
   width: min(92vw, 980px);
   max-height: min(78vh, 720px);
   background: rgba(255,255,255,0.98);
@@ -313,7 +290,6 @@ body {
     bottom: 86px;
     max-height: 75vh;
   }
-  .fab-eyes { right: 10px; bottom: 10px; }
 }
 
 .stat-group span:not(.stat-label) {
@@ -396,4 +372,220 @@ body {
   padding: 6px 8px;
   border: 2px solid #ced4da;
   border-radius: 6px;
+}
+
+/* ========================================
+   Table View & View Toggle Styles
+   ======================================== */
+
+/* View toggle button group */
+.view-toggle-group {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.view-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 2px solid #0969da;
+  border-radius: 6px;
+  background: white;
+  color: #0969da;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-toggle-btn:hover {
+  background: #f6f8fa;
+  border-color: #0550ae;
+}
+
+.view-toggle-btn:active {
+  background: #e7edf4;
+  transform: scale(0.98);
+}
+
+.view-toggle-btn .view-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.view-toggle-btn .view-label {
+  font-weight: 600;
+}
+
+/* Table container */
+.table-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+.table-scroll-wrapper {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+/* Data table styling */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table thead {
+  position: sticky;
+  top: 0;
+  background: #f6f8fa;
+  z-index: 10;
+  border-bottom: 2px solid #d0d7de;
+}
+
+.data-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #1f2328;
+  border-bottom: 1px solid #d0d7de;
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e7edf4;
+  color: #1f2328;
+}
+
+.data-table tbody tr:hover {
+  background: #f6f8fa;
+}
+
+.data-table tbody tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.data-table tbody tr:nth-child(even):hover {
+  background: #f3f4f6;
+}
+
+/* Table type toggle (Nodes/Edges) */
+.table-type-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  background: #f6f8fa;
+  border-bottom: 1px solid #d0d7de;
+}
+
+.table-type-btn {
+  padding: 6px 16px;
+  background: white;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #57606a;
+  transition: all 0.15s ease;
+}
+
+.table-type-btn:hover {
+  background: #f3f4f6;
+  border-color: #8c959f;
+}
+
+.table-type-btn.active {
+  background: #0969da;
+  color: white;
+  border-color: #0969da;
+}
+
+/* Table footer with pagination */
+.table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #f6f8fa;
+  border-top: 1px solid #d0d7de;
+  font-size: 12px;
+  color: #6a737d;
+}
+
+.table-nav-btn {
+  padding: 6px 12px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: white;
+  color: #1f2328;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.table-nav-btn:hover:not(:disabled) {
+  background: #f6f8fa;
+  border-color: #0969da;
+}
+
+.table-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Autofit button - floating in bottom right of graph window */
+.autofit-btn {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #0969da;
+  color: white;
+  border: 2px solid #0550ae;
+  cursor: pointer;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(9, 105, 218, 0.3);
+  transition: all 0.2s ease;
+  z-index: 100;
+}
+
+.autofit-btn:hover {
+  background: #0550ae;
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(9, 105, 218, 0.4);
+}
+
+.autofit-btn:active {
+  transform: scale(0.95);
+}
+
+.autofit-btn span {
+  line-height: 1;
+}
+
+/* View switching transitions */
+.canvas-container, .table-container {
+  transition: opacity 0.2s ease;
+}
+
+.canvas-container.hidden, .table-container.hidden {
+  display: none;
 }

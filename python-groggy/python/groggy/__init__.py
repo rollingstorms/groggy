@@ -96,20 +96,31 @@ try:
     _DISPLAY_AVAILABLE = True
 except ImportError:
     _DISPLAY_AVAILABLE = False
-    
-    # Provide fallback functions if display module is not available
+
+# Import comprehensive data import functionality
+from .imports import (
+    from_csv,
+    from_pandas,
+    from_numpy,
+    from_json,
+    from_parquet,
+    from_dict,
+)
+
+# Provide fallback functions if display module is not available
+if not _DISPLAY_AVAILABLE:
     def format_array(data):
         return f"GraphArray(len={len(data.get('data', []))}, dtype={data.get('dtype', 'object')})"
-    
+
     def format_matrix(data):
         shape = data.get('shape', (0, 0))
         return f"GraphMatrix(shape={shape}, dtype={data.get('dtype', 'object')})"
-        
+
     def format_table(data):
         shape = data.get('shape', (0, 0))
         return f"GraphTable(shape={shape})"
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 __all__ = [
     "Graph",
     "Subgraph",
@@ -184,8 +195,15 @@ __all__ = [
     # Auto-converting builder functions
     "array",
     "num_array",
-    "matrix", 
+    "matrix",
     "table",
+    # Data import functions
+    "from_csv",
+    "from_pandas",
+    "from_numpy",
+    "from_json",
+    "from_parquet",
+    "from_dict",
     # Hierarchical subgraph functionality
     "AggregationFunction",
     "MetaNode",

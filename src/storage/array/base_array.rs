@@ -698,6 +698,94 @@ impl BaseArray<AttrValue> {
         Ok(sum / count as f64)
     }
 
+    /// Calculate median of numeric values in the array
+    pub fn median(&self) -> crate::errors::GraphResult<f64> {
+        let mut numeric_values: Vec<f64> = Vec::new();
+
+        for val in self.inner.iter() {
+            match val {
+                AttrValue::Int(i) => numeric_values.push(*i as f64),
+                AttrValue::SmallInt(i) => numeric_values.push(*i as f64),
+                AttrValue::Float(f) => numeric_values.push(*f as f64),
+                AttrValue::Null => {} // Skip null values
+                _ => {
+                    return Err(crate::errors::GraphError::InvalidInput(format!(
+                        "Cannot compute median of non-numeric data type: {:?}",
+                        val
+                    )));
+                }
+            }
+        }
+
+        if numeric_values.is_empty() {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Cannot compute median of empty array".to_string(),
+            ));
+        }
+
+        numeric_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let len = numeric_values.len();
+        if len % 2 == 0 {
+            // Even number of values - average of middle two
+            let mid1 = numeric_values[len / 2 - 1];
+            let mid2 = numeric_values[len / 2];
+            Ok((mid1 + mid2) / 2.0)
+        } else {
+            // Odd number of values - middle value
+            Ok(numeric_values[len / 2])
+        }
+    }
+
+    /// Calculate standard deviation of numeric values in the array
+    pub fn std(&self) -> crate::errors::GraphResult<f64> {
+        let variance = self.var()?;
+        Ok(variance.sqrt())
+    }
+
+    /// Calculate variance of numeric values in the array
+    pub fn var(&self) -> crate::errors::GraphResult<f64> {
+        let mean = self.mean()?;
+        let mut sum_squared_diff: f64 = 0.0;
+        let mut count = 0;
+
+        for val in self.inner.iter() {
+            match val {
+                AttrValue::Int(i) => {
+                    let diff = (*i as f64) - mean;
+                    sum_squared_diff += diff * diff;
+                    count += 1;
+                }
+                AttrValue::SmallInt(i) => {
+                    let diff = (*i as f64) - mean;
+                    sum_squared_diff += diff * diff;
+                    count += 1;
+                }
+                AttrValue::Float(f) => {
+                    let diff = (*f as f64) - mean;
+                    sum_squared_diff += diff * diff;
+                    count += 1;
+                }
+                AttrValue::Null => {} // Skip null values
+                _ => {
+                    return Err(crate::errors::GraphError::InvalidInput(format!(
+                        "Cannot compute variance of non-numeric data type: {:?}",
+                        val
+                    )));
+                }
+            }
+        }
+
+        if count <= 1 {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Cannot compute variance with less than 2 values".to_string(),
+            ));
+        }
+
+        // Sample variance (n-1 denominator)
+        Ok(sum_squared_diff / (count - 1) as f64)
+    }
+
     /// Find minimum value in the array
     pub fn min(&self) -> crate::errors::GraphResult<AttrValue> {
         let mut min_val: Option<AttrValue> = None;
@@ -893,6 +981,851 @@ impl BaseArray<AttrValue> {
     /// Provides pandas-like string operations (.str.upper(), .str.contains(), etc.)
     pub fn str(&self) -> StringAccessor {
         StringAccessor::new(self)
+    }
+
+    /// Check if values in this array are in a provided set (pandas-style isin)
+    ///
+    /// # Arguments
+    /// * `values` - Vector of values to check membership against
+    ///
+    /// # Returns
+    /// Boolean array indicating which elements match the values
+    ///
+    /// # Examples
+    /// ```rust
+    /// use crate::storage::array::BaseArray;
+    /// use crate::types::AttrValue;
+    ///
+    /// let array = BaseArray::from_attr_values(vec![
+    ///     AttrValue::Text("Engineering".to_string()),
+    ///     AttrValue::Text("Marketing".to_string()),
+    ///     AttrValue::Text("Sales".to_string())
+    /// ]);
+    ///
+    /// let check_values = vec![
+    ///     AttrValue::Text("Engineering".to_string()),
+    ///     AttrValue::Text("Marketing".to_string())
+    /// ];
+    ///
+    /// let mask = array.isin(check_values)?;
+    /// // mask will be [true, true, false]
+    /// ```
+    pub fn isin(&self, values: Vec<AttrValue>) -> crate::errors::GraphResult<BaseArray<AttrValue>> {
+        let mut mask_data = Vec::with_capacity(self.len());
+
+        for attr_val in self.inner.iter() {
+            // Use simple iteration instead of HashSet for now to debug
+            let mut matches = false;
+            for check_val in &values {
+                if attr_val == check_val {
+                    matches = true;
+                    break;
+                }
+            }
+            mask_data.push(AttrValue::Bool(matches));
+        }
+
+        Ok(BaseArray::new(mask_data))
+    }
+
+    /// Count the frequency of each unique value in the array (pandas-style value_counts)
+    ///
+    /// # Arguments
+    /// * `sort` - Whether to sort the results by count (default: true)
+    /// * `ascending` - Sort order when sort=true (default: false, most frequent first)
+    /// * `dropna` - Whether to exclude null values (default: true)
+    ///
+    /// # Returns
+    /// Table with 'value' and 'count' columns showing frequency of each unique value
+    ///
+    /// # Examples
+    /// ```rust
+    /// use crate::storage::array::BaseArray;
+    /// use crate::types::AttrValue;
+    ///
+    /// let array = BaseArray::from_attr_values(vec![
+    ///     AttrValue::Text("A".to_string()),
+    ///     AttrValue::Text("B".to_string()),
+    ///     AttrValue::Text("A".to_string()),
+    ///     AttrValue::Text("C".to_string()),
+    ///     AttrValue::Text("A".to_string()),
+    /// ]);
+    ///
+    /// let counts = array.value_counts(true, false, true)?;
+    /// // Returns table with:
+    /// // value | count
+    /// // "A"   | 3
+    /// // "B"   | 1
+    /// // "C"   | 1
+    /// ```
+    pub fn value_counts(
+        &self,
+        sort: bool,
+        ascending: bool,
+        dropna: bool
+    ) -> crate::errors::GraphResult<crate::storage::table::BaseTable> {
+        use std::collections::HashMap;
+        use crate::types::AttrValue;
+
+        // Count frequencies
+        let mut counts: HashMap<String, (AttrValue, usize)> = HashMap::new();
+
+        for value in self.inner.iter() {
+            // Skip null values if dropna is true
+            if dropna && matches!(value, AttrValue::Null) {
+                continue;
+            }
+
+            let key = format!("{:?}", value);
+            let entry = counts.entry(key).or_insert((value.clone(), 0));
+            entry.1 += 1;
+        }
+
+        // Convert to vectors for sorting/table creation
+        let mut results: Vec<(AttrValue, usize)> = counts.into_values().collect();
+
+        // Sort if requested
+        if sort {
+            if ascending {
+                results.sort_by(|a, b| a.1.cmp(&b.1));
+            } else {
+                results.sort_by(|a, b| b.1.cmp(&a.1));
+            }
+        }
+
+        // Create table columns
+        let mut value_data = Vec::with_capacity(results.len());
+        let mut count_data = Vec::with_capacity(results.len());
+
+        for (value, count) in results {
+            value_data.push(value);
+            count_data.push(AttrValue::Int(count as i64));
+        }
+
+        // Create table
+        let mut columns = HashMap::new();
+        columns.insert("value".to_string(), BaseArray::from_attr_values(value_data));
+        columns.insert("count".to_string(), BaseArray::from_attr_values(count_data));
+
+        let table = crate::storage::table::BaseTable::with_column_order(
+            columns,
+            vec!["value".to_string(), "count".to_string()]
+        )?;
+
+        Ok(table)
+    }
+
+    /// Apply a function to each element in the array (pandas-style apply)
+    ///
+    /// This method takes a function that operates on AttrValue and returns a new AttrValue,
+    /// creating a new array with the transformed values.
+    ///
+    /// # Arguments
+    /// * `func` - Function to apply to each element
+    ///
+    /// # Returns
+    /// New BaseArray with transformed values
+    ///
+    /// # Examples
+    /// ```rust
+    /// use crate::storage::array::BaseArray;
+    /// use crate::types::AttrValue;
+    ///
+    /// let array = BaseArray::from_attr_values(vec![
+    ///     AttrValue::Int(1),
+    ///     AttrValue::Int(2),
+    ///     AttrValue::Int(3)
+    /// ]);
+    ///
+    /// // Square each number
+    /// let squared = array.apply(|x| match x {
+    ///     AttrValue::Int(n) => AttrValue::Int(n * n),
+    ///     _ => x.clone()
+    /// });
+    /// ```
+    pub fn apply<F>(&self, func: F) -> Self
+    where
+        F: Fn(&AttrValue) -> AttrValue,
+    {
+        let transformed_data: Vec<AttrValue> = self.inner
+            .iter()
+            .map(|value| func(value))
+            .collect();
+
+        BaseArray::from_attr_values(transformed_data)
+    }
+
+    /// Compute quantiles for the array (pandas-style quantile)
+    ///
+    /// # Arguments
+    /// * `q` - Quantile to compute (0.0 to 1.0), or vector of quantiles
+    /// * `interpolation` - Method for interpolation ("linear", "lower", "higher", "midpoint", "nearest")
+    ///
+    /// # Returns
+    /// AttrValue (single quantile) or BaseArray (multiple quantiles)
+    ///
+    /// # Examples
+    /// ```rust
+    /// use crate::storage::array::BaseArray;
+    /// use crate::types::AttrValue;
+    ///
+    /// let array = BaseArray::from_attr_values(vec![
+    ///     AttrValue::Int(1), AttrValue::Int(2), AttrValue::Int(3),
+    ///     AttrValue::Int(4), AttrValue::Int(5)
+    /// ]);
+    ///
+    /// // Single quantile
+    /// let median = array.quantile(0.5, "linear")?; // AttrValue::Float(3.0)
+    ///
+    /// // Multiple quantiles
+    /// let quartiles = array.quantiles(&[0.25, 0.5, 0.75], "linear")?;
+    /// ```
+    pub fn quantile(&self, q: f64, interpolation: &str) -> crate::errors::GraphResult<AttrValue> {
+        if q < 0.0 || q > 1.0 {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Quantile must be between 0.0 and 1.0".to_string()
+            ));
+        }
+
+        // Extract numeric values, filtering out non-numeric and null values
+        let mut numeric_values: Vec<f64> = Vec::new();
+        for value in self.inner.iter() {
+            match value {
+                AttrValue::Int(i) => numeric_values.push(*i as f64),
+                AttrValue::SmallInt(i) => numeric_values.push(*i as f64),
+                AttrValue::Float(f) => numeric_values.push(*f as f64),
+                AttrValue::Null => continue, // Skip nulls
+                _ => continue, // Skip non-numeric values
+            }
+        }
+
+        if numeric_values.is_empty() {
+            return Ok(AttrValue::Null);
+        }
+
+        // Sort the values
+        numeric_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let n = numeric_values.len();
+        if n == 1 {
+            return Ok(AttrValue::Float(numeric_values[0] as f32));
+        }
+
+        // Calculate the position
+        let position = q * (n - 1) as f64;
+        let lower_index = position.floor() as usize;
+        let upper_index = position.ceil() as usize;
+
+        // Handle interpolation
+        let result = match interpolation {
+            "linear" => {
+                if lower_index == upper_index {
+                    numeric_values[lower_index]
+                } else {
+                    let fraction = position - lower_index as f64;
+                    let lower_value = numeric_values[lower_index];
+                    let upper_value = numeric_values[upper_index];
+                    lower_value + fraction * (upper_value - lower_value)
+                }
+            }
+            "lower" => numeric_values[lower_index],
+            "higher" => numeric_values[upper_index],
+            "midpoint" => {
+                if lower_index == upper_index {
+                    numeric_values[lower_index]
+                } else {
+                    (numeric_values[lower_index] + numeric_values[upper_index]) / 2.0
+                }
+            }
+            "nearest" => {
+                let fraction = position - lower_index as f64;
+                if fraction < 0.5 {
+                    numeric_values[lower_index]
+                } else {
+                    numeric_values[upper_index]
+                }
+            }
+            _ => return Err(crate::errors::GraphError::InvalidInput(
+                format!("Invalid interpolation method: {}", interpolation)
+            ))
+        };
+
+        Ok(AttrValue::Float(result as f32))
+    }
+
+    /// Compute multiple quantiles for the array
+    ///
+    /// # Arguments
+    /// * `quantiles` - Slice of quantiles to compute (each 0.0 to 1.0)
+    /// * `interpolation` - Method for interpolation
+    ///
+    /// # Returns
+    /// BaseArray containing the computed quantiles
+    pub fn quantiles(&self, quantiles: &[f64], interpolation: &str) -> crate::errors::GraphResult<BaseArray<AttrValue>> {
+        let mut results = Vec::with_capacity(quantiles.len());
+
+        for &q in quantiles {
+            let quantile_value = self.quantile(q, interpolation)?;
+            results.push(quantile_value);
+        }
+
+        Ok(BaseArray::from_attr_values(results))
+    }
+
+    /// Compute percentiles for the array (equivalent to quantile * 100)
+    ///
+    /// # Arguments
+    /// * `percentiles` - Percentile to compute (0.0 to 100.0), or vector of percentiles
+    /// * `interpolation` - Method for interpolation
+    ///
+    /// # Examples
+    /// ```rust
+    /// let median = array.percentile(50.0, "linear")?; // 50th percentile = median
+    /// let quartiles = array.percentiles(&[25.0, 50.0, 75.0], "linear")?;
+    /// ```
+    pub fn get_percentile(&self, percentile: f64, interpolation: &str) -> crate::errors::GraphResult<AttrValue> {
+        if percentile < 0.0 || percentile > 100.0 {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Percentile must be between 0.0 and 100.0".to_string()
+            ));
+        }
+
+        self.quantile(percentile / 100.0, interpolation)
+    }
+
+    /// Compute multiple percentiles for the array
+    pub fn percentiles(&self, percentiles: &[f64], interpolation: &str) -> crate::errors::GraphResult<BaseArray<AttrValue>> {
+        // Validate all percentiles first
+        for &p in percentiles {
+            if p < 0.0 || p > 100.0 {
+                return Err(crate::errors::GraphError::InvalidInput(
+                    format!("Percentile {} must be between 0.0 and 100.0", p)
+                ));
+            }
+        }
+
+        // Convert percentiles to quantiles
+        let quantiles: Vec<f64> = percentiles.iter().map(|&p| p / 100.0).collect();
+        self.quantiles(&quantiles, interpolation)
+    }
+
+    /// Compute correlation coefficient with another array (pandas-style corr)
+    ///
+    /// # Arguments
+    /// * `other` - Another BaseArray to compute correlation with
+    /// * `method` - Correlation method ("pearson", "spearman", "kendall")
+    ///
+    /// # Returns
+    /// Correlation coefficient as AttrValue::Float, or AttrValue::Null if calculation fails
+    ///
+    /// # Examples
+    /// ```rust
+    /// use crate::storage::array::BaseArray;
+    /// use crate::types::AttrValue;
+    ///
+    /// let array1 = BaseArray::from_attr_values(vec![
+    ///     AttrValue::Int(1), AttrValue::Int(2), AttrValue::Int(3)
+    /// ]);
+    /// let array2 = BaseArray::from_attr_values(vec![
+    ///     AttrValue::Int(2), AttrValue::Int(4), AttrValue::Int(6)
+    /// ]);
+    ///
+    /// // Perfect positive correlation
+    /// let corr = array1.corr(&array2, "pearson")?; // AttrValue::Float(1.0)
+    /// ```
+    pub fn corr(&self, other: &BaseArray<AttrValue>, method: &str) -> crate::errors::GraphResult<AttrValue> {
+        // Extract numeric values from both arrays, filtering out non-numeric and null values
+        let mut values1: Vec<f64> = Vec::new();
+        let mut values2: Vec<f64> = Vec::new();
+
+        let min_len = std::cmp::min(self.inner.len(), other.inner.len());
+
+        for i in 0..min_len {
+            let val1 = self.inner.get(i).unwrap_or(&AttrValue::Null);
+            let val2 = other.inner.get(i).unwrap_or(&AttrValue::Null);
+
+            let num1 = match val1 {
+                AttrValue::Int(n) => Some(*n as f64),
+                AttrValue::SmallInt(n) => Some(*n as f64),
+                AttrValue::Float(f) => Some(*f as f64),
+                AttrValue::Null => None,
+                _ => None,
+            };
+
+            let num2 = match val2 {
+                AttrValue::Int(n) => Some(*n as f64),
+                AttrValue::SmallInt(n) => Some(*n as f64),
+                AttrValue::Float(f) => Some(*f as f64),
+                AttrValue::Null => None,
+                _ => None,
+            };
+
+            if let (Some(n1), Some(n2)) = (num1, num2) {
+                values1.push(n1);
+                values2.push(n2);
+            }
+        }
+
+        if values1.len() < 2 {
+            return Ok(AttrValue::Null);
+        }
+
+        let correlation = match method {
+            "pearson" => self.pearson_correlation(&values1, &values2)?,
+            "spearman" => {
+                // Convert to ranks and compute Pearson correlation of ranks
+                let ranks1 = self.compute_ranks(&values1);
+                let ranks2 = self.compute_ranks(&values2);
+                self.pearson_correlation(&ranks1, &ranks2)?
+            }
+            "kendall" => {
+                // Kendall's tau correlation
+                self.kendall_correlation(&values1, &values2)?
+            }
+            _ => return Err(crate::errors::GraphError::InvalidInput(
+                format!("Invalid correlation method: {}. Use 'pearson', 'spearman', or 'kendall'", method)
+            ))
+        };
+
+        Ok(AttrValue::Float(correlation as f32))
+    }
+
+    /// Compute covariance with another array (pandas-style cov)
+    ///
+    /// # Arguments
+    /// * `other` - Another BaseArray to compute covariance with
+    /// * `ddof` - Delta degrees of freedom (default: 1 for sample covariance)
+    ///
+    /// # Returns
+    /// Covariance as AttrValue::Float, or AttrValue::Null if calculation fails
+    ///
+    /// # Examples
+    /// ```rust
+    /// let cov = array1.cov(&array2, 1)?; // Sample covariance
+    /// let cov_pop = array1.cov(&array2, 0)?; // Population covariance
+    /// ```
+    pub fn cov(&self, other: &BaseArray<AttrValue>, ddof: i32) -> crate::errors::GraphResult<AttrValue> {
+        // Extract numeric values from both arrays
+        let mut values1: Vec<f64> = Vec::new();
+        let mut values2: Vec<f64> = Vec::new();
+
+        let min_len = std::cmp::min(self.inner.len(), other.inner.len());
+
+        for i in 0..min_len {
+            let val1 = self.inner.get(i).unwrap_or(&AttrValue::Null);
+            let val2 = other.inner.get(i).unwrap_or(&AttrValue::Null);
+
+            let num1 = match val1 {
+                AttrValue::Int(n) => Some(*n as f64),
+                AttrValue::SmallInt(n) => Some(*n as f64),
+                AttrValue::Float(f) => Some(*f as f64),
+                AttrValue::Null => None,
+                _ => None,
+            };
+
+            let num2 = match val2 {
+                AttrValue::Int(n) => Some(*n as f64),
+                AttrValue::SmallInt(n) => Some(*n as f64),
+                AttrValue::Float(f) => Some(*f as f64),
+                AttrValue::Null => None,
+                _ => None,
+            };
+
+            if let (Some(n1), Some(n2)) = (num1, num2) {
+                values1.push(n1);
+                values2.push(n2);
+            }
+        }
+
+        if values1.len() <= ddof as usize {
+            return Ok(AttrValue::Null);
+        }
+
+        // Calculate means
+        let mean1: f64 = values1.iter().sum::<f64>() / values1.len() as f64;
+        let mean2: f64 = values2.iter().sum::<f64>() / values2.len() as f64;
+
+        // Calculate covariance
+        let covariance: f64 = values1.iter()
+            .zip(values2.iter())
+            .map(|(x1, x2)| (x1 - mean1) * (x2 - mean2))
+            .sum::<f64>() / (values1.len() as f64 - ddof as f64);
+
+        Ok(AttrValue::Float(covariance as f32))
+    }
+
+    /// Helper function to compute Pearson correlation coefficient
+    fn pearson_correlation(&self, x: &[f64], y: &[f64]) -> crate::errors::GraphResult<f64> {
+        let n = x.len() as f64;
+        if n < 2.0 {
+            return Ok(0.0);
+        }
+
+        let mean_x = x.iter().sum::<f64>() / n;
+        let mean_y = y.iter().sum::<f64>() / n;
+
+        let mut numerator = 0.0;
+        let mut sum_sq_x = 0.0;
+        let mut sum_sq_y = 0.0;
+
+        for i in 0..x.len() {
+            let dx = x[i] - mean_x;
+            let dy = y[i] - mean_y;
+            numerator += dx * dy;
+            sum_sq_x += dx * dx;
+            sum_sq_y += dy * dy;
+        }
+
+        let denominator = (sum_sq_x * sum_sq_y).sqrt();
+        if denominator == 0.0 {
+            Ok(0.0)
+        } else {
+            Ok(numerator / denominator)
+        }
+    }
+
+    /// Helper function to compute ranks for Spearman correlation
+    fn compute_ranks(&self, values: &[f64]) -> Vec<f64> {
+        let mut indexed_values: Vec<(usize, f64)> = values.iter()
+            .enumerate()
+            .map(|(i, &v)| (i, v))
+            .collect();
+
+        // Sort by value
+        indexed_values.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        let mut ranks = vec![0.0; values.len()];
+        let mut i = 0;
+        while i < indexed_values.len() {
+            let current_value = indexed_values[i].1;
+            let start = i;
+
+            // Find all equal values
+            while i < indexed_values.len() && indexed_values[i].1 == current_value {
+                i += 1;
+            }
+
+            // Assign average rank to all equal values
+            let avg_rank = (start + i + 1) as f64 / 2.0;
+            for j in start..i {
+                ranks[indexed_values[j].0] = avg_rank;
+            }
+        }
+
+        ranks
+    }
+
+    /// Helper function to compute Kendall's tau correlation
+    fn kendall_correlation(&self, x: &[f64], y: &[f64]) -> crate::errors::GraphResult<f64> {
+        let n = x.len();
+        if n < 2 {
+            return Ok(0.0);
+        }
+
+        let mut concordant = 0;
+        let mut discordant = 0;
+
+        for i in 0..n {
+            for j in i + 1..n {
+                let x_diff = x[i] - x[j];
+                let y_diff = y[i] - y[j];
+
+                if (x_diff > 0.0 && y_diff > 0.0) || (x_diff < 0.0 && y_diff < 0.0) {
+                    concordant += 1;
+                } else if (x_diff > 0.0 && y_diff < 0.0) || (x_diff < 0.0 && y_diff > 0.0) {
+                    discordant += 1;
+                }
+                // If either difference is 0, it's a tie and doesn't count
+            }
+        }
+
+        let total_pairs = n * (n - 1) / 2;
+        if total_pairs == 0 {
+            Ok(0.0)
+        } else {
+            Ok((concordant as f64 - discordant as f64) / total_pairs as f64)
+        }
+    }
+
+    /// Rolling window operation with specified window size
+    ///
+    /// # Arguments
+    /// * `window` - Window size for rolling operations
+    /// * `operation` - Function to apply to each window (e.g., "mean", "sum", "min", "max", "std")
+    ///
+    /// # Returns
+    /// New BaseArray with rolling operation results
+    pub fn rolling(&self, window: usize, operation: &str) -> GraphResult<Self> {
+        if window == 0 {
+            return Err(crate::errors::GraphError::InvalidInput(
+                "Window size must be greater than 0".to_string(),
+            ));
+        }
+
+        let mut result_values = Vec::new();
+
+        for i in 0..self.data().len() {
+            if i + 1 < window {
+                // Not enough data for window, use null
+                result_values.push(AttrValue::Null);
+            } else {
+                // Extract window data
+                let start_idx = if i + 1 >= window { i + 1 - window } else { 0 };
+                let window_data: Vec<f64> = self.data()[start_idx..=i]
+                    .iter()
+                    .filter_map(|val| match val {
+                        AttrValue::Int(i) => Some(*i as f64),
+                        AttrValue::Float(f) => Some(*f as f64),
+                        _ => None,
+                    })
+                    .collect();
+
+                if window_data.is_empty() {
+                    result_values.push(AttrValue::Null);
+                } else {
+                    let result = match operation {
+                        "mean" => window_data.iter().sum::<f64>() / window_data.len() as f64,
+                        "sum" => window_data.iter().sum::<f64>(),
+                        "min" => window_data.iter().cloned().fold(f64::INFINITY, f64::min),
+                        "max" => window_data.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                        "std" => {
+                            let mean = window_data.iter().sum::<f64>() / window_data.len() as f64;
+                            let variance = window_data.iter()
+                                .map(|x| (x - mean).powi(2))
+                                .sum::<f64>() / window_data.len() as f64;
+                            variance.sqrt()
+                        }
+                        _ => {
+                            return Err(crate::errors::GraphError::InvalidInput(
+                                format!("Unsupported rolling operation: {}", operation),
+                            ));
+                        }
+                    };
+                    result_values.push(AttrValue::Float(result as f32));
+                }
+            }
+        }
+
+        Ok(BaseArray::from_attr_values(result_values))
+    }
+
+    /// Expanding window operation (cumulative from start)
+    ///
+    /// # Arguments
+    /// * `operation` - Function to apply to expanding window (e.g., "mean", "sum", "min", "max", "std")
+    ///
+    /// # Returns
+    /// New BaseArray with expanding operation results
+    pub fn expanding(&self, operation: &str) -> GraphResult<Self> {
+        let mut result_values = Vec::new();
+
+        for i in 0..self.data().len() {
+            // Extract data from start to current position
+            let window_data: Vec<f64> = self.data()[0..=i]
+                .iter()
+                .filter_map(|val| match val {
+                    AttrValue::Int(i) => Some(*i as f64),
+                    AttrValue::Float(f) => Some(*f as f64),
+                    _ => None,
+                })
+                .collect();
+
+            if window_data.is_empty() {
+                result_values.push(AttrValue::Null);
+            } else {
+                let result = match operation {
+                    "mean" => window_data.iter().sum::<f64>() / window_data.len() as f64,
+                    "sum" => window_data.iter().sum::<f64>(),
+                    "min" => window_data.iter().cloned().fold(f64::INFINITY, f64::min),
+                    "max" => window_data.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                    "std" => {
+                        let mean = window_data.iter().sum::<f64>() / window_data.len() as f64;
+                        let variance = window_data.iter()
+                            .map(|x| (x - mean).powi(2))
+                            .sum::<f64>() / window_data.len() as f64;
+                        variance.sqrt()
+                    }
+                    _ => {
+                        return Err(crate::errors::GraphError::InvalidInput(
+                            format!("Unsupported expanding operation: {}", operation),
+                        ));
+                    }
+                };
+                result_values.push(AttrValue::Float(result as f32));
+            }
+        }
+
+        Ok(BaseArray::from_attr_values(result_values))
+    }
+
+    /// Cumulative sum operation
+    ///
+    /// # Returns
+    /// New BaseArray with cumulative sum values
+    pub fn cumsum(&self) -> GraphResult<Self> {
+        let mut result_values = Vec::new();
+        let mut running_sum = 0.0;
+
+        for val in self.data() {
+            match val {
+                AttrValue::Int(i) => {
+                    running_sum += *i as f64;
+                    result_values.push(AttrValue::Float(running_sum as f32));
+                }
+                AttrValue::Float(f) => {
+                    running_sum += *f as f64;
+                    result_values.push(AttrValue::Float(running_sum as f32));
+                }
+                _ => {
+                    // For non-numeric values, keep the running sum unchanged
+                    result_values.push(AttrValue::Float(running_sum as f32));
+                }
+            }
+        }
+
+        Ok(BaseArray::from_attr_values(result_values))
+    }
+
+    /// Cumulative minimum operation
+    ///
+    /// # Returns
+    /// New BaseArray with cumulative minimum values
+    pub fn cummin(&self) -> GraphResult<Self> {
+        let mut result_values = Vec::new();
+        let mut running_min = f64::INFINITY;
+
+        for val in self.data() {
+            match val {
+                AttrValue::Int(i) => {
+                    running_min = running_min.min(*i as f64);
+                    result_values.push(AttrValue::Float(running_min as f32));
+                }
+                AttrValue::Float(f) => {
+                    running_min = running_min.min(*f as f64);
+                    result_values.push(AttrValue::Float(running_min as f32));
+                }
+                _ => {
+                    // For non-numeric values, keep current running minimum
+                    if running_min != f64::INFINITY {
+                        result_values.push(AttrValue::Float(running_min as f32));
+                    } else {
+                        result_values.push(AttrValue::Null);
+                    }
+                }
+            }
+        }
+
+        Ok(BaseArray::from_attr_values(result_values))
+    }
+
+    /// Cumulative maximum operation
+    ///
+    /// # Returns
+    /// New BaseArray with cumulative maximum values
+    pub fn cummax(&self) -> GraphResult<Self> {
+        let mut result_values = Vec::new();
+        let mut running_max = f64::NEG_INFINITY;
+
+        for val in self.data() {
+            match val {
+                AttrValue::Int(i) => {
+                    running_max = running_max.max(*i as f64);
+                    result_values.push(AttrValue::Float(running_max as f32));
+                }
+                AttrValue::Float(f) => {
+                    running_max = running_max.max(*f as f64);
+                    result_values.push(AttrValue::Float(running_max as f32));
+                }
+                _ => {
+                    // For non-numeric values, keep current running maximum
+                    if running_max != f64::NEG_INFINITY {
+                        result_values.push(AttrValue::Float(running_max as f32));
+                    } else {
+                        result_values.push(AttrValue::Null);
+                    }
+                }
+            }
+        }
+
+        Ok(BaseArray::from_attr_values(result_values))
+    }
+
+    /// Shift operation - shift values by specified periods
+    ///
+    /// # Arguments
+    /// * `periods` - Number of periods to shift (positive = shift right, negative = shift left)
+    /// * `fill_value` - Value to use for filling gaps (default: Null)
+    ///
+    /// # Returns
+    /// New BaseArray with shifted values
+    pub fn shift(&self, periods: i32, fill_value: Option<AttrValue>) -> GraphResult<Self> {
+        let fill = fill_value.unwrap_or(AttrValue::Null);
+        let mut result_values = vec![fill.clone(); self.data().len()];
+
+        if periods == 0 {
+            return Ok(BaseArray::from_attr_values(self.data().clone()));
+        }
+
+        if periods > 0 {
+            // Shift right
+            let shift = periods as usize;
+            for i in shift..self.data().len() {
+                result_values[i] = self.data()[i - shift].clone();
+            }
+        } else {
+            // Shift left
+            let shift = (-periods) as usize;
+            for i in 0..(self.data().len() - shift) {
+                result_values[i] = self.data()[i + shift].clone();
+            }
+        }
+
+        Ok(BaseArray::from_attr_values(result_values))
+    }
+
+    /// Percentage change operation
+    ///
+    /// # Arguments
+    /// * `periods` - Number of periods to use for comparison (default: 1)
+    ///
+    /// # Returns
+    /// New BaseArray with percentage change values
+    pub fn pct_change(&self, periods: Option<usize>) -> GraphResult<Self> {
+        let periods = periods.unwrap_or(1);
+        let mut result_values = Vec::new();
+
+        for i in 0..self.data().len() {
+            if i < periods {
+                result_values.push(AttrValue::Null);
+            } else {
+                let current = match &self.data()[i] {
+                    AttrValue::Int(val) => *val as f64,
+                    AttrValue::Float(val) => *val as f64,
+                    _ => {
+                        result_values.push(AttrValue::Null);
+                        continue;
+                    }
+                };
+
+                let previous = match &self.data()[i - periods] {
+                    AttrValue::Int(val) => *val as f64,
+                    AttrValue::Float(val) => *val as f64,
+                    _ => {
+                        result_values.push(AttrValue::Null);
+                        continue;
+                    }
+                };
+
+                if previous == 0.0 {
+                    result_values.push(AttrValue::Null);
+                } else {
+                    let pct_change = (current - previous) / previous;
+                    result_values.push(AttrValue::Float(pct_change as f32));
+                }
+            }
+        }
+
+        Ok(BaseArray::from_attr_values(result_values))
     }
 }
 

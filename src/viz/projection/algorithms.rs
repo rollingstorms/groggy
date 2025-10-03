@@ -1,11 +1,10 @@
 //! Projection algorithms for mapping high-dimensional embeddings to 2D coordinates
 
-use super::{HoneycombConfig, HoneycombLayoutStrategy, ProjectionEngine};
+use super::{ProjectionEngine};
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::streaming::data_source::Position;
-use std::collections::HashMap;
 
 /// PCA-based projection (fastest, linear)
 #[derive(Debug)]

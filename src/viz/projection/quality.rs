@@ -1,11 +1,10 @@
 //! Quality metrics and validation for projection systems
 
-use super::{QualityConfig, QualityThresholds};
+use super::{QualityConfig};
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::streaming::data_source::Position;
-use std::collections::HashMap;
 
 /// Quality metrics for evaluating projection quality
 #[derive(Debug, Clone)]

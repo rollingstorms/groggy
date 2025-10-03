@@ -8,7 +8,6 @@ use crate::storage::array::NumArray;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
 
 /// Memory allocation tracker that wraps the system allocator
 pub struct TrackingAllocator {

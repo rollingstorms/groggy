@@ -4,13 +4,12 @@ use super::base::BaseTable;
 use super::base::InteractiveConfig;
 use super::traits::{Table, TableIterator};
 use crate::errors::{GraphError, GraphResult};
-use crate::storage::array::{ArrayOps, BaseArray};
+use crate::storage::array::{BaseArray};
 use crate::types::{AttrValue, EdgeId, NodeId};
 use crate::viz::display::{ColumnSchema, DataType};
 use crate::viz::streaming::data_source::{
     DataSchema, DataSource, DataWindow, GraphEdge, GraphMetadata, GraphNode, LayoutAlgorithm,
-    NodePosition, Position, WindowKey,
-};
+    NodePosition, Position, };
 use crate::viz::VizModule;
 use std::collections::{HashMap, HashSet};
 
@@ -612,6 +611,12 @@ impl Table for EdgesTable {
         })
     }
 
+    fn sort_values(&self, columns: Vec<String>, ascending: Vec<bool>) -> GraphResult<Self> {
+        Ok(Self {
+            base: self.base.sort_values(columns, ascending)?,
+        })
+    }
+
     fn filter(&self, predicate: &str) -> GraphResult<Self> {
         Ok(Self {
             base: self.base.filter(predicate)?,
@@ -661,6 +666,30 @@ impl Table for EdgesTable {
 
         Ok(Self {
             base: self.base.drop_columns(&filtered_names)?,
+        })
+    }
+
+    fn pivot_table(
+        &self,
+        index_cols: &[String],
+        columns_col: &str,
+        values_col: &str,
+        agg_func: &str,
+    ) -> GraphResult<Self> {
+        Ok(Self {
+            base: self.base.pivot_table(index_cols, columns_col, values_col, agg_func)?,
+        })
+    }
+
+    fn melt(
+        &self,
+        id_vars: Option<&[String]>,
+        value_vars: Option<&[String]>,
+        var_name: Option<String>,
+        value_name: Option<String>,
+    ) -> GraphResult<Self> {
+        Ok(Self {
+            base: self.base.melt(id_vars, value_vars, var_name, value_name)?,
         })
     }
 

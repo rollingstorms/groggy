@@ -8,7 +8,6 @@ use crate::types::{AttrValue, NodeId};
 use crate::viz::realtime::accessor::{EngineSnapshot, EngineUpdate};
 use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc;
 
 /// Handles ordered application and coalescing of engine updates
 #[derive(Debug)]

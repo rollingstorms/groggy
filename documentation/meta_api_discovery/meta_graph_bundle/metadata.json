@@ -1,9 +1,9 @@
 {
   "version": "2.0",
-  "created_at": "2025-09-22T18:08:00.432086+00:00",
-  "groggy_version": "0.3.1",
-  "node_count": 34,
-  "edge_count": 469,
+  "created_at": "2025-09-29T16:05:50.421922+00:00",
+  "groggy_version": "0.5.0",
+  "node_count": 41,
+  "edge_count": 525,
   "validation_policy": {
     "strictness": "Standard",
     "validate_node_references": true,
@@ -15,9 +15,9 @@
     "auto_repair": false
   },
   "checksums": {
-    "nodes_sha256": "2c826ebb311d1831",
-    "edges_sha256": "87cbac7bdf8b6e7a",
-    "metadata_sha256": "9bc2388830aa7588"
+    "nodes_sha256": "3aa230fee0802307",
+    "edges_sha256": "216f9e2e2dcdeb33",
+    "metadata_sha256": "bf3549c84d7b91b8"
   },
   "schema_info": {
     "node_columns": [

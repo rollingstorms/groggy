@@ -251,16 +251,17 @@ impl PySubgraph {
 
     // === Data Export Methods ===
 
-    /// Convert subgraph nodes to a table - pure delegation to core GraphTable
+    /// Convert subgraph to a GraphTable containing both nodes and edges
+    /// Pure delegation to core GraphTable
     pub fn table(&self, py: Python) -> PyResult<PyObject> {
         let core_table = self
             .inner
-            .nodes_table()
+            .table()
             .map_err(|e| PyRuntimeError::new_err(format!("Table creation error: {}", e)))?;
 
-        // Return as PyNodesTable
-        let py_table = crate::ffi::storage::table::PyNodesTable { table: core_table };
-        Ok(Py::new(py, py_table)?.into_py(py))
+        // Return as PyGraphTable
+        let py_table = crate::ffi::storage::table::PyGraphTable::from_table(core_table);
+        Ok(py_table.into_py(py))
     }
 
     /// Convert subgraph edges to a table - pure delegation to core GraphTable

@@ -7,9 +7,7 @@
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;
-use crate::types::NodeId;
 use crate::viz::streaming::data_source::Position;
-use std::collections::HashMap;
 
 pub mod algorithms;
 pub mod honeycomb;

@@ -8,11 +8,10 @@ use super::{EmbeddingEngine, EnergyFunction};
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::{
-    neural::autodiff::{AutoDiffTensor, ComputationGraph},
+    neural::autodiff::{AutoDiffTensor},
     unified_matrix::UnifiedMatrix,
 };
 use crate::storage::matrix::GraphMatrix;
-use crate::traits::subgraph_operations::SubgraphOperations;
 use crate::types::NodeId;
 use std::collections::HashMap;
 

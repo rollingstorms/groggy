@@ -314,6 +314,17 @@ impl Subgraph {
         let base_table = BaseTable::from_columns(columns_map)?;
         EdgesTable::from_base_table(base_table)
     }
+
+    /// Get a GraphTable representation containing both nodes and edges
+    /// This is the comprehensive table view of the subgraph
+    pub fn table(&self) -> crate::errors::GraphResult<crate::storage::table::GraphTable> {
+        use crate::storage::table::GraphTable;
+
+        let nodes = self.nodes_table()?;
+        let edges = self.edges_table()?;
+
+        Ok(GraphTable::new(nodes, edges))
+    }
 }
 
 /// Core Graph operations implemented for Subgraph through delegation

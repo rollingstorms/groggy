@@ -5,7 +5,7 @@
 use groggy::{AttrValue, EdgeId, NodeId};
 use groggy::storage::table::Table;  // Add Table trait for select method
 use groggy::storage::array::{BaseArray, NumArray};  // Modern array types
-use pyo3::exceptions::{PyIndexError, PyKeyError, PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyAttributeError, PyIndexError, PyKeyError, PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySlice};
 use std::collections::HashSet;
@@ -989,14 +989,28 @@ impl PyNodesAccessor {
     /// Example:
     ///     dept_groups = g.nodes.group_by('department')
     ///     # Returns subgraphs for each department value
-    pub fn group_by(&self, attr_name: String) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+    pub fn group_by(&self, attr_names: &PyAny) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
         use std::collections::HashMap;
         use groggy::types::{AttrName, NodeId};
         use std::collections::HashSet;
 
-        let attr_name = AttrName::from(attr_name);
+        // Parse attr_names as either String or Vec<String>
+        let attr_name_list: Vec<String> = if let Ok(single) = attr_names.extract::<String>() {
+            vec![single]
+        } else if let Ok(multiple) = attr_names.extract::<Vec<String>>() {
+            multiple
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "attr_names must be a string or list of strings"
+            ));
+        };
+
+        let attr_names_typed: Vec<AttrName> = attr_name_list.iter()
+            .map(|s| AttrName::from(s.clone()))
+            .collect();
+
         let graph = self.graph.borrow();
-        
+
         // Determine which nodes to group
         let node_ids = if let Some(ref constrained) = self.constrained_nodes {
             constrained.clone()
@@ -1008,27 +1022,40 @@ impl PyNodesAccessor {
             return Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(Vec::new()));
         }
 
-        // Group nodes by attribute value
-        let mut groups: HashMap<groggy::types::AttrValue, HashSet<NodeId>> = HashMap::new();
+        // Group nodes by composite attribute value(s)
+        // For multi-column grouping, create a tuple of values as the key
+        let mut groups: HashMap<Vec<groggy::types::AttrValue>, HashSet<NodeId>> = HashMap::new();
 
         for &node_id in &node_ids {
-            if let Ok(Some(attr_value)) = graph.get_node_attr(node_id, &attr_name) {
-                groups.entry(attr_value).or_default().insert(node_id);
+            let mut key_values = Vec::new();
+            let mut has_all_attrs = true;
+
+            for attr_name in &attr_names_typed {
+                if let Ok(Some(attr_value)) = graph.get_node_attr(node_id, attr_name) {
+                    key_values.push(attr_value);
+                } else {
+                    has_all_attrs = false;
+                    break;
+                }
             }
-            // Skip nodes without the attribute
+
+            if has_all_attrs {
+                groups.entry(key_values).or_default().insert(node_id);
+            }
+            // Skip nodes without all the attributes
         }
 
         // Create subgraphs for each group - sort by attribute value for deterministic order
         let mut result_subgraphs = Vec::new();
         let mut sorted_groups: Vec<_> = groups.into_iter().collect();
         sorted_groups.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-        
-        for (attr_value, node_group) in sorted_groups {
+
+        for (key_values, node_group) in sorted_groups {
             if !node_group.is_empty() {
                 // Find induced edges for this group of nodes
                 let mut induced_edges = HashSet::new();
                 let all_edges = graph.edge_ids();
-                
+
                 for edge_id in all_edges {
                     if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
                         if node_group.contains(&source) && node_group.contains(&target) {
@@ -1038,17 +1065,22 @@ impl PyNodesAccessor {
                 }
 
                 // Create subgraph with descriptive name
-                let subgraph_name = format!("nodes_{}_group_{:?}", attr_name, attr_value);
+                let subgraph_name = if attr_name_list.len() == 1 {
+                    format!("nodes_{}_group_{:?}", attr_name_list[0], key_values[0])
+                } else {
+                    format!("nodes_{}_group_{:?}", attr_name_list.join("_"), key_values)
+                };
+
                 let core_subgraph = groggy::subgraphs::Subgraph::new(
                     self.graph.clone(),
                     node_group,
                     induced_edges,
                     subgraph_name,
                 );
-                
+
                 let py_subgraph = crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(core_subgraph)
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create subgraph: {}", e)))?;
-                
+
                 result_subgraphs.push(py_subgraph);
             }
         }
@@ -1403,6 +1435,158 @@ impl PyNodesAccessor {
         // Create array with repeated value
         let attr_values = vec![attr_value; node_count];
         Ok(BaseArray::from_attr_values(attr_values))
+    }
+
+    /// Append a new node to the graph with attributes (graph-aware table.append)
+    ///
+    /// Creates a new node in the underlying graph and sets its attributes.
+    /// This maintains consistency between the graph structure and node table.
+    ///
+    /// # Arguments
+    /// * `attrs_dict` - Dictionary mapping attribute names to values
+    ///
+    /// # Returns
+    /// NodeId of the newly created node
+    ///
+    /// # Examples
+    /// ```python
+    /// # Add a new node with attributes
+    /// node_id = g.nodes.append({'name': 'Alice', 'age': 30})
+    ///
+    /// # Node is immediately available in both graph and table
+    /// print(g.get_node_attr(node_id, 'name'))  # 'Alice'
+    /// print(g.nodes.table())  # Shows Alice in the table
+    /// ```
+    pub fn append(&self, py: Python, attrs_dict: &PyDict) -> PyResult<NodeId> {
+        let mut graph = self.graph.borrow_mut();
+
+        // Create a new node in the graph
+        let node_id = graph.add_node();
+
+        // Convert Python dict to attribute map
+        let mut attributes = std::collections::HashMap::new();
+        for (key, value) in attrs_dict.iter() {
+            let attr_name: String = key.extract()?;
+            let attr_value = python_value_to_attr_value(value)?;
+            attributes.insert(attr_name, attr_value);
+        }
+
+        // Set attributes using the graph's bulk set method
+        for (attr_name, attr_value) in attributes {
+            graph.set_node_attr(node_id, attr_name.clone(), attr_value)
+                .map_err(|e| PyRuntimeError::new_err(format!("Failed to set attribute '{}': {}", attr_name, e)))?;
+        }
+
+        Ok(node_id)
+    }
+
+    /// Extend the graph with multiple new nodes and their attributes (graph-aware table.extend)
+    ///
+    /// Creates multiple nodes in the underlying graph and sets their attributes.
+    /// This is more efficient than calling append multiple times.
+    ///
+    /// # Arguments
+    /// * `rows_data` - List of dictionaries, each representing a node's attributes
+    ///
+    /// # Returns
+    /// List of NodeIds for the newly created nodes
+    ///
+    /// # Examples
+    /// ```python
+    /// # Add multiple nodes with attributes
+    /// node_ids = g.nodes.extend([
+    ///     {'name': 'Alice', 'age': 30},
+    ///     {'name': 'Bob', 'age': 25},
+    ///     {'name': 'Carol', 'age': 35}
+    /// ])
+    ///
+    /// # All nodes are immediately available
+    /// print(len(g.nodes))  # Increased by 3
+    /// ```
+    pub fn extend(&self, py: Python, rows_data: &pyo3::types::PyList) -> PyResult<Vec<NodeId>> {
+        let mut graph = self.graph.borrow_mut();
+        let mut new_node_ids = Vec::new();
+
+        // Process each row
+        for row_item in rows_data.iter() {
+            let row_dict: &PyDict = row_item.downcast()?;
+
+            // Create a new node in the graph
+            let node_id = graph.add_node();
+
+            // Convert Python dict to attribute map and set attributes
+            for (key, value) in row_dict.iter() {
+                let attr_name: String = key.extract()?;
+                let attr_value = python_value_to_attr_value(value)?;
+                graph.set_node_attr(node_id, attr_name.clone(), attr_value)
+                    .map_err(|e| PyRuntimeError::new_err(format!("Failed to set attribute '{}' on node {}: {}", attr_name, node_id, e)))?;
+            }
+
+            new_node_ids.push(node_id);
+        }
+
+        Ok(new_node_ids)
+    }
+
+    /// Remove nodes from the graph by their indices in the table (graph-aware table.drop)
+    ///
+    /// Removes nodes from the underlying graph structure, which automatically
+    /// cleans up their attributes and any connected edges.
+    ///
+    /// # Arguments
+    /// * `indices` - List of row indices in the current table view to remove
+    ///
+    /// # Returns
+    /// Number of nodes actually removed
+    ///
+    /// # Examples
+    /// ```python
+    /// # Remove nodes at table rows 0, 2, and 5
+    /// removed_count = g.nodes.drop([0, 2, 5])
+    ///
+    /// # Nodes and their edges are gone from the graph
+    /// print(f"Removed {removed_count} nodes")
+    /// ```
+    pub fn drop_rows(&self, indices: Vec<usize>) -> PyResult<usize> {
+        if indices.is_empty() {
+            return Ok(0);
+        }
+
+        // Get the current node list (considering constraints)
+        let current_nodes = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            let graph = self.graph.borrow();
+            graph.node_ids()
+        };
+
+        // Validate indices and collect node IDs to remove
+        let mut nodes_to_remove = Vec::new();
+        for &index in &indices {
+            if index >= current_nodes.len() {
+                return Err(PyIndexError::new_err(format!(
+                    "Row index {} out of bounds for {} nodes",
+                    index, current_nodes.len()
+                )));
+            }
+            nodes_to_remove.push(current_nodes[index]);
+        }
+
+        // Remove nodes from the graph (this also removes their edges and attributes)
+        let mut graph = self.graph.borrow_mut();
+        let mut removed_count = 0;
+
+        for node_id in nodes_to_remove {
+            match graph.remove_node(node_id) {
+                Ok(_) => removed_count += 1,
+                Err(e) => {
+                    // Log warning but continue with other nodes
+                    eprintln!("Warning: Failed to remove node {}: {}", node_id, e);
+                }
+            }
+        }
+
+        Ok(removed_count)
     }
 
 }
@@ -1915,6 +2099,13 @@ impl PyEdgesAccessor {
 
     /// Support property-style attribute access: g.edges.weight
     fn __getattr__(&self, py: Python, name: &str) -> PyResult<PyObject> {
+        // Skip Python internal attributes to allow proper introspection
+        if name.starts_with("__") && name.ends_with("__") {
+            return Err(PyAttributeError::new_err(format!(
+                "'EdgesAccessor' object has no attribute '{}'", name
+            )));
+        }
+
         // Delegate to edge attribute column access
         self._get_edge_attribute_column(py, name)
     }
@@ -2160,14 +2351,24 @@ impl PyEdgesAccessor {
     /// Implements: g.edges.weight_matrix() and g.edges.weight_matrix('strength')
     fn weight_matrix(&self, py: Python, attr_name: Option<String>) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         use crate::ffi::storage::matrix::PyGraphMatrix;
-        
+
         let weight_attr = attr_name.unwrap_or_else(|| "weight".to_string());
         let graph_ref = self.graph.borrow();
-        
+
         let matrix = graph_ref.to_weighted_adjacency_matrix::<f64>(&weight_attr)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Weight matrix conversion failed: {}", e)))?;
-        
+
         Py::new(py, PyGraphMatrix { inner: matrix })
+    }
+
+    /// Create an EdgesArray for delegation chains
+    /// Implements: g.edges.array()
+    fn array(&self, py: Python) -> PyResult<Py<crate::ffi::storage::edges_array::PyEdgesArray>> {
+        use crate::ffi::storage::edges_array::PyEdgesArray;
+
+        // Create an EdgesArray with just this accessor to enable delegation
+        let edges_array = PyEdgesArray::new(vec![self.clone()]);
+        Py::new(py, edges_array)
     }
     
     /// Group edges by attribute value, returning SubgraphArray
@@ -2181,14 +2382,28 @@ impl PyEdgesAccessor {
     /// Example:
     ///     type_groups = g.edges.group_by('interaction_type')
     ///     # Returns subgraphs for each interaction type
-    pub fn group_by(&self, attr_name: String) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+    pub fn group_by(&self, attr_names: &PyAny) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
         use std::collections::HashMap;
         use groggy::types::{AttrName, EdgeId};
         use std::collections::HashSet;
 
-        let attr_name = AttrName::from(attr_name);
+        // Parse attr_names as either String or Vec<String>
+        let attr_name_list: Vec<String> = if let Ok(single) = attr_names.extract::<String>() {
+            vec![single]
+        } else if let Ok(multiple) = attr_names.extract::<Vec<String>>() {
+            multiple
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "attr_names must be a string or list of strings"
+            ));
+        };
+
+        let attr_names_typed: Vec<AttrName> = attr_name_list.iter()
+            .map(|s| AttrName::from(s.clone()))
+            .collect();
+
         let graph = self.graph.borrow();
-        
+
         // Determine which edges to group
         let edge_ids: Vec<groggy::EdgeId> = if let Some(ref constrained) = self.constrained_edges {
             constrained.iter().copied().collect::<Vec<groggy::EdgeId>>()
@@ -2196,12 +2411,24 @@ impl PyEdgesAccessor {
             graph.edge_ids()
         };
 
-        // Group edges by attribute value
-        let mut groups: HashMap<groggy::AttrValue, Vec<EdgeId>> = HashMap::new();
-        
+        // Group edges by composite attribute value(s)
+        let mut groups: HashMap<Vec<groggy::AttrValue>, Vec<EdgeId>> = HashMap::new();
+
         for edge_id in edge_ids {
-            if let Ok(Some(attr_value)) = graph.get_edge_attr(edge_id, &attr_name) {
-                groups.entry(attr_value.clone()).or_insert_with(Vec::new).push(edge_id);
+            let mut key_values = Vec::new();
+            let mut has_all_attrs = true;
+
+            for attr_name in &attr_names_typed {
+                if let Ok(Some(attr_value)) = graph.get_edge_attr(edge_id, attr_name) {
+                    key_values.push(attr_value);
+                } else {
+                    has_all_attrs = false;
+                    break;
+                }
+            }
+
+            if has_all_attrs {
+                groups.entry(key_values).or_insert_with(Vec::new).push(edge_id);
             }
         }
 
@@ -2209,12 +2436,12 @@ impl PyEdgesAccessor {
         let mut subgraphs = Vec::new();
         let mut sorted_groups: Vec<_> = groups.into_iter().collect();
         sorted_groups.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-        
-        for (_attr_value, grouped_edge_ids) in sorted_groups {
+
+        for (key_values, grouped_edge_ids) in sorted_groups {
             // For each group of edges, create a subgraph containing:
             // 1. All nodes that are endpoints of these edges
             // 2. Only the edges in this group
-            
+
             let mut induced_nodes = HashSet::new();
             for edge_id in &grouped_edge_ids {
                 if let Ok((source, target)) = graph.edge_endpoints(*edge_id) {
@@ -2222,17 +2449,24 @@ impl PyEdgesAccessor {
                     induced_nodes.insert(target);
                 }
             }
-            
+
             // Create subgraph with induced nodes and filtered edges
             let induced_node_set: HashSet<_> = induced_nodes.into_iter().collect();
             let grouped_edge_set: HashSet<_> = grouped_edge_ids.into_iter().collect();
+
+            let subgraph_name = if attr_name_list.len() == 1 {
+                format!("edges_{}_group_{:?}", attr_name_list[0], key_values[0])
+            } else {
+                format!("edges_{}_group_{:?}", attr_name_list.join("_"), key_values)
+            };
+
             let subgraph = groggy::subgraphs::Subgraph::new(
                 self.graph.clone(),
                 induced_node_set,
                 grouped_edge_set,
-                format!("edges_group_{:?}", _attr_value)
+                subgraph_name,
             );
-            
+
             subgraphs.push(crate::ffi::subgraphs::subgraph::PySubgraph {
                 inner: subgraph,
             });
