@@ -16,14 +16,64 @@ from pathlib import Path
 import warnings
 
 
+def get_known_return_types() -> Dict[str, Dict[str, str]]:
+    """
+    Manual mapping of known return types for methods that can't be easily inferred.
+    Based on PyO3 FFI patterns and common usage.
+    """
+    return {
+        'Graph': {
+            'view': 'Subgraph',
+            'filter_nodes': 'Subgraph',
+            'filter_edges': 'Subgraph',
+            'nodes': 'NodesAccessor',
+            'edges': 'EdgesAccessor',
+            'node_ids': 'NumArray',
+            'edge_ids': 'NumArray',
+        },
+        'Subgraph': {
+            'filter_nodes': 'Subgraph',
+            'filter_edges': 'Subgraph',
+            'nodes': 'NodesAccessor',
+            'edges': 'EdgesAccessor',
+            'node_ids': 'NumArray',
+            'edge_ids': 'NumArray',
+            'connected_components': 'ComponentsArray',
+        },
+        'NodesAccessor': {
+            'all': 'Subgraph',
+            'ids': 'NumArray',
+            'array': 'NodesArray',
+        },
+        'EdgesAccessor': {
+            'all': 'Subgraph',
+            'ids': 'NumArray',
+            'array': 'EdgesArray',
+            'sources': 'NumArray',
+            'targets': 'NumArray',
+        },
+        'NodesArray': {
+            'filter': 'NodesArray',
+        },
+        'EdgesArray': {
+            'filter': 'EdgesArray',
+        },
+        'NumArray': {
+            'filter': 'NumArray',
+        },
+    }
+
+
 def infer_return_types(module) -> Dict[str, Dict[str, str]]:
     """
     Infer return types by calling methods on test instances.
+    Combines runtime inference with known type mappings.
     Returns: {ClassName: {method_name: return_type}}
     """
-    return_types = {}
+    # Start with known mappings
+    return_types = get_known_return_types()
     
-    # Create test instances for common classes
+    # Create test instances for runtime inference
     test_instances = {}
     
     try:
@@ -84,7 +134,9 @@ def infer_return_types(module) -> Dict[str, Dict[str, str]]:
             try:
                 result = test_func(test_instances[class_name])
                 return_type = type(result).__name__
-                return_types[class_name][method_name] = return_type
+                # Only override if not already in known mappings
+                if method_name not in return_types[class_name]:
+                    return_types[class_name][method_name] = return_type
             except Exception:
                 pass  # Skip methods that fail
     

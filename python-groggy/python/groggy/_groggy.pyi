@@ -3374,7 +3374,7 @@ class EdgesAccessor:
         ...
 
     @property
-    def sources(self) -> Any:
+    def sources(self) -> NumArray:
         """
         Get source node IDs for all edges
         Returns a NumArray parallel to edge_ids where each element is the source of the corresponding edge
@@ -3382,7 +3382,7 @@ class EdgesAccessor:
         ...
 
     @property
-    def targets(self) -> Any:
+    def targets(self) -> NumArray:
         """
         Get target node IDs for all edges  
         Returns a NumArray parallel to edge_ids where each element is the target of the corresponding edge
@@ -3570,7 +3570,7 @@ class EdgesArray:
         """
         ...
 
-    def filter(self, *args, **kwargs) -> Any:
+    def filter(self, *args, **kwargs) -> EdgesArray:
         """
         Filter EdgesAccessor objects using a Python predicate function
         """
@@ -4288,7 +4288,7 @@ class Graph:
     def edge_endpoints(self, *args, **kwargs) -> Any:
         ...
 
-    def filter_edges(self, *args, **kwargs) -> Any:
+    def filter_edges(self, *args, **kwargs) -> Subgraph:
         """
         Filter edges using EdgeFilter object or string query
         
@@ -4296,7 +4296,7 @@ class Graph:
         """
         ...
 
-    def filter_nodes(self, *args, **kwargs) -> Any:
+    def filter_nodes(self, *args, **kwargs) -> Subgraph:
         """
         Filter nodes using NodeFilter object or string query
         
@@ -6946,7 +6946,7 @@ class NodesArray:
         """
         ...
 
-    def filter(self, *args, **kwargs) -> Any:
+    def filter(self, *args, **kwargs) -> NodesArray:
         """
         Filter NodesAccessor objects using a Python predicate function
         """
@@ -8239,7 +8239,7 @@ class Subgraph:
         """
         ...
 
-    def connected_components(self, *args, **kwargs) -> Any:
+    def connected_components(self, *args, **kwargs) -> ComponentsArray:
         """
         Get connected components within this subgraph (lazy array)
         """
@@ -8309,13 +8309,13 @@ class Subgraph:
         """
         ...
 
-    def filter_edges(self, *args, **kwargs) -> Any:
+    def filter_edges(self, *args, **kwargs) -> Subgraph:
         """
         Filter edges and return new subgraph
         """
         ...
 
-    def filter_nodes(self, *args, **kwargs) -> Any:
+    def filter_nodes(self, *args, **kwargs) -> Subgraph:
         """
         Filter nodes and return new subgraph  
         """
