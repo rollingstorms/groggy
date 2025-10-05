@@ -1,6 +1,6 @@
 # Python Type Stubs (.pyi) - Implementation TODO
 
-## ✅ Phase 1: Basic Stub Generation (COMPLETED)
+## ✅ Phase 1: Basic Stub Generation (COMPLETED - Enhanced!)
 
 - [x] Install stub generation tools
 - [x] Create custom stub generator script (`scripts/generate_stubs.py`)
@@ -8,13 +8,21 @@
 - [x] Test that stubs are complete (1038 methods across 56 classes!)
 - [x] Create convenience script (`scripts/generate_stubs.sh`)
 - [x] Commit stubs to repository
+- [x] **NEW:** Add return type inference for method chaining
+- [x] **NEW:** Properly handle PyO3 properties with `@property` decorator
+- [x] **NEW:** Infer types for common chaining patterns (view, nodes, edges)
 
-**Status:** Phase 1 complete! Autocomplete now works in Jupyter.
+**Status:** Phase 1 complete WITH enhancements! Method chaining now works with autocomplete.
 
 **Files Created:**
-- `python-groggy/python/groggy/_groggy.pyi` (8309 lines, 56 classes, 1038 methods)
-- `scripts/generate_stubs.py` (custom generator)
+- `python-groggy/python/groggy/_groggy.pyi` (9227 lines, 56 classes, 1038 methods, 123 properties)
+- `scripts/generate_stubs.py` (custom generator with type inference)
 - `scripts/generate_stubs.sh` (convenience wrapper)
+
+**Enhancements:**
+- Return type inference: 11 key methods have proper return types
+- Property detection: 123 properties marked with `@property`
+- Method chaining works: `g.view() -> Subgraph`, `g.nodes -> NodesAccessor`
 
 **How to Use:**
 ```python
@@ -23,6 +31,11 @@ import groggy as gr
 g = gr.Graph()
 g.<TAB>  # Shows all 64 methods with autocomplete!
 g.add_node<SHIFT+TAB>  # Shows docstring!
+
+# Method chaining with types!
+g.view().<TAB>  # Shows Subgraph methods
+g.nodes.<TAB>  # Shows NodesAccessor methods
+g.nodes.all().<TAB>  # Shows Subgraph methods (because nodes.all() -> Subgraph)
 ```
 
 ## 🔄 Phase 2: Documentation Enhancement (TODO)
@@ -130,14 +143,17 @@ Some FFI classes use `__getattr__` for dynamic attribute access (not method dele
 - ✅ Shift+Tab shows docstrings in Jupyter
 - ✅ All 1038 methods are discoverable
 - ✅ 56 classes fully stubbed
+- ✅ 123 properties properly typed
+- ✅ **Method chaining with type hints!**
+- ✅ **Properties return correct types (NodesAccessor, EdgesAccessor, etc.)**
 
 **What Could Be Better:**
-- Type hints are generic (`*args, **kwargs -> Any`)
+- Most type hints still use `*args, **kwargs` for parameters
 - Could have richer docs from Rust comments
 - Not yet integrated into build/CI
-- Some parameter names could be more specific
+- Some parameter names could be more specific (Phase 2 goal)
 
-**Overall:** Phase 1 achieves the main goal (discoverability and autocomplete). Phases 2-3 are enhancements.
+**Overall:** Phase 1 exceeds main goal! Discoverability AND method chaining both work.
 
 ## 🎯 Quick Reference
 
