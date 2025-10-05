@@ -34,10 +34,30 @@ g.add_node<SHIFT+TAB>  # Shows docstring!
 - [ ] Add type aliases (NodeId, EdgeId, etc.) for better type hints
 - [ ] Improve parameter type hints beyond `*args, **kwargs`
 - [ ] Add Examples sections to key methods
+- [ ] **Handle `__getattr__` delegation patterns** (NEW)
 
-**Estimated Time:** 6-8 hours
+**Estimated Time:** 8-10 hours (increased due to delegation handling)
 
 **Priority:** Medium (current stubs work, but could be better)
+
+### ⚠️ Known Issue: `__getattr__` Delegation
+
+Some FFI classes use `__getattr__` for dynamic attribute access (not method delegation):
+
+**Classes with `__getattr__`:**
+- `NodesAccessor` / `EdgesAccessor` - dynamic attribute column access (`g.nodes.name`, `g.edges.weight`)
+- `BaseTable` - dynamic column access
+- `BaseArray` - potential dynamic access
+- `Neighborhood` - delegation patterns
+
+**Current Status:** 
+- These classes show their direct methods correctly in stubs
+- Dynamic attributes accessed via `__getattr__` won't autocomplete (expected)
+- This is actually correct behavior - dynamic attributes can't be known at stub generation time
+
+**Future Enhancement:**
+- Could add `def __getattr__(self, name: str) -> Any: ...` to document the pattern
+- Could add comments explaining dynamic access in docstrings
 
 ### Tasks:
 1. Create Rust doc comment parser

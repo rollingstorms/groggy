@@ -162,7 +162,8 @@ def _apply_node_id_mapping(data_dict: Dict[str, List], table_type: str,
     if table_type == "nodes":
         # Create mapping from string node IDs to integers
         if node_id_column in mapped_dict:
-            unique_nodes = list(set(mapped_dict[node_id_column]))
+            # IMPORTANT: Sort unique nodes to ensure deterministic ID assignment
+            unique_nodes = sorted(set(mapped_dict[node_id_column]))
             node_mapping = {str(node): i for i, node in enumerate(unique_nodes)}
 
             # Add new mapped column alongside original
@@ -403,9 +404,15 @@ def from_csv(
         edges_mapped_dict = _apply_node_id_mapping(edges_dict, "edges",
                                                   node_id_column, source_id_column, target_id_column)
 
-        # Create tables from the expanded nodes
-        expanded_nodes_mapped_dict = _apply_node_id_mapping(expanded_nodes_dict, "nodes",
-                                                           node_id_column, source_id_column, target_id_column)
+        # Manually apply the expanded_node_mapping to the expanded nodes
+        # DO NOT call _apply_node_id_mapping again as it would re-create the mapping!
+        expanded_nodes_mapped_dict = expanded_nodes_dict.copy()
+        if node_id_column in expanded_nodes_mapped_dict:
+            expanded_nodes_mapped_dict["node_id"] = [
+                expanded_node_mapping[str(node)] 
+                for node in expanded_nodes_mapped_dict[node_id_column]
+            ]
+        
         nodes_table = NodesTable.from_dict({k: v for k, v in expanded_nodes_mapped_dict.items() if k != "_node_mapping"})
         edges_table = EdgesTable.from_dict({k: v for k, v in edges_mapped_dict.items() if k != "_node_mapping"})
 

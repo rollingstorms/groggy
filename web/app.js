@@ -29,7 +29,7 @@ export class RealtimeViz {
         this.currentEmbeddingMethod = null;
         this.currentEmbeddingDimensions = 2;
         this.opacity = 1.0;
-        this.curvatureMultiplier = 0.25;  // Match slider default
+        this.curvatureMultiplier = 1.0;  // Default multiplier (1.0 = no change)
         this.filters = {
             degreeMin: 0,
             degreeMax: Number.POSITIVE_INFINITY,
@@ -444,12 +444,30 @@ export class RealtimeViz {
         // Apply positions if available
         if (snapshot.positions && snapshot.positions.length > 0) {
             console.log(`📍 Applying ${snapshot.positions.length} node positions`);
+            const positionedNodeIds = new Set();
+            
             for (const position of snapshot.positions) {
                 const node = this.nodes.find(n => n.id === position.node_id);
                 if (node && position.coords && position.coords.length >= 2) {
                     node.x = position.coords[0] || 0;
                     node.y = position.coords[1] || 0;
+                    positionedNodeIds.add(node.id);
                 }
+            }
+            
+            // Generate random positions for nodes that didn't get positions from snapshot
+            const nodesWithoutPositions = this.nodes.filter(n => !positionedNodeIds.has(n.id));
+            if (nodesWithoutPositions.length > 0) {
+                console.log(`📍 Generating random positions for ${nodesWithoutPositions.length} nodes without positions`);
+                const centerX = 400;
+                const centerY = 300;
+                const radius = 200;
+                
+                nodesWithoutPositions.forEach((node, index) => {
+                    const angle = (index / nodesWithoutPositions.length) * 2 * Math.PI;
+                    node.x = centerX + Math.cos(angle) * radius + (Math.random() - 0.5) * 100;
+                    node.y = centerY + Math.sin(angle) * radius + (Math.random() - 0.5) * 100;
+                });
             }
         } else {
             // Generate random positions if none provided
@@ -471,26 +489,22 @@ export class RealtimeViz {
             this.updateAttributeDropdown(Array.from(attributes));
         }
 
-        // Reset derived state for filters and recompute visibility
+        // Reset derived state for filters
         this.filters.degreeMin = 0;
         this.filters.degreeMax = Number.POSITIVE_INFINITY;
         this.filters.attributeName = '';
         this.filters.attributeValue = '';
 
         const degreeMinInput = document.getElementById('degree-min');
-        const degreeMaxInput = document.getElementById('degree-max');
         if (degreeMinInput) {
             const min = parseInt(degreeMinInput.value, 10);
             if (!Number.isNaN(min)) {
                 this.filters.degreeMin = min;
             }
         }
-        if (degreeMaxInput) {
-            const max = parseInt(degreeMaxInput.value, 10);
-            if (!Number.isNaN(max)) {
-                this.filters.degreeMax = max;
-            }
-        }
+        
+        // Don't read degreeMax from slider here - computeNodeDegrees will set it
+        // to the actual max degree of the graph
 
         const attributeNameInput = document.getElementById('attribute-name');
         const attributeValueInput = document.getElementById('attribute-value');
@@ -499,6 +513,7 @@ export class RealtimeViz {
             this.filters.attributeValue = attributeValueInput.value.trim();
         }
 
+        // Compute degrees and auto-set max degree filter
         this.computeNodeDegrees();
         this.applyFilters();
 
@@ -1035,7 +1050,7 @@ export class RealtimeViz {
             if (sourceNode.x === undefined || targetNode.x === undefined) continue;
 
             const edgeCurvature = edge.curvature || 0;
-            const curvature = this.curvatureMultiplier + edgeCurvature;
+            const curvature = edgeCurvature * this.curvatureMultiplier;
 
             let edgeDistance;
 
@@ -1243,6 +1258,26 @@ export class RealtimeViz {
         });
 
         this.nodeDegrees = degrees;
+        
+        // Calculate max degree in the graph
+        const maxDegree = Math.max(0, ...Object.values(degrees));
+        
+        // Update degree filter slider to match graph's max degree
+        const degreeMaxInput = document.getElementById('degree-max');
+        const degreeMaxValue = document.getElementById('degree-max-value');
+        
+        if (degreeMaxInput && degreeMaxValue) {
+            // Set slider max and value to actual max degree (with minimum of 10 for usability)
+            const sliderMax = Math.max(10, maxDegree);
+            degreeMaxInput.max = sliderMax;
+            degreeMaxInput.value = sliderMax;
+            degreeMaxValue.textContent = sliderMax;
+            
+            // Update filter to include all nodes by default
+            this.filters.degreeMax = sliderMax;
+            
+            console.log(`📊 Degree range: 0 to ${maxDegree}, slider max set to ${sliderMax}`);
+        }
     }
 
     applyFilters() {
@@ -1449,23 +1484,38 @@ export class RealtimeViz {
                 return;
             }
 
-            // Check if edge is selected or hovered
+            // Check if edge is selected, hovered, or connected to selected node
             const isSelected = this.selectedEdge && this.selectedEdge.id === edge.id;
             const isHovered = this.hoveredEdge && this.hoveredEdge.id === edge.id;
+            const isConnectedToSelected = this.selectedNode && 
+                (edge.source === this.selectedNode.id || edge.target === this.selectedNode.id);
 
             // Apply edge styling from VizConfig with selection/hover highlight
             if (isSelected) {
                 ctx.strokeStyle = '#ff6b6b'; // Red for selection
                 ctx.lineWidth = 3 / this.camera.zoom;
+                ctx.globalAlpha = this.opacity;
             } else if (isHovered) {
                 ctx.strokeStyle = '#ffa500'; // Orange for hover
                 ctx.lineWidth = 2 / this.camera.zoom;
+                ctx.globalAlpha = this.opacity;
+            } else if (isConnectedToSelected) {
+                // Highlight edges connected to selected node
+                ctx.strokeStyle = edge.color || '#4a90e2'; // Use edge color or blue
+                ctx.lineWidth = (edge.width || 1) * 1.5 / this.camera.zoom; // Slightly thicker
+                ctx.globalAlpha = this.opacity * 0.9; // Nearly full opacity
+            } else if (this.selectedNode) {
+                // Dim edges not connected to selected node
+                ctx.strokeStyle = edge.color || '#cccccc';
+                ctx.lineWidth = (edge.width || 1) / this.camera.zoom;
+                ctx.globalAlpha = this.opacity * 0.2; // Dimmed
             } else {
                 ctx.strokeStyle = edge.color || '#cccccc';
                 ctx.lineWidth = (edge.width || 1) / this.camera.zoom;
+                ctx.globalAlpha = this.opacity;
             }
 
-            if (edge.opacity !== undefined) {
+            if (edge.opacity !== undefined && !isConnectedToSelected) {
                 ctx.globalAlpha = edge.opacity * this.opacity;
             }
 
@@ -1481,10 +1531,10 @@ export class RealtimeViz {
             }
 
             // Draw edge with curvature support
-            // Global curvatureMultiplier applies to all edges
-            // Individual edge curvature (from multi-edge detection) is added on top
+            // Edge curvature: multiply individual curvature by global multiplier
+            // This allows scaling all curvatures up/down while preserving relative differences
             const edgeCurvature = edge.curvature || 0;
-            const curvature = this.curvatureMultiplier + edgeCurvature;
+            const curvature = edgeCurvature * this.curvatureMultiplier;
 
             // Check if this is a self-loop
             const isSelfLoop = edge.source === edge.target;
@@ -1812,16 +1862,20 @@ class ViewManager {
     switchToGraph() {
         this.currentView = 'graph';
 
-        // Resume graph animation/physics
-        this.app.resume();
-
-        // Show graph view
+        // Show graph view first
         const canvasView = document.getElementById('canvas-view');
         if (canvasView) canvasView.style.display = 'block';
 
         // Hide table view
         const tableView = document.getElementById('table-view');
         if (tableView) tableView.style.display = 'none';
+
+        // Resume graph animation/physics
+        this.app.resume();
+        
+        // Force a canvas resize and redraw
+        this.app.resizeCanvas();
+        this.app.render();
 
         // Update toggle button
         const toggleBtn = document.getElementById('view-toggle');
@@ -1839,23 +1893,59 @@ class TableRenderer {
         this.currentData = null;
         this.currentOffset = 0;
         this.windowSize = 100; // Number of rows to load at once
+        this.bufferSize = 50; // Load more when this many rows from edge
         this.totalRows = 0;
         this.currentDataType = 'nodes'; // 'nodes' or 'edges'
-        this.initTableNavigation();
+        this.isLoading = false;
+        this.loadedRanges = []; // Track what ranges we've loaded: [{start, end}]
+        this.allRows = new Map(); // Cache of all loaded rows by index
+
+        // Sorting state: array of {column: string, direction: 'asc'|'desc'}
+        this.sortColumns = [];
+
+        this.initInfiniteScroll();
         this.initTableTypeToggle();
     }
 
-    initTableNavigation() {
-        const prevBtn = document.getElementById('table-prev');
-        const nextBtn = document.getElementById('table-next');
+    initInfiniteScroll() {
+        const tableScrollWrapper = document.querySelector('.table-scroll-wrapper');
+        if (!tableScrollWrapper) return;
 
-        if (prevBtn) {
-            prevBtn.addEventListener('click', () => this.loadPreviousPage());
-        }
+        // Set up scroll event listener for infinite scroll
+        tableScrollWrapper.addEventListener('scroll', () => this.handleScroll());
+    }
 
-        if (nextBtn) {
-            nextBtn.addEventListener('click', () => this.loadNextPage());
+    handleScroll() {
+        const tableScrollWrapper = document.querySelector('.table-scroll-wrapper');
+        if (!tableScrollWrapper || this.isLoading) return;
+
+        const scrollTop = tableScrollWrapper.scrollTop;
+        const scrollHeight = tableScrollWrapper.scrollHeight;
+        const clientHeight = tableScrollWrapper.clientHeight;
+
+        // Calculate approximate row that's at the top of viewport
+        const estimatedRowHeight = 30; // Approximate height per row
+        const topRowIndex = Math.floor(scrollTop / estimatedRowHeight);
+        const bottomRowIndex = Math.floor((scrollTop + clientHeight) / estimatedRowHeight);
+
+        // Check if we need to load more data near the top
+        if (topRowIndex < this.bufferSize && this.currentOffset > 0) {
+            const newOffset = Math.max(0, this.currentOffset - this.windowSize);
+            this.loadMoreData(newOffset);
         }
+        // Check if we need to load more data near the bottom
+        else if (bottomRowIndex > this.currentOffset + this.windowSize - this.bufferSize 
+                 && this.currentOffset + this.windowSize < this.totalRows) {
+            const newOffset = this.currentOffset + this.windowSize;
+            this.loadMoreData(newOffset);
+        }
+    }
+
+    loadMoreData(offset) {
+        if (this.isLoading) return;
+        
+        this.isLoading = true;
+        this.requestTableData(offset);
     }
 
     initTableTypeToggle() {
@@ -1874,10 +1964,18 @@ class TableRenderer {
     switchToNodes() {
         this.currentDataType = 'nodes';
         this.currentOffset = 0;
+        this.allRows.clear();
+        this.loadedRanges = [];
 
         // Update button states
         document.getElementById('table-nodes-btn')?.classList.add('active');
         document.getElementById('table-edges-btn')?.classList.remove('active');
+
+        // Clear table body and header for fresh load
+        const tableBody = document.getElementById('table-body');
+        const tableHeader = document.getElementById('table-header').querySelector('tr');
+        if (tableBody) tableBody.innerHTML = '';
+        if (tableHeader) tableHeader.innerHTML = '';
 
         this.requestTableData();
     }
@@ -1885,10 +1983,18 @@ class TableRenderer {
     switchToEdges() {
         this.currentDataType = 'edges';
         this.currentOffset = 0;
+        this.allRows.clear();
+        this.loadedRanges = [];
 
         // Update button states
         document.getElementById('table-nodes-btn')?.classList.remove('active');
         document.getElementById('table-edges-btn')?.classList.add('active');
+
+        // Clear table body and header for fresh load
+        const tableBody = document.getElementById('table-body');
+        const tableHeader = document.getElementById('table-header').querySelector('tr');
+        if (tableBody) tableBody.innerHTML = '';
+        if (tableHeader) tableHeader.innerHTML = '';
 
         this.requestTableData();
     }
@@ -1902,7 +2008,8 @@ class TableRenderer {
                 type: "RequestTableData",
                 offset: offset,
                 window_size: this.windowSize,
-                data_type: this.currentDataType
+                data_type: this.currentDataType,
+                sort_columns: this.sortColumns // Add sorting information
             };
 
             console.log('📤 Requesting table data:', message);
@@ -1910,6 +2017,7 @@ class TableRenderer {
         } else {
             console.warn('WebSocket not connected, showing placeholder');
             this.renderPlaceholder();
+            this.isLoading = false;
         }
     }
 
@@ -1919,10 +2027,19 @@ class TableRenderer {
         console.log('  - Headers:', data.headers);
         console.log('  - Rows:', data.rows?.length || 0);
         console.log('  - Total rows:', data.total_rows);
+        console.log('  - Start offset:', data.start_offset || 0);
 
         this.currentData = data;
         this.totalRows = data.total_rows;
+        
+        // Cache the loaded rows
+        const startOffset = data.start_offset || 0;
+        data.rows.forEach((row, idx) => {
+            this.allRows.set(startOffset + idx, row);
+        });
+        
         this.renderTableData(data);
+        this.isLoading = false;
     }
 
     renderPlaceholder() {
@@ -1970,26 +2087,92 @@ class TableRenderer {
         
         if (!tableBody || !tableHeader) return;
         
-        // Clear existing content
-        tableBody.innerHTML = '';
-        tableHeader.innerHTML = '';
-        
-        // Render headers
-        data.headers.forEach(header => {
-            const th = document.createElement('th');
-            th.textContent = header;
-            tableHeader.appendChild(th);
-        });
-        
-        // Render rows
-        data.rows.forEach(row => {
-            const tr = document.createElement('tr');
-            row.forEach(cell => {
-                const td = document.createElement('td');
-                td.textContent = this.formatCellValue(cell);
-                tr.appendChild(td);
+        // Only update header if it's empty (first load)
+        if (tableHeader.children.length === 0) {
+            // Render sortable headers
+            data.headers.forEach(header => {
+                const th = document.createElement('th');
+                th.className = 'sortable-header';
+                th.style.cursor = 'pointer';
+                th.style.userSelect = 'none';
+
+                const headerContent = document.createElement('span');
+                headerContent.textContent = header;
+
+                const sortIcon = document.createElement('span');
+                sortIcon.className = 'sort-icon';
+                sortIcon.style.marginLeft = '5px';
+
+                // Check current sort state
+                const sortState = this.getSortStateForColumn(header);
+                if (sortState) {
+                    sortIcon.textContent = sortState.direction === 'asc' ? '↑' : '↓';
+                    th.classList.add('sorted-' + sortState.direction);
+                } else {
+                    sortIcon.textContent = '↕';
+                    sortIcon.style.opacity = '0.3';
+                }
+
+                th.appendChild(headerContent);
+                th.appendChild(sortIcon);
+
+                th.addEventListener('click', () => this.handleColumnSort(header));
+                tableHeader.appendChild(th);
             });
-            tableBody.appendChild(tr);
+
+            // Add sort reset button if any sorting is active
+            if (this.sortColumns.length > 0) {
+                const resetTh = document.createElement('th');
+                resetTh.className = 'sort-reset-header';
+                resetTh.style.width = '30px';
+                resetTh.style.textAlign = 'center';
+
+                const resetBtn = document.createElement('button');
+                resetBtn.textContent = '✕';
+                resetBtn.title = 'Reset all sorting';
+                resetBtn.style.border = 'none';
+                resetBtn.style.background = 'transparent';
+                resetBtn.style.cursor = 'pointer';
+                resetBtn.style.fontSize = '16px';
+                resetBtn.style.color = '#999';
+
+                resetBtn.addEventListener('click', () => this.resetSorting());
+                resetTh.appendChild(resetBtn);
+                tableHeader.appendChild(resetTh);
+            }
+        }
+        
+        // Append new rows (don't clear existing)
+        const startOffset = data.start_offset || 0;
+        data.rows.forEach((row, idx) => {
+            const globalIndex = startOffset + idx;
+            
+            // Check if this row already exists
+            const existingRow = Array.from(tableBody.children).find(
+                tr => tr.dataset.rowIndex == globalIndex
+            );
+            
+            if (!existingRow) {
+                const tr = document.createElement('tr');
+                tr.dataset.rowIndex = globalIndex;
+                
+                row.forEach(cell => {
+                    const td = document.createElement('td');
+                    td.textContent = this.formatCellValue(cell);
+                    tr.appendChild(td);
+                });
+                
+                // Insert row in the correct position
+                const insertBefore = Array.from(tableBody.children).find(
+                    tr => parseInt(tr.dataset.rowIndex) > globalIndex
+                );
+                
+                if (insertBefore) {
+                    tableBody.insertBefore(tr, insertBefore);
+                } else {
+                    tableBody.appendChild(tr);
+                }
+            }
         });
         
         // Update footer
@@ -2004,43 +2187,65 @@ class TableRenderer {
 
     updateTableFooter() {
         const rowInfo = document.getElementById('table-row-info');
-        const prevBtn = document.getElementById('table-prev');
-        const nextBtn = document.getElementById('table-next');
         
         if (!rowInfo) return;
         
-        const startRow = this.currentOffset + 1;
-        const endRow = Math.min(this.currentOffset + this.windowSize, this.totalRows);
-        
-        rowInfo.textContent = `Rows: ${startRow}-${endRow} of ${this.totalRows}`;
-        
-        // Enable/disable navigation buttons
-        if (prevBtn) {
-            prevBtn.disabled = this.currentOffset === 0;
-        }
-        
-        if (nextBtn) {
-            nextBtn.disabled = this.currentOffset + this.windowSize >= this.totalRows;
-        }
-    }
-
-    loadPreviousPage() {
-        if (this.currentOffset > 0) {
-            this.currentOffset = Math.max(0, this.currentOffset - this.windowSize);
-            this.requestTableData(this.currentOffset);
-        }
-    }
-
-    loadNextPage() {
-        if (this.currentOffset + this.windowSize < this.totalRows) {
-            this.currentOffset += this.windowSize;
-            this.requestTableData(this.currentOffset);
-        }
+        // Show total count and scroll info
+        const cachedCount = this.allRows.size;
+        rowInfo.textContent = `Loaded ${cachedCount} of ${this.totalRows} rows (scroll for more)`;
     }
 
     handleTableDataMessage(data) {
         // Handle incoming table data from WebSocket
         this.renderTableData(data.window);
+    }
+
+    // Sorting helper methods
+    getSortStateForColumn(column) {
+        return this.sortColumns.find(sort => sort.column === column);
+    }
+
+    handleColumnSort(column) {
+        const existingSort = this.getSortStateForColumn(column);
+
+        if (!existingSort) {
+            // First click: add ASC sort
+            this.sortColumns.push({ column, direction: 'asc' });
+        } else if (existingSort.direction === 'asc') {
+            // Second click: change to DESC
+            existingSort.direction = 'desc';
+        } else {
+            // Third click: remove from sort
+            this.sortColumns = this.sortColumns.filter(sort => sort.column !== column);
+        }
+
+        // Reset cache and reload when sorting changes
+        this.allRows.clear();
+        this.loadedRanges = [];
+        this.currentOffset = 0;
+        
+        // Clear table body and header for fresh sort
+        const tableBody = document.getElementById('table-body');
+        const tableHeader = document.getElementById('table-header').querySelector('tr');
+        if (tableBody) tableBody.innerHTML = '';
+        if (tableHeader) tableHeader.innerHTML = '';
+        
+        this.requestTableData();
+    }
+
+    resetSorting() {
+        this.sortColumns = [];
+        this.allRows.clear();
+        this.loadedRanges = [];
+        this.currentOffset = 0;
+        
+        // Clear table for fresh load
+        const tableBody = document.getElementById('table-body');
+        const tableHeader = document.getElementById('table-header').querySelector('tr');
+        if (tableBody) tableBody.innerHTML = '';
+        if (tableHeader) tableHeader.innerHTML = '';
+        
+        this.requestTableData();
     }
 }
 

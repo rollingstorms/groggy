@@ -122,7 +122,7 @@ impl WsBridge {
                             // Debug message
                         }
                         "RequestTableData" => {
-                            use crate::viz::realtime::accessor::TableDataType;
+                            use crate::viz::realtime::accessor::{TableDataType, SortColumn};
                             let offset = obj.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
                             let window_size = obj.get("window_size").and_then(|v| v.as_u64()).unwrap_or(100) as usize;
                             let data_type_str = obj.get("data_type").and_then(|v| v.as_str()).unwrap_or("nodes");
@@ -130,10 +130,27 @@ impl WsBridge {
                                 "edges" => TableDataType::Edges,
                                 _ => TableDataType::Nodes,
                             };
+
+                            // Parse sort_columns array
+                            let sort_columns = obj.get("sort_columns")
+                                .and_then(|v| v.as_array())
+                                .map(|arr| {
+                                    arr.iter()
+                                        .filter_map(|item| {
+                                            let obj = item.as_object()?;
+                                            let column = obj.get("column")?.as_str()?.to_string();
+                                            let direction = obj.get("direction")?.as_str()?.to_string();
+                                            Some(SortColumn { column, direction })
+                                        })
+                                        .collect()
+                                })
+                                .unwrap_or_default();
+
                             return Ok(ControlMsg::RequestTableData {
                                 offset,
                                 window_size,
                                 data_type,
+                                sort_columns,
                             });
                         }
                         _ => {

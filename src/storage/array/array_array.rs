@@ -35,6 +35,9 @@ pub struct ArrayArray<T> {
 
     /// Optional keys for each array (e.g., group keys from group_by)
     keys: Option<Vec<String>>,
+
+    /// Optional column name to use when materialising keys into a table
+    key_name: Option<String>,
 }
 
 impl<T> ArrayArray<T>
@@ -46,11 +49,21 @@ where
         Self {
             arrays,
             keys: None,
+            key_name: None,
         }
     }
 
     /// Create new ArrayArray with associated keys
     pub fn with_keys(arrays: Vec<BaseArray<T>>, keys: Vec<String>) -> Result<Self, GraphError> {
+        Self::with_named_keys(arrays, keys, "group_key")
+    }
+
+    /// Create new ArrayArray with associated keys and explicit key column name
+    pub fn with_named_keys(
+        arrays: Vec<BaseArray<T>>,
+        keys: Vec<String>,
+        key_name: impl Into<String>,
+    ) -> Result<Self, GraphError> {
         if arrays.len() != keys.len() {
             return Err(GraphError::InvalidInput(format!(
                 "Number of arrays ({}) must match number of keys ({})",
@@ -62,6 +75,7 @@ where
         Ok(Self {
             arrays,
             keys: Some(keys),
+            key_name: Some(key_name.into()),
         })
     }
 
@@ -83,6 +97,11 @@ where
     /// Get keys if available
     pub fn keys(&self) -> Option<&Vec<String>> {
         self.keys.as_ref()
+    }
+
+    /// Get the key column name if available
+    pub fn key_name(&self) -> Option<&String> {
+        self.key_name.as_ref()
     }
 
     /// Convert to vector of arrays
@@ -215,7 +234,12 @@ impl ArrayArray<f64> {
             let key_col: Vec<AttrValue> = keys.iter()
                 .map(|s| AttrValue::Text(s.clone()))
                 .collect();
-            columns.insert("group_key".to_string(), BaseArray::from_attr_values(key_col));
+            let name = self
+                .key_name
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(|| "group_key".to_string());
+            columns.insert(name, BaseArray::from_attr_values(key_col));
         }
 
         // Add aggregation column
@@ -233,6 +257,9 @@ impl<T: Clone + Default + fmt::Display> fmt::Display for ArrayArray<T> {
         write!(f, "ArrayArray({} arrays", self.arrays.len())?;
         if let Some(keys) = &self.keys {
             write!(f, ", with keys: {:?}", keys)?;
+            if let Some(name) = &self.key_name {
+                write!(f, ", key_name: {}", name)?;
+            }
         }
         write!(f, ")")
     }
@@ -360,6 +387,23 @@ mod tests {
         let table = arr_arr.to_table_with_aggregation("mean", means).unwrap();
 
         assert!(table.has_column("group_key"));
+        assert!(table.has_column("mean"));
+        assert_eq!(table.row_count(), 2);
+    }
+
+    #[test]
+    fn test_to_table_with_named_keys() {
+        let arrays = vec![
+            BaseArray::from(vec![1.0, 2.0, 3.0]),
+            BaseArray::from(vec![4.0, 5.0, 6.0]),
+        ];
+        let keys = vec!["alpha".to_string(), "beta".to_string()];
+        let arr_arr = ArrayArray::with_named_keys(arrays, keys, "label").unwrap();
+
+        let means = arr_arr.mean();
+        let table = arr_arr.to_table_with_aggregation("mean", means).unwrap();
+
+        assert!(table.has_column("label"));
         assert!(table.has_column("mean"));
         assert_eq!(table.row_count(), 2);
     }

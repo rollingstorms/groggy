@@ -4,12 +4,85 @@ Generate Python type stub files (.pyi) for the Groggy Rust extension module.
 
 This script introspects the compiled _groggy module and generates comprehensive
 type stubs to enable autocomplete and type checking in IDEs and Jupyter notebooks.
+
+Enhanced to infer return types by calling methods on test instances for better
+method chaining support.
 """
 
 import inspect
 import importlib
-from typing import get_type_hints, List
+from typing import get_type_hints, List, Dict, Any, Optional
 from pathlib import Path
+import warnings
+
+
+def infer_return_types(module) -> Dict[str, Dict[str, str]]:
+    """
+    Infer return types by calling methods on test instances.
+    Returns: {ClassName: {method_name: return_type}}
+    """
+    return_types = {}
+    
+    # Create test instances for common classes
+    test_instances = {}
+    
+    try:
+        # Graph
+        g = module.Graph()
+        g.add_nodes(3)
+        g.add_edges([(0, 1), (1, 2)])
+        test_instances['Graph'] = g
+        
+        # Subgraph
+        test_instances['Subgraph'] = g.view()
+        
+        # Accessors
+        test_instances['NodesAccessor'] = g.nodes
+        test_instances['EdgesAccessor'] = g.edges
+        
+    except Exception as e:
+        warnings.warn(f"Failed to create test instances: {e}")
+        return return_types
+    
+    # Test methods that are properties
+    property_tests = {
+        'Graph': [
+            ('view', lambda obj: obj.view()),
+            ('nodes', lambda obj: obj.nodes),
+            ('edges', lambda obj: obj.edges),
+            ('node_ids', lambda obj: obj.node_ids),
+            ('edge_ids', lambda obj: obj.edge_ids),
+        ],
+        'NodesAccessor': [
+            ('all', lambda obj: obj.all()),
+            ('ids', lambda obj: obj.ids()),
+        ],
+        'EdgesAccessor': [
+            ('all', lambda obj: obj.all()),
+            ('ids', lambda obj: obj.ids()),
+        ],
+        'Subgraph': [
+            ('nodes', lambda obj: obj.nodes),
+            ('edges', lambda obj: obj.edges),
+        ],
+    }
+    
+    for class_name, tests in property_tests.items():
+        if class_name not in test_instances:
+            continue
+            
+        if class_name not in return_types:
+            return_types[class_name] = {}
+        
+        for method_name, test_func in tests:
+            try:
+                result = test_func(test_instances[class_name])
+                return_type = type(result).__name__
+                return_types[class_name][method_name] = return_type
+            except Exception:
+                pass  # Skip methods that fail
+    
+    return return_types
 
 
 def generate_stub_for_module(module_name: str, output_path: Path):
@@ -17,6 +90,11 @@ def generate_stub_for_module(module_name: str, output_path: Path):
     
     # Import the module
     module = importlib.import_module(module_name)
+    
+    # Infer return types
+    print("🔍 Inferring return types for better method chaining...")
+    return_type_map = infer_return_types(module)
+    print(f"   Found {sum(len(v) for v in return_type_map.values())} method return types")
     
     lines = []
     lines.append("# Type stubs for " + module_name)
@@ -64,7 +142,8 @@ def generate_stub_for_module(module_name: str, output_path: Path):
         lines.append("# Classes")
         lines.append("")
         for class_name, cls in sorted(classes):
-            lines.extend(generate_class_stub(class_name, cls))
+            class_return_types = return_type_map.get(class_name, {})
+            lines.extend(generate_class_stub(class_name, cls, class_return_types))
             lines.append("")
     
     # Write to file
@@ -75,9 +154,11 @@ def generate_stub_for_module(module_name: str, output_path: Path):
     print(f"   - {len(classes)} classes")
 
 
-def generate_class_stub(class_name: str, cls) -> List[str]:
-    """Generate stub for a single class."""
+def generate_class_stub(class_name: str, cls, return_types: Dict[str, str] = None) -> List[str]:
+    """Generate stub for a single class with inferred return types."""
     lines = []
+    if return_types is None:
+        return_types = {}
     
     # Class definition
     doc = inspect.getdoc(cls)
@@ -88,25 +169,63 @@ def generate_class_stub(class_name: str, cls) -> List[str]:
             lines.append(f"    {doc_line}")
         lines.append(f'    """')
     
-    # Get all methods (including method_descriptor from PyO3)
+    # Get all methods and properties
     methods = []
-    for name, method in inspect.getmembers(cls):
+    properties = []
+    has_getattr = False
+    
+    for name, member in inspect.getmembers(cls):
+        if name == '__getattr__':
+            has_getattr = True
+        
         if name.startswith('_') and name not in ['__init__', '__len__', '__getitem__', 
                                                    '__setitem__', '__iter__', '__next__',
-                                                   '__str__', '__repr__', '__eq__', '__hash__']:
+                                                   '__str__', '__repr__', '__eq__', '__hash__',
+                                                   '__getattr__']:
             continue  # Skip private methods except special ones
         
+        # Check if it's a property (getset_descriptor from PyO3)
+        if type(member).__name__ == 'getset_descriptor':
+            properties.append((name, member))
         # Check if it's callable (covers method, function, builtin, method_descriptor)
-        if callable(method):
-            methods.append((name, method))
+        elif callable(member):
+            methods.append((name, member))
     
-    if not methods:
+    if not methods and not properties:
         lines.append("    pass")
         return lines
+    
+    # Add note about __getattr__ if present
+    if has_getattr:
+        lines.append("    # Note: This class uses __getattr__ for dynamic attribute access")
+        lines.append("    # Some attributes may not appear in autocomplete")
+        lines.append("")
+    
+    # Generate property stubs first
+    for prop_name, prop in sorted(properties):
+        # Get inferred return type if available
+        inferred_return = return_types.get(prop_name, "Any")
+        
+        lines.append(f"    @property")
+        lines.append(f"    def {prop_name}(self) -> {inferred_return}:")
+        
+        # Add docstring if available
+        prop_doc = inspect.getdoc(prop)
+        if prop_doc:
+            lines.append(f'        """')
+            for doc_line in prop_doc.split('\n'):
+                lines.append(f"        {doc_line}")
+            lines.append(f'        """')
+        
+        lines.append("        ...")
+        lines.append("")
     
     # Generate method stubs
     for method_name, method in sorted(methods):
         method_doc = inspect.getdoc(method)
+        
+        # Get inferred return type if available
+        inferred_return = return_types.get(method_name)
         
         # Handle special methods
         if method_name == '__init__':
@@ -129,8 +248,14 @@ def generate_class_stub(class_name: str, cls) -> List[str]:
             lines.append(f"    def __eq__(self, other: Any) -> bool:")
         elif method_name == '__hash__':
             lines.append(f"    def __hash__(self) -> int:")
+        elif method_name == '__getattr__':
+            lines.append(f"    def __getattr__(self, name: str) -> Any:")
+            if not method_doc:
+                method_doc = "Dynamic attribute access - attributes not listed may be available"
         else:
-            lines.append(f"    def {method_name}(self, *args, **kwargs) -> Any:")
+            # Use inferred return type if available, otherwise Any
+            return_hint = inferred_return if inferred_return else "Any"
+            lines.append(f"    def {method_name}(self, *args, **kwargs) -> {return_hint}:")
         
         # Add docstring
         if method_doc:

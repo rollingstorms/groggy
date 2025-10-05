@@ -39,9 +39,7 @@
         </table>
       </div>
       <div class="table-footer">
-        <span id="table-row-info">Rows: 0-0 of 0</span>
-        <button id="table-prev" class="table-nav-btn" disabled>Previous</button>
-        <button id="table-next" class="table-nav-btn" disabled>Next</button>
+        <span id="table-row-info">Scroll to load more...</span>
       </div>
     </div>
 
@@ -130,10 +128,10 @@
         <div class="controls" style="display:grid;">
           <div class="control-group">
             <label>Degree Filter:</label>
-            <input type="range" id="degree-min" min="0" max="50" value="0" class="slider">
+            <input type="range" id="degree-min" min="0" max="100" value="0" class="slider">
             <span id="degree-min-value">0</span> -
-            <input type="range" id="degree-max" min="0" max="50" value="50" class="slider">
-            <span id="degree-max-value">50</span>
+            <input type="range" id="degree-max" min="0" max="100" value="100" class="slider">
+            <span id="degree-max-value">100</span>
           </div>
 
           <div class="control-group">
@@ -166,9 +164,9 @@
             <span id="opacity-value">1.0</span>
           </div>
           <div class="control-group">
-            <label>Edge Curvature:</label>
-            <input type="range" id="curvature-slider" min="-2" max="2" step="0.1" value="0.25" class="slider">
-            <span id="curvature-value">0.25</span>
+            <label>Edge Curvature Multiplier:</label>
+            <input type="range" id="curvature-slider" min="0" max="3" step="0.1" value="1.0" class="slider">
+            <span id="curvature-value">1.0</span>
           </div>
         </div>
       </div>

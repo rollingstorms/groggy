@@ -223,9 +223,9 @@ impl RealtimeServer {
                 }, if control_rx_opt.is_some() => {
                     if let Some((client_id, control_msg)) = control {
                         // Handle RequestTableData before processing other controls
-                        if let ControlMsg::RequestTableData { offset, window_size, data_type } = &control_msg {
+                        if let ControlMsg::RequestTableData { offset, window_size, data_type, sort_columns } = &control_msg {
                             if let Some(ref accessor) = self.accessor {
-                                match accessor.get_table_data(data_type.clone(), *offset, *window_size) {
+                                match accessor.get_table_data(data_type.clone(), *offset, *window_size, sort_columns.clone()) {
                                     Ok(table_window) => {
                                         let table_msg = WsMessage::TableData {
                                             version: 1,
@@ -319,12 +319,12 @@ impl RealtimeServer {
                                         // ❌ DEBUG: Engine failed to apply node drag event: {}
                                     }
                                 }
-                                ControlMsg::RequestTableData { offset, window_size, data_type } => {
+                                ControlMsg::RequestTableData { offset, window_size, data_type, sort_columns } => {
                                     eprintln!("🔍 RequestTableData received: offset={}, window_size={}, data_type={:?}", offset, window_size, data_type);
                                     // Fetch table data from accessor
                                     if let Some(ref accessor) = self.accessor {
                                         eprintln!("  ✓ Accessor available");
-                                        match accessor.get_table_data(data_type.clone(), *offset, *window_size) {
+                                        match accessor.get_table_data(data_type.clone(), *offset, *window_size, sort_columns.clone()) {
                                             Ok(table_window) => {
                                                 eprintln!("  ✓ Table data fetched: {} headers, {} rows", table_window.headers.len(), table_window.rows.len());
                                                 // Send table data response to requesting client
@@ -934,9 +934,9 @@ impl RealtimeServer {
                 }, if control_rx_opt.is_some() => {
                     if let Some((client_id, control_msg)) = control {
                         // Handle RequestTableData before processing other controls
-                        if let ControlMsg::RequestTableData { offset, window_size, data_type } = &control_msg {
+                        if let ControlMsg::RequestTableData { offset, window_size, data_type, sort_columns } = &control_msg {
                             if let Some(ref accessor) = self.accessor {
-                                match accessor.get_table_data(data_type.clone(), *offset, *window_size) {
+                                match accessor.get_table_data(data_type.clone(), *offset, *window_size, sort_columns.clone()) {
                                     Ok(table_window) => {
                                         let table_msg = WsMessage::TableData {
                                             version: 1,
@@ -1030,12 +1030,12 @@ impl RealtimeServer {
                                         // ❌ DEBUG: Engine failed to apply node drag event: {}
                                     }
                                 }
-                                ControlMsg::RequestTableData { offset, window_size, data_type } => {
+                                ControlMsg::RequestTableData { offset, window_size, data_type, sort_columns } => {
                                     eprintln!("🔍 RequestTableData received: offset={}, window_size={}, data_type={:?}", offset, window_size, data_type);
                                     // Fetch table data from accessor
                                     if let Some(ref accessor) = self.accessor {
                                         eprintln!("  ✓ Accessor available");
-                                        match accessor.get_table_data(data_type.clone(), *offset, *window_size) {
+                                        match accessor.get_table_data(data_type.clone(), *offset, *window_size, sort_columns.clone()) {
                                             Ok(table_window) => {
                                                 eprintln!("  ✓ Table data fetched: {} headers, {} rows", table_window.headers.len(), table_window.rows.len());
                                                 // Send table data response to requesting client
@@ -1118,7 +1118,7 @@ impl RealtimeServer {
             ControlMsg::NodeDrag { event } => {
                 // 🖱️  DEBUG: Node drag event {:?}
             }
-            ControlMsg::RequestTableData { offset, window_size, data_type } => {
+            ControlMsg::RequestTableData { offset, window_size, data_type, sort_columns } => {
                 // 📊 DEBUG: Table data request: offset={}, window_size={}, type={:?}
             }
         }

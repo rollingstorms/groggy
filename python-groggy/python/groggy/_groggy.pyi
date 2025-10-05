@@ -206,6 +206,22 @@ class AggregationResult:
     """
     Result of an aggregation operation
     """
+    @property
+    def attribute(self) -> Any:
+        ...
+
+    @property
+    def count(self) -> Any:
+        ...
+
+    @property
+    def operation(self) -> Any:
+        ...
+
+    @property
+    def value(self) -> Any:
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -379,6 +395,14 @@ class AttrValue:
     """
     Python wrapper for AttrValue
     """
+    @property
+    def type_name(self) -> Any:
+        ...
+
+    @property
+    def value(self) -> Any:
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -1187,6 +1211,41 @@ class BaseTable:
     """
     Python wrapper for BaseTable
     """
+    @property
+    def column_names(self) -> Any:
+        """
+        Get column names
+        """
+        ...
+
+    @property
+    def columns(self) -> Any:
+        """
+        Get column names (alias for column_names)
+        """
+        ...
+
+    @property
+    def ncols(self) -> Any:
+        """
+        Get number of columns
+        """
+        ...
+
+    @property
+    def nrows(self) -> Any:
+        """
+        Get number of rows
+        """
+        ...
+
+    @property
+    def shape(self) -> Any:
+        """
+        Get shape as (rows, cols)
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -2592,6 +2651,18 @@ class BranchInfo:
     """
     Python wrapper for branch information
     """
+    @property
+    def head(self) -> Any:
+        ...
+
+    @property
+    def is_current(self) -> Any:
+        ...
+
+    @property
+    def name(self) -> Any:
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -2627,6 +2698,26 @@ class Commit:
     """
     Python wrapper for commit information
     """
+    @property
+    def author(self) -> Any:
+        ...
+
+    @property
+    def id(self) -> Any:
+        ...
+
+    @property
+    def message(self) -> Any:
+        ...
+
+    @property
+    def parents(self) -> Any:
+        ...
+
+    @property
+    def timestamp(self) -> Any:
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -2662,6 +2753,30 @@ class ComponentSubgraph:
     """
     Python wrapper for ComponentSubgraph - Pure delegation to existing traits
     """
+    @property
+    def component_id(self) -> Any:
+        ...
+
+    @property
+    def component_size(self) -> Any:
+        ...
+
+    @property
+    def edge_count(self) -> Any:
+        ...
+
+    @property
+    def is_largest_component(self) -> Any:
+        ...
+
+    @property
+    def node_count(self) -> Any:
+        ...
+
+    @property
+    def total_components(self) -> Any:
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -2709,6 +2824,13 @@ class ComponentsArray:
     """
     Lazy array of connected components - avoids creating hundreds of PySubgraphs immediately
     """
+    @property
+    def viz(self) -> Any:
+        """
+        Get viz accessor for visualization
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -2804,6 +2926,41 @@ class ComposerPreview:
     """
     Python wrapper for ComposerPreview
     """
+    @property
+    def edge_strategy(self) -> Any:
+        """
+        Get the edge strategy
+        """
+        ...
+
+    @property
+    def entity_type(self) -> Any:
+        """
+        Get the entity type
+        """
+        ...
+
+    @property
+    def meta_edges_count(self) -> Any:
+        """
+        Get estimated number of meta-edges
+        """
+        ...
+
+    @property
+    def meta_node_attributes(self) -> Any:
+        """
+        Get the meta-node attributes that will be created
+        """
+        ...
+
+    @property
+    def will_include_edge_count(self) -> Any:
+        """
+        Whether edge count will be included
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -2839,6 +2996,20 @@ class DisplayConfig:
     """
     Python wrapper for DisplayConfig
     """
+    @property
+    def max_cols(self) -> Any:
+        """
+        Get max_cols setting
+        """
+        ...
+
+    @property
+    def max_rows(self) -> Any:
+        """
+        Get max_rows setting
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -2883,6 +3054,62 @@ class Edge:
     Regular edges are the basic connections between nodes in graphs. They provide access
     to edge attributes, topology information (source/target), and graph operations.
     """
+    @property
+    def entity_type(self) -> Any:
+        """
+        Get the entity type for this edge
+        
+        # Returns
+        The string "edge"
+        """
+        ...
+
+    @property
+    def id(self) -> Any:
+        """
+        Get the edge ID
+        
+        # Returns
+        The unique EdgeId for this edge
+        """
+        ...
+
+    @property
+    def is_active(self) -> Any:
+        """
+        Check if this edge is currently active
+        
+        # Returns
+        True if the edge is active in the graph
+        """
+        ...
+
+    @property
+    def source(self) -> Any:
+        """
+        Get the edge's source node ID
+        
+        # Returns
+        The NodeId of the source node
+        
+        # Raises
+        * `RuntimeError` - If there's an error getting the source
+        """
+        ...
+
+    @property
+    def target(self) -> Any:
+        """
+        Get the edge's target node ID
+        
+        # Returns
+        The NodeId of the target node
+        
+        # Raises
+        * `RuntimeError` - If there's an error getting the target
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -3110,6 +3337,64 @@ class EdgesAccessor:
     """
     Wrapper for g.edges that supports indexing syntax: g.edges[id] -> EdgeView  
     """
+    @property
+    def attributes(self) -> Any:
+        """
+        Get all unique attribute names across all edges
+        """
+        ...
+
+    @property
+    def base(self) -> Any:
+        """
+        Get filtered accessor for base edges (non-meta edges)
+        
+        Returns a new EdgesAccessor that only shows edges where entity_type != 'meta'
+        
+        Example:
+            base_edges = g.edges.base
+            base_count = len(base_edges)  
+            base_table = base_edges.table()
+        """
+        ...
+
+    @property
+    def meta(self) -> Any:
+        """
+        Get filtered accessor for meta-edges
+        
+        Returns a new EdgesAccessor that only shows edges where entity_type == 'meta'
+        
+        Example:
+            meta_edges = g.edges.meta
+            meta_count = len(meta_edges)
+            meta_table = meta_edges.table()
+        """
+        ...
+
+    @property
+    def sources(self) -> Any:
+        """
+        Get source node IDs for all edges
+        Returns a NumArray parallel to edge_ids where each element is the source of the corresponding edge
+        """
+        ...
+
+    @property
+    def targets(self) -> Any:
+        """
+        Get target node IDs for all edges  
+        Returns a NumArray parallel to edge_ids where each element is the target of the corresponding edge
+        """
+        ...
+
+    @property
+    def viz(self) -> Any:
+        """
+        Get viz accessor for visualization operations
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -3164,7 +3449,7 @@ class EdgesAccessor:
         """
         ...
 
-    def all(self, *args, **kwargs) -> Any:
+    def all(self, *args, **kwargs) -> Subgraph:
         """
         Get all edges as a subgraph (equivalent to g.edges[:]) - DELEGATED to SubgraphOperations
         Returns a subgraph containing all nodes that are connected by the edges and all edges
@@ -3194,7 +3479,7 @@ class EdgesAccessor:
         """
         ...
 
-    def ids(self, *args, **kwargs) -> Any:
+    def ids(self, *args, **kwargs) -> NumArray:
         """
         Get edge IDs as a NumArray for numerical operations
         Implements: g.edges.ids()
@@ -3456,6 +3741,13 @@ class EdgesTable:
     """
     Python wrapper for EdgesTable
     """
+    @property
+    def viz(self) -> Any:
+        """
+        Get viz accessor for visualization operations (no graph tab)
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -3796,6 +4088,48 @@ class Graph:
     """
     Python wrapper for the main Graph
     """
+    @property
+    def edge_ids(self) -> NumArray:
+        """
+        Get all active edge IDs as IntArray  
+        """
+        ...
+
+    @property
+    def edges(self) -> EdgesAccessor:
+        """
+        Get edges accessor for fluent API (g.edges property)
+        """
+        ...
+
+    @property
+    def is_directed(self) -> Any:
+        """
+        Check if this graph is directed
+        """
+        ...
+
+    @property
+    def is_undirected(self) -> Any:
+        """
+        Check if this graph is undirected
+        """
+        ...
+
+    @property
+    def node_ids(self) -> NumArray:
+        """
+        Get all active node IDs as IntArray
+        """
+        ...
+
+    @property
+    def nodes(self) -> NodesAccessor:
+        """
+        Get nodes accessor for fluent API (g.nodes property)
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -4175,7 +4509,7 @@ class Graph:
         """
         ...
 
-    def view(self, *args, **kwargs) -> Any:
+    def view(self, *args, **kwargs) -> Subgraph:
         """
         Return a full-view Subgraph (whole graph as a subgraph).
         Downstream code can always resolve parent graph from this object.
@@ -4187,6 +4521,77 @@ class GraphMatrix:
     """
     Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays
     """
+    @property
+    def columns(self) -> Any:
+        """
+        Get column names
+        """
+        ...
+
+    @property
+    def data(self) -> Any:
+        """
+        Get matrix data (materializes data to Python objects)
+        This is the primary materialization method - use sparingly for large matrices
+        """
+        ...
+
+    @property
+    def dtype(self) -> Any:
+        """
+        Get matrix data type
+        """
+        ...
+
+    @property
+    def grad(self) -> Any:
+        """
+        Get gradient matrix (None if no gradients computed yet)
+        """
+        ...
+
+    @property
+    def is_numeric(self) -> Any:
+        """
+        Check if matrix contains only numeric data
+        """
+        ...
+
+    @property
+    def is_sparse(self) -> Any:
+        """
+        Check if matrix is sparse (has many default values)
+        """
+        ...
+
+    @property
+    def is_square(self) -> Any:
+        """
+        Check if matrix is square
+        """
+        ...
+
+    @property
+    def is_symmetric(self) -> Any:
+        """
+        Check if matrix is symmetric (for square numeric matrices)
+        """
+        ...
+
+    @property
+    def requires_grad(self) -> Any:
+        """
+        Check if gradients are enabled for this matrix
+        """
+        ...
+
+    @property
+    def shape(self) -> Any:
+        """
+        Get matrix dimensions as (rows, columns) tuple
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -4769,6 +5174,27 @@ class GraphTable:
     """
     Python wrapper for GraphTable
     """
+    @property
+    def edges(self) -> Any:
+        """
+        Get EdgesTable component  
+        """
+        ...
+
+    @property
+    def nodes(self) -> Any:
+        """
+        Get NodesTable component
+        """
+        ...
+
+    @property
+    def viz(self) -> Any:
+        """
+        Get viz accessor for visualization operations
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -4998,6 +5424,18 @@ class GroupedAggregationResult:
     """
     Result of a grouped aggregation operation
     """
+    @property
+    def attribute(self) -> Any:
+        ...
+
+    @property
+    def groups(self) -> Any:
+        ...
+
+    @property
+    def operation(self) -> Any:
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5033,6 +5471,10 @@ class HistoricalView:
     """
     Python wrapper for historical view
     """
+    @property
+    def state_id(self) -> Any:
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5068,6 +5510,41 @@ class HistoryStatistics:
     """
     History statistics for the graph
     """
+    @property
+    def current_state_edges(self) -> Any:
+        """
+        Get current state edge count
+        """
+        ...
+
+    @property
+    def current_state_nodes(self) -> Any:
+        """
+        Get current state node count
+        """
+        ...
+
+    @property
+    def total_branches(self) -> Any:
+        """
+        Get total number of branches
+        """
+        ...
+
+    @property
+    def total_commits(self) -> Any:
+        """
+        Get total number of commits
+        """
+        ...
+
+    @property
+    def uncommitted_changes(self) -> Any:
+        """
+        Check if there are uncommitted changes
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5310,6 +5787,103 @@ class MetaEdge:
     between nodes. They have all the capabilities of regular edges plus meta-specific
     operations like getting aggregation counts.
     """
+    @property
+    def aggregated_from(self) -> Any:
+        """
+        Get the IDs of original edges that were aggregated into this meta-edge
+        
+        This is a future enhancement - currently original edge IDs are not stored
+        during the collapse process.
+        
+        # Returns
+        Optional list of original EdgeIds, or None if not available
+        
+        # Raises
+        * `RuntimeError` - If there's an error accessing aggregated edges
+        """
+        ...
+
+    @property
+    def edge_count(self) -> Any:
+        """
+        Get the count of original edges this meta-edge aggregates
+        
+        During subgraph collapse, multiple original edges may be aggregated
+        into a single meta-edge. This returns how many were combined.
+        
+        # Returns
+        Optional count of original edges, or None if not available
+        """
+        ...
+
+    @property
+    def entity_type(self) -> Any:
+        """
+        Get the entity type for this meta-edge
+        
+        # Returns
+        The string "meta_edge"
+        """
+        ...
+
+    @property
+    def id(self) -> Any:
+        """
+        Get the meta-edge ID
+        
+        # Returns
+        The unique EdgeId for this meta-edge
+        """
+        ...
+
+    @property
+    def is_active(self) -> Any:
+        """
+        Check if this meta-edge is currently active
+        
+        # Returns
+        True if the meta-edge is active in the graph
+        """
+        ...
+
+    @property
+    def is_meta_edge(self) -> Any:
+        """
+        Check if this is a meta-edge
+        
+        Meta-edges are identified by having entity_type="meta"
+        
+        # Returns
+        True if this is a meta-edge, False otherwise
+        """
+        ...
+
+    @property
+    def source(self) -> Any:
+        """
+        Get the meta-edge's source node ID
+        
+        # Returns
+        The NodeId of the source node
+        
+        # Raises
+        * `RuntimeError` - If there's an error getting the source
+        """
+        ...
+
+    @property
+    def target(self) -> Any:
+        """
+        Get the meta-edge's target node ID
+        
+        # Returns
+        The NodeId of the target node
+        
+        # Raises
+        * `RuntimeError` - If there's an error getting the target
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5430,6 +6004,113 @@ class MetaNode:
     the capabilities of regular nodes plus meta-specific operations like expanding
     back to the original subgraph.
     """
+    @property
+    def degree(self) -> Any:
+        """
+        Get the meta-node's degree (number of connected edges)
+        
+        # Returns
+        The number of edges connected to this meta-node
+        
+        # Raises
+        * `RuntimeError` - If there's an error calculating degree
+        """
+        ...
+
+    @property
+    def entity_type(self) -> Any:
+        """
+        Get the entity type for this meta-node
+        
+        # Returns
+        The string "meta_node"
+        """
+        ...
+
+    @property
+    def has_subgraph(self) -> Any:
+        """
+        Check if this meta-node contains a subgraph
+        
+        # Returns
+        True if this meta-node has an associated subgraph
+        """
+        ...
+
+    @property
+    def id(self) -> Any:
+        """
+        Get the meta-node ID
+        
+        # Returns
+        The unique NodeId for this meta-node
+        """
+        ...
+
+    @property
+    def is_active(self) -> Any:
+        """
+        Check if this meta-node is currently active
+        
+        # Returns
+        True if the meta-node is active in the graph
+        """
+        ...
+
+    @property
+    def meta_edges(self) -> Any:
+        """
+        Get all meta-edges connected to this meta-node
+        
+        Meta-edges are edges with entity_type="meta" that were created during
+        the subgraph collapse process.
+        
+        # Returns
+        List of EdgeIds representing meta-edges connected to this meta-node
+        
+        # Raises
+        * `RuntimeError` - If there's an error getting meta-edges
+        """
+        ...
+
+    @property
+    def neighbors(self) -> Any:
+        """
+        Get the meta-node's neighbors
+        
+        # Returns
+        List of NodeIds representing neighboring nodes (could be regular nodes or other meta-nodes)
+        
+        # Raises
+        * `RuntimeError` - If there's an error getting neighbors
+        """
+        ...
+
+    @property
+    def subgraph(self) -> Any:
+        """
+        Get the contained subgraph
+        
+        This returns the original subgraph that was collapsed to create this meta-node.
+        
+        # Returns
+        Optional PySubgraph representing the contained subgraph
+        
+        # Raises
+        * `RuntimeError` - If there's an error accessing the subgraph
+        """
+        ...
+
+    @property
+    def subgraph_id(self) -> Any:
+        """
+        Get the ID of the contained subgraph
+        
+        # Returns
+        Optional subgraph ID if this meta-node contains a subgraph
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5639,6 +6320,22 @@ class NeighborhoodResult:
     """
     Python wrapper for NeighborhoodResult
     """
+    @property
+    def execution_time_ms(self) -> Any:
+        ...
+
+    @property
+    def largest_neighborhood_size(self) -> Any:
+        ...
+
+    @property
+    def neighborhoods(self) -> Any:
+        ...
+
+    @property
+    def total_neighborhoods(self) -> Any:
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5692,6 +6389,22 @@ class NeighborhoodStats:
     """
     Python wrapper for NeighborhoodStats
     """
+    @property
+    def operation_counts(self) -> Any:
+        ...
+
+    @property
+    def total_neighborhoods(self) -> Any:
+        ...
+
+    @property
+    def total_nodes_sampled(self) -> Any:
+        ...
+
+    @property
+    def total_time_ms(self) -> Any:
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5739,6 +6452,14 @@ class NeighborhoodSubgraph:
     """
     Python wrapper for NeighborhoodSubgraph
     """
+    @property
+    def central_nodes(self) -> Any:
+        ...
+
+    @property
+    def hops(self) -> Any:
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5790,6 +6511,62 @@ class Node:
     Regular nodes are the basic building blocks of graphs. They provide access
     to node attributes, topology information (neighbors, degree), and graph operations.
     """
+    @property
+    def degree(self) -> Any:
+        """
+        Get the node's degree (number of connected edges)
+        
+        # Returns
+        The number of edges connected to this node
+        
+        # Raises
+        * `RuntimeError` - If there's an error calculating degree
+        """
+        ...
+
+    @property
+    def entity_type(self) -> Any:
+        """
+        Get the entity type for this node
+        
+        # Returns
+        The string "node"
+        """
+        ...
+
+    @property
+    def id(self) -> Any:
+        """
+        Get the node ID
+        
+        # Returns
+        The unique NodeId for this node
+        """
+        ...
+
+    @property
+    def is_active(self) -> Any:
+        """
+        Check if this node is currently active
+        
+        # Returns
+        True if the node is active in the graph
+        """
+        ...
+
+    @property
+    def neighbors(self) -> Any:
+        """
+        Get the node's neighbors
+        
+        # Returns
+        List of NodeIds representing neighboring nodes
+        
+        # Raises
+        * `RuntimeError` - If there's an error getting neighbors
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5926,6 +6703,65 @@ class NodesAccessor:
     """
     Wrapper for g.nodes that supports indexing syntax: g.nodes[id] -> NodeView
     """
+    @property
+    def attributes(self) -> Any:
+        """
+        Get all unique attribute names across all nodes
+        """
+        ...
+
+    @property
+    def base(self) -> Any:
+        """
+        Get filtered accessor for base (non-meta) nodes only
+        
+        Returns:
+            PyNodesAccessor: Accessor that only shows base nodes (entity_type != 'meta')
+        
+        Example:
+            base_nodes = g.nodes.base
+            base_count = len(base_nodes)
+            base_table = base_nodes.table()
+        """
+        ...
+
+    @property
+    def meta(self) -> Any:
+        """
+        Get filtered accessor for meta-nodes only
+        
+        Returns:
+            PyNodesAccessor: Accessor that only shows meta-nodes (entity_type == 'meta')
+        
+        Example:
+            meta_nodes = g.nodes.meta
+            meta_count = len(meta_nodes)
+            meta_table = meta_nodes.table()
+        """
+        ...
+
+    @property
+    def subgraphs(self) -> Any:
+        """
+        Access all subgraph-nodes (meta-nodes) in the graph
+        
+        Returns:
+            PyNumArray: Array of node IDs that contain subgraphs
+        
+        Example:
+            subgraph_nodes = g.nodes.subgraphs
+            for meta_node in subgraph_nodes:
+                print(f"Meta-node {meta_node.id} contains subgraph")
+        """
+        ...
+
+    @property
+    def viz(self) -> Any:
+        """
+        Get viz accessor for visualization operations
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -5980,7 +6816,7 @@ class NodesAccessor:
         """
         ...
 
-    def all(self, *args, **kwargs) -> Any:
+    def all(self, *args, **kwargs) -> Subgraph:
         """
         Get all nodes as a subgraph (equivalent to g.nodes[:]) - DELEGATED to SubgraphOperations  
         Returns a subgraph containing all nodes and all induced edges
@@ -6027,7 +6863,7 @@ class NodesAccessor:
         """
         ...
 
-    def ids(self, *args, **kwargs) -> Any:
+    def ids(self, *args, **kwargs) -> NumArray:
         """
         Get node IDs as an IntArray for integer operations
         Implements: g.nodes.ids()
@@ -6257,6 +7093,13 @@ class NodesTable:
     """
     Python wrapper for NodesTable
     """
+    @property
+    def viz(self) -> Any:
+        """
+        Get viz accessor for visualization operations (no graph tab)
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -6577,6 +7420,13 @@ class NumArray:
     """
     Unified statistical array supporting all numeric types internally
     """
+    @property
+    def dtype(self) -> Any:
+        """
+        Get the dtype of this array
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -6861,6 +7711,18 @@ class PyResultHandle:
     """
     Native result handle that keeps data in Rust
     """
+    @property
+    def edges(self) -> Any:
+        ...
+
+    @property
+    def nodes(self) -> Any:
+        ...
+
+    @property
+    def result_type(self) -> Any:
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -7043,6 +7905,13 @@ class StatsArray:
     """
     Unified statistical array supporting all numeric types internally
     """
+    @property
+    def dtype(self) -> Any:
+        """
+        Get the dtype of this array
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -7183,6 +8052,48 @@ class Subgraph:
     This completely replaces the complex dual-mode PySubgraph with simple delegation
     to the existing SubgraphOperations trait methods. Same API, much simpler implementation.
     """
+    @property
+    def edge_ids(self) -> Any:
+        """
+        Get edge IDs as PyIntArray
+        """
+        ...
+
+    @property
+    def edges(self) -> EdgesAccessor:
+        """
+        Get edges as a property that supports indexing and attribute access
+        """
+        ...
+
+    @property
+    def hierarchy_level(self) -> Any:
+        """
+        Get hierarchy level of this subgraph (0 = root level)
+        """
+        ...
+
+    @property
+    def node_ids(self) -> Any:
+        """
+        Get node IDs as PyIntArray
+        """
+        ...
+
+    @property
+    def nodes(self) -> NodesAccessor:
+        """
+        Get nodes as a property that supports indexing and attribute access
+        """
+        ...
+
+    @property
+    def viz(self) -> Any:
+        """
+        Get viz accessor for visualization operations
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -7691,6 +8602,13 @@ class SubgraphArray:
     """
     Specialized array for PySubgraph objects
     """
+    @property
+    def viz(self) -> Any:
+        """
+        Get viz accessor for visualization operations
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.

@@ -208,6 +208,7 @@ pub enum ControlMsg {
         offset: usize,
         window_size: usize,
         data_type: TableDataType,
+        sort_columns: Vec<SortColumn>,
     },
 }
 
@@ -218,6 +219,15 @@ pub enum TableDataType {
     Nodes,
     /// Edge table data
     Edges,
+}
+
+/// Column sorting specification
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SortColumn {
+    /// Column name to sort by
+    pub column: String,
+    /// Sort direction: "asc" or "desc"
+    pub direction: String,
 }
 
 impl Node {

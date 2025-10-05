@@ -29,8 +29,10 @@ impl GraphDataSource {
     pub fn new_with_label(graph: &Graph, node_label_attr: &str) -> Self {
         let mut attribute_types = HashMap::new();
 
-        let nodes = graph
-            .node_ids()
+        // DON'T sort - preserve the graph's original ordering so indices match
+        let node_ids_vec = graph.node_ids();
+
+        let nodes = node_ids_vec
             .into_iter()
             .map(|node_id| {
                 let mut attributes = HashMap::new();
@@ -57,8 +59,10 @@ impl GraphDataSource {
             })
             .collect::<Vec<_>>();
 
-        let edges = graph
-            .edge_ids()
+        // DON'T sort - preserve the graph's original ordering so indices match
+        let edge_ids_vec = graph.edge_ids();
+
+        let edges = edge_ids_vec
             .into_iter()
             .filter_map(|edge_id| match graph.edge_endpoints(edge_id) {
                 Ok((source, target)) => {

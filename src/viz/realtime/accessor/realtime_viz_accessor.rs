@@ -41,6 +41,7 @@ pub trait RealtimeVizAccessor: Send + Sync {
         data_type: super::engine_messages::TableDataType,
         offset: usize,
         window_size: usize,
+        sort_columns: Vec<super::engine_messages::SortColumn>,
     ) -> GraphResult<crate::viz::realtime::server::ws_bridge::TableDataWindow>;
 }
 
@@ -842,6 +843,7 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
         data_type: super::engine_messages::TableDataType,
         offset: usize,
         window_size: usize,
+        sort_columns: Vec<super::engine_messages::SortColumn>,
     ) -> GraphResult<crate::viz::realtime::server::ws_bridge::TableDataWindow> {
         use super::engine_messages::TableDataType;
         use crate::viz::realtime::server::ws_bridge::TableDataWindow;
@@ -850,9 +852,49 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
 
         match data_type {
             TableDataType::Nodes => {
-                let total_rows = snapshot.nodes.len();
+                let mut nodes = snapshot.nodes.clone();
+
+                // Apply sorting if sort_columns is not empty
+                if !sort_columns.is_empty() {
+                    nodes.sort_by(|a, b| {
+                        for sort_col in &sort_columns {
+                            let ordering = if sort_col.column == "ID" {
+                                // Sort by node ID
+                                if sort_col.direction == "desc" {
+                                    b.id.cmp(&a.id)
+                                } else {
+                                    a.id.cmp(&b.id)
+                                }
+                            } else {
+                                // Sort by attribute
+                                let a_val = a.attributes.get(&sort_col.column);
+                                let b_val = b.attributes.get(&sort_col.column);
+
+                                let cmp = match (a_val, b_val) {
+                                    (Some(av), Some(bv)) => av.partial_cmp(bv).unwrap_or(std::cmp::Ordering::Equal),
+                                    (Some(_), None) => std::cmp::Ordering::Less,
+                                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                                    (None, None) => std::cmp::Ordering::Equal,
+                                };
+
+                                if sort_col.direction == "desc" {
+                                    cmp.reverse()
+                                } else {
+                                    cmp
+                                }
+                            };
+
+                            if ordering != std::cmp::Ordering::Equal {
+                                return ordering;
+                            }
+                        }
+                        std::cmp::Ordering::Equal
+                    });
+                }
+
+                let total_rows = nodes.len();
                 let end = std::cmp::min(offset + window_size, total_rows);
-                let nodes_window = &snapshot.nodes[offset..end];
+                let nodes_window = &nodes[offset..end];
 
                 // Build headers from all unique attributes across all nodes in window
                 let mut headers = vec!["ID".to_string()];
@@ -888,9 +930,63 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                 })
             }
             TableDataType::Edges => {
-                let total_rows = snapshot.edges.len();
+                let mut edges = snapshot.edges.clone();
+
+                // Apply sorting if sort_columns is not empty
+                if !sort_columns.is_empty() {
+                    edges.sort_by(|a, b| {
+                        for sort_col in &sort_columns {
+                            let ordering = if sort_col.column == "ID" {
+                                // Sort by edge ID
+                                if sort_col.direction == "desc" {
+                                    b.id.cmp(&a.id)
+                                } else {
+                                    a.id.cmp(&b.id)
+                                }
+                            } else if sort_col.column == "Source" {
+                                // Sort by source node ID
+                                if sort_col.direction == "desc" {
+                                    b.source.cmp(&a.source)
+                                } else {
+                                    a.source.cmp(&b.source)
+                                }
+                            } else if sort_col.column == "Target" {
+                                // Sort by target node ID
+                                if sort_col.direction == "desc" {
+                                    b.target.cmp(&a.target)
+                                } else {
+                                    a.target.cmp(&b.target)
+                                }
+                            } else {
+                                // Sort by attribute
+                                let a_val = a.attributes.get(&sort_col.column);
+                                let b_val = b.attributes.get(&sort_col.column);
+
+                                let cmp = match (a_val, b_val) {
+                                    (Some(av), Some(bv)) => av.partial_cmp(bv).unwrap_or(std::cmp::Ordering::Equal),
+                                    (Some(_), None) => std::cmp::Ordering::Less,
+                                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                                    (None, None) => std::cmp::Ordering::Equal,
+                                };
+
+                                if sort_col.direction == "desc" {
+                                    cmp.reverse()
+                                } else {
+                                    cmp
+                                }
+                            };
+
+                            if ordering != std::cmp::Ordering::Equal {
+                                return ordering;
+                            }
+                        }
+                        std::cmp::Ordering::Equal
+                    });
+                }
+
+                let total_rows = edges.len();
                 let end = std::cmp::min(offset + window_size, total_rows);
-                let edges_window = &snapshot.edges[offset..end];
+                let edges_window = &edges[offset..end];
 
                 // Build headers from all unique attributes across all edges in window
                 let mut headers = vec!["ID".to_string(), "Source".to_string(), "Target".to_string()];

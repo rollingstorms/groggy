@@ -1,0 +1,17 @@
+{
+  "columns": [
+    "age",
+    "name"
+  ],
+  "data": [
+    {
+      "age": 25,
+      "name": "Alice"
+    },
+    {
+      "age": 30,
+      "name": "Bob"
+    }
+  ],
+  "nrows": 2
+}
