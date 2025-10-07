@@ -410,8 +410,8 @@ impl Ord for AttrValue {
             (SmallInt(a), SmallInt(b)) => a.cmp(b),
             (Float(a), Float(b)) => a.partial_cmp(b).unwrap_or(Ordering::Equal),
             (Bool(a), Bool(b)) => a.cmp(b),
-            (Text(a), Text(b)) => a.cmp(b),
-            (CompactText(a), CompactText(b)) => a.as_str().cmp(b.as_str()),
+            (Text(a), Text(b)) => AttrValue::cmp_text_content(a, b),
+            (CompactText(a), CompactText(b)) => AttrValue::cmp_text_content(a.as_str(), b.as_str()),
             (FloatVec(a), FloatVec(b)) => a.len().cmp(&b.len()).then_with(|| {
                 // Compare vectors lexicographically
                 for (va, vb) in a.iter().zip(b.iter()) {
@@ -423,7 +423,10 @@ impl Ord for AttrValue {
                 Ordering::Equal
             }),
             (Bytes(a), Bytes(b)) => a.cmp(b),
-            (CompressedText(a), CompressedText(b)) => a.data.cmp(&b.data),
+            (CompressedText(a), CompressedText(b)) => match (a.decompress_text(), b.decompress_text()) {
+                (Ok(lhs), Ok(rhs)) => AttrValue::cmp_text_content(lhs.as_str(), rhs.as_str()),
+                _ => a.data.cmp(&b.data),
+            },
             (CompressedFloatVec(a), CompressedFloatVec(b)) => a.data.cmp(&b.data),
 
             // Cross-type comparisons - order by type discriminant first
@@ -431,8 +434,24 @@ impl Ord for AttrValue {
             (SmallInt(a), Int(b)) => (*a as i64).cmp(b),
 
             // Text comparisons across storage types
-            (Text(a), CompactText(b)) => a.as_str().cmp(b.as_str()),
-            (CompactText(a), Text(b)) => a.as_str().cmp(b.as_str()),
+            (Text(a), CompactText(b)) => AttrValue::cmp_text_content(a.as_str(), b.as_str()),
+            (CompactText(a), Text(b)) => AttrValue::cmp_text_content(a.as_str(), b.as_str()),
+            (Text(a), CompressedText(b)) => match b.decompress_text() {
+                Ok(text) => AttrValue::cmp_text_content(a.as_str(), text.as_str()),
+                Err(_) => std::cmp::Ordering::Equal,
+            },
+            (CompressedText(a), Text(b)) => match a.decompress_text() {
+                Ok(text) => AttrValue::cmp_text_content(text.as_str(), b.as_str()),
+                Err(_) => std::cmp::Ordering::Equal,
+            },
+            (CompactText(a), CompressedText(b)) => match b.decompress_text() {
+                Ok(text) => AttrValue::cmp_text_content(a.as_str(), text.as_str()),
+                Err(_) => std::cmp::Ordering::Equal,
+            },
+            (CompressedText(a), CompactText(b)) => match a.decompress_text() {
+                Ok(text) => AttrValue::cmp_text_content(text.as_str(), b.as_str()),
+                Err(_) => std::cmp::Ordering::Equal,
+            },
 
             // Different types - order by discriminant (type priority)
             _ => self.type_discriminant().cmp(&other.type_discriminant()),
@@ -458,6 +477,26 @@ impl AttrValue {
             AttrValue::NodeArray(_) => 11,
             AttrValue::EdgeArray(_) => 12,
             AttrValue::Json(_) => 13,
+        }
+    }
+}
+
+impl AttrValue {
+    fn cmp_text_content(lhs: &str, rhs: &str) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+
+        fn parse_numeric(input: &str) -> Option<f64> {
+            let trimmed = input.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                trimmed.parse::<f64>().ok()
+            }
+        }
+
+        match (parse_numeric(lhs), parse_numeric(rhs)) {
+            (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(Ordering::Equal),
+            _ => lhs.cmp(rhs),
         }
     }
 }

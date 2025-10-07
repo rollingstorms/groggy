@@ -100,7 +100,7 @@ def test_node_attributes():
     # Try different ways to get attributes
     try:
         # Method 1: Try getting all attributes
-        all_attrs = g.all_node_attribute_names()
+        all_attrs = g.nodes.attribute_names()
         print(f"All node attribute names: {all_attrs}")
 
         # Method 2: Try getting individual attributes

@@ -95,10 +95,26 @@ impl PyArrayArray {
         self.inner.is_empty()
     }
 
-    // Temporarily comment out __getitem__ until we properly implement PyBaseArray conversion
-    // fn __getitem__(&self, index: isize) -> PyResult<PyBaseArray> {
-    //     ...
-    // }
+    /// Retrieve an individual BaseArray by index (supports negative indices)
+    fn __getitem__(&self, index: isize) -> PyResult<PyBaseArray> {
+        let len = self.inner.len() as isize;
+        let actual_index = if index < 0 { len + index } else { index };
+
+        if actual_index < 0 || actual_index >= len {
+            return Err(pyo3::exceptions::PyIndexError::new_err(format!(
+                "Array index {} out of range for {} arrays",
+                index, len
+            )));
+        }
+
+        let base_array = self
+            .inner
+            .get(actual_index as usize)
+            .cloned()
+            .ok_or_else(|| pyo3::exceptions::PyIndexError::new_err("Array retrieval failed"))?;
+
+        Ok(PyBaseArray { inner: base_array })
+    }
 
     /// String representation
     fn __repr__(&self) -> String {
@@ -362,6 +378,36 @@ mod tests {
 
         assert_eq!(arr_arr.__len__(), 2);
         assert!(!arr_arr.is_empty());
+    }
+
+    #[test]
+    fn test_py_array_array_getitem() {
+        use groggy::types::AttrValue;
+        use pyo3::Python;
+
+        Python::with_gil(|_| {
+            let arrays = vec![
+                BaseArray::from_attr_values(vec![
+                    AttrValue::Int(1),
+                    AttrValue::Int(2),
+                    AttrValue::Int(3),
+                ]),
+                BaseArray::from_attr_values(vec![
+                    AttrValue::Int(4),
+                    AttrValue::Int(5),
+                ]),
+            ];
+
+            let wrapper = PyArrayArray::from_array_array(ArrayArray::new(arrays));
+
+            let first = wrapper.__getitem__(0).expect("index 0 should succeed");
+            assert_eq!(first.inner.len(), 3);
+
+            let last = wrapper.__getitem__(-1).expect("negative index should work");
+            assert_eq!(last.inner.len(), 2);
+
+            assert!(wrapper.__getitem__(2).is_err());
+        });
     }
 
     #[test]

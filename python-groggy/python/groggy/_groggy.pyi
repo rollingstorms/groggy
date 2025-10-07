@@ -3396,6 +3396,18 @@ class EdgesAccessor:
         """
         ...
 
+    def attribute_names(self) -> List[str]:
+        """
+        List unique node attribute names available in this accessor view.
+        """
+        ...
+
+    def attribute_names(self) -> List[str]:
+        """
+        List unique edge attribute names available in this accessor view.
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -9225,4 +9237,3 @@ class VizAccessor:
         Update visualization parameters - sends control message to existing server
         """
         ...
-

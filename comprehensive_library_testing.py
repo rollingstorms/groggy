@@ -12,7 +12,8 @@ import json
 import time
 import traceback
 import csv
-from typing import Dict, List, Any, Tuple, Optional
+from pathlib import Path
+from typing import Dict, List, Any, Tuple, Optional, Iterator
 from collections import defaultdict
 
 # Add paths
@@ -683,22 +684,22 @@ class ComprehensiveLibraryTester:
         return summary
 
     def save_comprehensive_results(self, test_results: Dict, summary: Dict,
-                                 meta_graph: Any, api_summary: Dict):
+                                   meta_graph: Any, api_summary: Dict):
         """Save comprehensive test results"""
 
         timestamp = time.strftime('%Y%m%d_%H%M%S')
 
         # Save test results
         results_file = f'comprehensive_test_results_{timestamp}.json'
-        with open(results_file, 'w') as f:
+        with open(results_file, 'w') as handle:
             json.dump({
                 'test_results': test_results,
                 'summary': summary,
                 'timestamp': timestamp,
                 'api_stats': api_summary['meta_graph_stats']
-            }, f, indent=2, default=str)
+            }, handle, indent=2, default=str)
 
-        print(f"\\n💾 RESULTS SAVED:")
+        print(f"\n💾 RESULTS SAVED:")
         print(f"   Test results: {results_file}")
 
         # Generate markdown report
@@ -714,40 +715,51 @@ class ComprehensiveLibraryTester:
         return results_file, report_file
 
     def generate_markdown_report(self, test_results: Dict, summary: Dict, filename: str):
-        """Generate a comprehensive markdown report"""
+        """Generate a comprehensive markdown report."""
 
-        with open(filename, 'w') as f:
-            f.write(f"# Comprehensive Groggy Library Test Report\\n")
-            f.write(f"*Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}*\\n\\n")
+        with open(filename, 'w') as handle:
+            handle.write("# Comprehensive Groggy Library Test Report\n")
+            handle.write(f"*Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}*\n\n")
 
-            f.write(f"## Executive Summary\\n\\n")
+            handle.write("## Executive Summary\n\n")
             overall = summary['overall_stats']
-            f.write(f"- **Overall Success Rate**: {overall['overall_success_rate']:.1f}%\\n")
-            f.write(f"- **Objects Tested**: {overall['total_objects_tested']}\\n")
-            f.write(f"- **Methods Tested**: {overall['total_methods_tested']}\\n")
-            f.write(f"- **Release Readiness**: {'✅ Ready' if summary['release_readiness']['ready_for_release'] else '⚠️ Needs Work'}\\n\\n")
+            handle.write(f"- **Overall Success Rate**: {overall['overall_success_rate']:.1f}%\n")
+            handle.write(f"- **Objects Tested**: {overall['total_objects_tested']}\n")
+            handle.write(f"- **Methods Tested**: {overall['total_methods_tested']}\n")
+            readiness_flag = '✅ Ready' if summary['release_readiness']['ready_for_release'] else '⚠️ Needs Work'
+            handle.write(f"- **Release Readiness**: {readiness_flag}\n\n")
 
-            f.write(f"## Object Performance\\n\\n")
-            f.write(f"| Object | Success Rate | Status |\\n")
-            f.write(f"|--------|--------------|--------|\\n")
+            handle.write("## Object Performance\n\n")
+            handle.write("| Object | Success Rate | Status |\n")
+            handle.write("|--------|--------------|--------|\n")
 
-            for obj_name, result in sorted(test_results.items(), key=lambda x: x[1].get('success_rate', 0), reverse=True):
+            for obj_name, result in sorted(
+                test_results.items(),
+                key=lambda item: item[1].get('success_rate', 0),
+                reverse=True,
+            ):
                 rate = result.get('success_rate', 0)
                 status = "🟢" if rate >= 90 else "🟡" if rate >= 70 else "🔴"
-                f.write(f"| {obj_name} | {rate:.1f}% | {status} |\\n")
+                handle.write(f"| {obj_name} | {rate:.1f}% | {status} |\n")
 
-            f.write(f"\\n## Detailed Results\\n\\n")
+            handle.write("\n## Detailed Results\n\n")
             for obj_name, result in test_results.items():
-                f.write(f"### {obj_name} ({result.get('success_rate', 0):.1f}%)\\n\\n")
+                handle.write(f"### {obj_name} ({result.get('success_rate', 0):.1f}%)\n\n")
 
-                if 'methods' in result:
-                    successful = [name for name, info in result['methods'].items() if info['success']]
-                    failed = [name for name, info in result['methods'].items() if not info['success']]
+                if 'methods' not in result:
+                    continue
 
-                    if successful:
-                        f.write(f"**✅ Working methods ({len(successful)})**: {', '.join(successful)}\\n\\n")
-                    if failed:
-                        f.write(f"**❌ Failed methods ({len(failed)})**: {', '.join(failed)}\\n\\n")
+                successful = [name for name, info in result['methods'].items() if info['success']]
+                failed = [name for name, info in result['methods'].items() if not info['success']]
+
+                if successful:
+                    handle.write(
+                        f"**✅ Working methods ({len(successful)})**: {', '.join(successful)}\n\n"
+                    )
+                if failed:
+                    handle.write(
+                        f"**❌ Failed methods ({len(failed)})**: {', '.join(failed)}\n\n"
+                    )
 
     def generate_csv_exports(self, test_results: Dict, summary: Dict, timestamp: str) -> Tuple[str, str]:
         """Generate CSV exports for objects and methods"""
@@ -815,6 +827,112 @@ class ComprehensiveLibraryTester:
                         })
 
         return objects_csv_file, methods_csv_file
+
+
+def _resolve_result_paths(timestamp: Optional[str] = None) -> Tuple[Path, Path]:
+    """Resolve nodes/edges CSV paths for a given comprehensive test run."""
+
+    base = Path.cwd()
+
+    if timestamp is not None:
+        nodes_path = base / f"comprehensive_test_objects_{timestamp}.csv"
+        edges_path = base / f"comprehensive_test_methods_{timestamp}.csv"
+        if not nodes_path.exists() or not edges_path.exists():
+            raise FileNotFoundError(
+                f"Comprehensive test CSVs with timestamp '{timestamp}' not found."
+            )
+        return nodes_path, edges_path
+
+    # Discover most recent run by modification time
+    candidates = sorted(
+        base.glob("comprehensive_test_objects_*.csv"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+    if not candidates:
+        raise FileNotFoundError(
+            "No comprehensive test CSVs found. Run ComprehensiveLibraryTester first."
+        )
+
+    latest_nodes = candidates[0]
+    suffix = latest_nodes.stem.replace("comprehensive_test_objects_", "")
+    edges_path = base / f"comprehensive_test_methods_{suffix}.csv"
+    if not edges_path.exists():
+        raise FileNotFoundError(
+            f"Edge CSV missing for timestamp '{suffix}' (expected {edges_path.name})."
+        )
+
+    return latest_nodes, edges_path
+
+
+def load_comprehensive_test_graph(
+    timestamp: Optional[str] = None,
+    *,
+    to_graph: bool = True,
+    rerun_if_missing: bool = False,
+) -> "GraphTable":
+    """Load the comprehensive test results as a Groggy Graph/GraphTable.
+
+    Args:
+        timestamp: Specific timestamp slug (e.g. "20251004_152053"). If ``None``
+            the most recent CSV pair in the repository root is used.
+        to_graph: Return the materialised ``Graph`` object instead of ``GraphTable``.
+        rerun_if_missing: When True, automatically run the comprehensive test if
+            no CSVs are available. This defers to ``ComprehensiveLibraryTester``.
+
+    Returns:
+        Graph or GraphTable containing one node per tested object and edges for
+        each method invocation with the original CSV columns preserved as
+        attributes (including error ``message`` and ``error_category``).
+    """
+
+    try:
+        nodes_path, edges_path = _resolve_result_paths(timestamp)
+    except FileNotFoundError:
+        if not rerun_if_missing:
+            raise
+        tester = ComprehensiveLibraryTester()
+        tester.run_comprehensive_test()
+        nodes_path, edges_path = _resolve_result_paths(timestamp)
+
+    import groggy as gr  # Local import to avoid module cost on CLI tools
+
+    graph_table = gr.from_csv(
+        nodes_filepath=str(nodes_path),
+        edges_filepath=str(edges_path),
+        node_id_column="object_name",
+        source_id_column="object_name",
+        target_id_column="result_type",
+    )
+
+    return graph_table.to_graph() if to_graph else graph_table
+
+
+def iter_method_results(
+    timestamp: Optional[str] = None,
+    *,
+    only_failed: bool = False,
+) -> Iterator[Dict[str, str]]:
+    """Yield method result rows from the comprehensive test edge CSV.
+
+    Args:
+        timestamp: Optional timestamp slug. When omitted the freshest CSV pair
+            is used.
+        only_failed: If True, yield only rows where ``success`` is ``False``.
+
+    Yields:
+        Dictionaries matching the CSV header with easy access to ``message`` and
+        ``error_category`` fields for downstream diagnostics.
+    """
+
+    _, edges_path = _resolve_result_paths(timestamp)
+    with edges_path.open() as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if only_failed and row.get("success", "").lower() == "true":
+                continue
+            yield row
 
 
 def main():

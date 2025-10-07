@@ -1,0 +1,86 @@
+{
+  "nodes": [
+    {
+      "id": "alice",
+      "name": "Alice",
+      "age": 28,
+      "location": "NYC",
+      "occupation": "Engineer"
+    },
+    {
+      "id": "bob",
+      "name": "Bob",
+      "age": 32,
+      "location": "SF",
+      "occupation": "Designer"
+    },
+    {
+      "id": "carol",
+      "name": "Carol",
+      "age": 25,
+      "location": "NYC",
+      "occupation": "Engineer"
+    },
+    {
+      "id": "dave",
+      "name": "Dave",
+      "age": 30,
+      "location": "LA",
+      "occupation": "Manager"
+    },
+    {
+      "id": "eve",
+      "name": "Eve",
+      "age": 27,
+      "location": "SF",
+      "occupation": "Engineer"
+    }
+  ],
+  "edges": [
+    [
+      "alice",
+      "bob",
+      {
+        "relationship": "friend",
+        "strength": 0.8,
+        "years": 5
+      }
+    ],
+    [
+      "alice",
+      "carol",
+      {
+        "relationship": "colleague",
+        "strength": 0.9,
+        "years": 2
+      }
+    ],
+    [
+      "bob",
+      "eve",
+      {
+        "relationship": "friend",
+        "strength": 0.7,
+        "years": 3
+      }
+    ],
+    [
+      "carol",
+      "dave",
+      {
+        "relationship": "reports_to",
+        "strength": 0.6,
+        "years": 1
+      }
+    ],
+    [
+      "dave",
+      "eve",
+      {
+        "relationship": "friend",
+        "strength": 0.5,
+        "years": 1
+      }
+    ]
+  ]
+}

@@ -1,0 +1,6 @@
+source,target,relationship,strength,years
+alice,bob,friend,0.8,5
+alice,carol,colleague,0.9,2
+bob,eve,friend,0.7,3
+carol,dave,reports_to,0.6,1
+dave,eve,friend,0.5,1

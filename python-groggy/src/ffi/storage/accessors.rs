@@ -196,6 +196,65 @@ impl PyNodesAccessor {
     fn set_attrs(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         self.set_attrs_internal(py, attrs_dict)
     }
+
+    /// List attribute names available within this accessor's node set
+    fn attribute_names(&self) -> Vec<String> {
+        let graph_ref = self.graph.borrow();
+        let node_ids: Vec<NodeId> = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            graph_ref.node_ids()
+        };
+
+        let mut names = HashSet::new();
+        for node_id in node_ids {
+            if let Ok(attrs) = graph_ref.get_node_attrs(node_id) {
+                for attr_name in attrs.keys() {
+                    names.insert(attr_name.clone());
+                }
+            }
+        }
+
+        let mut result: Vec<String> = names.into_iter().collect();
+        result.sort();
+        result
+    }
+
+    /// Filter nodes using the same syntax as graph.filter_nodes and return a subgraph
+    #[pyo3(signature = (filter))]
+    fn filter(&self, py: Python, filter: &PyAny) -> PyResult<PyObject> {
+        use std::collections::HashSet;
+
+        let graph_rc = self.graph.clone();
+
+        // Determine the seed node set (respect constrained views)
+        let seed_nodes: Vec<NodeId> = if let Some(ref constrained) = self.constrained_nodes {
+            constrained.clone()
+        } else {
+            let graph_ref = self.graph.borrow();
+            graph_ref.node_ids()
+        };
+
+        let node_set: HashSet<NodeId> = seed_nodes.into_iter().collect();
+
+        let edge_set = groggy::subgraphs::Subgraph::calculate_induced_edges(&graph_rc, &node_set)
+            .map_err(|e| PyRuntimeError::new_err(format!("{:?}", e)))?;
+
+        let base_subgraph = groggy::subgraphs::Subgraph::new(
+            graph_rc.clone(),
+            node_set,
+            edge_set,
+            "nodes_accessor".to_string(),
+        );
+
+        let py_subgraph = PySubgraph::from_core_subgraph(base_subgraph)?;
+        let py_obj = Py::new(py, py_subgraph)?;
+        let filter_obj = filter.to_object(py);
+        py_obj
+            .as_ref(py)
+            .call_method1("filter_nodes", (filter_obj,))
+            .map(|obj| obj.to_object(py))
+    }
     /// Support node access: g.nodes[0] -> NodeView, g.nodes[[0,1,2]] -> Subgraph, g.nodes[0:5] -> Subgraph
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {
         // Try to extract as single integer
@@ -1259,6 +1318,44 @@ impl PyNodesAccessor {
     pub fn set_attrs_internal(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         use crate::ffi::api::graph_attributes::PyGraphAttrMut;
 
+        // Normalize input so we always work with attribute-centric format:
+        // {"attr": {node_id: value}}. Users can also pass
+        // {node_id: {"attr": value}} and we'll adapt it here.
+        let mut normalized_holder: Option<Py<PyDict>> = None;
+        let mut attrs_dict_ref = attrs_dict;
+
+        if let Some((first_key, _)) = attrs_dict.iter().next() {
+            if first_key.extract::<String>().is_err() {
+                let normalized = PyDict::new(py);
+
+                for (node_py, attr_map_py) in attrs_dict.iter() {
+                    let node_id: NodeId = node_py.extract()?;
+                    let attr_map = attr_map_py.downcast::<PyDict>().map_err(|_| {
+                        PyValueError::new_err("Expected dict of attributes per node when using node-centric format")
+                    })?;
+
+                    for (attr_name_py, value_py) in attr_map.iter() {
+                        let attr_name: String = attr_name_py.extract()?;
+                        let target_dict = match normalized.get_item(attr_name.clone())? {
+                            Some(existing) => existing.downcast::<PyDict>().map_err(|_| {
+                                PyValueError::new_err("Attribute entries must be dictionaries of node/value pairs")
+                            })?,
+                            None => {
+                                let new_dict = PyDict::new(py);
+                                normalized.set_item(attr_name.clone(), new_dict)?;
+                                new_dict
+                            }
+                        };
+
+                        target_dict.set_item(node_id, value_py)?;
+                    }
+                }
+
+                normalized_holder = Some(normalized.into());
+                attrs_dict_ref = normalized_holder.as_ref().unwrap().as_ref(py);
+            }
+        }
+
         // Create a mutable graph attributes handler
         let mut attr_handler = PyGraphAttrMut::new(self.graph.clone());
 
@@ -1268,7 +1365,7 @@ impl PyNodesAccessor {
             let constrained_set: std::collections::HashSet<NodeId> =
                 constrained_nodes.iter().copied().collect();
 
-            for (attr_name_py, node_values_py) in attrs_dict.iter() {
+            for (attr_name_py, node_values_py) in attrs_dict_ref.iter() {
                 let _attr_name: String = attr_name_py.extract()?;
 
                 // Handle different formats - for now assume node-centric format
@@ -1287,7 +1384,7 @@ impl PyNodesAccessor {
         }
 
         // Delegate to the graph attributes handler (it has the smart format detection)
-        attr_handler.set_node_attrs(py, attrs_dict)
+        attr_handler.set_node_attrs(py, attrs_dict_ref)
     }
 
     /// Apply auto-slicing to remove columns that are all NaN/None for the given node set
@@ -1634,6 +1731,72 @@ impl PyEdgesAccessor {
     /// Supports the same formats as the main graph: edge-centric, column-centric, etc.
     fn set_attrs(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         self.set_attrs_internal(py, attrs_dict)
+    }
+
+    /// List attribute names available within this accessor's edge set
+    fn attribute_names(&self) -> Vec<String> {
+        let graph_ref = self.graph.borrow();
+        let edge_ids: Vec<EdgeId> = if let Some(ref constrained) = self.constrained_edges {
+            constrained.clone()
+        } else {
+            graph_ref.edge_ids()
+        };
+
+        let mut names = HashSet::new();
+        for edge_id in edge_ids {
+            if let Ok(attrs) = graph_ref.get_edge_attrs(edge_id) {
+                for attr_name in attrs.keys() {
+                    names.insert(attr_name.clone());
+                }
+            }
+        }
+
+        let mut result: Vec<String> = names.into_iter().collect();
+        result.sort();
+        result
+    }
+
+    /// Filter edges using the same syntax as graph.filter_edges and return a subgraph
+    #[pyo3(signature = (filter))]
+    fn filter(&self, py: Python, filter: &PyAny) -> PyResult<PyObject> {
+        use std::collections::HashSet;
+
+        let graph_rc = self.graph.clone();
+
+        let edge_ids: Vec<EdgeId> = if let Some(ref constrained) = self.constrained_edges {
+            constrained.clone()
+        } else {
+            let graph_ref = self.graph.borrow();
+            graph_ref.edge_ids()
+        };
+
+        let edge_set: HashSet<EdgeId> = edge_ids.iter().copied().collect();
+
+        let mut node_set: HashSet<NodeId> = HashSet::new();
+        {
+            let graph_ref = self.graph.borrow();
+            for &edge_id in &edge_ids {
+                if let Ok((source, target)) = graph_ref.edge_endpoints(edge_id) {
+                    node_set.insert(source);
+                    node_set.insert(target);
+                }
+            }
+        }
+
+        let base_subgraph = groggy::subgraphs::Subgraph::new(
+            graph_rc.clone(),
+            node_set,
+            edge_set,
+            "edges_accessor".to_string(),
+        );
+
+        let py_subgraph = PySubgraph::from_core_subgraph(base_subgraph)?;
+        let py_obj = Py::new(py, py_subgraph)?;
+        let filter_obj = filter.to_object(py);
+        py_obj
+            .as_ref(py)
+            .call_method1("filter_edges", (filter_obj,))
+            .map(|obj| obj.to_object(py))
     }
     /// Support edge access: g.edges[0] -> EdgeView, g.edges[[0,1,2]] -> Subgraph, g.edges[0:5] -> Subgraph
     fn __getitem__(&self, py: Python, key: &PyAny) -> PyResult<PyObject> {

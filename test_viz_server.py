@@ -62,7 +62,7 @@ def create_test_graph():
     print("\n🔍 Node attributes as seen from graph:")
     for node_id in [node1, node2, node3, node4]:
         print(f"\nNode {node_id}:")
-        for attr_name in g.all_node_attribute_names():
+        for attr_name in g.nodes.attribute_names():
             try:
                 value = g.get_node_attr(node_id, attr_name)
                 print(f"  {attr_name}: {repr(value)} (type: {type(value).__name__})")
@@ -72,7 +72,7 @@ def create_test_graph():
     print("\n🔍 Edge attributes as seen from graph:")
     for edge_id in [edge1, edge2, edge3]:
         print(f"\nEdge {edge_id}:")
-        for attr_name in g.all_edge_attribute_names():
+        for attr_name in g.edges.attribute_names():
             try:
                 value = g.get_edge_attr(edge_id, attr_name)
                 print(f"  {attr_name}: {repr(value)} (type: {type(value).__name__})")

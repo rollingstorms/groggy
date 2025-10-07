@@ -158,21 +158,7 @@ impl BaseArray<AttrValue> {
         let mut indices: Vec<usize> = (0..self.len()).collect();
 
         indices.sort_by(|&a, &b| {
-            let val_a = &self.inner[a];
-            let val_b = &self.inner[b];
-
-            // Simple comparison based on AttrValue
-            use crate::types::AttrValue;
-            let ordering = match (val_a, val_b) {
-                (AttrValue::Int(a), AttrValue::Int(b)) => a.cmp(b),
-                (AttrValue::Float(a), AttrValue::Float(b)) => {
-                    a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
-                }
-                (AttrValue::Text(a), AttrValue::Text(b)) => a.cmp(b),
-                (AttrValue::Bool(a), AttrValue::Bool(b)) => a.cmp(b),
-                _ => std::cmp::Ordering::Equal, // Default for mixed types
-            };
-
+            let ordering = self.inner[a].cmp(&self.inner[b]);
             if ascending {
                 ordering
             } else {

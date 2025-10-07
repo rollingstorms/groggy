@@ -428,6 +428,18 @@ impl PyGraph {
         PyGraph::create_edges_accessor_internal(graph_ref, py)
     }
 
+    /// Delegate item access to the nodes accessor so g[key] mirrors g.nodes[key]
+    #[pyo3(name = "__getitem__")]
+    fn getitem(self_: PyRef<Self>, py: Python, key: &PyAny) -> PyResult<PyObject> {
+        let graph_ref: Py<PyGraph> = self_.into();
+        let nodes_accessor = PyGraph::create_nodes_accessor_internal(graph_ref, py)?;
+        let key_obj = key.to_object(py);
+        nodes_accessor
+            .as_ref(py)
+            .call_method1("__getitem__", (key_obj,))
+            .map(|obj| obj.to_object(py))
+    }
+
     /// Add multiple edges at once
     #[pyo3(signature = (edges, node_mapping = None, uid_key = None, source = None, target = None, warm_cache = None))]
     fn add_edges(
@@ -1207,7 +1219,9 @@ impl PyGraph {
             }
         }
 
-        all_attrs.into_iter().collect()
+        let mut result: Vec<String> = all_attrs.into_iter().collect();
+        result.sort();
+        result
     }
 
     /// Get all unique edge attribute names across the entire graph
@@ -1224,7 +1238,9 @@ impl PyGraph {
             }
         }
 
-        all_attrs.into_iter().collect()
+        let mut result: Vec<String> = all_attrs.into_iter().collect();
+        result.sort();
+        result
     }
 
     // === ALGORITHM OPERATIONS (delegate to PyGraphAnalysis helper) ===

@@ -8,6 +8,7 @@
 
 ## Build, Test, and Development Commands
 - `maturin develop --release` builds and installs the extension for local Python work; run it after changing Rust or FFI code.
+- Local workflows run against the in-tree build artifacts—avoid re-installing the wheel with `pip`, and skip external package installs unless explicitly required.
 - `cargo build --all-targets` (or `cargo check --all-features`) validates the core; use `cargo test viz::realtime` and similar module filters when iterating.
 - `pytest tests -q` covers the documented Python surface; narrow to files like `pytest tests/test_viz_accessor.py -k snapshot` for focused debugging.
 - Formatting and linting: `cargo fmt --all`, `cargo clippy --all-targets -- -D warnings`, `black .`, `isort .`, and `pre-commit run --all-files` before shipping.
