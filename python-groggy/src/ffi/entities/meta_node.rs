@@ -4,9 +4,9 @@
 //! exposing all GraphEntity, NodeOperations, and MetaNodeOperations methods to Python.
 
 use groggy::entities::MetaNode;
-use groggy::types::{NodeId, EdgeId};
-use pyo3::prelude::*;
+use groggy::types::{EdgeId, NodeId};
 use pyo3::exceptions::PyRuntimeError;
+use pyo3::prelude::*;
 
 /// Python wrapper for a meta-node (collapsed subgraph)
 ///
@@ -56,14 +56,13 @@ impl PyMetaNode {
     /// * `RuntimeError` - If there's an error accessing the attribute
     fn __getitem__(&self, py: Python, key: &str) -> PyResult<Py<PyAny>> {
         use groggy::traits::GraphEntity;
-        
+
         match self.inner.get_attribute(&key.into()) {
-            Ok(Some(attr_value)) => {
-                crate::ffi::utils::attr_value_to_python_value(py, &attr_value)
-            }
+            Ok(Some(attr_value)) => crate::ffi::utils::attr_value_to_python_value(py, &attr_value),
             Ok(None) => Err(pyo3::exceptions::PyKeyError::new_err(format!(
                 "MetaNode {} has no attribute '{}'",
-                self.inner.id(), key
+                self.inner.id(),
+                key
             ))),
             Err(e) => Err(PyRuntimeError::new_err(format!(
                 "Failed to get meta-node attribute: {}",
@@ -82,12 +81,14 @@ impl PyMetaNode {
     /// * `RuntimeError` - If there's an error setting the attribute
     fn __setitem__(&self, key: &str, value: &PyAny) -> PyResult<()> {
         use groggy::traits::GraphEntity;
-        
+
         let py_attr_value = crate::ffi::types::PyAttrValue::from_py_value(value)?;
         let attr_value = py_attr_value.to_attr_value();
         self.inner
             .set_attribute(key.into(), attr_value)
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to set meta-node attribute: {}", e)))?;
+            .map_err(|e| {
+                PyRuntimeError::new_err(format!("Failed to set meta-node attribute: {}", e))
+            })?;
         Ok(())
     }
 
@@ -100,7 +101,7 @@ impl PyMetaNode {
     /// True if the attribute exists, False otherwise
     fn __contains__(&self, key: &str) -> PyResult<bool> {
         use groggy::traits::GraphEntity;
-        
+
         match self.inner.get_attribute(&key.into()) {
             Ok(Some(_)) => Ok(true),
             Ok(None) => Ok(false),
@@ -120,7 +121,7 @@ impl PyMetaNode {
     #[getter]
     fn degree(&self) -> PyResult<usize> {
         use groggy::traits::NodeOperations;
-        
+
         self.inner
             .degree()
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get meta-node degree: {}", e)))
@@ -136,10 +137,10 @@ impl PyMetaNode {
     #[getter]
     fn neighbors(&self) -> PyResult<Vec<NodeId>> {
         use groggy::traits::NodeOperations;
-        
-        self.inner
-            .neighbors()
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to get meta-node neighbors: {}", e)))
+
+        self.inner.neighbors().map_err(|e| {
+            PyRuntimeError::new_err(format!("Failed to get meta-node neighbors: {}", e))
+        })
     }
 
     // === MetaNodeOperations (meta-specific methods) ===
@@ -176,13 +177,13 @@ impl PyMetaNode {
     #[getter]
     fn subgraph(&self, py: Python) -> PyResult<Option<PyObject>> {
         use groggy::traits::MetaNodeOperations;
-        
+
         match self.inner.subgraph() {
             Ok(Some(subgraph_trait_obj)) => {
                 // Extract the data from the trait object and create a concrete subgraph
                 use crate::ffi::subgraphs::subgraph::PySubgraph;
                 use groggy::subgraphs::Subgraph;
-                
+
                 // Create a new concrete Subgraph from the trait object data
                 let concrete_subgraph = Subgraph::new(
                     subgraph_trait_obj.graph_ref().clone(),
@@ -190,13 +191,14 @@ impl PyMetaNode {
                     subgraph_trait_obj.edge_set().clone(),
                     format!("expanded_subgraph_{}", self.inner.id()),
                 );
-                
+
                 let py_subgraph = PySubgraph::from_core_subgraph(concrete_subgraph)?;
                 Ok(Some(Py::new(py, py_subgraph)?.to_object(py)))
             }
             Ok(None) => Ok(None),
             Err(e) => Err(PyRuntimeError::new_err(format!(
-                "Failed to get meta-node subgraph: {}", e
+                "Failed to get meta-node subgraph: {}",
+                e
             ))),
         }
     }
@@ -227,7 +229,7 @@ impl PyMetaNode {
     #[getter]
     fn meta_edges(&self) -> PyResult<Vec<EdgeId>> {
         use groggy::traits::MetaNodeOperations;
-        
+
         self.inner
             .meta_edges()
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get meta-edges: {}", e)))
@@ -243,19 +245,22 @@ impl PyMetaNode {
     ///
     /// # Raises
     /// * `RuntimeError` - If there's an error during re-aggregation
-    fn re_aggregate(&self, agg_functions: std::collections::HashMap<String, String>) -> PyResult<()> {
+    fn re_aggregate(
+        &self,
+        agg_functions: std::collections::HashMap<String, String>,
+    ) -> PyResult<()> {
         use groggy::traits::MetaNodeOperations;
         use groggy::types::AttrName;
-        
+
         // Convert String keys to AttrName
         let rust_agg_functions: std::collections::HashMap<AttrName, String> = agg_functions
             .into_iter()
             .map(|(k, v)| (k.into(), v))
             .collect();
-        
-        self.inner
-            .re_aggregate(rust_agg_functions)
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to re-aggregate meta-node: {}", e)))
+
+        self.inner.re_aggregate(rust_agg_functions).map_err(|e| {
+            PyRuntimeError::new_err(format!("Failed to re-aggregate meta-node: {}", e))
+        })
     }
 
     // === Utility methods ===
@@ -269,7 +274,7 @@ impl PyMetaNode {
     /// * `RuntimeError` - If there's an error accessing attributes
     fn keys(&self) -> PyResult<Vec<String>> {
         use groggy::traits::NodeOperations;
-        
+
         match self.inner.node_attributes() {
             Ok(attrs) => Ok(attrs.keys().cloned().collect()),
             Err(e) => Err(PyRuntimeError::new_err(format!(
@@ -291,16 +296,16 @@ impl PyMetaNode {
     /// * `RuntimeError` - If there's an error accessing attributes
     fn values(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
         use groggy::traits::NodeOperations;
-        
+
         let node_attrs = self.inner.node_attributes().map_err(|e| {
             PyRuntimeError::new_err(format!("Failed to get meta-node attributes: {}", e))
         })?;
-        
+
         let values = node_attrs
             .values()
             .map(|value| crate::ffi::utils::attr_value_to_python_value(py, value))
             .collect::<PyResult<Vec<_>>>()?;
-        
+
         Ok(values)
     }
 

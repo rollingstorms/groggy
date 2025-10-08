@@ -13,22 +13,19 @@ pub fn simd_sum(data: &[f64]) -> f64 {
     }
 
     let chunks = data.len() / 4;
-    let remainder = data.len() % 4;
+    let _remainder = data.len() % 4;
 
     // Process 4 elements at a time with SIMD
     let mut simd_sum = f64x4::ZERO;
 
     for i in 0..chunks {
         let chunk_start = i * 4;
-        let chunk = unsafe {
-            // Safe because we've calculated chunks correctly
-            f64x4::new([
-                data[chunk_start],
-                data[chunk_start + 1],
-                data[chunk_start + 2],
-                data[chunk_start + 3],
-            ])
-        };
+        let chunk = f64x4::new([
+            data[chunk_start],
+            data[chunk_start + 1],
+            data[chunk_start + 2],
+            data[chunk_start + 3],
+        ]);
         simd_sum = simd_sum + chunk;
     }
 
@@ -61,21 +58,19 @@ pub fn simd_variance(data: &[f64], mean: f64) -> f64 {
     }
 
     let chunks = data.len() / 4;
-    let remainder = data.len() % 4;
+    let _remainder = data.len() % 4;
 
     let mean_vec = f64x4::splat(mean);
     let mut variance_sum = f64x4::ZERO;
 
     for i in 0..chunks {
         let chunk_start = i * 4;
-        let chunk = unsafe {
-            f64x4::new([
-                data[chunk_start],
-                data[chunk_start + 1],
-                data[chunk_start + 2],
-                data[chunk_start + 3],
-            ])
-        };
+        let chunk = f64x4::new([
+            data[chunk_start],
+            data[chunk_start + 1],
+            data[chunk_start + 2],
+            data[chunk_start + 3],
+        ]);
 
         let diff = chunk - mean_vec;
         let squared_diff = diff * diff;
@@ -113,22 +108,20 @@ pub fn simd_min(data: &[f64]) -> Option<f64> {
     }
 
     let chunks = data.len() / 4;
-    let remainder = data.len() % 4;
+    let _remainder = data.len() % 4;
 
     // Initialize with first chunk
-    let mut min_vec = unsafe { f64x4::new([data[0], data[1], data[2], data[3]]) };
+    let mut min_vec = f64x4::new([data[0], data[1], data[2], data[3]]);
 
     // Process remaining chunks
     for i in 1..chunks {
         let chunk_start = i * 4;
-        let chunk = unsafe {
-            f64x4::new([
-                data[chunk_start],
-                data[chunk_start + 1],
-                data[chunk_start + 2],
-                data[chunk_start + 3],
-            ])
-        };
+        let chunk = f64x4::new([
+            data[chunk_start],
+            data[chunk_start + 1],
+            data[chunk_start + 2],
+            data[chunk_start + 3],
+        ]);
 
         // Element-wise min
         min_vec = min_vec.min(chunk);
@@ -156,22 +149,20 @@ pub fn simd_max(data: &[f64]) -> Option<f64> {
     }
 
     let chunks = data.len() / 4;
-    let remainder = data.len() % 4;
+    let _remainder = data.len() % 4;
 
     // Initialize with first chunk
-    let mut max_vec = unsafe { f64x4::new([data[0], data[1], data[2], data[3]]) };
+    let mut max_vec = f64x4::new([data[0], data[1], data[2], data[3]]);
 
     // Process remaining chunks
     for i in 1..chunks {
         let chunk_start = i * 4;
-        let chunk = unsafe {
-            f64x4::new([
-                data[chunk_start],
-                data[chunk_start + 1],
-                data[chunk_start + 2],
-                data[chunk_start + 3],
-            ])
-        };
+        let chunk = f64x4::new([
+            data[chunk_start],
+            data[chunk_start + 1],
+            data[chunk_start + 2],
+            data[chunk_start + 3],
+        ]);
 
         // Element-wise max
         max_vec = max_vec.max(chunk);

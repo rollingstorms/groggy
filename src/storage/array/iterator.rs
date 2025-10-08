@@ -172,7 +172,7 @@ impl<T: NodeIdLike> ArrayIterator<T> {
 
         println!("filter_by_degree called with min_degree: {}", min_degree);
 
-        if let Some(graph_ref) = &self.graph_ref {
+        if let Some(_graph_ref) = &self.graph_ref {
             // If we have a graph reference, we could actually check degrees
             let filtered: Vec<T> = self
                 .elements
@@ -272,7 +272,7 @@ impl<T: EdgeLike> ArrayIterator<T> {
 
         println!("filter_by_weight called with min_weight: {}", min_weight);
 
-        if let Some(graph_ref) = &self.graph_ref {
+        if let Some(_graph_ref) = &self.graph_ref {
             let filtered: Vec<T> = self
                 .elements
                 .into_iter()

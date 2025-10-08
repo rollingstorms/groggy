@@ -145,6 +145,7 @@ pub struct HoneycombController {
 
     /// Sensitivity settings for different interactions
     rotation_sensitivity: f64,
+    #[allow(dead_code)]
     drag_sensitivity: f64,
 
     /// Embedding dimensions count (determined at runtime)
@@ -357,7 +358,7 @@ impl InteractionController for HoneycombController {
     }
 
     fn on_node_drag(&mut self, ev: NodeDragEvent) -> Vec<InteractionCommand> {
-        let mut commands = Vec::new();
+        let commands = Vec::new();
         match ev {
             NodeDragEvent::Start { node_id, x, y } => {
                 self.dragging_node = Some(node_id);

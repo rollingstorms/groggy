@@ -4,7 +4,7 @@
 
 use crate::ffi::entities::meta_node::PyMetaNode;
 use crate::ffi::subgraphs::subgraph::PySubgraph;
-use groggy::storage::array::{ArrayOps, ArrayIterator};
+use groggy::storage::array::{ArrayIterator, ArrayOps};
 use pyo3::prelude::*;
 use std::sync::Arc;
 
@@ -83,12 +83,12 @@ impl PySubgraphArray {
     fn __len__(&self) -> usize {
         self.inner.len()
     }
-    
+
     /// Check if the array is empty
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
-    
+
     /// Get subgraph at index or extract node attributes
     ///
     /// Supports three modes:
@@ -130,7 +130,7 @@ impl PySubgraphArray {
             }
 
             Err(pyo3::exceptions::PyTypeError::new_err(
-                "SubgraphArray indices must be integers, strings, or lists of strings"
+                "SubgraphArray indices must be integers, strings, or lists of strings",
             ))
         })
     }
@@ -152,9 +152,10 @@ impl PySubgraphArray {
             let node_values: Vec<AttrValue> = subgraph
                 .inner
                 .nodes()
-                .iter()  // Add .iter() to iterate over HashSet
+                .iter() // Add .iter() to iterate over HashSet
                 .filter_map(|&node_id| {
-                    graph_borrow.get_node_attr(node_id, &attr_name_string)
+                    graph_borrow
+                        .get_node_attr(node_id, &attr_name_string)
                         .ok()
                         .flatten()
                 })
@@ -167,7 +168,8 @@ impl PySubgraphArray {
                     .edges()
                     .iter()
                     .filter_map(|&edge_id| {
-                        graph_borrow.get_edge_attr(edge_id, &attr_name_string)
+                        graph_borrow
+                            .get_edge_attr(edge_id, &attr_name_string)
                             .ok()
                             .flatten()
                     })
@@ -271,7 +273,7 @@ impl PySubgraphArray {
     /// Apply table() to all subgraphs and return PyTableArray
     fn table(&self) -> PyResult<crate::ffi::storage::table_array::PyTableArray> {
         let mut tables = Vec::new();
-        
+
         Python::with_gil(|py| {
             for subgraph in self.inner.iter() {
                 match subgraph.table(py) {
@@ -280,21 +282,21 @@ impl PySubgraphArray {
                 }
             }
         });
-        
+
         Ok(crate::ffi::storage::table_array::PyTableArray::new(tables))
     }
-    
+
     /// Apply sample(k) to all subgraphs
     fn sample(&self, k: usize) -> PyResult<PySubgraphArray> {
         let mut sampled = Vec::new();
-        
+
         for subgraph in self.inner.iter() {
             match subgraph.sample(k) {
                 Ok(sampled_subgraph) => sampled.push(sampled_subgraph),
                 Err(_) => continue, // Skip failed subgraphs
             }
         }
-        
+
         Ok(PySubgraphArray::new(sampled))
     }
 
@@ -312,7 +314,7 @@ impl PySubgraphArray {
     ///     # Returns all department groups from all input subgraphs
     pub fn group_by(&self, attr_name: String, element_type: String) -> PyResult<PySubgraphArray> {
         let mut all_groups = Vec::new();
-        
+
         // Apply group_by to each subgraph and flatten results
         for subgraph in self.inner.iter() {
             match subgraph.group_by(attr_name.clone(), element_type.clone()) {
@@ -323,11 +325,11 @@ impl PySubgraphArray {
                             all_groups.push(group_subgraph.clone());
                         }
                     }
-                },
+                }
                 Err(_) => continue, // Skip failed subgraphs
             }
         }
-        
+
         Ok(PySubgraphArray::new(all_groups))
     }
 
@@ -349,7 +351,7 @@ impl PySubgraphArray {
                     // Wrap NodesTable in PyNodesTable
                     let py_table = crate::ffi::storage::table::PyNodesTable { table: nodes_table };
                     tables.push(py_table.into_py(py));
-                },
+                }
                 Err(_) => continue, // Skip failed subgraphs
             }
         }
@@ -375,7 +377,7 @@ impl PySubgraphArray {
                     // Wrap EdgesTable in PyEdgesTable
                     let py_table = crate::ffi::storage::table::PyEdgesTable { table: edges_table };
                     tables.push(py_table.into_py(py));
-                },
+                }
                 Err(_) => continue, // Skip failed subgraphs
             }
         }
@@ -427,9 +429,18 @@ impl PySubgraphArray {
         // Create columns
         let mut columns = HashMap::new();
         columns.insert("subgraph_id".to_string(), BaseArray::from_attr_values(ids));
-        columns.insert("node_count".to_string(), BaseArray::from_attr_values(node_counts));
-        columns.insert("edge_count".to_string(), BaseArray::from_attr_values(edge_counts));
-        columns.insert("density".to_string(), BaseArray::from_attr_values(densities));
+        columns.insert(
+            "node_count".to_string(),
+            BaseArray::from_attr_values(node_counts),
+        );
+        columns.insert(
+            "edge_count".to_string(),
+            BaseArray::from_attr_values(edge_counts),
+        );
+        columns.insert(
+            "density".to_string(),
+            BaseArray::from_attr_values(densities),
+        );
 
         // Create BaseTable
         let table = BaseTable::from_columns(columns)
@@ -442,14 +453,14 @@ impl PySubgraphArray {
     #[getter]
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
         use groggy::viz::streaming::GraphDataSource;
-        
+
         // For SubgraphArray, create a graph that contains all subgraphs
         let mut viz_graph = groggy::api::graph::Graph::new();
-        
+
         for subgraph in self.inner.iter() {
             let node_ids = subgraph.inner.node_ids();
             let edge_ids = subgraph.inner.edge_ids();
-            
+
             // Copy nodes with their attributes
             for &node_id in &node_ids {
                 // Check if node already exists to avoid duplicates
@@ -462,7 +473,7 @@ impl PySubgraphArray {
                     }
                 }
             }
-            
+
             // Copy edges with their attributes
             let graph_ref = subgraph.inner.graph();
             for &edge_id in &edge_ids {
@@ -477,13 +488,13 @@ impl PySubgraphArray {
                 }
             }
         }
-        
+
         let graph_data_source = GraphDataSource::new(&viz_graph);
         let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
             graph_data_source,
-            "SubgraphArray".to_string()
+            "SubgraphArray".to_string(),
         );
-        
+
         Py::new(py, viz_accessor)
     }
 
@@ -524,7 +535,7 @@ impl PySubgraphArray {
                 AttrValue::Bool(b)
             } else {
                 return Err(pyo3::exceptions::PyTypeError::new_err(
-                    "Map function must return int, float, str, or bool"
+                    "Map function must return int, float, str, or bool",
                 ));
             };
 
@@ -533,9 +544,7 @@ impl PySubgraphArray {
 
         // Create BaseArray from results and wrap in PyBaseArray
         let base_array = BaseArray::from_attr_values(results);
-        Ok(crate::ffi::storage::array::PyBaseArray {
-            inner: base_array,
-        })
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: base_array })
     }
 
     /// Merge all subgraphs into a single Graph
@@ -554,9 +563,9 @@ impl PySubgraphArray {
     /// merged_graph = dept_groups.merge()
     /// ```
     fn merge(&self, py: Python) -> PyResult<crate::ffi::api::graph::PyGraph> {
+        use std::cell::RefCell;
         use std::collections::HashSet;
         use std::rc::Rc;
-        use std::cell::RefCell;
 
         // Create a new graph
         let mut merged_graph = groggy::api::graph::Graph::new();
@@ -599,7 +608,11 @@ impl PySubgraphArray {
                             // Copy attributes
                             if let Ok(attrs) = graph_borrow.get_edge_attrs(edge_id) {
                                 for (attr_name, attr_value) in attrs {
-                                    let _ = merged_graph.set_edge_attr(new_edge_id, attr_name, attr_value);
+                                    let _ = merged_graph.set_edge_attr(
+                                        new_edge_id,
+                                        attr_name,
+                                        attr_value,
+                                    );
                                 }
                             }
                         }
@@ -621,14 +634,14 @@ impl ArrayOps<PySubgraph> for PySubgraphArray {
     fn len(&self) -> usize {
         self.inner.len()
     }
-    
+
     fn get(&self, index: usize) -> Option<&PySubgraph> {
         self.inner.get(index)
     }
-    
-    fn iter(&self) -> ArrayIterator<PySubgraph> 
-    where 
-        PySubgraph: Clone + 'static 
+
+    fn iter(&self) -> ArrayIterator<PySubgraph>
+    where
+        PySubgraph: Clone + 'static,
     {
         ArrayIterator::new(self.inner.as_ref().clone())
     }
@@ -659,7 +672,7 @@ impl PySubgraphArrayIterator {
     fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
-    
+
     fn __next__(&mut self, py: Python) -> PyResult<Option<PySubgraph>> {
         let array = self.array.borrow(py);
         if self.index < array.inner.len() {

@@ -130,6 +130,7 @@ impl<T: NumericType> AlignedBuffer<T> {
     }
 
     /// Get mutable raw pointer
+    #[allow(dead_code)]
     fn as_mut_ptr(&mut self) -> *mut T {
         self.ptr.as_ptr()
     }
@@ -205,6 +206,7 @@ pub struct SharedBuffer<T: NumericType> {
     layout: MatrixLayout,
     shape: (usize, usize),
     last_backend: Arc<RwLock<BackendId>>,
+    #[allow(dead_code)]
     backend_views: Arc<Mutex<HashMap<BackendId, Box<dyn BackendView<T>>>>>,
     modification_count: Arc<AtomicUsize>,
 }

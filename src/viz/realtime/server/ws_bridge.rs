@@ -75,7 +75,7 @@ impl WsBridge {
 
         // First, try to parse as the expected WsMessage format (Python format)
         if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(text) {
-            if let WsMessage::Control { payload, .. } = ws_msg {
+            if let WsMessage::Control { .. } = ws_msg {
                 // Debug message
             }
         }
@@ -83,7 +83,7 @@ impl WsBridge {
         // If that fails, try to parse as direct JSON formats that UI might send
 
         // Try parsing as direct ControlMsg JSON
-        if let Ok(control_msg) = serde_json::from_str::<ControlMsg>(text) {
+        if let Ok(_control_msg) = serde_json::from_str::<ControlMsg>(text) {
             // Debug message
         }
 
@@ -97,25 +97,25 @@ impl WsBridge {
                 if let Some(msg_type) = obj.get("type").and_then(|v| v.as_str()) {
                     match msg_type {
                         "ChangeLayout" => {
-                            let algorithm = obj
+                            let _algorithm = obj
                                 .get("algorithm")
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("force_directed")
                                 .to_string();
-                            let params: HashMap<String, String> = obj
+                            let _params: HashMap<String, String> = obj
                                 .get("params")
                                 .and_then(|v| serde_json::from_value(v.clone()).ok())
                                 .unwrap_or_default();
                             // Debug message
                         }
                         "ChangeEmbedding" => {
-                            let method = obj
+                            let _method = obj
                                 .get("method")
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("spectral")
                                 .to_string();
-                            let k = obj.get("k").and_then(|v| v.as_u64()).unwrap_or(2) as usize;
-                            let params: HashMap<String, String> = obj
+                            let _k = obj.get("k").and_then(|v| v.as_u64()).unwrap_or(2) as usize;
+                            let _params: HashMap<String, String> = obj
                                 .get("params")
                                 .and_then(|v| serde_json::from_value(v.clone()).ok())
                                 .unwrap_or_default();
@@ -428,7 +428,7 @@ impl WsBridge {
 
     /// Broadcast update to all connected clients
     pub async fn broadcast_update(&self, update: EngineUpdate) -> GraphResult<()> {
-        let client_count = self.clients.lock().await.len();
+        let _client_count = self.clients.lock().await.len();
         // Debug message
 
         // Send to broadcast channel; websocket tasks fan-out to clients
@@ -455,7 +455,7 @@ impl WsBridge {
     pub async fn handle_websocket_stream(
         &self,
         stream: tokio::net::TcpStream,
-        addr: std::net::SocketAddr,
+        _addr: std::net::SocketAddr,
     ) -> GraphResult<()> {
         // Debug message
 
@@ -520,7 +520,7 @@ impl WsBridge {
         let mut update_rx = self.update_tx.subscribe();
 
         // Handle messages from this client
-        let clients_clone = self.clients.clone();
+        let _clients_clone = self.clients.clone();
         let ws_sender_clone = ws_sender.clone();
 
         // Spawn task to handle outgoing messages
@@ -587,7 +587,7 @@ impl WsBridge {
                                 )
                                 .await;
                             }
-                            Err(e) => {
+                            Err(_e) => {
                                 // Debug message
                             }
                         }
@@ -596,7 +596,7 @@ impl WsBridge {
                         // Debug message
                         break;
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         // Debug message
                         break;
                     }
@@ -622,7 +622,7 @@ impl WsBridge {
 
         // Forward to engine if we have a control sender
         if let Some(control_tx) = control_tx {
-            if let Err(e) = control_tx.send((client_id, control_msg.clone())) {
+            if let Err(_e) = control_tx.send((client_id, control_msg.clone())) {
                 // Debug message
                 Self::send_control_ack_static(client_id, false, "Engine unavailable", clients)
                     .await;
@@ -653,7 +653,7 @@ impl WsBridge {
 
         let clients = clients.lock().await;
         if let Some(client_tx) = clients.get(&client_id) {
-            if let Err(e) = client_tx.send(ack_msg) {
+            if let Err(_e) = client_tx.send(ack_msg) {
                 // Debug message
             }
         }

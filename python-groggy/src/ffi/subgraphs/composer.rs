@@ -3,9 +3,8 @@
 //! Clean, intuitive API for meta-node creation that replaces the complex
 //! EdgeAggregationConfig system.
 
-use crate::ffi::entities::PyMetaNode;
-use groggy::subgraphs::{Subgraph, composer::{EdgeStrategy, MetaNodePlan, ComposerPreview}};
-use pyo3::exceptions::{PyValueError, PyRuntimeError};
+use groggy::subgraphs::composer::{ComposerPreview, EdgeStrategy, MetaNodePlan};
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 use std::collections::HashMap;
@@ -25,35 +24,43 @@ impl PyEdgeStrategy {
             .map_err(|e| PyValueError::new_err(format!("Invalid edge strategy: {}", e)))?;
         Ok(PyEdgeStrategy { inner })
     }
-    
+
     /// Create aggregate strategy (default)
     #[classmethod]
     fn aggregate(_cls: &PyType) -> Self {
-        PyEdgeStrategy { inner: EdgeStrategy::Aggregate }
+        PyEdgeStrategy {
+            inner: EdgeStrategy::Aggregate,
+        }
     }
-    
+
     /// Create keep_external strategy  
     #[classmethod]
     fn keep_external(_cls: &PyType) -> Self {
-        PyEdgeStrategy { inner: EdgeStrategy::KeepExternal }
+        PyEdgeStrategy {
+            inner: EdgeStrategy::KeepExternal,
+        }
     }
-    
+
     /// Create drop_all strategy
     #[classmethod]
     fn drop_all(_cls: &PyType) -> Self {
-        PyEdgeStrategy { inner: EdgeStrategy::DropAll }
+        PyEdgeStrategy {
+            inner: EdgeStrategy::DropAll,
+        }
     }
-    
+
     /// Create contract_all strategy
     #[classmethod]
     fn contract_all(_cls: &PyType) -> Self {
-        PyEdgeStrategy { inner: EdgeStrategy::ContractAll }
+        PyEdgeStrategy {
+            inner: EdgeStrategy::ContractAll,
+        }
     }
-    
+
     fn __str__(&self) -> String {
         format!("{:?}", self.inner)
     }
-    
+
     fn __repr__(&self) -> String {
         format!("EdgeStrategy.{:?}", self.inner)
     }
@@ -73,31 +80,33 @@ impl PyComposerPreview {
     fn meta_node_attributes(&self) -> HashMap<String, String> {
         self.inner.meta_node_attributes.clone()
     }
-    
+
     /// Get estimated number of meta-edges
     #[getter]
     fn meta_edges_count(&self) -> usize {
         self.inner.meta_edges_count
     }
-    
+
     /// Get the edge strategy
     #[getter]
     fn edge_strategy(&self) -> PyEdgeStrategy {
-        PyEdgeStrategy { inner: self.inner.edge_strategy.clone() }
+        PyEdgeStrategy {
+            inner: self.inner.edge_strategy.clone(),
+        }
     }
-    
+
     /// Whether edge count will be included
     #[getter]
     fn will_include_edge_count(&self) -> bool {
         self.inner.will_include_edge_count
     }
-    
+
     /// Get the entity type
     #[getter]
     fn entity_type(&self) -> String {
         self.inner.entity_type.clone()
     }
-    
+
     fn __str__(&self) -> String {
         format!(
             "ComposerPreview(attributes={}, meta_edges={}, strategy={:?}, entity_type='{}')",
@@ -107,7 +116,7 @@ impl PyComposerPreview {
             self.inner.entity_type
         )
     }
-    
+
     fn __repr__(&self) -> String {
         self.__str__()
     }
@@ -125,41 +134,46 @@ impl PyMetaNodePlan {
     /// Preview what the plan will create without executing
     fn preview(&self) -> PyComposerPreview {
         PyComposerPreview {
-            inner: self.preview_info.clone()
+            inner: self.preview_info.clone(),
         }
     }
-    
+
     /// Plans cannot be modified after execution - they are immutable snapshots
-    fn with_node_agg(&mut self, _target: String, _function: String, _source: Option<String>) -> PyResult<()> {
+    fn with_node_agg(
+        &mut self,
+        _target: String,
+        _function: String,
+        _source: Option<String>,
+    ) -> PyResult<()> {
         Err(PyRuntimeError::new_err(
             "Cannot modify plan after creation. Create a new plan with different parameters instead."
         ))
     }
-    
+
     fn with_edge_agg(&mut self, _attr_name: String, _function: String) -> PyResult<()> {
         Err(PyRuntimeError::new_err(
             "Cannot modify plan after creation. Create a new plan with different parameters instead."
         ))
     }
-    
+
     fn with_edge_strategy(&mut self, _strategy: &PyEdgeStrategy) -> PyResult<()> {
         Err(PyRuntimeError::new_err(
             "Cannot modify plan after creation. Create a new plan with different parameters instead."
         ))
     }
-    
+
     fn with_entity_type(&mut self, _entity_type: String) -> PyResult<()> {
         Err(PyRuntimeError::new_err(
             "Cannot modify plan after creation. Create a new plan with different parameters instead."
         ))
     }
-    
+
     fn with_preset(&mut self, _preset_name: String) -> PyResult<()> {
         Err(PyRuntimeError::new_err(
             "Cannot modify plan after creation. Create a new plan with different parameters instead."
         ))
     }
-    
+
     /// Execute the plan and create the meta-node
     pub fn add_to_graph(&self, _py: Python) -> PyResult<PyObject> {
         if let Some(_node_id) = &self.meta_node_id {
@@ -171,11 +185,11 @@ impl PyMetaNodePlan {
             ))
         } else {
             Err(PyRuntimeError::new_err(
-                "Plan execution failed - no meta-node was created"
+                "Plan execution failed - no meta-node was created",
             ))
         }
     }
-    
+
     fn __str__(&self) -> String {
         if self.meta_node_id.is_some() {
             format!(
@@ -192,21 +206,23 @@ impl PyMetaNodePlan {
             )
         }
     }
-    
+
     fn __repr__(&self) -> String {
         self.__str__()
     }
 }
 
 /// Utility functions for parsing Python input into composer format
-pub fn parse_node_aggs_from_python(node_aggs: &PyAny) -> PyResult<Vec<(String, String, Option<String>)>> {
+pub fn parse_node_aggs_from_python(
+    node_aggs: &PyAny,
+) -> PyResult<Vec<(String, String, Option<String>)>> {
     let mut result = Vec::new();
-    
+
     // Handle dict format: {"target": "function", "target2": ("function", "source")}
     if let Ok(dict) = node_aggs.downcast::<PyDict>() {
         for (key, value) in dict {
             let target = key.extract::<String>()?;
-            
+
             if let Ok(function) = value.extract::<String>() {
                 // Simple format: {"salary": "mean"}
                 result.push((target.clone(), function, Some(target)));
@@ -240,22 +256,22 @@ pub fn parse_node_aggs_from_python(node_aggs: &PyAny) -> PyResult<Vec<(String, S
         }
     } else {
         return Err(PyValueError::new_err(
-            "node_aggs must be a dict or list of tuples"
+            "node_aggs must be a dict or list of tuples",
         ));
     }
-    
+
     Ok(result)
 }
 
 /// Parse edge aggregations from Python dict or list (same format as node_aggs)
 pub fn parse_edge_aggs_from_python(edge_aggs: &PyAny) -> PyResult<Vec<(String, String)>> {
     let mut result = Vec::new();
-    
+
     // Handle dict format: {"attr": "function"} or {"attr": ("function", "source_attr")}
     if let Ok(dict) = edge_aggs.downcast::<PyDict>() {
         for (key, value) in dict {
             let attr_name = key.extract::<String>()?;
-            
+
             if let Ok(function) = value.extract::<String>() {
                 // Simple format: {"weight": "mean"}
                 result.push((attr_name, function));
@@ -289,15 +305,15 @@ pub fn parse_edge_aggs_from_python(edge_aggs: &PyAny) -> PyResult<Vec<(String, S
         }
     } else {
         return Err(PyValueError::new_err(
-            "edge_aggs must be a dict or list of tuples (same format as node_aggs)"
+            "edge_aggs must be a dict or list of tuples (same format as node_aggs)",
         ));
     }
-    
+
     Ok(result)
 }
 
 /// Simplified Python wrapper for immediate execution
-/// 
+///
 /// Since we can't store Rc<RefCell<Graph>> in a PyClass, we'll execute immediately.
 /// This still provides the clean API but without the plan/execute separation.
 #[pyclass(name = "MetaNodePlan")]
@@ -308,12 +324,15 @@ pub struct PyMetaNodePlanExecutor {
 
 impl PyMetaNodePlanExecutor {
     pub fn new(plan: MetaNodePlan) -> Self {
-        Self { 
-            preview_info: plan.preview() 
+        Self {
+            preview_info: plan.preview(),
         }
     }
-    
-    pub fn execute_immediately<T: groggy::traits::SubgraphOperations>(plan: MetaNodePlan, subgraph: &T) -> PyResult<groggy::entities::MetaNode> {
+
+    pub fn execute_immediately<T: groggy::traits::SubgraphOperations>(
+        plan: MetaNodePlan,
+        subgraph: &T,
+    ) -> PyResult<groggy::entities::MetaNode> {
         plan.add_to_graph(subgraph)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e)))
     }
@@ -324,17 +343,17 @@ impl PyMetaNodePlanExecutor {
     /// Preview what was configured  
     fn preview(&self) -> PyComposerPreview {
         PyComposerPreview {
-            inner: self.preview_info.clone()
+            inner: self.preview_info.clone(),
         }
     }
-    
+
     /// This is just a placeholder - actual execution happened already
     fn add_to_graph(&self, _py: Python) -> PyResult<PyObject> {
         Err(PyRuntimeError::new_err(
             "This MetaNodePlan has already been executed. The MetaNode was returned directly from collapse()."
         ))
     }
-    
+
     fn __str__(&self) -> String {
         format!(
             "MetaNodePlan(executed - {} attributes, {} meta-edges, strategy={:?})",
@@ -343,7 +362,7 @@ impl PyMetaNodePlanExecutor {
             self.preview_info.edge_strategy
         )
     }
-    
+
     fn __repr__(&self) -> String {
         self.__str__()
     }

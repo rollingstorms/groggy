@@ -40,9 +40,6 @@ impl PyAttrValue {
             RustAttrValue::IntVec(v) => v.to_object(py),
             RustAttrValue::TextVec(v) => v.to_object(py),
             RustAttrValue::BoolVec(v) => v.to_object(py),
-            RustAttrValue::IntVec(v) => v.to_object(py),
-            RustAttrValue::TextVec(v) => v.to_object(py),
-            RustAttrValue::BoolVec(v) => v.to_object(py),
             RustAttrValue::Bytes(b) => b.to_object(py),
             // Handle optimized variants by extracting their underlying value
             RustAttrValue::CompactText(cs) => cs.as_str().to_object(py),
@@ -104,7 +101,7 @@ impl PyAttrValue {
                 Ok(json_str_py) => {
                     let json_str: String = json_str_py.extract()?;
                     RustAttrValue::Json(json_str)
-                },
+                }
                 Err(_) => {
                     return Err(PyErr::new::<PyTypeError, _>(
                         "Unsupported attribute value type. Supported types: int, float, str, bool, List[int], List[str], List[bool], List[float], bytes, or any JSON-serializable type"
@@ -339,7 +336,6 @@ impl PyAttrValue {
         hasher.finish()
     }
 }
-
 
 // ToPyObject implementation for PyAttrValue
 impl pyo3::ToPyObject for PyAttrValue {

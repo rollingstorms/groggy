@@ -269,7 +269,7 @@ impl Graph {
         if let Some(nodes) = graph_data.get("nodes").and_then(|v| v.as_array()) {
             for node in nodes {
                 if let Some(node_id) = node.get("id").and_then(|v| v.as_u64()) {
-                    let node_id = node_id as crate::types::NodeId;
+                    let _node_id = node_id as crate::types::NodeId;
                     let added_node_id = graph.add_node();
                     // Note: We assume the loaded node_id matches the added one for now
 
@@ -2485,9 +2485,6 @@ impl Graph {
             return Ok(GraphMatrix::zeros(nodes.len(), 0));
         }
 
-        // Build matrix data column by column
-        let mut matrix_data = Vec::with_capacity(nodes.len() * col_count);
-
         // Phase 1: Detect all numerical attributes and determine LCD type
         use crate::types::AttrValue;
 
@@ -2540,7 +2537,8 @@ impl Graph {
             return Ok(GraphMatrix::zeros(nodes.len(), 0));
         }
 
-        matrix_data = Vec::with_capacity(nodes.len() * valid_col_count);
+        // Build matrix data with correct capacity after filtering numeric columns
+        let mut matrix_data = Vec::with_capacity(nodes.len() * valid_col_count);
 
         // Phase 2: Build matrix data with LCD conversion in ROW-MAJOR order
         for &node_id in &nodes {

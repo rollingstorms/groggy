@@ -47,13 +47,8 @@ impl PyCommit {
             edge_attr_changes: Vec::new(),
         });
 
-        let commit = groggy::state::Commit::new(
-            info.id,
-            parents,
-            fake_delta,
-            info.message,
-            info.author,
-        );
+        let commit =
+            groggy::state::Commit::new(info.id, parents, fake_delta, info.message, info.author);
 
         Self {
             inner: std::sync::Arc::new(commit),

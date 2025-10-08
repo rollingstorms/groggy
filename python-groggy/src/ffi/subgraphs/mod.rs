@@ -2,14 +2,9 @@
 //!
 //! This module contains Python bindings for subgraph operations
 
-pub mod subgraph;
-pub mod neighborhood;
 pub mod component;
-pub mod hierarchical;
 pub mod composer;
+pub mod hierarchical;
+pub mod neighborhood;
+pub mod subgraph;
 
-pub use subgraph::*;
-pub use neighborhood::*;
-pub use component::*;
-pub use hierarchical::*;
-pub use composer::*;

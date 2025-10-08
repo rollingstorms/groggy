@@ -17,7 +17,13 @@ pub mod state;
 
 pub use change_tracker::*;
 pub use delta::*;
-pub use history::*;
 pub use ref_manager::*;
 pub use space::*;
+
+// Re-export history items except those that conflict with state module
+pub use history::{
+    Commit, CommitDiff, Delta, HistoricalView, HistoryForest, HistoryStatistics, ViewSummary,
+};
+
+// Re-export state items (including the canonical AttributeChange and EntityType)
 pub use state::*;

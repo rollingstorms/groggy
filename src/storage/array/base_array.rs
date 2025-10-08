@@ -859,59 +859,6 @@ impl BaseArray<AttrValue> {
         seen.len()
     }
 
-    /// Helper function to compare two AttrValues for ordering
-    fn compare_values(a: &AttrValue, b: &AttrValue) -> crate::errors::GraphResult<i32> {
-        use std::cmp::Ordering;
-
-        let ordering = match (a, b) {
-            // Numeric comparisons
-            (AttrValue::Int(a), AttrValue::Int(b)) => a.cmp(b),
-            (AttrValue::SmallInt(a), AttrValue::SmallInt(b)) => a.cmp(b),
-            (AttrValue::Float(a), AttrValue::Float(b)) => {
-                a.partial_cmp(b).unwrap_or(Ordering::Equal)
-            }
-
-            // Mixed numeric comparisons
-            (AttrValue::Int(a), AttrValue::SmallInt(b)) => (*a).cmp(&(*b as i64)),
-            (AttrValue::SmallInt(a), AttrValue::Int(b)) => (*a as i64).cmp(b),
-            (AttrValue::Int(a), AttrValue::Float(b)) => {
-                (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal)
-            }
-            (AttrValue::Float(a), AttrValue::Int(b)) => {
-                a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal)
-            }
-            (AttrValue::SmallInt(a), AttrValue::Float(b)) => {
-                (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal)
-            }
-            (AttrValue::Float(a), AttrValue::SmallInt(b)) => {
-                a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal)
-            }
-
-            // String comparisons
-            (AttrValue::Text(a), AttrValue::Text(b)) => a.cmp(b),
-            (AttrValue::CompactText(a), AttrValue::CompactText(b)) => a.as_str().cmp(b.as_str()),
-            (AttrValue::Text(a), AttrValue::CompactText(b)) => a.as_str().cmp(b.as_str()),
-            (AttrValue::CompactText(a), AttrValue::Text(b)) => a.as_str().cmp(b.as_str()),
-
-            // Boolean comparisons
-            (AttrValue::Bool(a), AttrValue::Bool(b)) => a.cmp(b),
-
-            // Incompatible types
-            _ => {
-                return Err(crate::errors::GraphError::InvalidInput(format!(
-                    "Cannot compare incompatible types: {:?} and {:?}",
-                    a, b
-                )));
-            }
-        };
-
-        Ok(match ordering {
-            Ordering::Less => -1,
-            Ordering::Equal => 0,
-            Ordering::Greater => 1,
-        })
-    }
-
     /// Extract a numeric value for comparison-based operations
     fn extract_numeric(value: &AttrValue) -> Option<f64> {
         match value {

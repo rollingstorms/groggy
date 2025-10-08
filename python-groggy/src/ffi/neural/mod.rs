@@ -16,7 +16,7 @@ pub fn neural(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(activations::tanh, m)?)?;
     m.add_function(wrap_pyfunction!(activations::softmax, m)?)?;
     m.add_function(wrap_pyfunction!(activations::gelu, m)?)?;
-    
+
     Ok(())
 }
 

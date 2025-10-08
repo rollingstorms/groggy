@@ -330,7 +330,7 @@ impl TableArray {
             return Ok(BaseTable::new());
         }
 
-        let first_table = &self.tables[0];
+        let _first_table = &self.tables[0];
         let mut result_columns: HashMap<String, Vec<AttrValue>> = HashMap::new();
 
         if let Some(ref group_keys) = self.group_keys {
@@ -878,7 +878,7 @@ impl TableArray {
     /// Sum values in a column across all tables
     /// Returns the total sum of the specified column across all tables
     pub fn sum_column(&self, column: &str) -> GraphResult<AttrValue> {
-        let mut total_sum = AttrValue::Int(0);
+        let total_sum = AttrValue::Int(0);
         let mut is_float = false;
         let mut float_sum = 0.0;
         let mut int_sum: i64 = 0;

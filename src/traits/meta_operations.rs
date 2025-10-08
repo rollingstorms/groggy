@@ -83,7 +83,7 @@ pub trait MetaNodeOperations: NodeOperations {
     ///
     /// # Returns
     /// Ok(()) if re-aggregation succeeded, GraphError otherwise
-    fn re_aggregate(&self, agg_functions: HashMap<AttrName, String>) -> GraphResult<()> {
+    fn re_aggregate(&self, _agg_functions: HashMap<AttrName, String>) -> GraphResult<()> {
         // TODO: Implement re-aggregation logic
         // This would need to:
         // 1. Get the original subgraph

@@ -793,7 +793,7 @@ impl GraphPool {
         // Check all edges to find ones connected to this node
         // BUT only return edges that are still active (not just in topology)
         for (edge_id, (edge_source, edge_target)) in &self.topology {
-            if (*edge_source == node_id || *edge_target == node_id) {
+            if *edge_source == node_id || *edge_target == node_id {
                 // CONSISTENCY FIX: Only return edges that are still active
                 // The topology HashMap contains all edges (even deactivated ones)
                 // but we only want to return edges that are actually active

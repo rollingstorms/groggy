@@ -36,6 +36,7 @@ pub struct EngineSyncManager {
 struct TimestampedUpdate {
     update: EngineUpdate,
     timestamp: Instant,
+    #[allow(dead_code)]
     sequence_id: u64,
 }
 
@@ -44,6 +45,7 @@ struct TimestampedUpdate {
 struct CoalescedPositionDelta {
     node_id: NodeId,
     accumulated_delta: Vec<f64>,
+    #[allow(dead_code)]
     first_timestamp: Instant,
     last_timestamp: Instant,
     update_count: usize,
@@ -56,6 +58,7 @@ struct CoalescedAttributeChange {
     entity_id: String,
     attr_name: String,
     final_value: AttrValue,
+    #[allow(dead_code)]
     first_timestamp: Instant,
     last_timestamp: Instant,
     update_count: usize,

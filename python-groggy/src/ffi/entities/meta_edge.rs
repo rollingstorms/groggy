@@ -4,9 +4,9 @@
 //! exposing all GraphEntity, EdgeOperations, and MetaEdgeOperations methods to Python.
 
 use groggy::entities::MetaEdge;
-use groggy::types::{NodeId, EdgeId};
-use pyo3::prelude::*;
+use groggy::types::{EdgeId, NodeId};
 use pyo3::exceptions::PyRuntimeError;
+use pyo3::prelude::*;
 use std::collections::HashMap;
 
 /// Python wrapper for a meta-edge (aggregated edge)
@@ -57,14 +57,13 @@ impl PyMetaEdge {
     /// * `RuntimeError` - If there's an error accessing the attribute
     fn __getitem__(&self, py: Python, key: &str) -> PyResult<Py<PyAny>> {
         use groggy::traits::GraphEntity;
-        
+
         match self.inner.get_attribute(&key.into()) {
-            Ok(Some(attr_value)) => {
-                crate::ffi::utils::attr_value_to_python_value(py, &attr_value)
-            }
+            Ok(Some(attr_value)) => crate::ffi::utils::attr_value_to_python_value(py, &attr_value),
             Ok(None) => Err(pyo3::exceptions::PyKeyError::new_err(format!(
                 "MetaEdge {} has no attribute '{}'",
-                self.inner.id(), key
+                self.inner.id(),
+                key
             ))),
             Err(e) => Err(PyRuntimeError::new_err(format!(
                 "Failed to get meta-edge attribute: {}",
@@ -83,12 +82,14 @@ impl PyMetaEdge {
     /// * `RuntimeError` - If there's an error setting the attribute
     fn __setitem__(&self, key: &str, value: &PyAny) -> PyResult<()> {
         use groggy::traits::GraphEntity;
-        
+
         let py_attr_value = crate::ffi::types::PyAttrValue::from_py_value(value)?;
         let attr_value = py_attr_value.to_attr_value();
         self.inner
             .set_attribute(key.into(), attr_value)
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to set meta-edge attribute: {}", e)))?;
+            .map_err(|e| {
+                PyRuntimeError::new_err(format!("Failed to set meta-edge attribute: {}", e))
+            })?;
         Ok(())
     }
 
@@ -101,7 +102,7 @@ impl PyMetaEdge {
     /// True if the attribute exists, False otherwise
     fn __contains__(&self, key: &str) -> PyResult<bool> {
         use groggy::traits::GraphEntity;
-        
+
         match self.inner.get_attribute(&key.into()) {
             Ok(Some(_)) => Ok(true),
             Ok(None) => Ok(false),
@@ -121,7 +122,7 @@ impl PyMetaEdge {
     #[getter]
     fn source(&self) -> PyResult<NodeId> {
         use groggy::traits::EdgeOperations;
-        
+
         self.inner
             .source()
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get meta-edge source: {}", e)))
@@ -137,7 +138,7 @@ impl PyMetaEdge {
     #[getter]
     fn target(&self) -> PyResult<NodeId> {
         use groggy::traits::EdgeOperations;
-        
+
         self.inner
             .target()
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get meta-edge target: {}", e)))
@@ -183,7 +184,7 @@ impl PyMetaEdge {
     #[getter]
     fn aggregated_from(&self) -> PyResult<Option<Vec<EdgeId>>> {
         use groggy::traits::MetaEdgeOperations;
-        
+
         self.inner
             .aggregated_from()
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get aggregated edges: {}", e)))
@@ -201,7 +202,7 @@ impl PyMetaEdge {
     /// * `RuntimeError` - If there's an error expanding the meta-edge
     fn expand(&self) -> PyResult<Option<Vec<EdgeId>>> {
         use groggy::traits::MetaEdgeOperations;
-        
+
         self.inner
             .expand()
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to expand meta-edge: {}", e)))
@@ -222,17 +223,17 @@ impl PyMetaEdge {
     /// * `RuntimeError` - If there's an error accessing meta properties
     fn meta_properties(&self, py: Python) -> PyResult<HashMap<String, Py<PyAny>>> {
         use groggy::traits::MetaEdgeOperations;
-        
-        let props = self.inner
-            .meta_properties()
-            .map_err(|e| PyRuntimeError::new_err(format!("Failed to get meta properties: {}", e)))?;
-        
+
+        let props = self.inner.meta_properties().map_err(|e| {
+            PyRuntimeError::new_err(format!("Failed to get meta properties: {}", e))
+        })?;
+
         let mut py_props = HashMap::new();
         for (key, value) in props {
             let py_value = crate::ffi::utils::attr_value_to_python_value(py, &value)?;
             py_props.insert(key, py_value);
         }
-        
+
         Ok(py_props)
     }
 
@@ -247,7 +248,7 @@ impl PyMetaEdge {
     /// * `RuntimeError` - If there's an error accessing attributes
     fn keys(&self) -> PyResult<Vec<String>> {
         use groggy::traits::EdgeOperations;
-        
+
         match self.inner.edge_attributes() {
             Ok(attrs) => Ok(attrs.keys().cloned().collect()),
             Err(e) => Err(PyRuntimeError::new_err(format!(
@@ -269,16 +270,16 @@ impl PyMetaEdge {
     /// * `RuntimeError` - If there's an error accessing attributes
     fn values(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
         use groggy::traits::EdgeOperations;
-        
+
         let edge_attrs = self.inner.edge_attributes().map_err(|e| {
             PyRuntimeError::new_err(format!("Failed to get meta-edge attributes: {}", e))
         })?;
-        
+
         let values = edge_attrs
             .values()
             .map(|value| crate::ffi::utils::attr_value_to_python_value(py, value))
             .collect::<PyResult<Vec<_>>>()?;
-        
+
         Ok(values)
     }
 

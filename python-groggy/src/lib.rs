@@ -14,19 +14,23 @@ pub use ffi::api::graph_version::PyHistoricalView;
 pub use ffi::api::graph_version::{PyBranchInfo, PyCommit, PyHistoryStatistics};
 // Re-enabled accessor exports for table integration
 pub use ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor};
-pub use ffi::storage::array::{PyBaseArray, PyNodesArray, PyEdgesArray, PyMetaNodeArray};
+pub use ffi::storage::array::{PyBaseArray, PyEdgesArray, PyMetaNodeArray, PyNodesArray};
 pub use ffi::storage::array_array::PyArrayArray;
-pub use ffi::storage::num_array::{PyNumArray, PyNumArrayIterator, PyStatsArray, PyStatsArrayIterator};
+pub use ffi::storage::num_array::{
+    PyNumArray, PyNumArrayIterator, PyStatsArray, PyStatsArrayIterator,
+};
 // BoolArray and SimpleStatsArray functionality integrated into unified NumArray
-pub use ffi::storage::subgraph_array::{PySubgraphArray, PySubgraphArrayIterator};
-pub use ffi::storage::table_array::{PyTableArray, PyTableArrayIterator, PyTableArrayChainIterator};
-pub use ffi::storage::table_array_core::{PyTableArrayCore, PyTableArrayCoreIterator};
-pub use ffi::storage::nodes_array::{PyNodesArray as PyNodesArrayNew, PyNodesArrayIterator};
-pub use ffi::storage::edges_array::{PyEdgesArray as PyEdgesArrayNew, PyEdgesArrayIterator};
-pub use ffi::storage::matrix_array::{PyMatrixArray, PyMatrixArrayIterator};
-pub use ffi::subgraphs::component::PyComponentSubgraph;
 pub use ffi::storage::components::PyComponentsArray;
+pub use ffi::storage::edges_array::{PyEdgesArray as PyEdgesArrayNew, PyEdgesArrayIterator};
 pub use ffi::storage::matrix::PyGraphMatrix;
+pub use ffi::storage::matrix_array::{PyMatrixArray, PyMatrixArrayIterator};
+pub use ffi::storage::nodes_array::{PyNodesArray as PyNodesArrayNew, PyNodesArrayIterator};
+pub use ffi::storage::subgraph_array::{PySubgraphArray, PySubgraphArrayIterator};
+pub use ffi::storage::table_array::{
+    PyTableArray, PyTableArrayChainIterator, PyTableArrayIterator,
+};
+pub use ffi::storage::table_array_core::{PyTableArrayCore, PyTableArrayCoreIterator};
+pub use ffi::subgraphs::component::PyComponentSubgraph;
 pub use ffi::subgraphs::neighborhood::{
     PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph,
 };
@@ -35,19 +39,21 @@ pub use ffi::query::query::{PyAttributeFilter, PyEdgeFilter, PyNodeFilter};
 pub use ffi::query::query_parser::{parse_edge_query, parse_node_query};
 pub use ffi::subgraphs::subgraph::PySubgraph;
 // Re-enabled table exports for Phase 5 completion
-pub use ffi::storage::table::{PyBaseTable, PyNodesTable, PyEdgesTable, PyGraphTable};
 pub use ffi::query::traversal::{PyAggregationResult, PyGroupedAggregationResult};
+pub use ffi::storage::table::{PyBaseTable, PyEdgesTable, PyGraphTable, PyNodesTable};
 // pub use ffi::storage::views::{PyEdgeView, PyNodeView}; // Temporarily disabled
 pub use ffi::types::{PyAttrValue, PyAttributeCollection, PyResultHandle};
 
 // Entity system - trait-based wrappers
-pub use ffi::entities::{PyNode, PyEdge, PyMetaNode, PyMetaEdge};
+pub use ffi::entities::{PyEdge, PyMetaEdge, PyMetaNode, PyNode};
 
 // Hierarchical subgraph types
 pub use ffi::subgraphs::hierarchical::PyAggregationFunction;
 
 // MetaGraph Composer types
-pub use ffi::subgraphs::composer::{PyEdgeStrategy, PyComposerPreview, PyMetaNodePlan, PyMetaNodePlanExecutor};
+pub use ffi::subgraphs::composer::{
+    PyComposerPreview, PyEdgeStrategy, PyMetaNodePlan, PyMetaNodePlanExecutor,
+};
 
 // Display system exports
 pub use ffi::display::{PyDisplayConfig, PyTableFormatter};
@@ -307,19 +313,19 @@ fn merge(py: Python, graphs: Vec<Py<PyGraph>>) -> PyResult<PyObject> {
 ///   gr.table({"node_id": [1, 2, 3], "name": ["A", "B", "C"]})
 #[pyfunction]
 fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
-    use std::collections::HashMap;
     use ::groggy::storage::array::BaseArray;
     use ::groggy::storage::table::BaseTable;
-    use pyo3::types::{PyDict, PyList};
     use ::groggy::AttrValue;
-    
+    use pyo3::types::{PyDict, PyList};
+    use std::collections::HashMap;
+
     // Handle dict-like input: {"col1": [1, 2, 3], "col2": ["a", "b", "c"]}
     if let Ok(dict) = data.downcast::<PyDict>() {
         let mut columns = HashMap::new();
-        
+
         for (key, value) in dict.iter() {
             let column_name = key.extract::<String>()?;
-            
+
             // Convert value to BaseArray
             if let Ok(list) = value.downcast::<PyList>() {
                 // Convert list to AttrValues and create BaseArray
@@ -328,20 +334,20 @@ fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
                     let attr_val = crate::ffi::types::PyAttrValue::from_py_value(item)?;
                     attr_values.push(attr_val.inner);
                 }
-                
+
                 let base_array = BaseArray::from_attr_values(attr_values);
                 columns.insert(column_name, base_array);
             }
         }
-        
+
         // Create BaseTable
         let base_table = BaseTable::from_columns(columns)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        
+
         let py_table = PyBaseTable::from_table(base_table);
         return Ok(py_table.into_py(py));
     }
-    
+
     // Handle list-like input: [{"name": "Alice", "age": 25}, ...]
     if let Ok(list) = data.downcast::<PyList>() {
         if list.is_empty() {
@@ -351,20 +357,22 @@ fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
             let py_table = PyBaseTable::from_table(empty_table);
             return Ok(py_table.into_py(py));
         }
-        
+
         // Get column names from first row
         let first_row = list.get_item(0)?;
         if let Ok(row_dict) = first_row.downcast::<PyDict>() {
-            let column_names: Vec<String> = row_dict.keys().iter()
+            let column_names: Vec<String> = row_dict
+                .keys()
+                .iter()
                 .map(|k| k.extract::<String>())
                 .collect::<Result<Vec<_>, _>>()?;
-            
+
             // Collect data for each column
             let mut columns_data: HashMap<String, Vec<AttrValue>> = HashMap::new();
             for col_name in &column_names {
                 columns_data.insert(col_name.clone(), Vec::new());
             }
-            
+
             // Extract values from each row
             for row_py in list.iter() {
                 if let Ok(row_dict) = row_py.downcast::<PyDict>() {
@@ -376,25 +384,25 @@ fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
                     }
                 }
             }
-            
+
             // Create BaseArrays from collected data
             let mut columns = HashMap::new();
             for (col_name, values) in columns_data {
                 let base_array = BaseArray::from_attr_values(values);
                 columns.insert(col_name, base_array);
             }
-            
+
             // Create BaseTable
             let base_table = BaseTable::from_columns(columns)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-            
+
             let py_table = PyBaseTable::from_table(base_table);
             return Ok(py_table.into_py(py));
         }
     }
-    
+
     Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-        "table() expects a dict of lists or a list of dicts"
+        "table() expects a dict of lists or a list of dicts",
     ))
 }
 
@@ -406,7 +414,7 @@ fn bool_array_factory(values: Vec<bool>) -> PyNumArray {
 }
 
 /// Create NumArray with bool dtype filled with True values
-#[pyfunction]  
+#[pyfunction]
 #[pyo3(name = "ones_bool")]
 fn ones_bool_factory(size: usize) -> PyNumArray {
     let values = vec![true; size];
@@ -415,7 +423,7 @@ fn ones_bool_factory(size: usize) -> PyNumArray {
 
 /// Create NumArray with bool dtype filled with False values
 #[pyfunction]
-#[pyo3(name = "zeros_bool")]  
+#[pyo3(name = "zeros_bool")]
 fn zeros_bool_factory(size: usize) -> PyNumArray {
     let values = vec![false; size];
     PyNumArray::new_bool(values)
@@ -466,9 +474,9 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyMatrixArrayIterator>()?;
     // m.add_class::<PyPathResult>()?; // Unused
     m.add_class::<PyGraphTable>()?; // Re-enabled for Phase 5 completion
-    // m.add_class::<PyGroupBy>()?; // Still disabled  
+                                    // m.add_class::<PyGroupBy>()?; // Still disabled
     m.add_class::<PyBaseTable>()?; // Re-enabled for Phase 5 completion
-    m.add_class::<PyNodesTable>()?; // Re-enabled for Phase 5 completion  
+    m.add_class::<PyNodesTable>()?; // Re-enabled for Phase 5 completion
     m.add_class::<PyEdgesTable>()?; // Re-enabled for Phase 5 completion
 
     // Register display system types
@@ -478,8 +486,8 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Register accessor and view types
     m.add_class::<ffi::storage::accessors::PyNodesAccessor>()?; // Re-enabled for table integration
     m.add_class::<ffi::storage::accessors::PyEdgesAccessor>()?; // Re-enabled for table integration
-    // m.add_class::<PyNodeView>()?; // Still disabled - not essential for current functionality
-    // m.add_class::<PyEdgeView>()?; // Still disabled - not essential for current functionality
+                                                                // m.add_class::<PyNodeView>()?; // Still disabled - not essential for current functionality
+                                                                // m.add_class::<PyEdgeView>()?; // Still disabled - not essential for current functionality
 
     // Register viz accessor
     m.add_class::<VizAccessor>()?;
@@ -526,7 +534,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     // Register hierarchical subgraph types
     m.add_class::<ffi::subgraphs::hierarchical::PyAggregationFunction>()?;
     m.add_class::<ffi::entities::PyMetaNode>()?;
-    
+
     // Register MetaGraph Composer types
     m.add_class::<ffi::subgraphs::composer::PyEdgeStrategy>()?;
     m.add_class::<ffi::subgraphs::composer::PyComposerPreview>()?;

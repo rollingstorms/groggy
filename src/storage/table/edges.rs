@@ -179,7 +179,7 @@ impl EdgesTable {
     pub fn filter_by_sources(&self, source_nodes: &[NodeId]) -> GraphResult<Self> {
         // Create a simple predicate for now - could be optimized
         let source_strings: Vec<String> = source_nodes.iter().map(|id| id.to_string()).collect();
-        let predicate = format!("source IN [{}]", source_strings.join(", "));
+        let _predicate = format!("source IN [{}]", source_strings.join(", "));
 
         // For now, use a simpler approach - filter manually
         let sources = self.sources()?;

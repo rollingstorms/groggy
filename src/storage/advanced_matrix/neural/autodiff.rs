@@ -868,6 +868,7 @@ impl<T: NumericType> AutoDiffTensor<T> {
         Arc::clone(&self.graph)
     }
 
+    #[allow(dead_code)]
     fn ensure_same_graph(&self, other: &Self) -> MatrixResult<()> {
         if !Arc::ptr_eq(&self.graph, &other.graph) {
             return Err(MatrixError::ComputationError(
@@ -1122,6 +1123,7 @@ impl<T: NumericType> AutoDiffTensor<T> {
 pub struct GradientTape<T: NumericType> {
     operations: Vec<(Operation, Vec<NodeId>, NodeId)>,
     tensors: HashMap<NodeId, UnifiedMatrix<T>>,
+    #[allow(dead_code)]
     gradients: HashMap<NodeId, UnifiedMatrix<T>>,
     next_id: NodeId,
 }

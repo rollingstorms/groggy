@@ -25,15 +25,6 @@ impl NumPyBackend {
             is_available: false,
         }
     }
-
-    /// Check if NumPy and SciPy are available
-    fn check_availability() -> bool {
-        // In a full implementation, this would:
-        // 1. Check if PyO3 is available
-        // 2. Try to import numpy and scipy.linalg
-        // 3. Return true if both succeed
-        false
-    }
 }
 
 impl ComputeBackend for NumPyBackend {

@@ -624,6 +624,7 @@ impl MetaNodePlan {
     }
 
     /// Convert node aggregations to HashMap format expected by existing code
+    #[allow(dead_code)]
     fn convert_to_agg_functions(&self) -> HashMap<AttrName, String> {
         let mut result = HashMap::new();
 

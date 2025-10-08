@@ -2,7 +2,7 @@
 //!
 //! Provides a typed container for collections of table objects with full ArrayOps support
 
-use groggy::storage::array::{ArrayOps, ArrayIterator};
+use groggy::storage::array::ArrayOps;
 use pyo3::prelude::*;
 use std::sync::Arc;
 
@@ -21,7 +21,7 @@ impl PyTableArray {
             inner: Arc::new(tables),
         }
     }
-    
+
     /// Create from Arc<Vec<PyObject>> for zero-copy sharing
     pub fn from_arc(tables: Arc<Vec<PyObject>>) -> Self {
         Self { inner: tables }
@@ -34,12 +34,12 @@ impl PyTableArray {
     fn __len__(&self) -> usize {
         self.inner.len()
     }
-    
+
     /// Check if the array is empty
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
-    
+
     /// Get table at index or extract column as ArrayArray
     ///
     /// Supports two modes:
@@ -75,16 +75,16 @@ impl PyTableArray {
             }
 
             Err(pyo3::exceptions::PyTypeError::new_err(
-                "TableArray indices must be integers or strings"
+                "TableArray indices must be integers or strings",
             ))
         })
     }
 
     /// Extract a column from all tables and return as ArrayArray
     fn extract_column(&self, py: Python, column_name: &str) -> PyResult<PyObject> {
-        use groggy::storage::array::{ArrayArray, BaseArray};
-        use groggy::types::AttrValue;
         use crate::ffi::storage::array::PyBaseArray;
+        use groggy::storage::array::ArrayArray;
+        
 
         let mut arrays = Vec::new();
         let mut keys = Vec::new();
@@ -118,7 +118,7 @@ impl PyTableArray {
         let py_array_array = crate::PyArrayArray::from_array_array(array_array);
         Ok(py_array_array.into_py(py))
     }
-    
+
     /// Iterate over tables
     fn __iter__(slf: PyRef<Self>) -> PyTableArrayIterator {
         PyTableArrayIterator {
@@ -126,33 +126,33 @@ impl PyTableArray {
             index: 0,
         }
     }
-    
+
     /// Convert to Python list
     fn to_list(&self) -> Vec<PyObject> {
         self.inner.as_ref().clone()
     }
-    
+
     /// String representation
     fn __repr__(&self) -> String {
         format!("TableArray({} tables)", self.inner.len())
     }
-    
+
     /// Collect all tables into a Python list (for compatibility with iterator patterns)
     fn collect(&self) -> Vec<PyObject> {
         self.to_list()
     }
-    
+
     /// Create iterator for method chaining
     fn iter(&self) -> PyTableArrayChainIterator {
         PyTableArrayChainIterator {
             inner: self.inner.as_ref().clone(),
         }
     }
-    
+
     /// Apply aggregation to all tables - placeholder method
     fn agg(&self, py: Python, agg_spec: PyObject) -> PyResult<Vec<PyObject>> {
         let mut aggregated = Vec::new();
-        
+
         for table in self.inner.iter() {
             // Try to call agg method on each table
             if table.as_ref(py).hasattr("agg")? {
@@ -162,14 +162,14 @@ impl PyTableArray {
                 }
             }
         }
-        
+
         Ok(aggregated)
     }
-    
+
     /// Filter all tables using a query - placeholder method
     fn filter(&self, py: Python, query: String) -> PyResult<PyTableArray> {
         let mut filtered = Vec::new();
-        
+
         for table in self.inner.iter() {
             // Try to call filter method on each table
             if table.as_ref(py).hasattr("filter")? {
@@ -179,7 +179,7 @@ impl PyTableArray {
                 }
             }
         }
-        
+
         Ok(PyTableArray::new(filtered))
     }
 
@@ -220,7 +220,7 @@ impl PyTableArray {
                 AttrValue::Bool(b)
             } else {
                 return Err(pyo3::exceptions::PyTypeError::new_err(
-                    "Map function must return int, float, str, or bool"
+                    "Map function must return int, float, str, or bool",
                 ));
             };
 
@@ -229,9 +229,7 @@ impl PyTableArray {
 
         // Create BaseArray from results and wrap in PyBaseArray
         let base_array = BaseArray::from_attr_values(results);
-        Ok(crate::ffi::storage::array::PyBaseArray {
-            inner: base_array,
-        })
+        Ok(crate::ffi::storage::array::PyBaseArray { inner: base_array })
     }
 }
 
@@ -260,7 +258,7 @@ impl PyTableArrayIterator {
     fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
         slf
     }
-    
+
     fn __next__(&mut self, py: Python) -> PyResult<Option<PyObject>> {
         let array = self.array.borrow(py);
         if self.index < array.inner.len() {
@@ -284,7 +282,7 @@ impl PyTableArrayChainIterator {
     /// Apply aggregation to each table and return list of results
     fn agg(&mut self, py: Python, agg_spec: PyObject) -> PyResult<Vec<PyObject>> {
         let mut aggregated = Vec::new();
-        
+
         for table in &self.inner {
             // Try to call agg method on each table
             if table.as_ref(py).hasattr("agg")? {
@@ -294,14 +292,14 @@ impl PyTableArrayChainIterator {
                 }
             }
         }
-        
+
         Ok(aggregated)
     }
-    
+
     /// Apply filter to each table
     fn filter(&mut self, py: Python, query: String) -> PyResult<Self> {
         let mut filtered = Vec::new();
-        
+
         for table in &self.inner {
             // Try to call filter method on each table
             if table.as_ref(py).hasattr("filter")? {
@@ -311,19 +309,19 @@ impl PyTableArrayChainIterator {
                 }
             }
         }
-        
+
         Ok(Self { inner: filtered })
     }
-    
+
     /// Materialize iterator back into PyTableArray
     fn collect(&mut self) -> PyResult<PyTableArray> {
         Ok(PyTableArray::new(self.inner.clone()))
     }
-    
+
     /// Apply group_by to each table - placeholder method
     fn group_by(&mut self, py: Python, columns: Vec<String>) -> PyResult<Self> {
         let mut grouped = Vec::new();
-        
+
         for table in &self.inner {
             // Try to call group_by method on each table
             if table.as_ref(py).hasattr("group_by")? {
@@ -333,14 +331,14 @@ impl PyTableArrayChainIterator {
                 }
             }
         }
-        
+
         Ok(Self { inner: grouped })
     }
-    
+
     /// Join with another iterator of tables - simplified implementation
     fn join(&mut self, py: Python, other: &Self, on: String) -> PyResult<Self> {
         let mut joined = Vec::new();
-        
+
         // Simple cartesian join - in production would be more sophisticated
         for (i, left_table) in self.inner.iter().enumerate() {
             if let Some(right_table) = other.inner.get(i) {
@@ -353,16 +351,16 @@ impl PyTableArrayChainIterator {
                 }
             }
         }
-        
+
         Ok(Self { inner: joined })
     }
-    
+
     /// Take first n tables
     fn take(&mut self, n: usize) -> PyResult<Self> {
         let taken: Vec<PyObject> = self.inner.iter().take(n).cloned().collect();
         Ok(Self { inner: taken })
     }
-    
+
     /// Skip first n tables
     fn skip(&mut self, n: usize) -> PyResult<Self> {
         let skipped: Vec<PyObject> = self.inner.iter().skip(n).cloned().collect();

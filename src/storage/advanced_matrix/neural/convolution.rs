@@ -89,6 +89,7 @@ pub struct Conv2D<T: NumericType> {
     /// Bias tensor: (out_channels,)
     bias: Option<UnifiedMatrix<T>>,
     /// Cached im2col buffer for efficiency
+    #[allow(dead_code)]
     im2col_buffer: Option<UnifiedMatrix<T>>,
 }
 
@@ -102,7 +103,7 @@ impl<T: NumericType> Conv2D<T> {
         let (kernel_h, kernel_w) = config.kernel_size;
 
         // Initialize weights with Xavier/Glorot initialization
-        let weight_size = out_channels * in_channels * kernel_h * kernel_w;
+        let _weight_size = out_channels * in_channels * kernel_h * kernel_w;
         let weights = UnifiedMatrix::zeros(out_channels, in_channels * kernel_h * kernel_w)?;
 
         Ok(Self {
@@ -304,6 +305,7 @@ impl<T: NumericType> Conv2D<T> {
 /// 4D tensor representation for convolution operations
 /// Dimensions: (batch_size, channels, height, width)
 pub struct ConvTensor<T: NumericType> {
+    #[allow(dead_code)]
     data: UnifiedMatrix<T>,
     dimensions: (usize, usize, usize, usize), // (batch, channels, height, width)
 }
@@ -343,7 +345,7 @@ impl<T: NumericType> ConvTensor<T> {
 
         // Extract slice for this batch: (channels, height * width)
         let slice_size = channels * height * width;
-        let start_idx = batch_idx * slice_size;
+        let _start_idx = batch_idx * slice_size;
 
         // This would need actual tensor slicing implementation
         UnifiedMatrix::zeros(channels, height * width)
@@ -373,7 +375,7 @@ impl<T: NumericType> ConvTensor<T> {
 
 /// Standalone im2col transformation function
 pub fn im2col_transform<T: NumericType>(
-    input: &UnifiedMatrix<T>,
+    _input: &UnifiedMatrix<T>,
     input_shape: (usize, usize, usize), // (channels, height, width)
     kernel_size: (usize, usize),
     stride: (usize, usize),
@@ -395,7 +397,7 @@ pub fn im2col_transform<T: NumericType>(
     // Create im2col matrix
     let col_height = channels * kernel_h * kernel_w;
     let col_width = out_h * out_w;
-    let mut im2col = UnifiedMatrix::zeros(col_height, col_width)?;
+    let im2col = UnifiedMatrix::zeros(col_height, col_width)?;
 
     // Fill im2col matrix (same logic as in Conv2D)
     // ... implementation details ...

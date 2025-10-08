@@ -4,11 +4,8 @@
 //! Serves the UI at `/` with a `/ws` WebSocket endpoint.
 
 use super::{WsBridge, WsMessage};
-use crate::api::graph::Graph;
 use crate::errors::{io_error_to_graph_error, GraphError, GraphResult};
-use crate::viz::realtime::accessor::{
-    ControlMsg, EngineSnapshot, EngineUpdate, RealtimeVizAccessor,
-};
+use crate::viz::realtime::accessor::{ControlMsg, EngineUpdate, RealtimeVizAccessor};
 use crate::viz::realtime::engine::ControlCommand;
 use crate::viz::realtime::{RealTimeVizConfig, RealTimeVizEngine};
 use base64::{engine::general_purpose, Engine as _};
@@ -118,7 +115,7 @@ impl RealtimeServer {
                     let temp_graph = crate::api::graph::Graph::new(); // TODO: Convert snapshot to proper graph
                     let engine_config = RealTimeVizConfig::default();
                     let mut engine = RealTimeVizEngine::new(temp_graph, engine_config);
-                    if let Err(e) = engine.load_snapshot(snapshot.clone()).await {
+                    if let Err(_e) = engine.load_snapshot(snapshot.clone()).await {
                         if self.verbose >= 1 {
                             // Failed to load snapshot into engine
                         }
@@ -145,7 +142,7 @@ impl RealtimeServer {
                     tokio::spawn(async move {
                         let mut engine_rx = engine_rx;
                         while let Ok(update) = engine_rx.recv().await {
-                            if let Err(e) = ws_bridge_clone.broadcast_update(update).await {
+                            if let Err(_e) = ws_bridge_clone.broadcast_update(update).await {
                                 // ⚠️  DEBUG: WebSocket bridge failed to broadcast engine update: {}
                             }
                         }
@@ -154,7 +151,7 @@ impl RealtimeServer {
                     self.engine = Some(engine);
                     self.ws_bridge.set_snapshot(snapshot).await;
                 }
-                Err(e) => {
+                Err(_e) => {
                     // ⚠️  DEBUG: Failed to load initial snapshot: {}
                 }
             }
@@ -202,14 +199,14 @@ impl RealtimeServer {
                                         }
                                     },
                                     result = Self::handle_connection(stream, addr, ws_bridge_clone, port) => {
-                                        if let Err(e) = result {
+                                        if let Err(_e) = result {
                                             // ❌ DEBUG: Connection error for {}: {}
                                         }
                                     }
                                 }
                             });
                         }
-                        Err(e) => {
+                        Err(_e) => {
                             // ❌ DEBUG: Accept error: {}
                             // Continue accepting connections
                         }
@@ -246,7 +243,7 @@ impl RealtimeServer {
 
                         // 🎮 DEBUG: Processing control message from client {}: {:?}
                         if let Some(ref accessor) = self.accessor {
-                            if let Err(e) = Self::process_control_message(accessor, control_msg.clone()).await {
+                            if let Err(_e) = Self::process_control_message(accessor, control_msg.clone()).await {
                                 // ❌ DEBUG: Accessor failed to process control message: {}
                             }
                         }
@@ -256,7 +253,7 @@ impl RealtimeServer {
                             match &control_msg {
                                 ControlMsg::ChangeEmbedding { method, k, .. } => {
                                     // 🧠 DEBUG: Forwarding ChangeEmbedding to engine: method={}, k={}
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .apply(EngineUpdate::EmbeddingChanged {
                                             method: method.clone(),
                                             dimensions: *k,
@@ -268,7 +265,7 @@ impl RealtimeServer {
                                 }
                                 ControlMsg::ChangeLayout { algorithm, params } => {
                                     // 📐 DEBUG: Forwarding ChangeLayout to engine: algorithm={}
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .apply(EngineUpdate::LayoutChanged {
                                             algorithm: algorithm.clone(),
                                             params: params.clone(),
@@ -280,7 +277,7 @@ impl RealtimeServer {
                                 }
                                 ControlMsg::SetInteractionController { mode } => {
                                     // 🎮 DEBUG: Switching interaction controller to {}
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .handle_control_command(ControlCommand::SetInteractionController {
                                             mode: mode.clone(),
                                         })
@@ -290,7 +287,7 @@ impl RealtimeServer {
                                     }
                                 }
                                 ControlMsg::Pointer { event } => {
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .handle_control_command(ControlCommand::Pointer {
                                             event: event.clone(),
                                         })
@@ -300,7 +297,7 @@ impl RealtimeServer {
                                     }
                                 }
                                 ControlMsg::Wheel { event } => {
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .handle_control_command(ControlCommand::Wheel {
                                             event: event.clone(),
                                         })
@@ -310,7 +307,7 @@ impl RealtimeServer {
                                     }
                                 }
                                 ControlMsg::NodeDrag { event } => {
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .handle_control_command(ControlCommand::NodeDrag {
                                             event: event.clone(),
                                         })
@@ -808,7 +805,7 @@ impl RealtimeServer {
                     let mut engine = RealTimeVizEngine::new(temp_graph, engine_config);
 
                     // Load snapshot into engine
-                    if let Err(e) = engine.load_snapshot(snapshot.clone()).await {
+                    if let Err(_e) = engine.load_snapshot(snapshot.clone()).await {
                         if self.verbose >= 1 {
                             // Failed to load snapshot into engine
                         }
@@ -845,7 +842,7 @@ impl RealtimeServer {
                                     match update_result {
                                         Ok(update) => {
                                             // 📡 DEBUG: Forwarding engine update to WebSocket clients: {:?}
-                                            if let Err(e) = ws_bridge_clone.broadcast_update(update).await {
+                                            if let Err(_e) = ws_bridge_clone.broadcast_update(update).await {
                                                 // ⚠️  DEBUG: WebSocket bridge failed to broadcast engine update: {}
                                             }
                                         },
@@ -862,7 +859,7 @@ impl RealtimeServer {
                     self.engine = Some(engine);
                     self.ws_bridge.set_snapshot(snapshot).await;
                 }
-                Err(e) => {
+                Err(_e) => {
                     // ⚠️  DEBUG: Failed to load initial snapshot: {}
                 }
             }
@@ -910,14 +907,14 @@ impl RealtimeServer {
                                         // 🔌 DEBUG: Connection handler cancelled for {}
                                     },
                                     result = Self::handle_connection(stream, addr, ws_bridge_clone, port) => {
-                                        if let Err(e) = result {
+                                        if let Err(_e) = result {
                                             // ❌ DEBUG: Connection error for {}: {}
                                         }
                                     }
                                 }
                             });
                         }
-                        Err(e) => {
+                        Err(_e) => {
                             // ❌ DEBUG: Accept error: {}
                             // Continue accepting connections despite errors
                         }
@@ -955,7 +952,7 @@ impl RealtimeServer {
                         // 🎮 DEBUG: Processing control message from client {}: {:?}
                         // Accessor reactions
                         if let Some(ref accessor) = self.accessor {
-                            if let Err(e) = Self::process_control_message(accessor, control_msg.clone()).await {
+                            if let Err(_e) = Self::process_control_message(accessor, control_msg.clone()).await {
                                 // ❌ DEBUG: Accessor failed to process control message: {}
                             }
                         }
@@ -964,7 +961,7 @@ impl RealtimeServer {
                             match &control_msg {
                                 ControlMsg::ChangeEmbedding { method, k, .. } => {
                                     // 🧠 DEBUG: Forwarding ChangeEmbedding to engine: method={}, k={}
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .apply(EngineUpdate::EmbeddingChanged {
                                             method: method.clone(),
                                             dimensions: *k,
@@ -976,7 +973,7 @@ impl RealtimeServer {
                                 }
                                 ControlMsg::ChangeLayout { algorithm, params } => {
                                     // 📐 DEBUG: Forwarding ChangeLayout to engine: algorithm={}
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .apply(EngineUpdate::LayoutChanged {
                                             algorithm: algorithm.clone(),
                                             params: params.clone(),
@@ -988,7 +985,7 @@ impl RealtimeServer {
                                 }
                                 ControlMsg::SetInteractionController { mode } => {
                                     // 🎮 DEBUG: Switching interaction controller to {}
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .handle_control_command(ControlCommand::SetInteractionController {
                                             mode: mode.clone(),
                                         })
@@ -998,7 +995,7 @@ impl RealtimeServer {
                                     }
                                 }
                                 ControlMsg::Pointer { event } => {
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .handle_control_command(ControlCommand::Pointer {
                                             event: event.clone(),
                                         })
@@ -1008,7 +1005,7 @@ impl RealtimeServer {
                                     }
                                 }
                                 ControlMsg::Wheel { event } => {
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .handle_control_command(ControlCommand::Wheel {
                                             event: event.clone(),
                                         })
@@ -1018,7 +1015,7 @@ impl RealtimeServer {
                                     }
                                 }
                                 ControlMsg::NodeDrag { event } => {
-                                    if let Err(e) = engine
+                                    if let Err(_e) = engine
                                         .handle_control_command(ControlCommand::NodeDrag {
                                             event: event.clone(),
                                         })
@@ -1097,29 +1094,29 @@ impl RealtimeServer {
         // The accessor acknowledges control intent; the engine now owns runtime updates.
 
         match &control_msg {
-            ControlMsg::ChangeEmbedding { method, k, .. } => {
+            ControlMsg::ChangeEmbedding { .. } => {
                 // 🧠 DEBUG: Processing embedding change
             }
-            ControlMsg::ChangeLayout { algorithm, .. } => {
+            ControlMsg::ChangeLayout { .. } => {
                 // 📐 DEBUG: Processing layout change: {}
             }
-            ControlMsg::SetInteractionController { mode } => {
+            ControlMsg::SetInteractionController { mode: _ } => {
                 // 🎮 DEBUG: Requested controller mode {}
             }
-            ControlMsg::Pointer { event } => {
+            ControlMsg::Pointer { event: _ } => {
                 // 🖱️  DEBUG: Pointer event {:?}
             }
-            ControlMsg::Wheel { event } => {
+            ControlMsg::Wheel { event: _ } => {
                 // 🖱️  DEBUG: Wheel event {:?}
             }
-            ControlMsg::NodeDrag { event } => {
+            ControlMsg::NodeDrag { event: _ } => {
                 // 🖱️  DEBUG: Node drag event {:?}
             }
             ControlMsg::RequestTableData {
-                offset,
-                window_size,
-                data_type,
-                sort_columns,
+                offset: _,
+                window_size: _,
+                data_type: _,
+                sort_columns: _,
             } => {
                 // 📊 DEBUG: Table data request: offset={}, window_size={}, type={:?}
             }
@@ -1176,7 +1173,7 @@ pub fn start_realtime_background(
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
             // Create and configure server
-            let mut server = RealtimeServer::new(port)
+            let server = RealtimeServer::new(port)
                 .with_accessor(accessor)
                 .with_verbosity(verbose);
 

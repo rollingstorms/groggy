@@ -7,9 +7,7 @@
 use super::{EmbeddingEngine, EnergyFunction};
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
-use crate::storage::advanced_matrix::{
-    neural::autodiff::AutoDiffTensor, unified_matrix::UnifiedMatrix,
-};
+use crate::storage::advanced_matrix::neural::autodiff::AutoDiffTensor;
 use crate::storage::matrix::GraphMatrix;
 use crate::types::NodeId;
 use std::collections::HashMap;
@@ -159,7 +157,7 @@ impl EnergyEmbedding {
             })?;
 
         // Get gradients
-        let grad = positions_tensor
+        let _grad = positions_tensor
             .grad()
             .ok_or_else(|| GraphError::ConversionError {
                 from: "AutoDiff".to_string(),

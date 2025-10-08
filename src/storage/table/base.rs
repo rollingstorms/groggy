@@ -40,6 +40,7 @@ pub struct BaseTable {
     /// Display engine for unified formatting (FOUNDATION ONLY - specialized types delegate)
     display_engine: DisplayEngine,
     /// Streaming server for real-time updates (FOUNDATION ONLY - Phase 2)
+    #[allow(dead_code)]
     streaming_server: Option<StreamingServer>,
     /// Active server handles to keep them alive
     active_server_handles: Vec<crate::viz::streaming::types::ServerHandle>,
@@ -290,7 +291,7 @@ impl BaseTable {
         // Apply updates
         for (col_name, values) in updates {
             // Infer dtype from the first non-null value
-            let dtype = values
+            let _dtype = values
                 .iter()
                 .find(|v| !matches!(v, AttrValue::Null))
                 .map(|v| match v {
@@ -342,7 +343,7 @@ impl BaseTable {
         }
 
         // Infer dtype from the first non-null value
-        let dtype = values
+        let _dtype = values
             .iter()
             .find(|v| !matches!(v, AttrValue::Null))
             .map(|v| match v {
@@ -5953,120 +5954,6 @@ impl BaseTable {
     /// Close all active streaming servers for this table
     pub fn close_streaming(&mut self) {
         self.active_server_handles.clear(); // Dropping handles stops servers
-    }
-
-    /// Convert AttrValue to a primitive AttrValue that serializes to simple JSON
-    /// This function only returns Int, Float, Text, Bool, or Null - no complex enum variants
-    fn attr_value_to_primitive_value(&self, value: &AttrValue) -> AttrValue {
-        match value {
-            // Simple primitive types - pass through directly
-            AttrValue::Int(i) => AttrValue::Int(*i),
-            AttrValue::Float(f) => AttrValue::Float(*f),
-            AttrValue::Text(s) => AttrValue::Text(s.clone()),
-            AttrValue::Bool(b) => AttrValue::Bool(*b),
-            AttrValue::Null => AttrValue::Null,
-
-            // Convert all other types to their string representation
-            AttrValue::SmallInt(i) => AttrValue::Text(i.to_string()), // Convert to text to avoid enum variant
-            AttrValue::CompactText(s) => AttrValue::Text(s.as_str().to_string()),
-            AttrValue::FloatVec(v) => AttrValue::Text(format!(
-                "[{}]",
-                v.iter()
-                    .map(|f| f.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )),
-            AttrValue::Bytes(b) => AttrValue::Text(format!("bytes[{}]", b.len())),
-            AttrValue::CompressedText(cd) => match cd.decompress_text() {
-                Ok(text) => AttrValue::Text(text),
-                Err(_) => AttrValue::Text("[compressed text]".to_string()),
-            },
-            AttrValue::CompressedFloatVec(_) => {
-                AttrValue::Text("[compressed float vec]".to_string())
-            }
-            AttrValue::SubgraphRef(id) => AttrValue::Text(format!("subgraph:{}", id)),
-            AttrValue::NodeArray(nodes) => AttrValue::Text(format!("nodes[{}]", nodes.len())),
-            AttrValue::EdgeArray(edges) => AttrValue::Text(format!("edges[{}]", edges.len())),
-            AttrValue::IntVec(v) => AttrValue::Text(format!(
-                "[{}]",
-                v.iter()
-                    .map(|i| i.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )),
-            AttrValue::TextVec(v) => AttrValue::Text(format!(
-                "[{}]",
-                v.iter()
-                    .map(|s| format!("\"{}\"", s))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )),
-            AttrValue::BoolVec(v) => AttrValue::Text(format!(
-                "[{}]",
-                v.iter()
-                    .map(|b| b.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )),
-            AttrValue::Json(s) => AttrValue::Text(s.clone()),
-        }
-    }
-
-    /// Convert AttrValue to a simple JSON-compatible value for frontend rendering (unused now)
-    fn attr_value_to_display_value(&self, value: &AttrValue) -> serde_json::Value {
-        match value {
-            // Simple types - convert to JSON primitives
-            AttrValue::Int(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
-            AttrValue::SmallInt(i) => serde_json::Value::Number(serde_json::Number::from(*i)),
-            AttrValue::Float(f) => serde_json::Value::Number(
-                serde_json::Number::from_f64(*f as f64).unwrap_or(serde_json::Number::from(0)),
-            ),
-            AttrValue::Text(s) => serde_json::Value::String(s.clone()),
-            AttrValue::CompactText(s) => serde_json::Value::String(s.as_str().to_string()),
-            AttrValue::Bool(b) => serde_json::Value::Bool(*b),
-            AttrValue::Null => serde_json::Value::Null,
-
-            // Complex types - convert to readable strings
-            AttrValue::FloatVec(v) => serde_json::Value::String(format!(
-                "[{}]",
-                v.iter()
-                    .map(|f| f.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )),
-            AttrValue::Bytes(b) => serde_json::Value::String(format!("bytes[{}]", b.len())),
-            AttrValue::CompressedText(cd) => match cd.decompress_text() {
-                Ok(text) => serde_json::Value::String(text),
-                Err(_) => serde_json::Value::String("[compressed text]".to_string()),
-            },
-            AttrValue::CompressedFloatVec(_) => {
-                serde_json::Value::String("[compressed float vec]".to_string())
-            }
-            AttrValue::SubgraphRef(id) => serde_json::Value::String(format!("subgraph:{}", id)),
-            AttrValue::NodeArray(nodes) => {
-                serde_json::Value::String(format!("nodes[{}]", nodes.len()))
-            }
-            AttrValue::EdgeArray(edges) => {
-                serde_json::Value::String(format!("edges[{}]", edges.len()))
-            }
-            AttrValue::IntVec(v) => serde_json::Value::Array(
-                v.iter()
-                    .map(|&i| serde_json::Value::Number(i.into()))
-                    .collect(),
-            ),
-            AttrValue::TextVec(v) => serde_json::Value::Array(
-                v.iter()
-                    .map(|s| serde_json::Value::String(s.clone()))
-                    .collect(),
-            ),
-            AttrValue::BoolVec(v) => {
-                serde_json::Value::Array(v.iter().map(|&b| serde_json::Value::Bool(b)).collect())
-            }
-            AttrValue::Json(s) => {
-                // Try to parse as JSON, fallback to string if invalid
-                serde_json::from_str(s).unwrap_or_else(|_| serde_json::Value::String(s.clone()))
-            }
-        }
     }
 
     /// Increment version for cache invalidation

@@ -5,8 +5,8 @@
 
 use groggy::entities::Node;
 use groggy::types::NodeId;
-use pyo3::prelude::*;
 use pyo3::exceptions::PyRuntimeError;
+use pyo3::prelude::*;
 
 /// Python wrapper for a regular graph node
 ///
@@ -55,14 +55,13 @@ impl PyNode {
     /// * `RuntimeError` - If there's an error accessing the attribute
     fn __getitem__(&self, py: Python, key: &str) -> PyResult<Py<PyAny>> {
         use groggy::traits::GraphEntity;
-        
+
         match self.inner.get_attribute(&key.into()) {
-            Ok(Some(attr_value)) => {
-                crate::ffi::utils::attr_value_to_python_value(py, &attr_value)
-            }
+            Ok(Some(attr_value)) => crate::ffi::utils::attr_value_to_python_value(py, &attr_value),
             Ok(None) => Err(pyo3::exceptions::PyKeyError::new_err(format!(
                 "Node {} has no attribute '{}'",
-                self.inner.id(), key
+                self.inner.id(),
+                key
             ))),
             Err(e) => Err(PyRuntimeError::new_err(format!(
                 "Failed to get node attribute: {}",
@@ -81,7 +80,7 @@ impl PyNode {
     /// * `RuntimeError` - If there's an error setting the attribute
     fn __setitem__(&self, key: &str, value: &PyAny) -> PyResult<()> {
         use groggy::traits::GraphEntity;
-        
+
         // Convert PyAny to PyAttrValue
         let py_attr_value = crate::ffi::types::PyAttrValue::from_py_value(value)?;
         let attr_value = py_attr_value.to_attr_value();
@@ -100,7 +99,7 @@ impl PyNode {
     /// True if the attribute exists, False otherwise
     fn __contains__(&self, key: &str) -> PyResult<bool> {
         use groggy::traits::GraphEntity;
-        
+
         match self.inner.get_attribute(&key.into()) {
             Ok(Some(_)) => Ok(true),
             Ok(None) => Ok(false),
@@ -118,7 +117,7 @@ impl PyNode {
     #[getter]
     fn degree(&self) -> PyResult<usize> {
         use groggy::traits::NodeOperations;
-        
+
         self.inner
             .degree()
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get node degree: {}", e)))
@@ -134,7 +133,7 @@ impl PyNode {
     #[getter]
     fn neighbors(&self) -> PyResult<Vec<NodeId>> {
         use groggy::traits::NodeOperations;
-        
+
         self.inner
             .neighbors()
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to get node neighbors: {}", e)))
@@ -149,7 +148,7 @@ impl PyNode {
     /// * `RuntimeError` - If there's an error accessing attributes
     fn keys(&self) -> PyResult<Vec<String>> {
         use groggy::traits::NodeOperations;
-        
+
         match self.inner.node_attributes() {
             Ok(attrs) => Ok(attrs.keys().cloned().collect()),
             Err(e) => Err(PyRuntimeError::new_err(format!(
@@ -171,16 +170,16 @@ impl PyNode {
     /// * `RuntimeError` - If there's an error accessing attributes
     fn values(&self, py: Python) -> PyResult<Vec<Py<PyAny>>> {
         use groggy::traits::NodeOperations;
-        
+
         let node_attrs = self.inner.node_attributes().map_err(|e| {
             PyRuntimeError::new_err(format!("Failed to get node attributes: {}", e))
         })?;
-        
+
         let values = node_attrs
             .values()
             .map(|value| crate::ffi::utils::attr_value_to_python_value(py, value))
             .collect::<PyResult<Vec<_>>>()?;
-        
+
         Ok(values)
     }
 

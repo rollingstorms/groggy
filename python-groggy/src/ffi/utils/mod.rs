@@ -4,12 +4,8 @@
 
 pub mod config;
 pub mod convert;
-pub mod utils;
 pub mod indexing;
 pub mod matrix_indexing;
+pub mod utils;
 
-pub use config::*;
-pub use convert::*;
 pub use utils::*;
-pub use indexing::*;
-pub use matrix_indexing::*;

@@ -100,11 +100,14 @@ pub struct GraphMatrix<T: NumericType = f64> {
 
     /// Backend optimization
     backend_selector: Arc<BackendSelector>,
+    #[allow(dead_code)]
     memory_pool: Arc<AdvancedMemoryPool<T>>,
 
     /// Cached matrix properties
+    #[allow(dead_code)]
     properties: Option<MatrixProperties>,
     /// Reference to the source graph (optional)
+    #[allow(dead_code)]
     graph: Option<std::rc::Rc<crate::api::graph::Graph>>,
 }
 
@@ -112,7 +115,7 @@ impl<T: NumericType> GraphMatrix<T> {
     /// Create GraphMatrix from UnifiedMatrix storage
     pub fn from_storage(storage: UnifiedMatrix<T>) -> Self {
         let shape = storage.shape();
-        let (rows, cols) = (shape.rows, shape.cols);
+        let (_rows, cols) = (shape.rows, shape.cols);
         let column_names = (0..cols).map(|i| format!("col_{}", i)).collect();
 
         Self {
@@ -2889,7 +2892,7 @@ impl<T: NumericType> GraphMatrix<T> {
             }
             1 => {
                 // Repeat along columns (each column gets repeated)
-                let new_cols = cols * repeats;
+                let _new_cols = cols * repeats;
                 let mut new_arrays = Vec::new();
 
                 for col in 0..cols {

@@ -2,10 +2,12 @@
 //!
 //! Python bindings for smart indexing accessors.
 
+use groggy::storage::array::BaseArray; // Modern array types
+use groggy::storage::table::Table; // Add Table trait for select method
 use groggy::{AttrValue, EdgeId, NodeId};
-use groggy::storage::table::Table;  // Add Table trait for select method
-use groggy::storage::array::{BaseArray, NumArray};  // Modern array types
-use pyo3::exceptions::{PyAttributeError, PyIndexError, PyKeyError, PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::exceptions::{
+    PyAttributeError, PyIndexError, PyKeyError, PyRuntimeError, PyTypeError, PyValueError,
+};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PySlice};
 use std::collections::HashSet;
@@ -13,8 +15,7 @@ use std::collections::HashSet;
 // Import utils for conversion functions
 use crate::ffi::utils::python_value_to_attr_value;
 
-// Import table FFI types  
-use crate::ffi::storage::table::PyGraphTable;
+// Import table FFI types
 
 // Import modern array FFI types
 use crate::ffi::storage::array::PyBaseArray;
@@ -47,48 +48,47 @@ fn create_node_entity_from_core(
     let is_meta_node = {
         let graph_ref = graph.borrow();
         match graph_ref.get_node_attr(node_id, &"entity_type".into()) {
-            Ok(Some(attr_value)) => {
-                match attr_value {
-                    groggy::AttrValue::Text(s) => s == "meta",
-                    groggy::AttrValue::CompactText(s) => s.as_str() == "meta",
-                    _ => false,
-                }
-            }
+            Ok(Some(attr_value)) => match attr_value {
+                groggy::AttrValue::Text(s) => s == "meta",
+                groggy::AttrValue::CompactText(s) => s.as_str() == "meta",
+                _ => false,
+            },
             _ => false,
         }
     };
-    
+
     if is_meta_node {
         // Create PyMetaNode entity wrapper
         use crate::ffi::entities::PyMetaNode;
         use groggy::entities::MetaNode;
-        
+
         match MetaNode::new(node_id, graph) {
             Ok(meta_node) => {
                 let py_meta_node = PyMetaNode::from_meta_node(meta_node);
                 Ok(Py::new(py, py_meta_node)?.to_object(py))
             }
             Err(e) => Err(PyRuntimeError::new_err(format!(
-                "Failed to create MetaNode entity: {}", e
+                "Failed to create MetaNode entity: {}",
+                e
             ))),
         }
     } else {
         // Create PyNode entity wrapper
         use crate::ffi::entities::PyNode;
         use groggy::entities::Node;
-        
+
         match Node::new(node_id, graph) {
             Ok(node) => {
                 let py_node = PyNode::from_node(node);
                 Ok(Py::new(py, py_node)?.to_object(py))
             }
             Err(e) => Err(PyRuntimeError::new_err(format!(
-                "Failed to create Node entity: {}", e
+                "Failed to create Node entity: {}",
+                e
             ))),
         }
     }
 }
-
 
 /// Smart helper function to create appropriate Edge entity from core Graph
 /// Returns PyMetaEdge for meta-edges, PyEdge for regular edges
@@ -104,53 +104,52 @@ fn create_edge_entity_from_core(
             return Err(PyKeyError::new_err(format!("Edge {} not found", edge_id)));
         }
     }
-    
+
     // Check if this is a meta-edge by examining entity_type attribute
     let is_meta_edge = {
         let graph_ref = graph.borrow();
         match graph_ref.get_edge_attr(edge_id, &"entity_type".into()) {
-            Ok(Some(attr_value)) => {
-                match attr_value {
-                    groggy::AttrValue::Text(s) => s == "meta",
-                    groggy::AttrValue::CompactText(s) => s.as_str() == "meta",
-                    _ => false,
-                }
-            }
+            Ok(Some(attr_value)) => match attr_value {
+                groggy::AttrValue::Text(s) => s == "meta",
+                groggy::AttrValue::CompactText(s) => s.as_str() == "meta",
+                _ => false,
+            },
             _ => false,
         }
     };
-    
+
     if is_meta_edge {
         // Create PyMetaEdge entity wrapper
         use crate::ffi::entities::PyMetaEdge;
         use groggy::entities::MetaEdge;
-        
+
         match MetaEdge::new(edge_id, graph) {
             Ok(meta_edge) => {
                 let py_meta_edge = PyMetaEdge::from_meta_edge(meta_edge);
                 Ok(Py::new(py, py_meta_edge)?.to_object(py))
             }
             Err(e) => Err(PyRuntimeError::new_err(format!(
-                "Failed to create MetaEdge entity: {}", e
+                "Failed to create MetaEdge entity: {}",
+                e
             ))),
         }
     } else {
         // Create PyEdge entity wrapper
         use crate::ffi::entities::PyEdge;
         use groggy::entities::Edge;
-        
+
         match Edge::new(edge_id, graph) {
             Ok(edge) => {
                 let py_edge = PyEdge::from_edge(edge);
                 Ok(Py::new(py, py_edge)?.to_object(py))
             }
             Err(e) => Err(PyRuntimeError::new_err(format!(
-                "Failed to create Edge entity: {}", e
+                "Failed to create Edge entity: {}",
+                e
             ))),
         }
     }
 }
-
 
 /// Iterator for nodes that yields NodeViews
 #[pyclass(unsendable)]
@@ -340,7 +339,8 @@ impl PyNodesAccessor {
                 "boolean_filtered".to_string(),
             );
 
-            let py_subgraph = crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(subgraph)?;
+            let py_subgraph =
+                crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(subgraph)?;
             return Ok(Py::new(py, py_subgraph)?.to_object(py));
         }
 
@@ -599,7 +599,7 @@ impl PyNodesAccessor {
             name
         } else {
             return Err(PyTypeError::new_err(
-                "Column key must be a string. Use g.nodes['column_name'] = values"
+                "Column key must be a string. Use g.nodes['column_name'] = values",
             ));
         };
 
@@ -664,11 +664,14 @@ impl PyNodesAccessor {
             // Phase 2: Apply all updates atomically (all-or-nothing)
             let mut graph = self.graph.borrow_mut();
             for (node_id, value) in updates {
-                graph.set_node_attr(node_id, attr_name.clone(), value)
-                    .map_err(|e| PyRuntimeError::new_err(format!(
-                        "Atomic transaction failed at node {}: {}",
-                        node_id, e
-                    )))?;
+                graph
+                    .set_node_attr(node_id, attr_name.clone(), value)
+                    .map_err(|e| {
+                        PyRuntimeError::new_err(format!(
+                            "Atomic transaction failed at node {}: {}",
+                            node_id, e
+                        ))
+                    })?;
             }
             // If we reach here, all updates succeeded atomically
         }
@@ -725,10 +728,11 @@ impl PyNodesAccessor {
         } else {
             // Unconstrained case: use the full graph table
             let graph = self.graph.borrow();
-            graph.nodes_table()
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to create nodes table: {}", e)))?
+            graph.nodes_table().map_err(|e| {
+                PyRuntimeError::new_err(format!("Failed to create nodes table: {}", e))
+            })?
         };
-        
+
         Ok(crate::ffi::storage::table::PyNodesTable { table: nodes_table })
     }
 
@@ -741,9 +745,11 @@ impl PyNodesAccessor {
             let graph = self.graph.borrow();
             graph.node_ids()
         };
-        
+
         // Return as IntArray to preserve integer type for node IDs
-        Ok(crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids))
+        Ok(crate::ffi::storage::num_array::PyIntArray::from_node_ids(
+            node_ids,
+        ))
     }
 
     /// Get all nodes as a subgraph (equivalent to g.nodes[:]) - DELEGATED to SubgraphOperations  
@@ -875,10 +881,10 @@ impl PyNodesAccessor {
     }
 
     /// Access all subgraph-nodes (meta-nodes) in the graph
-    /// 
+    ///
     /// Returns:
     ///     PyNumArray: Array of node IDs that contain subgraphs
-    /// 
+    ///
     /// Example:
     ///     subgraph_nodes = g.nodes.subgraphs
     ///     for meta_node in subgraph_nodes:
@@ -898,8 +904,8 @@ impl PyNodesAccessor {
 
         // Find nodes with contained_subgraph attribute
         for node_id in node_ids {
-            if let Ok(Some(AttrValue::SubgraphRef(_))) = 
-                graph.get_node_attr(node_id, &"contained_subgraph".into()) 
+            if let Ok(Some(AttrValue::SubgraphRef(_))) =
+                graph.get_node_attr(node_id, &"contained_subgraph".into())
             {
                 subgraph_node_ids.push(AttrValue::Int(node_id as i64));
             }
@@ -913,19 +919,19 @@ impl PyNodesAccessor {
                 _ => 0.0, // Fallback (shouldn't happen since we're only adding Int values)
             })
             .collect();
-        
+
         let py_array = PyNumArray::new(values);
         Ok(Py::new(py, py_array)?.to_object(py))
     }
 
     /// Get a MetaNode object if the specified node is a meta-node
-    /// 
+    ///
     /// Args:
     ///     node_id: The node ID to check
-    /// 
+    ///
     /// Returns:
     ///     PyMetaNode if the node is a meta-node, None otherwise
-    /// 
+    ///
     /// Example:
     ///     meta_node = g.nodes.get_meta_node(3)
     ///     if meta_node:
@@ -933,7 +939,7 @@ impl PyNodesAccessor {
     fn get_meta_node(&self, py: Python, node_id: NodeId) -> PyResult<Option<PyObject>> {
         use crate::ffi::entities::PyMetaNode;
         use groggy::entities::MetaNode;
-        
+
         // Check if this node is a meta-node by checking entity_type
         let graph = self.graph.borrow();
         let entity_type_name = "entity_type".to_string();
@@ -946,11 +952,11 @@ impl PyNodesAccessor {
                     return Ok(None); // Not a string type, not a meta-node
                 }
             };
-            
+
             if entity_type_str == "meta" {
                 // This is a meta-node, create PyMetaNode
                 drop(graph); // Release borrow before creating MetaNode
-                
+
                 match MetaNode::new(node_id, self.graph.clone()) {
                     Ok(meta_node) => {
                         let py_meta_node = PyMetaNode::from_meta_node(meta_node);
@@ -958,22 +964,23 @@ impl PyNodesAccessor {
                     }
                     Err(e) => {
                         return Err(PyValueError::new_err(format!(
-                            "Failed to create MetaNode: {}", e
+                            "Failed to create MetaNode: {}",
+                            e
                         )));
                     }
                 }
             }
         }
-        
+
         // Not a meta-node
         Ok(None)
     }
 
     /// Get filtered accessor for base (non-meta) nodes only
-    /// 
+    ///
     /// Returns:
     ///     PyNodesAccessor: Accessor that only shows base nodes (entity_type != 'meta')
-    /// 
+    ///
     /// Example:
     ///     base_nodes = g.nodes.base
     ///     base_count = len(base_nodes)
@@ -982,21 +989,21 @@ impl PyNodesAccessor {
     fn base(&self, py: Python) -> PyResult<PyObject> {
         // Get all base nodes (entity_type != 'meta')
         let base_node_ids = self.get_filtered_node_ids("base")?;
-        
+
         // Create new constrained accessor
         let base_accessor = PyNodesAccessor {
             graph: self.graph.clone(),
             constrained_nodes: Some(base_node_ids),
         };
-        
+
         Ok(Py::new(py, base_accessor)?.to_object(py))
     }
 
     /// Get filtered accessor for meta-nodes only
-    /// 
+    ///
     /// Returns:
     ///     PyNodesAccessor: Accessor that only shows meta-nodes (entity_type == 'meta')
-    /// 
+    ///
     /// Example:
     ///     meta_nodes = g.nodes.meta
     ///     meta_count = len(meta_nodes)
@@ -1005,13 +1012,13 @@ impl PyNodesAccessor {
     fn meta(&self, py: Python) -> PyResult<PyObject> {
         // Get all meta-nodes (entity_type == 'meta')
         let meta_node_ids = self.get_filtered_node_ids("meta")?;
-        
+
         // Create new constrained accessor
         let meta_accessor = PyNodesAccessor {
             graph: self.graph.clone(),
             constrained_nodes: Some(meta_node_ids),
         };
-        
+
         Ok(Py::new(py, meta_accessor)?.to_object(py))
     }
 
@@ -1019,11 +1026,12 @@ impl PyNodesAccessor {
     /// Implements: g.nodes.matrix()
     fn matrix(&self, py: Python) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         use crate::ffi::storage::matrix::PyGraphMatrix;
-        
+
         let graph_ref = self.graph.borrow();
-        let matrix = graph_ref.to_matrix_f64()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Matrix conversion failed: {}", e)))?;
-        
+        let matrix = graph_ref.to_matrix_f64().map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Matrix conversion failed: {}", e))
+        })?;
+
         Py::new(py, PyGraphMatrix { inner: matrix })
     }
 
@@ -1031,7 +1039,7 @@ impl PyNodesAccessor {
     /// Implements: g.nodes.array() -> enables array operations and chaining
     fn array(&self, py: Python) -> PyResult<Py<crate::ffi::storage::nodes_array::PyNodesArray>> {
         use crate::ffi::storage::nodes_array::PyNodesArray;
-        
+
         // Create a NodesArray with just this accessor to enable delegation
         let nodes_array = PyNodesArray::new(vec![self.clone()]);
         Py::new(py, nodes_array)
@@ -1048,9 +1056,12 @@ impl PyNodesAccessor {
     /// Example:
     ///     dept_groups = g.nodes.group_by('department')
     ///     # Returns subgraphs for each department value
-    pub fn group_by(&self, attr_names: &PyAny) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
-        use std::collections::HashMap;
+    pub fn group_by(
+        &self,
+        attr_names: &PyAny,
+    ) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
         use groggy::types::{AttrName, NodeId};
+        use std::collections::HashMap;
         use std::collections::HashSet;
 
         // Parse attr_names as either String or Vec<String>
@@ -1060,11 +1071,12 @@ impl PyNodesAccessor {
             multiple
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(
-                "attr_names must be a string or list of strings"
+                "attr_names must be a string or list of strings",
             ));
         };
 
-        let attr_names_typed: Vec<AttrName> = attr_name_list.iter()
+        let attr_names_typed: Vec<AttrName> = attr_name_list
+            .iter()
             .map(|s| AttrName::from(s.clone()))
             .collect();
 
@@ -1078,7 +1090,9 @@ impl PyNodesAccessor {
         };
 
         if node_ids.is_empty() {
-            return Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(Vec::new()));
+            return Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
+                Vec::new(),
+            ));
         }
 
         // Group nodes by composite attribute value(s)
@@ -1137,14 +1151,22 @@ impl PyNodesAccessor {
                     subgraph_name,
                 );
 
-                let py_subgraph = crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(core_subgraph)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create subgraph: {}", e)))?;
+                let py_subgraph =
+                    crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(core_subgraph)
+                        .map_err(|e| {
+                            pyo3::exceptions::PyRuntimeError::new_err(format!(
+                                "Failed to create subgraph: {}",
+                                e
+                            ))
+                        })?;
 
                 result_subgraphs.push(py_subgraph);
             }
         }
 
-        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(result_subgraphs))
+        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
+            result_subgraphs,
+        ))
     }
 
     /// Get viz accessor for visualization operations
@@ -1169,7 +1191,7 @@ impl PyNodesAccessor {
         let graph_data_source = groggy::viz::streaming::GraphDataSource::new(&viz_graph);
         let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
             graph_data_source,
-            "NodesAccessor".to_string()
+            "NodesAccessor".to_string(),
         );
 
         Py::new(py, viz_accessor)
@@ -1178,23 +1200,26 @@ impl PyNodesAccessor {
 
 impl PyNodesAccessor {
     /// Create a NodesTable for only the constrained nodes
-    fn create_constrained_nodes_table(&self, constrained_nodes: &[groggy::NodeId]) -> PyResult<groggy::storage::table::NodesTable> {
-        use groggy::storage::table::{BaseTable, NodesTable};
+    fn create_constrained_nodes_table(
+        &self,
+        constrained_nodes: &[groggy::NodeId],
+    ) -> PyResult<groggy::storage::table::NodesTable> {
         use groggy::storage::array::BaseArray;
+        use groggy::storage::table::{BaseTable, NodesTable};
         use std::collections::HashMap;
-        
+
         let graph = self.graph.borrow();
-        
+
         // Collect all constrained nodes with their attributes
         let mut attribute_columns: HashMap<String, Vec<groggy::AttrValue>> = HashMap::new();
-        
+
         // Initialize with node_id column
         attribute_columns.insert("node_id".to_string(), Vec::new());
-        
+
         // First pass: collect all attribute names that exist on ANY of the constrained nodes
         let mut all_attr_names = std::collections::HashSet::new();
         all_attr_names.insert("node_id".to_string());
-        
+
         for &node_id in constrained_nodes {
             if let Ok(attrs) = graph.get_node_attrs(node_id) {
                 for attr_name in attrs.keys() {
@@ -1202,40 +1227,48 @@ impl PyNodesAccessor {
                 }
             }
         }
-        
+
         // Initialize all columns
         for attr_name in &all_attr_names {
             if !attribute_columns.contains_key(attr_name) {
                 attribute_columns.insert(attr_name.clone(), Vec::new());
             }
         }
-        
+
         // Second pass: collect data for each constrained node
         for &node_id in constrained_nodes {
             // Add node_id
-            attribute_columns.get_mut("node_id").unwrap().push(groggy::AttrValue::Int(node_id as i64));
-            
+            attribute_columns
+                .get_mut("node_id")
+                .unwrap()
+                .push(groggy::AttrValue::Int(node_id as i64));
+
             // Get all attributes for this node
             let node_attrs = graph.get_node_attrs(node_id).unwrap_or_default();
-            
+
             // For each expected attribute, add the value or null
             for attr_name in &all_attr_names {
                 if attr_name == "node_id" {
                     continue; // Already handled
                 }
-                
-                let attr_value = node_attrs.get(attr_name)
+
+                let attr_value = node_attrs
+                    .get(attr_name)
                     .cloned()
                     .unwrap_or(groggy::AttrValue::Null);
-                    
-                attribute_columns.get_mut(attr_name).unwrap().push(attr_value);
+
+                attribute_columns
+                    .get_mut(attr_name)
+                    .unwrap()
+                    .push(attr_value);
             }
         }
-        
+
         // Apply auto-slicing: remove columns that are all null for this node set
-        let node_set: std::collections::HashSet<groggy::NodeId> = constrained_nodes.iter().copied().collect();
+        let node_set: std::collections::HashSet<groggy::NodeId> =
+            constrained_nodes.iter().copied().collect();
         let mut columns_to_keep = Vec::new();
-        
+
         for (attr_name, values) in &attribute_columns {
             if attr_name == "node_id" {
                 // Always keep node_id column
@@ -1248,7 +1281,7 @@ impl PyNodesAccessor {
                 }
             }
         }
-        
+
         // Create filtered attribute columns
         let mut filtered_columns = HashMap::new();
         for attr_name in columns_to_keep {
@@ -1256,17 +1289,17 @@ impl PyNodesAccessor {
                 filtered_columns.insert(attr_name, BaseArray::from_attr_values(values));
             }
         }
-        
+
         // Convert to BaseTable and then NodesTable
         let base_table = BaseTable::from_columns(filtered_columns)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to create BaseTable: {}", e)))?;
-            
+
         NodesTable::from_base_table(base_table)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to convert to NodesTable: {}", e)))
     }
 
     /// Get filtered node IDs based on entity type
-    /// 
+    ///
     /// Args:
     ///     filter_type: "base" for non-meta nodes, "meta" for meta-nodes
     ///     
@@ -1276,14 +1309,14 @@ impl PyNodesAccessor {
         let graph = self.graph.borrow();
         let entity_type_name = "entity_type".to_string();
         let mut filtered_nodes = Vec::new();
-        
+
         // Determine which nodes to check based on existing constraints
         let nodes_to_check = if let Some(ref constrained) = self.constrained_nodes {
             constrained.clone()
         } else {
             graph.node_ids()
         };
-        
+
         for node_id in nodes_to_check {
             // Check the entity_type attribute
             if let Ok(Some(entity_type_attr)) = graph.get_node_attr(node_id, &entity_type_name) {
@@ -1293,14 +1326,14 @@ impl PyNodesAccessor {
                     AttrValue::CompactText(s) => s.as_str().to_string(),
                     _ => continue, // Skip nodes with non-string entity_type
                 };
-                
+
                 // Filter based on requested type
                 let matches_filter = match filter_type {
                     "base" => entity_type_str != "meta", // Base = everything except meta
                     "meta" => entity_type_str == "meta", // Meta = only meta nodes
-                    _ => false, // Unknown filter type
+                    _ => false,                          // Unknown filter type
                 };
-                
+
                 if matches_filter {
                     filtered_nodes.push(node_id);
                 }
@@ -1309,7 +1342,7 @@ impl PyNodesAccessor {
                 filtered_nodes.push(node_id);
             }
         }
-        
+
         Ok(filtered_nodes)
     }
 
@@ -1319,7 +1352,9 @@ impl PyNodesAccessor {
         use crate::ffi::api::graph_attributes::PyGraphAttrMut;
 
         if attrs_dict.is_empty() {
-            return Err(PyValueError::new_err("attrs_dict is missing required attribute mappings"));
+            return Err(PyValueError::new_err(
+                "attrs_dict is missing required attribute mappings",
+            ));
         }
 
         // Normalize input so we always work with attribute-centric format:
@@ -1335,14 +1370,18 @@ impl PyNodesAccessor {
                 for (node_py, attr_map_py) in attrs_dict.iter() {
                     let node_id: NodeId = node_py.extract()?;
                     let attr_map = attr_map_py.downcast::<PyDict>().map_err(|_| {
-                        PyValueError::new_err("Expected dict of attributes per node when using node-centric format")
+                        PyValueError::new_err(
+                            "Expected dict of attributes per node when using node-centric format",
+                        )
                     })?;
 
                     for (attr_name_py, value_py) in attr_map.iter() {
                         let attr_name: String = attr_name_py.extract()?;
                         let target_dict = match normalized.get_item(attr_name.clone())? {
                             Some(existing) => existing.downcast::<PyDict>().map_err(|_| {
-                                PyValueError::new_err("Attribute entries must be dictionaries of node/value pairs")
+                                PyValueError::new_err(
+                                    "Attribute entries must be dictionaries of node/value pairs",
+                                )
                             })?,
                             None => {
                                 let new_dict = PyDict::new(py);
@@ -1393,20 +1432,20 @@ impl PyNodesAccessor {
 
     /// Apply auto-slicing to remove columns that are all NaN/None for the given node set
     fn apply_node_auto_slice(
-        &self, 
-        table: groggy::storage::table::BaseTable, 
-        node_set: &std::collections::HashSet<groggy::NodeId>
+        &self,
+        table: groggy::storage::table::BaseTable,
+        node_set: &std::collections::HashSet<groggy::NodeId>,
     ) -> PyResult<groggy::storage::table::BaseTable> {
         let graph = self.graph.borrow();
-        
+
         // Get all attribute names in the table
-        let column_names = table.column_names(); 
+        let column_names = table.column_names();
         let mut columns_to_keep = Vec::new();
-        
+
         for column_name in column_names {
             // Check if this column has any non-null values for the nodes in our set
             let mut has_non_null_value = false;
-            
+
             for &node_id in node_set {
                 // Try to get the attribute value for this node
                 match graph.get_node_attr(node_id, &groggy::AttrName::from(column_name.clone())) {
@@ -1427,13 +1466,13 @@ impl PyNodesAccessor {
                     }
                 }
             }
-            
+
             // If this column has at least one non-null value, keep it
             if has_non_null_value {
                 columns_to_keep.push(column_name.clone());
             }
         }
-        
+
         // Create a new table with only the columns that have data
         if columns_to_keep.len() == column_names.len() {
             // All columns have data, return original table
@@ -1444,9 +1483,9 @@ impl PyNodesAccessor {
             Ok(table)
         } else {
             // Select only the columns with data
-            table.select(&columns_to_keep).map_err(|e| {
-                PyValueError::new_err(format!("Failed to slice table columns: {}", e))
-            })
+            table
+                .select(&columns_to_keep)
+                .map_err(|e| PyValueError::new_err(format!("Failed to slice table columns: {}", e)))
         }
     }
 
@@ -1465,26 +1504,28 @@ impl PyNodesAccessor {
         // TODO: Implement proper conversion from NodesAccessor to SubgraphArray
         // This requires complex subgraph creation logic
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "NodesAccessor to SubgraphArray conversion not yet implemented."
+            "NodesAccessor to SubgraphArray conversion not yet implemented.",
         ))
     }
 
     /// Convert nodes to EdgesAccessor showing all edges connected to these nodes
     pub fn to_edges(&self) -> PyResult<crate::ffi::storage::accessors::PyEdgesAccessor> {
+        use groggy::types::{EdgeId, NodeId};
         use std::collections::HashSet;
-        use groggy::types::{NodeId, EdgeId};
-        
+
         let graph = self.graph.borrow();
         let node_ids: Vec<NodeId> = if let Some(ref constraint) = self.constrained_nodes {
             constraint.clone()
         } else {
             graph.node_ids()
         };
-        
+
         let node_set: HashSet<NodeId> = node_ids.into_iter().collect();
-        
+
         // Find all edges connected to any of these nodes
-        let connected_edges: Vec<EdgeId> = graph.edge_ids().into_iter()
+        let connected_edges: Vec<EdgeId> = graph
+            .edge_ids()
+            .into_iter()
             .filter(|&edge_id| {
                 if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
                     node_set.contains(&source) || node_set.contains(&target)
@@ -1493,9 +1534,9 @@ impl PyNodesAccessor {
                 }
             })
             .collect();
-        
+
         drop(graph); // Release the borrow before creating PyEdgesAccessor
-        
+
         let edges_accessor = PyEdgesAccessor {
             graph: self.graph.clone(),
             constrained_edges: Some(connected_edges),
@@ -1504,7 +1545,11 @@ impl PyNodesAccessor {
     }
 
     /// Convert Python value to BaseArray<AttrValue> for column assignment
-    fn convert_python_to_base_array(&self, py: Python, value: &PyAny) -> PyResult<BaseArray<AttrValue>> {
+    fn convert_python_to_base_array(
+        &self,
+        py: Python,
+        value: &PyAny,
+    ) -> PyResult<BaseArray<AttrValue>> {
         // Handle BaseArray directly
         if let Ok(base_array) = value.extract::<PyRef<PyBaseArray>>() {
             return Ok(base_array.inner.clone());
@@ -1514,8 +1559,9 @@ impl PyNodesAccessor {
         if let Ok(list) = value.extract::<Vec<PyObject>>() {
             let mut attr_values = Vec::new();
             for py_obj in list {
-                let attr_value = python_value_to_attr_value(py_obj.as_ref(py))
-                    .map_err(|e| PyValueError::new_err(format!("Failed to convert list element: {}", e)))?;
+                let attr_value = python_value_to_attr_value(py_obj.as_ref(py)).map_err(|e| {
+                    PyValueError::new_err(format!("Failed to convert list element: {}", e))
+                })?;
                 attr_values.push(attr_value);
             }
             return Ok(BaseArray::from_attr_values(attr_values));
@@ -1574,8 +1620,14 @@ impl PyNodesAccessor {
 
         // Set attributes using the graph's bulk set method
         for (attr_name, attr_value) in attributes {
-            graph.set_node_attr(node_id, attr_name.clone(), attr_value)
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to set attribute '{}': {}", attr_name, e)))?;
+            graph
+                .set_node_attr(node_id, attr_name.clone(), attr_value)
+                .map_err(|e| {
+                    PyRuntimeError::new_err(format!(
+                        "Failed to set attribute '{}': {}",
+                        attr_name, e
+                    ))
+                })?;
         }
 
         Ok(node_id)
@@ -1619,8 +1671,14 @@ impl PyNodesAccessor {
             for (key, value) in row_dict.iter() {
                 let attr_name: String = key.extract()?;
                 let attr_value = python_value_to_attr_value(value)?;
-                graph.set_node_attr(node_id, attr_name.clone(), attr_value)
-                    .map_err(|e| PyRuntimeError::new_err(format!("Failed to set attribute '{}' on node {}: {}", attr_name, node_id, e)))?;
+                graph
+                    .set_node_attr(node_id, attr_name.clone(), attr_value)
+                    .map_err(|e| {
+                        PyRuntimeError::new_err(format!(
+                            "Failed to set attribute '{}' on node {}: {}",
+                            attr_name, node_id, e
+                        ))
+                    })?;
             }
 
             new_node_ids.push(node_id);
@@ -1667,7 +1725,8 @@ impl PyNodesAccessor {
             if index >= current_nodes.len() {
                 return Err(PyIndexError::new_err(format!(
                     "Row index {} out of bounds for {} nodes",
-                    index, current_nodes.len()
+                    index,
+                    current_nodes.len()
                 )));
             }
             nodes_to_remove.push(current_nodes[index]);
@@ -1689,7 +1748,6 @@ impl PyNodesAccessor {
 
         Ok(removed_count)
     }
-
 }
 
 /// Iterator for edges that yields EdgeViews
@@ -1880,7 +1938,8 @@ impl PyEdgesAccessor {
                 "boolean_filtered".to_string(),
             );
 
-            let py_subgraph = crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(subgraph)?;
+            let py_subgraph =
+                crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(subgraph)?;
             return Ok(Py::new(py, py_subgraph)?.to_object(py));
         }
 
@@ -2115,7 +2174,7 @@ impl PyEdgesAccessor {
             name
         } else {
             return Err(PyTypeError::new_err(
-                "Column key must be a string. Use g.edges['column_name'] = values"
+                "Column key must be a string. Use g.edges['column_name'] = values",
             ));
         };
 
@@ -2180,11 +2239,14 @@ impl PyEdgesAccessor {
             // Phase 2: Apply all updates atomically (all-or-nothing)
             let mut graph = self.graph.borrow_mut();
             for (edge_id, value) in updates {
-                graph.set_edge_attr(edge_id, attr_name.clone(), value)
-                    .map_err(|e| PyRuntimeError::new_err(format!(
-                        "Atomic transaction failed at edge {}: {}",
-                        edge_id, e
-                    )))?;
+                graph
+                    .set_edge_attr(edge_id, attr_name.clone(), value)
+                    .map_err(|e| {
+                        PyRuntimeError::new_err(format!(
+                            "Atomic transaction failed at edge {}: {}",
+                            edge_id, e
+                        ))
+                    })?;
             }
             // If we reach here, all updates succeeded atomically
         }
@@ -2269,7 +2331,8 @@ impl PyEdgesAccessor {
         // Skip Python internal attributes to allow proper introspection
         if name.starts_with("__") && name.ends_with("__") {
             return Err(PyAttributeError::new_err(format!(
-                "'EdgesAccessor' object has no attribute '{}'", name
+                "'EdgesAccessor' object has no attribute '{}'",
+                name
             )));
         }
 
@@ -2373,7 +2436,7 @@ impl PyEdgesAccessor {
     /// Get filtered accessor for base edges (non-meta edges)
     ///
     /// Returns a new EdgesAccessor that only shows edges where entity_type != 'meta'
-    /// 
+    ///
     /// Example:
     ///     base_edges = g.edges.base
     ///     base_count = len(base_edges)  
@@ -2382,13 +2445,13 @@ impl PyEdgesAccessor {
     fn base(&self, py: Python) -> PyResult<PyObject> {
         // Get all base edges (entity_type != 'meta')
         let base_edge_ids = self.get_filtered_edge_ids("base")?;
-        
+
         // Create new constrained accessor
         let base_accessor = PyEdgesAccessor {
             graph: self.graph.clone(),
             constrained_edges: Some(base_edge_ids),
         };
-        
+
         Ok(Py::new(py, base_accessor)?.to_object(py))
     }
 
@@ -2404,16 +2467,16 @@ impl PyEdgesAccessor {
     fn meta(&self, py: Python) -> PyResult<PyObject> {
         // Get all meta-edges (entity_type == 'meta')
         let meta_edge_ids = self.get_filtered_edge_ids("meta")?;
-        
+
         // Create new constrained accessor
         let meta_accessor = PyEdgesAccessor {
             graph: self.graph.clone(),
             constrained_edges: Some(meta_edge_ids),
         };
-        
+
         Ok(Py::new(py, meta_accessor)?.to_object(py))
     }
-    
+
     /// Get an EdgesTable representation of accessible edges
     /// Implements: g.edges.table()  
     pub fn table(&self) -> PyResult<crate::ffi::storage::table::PyEdgesTable> {
@@ -2423,10 +2486,11 @@ impl PyEdgesAccessor {
         } else {
             // Unconstrained case: use the full graph table
             let graph = self.graph.borrow();
-            graph.edges_table()
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to create edges table: {}", e)))?
+            graph.edges_table().map_err(|e| {
+                PyRuntimeError::new_err(format!("Failed to create edges table: {}", e))
+            })?
         };
-        
+
         Ok(crate::ffi::storage::table::PyEdgesTable { table: edges_table })
     }
 
@@ -2439,7 +2503,7 @@ impl PyEdgesAccessor {
             let graph = self.graph.borrow();
             graph.edge_ids()
         };
-        
+
         let values: Vec<i64> = edge_ids.into_iter().map(|id| id as i64).collect();
         Ok(PyNumArray::new_int64(values))
     }
@@ -2449,7 +2513,7 @@ impl PyEdgesAccessor {
     #[getter]
     fn sources(&self, _py: Python) -> PyResult<PyNumArray> {
         let graph = self.graph.borrow();
-        
+
         let sources = if let Some(ref constrained_edges) = self.constrained_edges {
             // Constrained case: only get sources for the constrained edges
             let mut constrained_sources = Vec::new();
@@ -2463,7 +2527,7 @@ impl PyEdgesAccessor {
             // Unconstrained case: get all edge sources
             graph.edge_sources()
         };
-        
+
         let values: Vec<i64> = sources.into_iter().map(|id| id as i64).collect();
         Ok(PyNumArray::new_int64(values))
     }
@@ -2473,7 +2537,7 @@ impl PyEdgesAccessor {
     #[getter]
     fn targets(&self, _py: Python) -> PyResult<PyNumArray> {
         let graph = self.graph.borrow();
-        
+
         let targets = if let Some(ref constrained_edges) = self.constrained_edges {
             // Constrained case: only get targets for the constrained edges
             let mut constrained_targets = Vec::new();
@@ -2487,7 +2551,7 @@ impl PyEdgesAccessor {
             // Unconstrained case: get all edge targets
             graph.edge_targets()
         };
-        
+
         let values: Vec<i64> = targets.into_iter().map(|id| id as i64).collect();
         Ok(PyNumArray::new_int64(values))
     }
@@ -2496,26 +2560,37 @@ impl PyEdgesAccessor {
     /// Implements: g.edges.matrix()
     fn matrix(&self, py: Python) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         use crate::ffi::storage::matrix::PyGraphMatrix;
-        
+
         // For now, delegate to adjacency matrix - later we can implement edge attribute matrices
         let graph_ref = self.graph.borrow();
-        let matrix = graph_ref.to_adjacency_matrix::<f64>()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Matrix conversion failed: {}", e)))?;
-        
+        let matrix = graph_ref.to_adjacency_matrix::<f64>().map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Matrix conversion failed: {}", e))
+        })?;
+
         Py::new(py, PyGraphMatrix { inner: matrix })
     }
-    
+
     /// Edge weight matrix (source × target with weights)
     /// Default to 'weight' attribute, but allow custom attribute selection
     /// Implements: g.edges.weight_matrix() and g.edges.weight_matrix('strength')
-    fn weight_matrix(&self, py: Python, attr_name: Option<String>) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
+    fn weight_matrix(
+        &self,
+        py: Python,
+        attr_name: Option<String>,
+    ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         use crate::ffi::storage::matrix::PyGraphMatrix;
 
         let weight_attr = attr_name.unwrap_or_else(|| "weight".to_string());
         let graph_ref = self.graph.borrow();
 
-        let matrix = graph_ref.to_weighted_adjacency_matrix::<f64>(&weight_attr)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Weight matrix conversion failed: {}", e)))?;
+        let matrix = graph_ref
+            .to_weighted_adjacency_matrix::<f64>(&weight_attr)
+            .map_err(|e| {
+                pyo3::exceptions::PyValueError::new_err(format!(
+                    "Weight matrix conversion failed: {}",
+                    e
+                ))
+            })?;
 
         Py::new(py, PyGraphMatrix { inner: matrix })
     }
@@ -2529,7 +2604,7 @@ impl PyEdgesAccessor {
         let edges_array = PyEdgesArray::new(vec![self.clone()]);
         Py::new(py, edges_array)
     }
-    
+
     /// Group edges by attribute value, returning SubgraphArray
     ///
     /// Args:
@@ -2541,9 +2616,12 @@ impl PyEdgesAccessor {
     /// Example:
     ///     type_groups = g.edges.group_by('interaction_type')
     ///     # Returns subgraphs for each interaction type
-    pub fn group_by(&self, attr_names: &PyAny) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
-        use std::collections::HashMap;
+    pub fn group_by(
+        &self,
+        attr_names: &PyAny,
+    ) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
         use groggy::types::{AttrName, EdgeId};
+        use std::collections::HashMap;
         use std::collections::HashSet;
 
         // Parse attr_names as either String or Vec<String>
@@ -2553,11 +2631,12 @@ impl PyEdgesAccessor {
             multiple
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(
-                "attr_names must be a string or list of strings"
+                "attr_names must be a string or list of strings",
             ));
         };
 
-        let attr_names_typed: Vec<AttrName> = attr_name_list.iter()
+        let attr_names_typed: Vec<AttrName> = attr_name_list
+            .iter()
             .map(|s| AttrName::from(s.clone()))
             .collect();
 
@@ -2587,7 +2666,10 @@ impl PyEdgesAccessor {
             }
 
             if has_all_attrs {
-                groups.entry(key_values).or_insert_with(Vec::new).push(edge_id);
+                groups
+                    .entry(key_values)
+                    .or_insert_with(Vec::new)
+                    .push(edge_id);
             }
         }
 
@@ -2626,12 +2708,12 @@ impl PyEdgesAccessor {
                 subgraph_name,
             );
 
-            subgraphs.push(crate::ffi::subgraphs::subgraph::PySubgraph {
-                inner: subgraph,
-            });
+            subgraphs.push(crate::ffi::subgraphs::subgraph::PySubgraph { inner: subgraph });
         }
 
-        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(subgraphs))
+        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
+            subgraphs,
+        ))
     }
 
     /// Get viz accessor for visualization operations
@@ -2681,7 +2763,7 @@ impl PyEdgesAccessor {
         let graph_data_source = groggy::viz::streaming::GraphDataSource::new(&viz_graph);
         let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
             graph_data_source,
-            "EdgesAccessor".to_string()
+            "EdgesAccessor".to_string(),
         );
 
         Py::new(py, viz_accessor)
@@ -2690,27 +2772,30 @@ impl PyEdgesAccessor {
 
 impl PyEdgesAccessor {
     /// Create an EdgesTable for only the constrained edges
-    fn create_constrained_edges_table(&self, constrained_edges: &[groggy::EdgeId]) -> PyResult<groggy::storage::table::EdgesTable> {
-        use groggy::storage::table::{BaseTable, EdgesTable};
+    fn create_constrained_edges_table(
+        &self,
+        constrained_edges: &[groggy::EdgeId],
+    ) -> PyResult<groggy::storage::table::EdgesTable> {
         use groggy::storage::array::BaseArray;
+        use groggy::storage::table::{BaseTable, EdgesTable};
         use std::collections::HashMap;
-        
+
         let graph = self.graph.borrow();
-        
+
         // Collect all constrained edges with their attributes
         let mut attribute_columns: HashMap<String, Vec<groggy::AttrValue>> = HashMap::new();
-        
+
         // Initialize with required edge columns: edge_id, source, target
         attribute_columns.insert("edge_id".to_string(), Vec::new());
         attribute_columns.insert("source".to_string(), Vec::new());
         attribute_columns.insert("target".to_string(), Vec::new());
-        
+
         // First pass: collect all attribute names that exist on ANY of the constrained edges
         let mut all_attr_names = std::collections::HashSet::new();
         all_attr_names.insert("edge_id".to_string());
         all_attr_names.insert("source".to_string());
         all_attr_names.insert("target".to_string());
-        
+
         for &edge_id in constrained_edges {
             if let Ok(attrs) = graph.get_edge_attrs(edge_id) {
                 for attr_name in attrs.keys() {
@@ -2718,49 +2803,68 @@ impl PyEdgesAccessor {
                 }
             }
         }
-        
+
         // Initialize all columns
         for attr_name in &all_attr_names {
             if !attribute_columns.contains_key(attr_name) {
                 attribute_columns.insert(attr_name.clone(), Vec::new());
             }
         }
-        
+
         // Second pass: collect data for each constrained edge
         for &edge_id in constrained_edges {
             // Add edge_id
-            attribute_columns.get_mut("edge_id").unwrap().push(groggy::AttrValue::Int(edge_id as i64));
-            
+            attribute_columns
+                .get_mut("edge_id")
+                .unwrap()
+                .push(groggy::AttrValue::Int(edge_id as i64));
+
             // Add source and target
             if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
-                attribute_columns.get_mut("source").unwrap().push(groggy::AttrValue::Int(source as i64));
-                attribute_columns.get_mut("target").unwrap().push(groggy::AttrValue::Int(target as i64));
+                attribute_columns
+                    .get_mut("source")
+                    .unwrap()
+                    .push(groggy::AttrValue::Int(source as i64));
+                attribute_columns
+                    .get_mut("target")
+                    .unwrap()
+                    .push(groggy::AttrValue::Int(target as i64));
             } else {
                 // Handle missing endpoints
-                attribute_columns.get_mut("source").unwrap().push(groggy::AttrValue::Null);
-                attribute_columns.get_mut("target").unwrap().push(groggy::AttrValue::Null);
+                attribute_columns
+                    .get_mut("source")
+                    .unwrap()
+                    .push(groggy::AttrValue::Null);
+                attribute_columns
+                    .get_mut("target")
+                    .unwrap()
+                    .push(groggy::AttrValue::Null);
             }
-            
+
             // Get all attributes for this edge
             let edge_attrs = graph.get_edge_attrs(edge_id).unwrap_or_default();
-            
+
             // For each expected attribute, add the value or null
             for attr_name in &all_attr_names {
                 if matches!(attr_name.as_str(), "edge_id" | "source" | "target") {
                     continue; // Already handled
                 }
-                
-                let attr_value = edge_attrs.get(attr_name)
+
+                let attr_value = edge_attrs
+                    .get(attr_name)
                     .cloned()
                     .unwrap_or(groggy::AttrValue::Null);
-                    
-                attribute_columns.get_mut(attr_name).unwrap().push(attr_value);
+
+                attribute_columns
+                    .get_mut(attr_name)
+                    .unwrap()
+                    .push(attr_value);
             }
         }
-        
+
         // Apply auto-slicing: remove columns that are all null for this edge set
         let mut columns_to_keep = Vec::new();
-        
+
         for (attr_name, values) in &attribute_columns {
             if matches!(attr_name.as_str(), "edge_id" | "source" | "target") {
                 // Always keep required edge columns
@@ -2773,7 +2877,7 @@ impl PyEdgesAccessor {
                 }
             }
         }
-        
+
         // Create filtered attribute columns
         let mut filtered_columns = HashMap::new();
         for attr_name in columns_to_keep {
@@ -2781,11 +2885,11 @@ impl PyEdgesAccessor {
                 filtered_columns.insert(attr_name, BaseArray::from_attr_values(values));
             }
         }
-        
+
         // Convert to BaseTable and then EdgesTable
         let base_table = BaseTable::from_columns(filtered_columns)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to create BaseTable: {}", e)))?;
-            
+
         EdgesTable::from_base_table(base_table)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to convert to EdgesTable: {}", e)))
     }
@@ -2795,7 +2899,9 @@ impl PyEdgesAccessor {
         use crate::ffi::api::graph_attributes::PyGraphAttrMut;
 
         if attrs_dict.is_empty() {
-            return Err(PyValueError::new_err("attrs_dict is missing required attribute mappings"));
+            return Err(PyValueError::new_err(
+                "attrs_dict is missing required attribute mappings",
+            ));
         }
 
         // Create a mutable graph attributes handler
@@ -2837,14 +2943,14 @@ impl PyEdgesAccessor {
         let graph = self.graph.borrow();
         let entity_type_name = "entity_type".to_string();
         let mut filtered_edges = Vec::new();
-        
+
         // Determine which edges to check based on existing constraints
         let edge_ids_to_check = if let Some(ref constrained) = self.constrained_edges {
             constrained.clone()
         } else {
             graph.edge_ids()
         };
-        
+
         for edge_id in edge_ids_to_check {
             // Try to get entity_type attribute for this edge
             match graph.get_edge_attr(edge_id, &entity_type_name) {
@@ -2855,17 +2961,19 @@ impl PyEdgesAccessor {
                         groggy::AttrValue::CompactText(compact) => compact.as_str(),
                         _ => continue, // Skip edges with non-string entity_type
                     };
-                    
+
                     // Apply filter logic
                     let should_include = match filter_type {
                         "base" => entity_type_str != "meta", // Include non-meta edges
                         "meta" => entity_type_str == "meta", // Include only meta-edges
-                        _ => return Err(PyValueError::new_err(format!(
-                            "Invalid filter_type: {}. Must be 'base' or 'meta'",
-                            filter_type
-                        ))),
+                        _ => {
+                            return Err(PyValueError::new_err(format!(
+                                "Invalid filter_type: {}. Must be 'base' or 'meta'",
+                                filter_type
+                            )))
+                        }
                     };
-                    
+
                     if should_include {
                         filtered_edges.push(edge_id);
                     }
@@ -2884,28 +2992,28 @@ impl PyEdgesAccessor {
                 }
             }
         }
-        
+
         Ok(filtered_edges)
     }
 
     /// Apply auto-slicing to remove columns that are all NaN/None for the given edge set
     fn apply_edge_auto_slice(
-        &self, 
-        table: groggy::storage::table::BaseTable, 
-        edge_set: &std::collections::HashSet<groggy::EdgeId>
+        &self,
+        table: groggy::storage::table::BaseTable,
+        edge_set: &std::collections::HashSet<groggy::EdgeId>,
     ) -> PyResult<groggy::storage::table::BaseTable> {
         let graph = self.graph.borrow();
-        
+
         // Get all attribute names in the table
         let column_names = table.column_names();
         let mut columns_to_keep = Vec::new();
-        
+
         for column_name in column_names {
             // Check if this column has any non-null values for the edges in our set
             let mut has_non_null_value = false;
-            
+
             for &edge_id in edge_set {
-                // Try to get the attribute value for this edge  
+                // Try to get the attribute value for this edge
                 match graph.get_edge_attr(edge_id, column_name) {
                     Ok(Some(attr_value)) => {
                         // Check if the value is not null/none
@@ -2924,13 +3032,13 @@ impl PyEdgesAccessor {
                     }
                 }
             }
-            
+
             // If this column has at least one non-null value, keep it
             if has_non_null_value {
                 columns_to_keep.push(column_name.clone());
             }
         }
-        
+
         // Create a new table with only the columns that have data
         if columns_to_keep.len() == column_names.len() {
             // All columns have data, return original table
@@ -2941,9 +3049,9 @@ impl PyEdgesAccessor {
             Ok(table)
         } else {
             // Select only the columns with data
-            table.select(&columns_to_keep).map_err(|e| {
-                PyValueError::new_err(format!("Failed to slice table columns: {}", e))
-            })
+            table
+                .select(&columns_to_keep)
+                .map_err(|e| PyValueError::new_err(format!("Failed to slice table columns: {}", e)))
         }
     }
 
@@ -2960,26 +3068,26 @@ impl PyEdgesAccessor {
     /// Convert edges to NodesAccessor containing all nodes connected to these edges
     pub fn nodes(&self) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
         use std::collections::HashSet;
-        
+
         let graph = self.graph.borrow();
         let edge_ids: Vec<EdgeId> = if let Some(ref constraint) = self.constrained_edges {
             constraint.clone()
         } else {
             graph.edge_ids()
         };
-        
+
         // Collect all nodes connected to these edges
         let mut connected_nodes: HashSet<NodeId> = HashSet::new();
-        
+
         for &edge_id in &edge_ids {
             if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
                 connected_nodes.insert(source);
                 connected_nodes.insert(target);
             }
         }
-        
+
         let node_ids: Vec<NodeId> = connected_nodes.into_iter().collect();
-        
+
         Ok(PyNodesAccessor {
             graph: self.graph.clone(),
             constrained_nodes: Some(node_ids),
@@ -2988,30 +3096,30 @@ impl PyEdgesAccessor {
 
     /// Convert edges to NodesAccessor showing all nodes connected by these edges
     pub fn to_nodes(&self) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
+        use groggy::types::{EdgeId, NodeId};
         use std::collections::HashSet;
-        use groggy::types::{NodeId, EdgeId};
-        
+
         let graph = self.graph.borrow();
         let edge_ids: Vec<EdgeId> = if let Some(ref constraint) = self.constrained_edges {
             constraint.clone()
         } else {
             graph.edge_ids()
         };
-        
+
         // Collect all nodes that are endpoints of these edges
         let mut connected_nodes = HashSet::new();
-        
+
         for &edge_id in &edge_ids {
             if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
                 connected_nodes.insert(source);
                 connected_nodes.insert(target);
             }
         }
-        
+
         let node_ids: Vec<NodeId> = connected_nodes.into_iter().collect();
-        
+
         drop(graph); // Release the borrow before creating PyNodesAccessor
-        
+
         let nodes_accessor = PyNodesAccessor {
             graph: self.graph.clone(),
             constrained_nodes: Some(node_ids),
@@ -3024,12 +3132,16 @@ impl PyEdgesAccessor {
         // TODO: Implement proper conversion from EdgesAccessor to SubgraphArray
         // This requires complex subgraph creation logic
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
-            "EdgesAccessor to SubgraphArray conversion not yet implemented."
+            "EdgesAccessor to SubgraphArray conversion not yet implemented.",
         ))
     }
 
     /// Convert Python value to BaseArray<AttrValue> for column assignment
-    fn convert_python_to_base_array(&self, py: Python, value: &PyAny) -> PyResult<BaseArray<AttrValue>> {
+    fn convert_python_to_base_array(
+        &self,
+        py: Python,
+        value: &PyAny,
+    ) -> PyResult<BaseArray<AttrValue>> {
         // Handle BaseArray directly
         if let Ok(base_array) = value.extract::<PyRef<PyBaseArray>>() {
             return Ok(base_array.inner.clone());
@@ -3039,8 +3151,9 @@ impl PyEdgesAccessor {
         if let Ok(list) = value.extract::<Vec<PyObject>>() {
             let mut attr_values = Vec::new();
             for py_obj in list {
-                let attr_value = python_value_to_attr_value(py_obj.as_ref(py))
-                    .map_err(|e| PyValueError::new_err(format!("Failed to convert list element: {}", e)))?;
+                let attr_value = python_value_to_attr_value(py_obj.as_ref(py)).map_err(|e| {
+                    PyValueError::new_err(format!("Failed to convert list element: {}", e))
+                })?;
                 attr_values.push(attr_value);
             }
             return Ok(BaseArray::from_attr_values(attr_values));
@@ -3062,5 +3175,4 @@ impl PyEdgesAccessor {
         let attr_values = vec![attr_value; edge_count];
         Ok(BaseArray::from_attr_values(attr_values))
     }
-
 }

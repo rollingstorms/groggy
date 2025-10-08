@@ -794,7 +794,7 @@ impl DataSourceRealtimeAccessor {
 
     /// Create graph metadata
     fn create_meta(&self, node_count: usize, edge_count: usize, has_positions: bool) -> GraphMeta {
-        let ds_meta = self.data_source.get_graph_metadata();
+        let _ds_meta = self.data_source.get_graph_metadata();
 
         GraphMeta {
             node_count,
@@ -845,11 +845,11 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                 }
 
                 if method == "rotation" {
-                    let rotation_x = params
+                    let _rotation_x = params
                         .get("rotation_x")
                         .and_then(|s| s.parse::<f64>().ok())
                         .unwrap_or(0.0);
-                    let rotation_y = params
+                    let _rotation_y = params
                         .get("rotation_y")
                         .and_then(|s| s.parse::<f64>().ok())
                         .unwrap_or(0.0);

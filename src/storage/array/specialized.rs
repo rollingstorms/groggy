@@ -99,6 +99,7 @@ pub struct EdgesArray {
     /// Optional reference to the parent graph for graph-aware operations
     graph_ref: Option<Rc<RefCell<Graph>>>,
     /// Optional name for debugging
+    #[allow(dead_code)]
     name: Option<String>,
 }
 
@@ -163,6 +164,7 @@ pub struct MetaNodeArray {
     /// Optional reference to the parent graph for graph-aware operations
     graph_ref: Option<Rc<RefCell<Graph>>>,
     /// Optional name for debugging
+    #[allow(dead_code)]
     name: Option<String>,
 }
 

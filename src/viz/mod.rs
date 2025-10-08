@@ -280,28 +280,6 @@ impl VizModule {
         Ok(RenderResult::Html(html))
     }
 
-    /// Render for streaming WebSocket server
-    fn render_streaming(&self, options: RenderOptions) -> GraphResult<RenderResult> {
-        // Delegate to existing interactive method
-        let interactive_opts = InteractiveOptions {
-            port: options.port.unwrap_or(8080),
-            layout: options.layout.unwrap_or(LayoutAlgorithm::ForceDirected {
-                charge: -30.0,
-                distance: 50.0,
-                iterations: 100,
-            }),
-            theme: options.theme.unwrap_or_else(|| "light".to_string()),
-            width: options.width.unwrap_or(800),
-            height: options.height.unwrap_or(600),
-            interactions: InteractionConfig::default(),
-            show_labels: false,
-            auto_open: false,
-        };
-
-        let interactive_viz = self.interactive(Some(interactive_opts))?;
-        Ok(RenderResult::Interactive(interactive_viz))
-    }
-
     /// Render for advanced real-time visualization with Phase 3 features
     fn render_realtime(&self, options: RenderOptions) -> GraphResult<RenderResult> {
         let verbose = options.verbose.unwrap_or(0);
@@ -1645,6 +1623,7 @@ impl InteractiveViz {
 pub struct InteractiveVizSession {
     server_handle: streaming::types::ServerHandle,
     url: String,
+    #[allow(dead_code)]
     config: InteractiveOptions,
 }
 

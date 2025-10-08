@@ -3,19 +3,19 @@
 //! Lazy array of connected components - only materializes PySubgraphs on access
 
 use groggy::api::graph::Graph;
+use groggy::storage::array::{ArrayIterator, ArrayOps, SubgraphLike};
 use groggy::subgraphs::Subgraph;
-use groggy::{EdgeId, NodeId};
-use groggy::storage::array::{ArrayOps, ArrayIterator, SubgraphLike};
 use groggy::traits::SubgraphOperations;
-use pyo3::exceptions::{PyAttributeError, PyIndexError, PyRuntimeError};
+use groggy::{EdgeId, NodeId};
+use pyo3::exceptions::{PyIndexError, PyRuntimeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::ffi::subgraphs::subgraph::PySubgraph;
 use crate::ffi::entities::meta_node::PyMetaNode;
+use crate::ffi::subgraphs::subgraph::PySubgraph;
 
 /// Lazy array of connected components - avoids creating hundreds of PySubgraphs immediately
 #[pyclass(name = "ComponentsArray", unsendable)]
@@ -200,11 +200,11 @@ impl PyComponentsArray {
 
         self.__getitem__(largest_index as isize)
     }
-    
+
     /// Direct delegation: Apply table() to each component and return PyTableArray
     fn table(&self) -> PyResult<crate::ffi::storage::table_array::PyTableArray> {
         let mut tables = Vec::new();
-        
+
         Python::with_gil(|py| {
             for i in 0..self.components_data.len() {
                 if let Ok(component) = self.__getitem__(i as isize) {
@@ -215,14 +215,14 @@ impl PyComponentsArray {
                 }
             }
         });
-        
+
         Ok(crate::ffi::storage::table_array::PyTableArray::new(tables))
     }
-    
+
     /// Direct delegation: Apply sample(k) to each component and return PySubgraphArray
     fn sample(&self, k: usize) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
         let mut sampled = Vec::new();
-        
+
         for i in 0..self.components_data.len() {
             if let Ok(component) = self.__getitem__(i as isize) {
                 match component.sample(k) {
@@ -231,19 +231,22 @@ impl PyComponentsArray {
                 }
             }
         }
-        
-        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(sampled))
+
+        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
+            sampled,
+        ))
     }
-    
+
     /// Direct delegation: Apply neighborhood() to each component and return PySubgraphArray
     fn neighborhood(&self) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
         let mut neighborhoods = Vec::new();
-        
+
         Python::with_gil(|py| {
             for i in 0..self.components_data.len() {
                 if let Ok(component) = self.__getitem__(i as isize) {
                     // For simplicity, use first node as central and 1 hop
-                    let node_ids: Vec<groggy::NodeId> = component.inner.node_set().iter().take(1).copied().collect();
+                    let node_ids: Vec<groggy::NodeId> =
+                        component.inner.node_set().iter().take(1).copied().collect();
                     if !node_ids.is_empty() {
                         let node_list = PyList::new(py, &node_ids);
                         let node_any: &PyAny = node_list.as_ref();
@@ -251,7 +254,7 @@ impl PyComponentsArray {
                             Ok(_neighborhood_result) => {
                                 // For now, return the original component as placeholder
                                 neighborhoods.push(component);
-                            },
+                            }
                             Err(_) => continue, // Skip failed components
                         }
                     } else {
@@ -260,14 +263,16 @@ impl PyComponentsArray {
                 }
             }
         });
-        
-        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(neighborhoods))
+
+        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
+            neighborhoods,
+        ))
     }
-    
+
     /// Direct delegation: Apply filter to components
     fn filter(&self, predicate: PyObject) -> PyResult<Self> {
         let mut filtered_data = Vec::new();
-        
+
         Python::with_gil(|py| {
             for i in 0..self.components_data.len() {
                 if let Ok(component) = self.__getitem__(i as isize) {
@@ -277,13 +282,13 @@ impl PyComponentsArray {
                             if result.is_true(py).unwrap_or(false) {
                                 filtered_data.push(self.components_data[i].clone());
                             }
-                        },
+                        }
                         Err(_) => continue, // Skip on error
                     }
                 }
             }
         });
-        
+
         Ok(Self {
             components_data: filtered_data,
             graph_ref: self.graph_ref.clone(),
@@ -295,7 +300,7 @@ impl PyComponentsArray {
     #[getter]
     fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
         use groggy::viz::streaming::GraphDataSource;
-        
+
         // Create a combined graph from all components
         let mut viz_graph = groggy::api::graph::Graph::new();
         let mut node_mapping = std::collections::HashMap::new();
@@ -307,25 +312,35 @@ impl PyComponentsArray {
                 if !node_mapping.contains_key(&node_id) {
                     let new_node_id = viz_graph.add_node();
                     node_mapping.insert(node_id, new_node_id);
-                    
+
                     // Copy node attributes
                     if let Ok(attrs) = self.graph_ref.borrow().get_node_attrs(node_id) {
                         for (attr_name, attr_value) in attrs {
-                            let _ = viz_graph.set_node_attr(new_node_id, attr_name.to_string(), attr_value.clone());
+                            let _ = viz_graph.set_node_attr(
+                                new_node_id,
+                                attr_name.to_string(),
+                                attr_value.clone(),
+                            );
                         }
                     }
                 }
             }
-            
+
             // Add edges from this component
             for &edge_id in component_edges {
                 if let Ok((source, target)) = self.graph_ref.borrow().edge_endpoints(edge_id) {
-                    if let (Some(&viz_source), Some(&viz_target)) = (node_mapping.get(&source), node_mapping.get(&target)) {
+                    if let (Some(&viz_source), Some(&viz_target)) =
+                        (node_mapping.get(&source), node_mapping.get(&target))
+                    {
                         if let Ok(new_edge_id) = viz_graph.add_edge(viz_source, viz_target) {
                             // Copy edge attributes
                             if let Ok(attrs) = self.graph_ref.borrow().get_edge_attrs(edge_id) {
                                 for (attr_name, attr_value) in attrs {
-                                    let _ = viz_graph.set_edge_attr(new_edge_id, attr_name.to_string(), attr_value.clone());
+                                    let _ = viz_graph.set_edge_attr(
+                                        new_edge_id,
+                                        attr_name.to_string(),
+                                        attr_value.clone(),
+                                    );
                                 }
                             }
                         }
@@ -337,7 +352,7 @@ impl PyComponentsArray {
         let graph_data_source = GraphDataSource::new(&viz_graph);
         let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
             graph_data_source,
-            "ComponentsArray".to_string()
+            "ComponentsArray".to_string(),
         );
         Py::new(py, viz_accessor)
     }
@@ -376,28 +391,28 @@ impl ArrayOps<PySubgraph> for PyComponentsArray {
     fn len(&self) -> usize {
         self.components_data.len()
     }
-    
+
     fn get(&self, _index: usize) -> Option<&PySubgraph> {
         // For ArrayOps, we can't return a reference because we create on demand
         // This is a limitation of our lazy materialization approach
         // We'll need to materialize and cache to support this properly
         None // TODO: Consider changing ArrayOps to return owned values for some types
     }
-    
-    fn iter(&self) -> ArrayIterator<PySubgraph> 
-    where 
-        PySubgraph: Clone + 'static 
+
+    fn iter(&self) -> ArrayIterator<PySubgraph>
+    where
+        PySubgraph: Clone + 'static,
     {
         // Materialize all components for the iterator
         let mut materialized: Vec<PySubgraph> = Vec::new();
-        
+
         for i in 0..self.components_data.len() {
             // Use our existing lazy materialization logic
             if let Ok(py_subgraph) = self.__getitem__(i as isize) {
                 materialized.push(py_subgraph);
             }
         }
-        
+
         // Create iterator with graph reference for graph-aware operations
         ArrayIterator::with_graph(materialized, self.graph_ref.clone())
     }
@@ -429,7 +444,7 @@ impl PyComponentsIterator {
             inner: inner.filter_nodes(query),
         })
     }
-    
+
     /// Filter edges within subgraphs using a query string
     /// Enables: g.connected_components().iter().filter_edges('weight > 0.5')
     fn filter_edges(slf: PyRefMut<Self>, query: &str) -> PyResult<Self> {
@@ -438,7 +453,7 @@ impl PyComponentsIterator {
             inner: inner.filter_edges(query),
         })
     }
-    
+
     /// Collapse subgraphs into meta-nodes with aggregations
     /// Enables: g.connected_components().iter().collapse({'avg_age': ('mean', 'age')})
     fn collapse(slf: PyRefMut<Self>, aggs: &PyDict) -> PyResult<PyMetaNodeIterator> {
@@ -449,15 +464,15 @@ impl PyComponentsIterator {
             let value_str = value.str()?.to_str()?;
             agg_map.insert(key_str.to_string(), value_str.to_string());
         }
-        
+
         let inner = slf.inner.clone(); // Clone the inner ArrayIterator
         let meta_iterator = inner.collapse(agg_map);
-        
+
         Ok(PyMetaNodeIterator {
             inner: meta_iterator,
         })
     }
-    
+
     /// Collect results back into a ComponentsArray-like structure
     /// Enables: g.connected_components().iter().filter_nodes().collect()
     fn collect(slf: PyRefMut<Self>) -> PyResult<Vec<PySubgraph>> {
@@ -465,12 +480,12 @@ impl PyComponentsIterator {
         let inner = slf.inner.clone(); // Clone the inner ArrayIterator
         Ok(inner.into_vec())
     }
-    
+
     /// Apply table() to each component and return PyTableArray
     fn table(&mut self) -> PyResult<crate::ffi::storage::table_array::PyTableArray> {
         let components = self.inner.clone().into_vec();
         let mut tables = Vec::new();
-        
+
         Python::with_gil(|py| {
             for component in components {
                 match component.table(py) {
@@ -479,43 +494,49 @@ impl PyComponentsIterator {
                 }
             }
         });
-        
+
         Ok(crate::ffi::storage::table_array::PyTableArray::new(tables))
     }
-    
+
     /// Apply sample(k) to each component and return PySubgraphArray
-    fn sample(&mut self, k: usize) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+    fn sample(
+        &mut self,
+        k: usize,
+    ) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
         let components = self.inner.clone().into_vec();
         let mut sampled = Vec::new();
-        
+
         for component in components {
             match component.sample(k) {
                 Ok(sampled_component) => sampled.push(sampled_component),
                 Err(_) => continue, // Skip failed components
             }
         }
-        
-        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(sampled))
+
+        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
+            sampled,
+        ))
     }
-    
+
     /// Apply neighborhood() to each component and return PySubgraphArray (simplified version)
     fn neighborhood(&mut self) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
         let components = self.inner.clone().into_vec();
         let mut neighborhoods = Vec::new();
-        
+
         Python::with_gil(|py| {
             for component in components {
                 // For simplicity, use first node as central and 1 hop
-                let node_ids: Vec<groggy::NodeId> = component.inner.node_set().iter().take(1).copied().collect();
-                    if !node_ids.is_empty() {
-                        let node_list = PyList::new(py, &node_ids);
-                        let node_any: &PyAny = node_list.as_ref();
-                        match component.neighborhood(py, Some(node_any), 1) {
+                let node_ids: Vec<groggy::NodeId> =
+                    component.inner.node_set().iter().take(1).copied().collect();
+                if !node_ids.is_empty() {
+                    let node_list = PyList::new(py, &node_ids);
+                    let node_any: &PyAny = node_list.as_ref();
+                    match component.neighborhood(py, Some(node_any), 1) {
                         Ok(_neighborhood_result) => {
                             // For now, return the original component as placeholder
                             // In full implementation, would extract subgraph from neighborhood result
                             neighborhoods.push(component);
-                        },
+                        }
                         Err(_) => continue, // Skip failed components
                     }
                 } else {
@@ -523,24 +544,26 @@ impl PyComponentsIterator {
                 }
             }
         });
-        
-        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(neighborhoods))
+
+        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
+            neighborhoods,
+        ))
     }
 }
 
-/// Python wrapper for ArrayIterator<MetaNode> 
+/// Python wrapper for ArrayIterator<MetaNode>
 #[pyclass(name = "MetaNodeIterator", unsendable)]
 pub struct PyMetaNodeIterator {
     inner: ArrayIterator<()>, // Placeholder for now
 }
 
-#[pymethods] 
+#[pymethods]
 impl PyMetaNodeIterator {
     /// Collect meta-nodes into a list - placeholder implementation
     fn collect(slf: PyRefMut<Self>) -> PyResult<Vec<String>> {
         let inner = slf.inner.clone(); // Clone the inner ArrayIterator
         let _elements = inner.into_vec(); // Get the placeholder elements
-        // Return placeholder result for now
+                                          // Return placeholder result for now
         Ok(vec!["placeholder_meta_node".to_string()])
     }
 }

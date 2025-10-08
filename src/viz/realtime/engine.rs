@@ -27,7 +27,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{broadcast, mpsc};
-use tokio::time::{interval, sleep};
+use tokio::time::interval;
 
 /// Main real-time visualization engine
 pub struct RealTimeVizEngine {
@@ -63,6 +63,7 @@ pub struct RealTimeVizEngine {
     /// Pending parameter deltas to include with the next envelope broadcast
     pending_params_changed: Option<HashMap<String, serde_json::Value>>,
     /// Active animation controllers
+    #[allow(dead_code)]
     animation_controllers: Vec<AnimationController>,
 
     /// Frame timing history for FPS calculation
@@ -244,7 +245,7 @@ impl RealTimeVizEngine {
         self.performance_monitor.start()?;
 
         // Setup communication channels
-        let (control_tx, control_rx) = mpsc::unbounded_channel();
+        let (_control_tx, control_rx) = mpsc::unbounded_channel();
 
         self.control_receiver = Some(control_rx);
 
@@ -492,7 +493,7 @@ impl RealTimeVizEngine {
                 self.apply_nd_rotation(axis_i, axis_j, radians).await?;
             }
 
-            ControlCommand::SetViewRotation { radians } => {
+            ControlCommand::SetViewRotation { radians: _ } => {
                 // Controllers that support this should interpret via Pointer/Wheel events.
                 self.broadcast_view_state().await?;
             }
@@ -867,13 +868,13 @@ impl RealTimeVizEngine {
                                     flat_embedding_matrix = crate::storage::matrix::GraphMatrix::from_storage(unified);
                                     &flat_embedding_matrix
                                 }
-                                Err(e) => {
+                                Err(_e) => {
                                     // Failed to create matrix from flat positions, using original embedding
                                     embedding
                                 }
                             }
                         }
-                        Err(e) => {
+                        Err(_e) => {
                             // Flat embedding failed, using original embedding
                             embedding
                         }
@@ -952,15 +953,15 @@ impl RealTimeVizEngine {
         // Computing force-directed layout positions
 
         // Parse parameters with defaults
-        let iterations = params
+        let _iterations = params
             .get("iterations")
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(150);
-        let charge = params
+        let _charge = params
             .get("charge")
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(-100.0);
-        let distance = params
+        let _distance = params
             .get("distance")
             .and_then(|s| s.parse::<f64>().ok())
             .unwrap_or(80.0);
@@ -1573,9 +1574,6 @@ impl RealTimeVizEngine {
         // Use sync manager to handle snapshot ordering
         let sync_updates = self.sync_manager.queue_snapshot(snapshot.clone()).await?;
 
-        // Use sync manager to handle snapshot ordering
-        let sync_updates = self.sync_manager.queue_snapshot(snapshot.clone()).await?;
-
         // Update engine state with snapshot data
         {
             let mut state = self.state.lock().unwrap();
@@ -1687,22 +1685,28 @@ impl RealTimeVizEngine {
         let update_for_broadcast = update.clone();
 
         match update {
-            EngineUpdate::NodeAdded(node) => {
+            EngineUpdate::NodeAdded(_node) => {
                 // TODO: Add node to graph and update positions
             }
-            EngineUpdate::NodeRemoved(node_id) => {
+            EngineUpdate::NodeRemoved(_node_id) => {
                 // TODO: Remove node from graph and positions
             }
-            EngineUpdate::EdgeAdded(edge) => {
+            EngineUpdate::EdgeAdded(_edge) => {
                 // TODO: Add edge to graph
             }
-            EngineUpdate::EdgeRemoved(edge_id) => {
+            EngineUpdate::EdgeRemoved(_edge_id) => {
                 // TODO: Remove edge from graph
             }
-            EngineUpdate::NodeChanged { id, attributes } => {
+            EngineUpdate::NodeChanged {
+                id: _id,
+                attributes: _attributes,
+            } => {
                 // TODO: Update node attributes in graph
             }
-            EngineUpdate::EdgeChanged { id, attributes } => {
+            EngineUpdate::EdgeChanged {
+                id: _id,
+                attributes: _attributes,
+            } => {
                 // TODO: Update edge attributes in graph
             }
             EngineUpdate::PositionDelta { node_id, delta } => {
@@ -2300,12 +2304,6 @@ impl RealTimeVizEngine {
     /// Subscribe to engine-generated updates
     pub fn subscribe(&self) -> broadcast::Receiver<EngineUpdate> {
         self.update_broadcaster.subscribe()
-    }
-
-    /// Generate engine update (for physics loops, layout iterations, etc.)
-    async fn generate_update(&self, update: EngineUpdate) -> GraphResult<()> {
-        let _ = self.update_broadcaster.send(update);
-        Ok(())
     }
 
     /// Fallback method when engine layout fails - delegates to accessor's layout method

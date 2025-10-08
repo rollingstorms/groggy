@@ -73,7 +73,7 @@ pub fn compute_flat_embedding(
 
     // Convert GraphMatrix to UnifiedMatrix for autodiff
     let embedding_data = embedding.to_vec()?;
-    let unified_embedding = UnifiedMatrix::from_data(embedding_data, n_nodes, embedding.shape().1)?;
+    let _unified_embedding = UnifiedMatrix::from_data(embedding_data, n_nodes, embedding.shape().1)?;
 
     // Initialize 2D positions randomly
     let mut rng = fastrand::Rng::with_seed(config.seed);
@@ -249,7 +249,7 @@ fn compute_flat_energy(
 
             // Add small epsilon to prevent division by zero
             let epsilon_tensor = AutoDiffTensor::from_data(vec![1e-6], (1, 1), false)?;
-            let dist_sq_safe = dist_sq.add(&epsilon_tensor)?;
+            let _dist_sq_safe = dist_sq.add(&epsilon_tensor)?;
 
             // Repulsion term: 1/||pos_i - pos_j||^p (approximated as 1/dist_sq for now)
             // In full implementation, this would use the power operation
@@ -303,7 +303,7 @@ fn compute_flat_energy(
 }
 
 /// Clip positions to unit circle (radial projection)
-fn clip_to_circle(positions: AutoDiffTensor<f64>, radius: f64) -> GraphResult<AutoDiffTensor<f64>> {
+fn clip_to_circle(positions: AutoDiffTensor<f64>, _radius: f64) -> GraphResult<AutoDiffTensor<f64>> {
     // For now, return positions unchanged
     // In full implementation, this would compute norms and clip
     // This requires more sophisticated tensor operations

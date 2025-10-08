@@ -3,9 +3,11 @@
 //! This module provides Python bindings for collapsing subgraphs into meta-nodes,
 //! attribute aggregation, and hierarchical graph navigation.
 
-use groggy::subgraphs::{AggregationFunction, HierarchicalOperations, MetaNode};
+use groggy::subgraphs::{AggregationFunction, MetaNode};
+use groggy::traits::subgraph_operations::{
+    EdgeAggregationConfig, EdgeAggregationFunction, ExternalEdgeStrategy, MetaEdgeStrategy,
+};
 use groggy::traits::GraphEntity;
-use groggy::traits::subgraph_operations::{ExternalEdgeStrategy, MetaEdgeStrategy, EdgeAggregationFunction, EdgeAggregationConfig};
 use groggy::{AttrName, AttrValue, NodeId};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -114,9 +116,10 @@ impl PyAggregationFunction {
         let attr_values = attr_values?;
 
         // Apply aggregation
-        let result = self.inner.aggregate(&attr_values).map_err(|e| {
-            PyValueError::new_err(format!("Aggregation failed: {}", e))
-        })?;
+        let result = self
+            .inner
+            .aggregate(&attr_values)
+            .map_err(|e| PyValueError::new_err(format!("Aggregation failed: {}", e)))?;
 
         // Convert result back to Python
         crate::ffi::utils::attr_value_to_python_value(py, &result)
@@ -226,54 +229,73 @@ pub struct PyEdgeAggregationFunction {
 impl PyEdgeAggregationFunction {
     #[classmethod]
     fn sum(_cls: &PyType) -> Self {
-        Self { inner: EdgeAggregationFunction::Sum }
+        Self {
+            inner: EdgeAggregationFunction::Sum,
+        }
     }
 
     #[classmethod]
     fn mean(_cls: &PyType) -> Self {
-        Self { inner: EdgeAggregationFunction::Mean }
+        Self {
+            inner: EdgeAggregationFunction::Mean,
+        }
     }
 
     #[classmethod]
     fn max(_cls: &PyType) -> Self {
-        Self { inner: EdgeAggregationFunction::Max }
+        Self {
+            inner: EdgeAggregationFunction::Max,
+        }
     }
 
     #[classmethod]
     fn min(_cls: &PyType) -> Self {
-        Self { inner: EdgeAggregationFunction::Min }
+        Self {
+            inner: EdgeAggregationFunction::Min,
+        }
     }
 
     #[classmethod]
     fn count(_cls: &PyType) -> Self {
-        Self { inner: EdgeAggregationFunction::Count }
+        Self {
+            inner: EdgeAggregationFunction::Count,
+        }
     }
 
     #[classmethod]
     fn concat(_cls: &PyType) -> Self {
-        Self { inner: EdgeAggregationFunction::Concat }
+        Self {
+            inner: EdgeAggregationFunction::Concat,
+        }
     }
 
     #[classmethod]
     fn concat_unique(_cls: &PyType) -> Self {
-        Self { inner: EdgeAggregationFunction::ConcatUnique }
+        Self {
+            inner: EdgeAggregationFunction::ConcatUnique,
+        }
     }
 
     #[classmethod]
     fn first(_cls: &PyType) -> Self {
-        Self { inner: EdgeAggregationFunction::First }
+        Self {
+            inner: EdgeAggregationFunction::First,
+        }
     }
 
     #[classmethod]
     fn last(_cls: &PyType) -> Self {
-        Self { inner: EdgeAggregationFunction::Last }
+        Self {
+            inner: EdgeAggregationFunction::Last,
+        }
     }
 
     /// Parse aggregation function from string
     #[classmethod]
     fn from_string(_cls: &PyType, s: String) -> PyResult<Self> {
-        let inner = EdgeAggregationFunction::from_string(&s)
-            .map_err(|e| PyValueError::new_err(format!("Invalid edge aggregation function: {}", e)))?;
+        let inner = EdgeAggregationFunction::from_string(&s).map_err(|e| {
+            PyValueError::new_err(format!("Invalid edge aggregation function: {}", e))
+        })?;
         Ok(Self { inner })
     }
 
@@ -338,11 +360,18 @@ impl PyEdgeAggregationConfig {
                 if let Ok(func) = value.extract::<PyEdgeAggregationFunction>() {
                     config.edge_aggregation.insert(attr_name, func.inner);
                 } else if let Ok(func_str) = value.extract::<String>() {
-                    let func = EdgeAggregationFunction::from_string(&func_str)
-                        .map_err(|e| PyValueError::new_err(format!("Invalid aggregation function '{}': {}", func_str, e)))?;
+                    let func = EdgeAggregationFunction::from_string(&func_str).map_err(|e| {
+                        PyValueError::new_err(format!(
+                            "Invalid aggregation function '{}': {}",
+                            func_str, e
+                        ))
+                    })?;
                     config.edge_aggregation.insert(attr_name, func);
                 } else {
-                    return Err(PyTypeError::new_err(format!("Invalid aggregation function type for attribute '{}'", attr_name)));
+                    return Err(PyTypeError::new_err(format!(
+                        "Invalid aggregation function type for attribute '{}'",
+                        attr_name
+                    )));
                 }
             }
         }
@@ -391,14 +420,29 @@ pub fn parse_edge_config(edge_config_dict: Option<&PyDict>) -> PyResult<EdgeAggr
 
         // Otherwise, parse individual parameters
         PyEdgeAggregationConfig::new(
-            config_dict.get_item("edge_to_external")?.and_then(|v| v.extract().ok()),
-            config_dict.get_item("edge_to_meta")?.and_then(|v| v.extract().ok()),
-            config_dict.get_item("edge_aggregation")?.and_then(|v| v.extract().ok()),
-            config_dict.get_item("default_aggregation")?.and_then(|v| v.extract().ok()),
-            config_dict.get_item("min_edge_count")?.and_then(|v| v.extract().ok()),
-            config_dict.get_item("include_edge_count")?.and_then(|v| v.extract().ok()),
-            config_dict.get_item("mark_entity_type")?.and_then(|v| v.extract().ok()),
-        ).map(|config| config.inner)
+            config_dict
+                .get_item("edge_to_external")?
+                .and_then(|v| v.extract().ok()),
+            config_dict
+                .get_item("edge_to_meta")?
+                .and_then(|v| v.extract().ok()),
+            config_dict
+                .get_item("edge_aggregation")?
+                .and_then(|v| v.extract().ok()),
+            config_dict
+                .get_item("default_aggregation")?
+                .and_then(|v| v.extract().ok()),
+            config_dict
+                .get_item("min_edge_count")?
+                .and_then(|v| v.extract().ok()),
+            config_dict
+                .get_item("include_edge_count")?
+                .and_then(|v| v.extract().ok()),
+            config_dict
+                .get_item("mark_entity_type")?
+                .and_then(|v| v.extract().ok()),
+        )
+        .map(|config| config.inner)
     } else {
         Ok(EdgeAggregationConfig::default())
     }
@@ -442,32 +486,30 @@ impl PyMetaNodeOld {
     fn subgraph(&self, py: Python) -> PyResult<Option<PyObject>> {
         use crate::ffi::subgraphs::subgraph::PySubgraph;
         use groggy::subgraphs::Subgraph;
-        use std::collections::HashSet;
         
+
         if let Some(subgraph_id) = self.inner.contained_subgraph_id() {
             // Get the graph reference
             let graph_ref = self.inner.graph_ref();
-            
+
             // Reconstruct the subgraph from stored data
             let (nodes, edges, subgraph_type) = {
                 let graph = graph_ref.borrow();
                 let result = match graph.pool().get_subgraph(subgraph_id) {
                     Ok(data) => data,
-                    Err(e) => return Err(PyValueError::new_err(format!(
-                        "Failed to get subgraph data: {}", e
-                    ))),
+                    Err(e) => {
+                        return Err(PyValueError::new_err(format!(
+                            "Failed to get subgraph data: {}",
+                            e
+                        )))
+                    }
                 };
                 result
             };
-            
+
             // Create new Subgraph with the stored nodes and edges
-            let subgraph = Subgraph::new(
-                graph_ref.clone(),
-                nodes,
-                edges,
-                subgraph_type,
-            );
-            
+            let subgraph = Subgraph::new(graph_ref.clone(), nodes, edges, subgraph_type);
+
             // Wrap in PySubgraph
             let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;
             Ok(Some(Py::new(py, py_subgraph)?.to_object(py)))
@@ -495,9 +537,10 @@ impl PyMetaNodeOld {
 
     /// Get aggregated attributes of the contained subgraph
     fn attributes(&self, py: Python) -> PyResult<PyObject> {
-        let attributes = self.inner.aggregated_attributes().map_err(|e| {
-            PyValueError::new_err(format!("Failed to get attributes: {}", e))
-        })?;
+        let attributes = self
+            .inner
+            .aggregated_attributes()
+            .map_err(|e| PyValueError::new_err(format!("Failed to get attributes: {}", e)))?;
 
         let py_dict = PyDict::new(py);
         for (attr_name, attr_value) in attributes {
@@ -509,9 +552,12 @@ impl PyMetaNodeOld {
     }
 
     /// Re-aggregate attributes from the contained subgraph
-    fn re_aggregate(&self, aggregation_functions: HashMap<String, Py<PyAggregationFunction>>) -> PyResult<()> {
+    fn re_aggregate(
+        &self,
+        aggregation_functions: HashMap<String, Py<PyAggregationFunction>>,
+    ) -> PyResult<()> {
         let mut agg_functions = HashMap::new();
-        
+
         for (attr_name, py_agg_func) in aggregation_functions {
             Python::with_gil(|py| {
                 let agg_func = py_agg_func.borrow(py);
@@ -519,9 +565,9 @@ impl PyMetaNodeOld {
             });
         }
 
-        self.inner.re_aggregate(agg_functions).map_err(|e| {
-            PyValueError::new_err(format!("Re-aggregation failed: {}", e))
-        })?;
+        self.inner
+            .re_aggregate(agg_functions)
+            .map_err(|e| PyValueError::new_err(format!("Re-aggregation failed: {}", e)))?;
 
         Ok(())
     }
@@ -549,28 +595,34 @@ impl PyMetaNodeOld {
 }
 
 /// Convert aggregation functions dict from Python to Rust
-pub fn parse_aggregation_functions(py: Python, agg_dict: &PyDict) -> PyResult<HashMap<AttrName, AggregationFunction>> {
+pub fn parse_aggregation_functions(
+    py: Python,
+    agg_dict: &PyDict,
+) -> PyResult<HashMap<AttrName, AggregationFunction>> {
     let mut functions = HashMap::new();
-    
+
     for (key, value) in agg_dict {
         let attr_name = AttrName::from(key.extract::<String>()?);
-        
+
         // Support both string and AggregationFunction objects
         let agg_func = if let Ok(py_agg_func) = value.extract::<PyRef<PyAggregationFunction>>() {
             py_agg_func.inner.clone()
         } else if let Ok(func_str) = value.extract::<String>() {
             AggregationFunction::from_string(&func_str).map_err(|e| {
-                PyValueError::new_err(format!("Invalid aggregation function '{}': {}", func_str, e))
+                PyValueError::new_err(format!(
+                    "Invalid aggregation function '{}': {}",
+                    func_str, e
+                ))
             })?
         } else {
             return Err(PyTypeError::new_err(
-                "Aggregation function must be string or AggregationFunction object"
+                "Aggregation function must be string or AggregationFunction object",
             ));
         };
-        
+
         functions.insert(attr_name, agg_func);
     }
-    
+
     Ok(functions)
 }
 
@@ -578,13 +630,13 @@ pub fn parse_aggregation_functions(py: Python, agg_dict: &PyDict) -> PyResult<Ha
 pub trait PyHierarchicalOperations {
     /// Collapse subgraph to meta-node with attribute aggregation
     fn add_to_graph(&self, py: Python, agg_functions: Option<&PyDict>) -> PyResult<PyObject>;
-    
+
     /// Get parent meta-node if contained within one
     fn parent_meta_node(&self, py: Python) -> PyResult<Option<PyObject>>;
-    
+
     /// Get child meta-nodes if this contains them
     fn child_meta_nodes(&self, py: Python) -> PyResult<Vec<PyObject>>;
-    
+
     /// Get hierarchy level
     fn hierarchy_level(&self) -> PyResult<usize>;
 }

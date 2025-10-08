@@ -3,13 +3,13 @@
 //! Pure delegation to core Subgraph with ALL the same methods as the current PySubgraph.
 //! This replaces the 800+ line complex version with pure delegation to existing trait methods.
 
-use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
 use crate::ffi::storage::subgraph_array::PySubgraphArray;
+use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
-use groggy::subgraphs::Subgraph;
-use groggy::traits::{NeighborhoodOperations, SubgraphOperations, GraphEntity};
-use groggy::{AttrValue, EdgeId, NodeId, SimilarityMetric};
 use groggy::storage::array::BaseArray;
+use groggy::subgraphs::Subgraph;
+use groggy::traits::{GraphEntity, NeighborhoodOperations, SubgraphOperations};
+use groggy::{AttrValue, EdgeId, NodeId, SimilarityMetric};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -19,10 +19,8 @@ use std::collections::HashSet;
 use crate::ffi::api::graph::PyGraph;
 use crate::ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor}; // Essential FFI - re-enabled
 use crate::ffi::storage::array::PyBaseArray;
-use crate::PyNumArray;
 use crate::ffi::storage::components::PyComponentsArray;
-use crate::ffi::viz_accessor::VizAccessor;
-use crate::ffi::utils::python_value_to_attr_value;
+use crate::PyNumArray;
 // use crate::ffi::storage::table::PyBaseTable; // Temporarily disabled
 
 /// Python wrapper for core Subgraph - Pure delegation to existing trait methods
@@ -51,7 +49,6 @@ impl PySubgraph {
             "from_trait_object not yet implemented - use concrete Subgraph types",
         ))
     }
-
 }
 
 #[pymethods]
@@ -95,10 +92,10 @@ impl PySubgraph {
         // The subgraph already filters to the right nodes/edges
         let graph_ref = self.inner.graph();
         let graph_data_source = GraphDataSource::new(&*graph_ref.borrow());
-        
+
         let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
             graph_data_source,
-            "Subgraph".to_string()
+            "Subgraph".to_string(),
         );
 
         Py::new(py, viz_accessor)
@@ -122,12 +119,7 @@ impl PySubgraph {
     /// Get node IDs as PyIntArray
     #[getter]
     fn node_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
-        let node_ids: Vec<usize> = self
-            .inner
-            .node_set()
-            .iter()
-            .copied()
-            .collect();
+        let node_ids: Vec<usize> = self.inner.node_set().iter().copied().collect();
         let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids);
         Py::new(py, py_int_array)
     }
@@ -135,12 +127,7 @@ impl PySubgraph {
     /// Get edge IDs as PyIntArray
     #[getter]
     fn edge_ids(&self, py: Python) -> PyResult<Py<crate::ffi::storage::num_array::PyIntArray>> {
-        let edge_ids: Vec<usize> = self
-            .inner
-            .edge_set()
-            .iter()
-            .copied()
-            .collect();
+        let edge_ids: Vec<usize> = self.inner.edge_set().iter().copied().collect();
         let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(edge_ids);
         Py::new(py, py_int_array)
     }
@@ -740,7 +727,7 @@ impl PySubgraph {
                     out_degrees.push(groggy::AttrValue::Int(out_deg as i64));
                 }
 
-                // Convert to NumArray for rich display and comparison operations  
+                // Convert to NumArray for rich display and comparison operations
                 let py_num_array = PyNumArray::from_attr_values(out_degrees)?;
                 Ok(Py::new(py, py_num_array)?.to_object(py))
             }
@@ -776,7 +763,7 @@ impl PySubgraph {
                     out_degrees.push(groggy::AttrValue::Int(out_deg as i64));
                 }
 
-                // Convert to NumArray for rich display and comparison operations  
+                // Convert to NumArray for rich display and comparison operations
                 let py_num_array = PyNumArray::from_attr_values(out_degrees)?;
                 Ok(Py::new(py, py_num_array)?.to_object(py))
             }
@@ -827,8 +814,8 @@ impl PySubgraph {
                 }
             }
 
-            let py_base_array = PyBaseArray { 
-                inner: BaseArray::new(attr_values) 
+            let py_base_array = PyBaseArray {
+                inner: BaseArray::new(attr_values),
             };
             return Ok(Py::new(py, py_base_array)?.to_object(py));
         }
@@ -907,7 +894,7 @@ impl PySubgraph {
     /// Sample k nodes from this subgraph randomly
     pub fn sample(&self, k: usize) -> PyResult<PySubgraph> {
         let node_ids: Vec<NodeId> = self.inner.node_set().iter().copied().collect();
-        
+
         if k >= node_ids.len() {
             // Return the same subgraph if k is larger than available nodes
             return Ok(self.clone());
@@ -915,7 +902,7 @@ impl PySubgraph {
 
         // Simple sampling: take first k nodes (for now - would use proper random sampling in production)
         let sampled_nodes: Vec<NodeId> = node_ids.into_iter().take(k).collect();
-        
+
         // For now, just return a clone of the original subgraph as a placeholder
         // In a full implementation, we would properly create an induced subgraph
         // with the sampled nodes using the core graph algorithms
@@ -963,10 +950,7 @@ impl PySubgraph {
     fn neighbors(&self, py: Python, node_id: NodeId) -> PyResult<Py<PyNumArray>> {
         match self.inner.neighbors(node_id) {
             Ok(neighbor_ids) => {
-                let values: Vec<f64> = neighbor_ids
-                    .into_iter()
-                    .map(|id| id as f64)
-                    .collect();
+                let values: Vec<f64> = neighbor_ids.into_iter().map(|id| id as f64).collect();
                 let py_array = PyNumArray::new(values);
                 Py::new(py, py_array)
             }
@@ -1137,7 +1121,7 @@ impl PySubgraph {
             Ok(Some(boxed_subgraph)) => {
                 // Create a concrete Subgraph from the trait object data
                 use groggy::subgraphs::Subgraph;
-                use groggy::traits::GraphEntity;
+                
                 let concrete_subgraph = Subgraph::new(
                     self.inner.graph(),
                     boxed_subgraph.node_set().clone(),
@@ -1162,7 +1146,7 @@ impl PySubgraph {
             Ok(boxed_subgraph) => {
                 // Create a concrete Subgraph from the trait object data
                 use groggy::subgraphs::Subgraph;
-                use groggy::traits::GraphEntity;
+                
                 let concrete_subgraph = Subgraph::new(
                     self.inner.graph(),
                     boxed_subgraph.node_set().clone(),
@@ -1186,7 +1170,7 @@ impl PySubgraph {
             Ok(boxed_subgraph) => {
                 // Create a concrete Subgraph from the trait object data
                 use groggy::subgraphs::Subgraph;
-                use groggy::traits::GraphEntity;
+                
                 let concrete_subgraph = Subgraph::new(
                     self.inner.graph(),
                     boxed_subgraph.node_set().clone(),
@@ -1224,14 +1208,14 @@ impl PySubgraph {
     }
 
     /// Enhanced collapse supporting three syntax forms for flexible aggregation
-    /// 
+    ///
     /// # Supported Syntax Forms:
-    /// 
+    ///
     /// ## Form 1: Simple (backward compatible)
     /// ```python
     /// subgraph.add_to_graph({"age": "mean", "salary": "sum"})
     /// ```
-    /// 
+    ///
     /// ## Form 2: Tuple (custom attribute names)
     /// ```python
     /// subgraph.add_to_graph({
@@ -1240,7 +1224,7 @@ impl PySubgraph {
     ///     "person_count": ("count", None)
     /// })
     /// ```
-    /// 
+    ///
     /// ## Form 3: Dict-of-dicts (advanced with defaults)
     /// ```python
     /// subgraph.add_to_graph({
@@ -1263,7 +1247,7 @@ impl PySubgraph {
     /// NOTE: This feature is not yet implemented - always returns empty list
     fn child_meta_nodes(&self, _py: Python) -> PyResult<Vec<PyObject>> {
         // TODO: Implement hierarchical navigation in future version
-        // The current HierarchicalOperations trait methods are stubs 
+        // The current HierarchicalOperations trait methods are stubs
         Ok(Vec::new())
     }
 
@@ -1271,7 +1255,7 @@ impl PySubgraph {
     #[getter]
     fn hierarchy_level(&self) -> PyResult<usize> {
         use groggy::subgraphs::HierarchicalOperations;
-        
+
         self.inner.hierarchy_level().map_err(|e| {
             pyo3::exceptions::PyRuntimeError::new_err(format!(
                 "Failed to get hierarchy level: {}",
@@ -1283,7 +1267,7 @@ impl PySubgraph {
     /// Check if this subgraph contains nodes that are meta-nodes
     fn has_meta_nodes(&self) -> bool {
         use groggy::subgraphs::HierarchicalOperations;
-        
+
         // Check if any child meta-nodes exist
         self.inner.child_meta_nodes().unwrap_or_default().len() > 0
     }
@@ -1294,10 +1278,10 @@ impl PySubgraph {
     }
 
     /// Modern MetaGraph Composer API - Clean interface for meta-node creation
-    /// 
+    ///
     /// This is the new, intuitive way to create meta-nodes with flexible configuration.
     /// Returns a MetaNodePlan that can be previewed, modified, and executed.
-    /// 
+    ///
     /// # Arguments
     /// * `node_aggs` - Node aggregation specifications (dict or list format)
     /// * `edge_aggs` - Edge aggregation specifications (dict format)
@@ -1307,7 +1291,7 @@ impl PySubgraph {
     /// * `include_edge_count` - Include edge_count attribute in meta-edges
     /// * `mark_entity_type` - Mark meta-nodes/edges with entity_type
     /// * `entity_type` - Entity type for marking
-    /// 
+    ///
     /// # Examples
     /// ```python
     /// # Dict format for node aggregations
@@ -1318,14 +1302,14 @@ impl PySubgraph {
     ///     node_strategy="extract"
     /// )
     /// meta_node = plan.add_to_graph()
-    /// 
+    ///
     /// # With preset
     /// plan = subgraph.collapse(preset="social_network")
     /// meta_node = plan.add_to_graph()
     /// ```
     #[pyo3(signature = (
         node_aggs = None,
-        edge_aggs = None, 
+        edge_aggs = None,
         edge_strategy = "aggregate",
         node_strategy = "extract",
         preset = None,
@@ -1347,78 +1331,97 @@ impl PySubgraph {
         entity_type: &str,
         allow_missing_attributes: bool,
     ) -> PyResult<PyObject> {
-        use crate::ffi::subgraphs::composer::{PyMetaNodePlanExecutor, parse_node_aggs_from_python, parse_edge_aggs_from_python};
+        use crate::ffi::subgraphs::composer::{
+            parse_edge_aggs_from_python, parse_node_aggs_from_python,
+        };
         use groggy::subgraphs::composer::EdgeStrategy;
         use groggy::traits::subgraph_operations::NodeStrategy;
-        
+
         // Parse input parameters
         let parsed_node_aggs = if let Some(aggs) = node_aggs {
             parse_node_aggs_from_python(aggs)?
         } else {
             Vec::new()
         };
-        
+
         let parsed_edge_aggs = if let Some(aggs) = edge_aggs {
             parse_edge_aggs_from_python(aggs)?
         } else {
             Vec::new()
         };
-        
-        let strategy = EdgeStrategy::from_str(edge_strategy)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid edge strategy: {}", e)))?;
-        
+
+        let strategy = EdgeStrategy::from_str(edge_strategy).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Invalid edge strategy: {}", e))
+        })?;
+
         let node_strategy = match node_strategy {
             "extract" => NodeStrategy::Extract,
             "collapse" => NodeStrategy::Collapse,
-            _ => return Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Invalid node strategy '{}'. Must be 'extract' or 'collapse'", node_strategy)
-            ))
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "Invalid node strategy '{}'. Must be 'extract' or 'collapse'",
+                    node_strategy
+                )))
+            }
         };
-        
+
         // Call the trait method
-        let plan = self.inner.collapse(
-            parsed_node_aggs,
-            parsed_edge_aggs,
-            strategy,
-            node_strategy,
-            preset,
-            include_edge_count,
-            mark_entity_type,
-            entity_type.to_string(),
-        ).map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create plan: {}", e)))?;
-        
+        let plan = self
+            .inner
+            .collapse(
+                parsed_node_aggs,
+                parsed_edge_aggs,
+                strategy,
+                node_strategy,
+                preset,
+                include_edge_count,
+                mark_entity_type,
+                entity_type.to_string(),
+            )
+            .map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create plan: {}", e))
+            })?;
+
         // Execute using appropriate method based on allow_missing_attributes
         let meta_node = if allow_missing_attributes {
-            plan.add_to_graph_with_defaults(&self.inner)
-                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e)))?
+            plan.add_to_graph_with_defaults(&self.inner).map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Failed to create meta-node: {}",
+                    e
+                ))
+            })?
         } else {
-            plan.add_to_graph(&self.inner)
-                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e)))?
+            plan.add_to_graph(&self.inner).map_err(|e| {
+                pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Failed to create meta-node: {}",
+                    e
+                ))
+            })?
         };
-        
+
         // Return the MetaNode directly using the new trait-based entity
         use crate::ffi::entities::PyMetaNode;
         let py_meta_node = PyMetaNode::from_meta_node(meta_node);
         Ok(Py::new(py, py_meta_node)?.to_object(py))
     }
-    
+
     fn __str__(&self) -> String {
         let mut result = format!(
             "Subgraph with {} nodes and {} edges",
             self.inner.node_count(),
             self.inner.edge_count()
         );
-        
+
         // Add edge table if there are edges
         if self.inner.edge_count() > 0 {
             result.push_str("\n\nEdges:");
             result.push_str("\n  ID    Source → Target");
             result.push_str("\n  ----  ---------------");
-            
+
             // Get graph reference to access edge endpoints
             let graph = self.inner.graph_ref();
             let graph_borrowed = graph.borrow();
-            
+
             // Iterate through edges in the subgraph
             for &edge_id in self.inner.edge_set() {
                 if let Ok((source, target)) = graph_borrowed.edge_endpoints(edge_id) {
@@ -1426,38 +1429,38 @@ impl PySubgraph {
                 }
             }
         }
-        
+
         result
     }
-    
+
     // ========================================================================
     // PHASE 3: Cross-Type Conversions - Enable unified delegation architecture
     // ========================================================================
-    
+
     /// Get nodes from this subgraph as a NodesAccessor
     /// Enables chaining like: subgraph.to_nodes().table().stats()
     pub fn to_nodes(&self) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
         let node_ids: Vec<groggy::types::NodeId> = self.inner.node_set().iter().copied().collect();
-        
+
         // Create a NodesAccessor using the same pattern as the getter method
         Ok(crate::ffi::storage::accessors::PyNodesAccessor {
             graph: self.inner.graph(),
             constrained_nodes: Some(node_ids),
         })
     }
-    
+
     /// Get edges from this subgraph as an EdgesAccessor  
     /// Enables chaining like: subgraph.to_edges().to_nodes().connected_components()
     pub fn to_edges(&self) -> PyResult<crate::ffi::storage::accessors::PyEdgesAccessor> {
         let edge_ids: Vec<groggy::types::EdgeId> = self.inner.edge_set().iter().copied().collect();
-        
+
         // Create an EdgesAccessor using the struct syntax
         Ok(crate::ffi::storage::accessors::PyEdgesAccessor {
             graph: self.inner.graph(),
             constrained_edges: Some(edge_ids),
         })
     }
-    
+
     /// Convert this subgraph to its adjacency matrix representation
     /// Enables chaining like: subgraph.to_matrix().eigen().stats()
     pub fn to_matrix(&self) -> PyResult<crate::ffi::storage::matrix::PyGraphMatrix> {
@@ -1465,14 +1468,14 @@ impl PySubgraph {
         // In full implementation, would convert subgraph to adjacency matrix
         let graph_ref = self.inner.graph();
         let graph_borrowed = graph_ref.borrow();
-        
+
         // Get node IDs and create a mapping
         let node_ids: Vec<groggy::types::NodeId> = self.inner.node_set().iter().copied().collect();
         let n = node_ids.len();
-        
+
         // Create adjacency matrix data (simplified - would be optimized in real implementation)
         let mut matrix_data = vec![vec![0.0f32; n]; n];
-        
+
         // Fill adjacency matrix
         for (i, &node_i) in node_ids.iter().enumerate() {
             for (j, &node_j) in node_ids.iter().enumerate() {
@@ -1486,34 +1489,34 @@ impl PySubgraph {
                 }
             }
         }
-        
+
         // Convert matrix data to NumArrays for each column
         Python::with_gil(|py| {
             let mut py_arrays: Vec<PyObject> = Vec::with_capacity(n);
-            
+
             // Create a column for each node (column-major format)
             for col_idx in 0..n {
                 let column_values: Vec<f64> = (0..n)
                     .map(|row_idx| matrix_data[row_idx][col_idx] as f64)
                     .collect();
-                
+
                 // Create NumArray since adjacency matrices are always numerical
                 let num_array = PyNumArray::new(column_values);
                 py_arrays.push(Py::new(py, num_array)?.to_object(py));
             }
-            
-            // Create GraphMatrix using the new constructor that accepts PyObject arrays  
+
+            // Create GraphMatrix using the new constructor that accepts PyObject arrays
             let matrix = crate::ffi::storage::matrix::PyGraphMatrix::new(py, py_arrays)?;
-            
+
             // Set column names based on node IDs
             let column_names: Vec<String> = node_ids
                 .iter()
                 .map(|&node_id| format!("node_{}", node_id))
                 .collect();
-            
+
             let mut inner_matrix = matrix.inner;
             inner_matrix.set_column_names(column_names);
-            
+
             Ok(crate::ffi::storage::matrix::PyGraphMatrix::from_graph_matrix(inner_matrix))
         })
     }
@@ -1522,26 +1525,40 @@ impl PySubgraph {
 
     /// Get adjacency matrix for this subgraph view
     /// Returns: GraphMatrix representing adjacency relationships
-    fn adjacency_matrix(&self, py: Python) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
+    fn adjacency_matrix(
+        &self,
+        py: Python,
+    ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         let nodes: Vec<NodeId> = self.inner.node_set().iter().copied().collect();
         let edges: Vec<EdgeId> = self.inner.edge_set().iter().copied().collect();
-        
+
         // Convert edges to (source, target) tuples
         let mut edge_pairs = Vec::new();
         let graph_ref = self.inner.graph();
         let graph_borrow = graph_ref.borrow();
-        
+
         for edge_id in edges {
             if let Ok((source, target)) = graph_borrow.edge_endpoints(edge_id) {
                 edge_pairs.push((source, target));
             }
         }
-        
+
         // Build adjacency matrix using existing infrastructure
-        let adjacency_matrix = groggy::storage::adjacency::AdjacencyMatrixBuilder::from_edges(&nodes, &edge_pairs)
-            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Adjacency matrix creation failed: {}", e)))?;
-            
-        Py::new(py, crate::ffi::storage::matrix::PyGraphMatrix { inner: adjacency_matrix })
+        let adjacency_matrix =
+            groggy::storage::adjacency::AdjacencyMatrixBuilder::from_edges(&nodes, &edge_pairs)
+                .map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "Adjacency matrix creation failed: {}",
+                        e
+                    ))
+                })?;
+
+        Py::new(
+            py,
+            crate::ffi::storage::matrix::PyGraphMatrix {
+                inner: adjacency_matrix,
+            },
+        )
     }
 
     /// Get adjacency matrix (shortcut for adjacency_matrix)
@@ -1554,15 +1571,15 @@ impl PySubgraph {
     /// Returns: Dict mapping node_id -> list of connected node_ids
     fn adjacency_list(&self, py: Python) -> PyResult<PyObject> {
         use pyo3::types::PyDict;
-        
+
         let result_dict = PyDict::new(py);
         let graph_ref = self.inner.graph();
         let graph_borrow = graph_ref.borrow();
-        
+
         // For each node in subgraph, find connected nodes
         for &node_id in self.inner.node_set() {
             let mut neighbors = Vec::new();
-            
+
             // Check all edges in subgraph to find neighbors
             for &edge_id in self.inner.edge_set() {
                 if let Ok((source, target)) = graph_borrow.edge_endpoints(edge_id) {
@@ -1573,10 +1590,10 @@ impl PySubgraph {
                     }
                 }
             }
-            
+
             result_dict.set_item(node_id as usize, neighbors)?;
         }
-        
+
         Ok(result_dict.into())
     }
 
@@ -1592,21 +1609,25 @@ impl PySubgraph {
     /// Example:
     ///     dept_groups = subgraph.group_by('department', 'nodes')
     ///     type_groups = subgraph.group_by('interaction_type', 'edges')
-    pub fn group_by(&self, attr_name: String, element_type: String) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
+    pub fn group_by(
+        &self,
+        attr_name: String,
+        element_type: String,
+    ) -> PyResult<crate::ffi::storage::subgraph_array::PySubgraphArray> {
         let attr_name = groggy::types::AttrName::from(attr_name);
-        
+
         let subgraphs = match element_type.as_str() {
-            "nodes" => {
-                self.inner.group_by_nodes(&attr_name)
-                    .map_err(crate::ffi::utils::graph_error_to_py_err)?
-            },
-            "edges" => {
-                self.inner.group_by_edges(&attr_name)
-                    .map_err(crate::ffi::utils::graph_error_to_py_err)?
-            },
+            "nodes" => self
+                .inner
+                .group_by_nodes(&attr_name)
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
+            "edges" => self
+                .inner
+                .group_by_edges(&attr_name)
+                .map_err(crate::ffi::utils::graph_error_to_py_err)?,
             _ => {
                 return Err(pyo3::exceptions::PyValueError::new_err(
-                    "element_type must be either 'nodes' or 'edges'"
+                    "element_type must be either 'nodes' or 'edges'",
                 ));
             }
         };
@@ -1618,18 +1639,21 @@ impl PySubgraph {
             .collect();
 
         let py_subgraphs = py_subgraphs?;
-        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(py_subgraphs))
+        Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(
+            py_subgraphs,
+        ))
     }
-
 }
 
 /// Parse enhanced aggregation specification from Python dict supporting three syntax forms
-fn parse_enhanced_aggregation_spec(py_dict: &pyo3::types::PyDict) -> PyResult<Vec<groggy::traits::subgraph_operations::AggregationSpec>> {
+fn parse_enhanced_aggregation_spec(
+    py_dict: &pyo3::types::PyDict,
+) -> PyResult<Vec<groggy::traits::subgraph_operations::AggregationSpec>> {
     let mut specs = Vec::new();
-    
+
     for (key, value) in py_dict {
         let target_attr = key.extract::<String>()?;
-        
+
         // Parse the value based on its type
         let agg_spec = if let Ok(func_str) = value.extract::<String>() {
             // FORM 1: Simple - {"age": "mean"}
@@ -1650,14 +1674,18 @@ fn parse_enhanced_aggregation_spec(py_dict: &pyo3::types::PyDict) -> PyResult<Ve
             }
         } else if let Ok(dict) = value.extract::<&pyo3::types::PyDict>() {
             // FORM 3: Dict - {"avg_age": {"func": "mean", "source": "age", "default": 0}}
-            let func_str = dict.get_item("func")?
-                .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Missing 'func' in aggregation spec"))?
+            let func_str = dict
+                .get_item("func")?
+                .ok_or_else(|| {
+                    pyo3::exceptions::PyValueError::new_err("Missing 'func' in aggregation spec")
+                })?
                 .extract::<String>()?;
-                
-            let source_attr = dict.get_item("source")?
+
+            let source_attr = dict
+                .get_item("source")?
                 .map(|s| s.extract::<String>())
                 .transpose()?;
-                
+
             let default_value = if let Some(default_item) = dict.get_item("default")? {
                 // Convert Python value to AttrValue using the same logic as before
                 let attr_value = if let Ok(b) = default_item.extract::<bool>() {
@@ -1686,7 +1714,7 @@ fn parse_enhanced_aggregation_spec(py_dict: &pyo3::types::PyDict) -> PyResult<Ve
             } else {
                 None
             };
-            
+
             groggy::traits::subgraph_operations::AggregationSpec {
                 target_attr: target_attr,
                 function: func_str,
@@ -1695,13 +1723,14 @@ fn parse_enhanced_aggregation_spec(py_dict: &pyo3::types::PyDict) -> PyResult<Ve
             }
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(format!(
-                "Invalid aggregation specification for '{}'. Expected string, tuple, or dict.", target_attr
+                "Invalid aggregation specification for '{}'. Expected string, tuple, or dict.",
+                target_attr
             )));
         };
-        
+
         specs.push(agg_spec);
     }
-    
+
     Ok(specs)
 }
 

@@ -76,6 +76,7 @@ struct SimulationState {
     velocities: Vec<Position>,
     forces: Vec<Position>,
     alpha: f64,
+    #[allow(dead_code)]
     energy: f64,
     iteration: usize,
 }
@@ -236,7 +237,7 @@ impl ForceDirectedLayout {
     }
 
     /// Barnes-Hut algorithm for efficient force calculation
-    fn barnes_hut_forces(&self, state: &mut SimulationState, nodes: &[VizNode]) {
+    fn barnes_hut_forces(&self, state: &mut SimulationState, _nodes: &[VizNode]) {
         // Simplified Barnes-Hut - in production would use quadtree
         // For now, implement a spatial grid approximation
         let grid_size = 50.0;
@@ -996,7 +997,7 @@ impl LayoutRegistry {
     }
 }
 
-/// Global layout registry instance
+// Global layout registry instance
 lazy_static::lazy_static! {
     pub static ref LAYOUT_REGISTRY: LayoutRegistry = LayoutRegistry::new();
 }
@@ -1201,18 +1202,6 @@ impl HoneycombLayout {
         let x = self.cell_size * (3.0f64.sqrt() * q as f64 + 3.0f64.sqrt() / 2.0 * r as f64);
         let y = self.cell_size * (3.0 / 2.0 * r as f64);
         Position { x, y }
-    }
-
-    /// Convert pixel coordinates back to hex coordinates
-    fn pixel_to_hex(&self, x: f64, y: f64) -> (i32, i32) {
-        let q = (3.0f64.sqrt() / 3.0 * x - 1.0 / 3.0 * y) / self.cell_size;
-        let r = (2.0 / 3.0 * y) / self.cell_size;
-
-        // Round to nearest hex coordinates
-        let q_round = q.round() as i32;
-        let r_round = r.round() as i32;
-
-        (q_round, r_round)
     }
 
     /// Generate spiral hex coordinates

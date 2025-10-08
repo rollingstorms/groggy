@@ -4,7 +4,6 @@
 
 use crate::ffi::storage::array::PyBaseArray;
 // use crate::ffi::storage::table::PyBaseTable; // Temporarily disabled
-use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
 use groggy::{AttrName, AttrValue, EdgeId, NodeId};
 use pyo3::prelude::*;
@@ -380,23 +379,26 @@ impl PyGraphAttrMut {
             if float_id.fract().abs() <= f64::EPSILON {
                 return self.convert_int_to_target::<T>(py, float_id as i64);
             }
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                format!("ID value {} must be an integer-compatible float", float_id)
-            ));
+            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                "ID value {} must be an integer-compatible float",
+                float_id
+            )));
         }
 
         if let Ok(str_id) = id_py.extract::<String>() {
             if let Ok(parsed_int) = str_id.parse::<i64>() {
                 return self.convert_int_to_target::<T>(py, parsed_int);
             }
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                format!("Cannot parse string key '{}' as integer", str_id)
-            ));
+            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                "Cannot parse string key '{}' as integer",
+                str_id
+            )));
         }
 
-        Err(pyo3::exceptions::PyTypeError::new_err(
-            format!("Key type '{}' cannot be converted to ID type", id_py.get_type().name()?)
-        ))
+        Err(pyo3::exceptions::PyTypeError::new_err(format!(
+            "Key type '{}' cannot be converted to ID type",
+            id_py.get_type().name()?
+        )))
     }
 
     fn convert_int_to_target<T>(&self, py: Python, int_id: i64) -> PyResult<T>
@@ -404,16 +406,18 @@ impl PyGraphAttrMut {
         T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
     {
         if int_id < 0 {
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                format!("ID value {} must be non-negative", int_id)
-            ));
+            return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                "ID value {} must be non-negative",
+                int_id
+            )));
         }
 
         let py_int = int_id.to_object(py);
         py_int.extract::<T>(py).map_err(|_| {
-            pyo3::exceptions::PyTypeError::new_err(
-                format!("Cannot convert integer key '{}' to expected ID type", int_id)
-            )
+            pyo3::exceptions::PyTypeError::new_err(format!(
+                "Cannot convert integer key '{}' to expected ID type",
+                int_id
+            ))
         })
     }
 }

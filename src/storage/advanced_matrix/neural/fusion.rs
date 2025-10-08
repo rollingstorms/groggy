@@ -546,7 +546,7 @@ impl<T: NumericType> FusionEngine<T> {
         node_ids: &[NodeId],
     ) -> MatrixResult<()> {
         // Remove nodes from graph (simplified - would need proper cleanup)
-        for &node_id in node_ids {
+        for &_node_id in node_ids {
             // graph.nodes.remove(&node_id);
         }
 
@@ -661,8 +661,8 @@ impl<T: NumericType> FusionEngine<T> {
         }
 
         let x = inputs[0]; // Input
-        let gamma = inputs[1]; // Scale
-        let beta = inputs[2]; // Bias
+        let _gamma = inputs[1]; // Scale
+        let _beta = inputs[2]; // Bias
 
         // Layer norm: (x - mean(x)) / sqrt(var(x) + eps) * gamma + beta
         // This would need actual implementation with mean and variance computation

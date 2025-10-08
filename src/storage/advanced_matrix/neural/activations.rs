@@ -207,7 +207,7 @@ impl ActivationOps {
         // For numerical stability, subtract max from each row
         for row in 0..shape.rows {
             // Find max in this row
-            let row_start = row * shape.cols;
+            let _row_start = row * shape.cols;
             let row_data = Self::get_row_data(input, row)?;
             let max_val = row_data
                 .iter()
@@ -251,7 +251,7 @@ impl ActivationOps {
         let mut result = UnifiedMatrix::zeros(shape.rows, shape.cols)?;
 
         // Get backend for SIMD operations if available
-        let backend = input.backend_selector.select_backend(
+        let _backend = input.backend_selector.select_backend(
             OperationType::ElementwiseAdd, // Use as proxy for element-wise ops
             shape.rows * shape.cols,
             T::DTYPE,
@@ -334,7 +334,7 @@ impl ActivationOps {
         b: &UnifiedMatrix<T>,
     ) -> MatrixResult<UnifiedMatrix<T>> {
         // Use the backend's elementwise_add operation
-        let backend = a.backend_selector.select_backend(
+        let _backend = a.backend_selector.select_backend(
             OperationType::ElementwiseAdd,
             a.shape().rows * a.shape().cols,
             T::DTYPE,
@@ -351,7 +351,7 @@ impl ActivationOps {
         b: &UnifiedMatrix<T>,
     ) -> MatrixResult<UnifiedMatrix<T>> {
         // Use the backend's elementwise_mul operation
-        let backend = a.backend_selector.select_backend(
+        let _backend = a.backend_selector.select_backend(
             OperationType::ElementwiseMul,
             a.shape().rows * a.shape().cols,
             T::DTYPE,

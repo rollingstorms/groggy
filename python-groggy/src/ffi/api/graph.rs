@@ -17,11 +17,10 @@ use crate::ffi::storage::accessors::{PyEdgesAccessor, PyNodesAccessor}; // Essen
 use crate::ffi::storage::array::PyBaseArray;
 use crate::ffi::storage::views::{PyEdgeView, PyNodeView}; // Essential FFI - re-enabled
 use crate::PyNumArray;
-use crate::ffi::subgraphs::neighborhood::PyNeighborhoodStats;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
 use crate::ffi::query::query::{PyEdgeFilter, PyNodeFilter};
-use crate::ffi::subgraphs::subgraph::PySubgraph;
 use crate::ffi::query::traversal::PyGroupedAggregationResult;
+use crate::ffi::subgraphs::subgraph::PySubgraph;
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
 
@@ -501,7 +500,7 @@ impl PyGraph {
         if let Ok(edge_list) = edges.extract::<Vec<&PyTuple>>() {
             // Check if all tuples have 3 elements (indicating attrs format)
             let has_attrs = edge_list.iter().all(|t| t.len() == 3);
-            
+
             if has_attrs {
                 let mut edge_ids = Vec::new();
                 let mut edges_with_attrs = Vec::new();
@@ -689,14 +688,16 @@ impl PyGraph {
                 // Determine source and target field names
                 let source_field = source.as_deref().unwrap_or("source");
                 let target_field = target.as_deref().unwrap_or("target");
-                
+
                 // Extract source and target
                 let source_id = if let Some(mapping) = &node_mapping {
                     // Use node_mapping if provided
-                    let source_val = edge_dict.get_item(source_field)?
-                        .ok_or_else(|| PyErr::new::<PyKeyError, _>(
-                            format!("Missing source field: {}", source_field)
-                        ))?;
+                    let source_val = edge_dict.get_item(source_field)?.ok_or_else(|| {
+                        PyErr::new::<PyKeyError, _>(format!(
+                            "Missing source field: {}",
+                            source_field
+                        ))
+                    })?;
                     let source_str: String = source_val.extract()?;
                     *mapping.get(&source_str).ok_or_else(|| {
                         pyo3::exceptions::PyKeyError::new_err(format!(
@@ -706,10 +707,12 @@ impl PyGraph {
                     })?
                 } else {
                     // Try to extract directly as NodeId first
-                    let source_val = edge_dict.get_item(source_field)?
-                        .ok_or_else(|| PyErr::new::<PyKeyError, _>(
-                            format!("Missing source field: {}", source_field)
-                        ))?;
+                    let source_val = edge_dict.get_item(source_field)?.ok_or_else(|| {
+                        PyErr::new::<PyKeyError, _>(format!(
+                            "Missing source field: {}",
+                            source_field
+                        ))
+                    })?;
                     if let Ok(node_id) = source_val.extract::<NodeId>() {
                         node_id
                     } else if let Ok(string_id) = source_val.extract::<String>() {
@@ -730,10 +733,12 @@ impl PyGraph {
 
                 let target_id = if let Some(mapping) = &node_mapping {
                     // Use node_mapping if provided
-                    let target_val = edge_dict.get_item(target_field)?
-                        .ok_or_else(|| PyErr::new::<PyKeyError, _>(
-                            format!("Missing target field: {}", target_field)
-                        ))?;
+                    let target_val = edge_dict.get_item(target_field)?.ok_or_else(|| {
+                        PyErr::new::<PyKeyError, _>(format!(
+                            "Missing target field: {}",
+                            target_field
+                        ))
+                    })?;
                     let target_str: String = target_val.extract()?;
                     *mapping.get(&target_str).ok_or_else(|| {
                         pyo3::exceptions::PyKeyError::new_err(format!(
@@ -743,10 +748,12 @@ impl PyGraph {
                     })?
                 } else {
                     // Try to extract directly as NodeId first
-                    let target_val = edge_dict.get_item(target_field)?
-                        .ok_or_else(|| PyErr::new::<PyKeyError, _>(
-                            format!("Missing target field: {}", target_field)
-                        ))?;
+                    let target_val = edge_dict.get_item(target_field)?.ok_or_else(|| {
+                        PyErr::new::<PyKeyError, _>(format!(
+                            "Missing target field: {}",
+                            target_field
+                        ))
+                    })?;
                     if let Ok(node_id) = target_val.extract::<NodeId>() {
                         node_id
                     } else if let Ok(string_id) = target_val.extract::<String>() {
@@ -774,7 +781,12 @@ impl PyGraph {
                 edge_ids.push(edge_id);
 
                 // Store edge and its attributes for bulk processing
-                edges_with_attrs.push((edge_id, edge_dict, source_field.to_string(), target_field.to_string()));
+                edges_with_attrs.push((
+                    edge_id,
+                    edge_dict,
+                    source_field.to_string(),
+                    target_field.to_string(),
+                ));
             }
 
             // OPTIMIZATION: Use bulk attribute setting instead of individual calls
@@ -1282,7 +1294,7 @@ impl PyGraph {
             }
             nodes
         };
-        
+
         let mut analysis_handler = PyGraphAnalysis::new(Py::new(py, self.clone())?)?;
         analysis_handler.neighborhood(py, center_nodes_vec, radius, max_nodes)
     }
@@ -1518,21 +1530,6 @@ impl PyGraph {
         Ok(dict.to_object(py))
     }
 
-    // === ADJACENCY MATRIX OPERATIONS ===
-
-    // === DISPLAY/TABLE METHODS ===
-
-    // === NEIGHBORHOOD SAMPLING OPERATIONS ===
-    // Moved to graph_analysis.rs module
-
-    /// Get neighborhood sampling performance statistics
-    #[allow(dead_code)]
-    fn neighborhood_statistics(&self) -> PyNeighborhoodStats {
-        PyNeighborhoodStats {
-            inner: self.inner.borrow_mut().neighborhood_statistics().clone(),
-        }
-    }
-
     // === GRAPH MERGING OPERATIONS ===
 
     /// Add another graph to this graph (merge nodes and edges)
@@ -1692,7 +1689,6 @@ impl PyGraph {
         let result = subgraph.is_connected().map_err(graph_error_to_py_err)?;
         Ok(result)
     }
-
 
     /// Convert this graph to a NetworkX graph
     ///
@@ -1860,16 +1856,17 @@ impl PyGraph {
             name, all_node_attrs, all_edge_attrs
         )))
     }
-    
+
     /// Get a GraphTable representation of this graph
     /// Implements: g.table()
     pub fn table(&self) -> PyResult<crate::ffi::storage::table::PyGraphTable> {
         let graph_table = {
             let graph = self.inner.borrow();
-            graph.table()
-                .map_err(|e| PyRuntimeError::new_err(format!("Failed to create graph table: {}", e)))?
+            graph.table().map_err(|e| {
+                PyRuntimeError::new_err(format!("Failed to create graph table: {}", e))
+            })?
         };
-        
+
         Ok(crate::ffi::storage::table::PyGraphTable { table: graph_table })
     }
 }
@@ -1882,10 +1879,10 @@ impl PyGraph {
         &self,
         adjacency_matrix: groggy::AdjacencyMatrix,
     ) -> PyResult<groggy::GraphMatrix> {
-        use groggy::storage::GraphMatrix;
+        
         use crate::ffi::storage::num_array::PyNumArray;
-        use crate::ffi::storage::array::PyBaseArray;
-        use pyo3::types::PyAny;
+        
+        
 
         // Extract matrix data and convert to NumArrays (numerical adjacency data)
         // Phase 2.2: Updated to use NumArray since adjacency matrices are always numerical
@@ -1909,14 +1906,14 @@ impl PyGraph {
 
             // Create GraphMatrix using the new constructor that accepts PyObject arrays
             let matrix = crate::ffi::storage::matrix::PyGraphMatrix::new(py, py_arrays)?;
-            
+
             // Set proper column names (for now, use default names)
             let column_names: Vec<String> = (0..cols).map(|i| format!("col_{}", i)).collect();
-            
+
             // Update the GraphMatrix with proper column names
             let mut inner_matrix = matrix.inner;
             inner_matrix.set_column_names(column_names);
-            
+
             Ok(inner_matrix)
         })
     }
@@ -2092,20 +2089,14 @@ impl PyGraph {
 
     pub fn get_node_ids_array(&self, py: Python) -> PyResult<Py<PyNumArray>> {
         let node_ids = self.inner.borrow_mut().node_ids();
-        let values: Vec<f64> = node_ids
-            .into_iter()
-            .map(|id| id as f64)
-            .collect();
+        let values: Vec<f64> = node_ids.into_iter().map(|id| id as f64).collect();
         let py_num_array = PyNumArray::new(values);
         Py::new(py, py_num_array)
     }
 
     pub fn get_edge_ids_array(&self, py: Python) -> PyResult<Py<PyNumArray>> {
         let edge_ids = self.inner.borrow_mut().edge_ids();
-        let values: Vec<f64> = edge_ids
-            .into_iter()
-            .map(|id| id as f64)
-            .collect();
+        let values: Vec<f64> = edge_ids.into_iter().map(|id| id as f64).collect();
         let py_num_array = PyNumArray::new(values);
         Py::new(py, py_num_array)
     }
@@ -2160,8 +2151,8 @@ impl PyGraph {
                     .collect();
 
                 // Create BaseArray directly from attribute values
-                let py_base_array = PyBaseArray { 
-                    inner: groggy::storage::array::BaseArray::new(attr_values) 
+                let py_base_array = PyBaseArray {
+                    inner: groggy::storage::array::BaseArray::new(attr_values),
                 };
 
                 Py::new(py, py_base_array)
@@ -2273,14 +2264,14 @@ impl PyGraph {
     // === HIERARCHICAL METHODS ===
 
     /// Add multiple subgraphs to the graph as meta-nodes (batch operation)
-    /// 
+    ///
     /// Args:
     ///     subgraphs: List of Subgraph objects to add as meta-nodes
     ///     agg_functions: Optional dict mapping attribute names to aggregation functions
-    /// 
+    ///
     /// Returns:
     ///     List[MetaNode]: The created meta-nodes
-    /// 
+    ///
     /// Example:
     ///     communities = g.connected_components()
     ///     meta_nodes = g.add_subgraphs(communities, {
@@ -2303,5 +2294,4 @@ impl PyGraph {
 
         Ok(meta_nodes)
     }
-
 }

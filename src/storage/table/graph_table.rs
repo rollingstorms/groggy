@@ -5,7 +5,6 @@ use super::base::InteractiveConfig;
 use super::edges::{EdgeConfig, EdgesTable};
 use super::nodes::NodesTable;
 use super::traits::Table;
-use crate::entities::Node;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::array::BaseArray;
 use crate::types::{AttrValue, EdgeId, NodeId};
@@ -458,7 +457,7 @@ impl GraphTable {
             return Ok(tables.into_iter().next().unwrap());
         }
 
-        let mut merged_policy = tables[0].policy.clone();
+        let _merged_policy = tables[0].policy.clone();
         let mut merged_nodes_data: Vec<HashMap<String, AttrValue>> = Vec::new();
         let mut merged_edges_data: Vec<(EdgeId, NodeId, NodeId, HashMap<String, AttrValue>)> =
             Vec::new();
@@ -602,7 +601,7 @@ impl GraphTable {
     fn merge_simple_concat(tables: Vec<GraphTable>) -> GraphResult<Self> {
         let mut merged_nodes_data = Vec::new();
         let mut merged_edges_data = Vec::new();
-        let merged_policy = tables[0].policy.clone();
+        let _merged_policy = tables[0].policy.clone();
 
         for table in tables {
             // Collect node data
@@ -734,7 +733,7 @@ impl GraphTable {
                 .map(|s| s.clone())
                 .unwrap_or_else(|| format!("domain_{}", i));
 
-            table.add_domain_metadata(&domain_name)?;
+            table._add_domain_metadata(&domain_name)?;
             tables.push(table);
         }
 
@@ -742,10 +741,10 @@ impl GraphTable {
     }
 
     /// Add domain metadata to all nodes and edges in this table
-    fn add_domain_metadata(&mut self, domain: &str) -> GraphResult<()> {
+    fn _add_domain_metadata(&mut self, _domain: &str) -> GraphResult<()> {
         // Add domain to all nodes
         if let Ok(node_ids) = self.nodes.node_ids() {
-            for &node_id in &node_ids {
+            for &_node_id in &node_ids {
                 // This would require modifying the nodes table in-place
                 // For now, we'll note this as a design consideration
                 // In practice, domain metadata would be added during merge
@@ -987,7 +986,7 @@ impl GraphTable {
     ///
     /// Creates a VizModule that visualizes both nodes and edges as a complete graph.
     /// The visualization will show the graph structure with node-edge relationships.
-    pub fn interactive(&self, config: Option<InteractiveConfig>) -> GraphResult<VizModule> {
+    pub fn interactive(&self, _config: Option<InteractiveConfig>) -> GraphResult<VizModule> {
         use std::sync::Arc;
 
         // Create VizModule from this GraphTable which already implements DataSource
@@ -1367,7 +1366,7 @@ impl GraphTable {
     where
         T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
-        use crate::storage::matrix::{FromAttrValue, GraphMatrix};
+        use crate::storage::matrix::GraphMatrix;
 
         // For now, convert nodes table to matrix (most common use case)
         // TODO: Add option to convert edges table or combined table
@@ -1445,7 +1444,7 @@ impl GraphTable {
     where
         T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
-        use crate::storage::matrix::{FromAttrValue, GraphMatrix};
+        use crate::storage::matrix::GraphMatrix;
 
         if self.edges.is_empty() {
             return Ok(GraphMatrix::zeros(0, 0));

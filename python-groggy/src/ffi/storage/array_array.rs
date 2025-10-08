@@ -32,10 +32,7 @@ impl PyArrayArray {
     }
 
     /// Create with keys
-    pub fn with_keys(
-        arrays: Vec<BaseArray<AttrValue>>,
-        keys: Vec<String>,
-    ) -> PyResult<Self> {
+    pub fn with_keys(arrays: Vec<BaseArray<AttrValue>>, keys: Vec<String>) -> PyResult<Self> {
         ArrayArray::with_keys(arrays, keys)
             .map(|arr| Self { inner: arr })
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
@@ -262,10 +259,11 @@ impl PyArrayArray {
 
         // Add group keys if present
         if let Some(keys) = self.inner.keys() {
-            let key_col: Vec<AttrValue> = keys.iter()
-                .map(|s| AttrValue::Text(s.clone()))
-                .collect();
-            columns.insert("group_key".to_string(), BaseArray::from_attr_values(key_col));
+            let key_col: Vec<AttrValue> = keys.iter().map(|s| AttrValue::Text(s.clone())).collect();
+            columns.insert(
+                "group_key".to_string(),
+                BaseArray::from_attr_values(key_col),
+            );
         }
 
         // Apply each aggregation
@@ -290,9 +288,8 @@ impl PyArrayArray {
                 }
             };
 
-            let value_col: Vec<AttrValue> = values.iter()
-                .map(|&v| AttrValue::Float(v as f32))
-                .collect();
+            let value_col: Vec<AttrValue> =
+                values.iter().map(|&v| AttrValue::Float(v as f32)).collect();
             columns.insert(col_name_str, BaseArray::from_attr_values(value_col));
         }
 
@@ -345,7 +342,7 @@ impl PyArrayArray {
             _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
                 "Unsupported type conversion: {}. Use 'float64', 'numeric', or 'arrayarray'",
                 dtype
-            )))
+            ))),
         }
     }
 
@@ -392,10 +389,7 @@ mod tests {
                     AttrValue::Int(2),
                     AttrValue::Int(3),
                 ]),
-                BaseArray::from_attr_values(vec![
-                    AttrValue::Int(4),
-                    AttrValue::Int(5),
-                ]),
+                BaseArray::from_attr_values(vec![AttrValue::Int(4), AttrValue::Int(5)]),
             ];
 
             let wrapper = PyArrayArray::from_array_array(ArrayArray::new(arrays));

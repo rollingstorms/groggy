@@ -248,7 +248,7 @@ impl<T: NumericType> UnifiedMatrix<T> {
 
     /// Create an identity matrix
     pub fn identity(size: usize) -> MatrixResult<Self> {
-        let mut matrix = Self::new(size, size)?;
+        let matrix = Self::new(size, size)?;
 
         // Set diagonal elements to 1
         if let MatrixStorage::Dense(ref buffer) = matrix.storage {
@@ -395,7 +395,7 @@ impl<T: NumericType> UnifiedMatrix<T> {
         }
 
         // Create result matrix
-        let mut result = Self::new(self.shape.rows, other.shape.cols)?;
+        let result = Self::new(self.shape.rows, other.shape.cols)?;
 
         // Select backend for computation
         let backend = self.backend_selector.select_backend(
@@ -492,7 +492,7 @@ impl<T: NumericType> UnifiedMatrix<T> {
 
         let mut result = Self::new(self.shape.rows, self.shape.cols)?;
 
-        let backend = self.backend_selector.select_backend(
+        let _backend = self.backend_selector.select_backend(
             OperationType::ElementwiseSub,
             self.len(),
             T::DTYPE,

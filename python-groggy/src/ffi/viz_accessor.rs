@@ -3,15 +3,14 @@
 //! Provides a pandas-like .viz accessor for visualization operations on subgraphs,
 //! arrays, and tables with support for different backends (jupyter, server).
 
+use futures_util::{SinkExt, StreamExt};
+use groggy::viz::streaming::GraphDataSource;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use groggy::viz::streaming::GraphDataSource;
-use groggy::errors::GraphResult;
-use std::net::TcpListener;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::net::TcpListener;
+use std::sync::Mutex;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
-use futures_util::{SinkExt, StreamExt};
 
 /// Macro for conditional debug printing based on verbosity level
 macro_rules! debug_print {
@@ -35,21 +34,24 @@ static SERVER_REGISTRY: std::sync::LazyLock<Mutex<HashMap<u16, ServerInfo>>> =
 
 /// Find an available port in the given range
 fn find_available_port(start_port: u16) -> Result<u16, String> {
-    for port in start_port..=start_port+200 {
+    for port in start_port..=start_port + 200 {
         match TcpListener::bind(("127.0.0.1", port)) {
             Ok(_) => {
                 // Port is available - no debug needed unless verbose
                 return Ok(port);
-            },
+            }
             Err(e) => {
                 // Port unavailable - continue trying next port
                 continue;
             }
         }
     }
-    Err(format!("No available ports found in range {}-{}", start_port, start_port+200))
+    Err(format!(
+        "No available ports found in range {}-{}",
+        start_port,
+        start_port + 200
+    ))
 }
-
 
 /// VizAccessor provides visualization methods for groggy objects
 #[pyclass]
@@ -67,13 +69,24 @@ impl VizAccessor {
     /// Show visualization with Realtime backend using proper DataSource integration
     /// Now supports server reuse - updates existing servers instead of creating new ones
     #[pyo3(signature = (layout = "honeycomb".to_string(), verbose = None, **kwargs))]
-    fn show(&self, py: Python, layout: String, verbose: Option<u8>, kwargs: Option<&pyo3::types::PyDict>) -> PyResult<PyObject> {
+    fn show(
+        &self,
+        py: Python,
+        layout: String,
+        verbose: Option<u8>,
+        kwargs: Option<&pyo3::types::PyDict>,
+    ) -> PyResult<PyObject> {
         let verbose = verbose.unwrap_or(0);
         debug_print!(verbose, 2, "📺 VizAccessor.show()");
         let (alg, viz_config) = self.parse_layout_kwargs_typed(kwargs, &layout, verbose)?;
-        self.ensure_server_and_display_iframe(py, verbose, &alg, &viz_config, /*open_browser=*/false)
+        self.ensure_server_and_display_iframe(
+            py,
+            verbose,
+            &alg,
+            &viz_config,
+            /*open_browser=*/ false,
+        )
     }
-
 
     /// Show visualization in standalone server mode using realtime backend
     #[pyo3(signature = (verbose=None))]
@@ -82,7 +95,13 @@ impl VizAccessor {
         debug_print!(verbose, 2, "🖥️ VizAccessor.server()");
         // No kwargs here, so use default honeycomb and empty viz_config
         let (alg, viz_config) = self.parse_layout_kwargs_typed(None, "honeycomb", verbose)?;
-        self.ensure_server_and_display_iframe(py, verbose, &alg, &viz_config, /*open_browser=*/true)
+        self.ensure_server_and_display_iframe(
+            py,
+            verbose,
+            &alg,
+            &viz_config,
+            /*open_browser=*/ true,
+        )
     }
 
     /// Update visualization parameters - sends control message to existing server
@@ -93,8 +112,18 @@ impl VizAccessor {
 
         let (layout, viz_config) = self.parse_layout_kwargs_typed(kwargs, "honeycomb", verbose)?;
         if let Some(info) = self.get_server_info() {
-            self.send_control_message_to_server(py, verbose, info.port, layout, viz_config.layout_params)?;
-            debug_print!(verbose, 1, "✅ Visualization parameters updated successfully");
+            self.send_control_message_to_server(
+                py,
+                verbose,
+                info.port,
+                layout,
+                viz_config.layout_params,
+            )?;
+            debug_print!(
+                verbose,
+                1,
+                "✅ Visualization parameters updated successfully"
+            );
             Ok(())
         } else {
             Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
@@ -159,7 +188,9 @@ impl VizAccessor {
     /// Normalize aliases so front/back-end agree
     fn normalize_layout_name(&self, s: &str) -> String {
         match s.to_lowercase().as_str() {
-            "force" | "force_directed" | "force-directed" | "spring" => "force_directed".to_string(),
+            "force" | "force_directed" | "force-directed" | "spring" => {
+                "force_directed".to_string()
+            }
             "circle" | "circular" => "circular".to_string(),
             "grid" | "matrix" => "grid".to_string(),
             "hex" | "hexagonal" | "honeycomb" => "honeycomb".to_string(),
@@ -174,14 +205,18 @@ impl VizAccessor {
         fallback_layout: &str, // e.g. "honeycomb"
         verbose: u8,
     ) -> PyResult<(String, groggy::viz::realtime::VizConfig)> {
-        use groggy::viz::realtime::{VizConfig, VizParameter};
+        use groggy::viz::realtime::VizConfig;
         use pyo3::types::{PyList, PyTuple};
 
         let mut layout = self.normalize_layout_name(fallback_layout);
         let mut viz_config = VizConfig::new();
 
         if let Some(kw) = kwargs {
-            debug_print!(verbose, 3, "📝 Processing visualization parameters from kwargs...");
+            debug_print!(
+                verbose,
+                3,
+                "📝 Processing visualization parameters from kwargs..."
+            );
 
             for (k, v) in kw.iter() {
                 let key = k.extract::<String>().unwrap_or_else(|_| k.to_string());
@@ -314,9 +349,18 @@ impl VizAccessor {
                     "node_size_range" => {
                         if let Ok(tuple) = v.downcast::<PyTuple>() {
                             if tuple.len() == 2 {
-                                if let (Ok(min), Ok(max)) = (tuple.get_item(0)?.extract::<f64>(), tuple.get_item(1)?.extract::<f64>()) {
+                                if let (Ok(min), Ok(max)) = (
+                                    tuple.get_item(0)?.extract::<f64>(),
+                                    tuple.get_item(1)?.extract::<f64>(),
+                                ) {
                                     viz_config.node_size_range = Some((min, max));
-                                    debug_print!(verbose, 3, "  📏 node_size_range=[{}, {}]", min, max);
+                                    debug_print!(
+                                        verbose,
+                                        3,
+                                        "  📏 node_size_range=[{}, {}]",
+                                        min,
+                                        max
+                                    );
                                 }
                             }
                         }
@@ -324,9 +368,18 @@ impl VizAccessor {
                     "edge_width_range" => {
                         if let Ok(tuple) = v.downcast::<PyTuple>() {
                             if tuple.len() == 2 {
-                                if let (Ok(min), Ok(max)) = (tuple.get_item(0)?.extract::<f64>(), tuple.get_item(1)?.extract::<f64>()) {
+                                if let (Ok(min), Ok(max)) = (
+                                    tuple.get_item(0)?.extract::<f64>(),
+                                    tuple.get_item(1)?.extract::<f64>(),
+                                ) {
                                     viz_config.edge_width_range = Some((min, max));
-                                    debug_print!(verbose, 3, "  📏 edge_width_range=[{}, {}]", min, max);
+                                    debug_print!(
+                                        verbose,
+                                        3,
+                                        "  📏 edge_width_range=[{}, {}]",
+                                        min,
+                                        max
+                                    );
                                 }
                             }
                         }
@@ -335,10 +388,16 @@ impl VizAccessor {
                     // Color parameters
                     "color_palette" => {
                         if let Ok(list) = v.downcast::<PyList>() {
-                            let palette: Result<Vec<String>, _> = list.iter().map(|item| item.extract::<String>()).collect();
+                            let palette: Result<Vec<String>, _> =
+                                list.iter().map(|item| item.extract::<String>()).collect();
                             if let Ok(palette) = palette {
                                 viz_config.color_palette = Some(palette);
-                                debug_print!(verbose, 3, "  🎨 color_palette with {} colors", viz_config.color_palette.as_ref().unwrap().len());
+                                debug_print!(
+                                    verbose,
+                                    3,
+                                    "  🎨 color_palette with {} colors",
+                                    viz_config.color_palette.as_ref().unwrap().len()
+                                );
                             }
                         }
                     }
@@ -352,10 +411,16 @@ impl VizAccessor {
                     // Tooltip parameters
                     "tooltip_columns" => {
                         if let Ok(list) = v.downcast::<PyList>() {
-                            let columns: Result<Vec<String>, _> = list.iter().map(|item| item.extract::<String>()).collect();
+                            let columns: Result<Vec<String>, _> =
+                                list.iter().map(|item| item.extract::<String>()).collect();
                             if let Ok(columns) = columns {
                                 viz_config.tooltip_columns = columns;
-                                debug_print!(verbose, 3, "  💬 tooltip_columns with {} columns", viz_config.tooltip_columns.len());
+                                debug_print!(
+                                    verbose,
+                                    3,
+                                    "  💬 tooltip_columns with {} columns",
+                                    viz_config.tooltip_columns.len()
+                                );
                             }
                         }
                     }
@@ -411,12 +476,21 @@ impl VizAccessor {
             }
         }
 
-        debug_print!(verbose, 3, "📊 Final visualization config: algorithm='{}', styled parameters parsed", layout);
+        debug_print!(
+            verbose,
+            3,
+            "📊 Final visualization config: algorithm='{}', styled parameters parsed",
+            layout
+        );
         Ok((layout, viz_config))
     }
 
     /// Parse a Python value into a VizParameter (array, column name, or single value)
-    fn parse_viz_parameter<T>(&self, py_value: &PyAny, verbose: u8) -> PyResult<groggy::viz::realtime::VizParameter<T>>
+    fn parse_viz_parameter<T>(
+        &self,
+        py_value: &PyAny,
+        verbose: u8,
+    ) -> PyResult<groggy::viz::realtime::VizParameter<T>>
     where
         for<'a> T: pyo3::FromPyObject<'a>,
     {
@@ -431,18 +505,30 @@ impl VizAccessor {
 
         // Try to extract as a list (array of values)
         if let Ok(py_list) = py_value.downcast::<PyList>() {
-            let values: Result<Vec<T>, _> = py_list.iter().map(|item| item.extract::<T>()).collect();
+            let values: Result<Vec<T>, _> =
+                py_list.iter().map(|item| item.extract::<T>()).collect();
             if let Ok(values) = values {
-                debug_print!(verbose, 3, "    📊 Parsed as array with {} values", values.len());
+                debug_print!(
+                    verbose,
+                    3,
+                    "    📊 Parsed as array with {} values",
+                    values.len()
+                );
                 return Ok(VizParameter::Array(values));
             }
         }
 
         // Try to extract as a tuple (array of values)
         if let Ok(py_tuple) = py_value.downcast::<PyTuple>() {
-            let values: Result<Vec<T>, _> = py_tuple.iter().map(|item| item.extract::<T>()).collect();
+            let values: Result<Vec<T>, _> =
+                py_tuple.iter().map(|item| item.extract::<T>()).collect();
             if let Ok(values) = values {
-                debug_print!(verbose, 3, "    📊 Parsed as tuple array with {} values", values.len());
+                debug_print!(
+                    verbose,
+                    3,
+                    "    📊 Parsed as tuple array with {} values",
+                    values.len()
+                );
                 return Ok(VizParameter::Array(values));
             }
         }
@@ -466,19 +552,34 @@ impl VizAccessor {
         verbose: u8,
         layout: &str,
         viz_config: &groggy::viz::realtime::VizConfig,
-        open_browser: bool,   // true for `.server()`, false for `.show()`
+        open_browser: bool, // true for `.server()`, false for `.show()`
     ) -> PyResult<PyObject> {
         if let Some(info) = self.get_server_info() {
             // Reuse: just send a control message and re-display iframe
-            self.send_control_message_to_server(py, verbose, info.port, layout.to_string(), viz_config.layout_params.clone())?;
+            self.send_control_message_to_server(
+                py,
+                verbose,
+                info.port,
+                layout.to_string(),
+                viz_config.layout_params.clone(),
+            )?;
             let html = format!(
-r#"<div style="position: relative;">
+                r#"<div style="position: relative;">
 <iframe src="http://127.0.0.1:{}/" width="100%" height="640" frameborder="0" style="border: 1px solid #ddd;"></iframe>
-</div>"#, info.port);
-            py.run(&format!(r#"
+</div>"#,
+                info.port
+            );
+            py.run(
+                &format!(
+                    r#"
 from IPython.display import HTML, display
 display(HTML(r'''{html}'''))
-    "#, html = html.replace("'", "\\'")), None, None)?;
+    "#,
+                    html = html.replace("'", "\\'")
+                ),
+                None,
+                None,
+            )?;
             return Ok(py.None());
         }
 
@@ -486,9 +587,10 @@ display(HTML(r'''{html}'''))
         let ds = match &self.data_source {
             Some(ds) => ds.clone(),
             None => {
-                return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                    format!("No data source available for {}", self.object_type)
-                ));
+                return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "No data source available for {}",
+                    self.object_type
+                )));
             }
         };
         let data_source_id = self.data_source_id.clone();
@@ -553,7 +655,13 @@ r#"<div style="position: relative;">
         // Register server
         {
             let mut registry = SERVER_REGISTRY.lock().unwrap();
-            registry.insert(port, ServerInfo { port, data_source_id });
+            registry.insert(
+                port,
+                ServerInfo {
+                    port,
+                    data_source_id,
+                },
+            );
         }
 
         // Apply requested layout to freshly started server
@@ -574,13 +682,27 @@ r#"<div style="position: relative;">
         }
 
         if open_browser {
-            py.run(&format!("import webbrowser; webbrowser.open('http://127.0.0.1:{}/')", port), None, None)?;
+            py.run(
+                &format!(
+                    "import webbrowser; webbrowser.open('http://127.0.0.1:{}/')",
+                    port
+                ),
+                None,
+                None,
+            )?;
         }
 
-        py.run(&format!(r#"
+        py.run(
+            &format!(
+                r#"
 from IPython.display import HTML, display
 display(HTML(r'''{html}'''))
-    "#, html = iframe_html.replace("'", "\\'")), None, None)?;
+    "#,
+                html = iframe_html.replace("'", "\\'")
+            ),
+            None,
+            None,
+        )?;
 
         Ok(py.None())
     }
@@ -594,7 +716,12 @@ display(HTML(r'''{html}'''))
         layout: String,
         layout_params: HashMap<String, String>,
     ) -> PyResult<()> {
-        debug_print!(verbose, 2, "📡 Sending ChangeLayout control message to server on port {}", port);
+        debug_print!(
+            verbose,
+            2,
+            "📡 Sending ChangeLayout control message to server on port {}",
+            port
+        );
 
         let result = py.allow_threads(move || -> Result<String, String> {
             // Create tokio runtime for WebSocket client
@@ -630,7 +757,11 @@ display(HTML(r'''{html}'''))
                         // Send the control message
                         match ws_stream.send(Message::Text(message_text)).await {
                             Ok(()) => {
-                                debug_print!(verbose, 2, "✅ ChangeLayout control message sent successfully");
+                                debug_print!(
+                                    verbose,
+                                    2,
+                                    "✅ ChangeLayout control message sent successfully"
+                                );
 
                                 // Wait briefly for server to process and send position updates
                                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -640,13 +771,24 @@ display(HTML(r'''{html}'''))
                                 Ok("Control message sent successfully".to_string())
                             }
                             Err(e) => {
-                                debug_print!(verbose, 1, "❌ Failed to send WebSocket message: {}", e);
+                                debug_print!(
+                                    verbose,
+                                    1,
+                                    "❌ Failed to send WebSocket message: {}",
+                                    e
+                                );
                                 Err(format!("Failed to send WebSocket message: {}", e))
                             }
                         }
                     }
                     Err(e) => {
-                        debug_print!(verbose, 1, "❌ Failed to connect to WebSocket {}: {}", ws_url, e);
+                        debug_print!(
+                            verbose,
+                            1,
+                            "❌ Failed to connect to WebSocket {}: {}",
+                            ws_url,
+                            e
+                        );
                         Err(format!("Failed to connect to WebSocket: {}", e))
                     }
                 }
@@ -655,14 +797,19 @@ display(HTML(r'''{html}'''))
 
         match result {
             Ok(_) => {
-                debug_print!(verbose, 2, "🔄 Server update successful - layout parameters sent");
+                debug_print!(
+                    verbose,
+                    2,
+                    "🔄 Server update successful - layout parameters sent"
+                );
                 Ok(())
-            },
+            }
             Err(e) => {
                 debug_print!(verbose, 1, "❌ Failed to send control message: {}", e);
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                    format!("Failed to send control message: {}", e)
-                ))
+                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Failed to send control message: {}",
+                    e
+                )))
             }
         }
     }
@@ -689,7 +836,13 @@ display(HTML(r'''{html}'''))
             }
         }
 
-        debug_print!(verbose, 3, "📊 Final layout parameters: algorithm='{}', params={:?}", layout, layout_params);
+        debug_print!(
+            verbose,
+            3,
+            "📊 Final layout parameters: algorithm='{}', params={:?}",
+            layout,
+            layout_params
+        );
         Ok((layout, layout_params))
     }
 
@@ -702,7 +855,12 @@ display(HTML(r'''{html}'''))
         layout_params: HashMap<String, String>,
         verbose: u8,
     ) -> PyResult<PyObject> {
-        debug_print!(verbose, 2, "📡 Sending ChangeLayout control message to server on port {}", port);
+        debug_print!(
+            verbose,
+            2,
+            "📡 Sending ChangeLayout control message to server on port {}",
+            port
+        );
 
         let result = py.allow_threads(move || -> Result<String, String> {
             use groggy::viz::realtime::accessor::ControlMsg;
@@ -794,8 +952,9 @@ display(HTML(r'''{html}'''))
         match result {
             Ok(html) => {
                 // Auto-display in Jupyter using display(HTML())
-                py.run(&format!(
-                    r#"
+                py.run(
+                    &format!(
+                        r#"
 try:
     from IPython.display import HTML, display
     _html_obj = HTML(r'''{html}''')
@@ -803,16 +962,20 @@ try:
 except Exception as e:
     print(f"Display error: {{e}}")
 "#,
-                    html = html.replace("'", "\\'")
-                ), None, None)?;
+                        html = html.replace("'", "\\'")
+                    ),
+                    None,
+                    None,
+                )?;
 
                 Ok(py.None())
-            },
+            }
             Err(e) => {
                 debug_print!(verbose, 1, "❌ Failed to update existing server: {}", e);
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                    format!("Failed to update existing server: {}", e)
-                ))
+                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Failed to update existing server: {}",
+                    e
+                )))
             }
         }
     }
@@ -829,7 +992,6 @@ fn extract_port_from_iframe(iframe_html: &str) -> Option<u16> {
     }
     None
 }
-
 
 #[cfg(test)]
 mod tests {

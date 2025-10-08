@@ -315,7 +315,7 @@ impl<T: Clone + 'static> LazyArrayIterator<T> {
 
     /// Internal: Execute the optimized operation chain
     fn execute_operations_static(
-        mut elements: Vec<T>,
+        elements: Vec<T>,
         _graph_ref: Option<Rc<RefCell<Graph>>>,
         estimated_size: usize,
         operations: Vec<LazyOperation>,
@@ -363,7 +363,7 @@ impl<T: Clone + 'static> LazyArrayIterator<T> {
     fn execute_filter_static(elements: Vec<T>, query: &str) -> GraphResult<Vec<T>> {
         // For AttrValue, we can use the query evaluator
         if TypeId::of::<T>() == TypeId::of::<crate::types::AttrValue>() {
-            let evaluator = crate::storage::array::BatchQueryEvaluator::new(query);
+            let _evaluator = crate::storage::array::BatchQueryEvaluator::new(query);
             // This is a bit tricky due to generic constraints, so we'll use a simpler approach
             let result = elements
                 .into_iter()
@@ -444,7 +444,7 @@ impl<T: SubgraphLike + Clone + 'static> LazyArrayIterator<T> {
     }
 
     /// Lazily collapse subgraphs with aggregation
-    pub fn collapse(mut self, aggs: HashMap<String, String>) -> LazyArrayIterator<()> {
+    pub fn collapse(self, aggs: HashMap<String, String>) -> LazyArrayIterator<()> {
         // Note: collapse changes the type to () (unit type) as it aggregates
         LazyArrayIterator {
             elements: vec![(); self.elements.len()], // Placeholder elements

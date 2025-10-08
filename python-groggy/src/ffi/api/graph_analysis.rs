@@ -236,8 +236,8 @@ impl PyGraphAnalysis {
         attr_name: Option<String>,
     ) -> PyResult<PyObject> {
         use crate::ffi::subgraphs::subgraph::PySubgraph;
-        use groggy::subgraphs::Subgraph;
         use groggy::query::TraversalOptions;
+        use groggy::subgraphs::Subgraph;
 
         let inplace = inplace.unwrap_or(false);
         let graph_ref = self.graph.borrow_mut(py);
@@ -308,8 +308,8 @@ impl PyGraphAnalysis {
         attr_name: Option<String>,
     ) -> PyResult<PyObject> {
         use crate::ffi::subgraphs::subgraph::PySubgraph;
-        use groggy::subgraphs::Subgraph;
         use groggy::query::TraversalOptions;
+        use groggy::subgraphs::Subgraph;
 
         let inplace = inplace.unwrap_or(false);
         let graph_ref = self.graph.borrow_mut(py);

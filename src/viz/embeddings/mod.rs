@@ -400,7 +400,7 @@ impl EmbeddingEngine for CompositeEmbedding {
                 Ok(result)
             }
 
-            CombinationStrategy::Interleave { chunk_size } => {
+            CombinationStrategy::Interleave { chunk_size: _ } => {
                 // TODO: Implement interleaving strategy
                 todo!("Interleave combination strategy not yet implemented")
             }
@@ -409,7 +409,7 @@ impl EmbeddingEngine for CompositeEmbedding {
 
     fn supports_incremental(&self) -> bool {
         // Only if all constituent methods support incremental updates
-        self.methods.iter().all(|(method, _)| {
+        self.methods.iter().all(|(_method, _)| {
             // This is simplified - would need to check each method properly
             false
         })

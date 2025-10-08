@@ -2,13 +2,14 @@
 //!
 //! Python bindings for statistical arrays and matrices.
 
-use groggy::storage::array::{BaseArray, ArrayOps, ArrayIterator, NodesArray, EdgesArray, MetaNodeArray, NodeIdLike, EdgeLike, MetaNodeLike};
-use groggy::types::{AttrValue as RustAttrValue, AttrValueType, NodeId, EdgeId};
 use groggy::entities::meta_node::MetaNode;
-use pyo3::exceptions::{PyAttributeError, PyImportError, PyIndexError, PyTypeError, PyValueError};
+use groggy::storage::array::{
+    ArrayIterator, ArrayOps, BaseArray, EdgesArray, MetaNodeArray, NodesArray,
+};
+use groggy::types::{AttrValue as RustAttrValue, AttrValueType, EdgeId, NodeId};
+use pyo3::exceptions::{PyAttributeError, PyIndexError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
-use std::collections::HashMap;
 
 // Use utility functions from utils module
 use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
@@ -80,39 +81,41 @@ impl PyBaseArray {
     }
 
     /// Advanced index access supporting multiple indexing types
-    /// Supports: 
+    /// Supports:
     /// - Single integer: array[5], array[-1]
     /// - Integer lists: array[[0, 2, 5]]
     /// - Boolean arrays: array[bool_mask]
     /// - Slices: array[:5], array[::2], array[1:10:2]
     fn __getitem__(&self, py: Python, index: &PyAny) -> PyResult<PyObject> {
-        use groggy::storage::array::AdvancedIndexing;
         use crate::ffi::utils::indexing::python_index_to_slice_index;
-        
+        use groggy::storage::array::AdvancedIndexing;
+
         // Handle simple integer case directly for performance
         if let Ok(int_val) = index.extract::<isize>() {
             let len = self.inner.len() as isize;
             let actual_index = if int_val < 0 { len + int_val } else { int_val };
-            
+
             if actual_index < 0 || actual_index >= len {
                 return Err(PyIndexError::new_err("Index out of range"));
             }
-            
+
             match self.inner.get(actual_index as usize) {
                 Some(attr_value) => return attr_value_to_python_value(py, attr_value),
                 None => return Err(PyIndexError::new_err("Index out of range")),
             }
         }
-        
+
         // Handle advanced indexing cases
         let slice_index = python_index_to_slice_index(py, index)?;
-        
+
         match self.inner.get_slice(&slice_index) {
             Ok(sliced_array) => {
-                let py_array = PyBaseArray { inner: sliced_array };
+                let py_array = PyBaseArray {
+                    inner: sliced_array,
+                };
                 Ok(py_array.into_py(py))
             }
-            Err(e) => Err(pyo3::exceptions::PyIndexError::new_err(format!("{}", e)))
+            Err(e) => Err(pyo3::exceptions::PyIndexError::new_err(format!("{}", e))),
         }
     }
 
@@ -120,12 +123,14 @@ impl PyBaseArray {
     fn __repr__(&self) -> String {
         let dtype = self.dtype();
         let len = self.inner.len();
-        
+
         // Show a preview of the data
         let preview = if len == 0 {
             "empty".to_string()
         } else {
-            let preview_items: Vec<String> = self.inner.iter()
+            let preview_items: Vec<String> = self
+                .inner
+                .iter()
                 .take(3)
                 .map(|v| match v {
                     groggy::types::AttrValue::Text(s) => format!("'{}'", s),
@@ -137,7 +142,7 @@ impl PyBaseArray {
                     _ => format!("{:?}", v), // Catch-all for other variants
                 })
                 .collect();
-            
+
             let preview_str = preview_items.join(", ");
             if len > 3 {
                 format!("[{}, ...]", preview_str)
@@ -145,16 +150,15 @@ impl PyBaseArray {
                 format!("[{}]", preview_str)
             }
         };
-        
-        format!(
-            "BaseArray[{}] {} (dtype: {})",
-            len, preview, dtype
-        )
+
+        format!("BaseArray[{}] {} (dtype: {})", len, preview, dtype)
     }
 
     /// Get the data type of the array based on the first non-null element
     fn dtype(&self) -> String {
-        let dtype = self.inner.first()
+        let dtype = self
+            .inner
+            .first()
             .map(|v| v.dtype())
             .unwrap_or(AttrValueType::Null);
         format!("{:?}", dtype)
@@ -167,7 +171,7 @@ impl PyBaseArray {
             inner: BaseArray::new(data),
         }
     }
-    
+
     fn tail(&self, n: usize) -> Self {
         let len = self.inner.len();
         let start = if len > n { len - n } else { 0 };
@@ -176,17 +180,17 @@ impl PyBaseArray {
             inner: BaseArray::new(data),
         }
     }
-    
+
     fn unique(&self) -> Self {
         let mut unique_values: Vec<RustAttrValue> = Vec::new();
         let mut seen: std::collections::HashSet<RustAttrValue> = std::collections::HashSet::new();
-        
+
         for value in self.inner.iter() {
             if seen.insert(value.clone()) {
                 unique_values.push(value.clone());
             }
         }
-        
+
         PyBaseArray {
             inner: BaseArray::new(unique_values),
         }
@@ -195,17 +199,21 @@ impl PyBaseArray {
     fn describe(&self, py: Python) -> PyResult<PyObject> {
         // Basic descriptive statistics
         let count = self.inner.len();
-        let non_null_count = self.inner.iter().filter(|v| !matches!(v, RustAttrValue::Null)).count();
+        let non_null_count = self
+            .inner
+            .iter()
+            .filter(|v| !matches!(v, RustAttrValue::Null))
+            .count();
         let null_count = count - non_null_count;
         let unique_count = self.unique().inner.len();
-        
+
         let dict = PyDict::new(py);
         dict.set_item("count", count)?;
         dict.set_item("non_null", non_null_count)?;
         dict.set_item("null", null_count)?;
         dict.set_item("unique", unique_count)?;
         dict.set_item("dtype", self.dtype())?;
-        
+
         Ok(dict.into())
     }
 
@@ -213,7 +221,10 @@ impl PyBaseArray {
     fn sum(&self, py: Python) -> PyResult<PyObject> {
         match self.inner.sum() {
             Ok(result) => attr_value_to_python_value(py, &result),
-            Err(e) => Err(PyValueError::new_err(format!("Sum calculation failed: {}", e))),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Sum calculation failed: {}",
+                e
+            ))),
         }
     }
 
@@ -221,7 +232,10 @@ impl PyBaseArray {
     fn mean(&self) -> PyResult<f64> {
         match self.inner.mean() {
             Ok(result) => Ok(result),
-            Err(e) => Err(PyValueError::new_err(format!("Mean calculation failed: {}", e))),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Mean calculation failed: {}",
+                e
+            ))),
         }
     }
 
@@ -229,7 +243,10 @@ impl PyBaseArray {
     fn median(&self) -> PyResult<f64> {
         match self.inner.median() {
             Ok(result) => Ok(result),
-            Err(e) => Err(PyValueError::new_err(format!("Median calculation failed: {}", e))),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Median calculation failed: {}",
+                e
+            ))),
         }
     }
 
@@ -237,7 +254,10 @@ impl PyBaseArray {
     fn std(&self) -> PyResult<f64> {
         match self.inner.std() {
             Ok(result) => Ok(result),
-            Err(e) => Err(PyValueError::new_err(format!("Standard deviation calculation failed: {}", e))),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Standard deviation calculation failed: {}",
+                e
+            ))),
         }
     }
 
@@ -245,7 +265,10 @@ impl PyBaseArray {
     fn var(&self) -> PyResult<f64> {
         match self.inner.var() {
             Ok(result) => Ok(result),
-            Err(e) => Err(PyValueError::new_err(format!("Variance calculation failed: {}", e))),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Variance calculation failed: {}",
+                e
+            ))),
         }
     }
 
@@ -253,7 +276,10 @@ impl PyBaseArray {
     fn min(&self, py: Python) -> PyResult<PyObject> {
         match self.inner.min() {
             Ok(result) => attr_value_to_python_value(py, &result),
-            Err(e) => Err(PyValueError::new_err(format!("Min calculation failed: {}", e))),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Min calculation failed: {}",
+                e
+            ))),
         }
     }
 
@@ -261,7 +287,10 @@ impl PyBaseArray {
     fn max(&self, py: Python) -> PyResult<PyObject> {
         match self.inner.max() {
             Ok(result) => attr_value_to_python_value(py, &result),
-            Err(e) => Err(PyValueError::new_err(format!("Max calculation failed: {}", e))),
+            Err(e) => Err(PyValueError::new_err(format!(
+                "Max calculation failed: {}",
+                e
+            ))),
         }
     }
 
@@ -280,7 +309,8 @@ impl PyBaseArray {
     /// Similar to pandas Series.isna()
     fn isna(&self) -> PyBaseArray {
         let bool_array = self.inner.isna();
-        let attr_values: Vec<RustAttrValue> = bool_array.into_iter()
+        let attr_values: Vec<RustAttrValue> = bool_array
+            .into_iter()
             .map(|b| RustAttrValue::Bool(b))
             .collect();
         PyBaseArray {
@@ -293,7 +323,8 @@ impl PyBaseArray {
     /// Similar to pandas Series.notna()
     fn notna(&self) -> PyBaseArray {
         let bool_array = self.inner.notna();
-        let attr_values: Vec<RustAttrValue> = bool_array.into_iter()
+        let attr_values: Vec<RustAttrValue> = bool_array
+            .into_iter()
             .map(|b| RustAttrValue::Bool(b))
             .collect();
         PyBaseArray {
@@ -335,44 +366,47 @@ impl PyBaseArray {
     fn iter(slf: PyRef<Self>) -> PyResult<PyBaseArrayIterator> {
         // Use our ArrayOps implementation to create the iterator
         let array_iterator = ArrayOps::iter(&slf.inner);
-        
+
         Ok(PyBaseArrayIterator {
             inner: array_iterator,
         })
     }
-    
-    /// Delegation-based method application to each element 
+
+    /// Delegation-based method application to each element
     /// This demonstrates the concept: apply a method to each element and return new array
     fn apply_to_each(&self, py: Python, method_name: &str, args: &PyTuple) -> PyResult<PyObject> {
         let mut results = Vec::new();
-        
+
         // Apply the method to each element in the array
         for value in self.inner.data() {
             // Convert AttrValue to a Python object that might have the method
             let py_value = attr_value_to_python_value(py, value)?;
-            
+
             // Check if this value has the requested method
             if py_value.as_ref(py).hasattr(method_name)? {
                 // Get the method and call it with the provided arguments
                 let method = py_value.as_ref(py).getattr(method_name)?;
                 let result = method.call1(args)?;
-                
+
                 // Convert result back to AttrValue
                 let attr_result = python_value_to_attr_value(result)?;
                 results.push(attr_result);
             } else {
-                return Err(PyAttributeError::new_err(
-                    format!("Elements in array don't have method '{}'", method_name)
-                ));
+                return Err(PyAttributeError::new_err(format!(
+                    "Elements in array don't have method '{}'",
+                    method_name
+                )));
             }
         }
-        
+
         // Create new BaseArray with results
         let result_array = BaseArray::from_attr_values(results);
-        let py_base = PyBaseArray { inner: result_array };
+        let py_base = PyBaseArray {
+            inner: result_array,
+        };
         Ok(Py::new(py, py_base)?.to_object(py))
     }
-    
+
     /// BaseArray __getattr__ delegation: automatically apply methods to each element
     /// This enables: array.some_method() -> applies some_method to each element
     pub fn __getattr__(&self, py: Python, name: &str) -> PyResult<PyObject> {
@@ -382,47 +416,55 @@ impl PyBaseArray {
         Ok(result.into_py(py))
     }
 
-    
     /// Rich HTML representation for Jupyter notebooks
-    /// 
+    ///
     /// Returns beautiful HTML table representation that displays automatically
     /// in Jupyter notebook cells, similar to pandas DataFrames.
     pub fn _repr_html_(&self, _py: Python) -> PyResult<String> {
         // Convert to table and get its HTML representation
         let table = self.to_table()?;
-        
+
         // Use the core table's _repr_html_ method for proper HTML output
         let html = table.table._repr_html_();
         Ok(html)
     }
-    
+
     /// Convert array to table format for streaming visualization
-    /// 
+    ///
     /// Creates a BaseTable with 'index' and 'value' columns from the array data.
     /// This enables the array to use the rich streaming table infrastructure.
     fn to_table(&self) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
         use groggy::storage::table::BaseTable;
         use groggy::types::AttrValue;
         use std::collections::HashMap;
-        
+
         // Create columns for the table
         let mut columns = HashMap::new();
-        
+
         // Index column (0, 1, 2, ...)
         let indices: Vec<AttrValue> = (0..self.inner.len())
             .map(|i| AttrValue::SmallInt(i as i32))
             .collect();
-        columns.insert("index".to_string(), groggy::storage::array::BaseArray::new(indices));
-        
+        columns.insert(
+            "index".to_string(),
+            groggy::storage::array::BaseArray::new(indices),
+        );
+
         // Value column (array data)
         let values: Vec<AttrValue> = self.inner.clone_vec();
-        columns.insert("value".to_string(), groggy::storage::array::BaseArray::new(values));
-        
+        columns.insert(
+            "value".to_string(),
+            groggy::storage::array::BaseArray::new(values),
+        );
+
         // Create the BaseTable
-        let base_table = BaseTable::from_columns(columns)
-            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create table: {}", e)))?;
-        
-        Ok(crate::ffi::storage::table::PyBaseTable::from_table(base_table))
+        let base_table = BaseTable::from_columns(columns).map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create table: {}", e))
+        })?;
+
+        Ok(crate::ffi::storage::table::PyBaseTable::from_table(
+            base_table,
+        ))
     }
 
     // === COMPARISON OPERATORS FOR BOOLEAN INDEXING ===
@@ -431,7 +473,7 @@ impl PyBaseArray {
     fn __gt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
         let mut result = Vec::new();
-        
+
         for value in self.inner.iter() {
             let comparison_result = match (value, &other_value) {
                 // Integer comparisons
@@ -449,9 +491,15 @@ impl PyBaseArray {
 
                 // String comparisons
                 (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a.as_str() > b.as_str(),
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => a.as_str() > b.as_str(),
-                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => a.as_str() > b.as_str(),
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => a.as_str() > b.as_str(),
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => {
+                    a.as_str() > b.as_str()
+                }
+                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => {
+                    a.as_str() > b.as_str()
+                }
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => {
+                    a.as_str() > b.as_str()
+                }
 
                 // Boolean comparisons (false < true)
                 (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a > b,
@@ -469,7 +517,7 @@ impl PyBaseArray {
             };
             result.push(comparison_result);
         }
-        
+
         // Convert Vec<bool> to unified NumArray with bool dtype
         let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
         Ok(py_bool_array.into_py(py))
@@ -479,7 +527,7 @@ impl PyBaseArray {
     fn __lt__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
         let mut result = Vec::new();
-        
+
         for value in self.inner.iter() {
             let comparison_result = match (value, &other_value) {
                 // Integer comparisons
@@ -497,9 +545,15 @@ impl PyBaseArray {
 
                 // String comparisons
                 (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a.as_str() < b.as_str(),
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => a.as_str() < b.as_str(),
-                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => a.as_str() < b.as_str(),
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => a.as_str() < b.as_str(),
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => {
+                    a.as_str() < b.as_str()
+                }
+                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => {
+                    a.as_str() < b.as_str()
+                }
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => {
+                    a.as_str() < b.as_str()
+                }
 
                 // Boolean comparisons (false < true)
                 (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a < b,
@@ -517,7 +571,7 @@ impl PyBaseArray {
             };
             result.push(comparison_result);
         }
-        
+
         // Convert Vec<bool> to unified NumArray with bool dtype
         let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
         Ok(py_bool_array.into_py(py))
@@ -527,7 +581,7 @@ impl PyBaseArray {
     fn __ge__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
         let mut result = Vec::new();
-        
+
         for value in self.inner.iter() {
             let comparison_result = match (value, &other_value) {
                 // Integer comparisons
@@ -544,10 +598,18 @@ impl PyBaseArray {
                 (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => *a >= (*b as f32),
 
                 // String comparisons
-                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a.as_str() >= b.as_str(),
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => a.as_str() >= b.as_str(),
-                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => a.as_str() >= b.as_str(),
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => a.as_str() >= b.as_str(),
+                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => {
+                    a.as_str() >= b.as_str()
+                }
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => {
+                    a.as_str() >= b.as_str()
+                }
+                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => {
+                    a.as_str() >= b.as_str()
+                }
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => {
+                    a.as_str() >= b.as_str()
+                }
 
                 // Boolean comparisons (false < true)
                 (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a >= b,
@@ -565,7 +627,7 @@ impl PyBaseArray {
             };
             result.push(comparison_result);
         }
-        
+
         // Convert Vec<bool> to unified NumArray with bool dtype
         let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
         Ok(py_bool_array.into_py(py))
@@ -575,7 +637,7 @@ impl PyBaseArray {
     fn __le__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
         let mut result = Vec::new();
-        
+
         for value in self.inner.iter() {
             let comparison_result = match (value, &other_value) {
                 // Integer comparisons
@@ -592,10 +654,18 @@ impl PyBaseArray {
                 (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => *a <= (*b as f32),
 
                 // String comparisons
-                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a.as_str() <= b.as_str(),
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => a.as_str() <= b.as_str(),
-                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => a.as_str() <= b.as_str(),
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => a.as_str() <= b.as_str(),
+                (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => {
+                    a.as_str() <= b.as_str()
+                }
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => {
+                    a.as_str() <= b.as_str()
+                }
+                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => {
+                    a.as_str() <= b.as_str()
+                }
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => {
+                    a.as_str() <= b.as_str()
+                }
 
                 // Boolean comparisons (false < true)
                 (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a <= b,
@@ -613,7 +683,7 @@ impl PyBaseArray {
             };
             result.push(comparison_result);
         }
-        
+
         // Convert Vec<bool> to unified NumArray with bool dtype
         let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
         Ok(py_bool_array.into_py(py))
@@ -623,36 +693,52 @@ impl PyBaseArray {
     fn __eq__(&self, py: Python, other: &PyAny) -> PyResult<PyObject> {
         let other_value = crate::ffi::utils::python_value_to_attr_value(other)?;
         let mut result = Vec::new();
-        
+
         for value in self.inner.iter() {
             let comparison_result = match (value, &other_value) {
                 // Exact type matches
                 (groggy::AttrValue::Int(a), groggy::AttrValue::Int(b)) => a == b,
                 (groggy::AttrValue::SmallInt(a), groggy::AttrValue::SmallInt(b)) => a == b,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => (a - b).abs() < f32::EPSILON,
+                (groggy::AttrValue::Float(a), groggy::AttrValue::Float(b)) => {
+                    (a - b).abs() < f32::EPSILON
+                }
                 (groggy::AttrValue::Bool(a), groggy::AttrValue::Bool(b)) => a == b,
                 (groggy::AttrValue::Text(a), groggy::AttrValue::Text(b)) => a == b,
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => a.as_str() == b.as_str(),
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::CompactText(b)) => {
+                    a.as_str() == b.as_str()
+                }
                 (groggy::AttrValue::Null, groggy::AttrValue::Null) => true,
 
                 // Mixed numeric type comparisons
                 (groggy::AttrValue::Int(a), groggy::AttrValue::SmallInt(b)) => *a == (*b as i64),
                 (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Int(b)) => (*a as i64) == *b,
-                (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => (*a as f32 - *b).abs() < f32::EPSILON,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::Int(b)) => (*a - *b as f32).abs() < f32::EPSILON,
-                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Float(b)) => (*a as f32 - *b).abs() < f32::EPSILON,
-                (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => (*a - *b as f32).abs() < f32::EPSILON,
+                (groggy::AttrValue::Int(a), groggy::AttrValue::Float(b)) => {
+                    (*a as f32 - *b).abs() < f32::EPSILON
+                }
+                (groggy::AttrValue::Float(a), groggy::AttrValue::Int(b)) => {
+                    (*a - *b as f32).abs() < f32::EPSILON
+                }
+                (groggy::AttrValue::SmallInt(a), groggy::AttrValue::Float(b)) => {
+                    (*a as f32 - *b).abs() < f32::EPSILON
+                }
+                (groggy::AttrValue::Float(a), groggy::AttrValue::SmallInt(b)) => {
+                    (*a - *b as f32).abs() < f32::EPSILON
+                }
 
                 // Mixed string comparisons
-                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => a.as_str() == b.as_str(),
-                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => a.as_str() == b.as_str(),
+                (groggy::AttrValue::Text(a), groggy::AttrValue::CompactText(b)) => {
+                    a.as_str() == b.as_str()
+                }
+                (groggy::AttrValue::CompactText(a), groggy::AttrValue::Text(b)) => {
+                    a.as_str() == b.as_str()
+                }
 
                 // Different types are not equal (including nulls with non-nulls)
                 _ => false,
             };
             result.push(comparison_result);
         }
-        
+
         // Convert Vec<bool> to unified NumArray with bool dtype
         let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(result);
         Ok(py_bool_array.into_py(py))
@@ -668,7 +754,7 @@ impl PyBaseArray {
         let py_bool_array = crate::ffi::storage::num_array::PyNumArray::new_bool(ne_result);
         Ok(py_bool_array.into_py(py))
     }
-    
+
     /// Convert BaseArray to different numeric types when possible
     fn to_type(&self, py: Python, dtype: &str) -> PyResult<PyObject> {
         match dtype {
@@ -681,16 +767,19 @@ impl PyBaseArray {
                         groggy::AttrValue::SmallInt(i) => int_values.push(*i as i64),
                         groggy::AttrValue::Float(f) => int_values.push(f.round() as i64),
                         groggy::AttrValue::Bool(b) => int_values.push(if *b { 1 } else { 0 }),
-                        _ => return Err(pyo3::exceptions::PyValueError::new_err(
-                            format!("Cannot convert {:?} to int64", value)
-                        ))
+                        _ => {
+                            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                                "Cannot convert {:?} to int64",
+                                value
+                            )))
+                        }
                     }
                 }
                 let int_array = crate::ffi::storage::num_array::PyNumArray::new_int64(int_values);
                 Ok(int_array.into_py(py))
             }
             "float64" | "f64" => {
-                // Try to convert all elements to f64  
+                // Try to convert all elements to f64
                 let mut float_values = Vec::new();
                 for value in self.inner.iter() {
                     match value {
@@ -698,38 +787,43 @@ impl PyBaseArray {
                         groggy::AttrValue::SmallInt(i) => float_values.push(*i as f64),
                         groggy::AttrValue::Float(f) => float_values.push(*f as f64),
                         groggy::AttrValue::Bool(b) => float_values.push(if *b { 1.0 } else { 0.0 }),
-                        _ => return Err(pyo3::exceptions::PyValueError::new_err(
-                            format!("Cannot convert {:?} to float64", value)
-                        ))
+                        _ => {
+                            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                                "Cannot convert {:?} to float64",
+                                value
+                            )))
+                        }
                     }
                 }
-                let num_array = crate::ffi::storage::num_array::PyNumArray::new_float64(float_values);
+                let num_array =
+                    crate::ffi::storage::num_array::PyNumArray::new_float64(float_values);
                 Ok(num_array.into_py(py))
             }
             "basearray" => {
                 // Return a copy of self
                 Ok(self.clone().into_py(py))
             }
-            _ => Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Unsupported dtype: {}. Supported: 'int64', 'float64', 'basearray'", dtype)
-            ))
+            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Unsupported dtype: {}. Supported: 'int64', 'float64', 'basearray'",
+                dtype
+            ))),
         }
     }
-    
+
     // === BASEARRAY INTELLIGENCE METHODS (Week 5-6: BaseArray Intelligence) ===
-    
+
     /// Infer the optimal numeric type for this BaseArray
     /// Analyzes all elements to determine the most appropriate NumericType
     /// Returns None if the array contains non-numeric data
     fn infer_numeric_type(&self) -> Option<String> {
         use groggy::NumericType;
-        
+
         if self.inner.is_empty() {
             return None;
         }
-        
+
         let mut current_type: Option<NumericType> = None;
-        
+
         for value in self.inner.iter() {
             let value_type = match value {
                 groggy::AttrValue::Bool(_) => Some(NumericType::Bool),
@@ -737,9 +831,9 @@ impl PyBaseArray {
                 groggy::AttrValue::Int(_) => Some(NumericType::Int64),
                 groggy::AttrValue::Float(_) => Some(NumericType::Float32),
                 groggy::AttrValue::Null => continue, // Skip nulls in type inference
-                _ => return None, // Non-numeric data found
+                _ => return None,                    // Non-numeric data found
             };
-            
+
             if let Some(vt) = value_type {
                 current_type = Some(match current_type {
                     None => vt,
@@ -747,10 +841,10 @@ impl PyBaseArray {
                 });
             }
         }
-        
+
         current_type.map(|t| format!("{:?}", t))
     }
-    
+
     /// Convert BaseArray to NumArray if all elements are numeric
     /// Returns appropriate numeric array type based on inferred type
     /// OPTIMIZED: Single-pass conversion with pre-allocated vectors
@@ -758,30 +852,49 @@ impl PyBaseArray {
         // OPTIMIZATION: Single-pass type inference and conversion
         if self.inner.is_empty() {
             // Return empty NumArray for empty input
-            return Ok(crate::ffi::storage::num_array::PyNumArray::new_float64(Vec::new()).into_py(py));
+            return Ok(
+                crate::ffi::storage::num_array::PyNumArray::new_float64(Vec::new()).into_py(py),
+            );
         }
-        
+
         let len = self.inner.len();
         let mut current_type: Option<groggy::NumericType> = None;
-        
+
         // Pre-allocate vectors with known capacity for better performance
         let mut bool_values = Vec::with_capacity(len);
         let mut int_values = Vec::with_capacity(len);
         let mut float_values = Vec::with_capacity(len);
-        
+
         // Single pass: determine type and convert simultaneously
         for value in self.inner.iter() {
             let (value_type, bool_val, int_val, float_val) = match value {
-                groggy::AttrValue::Bool(b) => (Some(groggy::NumericType::Bool), *b, if *b { 1 } else { 0 }, if *b { 1.0 } else { 0.0 }),
-                groggy::AttrValue::SmallInt(i) => (Some(groggy::NumericType::Int32), *i != 0, *i as i64, *i as f64),
-                groggy::AttrValue::Int(i) => (Some(groggy::NumericType::Int64), *i != 0, *i, *i as f64),
-                groggy::AttrValue::Float(f) => (Some(groggy::NumericType::Float32), *f != 0.0, f.round() as i64, *f as f64),
+                groggy::AttrValue::Bool(b) => (
+                    Some(groggy::NumericType::Bool),
+                    *b,
+                    if *b { 1 } else { 0 },
+                    if *b { 1.0 } else { 0.0 },
+                ),
+                groggy::AttrValue::SmallInt(i) => (
+                    Some(groggy::NumericType::Int32),
+                    *i != 0,
+                    *i as i64,
+                    *i as f64,
+                ),
+                groggy::AttrValue::Int(i) => {
+                    (Some(groggy::NumericType::Int64), *i != 0, *i, *i as f64)
+                }
+                groggy::AttrValue::Float(f) => (
+                    Some(groggy::NumericType::Float32),
+                    *f != 0.0,
+                    f.round() as i64,
+                    *f as f64,
+                ),
                 groggy::AttrValue::Null => (None, false, 0, 0.0), // Skip nulls in type inference
                 _ => return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "BaseArray contains non-numeric data and cannot be converted to numeric array"
-                ))
+                    "BaseArray contains non-numeric data and cannot be converted to numeric array",
+                )),
             };
-            
+
             // Update promoted type
             if let Some(vt) = value_type {
                 current_type = Some(match current_type {
@@ -789,28 +902,29 @@ impl PyBaseArray {
                     Some(ct) => ct.promote_with(vt),
                 });
             }
-            
+
             // Store converted values (we'll use the appropriate one based on final type)
             bool_values.push(bool_val);
             int_values.push(int_val);
             float_values.push(float_val);
         }
-        
+
         // Return appropriate array type based on promoted type
         match current_type {
             Some(groggy::NumericType::Bool) => {
                 // Convert to unified NumArray with bool dtype
                 let py_bool = crate::ffi::storage::num_array::PyNumArray::new_bool(bool_values);
                 Ok(py_bool.into_py(py))
-            },
+            }
             Some(groggy::NumericType::Int32) | Some(groggy::NumericType::Int64) => {
                 let int_array = crate::ffi::storage::num_array::PyNumArray::new_int64(int_values);
                 Ok(int_array.into_py(py))
-            },
+            }
             Some(groggy::NumericType::Float32) | Some(groggy::NumericType::Float64) => {
-                let num_array = crate::ffi::storage::num_array::PyNumArray::new_float64(float_values);
+                let num_array =
+                    crate::ffi::storage::num_array::PyNumArray::new_float64(float_values);
                 Ok(num_array.into_py(py))
-            },
+            }
             None => {
                 // All nulls - default to empty NumArray
                 let num_array = crate::ffi::storage::num_array::PyNumArray::new_float64(Vec::new());
@@ -818,42 +932,42 @@ impl PyBaseArray {
             }
         }
     }
-    
+
     /// Check if this BaseArray can be converted to a numeric array
     fn is_numeric(&self) -> bool {
         self.infer_numeric_type().is_some()
     }
-    
+
     /// Get statistics about the numeric compatibility of this BaseArray
     fn numeric_compatibility_info(&self, py: Python) -> PyResult<PyObject> {
         use pyo3::types::PyDict;
-        
+
         let info = PyDict::new(py);
-        
+
         if self.inner.is_empty() {
             info.set_item("is_numeric", false)?;
             info.set_item("reason", "Array is empty")?;
             return Ok(info.to_object(py));
         }
-        
+
         let total_count = self.inner.len();
         let mut numeric_count = 0;
         let mut null_count = 0;
         let mut type_counts = std::collections::HashMap::new();
-        
+
         for value in self.inner.iter() {
             match value {
-                groggy::AttrValue::Bool(_) | 
-                groggy::AttrValue::SmallInt(_) |
-                groggy::AttrValue::Int(_) |
-                groggy::AttrValue::Float(_) => {
+                groggy::AttrValue::Bool(_)
+                | groggy::AttrValue::SmallInt(_)
+                | groggy::AttrValue::Int(_)
+                | groggy::AttrValue::Float(_) => {
                     numeric_count += 1;
                     let type_name = match value {
                         groggy::AttrValue::Bool(_) => "bool",
                         groggy::AttrValue::SmallInt(_) => "int32",
-                        groggy::AttrValue::Int(_) => "int64", 
+                        groggy::AttrValue::Int(_) => "int64",
                         groggy::AttrValue::Float(_) => "float32",
-                        _ => unreachable!()
+                        _ => unreachable!(),
                     };
                     *type_counts.entry(type_name.to_string()).or_insert(0) += 1;
                 }
@@ -864,23 +978,23 @@ impl PyBaseArray {
                         groggy::AttrValue::CompactText(_) => "compact_text",
                         groggy::AttrValue::FloatVec(_) => "float_vec",
                         groggy::AttrValue::Bytes(_) => "bytes",
-                        _ => "other"
+                        _ => "other",
                     };
                     *type_counts.entry(type_name.to_string()).or_insert(0) += 1;
                 }
             }
         }
-        
+
         let is_numeric = numeric_count + null_count == total_count;
         let numeric_percentage = (numeric_count as f64 / total_count as f64) * 100.0;
-        
+
         info.set_item("is_numeric", is_numeric)?;
         info.set_item("total_count", total_count)?;
         info.set_item("numeric_count", numeric_count)?;
         info.set_item("null_count", null_count)?;
         info.set_item("numeric_percentage", numeric_percentage)?;
         info.set_item("type_counts", type_counts)?;
-        
+
         if let Some(inferred_type) = self.infer_numeric_type() {
             info.set_item("inferred_numeric_type", inferred_type)?;
             info.set_item("recommended_conversion", "to_num_array()")?;
@@ -890,7 +1004,7 @@ impl PyBaseArray {
         } else {
             info.set_item("reason", "No numeric data found")?;
         }
-        
+
         Ok(info.to_object(py))
     }
 
@@ -907,9 +1021,13 @@ impl PyBaseArray {
     /// ```python
     /// table = array.to_table_with_name("scores")
     /// ```
-    pub fn to_table_with_name(&self, column_name: &str) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
-        let result = self.inner.to_table_with_name(column_name)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Table conversion failed: {}", e)))?;
+    pub fn to_table_with_name(
+        &self,
+        column_name: &str,
+    ) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let result = self.inner.to_table_with_name(column_name).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Table conversion failed: {}", e))
+        })?;
 
         Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
     }
@@ -923,9 +1041,13 @@ impl PyBaseArray {
     /// ```python
     /// table = array.to_table_with_prefix("old_")  # Creates column "old_values"
     /// ```
-    pub fn to_table_with_prefix(&self, prefix: &str) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
-        let result = self.inner.to_table_with_prefix(prefix)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Table conversion failed: {}", e)))?;
+    pub fn to_table_with_prefix(
+        &self,
+        prefix: &str,
+    ) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let result = self.inner.to_table_with_prefix(prefix).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Table conversion failed: {}", e))
+        })?;
 
         Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
     }
@@ -939,9 +1061,13 @@ impl PyBaseArray {
     /// ```python
     /// table = array.to_table_with_suffix("_v1")  # Creates column "values_v1"
     /// ```
-    pub fn to_table_with_suffix(&self, suffix: &str) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
-        let result = self.inner.to_table_with_suffix(suffix)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Table conversion failed: {}", e)))?;
+    pub fn to_table_with_suffix(
+        &self,
+        suffix: &str,
+    ) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+        let result = self.inner.to_table_with_suffix(suffix).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Table conversion failed: {}", e))
+        })?;
 
         Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
     }
@@ -996,8 +1122,9 @@ impl PyBaseArray {
     /// new_array = array.drop_elements([0, 2, 4])  # Drop elements at indices 0, 2, and 4
     /// ```
     pub fn drop_elements(&self, indices: Vec<usize>) -> PyResult<Self> {
-        let result = self.inner.drop_elements(&indices)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Drop elements failed: {}", e)))?;
+        let result = self.inner.drop_elements(&indices).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Drop elements failed: {}", e))
+        })?;
 
         Ok(Self { inner: result })
     }
@@ -1156,8 +1283,9 @@ impl PyBaseArray {
             )));
         }
 
-        let result = self.inner.drop_elements(&[index])
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Remove failed: {}", e)))?;
+        let result = self.inner.drop_elements(&[index]).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Remove failed: {}", e))
+        })?;
 
         Ok(Self { inner: result })
     }
@@ -1175,7 +1303,7 @@ impl PyBaseArray {
     /// filtered = array.filter(lambda x: x > 5)
     /// ```
     pub fn filter(&self, predicate: PyObject, py: Python) -> PyResult<Self> {
-        use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
+        use crate::ffi::utils::attr_value_to_python_value;
 
         let mut filtered_values = Vec::new();
 
@@ -1247,7 +1375,9 @@ impl PyBaseArray {
     pub fn sort(&self, ascending: Option<bool>) -> PyResult<Self> {
         let ascending = ascending.unwrap_or(true);
 
-        let mut indexed_values: Vec<(usize, groggy::types::AttrValue)> = self.inner.data()
+        let mut indexed_values: Vec<(usize, groggy::types::AttrValue)> = self
+            .inner
+            .data()
             .iter()
             .enumerate()
             .map(|(i, v)| (i, v.clone()))
@@ -1259,33 +1389,51 @@ impl PyBaseArray {
             match (a, b) {
                 // Numeric comparisons
                 (groggy::types::AttrValue::Int(a), groggy::types::AttrValue::Int(b)) => {
-                    if ascending { a.cmp(b) } else { b.cmp(a) }
+                    if ascending {
+                        a.cmp(b)
+                    } else {
+                        b.cmp(a)
+                    }
                 }
                 (groggy::types::AttrValue::Float(a), groggy::types::AttrValue::Float(b)) => {
                     let ord = a.partial_cmp(b).unwrap_or(Ordering::Equal);
-                    if ascending { ord } else { ord.reverse() }
+                    if ascending {
+                        ord
+                    } else {
+                        ord.reverse()
+                    }
                 }
                 (groggy::types::AttrValue::Int(a), groggy::types::AttrValue::Float(b)) => {
                     let ord = (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal);
-                    if ascending { ord } else { ord.reverse() }
+                    if ascending {
+                        ord
+                    } else {
+                        ord.reverse()
+                    }
                 }
                 (groggy::types::AttrValue::Float(a), groggy::types::AttrValue::Int(b)) => {
                     let ord = a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal);
-                    if ascending { ord } else { ord.reverse() }
+                    if ascending {
+                        ord
+                    } else {
+                        ord.reverse()
+                    }
                 }
                 // String comparisons
                 (groggy::types::AttrValue::Text(a), groggy::types::AttrValue::Text(b)) => {
-                    if ascending { a.cmp(b) } else { b.cmp(a) }
+                    if ascending {
+                        a.cmp(b)
+                    } else {
+                        b.cmp(a)
+                    }
                 }
                 // Default case - maintain original order
                 _ => Ordering::Equal,
             }
         });
 
-        let sorted_values: Vec<groggy::types::AttrValue> = indexed_values
-            .into_iter()
-            .map(|(_, v)| v)
-            .collect();
+        let sorted_values: Vec<groggy::types::AttrValue> =
+            indexed_values.into_iter().map(|(_, v)| v).collect();
 
         Ok(Self {
             inner: groggy::storage::array::BaseArray::new(sorted_values),
@@ -1302,7 +1450,8 @@ impl PyBaseArray {
     /// reversed_array = array.reverse()
     /// ```
     pub fn reverse(&self) -> Self {
-        let mut reversed_values: Vec<groggy::types::AttrValue> = self.inner.data().iter().cloned().collect();
+        let mut reversed_values: Vec<groggy::types::AttrValue> =
+            self.inner.data().iter().cloned().collect();
         reversed_values.reverse();
 
         Self {
@@ -1335,13 +1484,15 @@ impl PyBaseArray {
         &self,
         sort: Option<bool>,
         ascending: Option<bool>,
-        dropna: Option<bool>
+        dropna: Option<bool>,
     ) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
         let sort = sort.unwrap_or(true);
         let ascending = ascending.unwrap_or(false);
         let dropna = dropna.unwrap_or(true);
 
-        let result = self.inner.value_counts(sort, ascending, dropna)
+        let result = self
+            .inner
+            .value_counts(sort, ascending, dropna)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(crate::ffi::storage::table::PyBaseTable::from_table(result))
@@ -1370,7 +1521,8 @@ impl PyBaseArray {
     /// ```
     pub fn apply(&self, func: PyObject) -> PyResult<Self> {
         Python::with_gil(|py| {
-            let transformed_data: PyResult<Vec<RustAttrValue>> = self.inner
+            let transformed_data: PyResult<Vec<RustAttrValue>> = self
+                .inner
                 .iter()
                 .map(|value| {
                     // Convert AttrValue to Python object
@@ -1413,7 +1565,9 @@ impl PyBaseArray {
 
         let interpolation = interpolation.unwrap_or("linear");
 
-        let result = self.inner.quantile(q, interpolation)
+        let result = self
+            .inner
+            .quantile(q, interpolation)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Python::with_gil(|py| attr_value_to_python_value(py, &result))
@@ -1430,7 +1584,9 @@ impl PyBaseArray {
     pub fn quantiles(&self, quantiles: Vec<f64>, interpolation: Option<&str>) -> PyResult<Self> {
         let interpolation = interpolation.unwrap_or("linear");
 
-        let result = self.inner.quantiles(&quantiles, interpolation)
+        let result = self
+            .inner
+            .quantiles(&quantiles, interpolation)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(PyBaseArray { inner: result })
@@ -1456,7 +1612,9 @@ impl PyBaseArray {
 
         let interpolation = interpolation.unwrap_or("linear");
 
-        let result = self.inner.get_percentile(percentile, interpolation)
+        let result = self
+            .inner
+            .get_percentile(percentile, interpolation)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Python::with_gil(|py| attr_value_to_python_value(py, &result))
@@ -1479,12 +1637,18 @@ impl PyBaseArray {
     /// # Get 95th percentile with nearest interpolation
     /// p95 = array.get_percentile(95.0, "nearest")
     /// ```
-    pub fn get_percentile(&self, percentile: f64, interpolation: Option<&str>) -> PyResult<PyObject> {
+    pub fn get_percentile(
+        &self,
+        percentile: f64,
+        interpolation: Option<&str>,
+    ) -> PyResult<PyObject> {
         use crate::ffi::utils::attr_value_to_python_value;
 
         let interpolation = interpolation.unwrap_or("linear");
 
-        let result = self.inner.get_percentile(percentile, interpolation)
+        let result = self
+            .inner
+            .get_percentile(percentile, interpolation)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Python::with_gil(|py| attr_value_to_python_value(py, &result))
@@ -1498,10 +1662,16 @@ impl PyBaseArray {
     ///
     /// # Returns
     /// BaseArray containing the computed percentiles
-    pub fn percentiles(&self, percentiles: Vec<f64>, interpolation: Option<&str>) -> PyResult<Self> {
+    pub fn percentiles(
+        &self,
+        percentiles: Vec<f64>,
+        interpolation: Option<&str>,
+    ) -> PyResult<Self> {
         let interpolation = interpolation.unwrap_or("linear");
 
-        let result = self.inner.percentiles(&percentiles, interpolation)
+        let result = self
+            .inner
+            .percentiles(&percentiles, interpolation)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(PyBaseArray { inner: result })
@@ -1518,7 +1688,9 @@ impl PyBaseArray {
     pub fn corr(&self, other: &PyBaseArray, method: Option<&str>) -> PyResult<PyObject> {
         let method = method.unwrap_or("pearson");
 
-        let result = self.inner.corr(&other.inner, method)
+        let result = self
+            .inner
+            .corr(&other.inner, method)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Python::with_gil(|py| attr_value_to_python_value(py, &result))
@@ -1535,7 +1707,9 @@ impl PyBaseArray {
     pub fn cov(&self, other: &PyBaseArray, ddof: Option<i32>) -> PyResult<PyObject> {
         let ddof = ddof.unwrap_or(1);
 
-        let result = self.inner.cov(&other.inner, ddof)
+        let result = self
+            .inner
+            .cov(&other.inner, ddof)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Python::with_gil(|py| attr_value_to_python_value(py, &result))
@@ -1550,7 +1724,9 @@ impl PyBaseArray {
     /// # Returns
     /// New BaseArray with rolling operation results
     pub fn rolling(&self, window: usize, operation: &str) -> PyResult<Self> {
-        let result = self.inner.rolling(window, operation)
+        let result = self
+            .inner
+            .rolling(window, operation)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(PyBaseArray { inner: result })
@@ -1564,7 +1740,9 @@ impl PyBaseArray {
     /// # Returns
     /// New BaseArray with expanding operation results
     pub fn expanding(&self, operation: &str) -> PyResult<Self> {
-        let result = self.inner.expanding(operation)
+        let result = self
+            .inner
+            .expanding(operation)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(PyBaseArray { inner: result })
@@ -1575,7 +1753,9 @@ impl PyBaseArray {
     /// # Returns
     /// New BaseArray with cumulative sum values
     pub fn cumsum(&self) -> PyResult<Self> {
-        let result = self.inner.cumsum()
+        let result = self
+            .inner
+            .cumsum()
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(PyBaseArray { inner: result })
@@ -1586,7 +1766,9 @@ impl PyBaseArray {
     /// # Returns
     /// New BaseArray with cumulative minimum values
     pub fn cummin(&self) -> PyResult<Self> {
-        let result = self.inner.cummin()
+        let result = self
+            .inner
+            .cummin()
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(PyBaseArray { inner: result })
@@ -1597,7 +1779,9 @@ impl PyBaseArray {
     /// # Returns
     /// New BaseArray with cumulative maximum values
     pub fn cummax(&self) -> PyResult<Self> {
-        let result = self.inner.cummax()
+        let result = self
+            .inner
+            .cummax()
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(PyBaseArray { inner: result })
@@ -1618,7 +1802,9 @@ impl PyBaseArray {
             groggy::AttrValue::Null
         };
 
-        let result = self.inner.shift(periods, Some(rust_fill_value))
+        let result = self
+            .inner
+            .shift(periods, Some(rust_fill_value))
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(PyBaseArray { inner: result })
@@ -1632,7 +1818,9 @@ impl PyBaseArray {
     /// # Returns
     /// New BaseArray with percentage change values
     pub fn pct_change(&self, periods: Option<usize>) -> PyResult<Self> {
-        let result = self.inner.pct_change(periods)
+        let result = self
+            .inner
+            .pct_change(periods)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
 
         Ok(PyBaseArray { inner: result })
@@ -1654,20 +1842,18 @@ impl PyBaseArrayIterator {
             let filtered = inner.filter(|attr_value| {
                 // Convert AttrValue to Python and call predicate
                 match attr_value_to_python_value(py, attr_value) {
-                    Ok(py_value) => {
-                        match predicate.call1(py, (py_value,)) {
-                            Ok(result) => result.is_true(py).unwrap_or(false),
-                            Err(_) => false,
-                        }
-                    }
+                    Ok(py_value) => match predicate.call1(py, (py_value,)) {
+                        Ok(result) => result.is_true(py).unwrap_or(false),
+                        Err(_) => false,
+                    },
                     Err(_) => false,
                 }
             });
-            
+
             Ok(Self { inner: filtered })
         })
     }
-    
+
     /// Map elements using a Python function
     fn map(slf: PyRefMut<Self>, func: PyObject) -> PyResult<Self> {
         Python::with_gil(|py| {
@@ -1689,37 +1875,41 @@ impl PyBaseArrayIterator {
                     Err(_) => attr_value, // Keep original on conversion error
                 }
             });
-            
+
             Ok(Self { inner: mapped })
         })
     }
-    
+
     /// Take first n elements
     fn take(slf: PyRefMut<Self>, n: usize) -> PyResult<Self> {
         let inner = slf.inner.clone();
-        Ok(Self { inner: inner.take(n) })
+        Ok(Self {
+            inner: inner.take(n),
+        })
     }
-    
+
     /// Skip first n elements
     fn skip(slf: PyRefMut<Self>, n: usize) -> PyResult<Self> {
         let inner = slf.inner.clone();
-        Ok(Self { inner: inner.skip(n) })
+        Ok(Self {
+            inner: inner.skip(n),
+        })
     }
-    
+
     /// Collect back into a BaseArray
     fn collect(slf: PyRefMut<Self>) -> PyResult<PyBaseArray> {
         let inner = slf.inner.clone();
-        
+
         // Extract the data directly
         let elements = inner.into_vec();
-        
+
         // Infer dtype from first non-null element
         let dtype = elements
             .iter()
             .find(|v| !matches!(v, RustAttrValue::Null))
             .map(|v| v.dtype())
             .unwrap_or(AttrValueType::Text);
-        
+
         Ok(PyBaseArray {
             inner: BaseArray::new(elements),
         })
@@ -1743,39 +1933,41 @@ impl PyNodesArray {
     fn new(node_ids: Vec<usize>) -> PyResult<Self> {
         // Convert Python usize to NodeId
         let nodes: Vec<NodeId> = node_ids.into_iter().collect();
-        
+
         Ok(PyNodesArray {
             inner: NodesArray::new(nodes),
         })
     }
-    
+
     /// Get the number of nodes
     fn __len__(&self) -> usize {
         self.inner.len()
     }
-    
+
     /// Get node ID by index
     fn __getitem__(&self, index: isize) -> PyResult<usize> {
         let len = self.inner.len() as isize;
         let actual_index = if index < 0 { len + index } else { index };
-        
+
         if actual_index < 0 || actual_index >= len {
             return Err(PyIndexError::new_err("Index out of range"));
         }
-        
+
         match self.inner.get(actual_index as usize) {
             Some(node_id) => Ok(*node_id),
             None => Err(PyIndexError::new_err("Index out of range")),
         }
     }
-    
+
     /// String representation
     fn __repr__(&self) -> String {
         let len = self.inner.len();
         let preview = if len == 0 {
             "empty".to_string()
         } else {
-            let preview_ids: Vec<String> = self.inner.node_ids()
+            let preview_ids: Vec<String> = self
+                .inner
+                .node_ids()
                 .iter()
                 .take(3)
                 .map(|&id| id.to_string())
@@ -1787,62 +1979,70 @@ impl PyNodesArray {
                 format!("[{}]", preview_str)
             }
         };
-        
-        format!(
-            "NodesArray[{}] {} node_ids",
-            len, preview
-        )
+
+        format!("NodesArray[{}] {} node_ids", len, preview)
     }
-    
+
     /// Enable fluent chaining with .iter() method for node-specific operations
     fn iter(slf: PyRef<Self>) -> PyResult<PyNodesArrayIterator> {
         let array_iterator = ArrayOps::iter(&slf.inner);
-        
+
         Ok(PyNodesArrayIterator {
             inner: array_iterator,
         })
     }
 
     /// Rich HTML representation for Jupyter notebooks
-    /// 
+    ///
     /// Returns beautiful HTML table representation that displays automatically
     /// in Jupyter notebook cells for NodesArray data.
     pub fn _repr_html_(&self, _py: Python) -> PyResult<String> {
         // Convert to table and get its HTML representation
         let table = self.to_table()?;
-        
+
         // Use the core table's _repr_html_ method for proper HTML output
         let html = table.table._repr_html_();
         Ok(html)
     }
-    
+
     /// Convert nodes array to table format for streaming visualization
     fn to_table(&self) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
         use groggy::storage::table::BaseTable;
         use groggy::types::AttrValue;
         use std::collections::HashMap;
-        
+
         // Create columns for the table
         let mut columns = HashMap::new();
-        
+
         // Index column (0, 1, 2, ...)
         let indices: Vec<AttrValue> = (0..self.inner.len())
             .map(|i| AttrValue::SmallInt(i as i32))
             .collect();
-        columns.insert("index".to_string(), groggy::storage::array::BaseArray::new(indices));
-        
+        columns.insert(
+            "index".to_string(),
+            groggy::storage::array::BaseArray::new(indices),
+        );
+
         // Node ID column
-        let node_ids: Vec<AttrValue> = self.inner.node_ids()
+        let node_ids: Vec<AttrValue> = self
+            .inner
+            .node_ids()
             .iter()
             .map(|&node_id| AttrValue::SmallInt(node_id as i32))
             .collect();
-        columns.insert("node_id".to_string(), groggy::storage::array::BaseArray::new(node_ids));
-        
+        columns.insert(
+            "node_id".to_string(),
+            groggy::storage::array::BaseArray::new(node_ids),
+        );
+
         // Create the BaseTable
-        let base_table = BaseTable::from_columns(columns)
-            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create table: {}", e)))?;
-        
-        Ok(crate::ffi::storage::table::PyBaseTable::from_table(base_table))
+        let base_table = BaseTable::from_columns(columns).map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create table: {}", e))
+        })?;
+
+        Ok(crate::ffi::storage::table::PyBaseTable::from_table(
+            base_table,
+        ))
     }
 }
 
@@ -1862,34 +2062,34 @@ impl PyNodesArrayIterator {
             inner: inner.filter_by_degree(min_degree),
         })
     }
-    
+
     /// Get neighbors for each node  
     /// Enables: node_ids.iter().get_neighbors()
     fn get_neighbors(slf: PyRefMut<Self>) -> PyResult<PyNeighborsArrayIterator> {
         let inner = slf.inner.clone();
         let neighbors_iterator = inner.get_neighbors();
-        
+
         Ok(PyNeighborsArrayIterator {
             inner: neighbors_iterator,
         })
     }
-    
+
     /// Convert nodes to subgraphs
     /// Enables: node_ids.iter().to_subgraph()
     fn to_subgraph(slf: PyRefMut<Self>) -> PyResult<PySubgraphArrayIterator> {
         let inner = slf.inner.clone();
         let subgraph_iterator = inner.to_subgraph();
-        
+
         Ok(PySubgraphArrayIterator {
             inner: subgraph_iterator,
         })
     }
-    
+
     /// Collect back into a NodesArray
     fn collect(slf: PyRefMut<Self>) -> PyResult<PyNodesArray> {
         let inner = slf.inner.clone();
         let node_ids = inner.into_vec();
-        
+
         Ok(PyNodesArray {
             inner: NodesArray::new(node_ids),
         })
@@ -1909,24 +2109,26 @@ impl PyEdgesArray {
     fn new(edge_ids: Vec<usize>) -> PyResult<Self> {
         // Convert Python usize to EdgeId
         let edges: Vec<EdgeId> = edge_ids.into_iter().collect();
-        
+
         Ok(PyEdgesArray {
             inner: EdgesArray::new(edges),
         })
     }
-    
+
     /// Get the number of edges
     fn __len__(&self) -> usize {
         self.inner.len()
     }
-    
+
     /// String representation
     fn __repr__(&self) -> String {
         let len = self.inner.len();
         let preview = if len == 0 {
             "empty".to_string()
         } else {
-            let preview_ids: Vec<String> = self.inner.edge_ids()
+            let preview_ids: Vec<String> = self
+                .inner
+                .edge_ids()
                 .iter()
                 .take(3)
                 .map(|&id| id.to_string())
@@ -1938,62 +2140,70 @@ impl PyEdgesArray {
                 format!("[{}]", preview_str)
             }
         };
-        
-        format!(
-            "EdgesArray[{}] {} edge_ids",
-            len, preview
-        )
+
+        format!("EdgesArray[{}] {} edge_ids", len, preview)
     }
-    
+
     /// Enable fluent chaining with .iter() method for edge-specific operations
     fn iter(slf: PyRef<Self>) -> PyResult<PyEdgesArrayIterator> {
         let array_iterator = ArrayOps::iter(&slf.inner);
-        
+
         Ok(PyEdgesArrayIterator {
             inner: array_iterator,
         })
     }
 
     /// Rich HTML representation for Jupyter notebooks
-    /// 
+    ///
     /// Returns beautiful HTML table representation that displays automatically
     /// in Jupyter notebook cells for EdgesArray data.
     pub fn _repr_html_(&self, _py: Python) -> PyResult<String> {
         // Convert to table and get its HTML representation
         let table = self.to_table()?;
-        
+
         // Use the core table's _repr_html_ method for proper HTML output
         let html = table.table._repr_html_();
         Ok(html)
     }
-    
+
     /// Convert edges array to table format for streaming visualization
     fn to_table(&self) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
         use groggy::storage::table::BaseTable;
         use groggy::types::AttrValue;
         use std::collections::HashMap;
-        
+
         // Create columns for the table
         let mut columns = HashMap::new();
-        
+
         // Index column (0, 1, 2, ...)
         let indices: Vec<AttrValue> = (0..self.inner.len())
             .map(|i| AttrValue::SmallInt(i as i32))
             .collect();
-        columns.insert("index".to_string(), groggy::storage::array::BaseArray::new(indices));
-        
+        columns.insert(
+            "index".to_string(),
+            groggy::storage::array::BaseArray::new(indices),
+        );
+
         // Edge ID column
-        let edge_ids: Vec<AttrValue> = self.inner.edge_ids()
+        let edge_ids: Vec<AttrValue> = self
+            .inner
+            .edge_ids()
             .iter()
             .map(|&edge_id| AttrValue::SmallInt(edge_id as i32))
             .collect();
-        columns.insert("edge_id".to_string(), groggy::storage::array::BaseArray::new(edge_ids));
-        
+        columns.insert(
+            "edge_id".to_string(),
+            groggy::storage::array::BaseArray::new(edge_ids),
+        );
+
         // Create the BaseTable
-        let base_table = BaseTable::from_columns(columns)
-            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create table: {}", e)))?;
-        
-        Ok(crate::ffi::storage::table::PyBaseTable::from_table(base_table))
+        let base_table = BaseTable::from_columns(columns).map_err(|e| {
+            pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create table: {}", e))
+        })?;
+
+        Ok(crate::ffi::storage::table::PyBaseTable::from_table(
+            base_table,
+        ))
     }
 }
 
@@ -2013,23 +2223,23 @@ impl PyEdgesArrayIterator {
             inner: inner.filter_by_weight(min_weight),
         })
     }
-    
+
     /// Group edges by source node
     /// Enables: edges.iter().group_by_source()
     fn group_by_source(slf: PyRefMut<Self>) -> PyResult<PyEdgeGroupsIterator> {
         let inner = slf.inner.clone();
         let groups_iterator = inner.group_by_source();
-        
+
         Ok(PyEdgeGroupsIterator {
             inner: groups_iterator,
         })
     }
-    
+
     /// Collect back into an EdgesArray
     fn collect(slf: PyRefMut<Self>) -> PyResult<PyEdgesArray> {
         let inner = slf.inner.clone();
         let edge_ids = inner.into_vec();
-        
+
         Ok(PyEdgesArray {
             inner: EdgesArray::new(edge_ids),
         })
@@ -2048,16 +2258,16 @@ impl PyMetaNodeArray {
     fn __len__(&self) -> usize {
         self.inner.len()
     }
-    
+
     /// String representation
     fn __repr__(&self) -> String {
         format!("MetaNodeArray[{}]", self.inner.len())
     }
-    
+
     /// Enable fluent chaining with .iter() method for meta-node-specific operations
     fn iter(slf: PyRef<Self>) -> PyResult<PyMetaNodeArrayIterator> {
         let array_iterator = ArrayOps::iter(&slf.inner);
-        
+
         Ok(PyMetaNodeArrayIterator {
             inner: array_iterator,
         })
@@ -2077,25 +2287,28 @@ impl PyMetaNodeArrayIterator {
     fn expand(slf: PyRefMut<Self>) -> PyResult<PySubgraphArrayIterator> {
         let inner = slf.inner.clone();
         let subgraph_iterator = inner.expand();
-        
+
         Ok(PySubgraphArrayIterator {
             inner: subgraph_iterator,
         })
     }
-    
+
     /// Re-aggregate meta-nodes with new aggregation functions
-    fn re_aggregate(slf: PyRefMut<Self>, aggs: std::collections::HashMap<String, String>) -> PyResult<Self> {
+    fn re_aggregate(
+        slf: PyRefMut<Self>,
+        aggs: std::collections::HashMap<String, String>,
+    ) -> PyResult<Self> {
         let inner = slf.inner.clone();
         Ok(Self {
             inner: inner.re_aggregate(aggs),
         })
     }
-    
+
     /// Collect back into a MetaNodeArray
     fn collect(slf: PyRefMut<Self>) -> PyResult<PyMetaNodeArray> {
         let inner = slf.inner.clone();
         let meta_nodes = inner.into_vec();
-        
+
         Ok(PyMetaNodeArray {
             inner: MetaNodeArray::new(meta_nodes),
         })
@@ -2118,12 +2331,12 @@ impl PyNeighborsArrayIterator {
         let inner = slf.inner.clone();
         let neighbor_lists = inner.into_vec();
         let flattened: Vec<NodeId> = neighbor_lists.into_iter().flatten().collect();
-        
+
         Ok(PyNodesArray {
             inner: NodesArray::new(flattened),
         })
     }
-    
+
     /// Collect into a list of lists
     fn collect(slf: PyRefMut<Self>) -> PyResult<Vec<Vec<usize>>> {
         let inner = slf.inner.clone();
@@ -2132,7 +2345,7 @@ impl PyNeighborsArrayIterator {
             .into_iter()
             .map(|neighbors| neighbors.into_iter().collect())
             .collect();
-        
+
         Ok(py_lists)
     }
 }
@@ -2151,12 +2364,12 @@ impl PySubgraphArrayIterator {
             inner: inner.filter_nodes(query),
         })
     }
-    
+
     /// Collect into a list of subgraphs
     fn collect(slf: PyRefMut<Self>) -> PyResult<Vec<String>> {
         let inner = slf.inner.clone();
         let _subgraphs = inner.into_vec();
-        
+
         // Placeholder: return string representations
         Ok(vec!["placeholder_subgraph".to_string()])
     }
@@ -2177,7 +2390,7 @@ impl PyEdgeGroupsIterator {
             .into_iter()
             .map(|group| group.into_iter().collect())
             .collect();
-        
+
         Ok(py_groups)
     }
 }

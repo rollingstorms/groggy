@@ -305,7 +305,7 @@ impl MetaNode {
 
         // Second, try to get common aggregated attribute names that might have been missed
         // This ensures we catch attributes set during collapse_to_node operations
-        let common_agg_patterns = vec![
+        let _common_agg_patterns = vec![
             "avg_",
             "sum_",
             "total_",
