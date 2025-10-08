@@ -1,9 +1,9 @@
 //! BaseTable - unified table implementation built on BaseArray columns
 
-use super::traits::{Table, TableIterator};
+use super::traits::Table;
 use crate::core::{DisplayDataSchema, DisplayDataWindow};
 use crate::errors::GraphResult;
-use crate::storage::array::{BaseArray};
+use crate::storage::array::BaseArray;
 use crate::types::AttrValue;
 use crate::viz::display::{ColumnSchema, DataType, DisplayConfig, DisplayEngine, OutputFormat};
 use crate::viz::streaming::data_source::{DataSchema, DataWindow};
@@ -11,7 +11,7 @@ use crate::viz::streaming::data_source::{GraphNode, LayoutAlgorithm, NodePositio
 use crate::viz::streaming::server::StreamingServer;
 use crate::viz::streaming::types::StreamingConfig;
 use crate::viz::streaming::DataSource;
-use crate::viz::{VizModule};
+use crate::viz::VizModule;
 use std::collections::HashMap;
 
 /// Statistics calculated for a single column in describe() method
@@ -558,7 +558,6 @@ impl BaseTable {
         class_weights: Option<HashMap<String, Vec<(String, f64)>>>,
         replace: bool,
     ) -> GraphResult<Self> {
-
         // Validate input parameters
         if n.is_some() && fraction.is_some() {
             return Err(crate::errors::GraphError::InvalidInput(
@@ -924,27 +923,29 @@ impl Table for BaseTable {
     fn sort_values(&self, columns: Vec<String>, ascending: Vec<bool>) -> GraphResult<Self> {
         if columns.is_empty() {
             return Err(crate::errors::GraphError::InvalidInput(
-                "At least one column must be specified for sorting".to_string()
+                "At least one column must be specified for sorting".to_string(),
             ));
         }
 
         if columns.len() != ascending.len() {
             return Err(crate::errors::GraphError::InvalidInput(
-                "Length of columns and ascending vectors must match".to_string()
+                "Length of columns and ascending vectors must match".to_string(),
             ));
         }
 
         // Validate all columns exist
         for col_name in &columns {
             if !self.has_column(col_name) {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("Column '{}' not found", col_name)
-                ));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Column '{}' not found",
+                    col_name
+                )));
             }
         }
 
         // Create vector of (row_index, values_for_sorting) for multi-column sorting
-        let mut sort_data: Vec<(usize, Vec<&crate::types::AttrValue>)> = Vec::with_capacity(self.nrows);
+        let mut sort_data: Vec<(usize, Vec<&crate::types::AttrValue>)> =
+            Vec::with_capacity(self.nrows);
 
         for row_idx in 0..self.nrows {
             let mut row_values = Vec::with_capacity(columns.len());
@@ -1148,10 +1149,6 @@ impl Table for BaseTable {
             source_id: self.source_id.clone(),
             version: self.version + 1,
         })
-    }
-
-    fn iter(&self) -> TableIterator<Self> {
-        TableIterator::new(self.clone())
     }
 
     fn pivot_table(
@@ -1587,7 +1584,8 @@ impl BaseTable {
 
         if parts.len() < 2 {
             return Err(crate::errors::GraphError::InvalidInput(format!(
-                "Invalid compound predicate: '{}'", predicate
+                "Invalid compound predicate: '{}'",
+                predicate
             )));
         }
 
@@ -1600,7 +1598,7 @@ impl BaseTable {
 
             if part_mask.len() != result_mask.len() {
                 return Err(crate::errors::GraphError::InvalidInput(
-                    "Predicate evaluation returned inconsistent mask sizes".to_string()
+                    "Predicate evaluation returned inconsistent mask sizes".to_string(),
                 ));
             }
 
@@ -1618,17 +1616,24 @@ impl BaseTable {
 
     /// Evaluate IN predicates (column IN [val1, val2, val3])
     fn evaluate_in_predicate(&self, predicate: &str) -> GraphResult<Vec<bool>> {
-        let in_pos = predicate.find(" IN ").or_else(|| predicate.find(" in "))
-            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                "Invalid IN predicate format".to_string()
-            ))?;
+        let in_pos = predicate
+            .find(" IN ")
+            .or_else(|| predicate.find(" in "))
+            .ok_or_else(|| {
+                crate::errors::GraphError::InvalidInput("Invalid IN predicate format".to_string())
+            })?;
 
         let column_name = predicate[..in_pos].trim();
         let values_part = predicate[in_pos + 4..].trim(); // Skip " IN "
 
         // Parse values list [val1, val2, val3] or (val1, val2, val3)
-        let values_part = values_part.trim_start_matches(['[', '(']).trim_end_matches([']', ')']);
-        let values: Vec<&str> = values_part.split(',').map(|s| s.trim().trim_matches(['"', '\''])).collect();
+        let values_part = values_part
+            .trim_start_matches(['[', '('])
+            .trim_end_matches([']', ')']);
+        let values: Vec<&str> = values_part
+            .split(',')
+            .map(|s| s.trim().trim_matches(['"', '\'']))
+            .collect();
 
         let filter_column = self.column(column_name).ok_or_else(|| {
             crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", column_name))
@@ -1641,9 +1646,9 @@ impl BaseTable {
             let matches = match row_value {
                 Some(attr_val) => {
                     // Check if attr_val matches any value in the IN list
-                    values.iter().any(|&val| {
-                        Self::compare_attr_value(attr_val, "==", val).unwrap_or(false)
-                    })
+                    values
+                        .iter()
+                        .any(|&val| Self::compare_attr_value(attr_val, "==", val).unwrap_or(false))
                 }
                 None => false,
             };
@@ -1655,10 +1660,12 @@ impl BaseTable {
 
     /// Evaluate LIKE predicates with wildcard pattern matching
     fn evaluate_like_predicate(&self, predicate: &str) -> GraphResult<Vec<bool>> {
-        let like_pos = predicate.find(" LIKE ").or_else(|| predicate.find(" like "))
-            .ok_or_else(|| crate::errors::GraphError::InvalidInput(
-                "Invalid LIKE predicate format".to_string()
-            ))?;
+        let like_pos = predicate
+            .find(" LIKE ")
+            .or_else(|| predicate.find(" like "))
+            .ok_or_else(|| {
+                crate::errors::GraphError::InvalidInput("Invalid LIKE predicate format".to_string())
+            })?;
 
         let column_name = predicate[..like_pos].trim();
         let pattern = predicate[like_pos + 6..].trim().trim_matches(['"', '\'']); // Skip " LIKE "
@@ -1676,9 +1683,11 @@ impl BaseTable {
                     let text = match attr_val {
                         crate::types::AttrValue::Text(s) => s.as_str(),
                         crate::types::AttrValue::CompactText(s) => s.as_str(),
-                        _ => return Err(crate::errors::GraphError::InvalidInput(
-                            "LIKE operator only works with text columns".to_string()
-                        )),
+                        _ => {
+                            return Err(crate::errors::GraphError::InvalidInput(
+                                "LIKE operator only works with text columns".to_string(),
+                            ))
+                        }
                     };
                     Self::matches_like_pattern(text, pattern)
                 }
@@ -1699,7 +1708,7 @@ impl BaseTable {
             (pos, 9) // " between " is 9 characters
         } else {
             return Err(crate::errors::GraphError::InvalidInput(
-                "Invalid BETWEEN predicate format".to_string()
+                "Invalid BETWEEN predicate format".to_string(),
             ));
         };
 
@@ -1713,12 +1722,14 @@ impl BaseTable {
             (pos, 5) // " and " is 5 characters
         } else {
             return Err(crate::errors::GraphError::InvalidInput(
-                "BETWEEN requires AND separator".to_string()
+                "BETWEEN requires AND separator".to_string(),
             ));
         };
 
         let lower_val = values_part[..and_pos].trim().trim_matches(['"', '\'']);
-        let upper_val = values_part[and_pos + and_len..].trim().trim_matches(['"', '\'']);
+        let upper_val = values_part[and_pos + and_len..]
+            .trim()
+            .trim_matches(['"', '\'']);
 
         let filter_column = self.column(column_name).ok_or_else(|| {
             crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", column_name))
@@ -1749,20 +1760,23 @@ impl BaseTable {
         if pattern == "%" {
             true // Match everything
         } else if pattern.starts_with('%') && pattern.ends_with('%') {
-            let inner = &pattern[1..pattern.len()-1];
+            let inner = &pattern[1..pattern.len() - 1];
             text.contains(inner)
         } else if pattern.starts_with('%') {
             let suffix = &pattern[1..];
             text.ends_with(suffix)
         } else if pattern.ends_with('%') {
-            let prefix = &pattern[..pattern.len()-1];
+            let prefix = &pattern[..pattern.len() - 1];
             text.starts_with(prefix)
         } else if pattern.contains('_') {
             // Basic single character wildcard support
             if pattern.len() != text.len() {
                 return false;
             }
-            pattern.chars().zip(text.chars()).all(|(p, t)| p == '_' || p == t)
+            pattern
+                .chars()
+                .zip(text.chars())
+                .all(|(p, t)| p == '_' || p == t)
         } else {
             // Exact match
             text == pattern
@@ -1898,7 +1912,11 @@ impl BaseTable {
     /// ])?;
     /// let filtered = table.filter_by_mask(&mask)?;
     /// ```
-    pub fn isin(&self, column_name: &str, values: Vec<crate::types::AttrValue>) -> GraphResult<Vec<bool>> {
+    pub fn isin(
+        &self,
+        column_name: &str,
+        values: Vec<crate::types::AttrValue>,
+    ) -> GraphResult<Vec<bool>> {
         let filter_column = self.column(column_name).ok_or_else(|| {
             crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", column_name))
         })?;
@@ -1941,9 +1959,9 @@ impl BaseTable {
             if let Some(value) = filter_column.get(i) {
                 // Only include numeric values for sorting
                 match value {
-                    crate::types::AttrValue::Int(_) |
-                    crate::types::AttrValue::SmallInt(_) |
-                    crate::types::AttrValue::Float(_) => {
+                    crate::types::AttrValue::Int(_)
+                    | crate::types::AttrValue::SmallInt(_)
+                    | crate::types::AttrValue::Float(_) => {
                         value_indices.push((value.clone(), i));
                     }
                     _ => {} // Skip non-numeric values
@@ -1957,7 +1975,8 @@ impl BaseTable {
         });
 
         // Take the first n indices
-        let top_indices: Vec<usize> = value_indices.into_iter()
+        let top_indices: Vec<usize> = value_indices
+            .into_iter()
             .take(n)
             .map(|(_, idx)| idx)
             .collect();
@@ -1988,9 +2007,9 @@ impl BaseTable {
             if let Some(value) = filter_column.get(i) {
                 // Only include numeric values for sorting
                 match value {
-                    crate::types::AttrValue::Int(_) |
-                    crate::types::AttrValue::SmallInt(_) |
-                    crate::types::AttrValue::Float(_) => {
+                    crate::types::AttrValue::Int(_)
+                    | crate::types::AttrValue::SmallInt(_)
+                    | crate::types::AttrValue::Float(_) => {
                         value_indices.push((value.clone(), i));
                     }
                     _ => {} // Skip non-numeric values
@@ -2004,7 +2023,8 @@ impl BaseTable {
         });
 
         // Take the first n indices
-        let top_indices: Vec<usize> = value_indices.into_iter()
+        let top_indices: Vec<usize> = value_indices
+            .into_iter()
             .take(n)
             .map(|(_, idx)| idx)
             .collect();
@@ -2014,7 +2034,11 @@ impl BaseTable {
     }
 
     /// Helper method to compare AttrValues for sorting (used by nlargest/nsmallest)
-    fn compare_attr_values_for_sort(&self, a: &crate::types::AttrValue, b: &crate::types::AttrValue) -> std::cmp::Ordering {
+    fn compare_attr_values_for_sort(
+        &self,
+        a: &crate::types::AttrValue,
+        b: &crate::types::AttrValue,
+    ) -> std::cmp::Ordering {
         use crate::types::AttrValue;
         match (a, b) {
             (AttrValue::Int(a), AttrValue::Int(b)) => a.cmp(b),
@@ -2022,24 +2046,20 @@ impl BaseTable {
             (AttrValue::Float(a), AttrValue::Float(b)) => {
                 a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
             }
-            (AttrValue::Int(a), AttrValue::Float(b)) => {
-                (*a as f32).partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
-            }
-            (AttrValue::Float(a), AttrValue::Int(b)) => {
-                a.partial_cmp(&(*b as f32)).unwrap_or(std::cmp::Ordering::Equal)
-            }
-            (AttrValue::SmallInt(a), AttrValue::Float(b)) => {
-                (*a as f32).partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
-            }
-            (AttrValue::Float(a), AttrValue::SmallInt(b)) => {
-                a.partial_cmp(&(*b as f32)).unwrap_or(std::cmp::Ordering::Equal)
-            }
-            (AttrValue::Int(a), AttrValue::SmallInt(b)) => {
-                (*a).cmp(&(*b as i64))
-            }
-            (AttrValue::SmallInt(a), AttrValue::Int(b)) => {
-                (*a as i64).cmp(b)
-            }
+            (AttrValue::Int(a), AttrValue::Float(b)) => (*a as f32)
+                .partial_cmp(b)
+                .unwrap_or(std::cmp::Ordering::Equal),
+            (AttrValue::Float(a), AttrValue::Int(b)) => a
+                .partial_cmp(&(*b as f32))
+                .unwrap_or(std::cmp::Ordering::Equal),
+            (AttrValue::SmallInt(a), AttrValue::Float(b)) => (*a as f32)
+                .partial_cmp(b)
+                .unwrap_or(std::cmp::Ordering::Equal),
+            (AttrValue::Float(a), AttrValue::SmallInt(b)) => a
+                .partial_cmp(&(*b as f32))
+                .unwrap_or(std::cmp::Ordering::Equal),
+            (AttrValue::Int(a), AttrValue::SmallInt(b)) => (*a).cmp(&(*b as i64)),
+            (AttrValue::SmallInt(a), AttrValue::Int(b)) => (*a as i64).cmp(b),
             _ => std::cmp::Ordering::Equal, // For non-comparable or mixed types
         }
     }
@@ -2113,29 +2133,32 @@ impl BaseTable {
         // Validation
         if index_cols.is_empty() {
             return Err(crate::errors::GraphError::InvalidInput(
-                "At least one index column must be specified".to_string()
+                "At least one index column must be specified".to_string(),
             ));
         }
 
         // Validate columns exist
         for col in index_cols {
             if !self.has_column(col) {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("Index column '{}' not found", col)
-                ));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Index column '{}' not found",
+                    col
+                )));
             }
         }
 
         if !self.has_column(columns_col) {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Columns column '{}' not found", columns_col)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Columns column '{}' not found",
+                columns_col
+            )));
         }
 
         if !self.has_column(values_col) {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Values column '{}' not found", values_col)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Values column '{}' not found",
+                values_col
+            )));
         }
 
         // Get unique values from columns_col to determine new column names
@@ -2163,7 +2186,10 @@ impl BaseTable {
                     group_key.push(AttrValue::Null);
                 }
             }
-            groups.entry(group_key).or_insert_with(Vec::new).push(row_idx);
+            groups
+                .entry(group_key)
+                .or_insert_with(Vec::new)
+                .push(row_idx);
         }
 
         // Build the pivot table
@@ -2184,7 +2210,8 @@ impl BaseTable {
         let num_groups = groups.len();
 
         // Initialize column data vectors
-        let mut column_data: std::collections::HashMap<String, Vec<AttrValue>> = std::collections::HashMap::new();
+        let mut column_data: std::collections::HashMap<String, Vec<AttrValue>> =
+            std::collections::HashMap::new();
         for col_name in &new_column_order {
             column_data.insert(col_name.clone(), Vec::new());
         }
@@ -2208,8 +2235,12 @@ impl BaseTable {
                 let values_array = self.column(values_col).unwrap();
 
                 for &row_idx in &row_indices {
-                    if let (Some(col_val), Some(val)) = (columns_array.get(row_idx), values_array.get(row_idx)) {
-                        if self.compare_attr_values_for_sort(col_val, unique_val) == std::cmp::Ordering::Equal {
+                    if let (Some(col_val), Some(val)) =
+                        (columns_array.get(row_idx), values_array.get(row_idx))
+                    {
+                        if self.compare_attr_values_for_sort(col_val, unique_val)
+                            == std::cmp::Ordering::Equal
+                        {
                             values_to_agg.push(val);
                         }
                     }
@@ -2268,7 +2299,10 @@ impl BaseTable {
         // Validate that id_vars exist in the table
         for col in id_vars {
             if !self.has_column(col) {
-                return Err(crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", col)));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Column '{}' not found",
+                    col
+                )));
             }
         }
 
@@ -2277,7 +2311,10 @@ impl BaseTable {
             // Validate that value_vars exist in the table
             for col in value_vars {
                 if !self.has_column(col) {
-                    return Err(crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", col)));
+                    return Err(crate::errors::GraphError::InvalidInput(format!(
+                        "Column '{}' not found",
+                        col
+                    )));
                 }
             }
             value_vars.to_vec()
@@ -2292,7 +2329,7 @@ impl BaseTable {
 
         if value_vars.is_empty() {
             return Err(crate::errors::GraphError::InvalidInput(
-                "No columns to melt".to_string()
+                "No columns to melt".to_string(),
             ));
         }
 
@@ -2305,7 +2342,8 @@ impl BaseTable {
         new_column_order.push(value_name.clone());
 
         // Initialize column data vectors
-        let mut column_data: std::collections::HashMap<String, Vec<AttrValue>> = std::collections::HashMap::new();
+        let mut column_data: std::collections::HashMap<String, Vec<AttrValue>> =
+            std::collections::HashMap::new();
         for col_name in &new_column_order {
             column_data.insert(col_name.clone(), Vec::with_capacity(melted_rows));
         }
@@ -2315,7 +2353,8 @@ impl BaseTable {
             for value_var in &value_vars {
                 // Add id_vars values for this row
                 for id_var in id_vars {
-                    let value = self.column(id_var)
+                    let value = self
+                        .column(id_var)
                         .and_then(|col| col.get(row_idx))
                         .cloned()
                         .unwrap_or(AttrValue::Null);
@@ -2329,7 +2368,8 @@ impl BaseTable {
                 var_col_data.push(AttrValue::Text(value_var.clone()));
 
                 // Add the value from the current value_var column
-                let value = self.column(value_var)
+                let value = self
+                    .column(value_var)
                     .and_then(|col| col.get(row_idx))
                     .cloned()
                     .unwrap_or(AttrValue::Null);
@@ -2379,7 +2419,7 @@ impl BaseTable {
         column: &str,
         sort: bool,
         ascending: bool,
-        dropna: bool
+        dropna: bool,
     ) -> GraphResult<Self> {
         // Validate column exists
         if !self.has_column(column) {
@@ -2435,7 +2475,12 @@ impl BaseTable {
     ///
     /// # Returns
     /// BaseArray containing the computed quantiles
-    pub fn quantiles(&self, column: &str, quantiles: &[f64], interpolation: &str) -> GraphResult<BaseArray<AttrValue>> {
+    pub fn quantiles(
+        &self,
+        column: &str,
+        quantiles: &[f64],
+        interpolation: &str,
+    ) -> GraphResult<BaseArray<AttrValue>> {
         // Validate column exists
         if !self.has_column(column) {
             return Err(crate::errors::GraphError::InvalidInput(format!(
@@ -2461,7 +2506,12 @@ impl BaseTable {
     /// // Get median (50th percentile)
     /// let median = table.percentile("sales", 50.0, "linear")?;
     /// ```
-    pub fn get_percentile(&self, column: &str, percentile: f64, interpolation: &str) -> GraphResult<AttrValue> {
+    pub fn get_percentile(
+        &self,
+        column: &str,
+        percentile: f64,
+        interpolation: &str,
+    ) -> GraphResult<AttrValue> {
         // Validate column exists
         if !self.has_column(column) {
             return Err(crate::errors::GraphError::InvalidInput(format!(
@@ -2476,7 +2526,12 @@ impl BaseTable {
     }
 
     /// Compute multiple percentiles for a specific column
-    pub fn percentiles(&self, column: &str, percentiles: &[f64], interpolation: &str) -> GraphResult<BaseArray<AttrValue>> {
+    pub fn percentiles(
+        &self,
+        column: &str,
+        percentiles: &[f64],
+        interpolation: &str,
+    ) -> GraphResult<BaseArray<AttrValue>> {
         // Validate column exists
         if !self.has_column(column) {
             return Err(crate::errors::GraphError::InvalidInput(format!(
@@ -2589,16 +2644,23 @@ impl BaseTable {
     /// // Compute Spearman rank correlation
     /// let spearman = table.corr_columns("price", "demand", "spearman")?;
     /// ```
-    pub fn corr_columns(&self, column1: &str, column2: &str, method: &str) -> GraphResult<AttrValue> {
+    pub fn corr_columns(
+        &self,
+        column1: &str,
+        column2: &str,
+        method: &str,
+    ) -> GraphResult<AttrValue> {
         // Validate both columns exist
         if !self.has_column(column1) {
             return Err(crate::errors::GraphError::InvalidInput(format!(
-                "Column '{}' not found in table", column1
+                "Column '{}' not found in table",
+                column1
             )));
         }
         if !self.has_column(column2) {
             return Err(crate::errors::GraphError::InvalidInput(format!(
-                "Column '{}' not found in table", column2
+                "Column '{}' not found in table",
+                column2
             )));
         }
 
@@ -2630,9 +2692,12 @@ impl BaseTable {
         for col_name in &self.column_order {
             if let Some(column) = self.columns.get(col_name) {
                 // Check if column has any numeric values
-                let has_numeric = column.iter().any(|val| matches!(val,
-                    AttrValue::Int(_) | AttrValue::SmallInt(_) | AttrValue::Float(_)
-                ));
+                let has_numeric = column.iter().any(|val| {
+                    matches!(
+                        val,
+                        AttrValue::Int(_) | AttrValue::SmallInt(_) | AttrValue::Float(_)
+                    )
+                });
                 if has_numeric {
                     numeric_columns.push(col_name.clone());
                 }
@@ -2641,7 +2706,7 @@ impl BaseTable {
 
         if numeric_columns.is_empty() {
             return Err(crate::errors::GraphError::InvalidInput(
-                "No numeric columns found for correlation matrix".to_string()
+                "No numeric columns found for correlation matrix".to_string(),
             ));
         }
 
@@ -2652,10 +2717,11 @@ impl BaseTable {
         matrix_data.insert(
             "index".to_string(),
             BaseArray::from_attr_values(
-                numeric_columns.iter()
+                numeric_columns
+                    .iter()
                     .map(|name| AttrValue::Text(name.clone()))
-                    .collect()
-            )
+                    .collect(),
+            ),
         );
 
         // Calculate correlations for each column pair
@@ -2696,12 +2762,14 @@ impl BaseTable {
         // Validate both columns exist
         if !self.has_column(column1) {
             return Err(crate::errors::GraphError::InvalidInput(format!(
-                "Column '{}' not found in table", column1
+                "Column '{}' not found in table",
+                column1
             )));
         }
         if !self.has_column(column2) {
             return Err(crate::errors::GraphError::InvalidInput(format!(
-                "Column '{}' not found in table", column2
+                "Column '{}' not found in table",
+                column2
             )));
         }
 
@@ -2733,9 +2801,12 @@ impl BaseTable {
         for col_name in &self.column_order {
             if let Some(column) = self.columns.get(col_name) {
                 // Check if column has any numeric values
-                let has_numeric = column.iter().any(|val| matches!(val,
-                    AttrValue::Int(_) | AttrValue::SmallInt(_) | AttrValue::Float(_)
-                ));
+                let has_numeric = column.iter().any(|val| {
+                    matches!(
+                        val,
+                        AttrValue::Int(_) | AttrValue::SmallInt(_) | AttrValue::Float(_)
+                    )
+                });
                 if has_numeric {
                     numeric_columns.push(col_name.clone());
                 }
@@ -2744,7 +2815,7 @@ impl BaseTable {
 
         if numeric_columns.is_empty() {
             return Err(crate::errors::GraphError::InvalidInput(
-                "No numeric columns found for covariance matrix".to_string()
+                "No numeric columns found for covariance matrix".to_string(),
             ));
         }
 
@@ -2755,10 +2826,11 @@ impl BaseTable {
         matrix_data.insert(
             "index".to_string(),
             BaseArray::from_attr_values(
-                numeric_columns.iter()
+                numeric_columns
+                    .iter()
                     .map(|name| AttrValue::Text(name.clone()))
-                    .collect()
-            )
+                    .collect(),
+            ),
         );
 
         // Calculate covariances for each column pair
@@ -2881,7 +2953,10 @@ impl BaseTable {
 
         // Create result table
         let mut result_columns = HashMap::new();
-        result_columns.insert(result_name.to_string(), BaseArray::from_attr_values(result_values));
+        result_columns.insert(
+            result_name.to_string(),
+            BaseArray::from_attr_values(result_values),
+        );
 
         Self::from_columns(result_columns)
     }
@@ -2973,7 +3048,8 @@ impl BaseTable {
         }
 
         // Collect all unique column names from existing table and new rows
-        let mut all_columns: std::collections::HashSet<String> = self.column_order.iter().cloned().collect();
+        let mut all_columns: std::collections::HashSet<String> =
+            self.column_order.iter().cloned().collect();
         for row in &rows_data {
             all_columns.extend(row.keys().cloned());
         }
@@ -3013,7 +3089,6 @@ impl BaseTable {
         Self::with_column_order(new_columns, new_column_order)
     }
 
-
     /// Helper method to aggregate a list of values using the specified function
     fn aggregate_values(&self, values: &[&AttrValue], agg_func: &str) -> GraphResult<AttrValue> {
         if values.is_empty() {
@@ -3030,25 +3105,40 @@ impl BaseTable {
                         AttrValue::SmallInt(i) => sum += *i as f64,
                         AttrValue::Float(f) => sum += *f as f64,
                         AttrValue::Null => continue, // Skip nulls
-                        _ => return Err(crate::errors::GraphError::InvalidInput(
-                            format!("Cannot sum non-numeric value: {:?}", value)
-                        )),
+                        _ => {
+                            return Err(crate::errors::GraphError::InvalidInput(format!(
+                                "Cannot sum non-numeric value: {:?}",
+                                value
+                            )))
+                        }
                     }
                 }
                 Ok(AttrValue::Float(sum as f32))
-            },
+            }
             "mean" => {
                 let mut sum = 0.0;
                 let mut count = 0;
                 for value in values {
                     match value {
-                        AttrValue::Int(i) => { sum += *i as f64; count += 1; },
-                        AttrValue::SmallInt(i) => { sum += *i as f64; count += 1; },
-                        AttrValue::Float(f) => { sum += *f as f64; count += 1; },
+                        AttrValue::Int(i) => {
+                            sum += *i as f64;
+                            count += 1;
+                        }
+                        AttrValue::SmallInt(i) => {
+                            sum += *i as f64;
+                            count += 1;
+                        }
+                        AttrValue::Float(f) => {
+                            sum += *f as f64;
+                            count += 1;
+                        }
                         AttrValue::Null => continue, // Skip nulls
-                        _ => return Err(crate::errors::GraphError::InvalidInput(
-                            format!("Cannot calculate mean of non-numeric value: {:?}", value)
-                        )),
+                        _ => {
+                            return Err(crate::errors::GraphError::InvalidInput(format!(
+                                "Cannot calculate mean of non-numeric value: {:?}",
+                                value
+                            )))
+                        }
                     }
                 }
                 if count == 0 {
@@ -3056,28 +3146,32 @@ impl BaseTable {
                 } else {
                     Ok(AttrValue::Float((sum / count as f64) as f32))
                 }
-            },
+            }
             "min" => {
                 let mut min_val = values[0];
                 for &value in values.iter().skip(1) {
-                    if self.compare_attr_values_for_sort(value, min_val) == std::cmp::Ordering::Less {
+                    if self.compare_attr_values_for_sort(value, min_val) == std::cmp::Ordering::Less
+                    {
                         min_val = value;
                     }
                 }
                 Ok(min_val.clone())
-            },
+            }
             "max" => {
                 let mut max_val = values[0];
                 for &value in values.iter().skip(1) {
-                    if self.compare_attr_values_for_sort(value, max_val) == std::cmp::Ordering::Greater {
+                    if self.compare_attr_values_for_sort(value, max_val)
+                        == std::cmp::Ordering::Greater
+                    {
                         max_val = value;
                     }
                 }
                 Ok(max_val.clone())
-            },
-            _ => Err(crate::errors::GraphError::InvalidInput(
-                format!("Unsupported aggregation function: {}", agg_func)
-            )),
+            }
+            _ => Err(crate::errors::GraphError::InvalidInput(format!(
+                "Unsupported aggregation function: {}",
+                agg_func
+            ))),
         }
     }
 
@@ -3104,7 +3198,12 @@ impl BaseTable {
     ///
     /// # Returns
     /// BaseArray with rolling operation results
-    pub fn rolling(&self, column: &str, window: usize, operation: &str) -> GraphResult<BaseArray<AttrValue>> {
+    pub fn rolling(
+        &self,
+        column: &str,
+        window: usize,
+        operation: &str,
+    ) -> GraphResult<BaseArray<AttrValue>> {
         let column_data = self.column(column).ok_or_else(|| {
             crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", column))
         })?;
@@ -3177,7 +3276,12 @@ impl BaseTable {
     ///
     /// # Returns
     /// BaseArray with shifted values
-    pub fn shift(&self, column: &str, periods: i32, fill_value: Option<AttrValue>) -> GraphResult<BaseArray<AttrValue>> {
+    pub fn shift(
+        &self,
+        column: &str,
+        periods: i32,
+        fill_value: Option<AttrValue>,
+    ) -> GraphResult<BaseArray<AttrValue>> {
         let column_data = self.column(column).ok_or_else(|| {
             crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", column))
         })?;
@@ -3192,7 +3296,11 @@ impl BaseTable {
     ///
     /// # Returns
     /// BaseArray with percentage change values
-    pub fn pct_change(&self, column: &str, periods: Option<usize>) -> GraphResult<BaseArray<AttrValue>> {
+    pub fn pct_change(
+        &self,
+        column: &str,
+        periods: Option<usize>,
+    ) -> GraphResult<BaseArray<AttrValue>> {
         let column_data = self.column(column).ok_or_else(|| {
             crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", column))
         })?;
@@ -3213,11 +3321,17 @@ impl BaseTable {
         for column_name in &self.column_order {
             if let Some(column) = self.columns.get(column_name) {
                 // Check if column is numeric
-                let is_numeric = column.data().iter().any(|val| matches!(val, AttrValue::Int(_) | AttrValue::Float(_)));
+                let is_numeric = column
+                    .data()
+                    .iter()
+                    .any(|val| matches!(val, AttrValue::Int(_) | AttrValue::Float(_)));
 
                 if is_numeric {
                     let rolling_result = column.rolling(window, operation)?;
-                    result_columns.insert(format!("{}_rolling_{}_{}", column_name, window, operation), rolling_result);
+                    result_columns.insert(
+                        format!("{}_rolling_{}_{}", column_name, window, operation),
+                        rolling_result,
+                    );
                 } else {
                     // Keep non-numeric columns as-is
                     result_columns.insert(column_name.clone(), column.clone());
@@ -3241,11 +3355,17 @@ impl BaseTable {
         for column_name in &self.column_order {
             if let Some(column) = self.columns.get(column_name) {
                 // Check if column is numeric
-                let is_numeric = column.data().iter().any(|val| matches!(val, AttrValue::Int(_) | AttrValue::Float(_)));
+                let is_numeric = column
+                    .data()
+                    .iter()
+                    .any(|val| matches!(val, AttrValue::Int(_) | AttrValue::Float(_)));
 
                 if is_numeric {
                     let expanding_result = column.expanding(operation)?;
-                    result_columns.insert(format!("{}_expanding_{}", column_name, operation), expanding_result);
+                    result_columns.insert(
+                        format!("{}_expanding_{}", column_name, operation),
+                        expanding_result,
+                    );
                 } else {
                     // Keep non-numeric columns as-is
                     result_columns.insert(column_name.clone(), column.clone());
@@ -3284,15 +3404,24 @@ impl BaseTable {
                 // Analyze data types and nulls
                 let mut type_counts: HashMap<String, usize> = HashMap::new();
                 let mut null_count = 0;
-                let mut unique_values: std::collections::HashSet<String> = std::collections::HashSet::new();
+                let mut unique_values: std::collections::HashSet<String> =
+                    std::collections::HashSet::new();
 
                 for value in column.data() {
                     match value {
                         AttrValue::Null => null_count += 1,
-                        AttrValue::Int(_) => *type_counts.entry("integer".to_string()).or_insert(0) += 1,
-                        AttrValue::SmallInt(_) => *type_counts.entry("small_integer".to_string()).or_insert(0) += 1,
-                        AttrValue::Float(_) => *type_counts.entry("float".to_string()).or_insert(0) += 1,
-                        AttrValue::Bool(_) => *type_counts.entry("boolean".to_string()).or_insert(0) += 1,
+                        AttrValue::Int(_) => {
+                            *type_counts.entry("integer".to_string()).or_insert(0) += 1
+                        }
+                        AttrValue::SmallInt(_) => {
+                            *type_counts.entry("small_integer".to_string()).or_insert(0) += 1
+                        }
+                        AttrValue::Float(_) => {
+                            *type_counts.entry("float".to_string()).or_insert(0) += 1
+                        }
+                        AttrValue::Bool(_) => {
+                            *type_counts.entry("boolean".to_string()).or_insert(0) += 1
+                        }
                         AttrValue::Text(s) => {
                             *type_counts.entry("text".to_string()).or_insert(0) += 1;
                             unique_values.insert(s.clone());
@@ -3312,7 +3441,8 @@ impl BaseTable {
                 let non_null_count = total_count - null_count;
 
                 // Determine primary data type
-                let primary_type = type_counts.iter()
+                let primary_type = type_counts
+                    .iter()
                     .max_by_key(|(_, count)| *count)
                     .map(|(type_name, _)| type_name.clone())
                     .unwrap_or_else(|| "unknown".to_string());
@@ -3320,12 +3450,18 @@ impl BaseTable {
                 data_types.push(AttrValue::Text(primary_type));
                 non_null_counts.push(AttrValue::Int(non_null_count as i64));
                 null_counts.push(AttrValue::Int(null_count as i64));
-                null_percentages.push(AttrValue::Float((null_count as f32 / total_count as f32) * 100.0));
+                null_percentages.push(AttrValue::Float(
+                    (null_count as f32 / total_count as f32) * 100.0,
+                ));
                 unique_counts.push(AttrValue::Int(unique_values.len() as i64));
-                cardinalities.push(AttrValue::Float(unique_values.len() as f32 / total_count as f32));
+                cardinalities.push(AttrValue::Float(
+                    unique_values.len() as f32 / total_count as f32,
+                ));
 
                 // Statistical analysis for numeric columns
-                let numeric_values: Vec<f64> = column.data().iter()
+                let numeric_values: Vec<f64> = column
+                    .data()
+                    .iter()
                     .filter_map(|val| match val {
                         AttrValue::Int(i) => Some(*i as f64),
                         AttrValue::SmallInt(i) => Some(*i as f64),
@@ -3342,29 +3478,40 @@ impl BaseTable {
                     let mut sorted_values = numeric_values.clone();
                     sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
                     let median_val = if sorted_values.len() % 2 == 0 {
-                        (sorted_values[sorted_values.len() / 2 - 1] + sorted_values[sorted_values.len() / 2]) / 2.0
+                        (sorted_values[sorted_values.len() / 2 - 1]
+                            + sorted_values[sorted_values.len() / 2])
+                            / 2.0
                     } else {
                         sorted_values[sorted_values.len() / 2]
                     };
                     medians.push(AttrValue::Float(median_val as f32));
 
                     // Calculate standard deviation
-                    let variance = numeric_values.iter()
+                    let variance = numeric_values
+                        .iter()
                         .map(|x| (x - mean_val).powi(2))
-                        .sum::<f64>() / numeric_values.len() as f64;
+                        .sum::<f64>()
+                        / numeric_values.len() as f64;
                     stds.push(AttrValue::Float(variance.sqrt() as f32));
 
                     // Min and Max
                     let min_val = numeric_values.iter().cloned().fold(f64::INFINITY, f64::min);
-                    let max_val = numeric_values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                    let max_val = numeric_values
+                        .iter()
+                        .cloned()
+                        .fold(f64::NEG_INFINITY, f64::max);
                     mins.push(AttrValue::Float(min_val as f32));
                     maxs.push(AttrValue::Float(max_val as f32));
 
                     // Quartiles
                     let q25_idx = (sorted_values.len() as f64 * 0.25) as usize;
                     let q75_idx = (sorted_values.len() as f64 * 0.75) as usize;
-                    q25s.push(AttrValue::Float(sorted_values.get(q25_idx).unwrap_or(&0.0).clone() as f32));
-                    q75s.push(AttrValue::Float(sorted_values.get(q75_idx).unwrap_or(&0.0).clone() as f32));
+                    q25s.push(AttrValue::Float(
+                        sorted_values.get(q25_idx).unwrap_or(&0.0).clone() as f32,
+                    ));
+                    q75s.push(AttrValue::Float(
+                        sorted_values.get(q75_idx).unwrap_or(&0.0).clone() as f32,
+                    ));
                 } else {
                     // Non-numeric columns
                     means.push(AttrValue::Null);
@@ -3379,13 +3526,31 @@ impl BaseTable {
         }
 
         // Create profile table
-        profile_data.insert("column".to_string(), BaseArray::from_attr_values(column_names));
+        profile_data.insert(
+            "column".to_string(),
+            BaseArray::from_attr_values(column_names),
+        );
         profile_data.insert("dtype".to_string(), BaseArray::from_attr_values(data_types));
-        profile_data.insert("non_null_count".to_string(), BaseArray::from_attr_values(non_null_counts));
-        profile_data.insert("null_count".to_string(), BaseArray::from_attr_values(null_counts));
-        profile_data.insert("null_percentage".to_string(), BaseArray::from_attr_values(null_percentages));
-        profile_data.insert("unique_count".to_string(), BaseArray::from_attr_values(unique_counts));
-        profile_data.insert("cardinality".to_string(), BaseArray::from_attr_values(cardinalities));
+        profile_data.insert(
+            "non_null_count".to_string(),
+            BaseArray::from_attr_values(non_null_counts),
+        );
+        profile_data.insert(
+            "null_count".to_string(),
+            BaseArray::from_attr_values(null_counts),
+        );
+        profile_data.insert(
+            "null_percentage".to_string(),
+            BaseArray::from_attr_values(null_percentages),
+        );
+        profile_data.insert(
+            "unique_count".to_string(),
+            BaseArray::from_attr_values(unique_counts),
+        );
+        profile_data.insert(
+            "cardinality".to_string(),
+            BaseArray::from_attr_values(cardinalities),
+        );
         profile_data.insert("mean".to_string(), BaseArray::from_attr_values(means));
         profile_data.insert("median".to_string(), BaseArray::from_attr_values(medians));
         profile_data.insert("std".to_string(), BaseArray::from_attr_values(stds));
@@ -3405,7 +3570,11 @@ impl BaseTable {
     ///
     /// # Returns
     /// BaseArray with boolean values indicating outliers
-    pub fn check_outliers(&self, column: &str, factor: Option<f64>) -> GraphResult<BaseArray<AttrValue>> {
+    pub fn check_outliers(
+        &self,
+        column: &str,
+        factor: Option<f64>,
+    ) -> GraphResult<BaseArray<AttrValue>> {
         let factor = factor.unwrap_or(1.5);
 
         let column_data = self.column(column).ok_or_else(|| {
@@ -3413,7 +3582,9 @@ impl BaseTable {
         })?;
 
         // Extract numeric values
-        let numeric_values: Vec<f64> = column_data.data().iter()
+        let numeric_values: Vec<f64> = column_data
+            .data()
+            .iter()
             .filter_map(|val| match val {
                 AttrValue::Int(i) => Some(*i as f64),
                 AttrValue::SmallInt(i) => Some(*i as f64),
@@ -3423,9 +3594,10 @@ impl BaseTable {
             .collect();
 
         if numeric_values.is_empty() {
-            return Err(crate::errors::GraphError::InvalidInput(
-                format!("Column '{}' contains no numeric values", column)
-            ));
+            return Err(crate::errors::GraphError::InvalidInput(format!(
+                "Column '{}' contains no numeric values",
+                column
+            )));
         }
 
         // Calculate quartiles
@@ -3502,7 +3674,8 @@ impl BaseTable {
                     *type_counts.entry(type_name.to_string()).or_insert(0) += 1;
                 }
 
-                let actual_type = type_counts.iter()
+                let actual_type = type_counts
+                    .iter()
                     .max_by_key(|(_, count)| *count)
                     .map(|(type_name, _)| type_name.clone())
                     .unwrap_or_else(|| "unknown".to_string());
@@ -3549,7 +3722,8 @@ impl BaseTable {
                         *type_counts.entry(type_name.to_string()).or_insert(0) += 1;
                     }
 
-                    let actual_type = type_counts.iter()
+                    let actual_type = type_counts
+                        .iter()
                         .max_by_key(|(_, count)| *count)
                         .map(|(type_name, _)| type_name.clone())
                         .unwrap_or_else(|| "unknown".to_string());
@@ -3564,10 +3738,22 @@ impl BaseTable {
             }
         }
 
-        validation_data.insert("column".to_string(), BaseArray::from_attr_values(column_names));
-        validation_data.insert("expected_type".to_string(), BaseArray::from_attr_values(expected_types));
-        validation_data.insert("actual_type".to_string(), BaseArray::from_attr_values(actual_types));
-        validation_data.insert("type_match".to_string(), BaseArray::from_attr_values(type_matches));
+        validation_data.insert(
+            "column".to_string(),
+            BaseArray::from_attr_values(column_names),
+        );
+        validation_data.insert(
+            "expected_type".to_string(),
+            BaseArray::from_attr_values(expected_types),
+        );
+        validation_data.insert(
+            "actual_type".to_string(),
+            BaseArray::from_attr_values(actual_types),
+        );
+        validation_data.insert(
+            "type_match".to_string(),
+            BaseArray::from_attr_values(type_matches),
+        );
         validation_data.insert("issues".to_string(), BaseArray::from_attr_values(issues));
 
         Self::from_columns(validation_data)
@@ -3578,7 +3764,6 @@ impl BaseTable {
 impl BaseTable {
     /// Export table to CSV file
     pub fn to_csv<P: AsRef<std::path::Path>>(&self, path: P) -> GraphResult<()> {
-
         let path = path.as_ref();
         let mut writer = csv::Writer::from_path(path).map_err(|e| {
             crate::errors::GraphError::InvalidInput(format!("Failed to create CSV writer: {}", e))
@@ -4650,7 +4835,10 @@ impl BaseTable {
             let mut new_values = Vec::with_capacity(result_size);
 
             for left_idx in 0..self.nrows {
-                let value = column.get(left_idx).cloned().unwrap_or(crate::types::AttrValue::Null);
+                let value = column
+                    .get(left_idx)
+                    .cloned()
+                    .unwrap_or(crate::types::AttrValue::Null);
                 // Repeat this value for all right table rows
                 for _ in 0..other.nrows {
                     new_values.push(value.clone());
@@ -4672,7 +4860,10 @@ impl BaseTable {
             for _ in 0..self.nrows {
                 // For each left row, add all right values
                 for right_idx in 0..other.nrows {
-                    let value = column.get(right_idx).cloned().unwrap_or(crate::types::AttrValue::Null);
+                    let value = column
+                        .get(right_idx)
+                        .cloned()
+                        .unwrap_or(crate::types::AttrValue::Null);
                     new_values.push(value);
                 }
             }

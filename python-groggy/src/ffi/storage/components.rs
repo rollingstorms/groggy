@@ -9,7 +9,7 @@ use groggy::storage::array::{ArrayOps, ArrayIterator, SubgraphLike};
 use groggy::traits::SubgraphOperations;
 use pyo3::exceptions::{PyAttributeError, PyIndexError, PyRuntimeError};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -118,6 +118,54 @@ impl PyComponentsArray {
         format!("ComponentsArray({} components)", self.components_data.len())
     }
 
+    /// Collapse each component into a meta-node using the Subgraph collapse API.
+    #[pyo3(signature = (
+        node_aggs = None,
+        edge_aggs = None,
+        edge_strategy = "aggregate",
+        node_strategy = "extract",
+        preset = None,
+        include_edge_count = true,
+        mark_entity_type = true,
+        entity_type = "meta",
+        allow_missing_attributes = true
+    ))]
+    fn collapse(
+        &self,
+        py: Python,
+        node_aggs: Option<&PyAny>,
+        edge_aggs: Option<&PyAny>,
+        edge_strategy: &str,
+        node_strategy: &str,
+        preset: Option<String>,
+        include_edge_count: bool,
+        mark_entity_type: bool,
+        entity_type: &str,
+        allow_missing_attributes: bool,
+    ) -> PyResult<Vec<Py<PyMetaNode>>> {
+        let mut meta_nodes = Vec::with_capacity(self.components_data.len());
+
+        for index in 0..self.components_data.len() {
+            let component = self.__getitem__(index as isize)?;
+            let meta_node = component.collapse(
+                py,
+                node_aggs,
+                edge_aggs,
+                edge_strategy,
+                node_strategy,
+                preset.clone(),
+                include_edge_count,
+                mark_entity_type,
+                entity_type,
+                allow_missing_attributes,
+            )?;
+
+            meta_nodes.push(meta_node.extract::<Py<PyMetaNode>>(py)?);
+        }
+
+        Ok(meta_nodes)
+    }
+
     /// Convert to regular Python list (materializes all components)
     fn to_list(&self) -> PyResult<Vec<PySubgraph>> {
         let mut result = Vec::new();
@@ -197,7 +245,9 @@ impl PyComponentsArray {
                     // For simplicity, use first node as central and 1 hop
                     let node_ids: Vec<groggy::NodeId> = component.inner.node_set().iter().take(1).copied().collect();
                     if !node_ids.is_empty() {
-                        match component.neighborhood(py, node_ids, 1) {
+                        let node_list = PyList::new(py, &node_ids);
+                        let node_any: &PyAny = node_list.as_ref();
+                        match component.neighborhood(py, Some(node_any), 1) {
                             Ok(_neighborhood_result) => {
                                 // For now, return the original component as placeholder
                                 neighborhoods.push(component);
@@ -457,8 +507,10 @@ impl PyComponentsIterator {
             for component in components {
                 // For simplicity, use first node as central and 1 hop
                 let node_ids: Vec<groggy::NodeId> = component.inner.node_set().iter().take(1).copied().collect();
-                if !node_ids.is_empty() {
-                    match component.neighborhood(py, node_ids, 1) {
+                    if !node_ids.is_empty() {
+                        let node_list = PyList::new(py, &node_ids);
+                        let node_any: &PyAny = node_list.as_ref();
+                        match component.neighborhood(py, Some(node_any), 1) {
                         Ok(_neighborhood_result) => {
                             // For now, return the original component as placeholder
                             // In full implementation, would extract subgraph from neighborhood result

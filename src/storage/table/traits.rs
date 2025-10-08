@@ -3,6 +3,7 @@
 use crate::errors::GraphResult;
 use crate::storage::array::BaseArray;
 use crate::types::AttrValue;
+use std::collections::HashMap;
 
 /// Core table operations trait - foundation for all table types
 /// All tables are composed of BaseArray columns and support unified operations
@@ -23,6 +24,11 @@ pub trait Table {
     /// Get the shape (rows, cols) of the table
     fn shape(&self) -> (usize, usize) {
         (self.nrows(), self.ncols())
+    }
+
+    /// Check whether the table contains any rows
+    fn is_empty(&self) -> bool {
+        self.nrows() == 0
     }
 
     // =================================================================
@@ -137,167 +143,81 @@ pub trait Table {
     // Chaining support - the key integration point!
     // =================================================================
 
-    /// Enable fluent chaining with .iter() method
-    /// Returns a TableIterator that supports method chaining
-    fn iter(&self) -> TableIterator<Self>
+    /// Iterate over rows in the table.
+    /// The iterator yields `TableRow` handles that provide access to values by column name.
+    fn iter(&self) -> TableRowIterator<'_, Self>
     where
-        Self: Sized + Clone;
+        Self: Sized,
+    {
+        TableRowIterator::new(self)
+    }
+}
+/// Iterator over table rows yielding lightweight row handles.
+pub struct TableRowIterator<'a, T: Table> {
+    table: &'a T,
+    index: usize,
+    len: usize,
 }
 
-/// Universal iterator for table operations with chaining support
-/// This mirrors the ArrayIterator pattern for tables
-#[derive(Clone)]
-pub struct TableIterator<T: Table> {
-    /// The table being iterated over
-    table: T,
-    /// Optional transformation operations to apply
-    operations: Vec<TableOperation>,
-}
-
-/// Operations that can be chained on tables
-#[derive(Clone, Debug)]
-pub enum TableOperation {
-    Head(usize),
-    Tail(usize),
-    Slice(usize, usize),
-    SortBy(String, bool),
-    SortValues(Vec<String>, Vec<bool>),
-    Filter(String),
-    Select(Vec<String>),
-    DropColumns(Vec<String>),
-    PivotTable(Vec<String>, String, String, String),
-    Melt(Option<Vec<String>>, Option<Vec<String>>, Option<String>, Option<String>),
-}
-
-impl<T: Table + Clone> TableIterator<T> {
-    /// Create a new TableIterator
-    pub fn new(table: T) -> Self {
+impl<'a, T: Table> TableRowIterator<'a, T> {
+    pub fn new(table: &'a T) -> Self {
         Self {
             table,
-            operations: Vec::new(),
+            index: 0,
+            len: table.nrows(),
         }
     }
+}
 
-    /// Add a head operation to the chain
-    pub fn head(mut self, n: usize) -> Self {
-        self.operations.push(TableOperation::Head(n));
-        self
-    }
+impl<'a, T: Table> Iterator for TableRowIterator<'a, T> {
+    type Item = TableRow<'a, T>;
 
-    /// Add a tail operation to the chain
-    pub fn tail(mut self, n: usize) -> Self {
-        self.operations.push(TableOperation::Tail(n));
-        self
-    }
-
-    /// Add a slice operation to the chain
-    pub fn slice(mut self, start: usize, end: usize) -> Self {
-        self.operations.push(TableOperation::Slice(start, end));
-        self
-    }
-
-    /// Add a sort operation to the chain
-    pub fn sort_by(mut self, column: &str, ascending: bool) -> Self {
-        self.operations
-            .push(TableOperation::SortBy(column.to_string(), ascending));
-        self
-    }
-
-    /// Add a multi-column sort operation to the chain
-    pub fn sort_values(mut self, columns: Vec<String>, ascending: Vec<bool>) -> Self {
-        self.operations
-            .push(TableOperation::SortValues(columns, ascending));
-        self
-    }
-
-    /// Add a filter operation to the chain
-    pub fn filter(mut self, predicate: &str) -> Self {
-        self.operations
-            .push(TableOperation::Filter(predicate.to_string()));
-        self
-    }
-
-    /// Add a select operation to the chain
-    pub fn select(mut self, column_names: &[String]) -> Self {
-        self.operations
-            .push(TableOperation::Select(column_names.to_vec()));
-        self
-    }
-
-    /// Add a drop columns operation to the chain
-    pub fn drop_columns(mut self, column_names: &[String]) -> Self {
-        self.operations
-            .push(TableOperation::DropColumns(column_names.to_vec()));
-        self
-    }
-
-    /// Add a pivot table operation to the chain
-    pub fn pivot_table(
-        mut self,
-        index_cols: &[String],
-        columns_col: &str,
-        values_col: &str,
-        agg_func: &str,
-    ) -> Self {
-        self.operations.push(TableOperation::PivotTable(
-            index_cols.to_vec(),
-            columns_col.to_string(),
-            values_col.to_string(),
-            agg_func.to_string(),
-        ));
-        self
-    }
-
-    /// Add a melt operation to the chain
-    pub fn melt(
-        mut self,
-        id_vars: Option<&[String]>,
-        value_vars: Option<&[String]>,
-        var_name: Option<String>,
-        value_name: Option<String>,
-    ) -> Self {
-        self.operations.push(TableOperation::Melt(
-            id_vars.map(|v| v.to_vec()),
-            value_vars.map(|v| v.to_vec()),
-            var_name,
-            value_name,
-        ));
-        self
-    }
-
-    /// Execute all chained operations and return the result
-    pub fn collect(self) -> GraphResult<T> {
-        let mut result = self.table;
-
-        for operation in self.operations {
-            result = match operation {
-                TableOperation::Head(n) => result.head(n),
-                TableOperation::Tail(n) => result.tail(n),
-                TableOperation::Slice(start, end) => result.slice(start, end),
-                TableOperation::SortBy(column, ascending) => result.sort_by(&column, ascending)?,
-                TableOperation::SortValues(columns, ascending) => result.sort_values(columns, ascending)?,
-                TableOperation::Filter(predicate) => result.filter(&predicate)?,
-                TableOperation::Select(columns) => result.select(&columns)?,
-                TableOperation::DropColumns(columns) => result.drop_columns(&columns)?,
-                TableOperation::PivotTable(index_cols, columns_col, values_col, agg_func) => {
-                    result.pivot_table(&index_cols, &columns_col, &values_col, &agg_func)?
-                },
-                TableOperation::Melt(id_vars, value_vars, var_name, value_name) => {
-                    result.melt(
-                        id_vars.as_deref(),
-                        value_vars.as_deref(),
-                        var_name,
-                        value_name
-                    )?
-                },
-            };
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.len {
+            return None;
         }
 
-        Ok(result)
+        let row = TableRow {
+            table: self.table,
+            index: self.index,
+        };
+        self.index += 1;
+        Some(row)
+    }
+}
+
+/// Lightweight accessor for a single table row.
+pub struct TableRow<'a, T: Table> {
+    table: &'a T,
+    index: usize,
+}
+
+impl<'a, T: Table> TableRow<'a, T> {
+    /// Row index within the table.
+    pub fn index(&self) -> usize {
+        self.index
     }
 
-    /// Get the current table without executing operations (for inspection)
-    pub fn current_table(&self) -> &T {
-        &self.table
+    /// Get a value for the column, if present.
+    pub fn get(&self, column: &str) -> Option<&'a AttrValue> {
+        self.table
+            .column(column)
+            .and_then(|col| col.data().get(self.index))
+    }
+
+    /// Borrow the column names for this table.
+    pub fn column_names(&self) -> &'a [String] {
+        self.table.column_names()
+    }
+
+    /// Clone the current row into a HashMap for ergonomic consumption.
+    pub fn to_hash_map(&self) -> HashMap<String, AttrValue> {
+        let mut row = HashMap::new();
+        for column in self.table.column_names() {
+            if let Some(value) = self.get(column) {
+                row.insert(column.clone(), value.clone());
+            }
+        }
+        row
     }
 }

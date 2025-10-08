@@ -6,7 +6,7 @@ use crate::ffi::storage::array::PyBaseArray;
 use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
 use crate::ffi::storage::num_array::PyNumArray;
 use crate::ffi::viz_accessor::VizAccessor;
-use groggy::storage::{ArrayOps, array::{BaseArray, NumArray}, table::{BaseTable, NodesTable, EdgesTable, Table, TableIterator}};
+use groggy::storage::{ArrayOps, array::{BaseArray, NumArray}, table::{BaseTable, NodesTable, EdgesTable, Table}};
 use groggy::viz::streaming::data_source::DataSource as VizDataSource;  // Import DataSource trait for streaming methods
 use groggy::viz::VizModule;
 use groggy::types::{NodeId, EdgeId, AttrValue, AttrValueType};
@@ -147,6 +147,11 @@ impl PyBaseTable {
     pub fn shape(&self) -> (usize, usize) {
         self.table.shape()
     }
+
+    /// Check whether the table contains any rows
+    pub fn is_empty(&self) -> bool {
+        self.table.is_empty()
+    }
     
     /// Check if column exists
     pub fn has_column(&self, name: &str) -> bool {
@@ -167,10 +172,11 @@ impl PyBaseTable {
         Py::new(py, Self::from_table(result_table))
     }
     
-    /// Get table iterator for chaining
-    pub fn iter(&self) -> PyBaseTableIterator {
-        PyBaseTableIterator {
-            iterator: self.table.iter(),
+    /// Explicit row iterator that mirrors the default Python iteration protocol.
+    pub fn iter(&self) -> PyBaseTableRowIterator {
+        PyBaseTableRowIterator {
+            table: self.table.clone(),
+            current_row: 0,
         }
     }
     
@@ -209,13 +215,20 @@ impl PyBaseTable {
     ///     # Sort by all columns ascending
     ///     sorted_table = table.sort_values(['col1', 'col2'], True)
     #[pyo3(signature = (columns, ascending = None))]
-    pub fn sort_values(&self, py: Python, columns: Vec<String>, ascending: Option<PyObject>) -> PyResult<Py<Self>> {
+    pub fn sort_values(&self, py: Python, columns: PyObject, ascending: Option<PyObject>) -> PyResult<Py<Self>> {
+        // Normalize columns argument to Vec<String>
+        let column_vec: Vec<String> = if let Ok(single_column) = columns.extract::<String>(py) {
+            vec![single_column]
+        } else {
+            columns.extract::<Vec<String>>(py)?
+        };
+
         // Convert ascending parameter to Vec<bool>
         let ascending_vec = match ascending {
             Some(asc_obj) => {
                 if let Ok(single_bool) = asc_obj.extract::<bool>(py) {
                     // Single boolean applies to all columns
-                    vec![single_bool; columns.len()]
+                    vec![single_bool; column_vec.len()]
                 } else if let Ok(bool_list) = asc_obj.extract::<Vec<bool>>(py) {
                     // List of booleans
                     bool_list
@@ -227,11 +240,11 @@ impl PyBaseTable {
             }
             None => {
                 // Default to all ascending
-                vec![true; columns.len()]
+                vec![true; column_vec.len()]
             }
         };
 
-        let sorted_table = self.table.sort_values(columns, ascending_vec)
+        let sorted_table = self.table.sort_values(column_vec, ascending_vec)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         Py::new(py, Self::from_table(sorted_table))
@@ -2820,27 +2833,6 @@ impl PyBaseTableRowIterator {
 }
 
 // =============================================================================
-// PyBaseTableIterator - Python wrapper for TableIterator<BaseTable>
-// =============================================================================
-
-/// Python wrapper for BaseTable iterator
-#[pyclass(name = "BaseTableIterator", module = "groggy")]
-pub struct PyBaseTableIterator {
-    pub(crate) iterator: TableIterator<BaseTable>,
-}
-
-#[pymethods]
-impl PyBaseTableIterator {
-    /// Execute all operations and return result
-    pub fn collect(&self) -> PyResult<PyBaseTable> {
-        let result = self.iterator.clone().collect()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        
-        Ok(PyBaseTable::from_table(result))
-    }
-}
-
-// =============================================================================
 // PyNodesTable - Python wrapper for NodesTable
 // =============================================================================
 
@@ -2944,12 +2936,17 @@ impl PyNodesTable {
     pub fn ncols(&self) -> usize {
         self.table.ncols()
     }
+
+    /// Check whether the table contains any rows
+    pub fn is_empty(&self) -> bool {
+        self.table.is_empty()
+    }
     
     /// Get shape as (rows, cols)
     pub fn shape(&self) -> (usize, usize) {
         self.table.shape()
     }
-    
+
     /// Get reference to underlying BaseTable
     pub fn base_table(&self) -> PyBaseTable {
         PyBaseTable::from_table(self.table.base_table().clone())
@@ -2966,10 +2963,11 @@ impl PyNodesTable {
         self.base_table().to_pandas(py)
     }
     
-    /// Get table iterator for chaining
-    pub fn iter(&self) -> PyNodesTableIterator {
-        PyNodesTableIterator {
-            iterator: self.table.iter(),
+    /// Explicit row iterator matching the Python iteration protocol.
+    pub fn iter(&self) -> PyNodesTableRowIterator {
+        PyNodesTableRowIterator {
+            table: self.table.clone(),
+            current_row: 0,
         }
     }
     
@@ -3037,13 +3035,18 @@ impl PyNodesTable {
     /// Returns:
     ///     PyNodesTable: A new sorted table
     #[pyo3(signature = (columns, ascending = None))]
-    pub fn sort_values(&self, py: Python, columns: Vec<String>, ascending: Option<PyObject>) -> PyResult<Self> {
-        // Convert ascending parameter to Vec<bool>
+    pub fn sort_values(&self, py: Python, columns: PyObject, ascending: Option<PyObject>) -> PyResult<Self> {
+        let column_vec: Vec<String> = if let Ok(single_column) = columns.extract::<String>(py) {
+            vec![single_column]
+        } else {
+            columns.extract::<Vec<String>>(py)?
+        };
+
         let ascending_vec = match ascending {
             Some(asc_obj) => {
                 if let Ok(single_bool) = asc_obj.extract::<bool>(py) {
                     // Single boolean applies to all columns
-                    vec![single_bool; columns.len()]
+                    vec![single_bool; column_vec.len()]
                 } else if let Ok(bool_list) = asc_obj.extract::<Vec<bool>>(py) {
                     // List of booleans
                     bool_list
@@ -3055,11 +3058,11 @@ impl PyNodesTable {
             }
             None => {
                 // Default to all ascending
-                vec![true; columns.len()]
+                vec![true; column_vec.len()]
             }
         };
 
-        let sorted_table = self.table.sort_values(columns, ascending_vec)
+        let sorted_table = self.table.sort_values(column_vec, ascending_vec)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         Ok(Self { table: sorted_table })
@@ -3633,25 +3636,7 @@ impl PyNodesTableRowIterator {
 }
 
 // =============================================================================
-// PyNodesTableIterator - Python wrapper for TableIterator<NodesTable>
 // =============================================================================
-
-/// Python wrapper for NodesTable iterator
-#[pyclass(name = "NodesTableIterator", module = "groggy")]
-pub struct PyNodesTableIterator {
-    pub(crate) iterator: TableIterator<NodesTable>,
-}
-
-#[pymethods]
-impl PyNodesTableIterator {
-    /// Execute all operations and return result
-    pub fn collect(&self) -> PyResult<PyNodesTable> {
-        let result = self.iterator.clone().collect()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        
-        Ok(PyNodesTable { table: result })
-    }
-}
 
 // =============================================================================
 // PyEdgesTable - Python wrapper for EdgesTable
@@ -3809,10 +3794,11 @@ impl PyEdgesTable {
         self.base_table().to_pandas(py)
     }
     
-    /// Get table iterator for chaining
-    pub fn iter(&self) -> PyEdgesTableIterator {
-        PyEdgesTableIterator {
-            iterator: self.table.iter(),
+    /// Explicit row iterator matching the Python iteration protocol.
+    pub fn iter(&self) -> PyEdgesTableRowIterator {
+        PyEdgesTableRowIterator {
+            table: self.table.clone(),
+            current_row: 0,
         }
     }
     
@@ -3881,13 +3867,18 @@ impl PyEdgesTable {
     /// Returns:
     ///     PyEdgesTable: A new sorted table
     #[pyo3(signature = (columns, ascending = None))]
-    pub fn sort_values(&self, py: Python, columns: Vec<String>, ascending: Option<PyObject>) -> PyResult<Self> {
-        // Convert ascending parameter to Vec<bool>
+    pub fn sort_values(&self, py: Python, columns: PyObject, ascending: Option<PyObject>) -> PyResult<Self> {
+        let column_vec: Vec<String> = if let Ok(single_column) = columns.extract::<String>(py) {
+            vec![single_column]
+        } else {
+            columns.extract::<Vec<String>>(py)?
+        };
+
         let ascending_vec = match ascending {
             Some(asc_obj) => {
                 if let Ok(single_bool) = asc_obj.extract::<bool>(py) {
                     // Single boolean applies to all columns
-                    vec![single_bool; columns.len()]
+                    vec![single_bool; column_vec.len()]
                 } else if let Ok(bool_list) = asc_obj.extract::<Vec<bool>>(py) {
                     // List of booleans
                     bool_list
@@ -3899,11 +3890,11 @@ impl PyEdgesTable {
             }
             None => {
                 // Default to all ascending
-                vec![true; columns.len()]
+                vec![true; column_vec.len()]
             }
         };
 
-        let sorted_table = self.table.sort_values(columns, ascending_vec)
+        let sorted_table = self.table.sort_values(column_vec, ascending_vec)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         Ok(Self { table: sorted_table })
@@ -4492,27 +4483,6 @@ impl PyEdgesTableRowIterator {
 }
 
 // =============================================================================
-// PyEdgesTableIterator - Python wrapper for TableIterator<EdgesTable>
-// =============================================================================
-
-/// Python wrapper for EdgesTable iterator
-#[pyclass(name = "EdgesTableIterator", module = "groggy")]
-pub struct PyEdgesTableIterator {
-    pub(crate) iterator: TableIterator<EdgesTable>,
-}
-
-#[pymethods]
-impl PyEdgesTableIterator {
-    /// Execute all operations and return result
-    pub fn collect(&self) -> PyResult<PyEdgesTable> {
-        let result = self.iterator.clone().collect()
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-        
-        Ok(PyEdgesTable { table: result })
-    }
-}
-
-// =============================================================================
 // PyGraphTable - Python wrapper for GraphTable (composite)
 // =============================================================================
 
@@ -4541,10 +4511,15 @@ impl PyGraphTable {
     pub fn ncols(&self) -> usize {
         self.table.ncols()
     }
-    
+
     /// Get shape as (rows, cols)
     pub fn shape(&self) -> (usize, usize) {
         self.table.shape()
+    }
+
+    /// Check whether both node and edge tables are empty
+    pub fn is_empty(&self) -> bool {
+        self.table.nodes().is_empty() && self.table.edges().is_empty()
     }
     
     /// Get NodesTable component
@@ -4619,23 +4594,13 @@ impl PyGraphTable {
         PyGraphTable { table: self.table.tail(n) }
     }
     
-    /// Merge multiple GraphTables into one
+    /// Merge multiple GraphTables into one using the specified strategy
     #[staticmethod]
-    pub fn merge(tables: Vec<PyGraphTable>) -> PyResult<PyGraphTable> {
-        let rust_tables: Vec<groggy::storage::table::GraphTable> = 
-            tables.into_iter().map(|t| t.table).collect();
-            
-        let merged = groggy::storage::table::GraphTable::merge(rust_tables)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-            
-        Ok(PyGraphTable { table: merged })
-    }
-    
-    /// Merge with conflict resolution strategy
-    #[staticmethod] 
-    pub fn merge_with_strategy(tables: Vec<PyGraphTable>, strategy: &str) -> PyResult<PyGraphTable> {
+    #[pyo3(signature = (tables, strategy = "domain_prefix"))]
+    pub fn merge(tables: Vec<PyGraphTable>, strategy: &str) -> PyResult<PyGraphTable> {
         use groggy::storage::table::ConflictResolution;
-        
+        use groggy::storage::graph_table::MergeOptions;
+
         let conflict_strategy = match strategy.to_lowercase().as_str() {
             "fail" => ConflictResolution::Fail,
             "keep_first" => ConflictResolution::KeepFirst,
@@ -4643,40 +4608,23 @@ impl PyGraphTable {
             "merge_attributes" => ConflictResolution::MergeAttributes,
             "domain_prefix" => ConflictResolution::DomainPrefix,
             "auto_remap" => ConflictResolution::AutoRemap,
-            _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Unknown conflict resolution strategy: {}", strategy)
-            ))
+            other => {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    format!("Unknown conflict resolution strategy: {}", other)
+                ))
+            }
         };
-        
-        let rust_tables: Vec<groggy::storage::table::GraphTable> = 
+
+        let rust_tables: Vec<groggy::storage::table::GraphTable> =
             tables.into_iter().map(|t| t.table).collect();
-            
-        let merged = groggy::storage::table::GraphTable::merge_with_strategy(rust_tables, conflict_strategy)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-            
+
+        let merged = groggy::storage::table::GraphTable::merge(
+            rust_tables,
+            MergeOptions::new(conflict_strategy),
+        )
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
         Ok(PyGraphTable { table: merged })
-    }
-    
-    /// Merge with another GraphTable
-    pub fn merge_with(&mut self, other: PyGraphTable, strategy: &str) -> PyResult<()> {
-        use groggy::storage::table::ConflictResolution;
-        
-        let conflict_strategy = match strategy.to_lowercase().as_str() {
-            "fail" => ConflictResolution::Fail,
-            "keep_first" => ConflictResolution::KeepFirst, 
-            "keep_second" => ConflictResolution::KeepSecond,
-            "merge_attributes" => ConflictResolution::MergeAttributes,
-            "domain_prefix" => ConflictResolution::DomainPrefix,
-            "auto_remap" => ConflictResolution::AutoRemap,
-            _ => return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                format!("Unknown conflict resolution strategy: {}", strategy)
-            ))
-        };
-        
-        self.table.merge_with(other.table, conflict_strategy)
-            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
-            
-        Ok(())
     }
     
     /// Create federated GraphTable from multiple bundle paths

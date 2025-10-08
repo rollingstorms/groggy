@@ -20,7 +20,7 @@ use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::types::{EdgeId, EntityId, NodeId, SubgraphId};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 /// Result of neighborhood sampling operations
 #[derive(Debug, Clone)]
@@ -441,6 +441,7 @@ impl crate::traits::NeighborhoodOperations for NeighborhoodSubgraph {
     ) -> GraphResult<Box<dyn crate::traits::NeighborhoodOperations>> {
         // Use existing neighborhood sampling to expand
         let mut sampler = NeighborhoodSampler::new();
+        sampler.set_graph_ref(&self.graph_ref);
         let new_hops = self.hops + additional_hops;
 
         // For simplicity, expand from the first central node
@@ -509,13 +510,25 @@ impl crate::traits::NeighborhoodOperations for NeighborhoodSubgraph {
 pub struct NeighborhoodSampler {
     /// Performance statistics
     stats: NeighborhoodStats,
+    /// Weak self-reference for constructing subgraphs tied to the live graph
+    graph_ref: Option<Weak<RefCell<Graph>>>,
 }
 
 impl NeighborhoodSampler {
     pub fn new() -> Self {
         Self {
             stats: NeighborhoodStats::new(),
+            graph_ref: None,
         }
+    }
+
+    /// Attach the owning graph so generated subgraphs can mutate the real graph
+    pub fn set_graph_ref(&mut self, graph_ref: &Rc<RefCell<Graph>>) {
+        self.graph_ref = Some(Rc::downgrade(graph_ref));
+    }
+
+    fn graph_ref(&self) -> Option<Rc<RefCell<Graph>>> {
+        self.graph_ref.as_ref().and_then(|weak| weak.upgrade())
     }
 
     /// Generate 1-hop neighborhood for a single node
@@ -551,9 +564,10 @@ impl NeighborhoodSampler {
         self.stats
             .record_neighborhood("single_neighborhood".to_string(), size, duration);
 
-        // TODO: Fix graph_ref creation - temporary workaround
-        // This is a simplified version to get compilation working
-        let graph_ref = Rc::new(RefCell::new(Graph::new()));
+        // Use the live graph when available so downstream operations mutate shared state
+        let graph_ref = self
+            .graph_ref()
+            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new())));
 
         // Generate proper SubgraphId using hash of content
         let subgraph_id = {
@@ -653,7 +667,9 @@ impl NeighborhoodSampler {
             let duration = start.elapsed();
             self.stats
                 .record_neighborhood("k_hop_neighborhood".to_string(), 1, duration);
-            let graph_ref = Rc::new(RefCell::new(Graph::new()));
+            let graph_ref = self
+                .graph_ref()
+                .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new())));
             let subgraph_id = 1;
             return Ok(NeighborhoodSubgraph {
                 graph_ref,
@@ -706,7 +722,9 @@ impl NeighborhoodSampler {
         self.stats
             .record_neighborhood("k_hop_neighborhood".to_string(), size, duration);
 
-        let graph_ref = Rc::new(RefCell::new(Graph::new()));
+        let graph_ref = self
+            .graph_ref()
+            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new())));
         let subgraph_id = 2;
         Ok(NeighborhoodSubgraph {
             graph_ref,
@@ -769,7 +787,9 @@ impl NeighborhoodSampler {
         self.stats
             .record_neighborhood("unified_neighborhood".to_string(), size, duration);
 
-        let graph_ref = Rc::new(RefCell::new(Graph::new()));
+        let graph_ref = self
+            .graph_ref()
+            .unwrap_or_else(|| Rc::new(RefCell::new(Graph::new())));
         let subgraph_id = 3;
         Ok(NeighborhoodSubgraph {
             graph_ref,

@@ -5,8 +5,7 @@
 //! All subgraph types use the same optimized foundation with specialized behaviors.
 
 use crate::errors::{GraphError, GraphResult};
-use crate::subgraphs::composer::{
-    EdgeStrategy, MetaNodePlan, };
+use crate::subgraphs::composer::{EdgeStrategy, MetaNodePlan};
 use crate::traits::GraphEntity;
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 use std::collections::{HashMap, HashSet};
@@ -1185,21 +1184,25 @@ pub trait SubgraphOperations: GraphEntity {
         let binding = self.graph_ref();
         let mut graph = binding.borrow_mut();
 
-        // Batch validation - check all nodes exist upfront
-        for node_values in attrs_values.values() {
-            for &(node_id, _) in node_values {
-                if !graph.space().contains_node(node_id) {
-                    return Err(crate::errors::GraphError::node_not_found(
-                        node_id,
-                        "set bulk node attributes",
-                    )
-                    .into());
-                }
+        // Filter out nodes that no longer exist (e.g., removed during collapse workflows)
+        let mut filtered_attrs = HashMap::new();
+        for (attr_name, node_values) in attrs_values.into_iter() {
+            let filtered_values: Vec<(NodeId, AttrValue)> = node_values
+                .into_iter()
+                .filter(|(node_id, _)| graph.space().contains_node(*node_id))
+                .collect();
+
+            if !filtered_values.is_empty() {
+                filtered_attrs.insert(attr_name, filtered_values);
             }
         }
 
+        if filtered_attrs.is_empty() {
+            return Ok(());
+        }
+
         // Use optimized vectorized pool operation
-        let index_changes = graph.pool_mut().set_bulk_attrs(attrs_values, true);
+        let index_changes = graph.pool_mut().set_bulk_attrs(filtered_attrs, true);
 
         // Update space attribute indices in bulk
         for (attr_name, entity_indices) in index_changes {

@@ -4,15 +4,16 @@ use super::base::BaseTable;
 use super::base::InteractiveConfig;
 use super::edges::{EdgeConfig, EdgesTable};
 use super::nodes::NodesTable;
-use super::traits::{Table, TableIterator};
+use super::traits::Table;
+use crate::entities::Node;
 use crate::errors::{GraphError, GraphResult};
-use crate::storage::array::{BaseArray};
+use crate::storage::array::BaseArray;
 use crate::types::{AttrValue, EdgeId, NodeId};
 use crate::viz::display::{ColumnSchema, DataType};
 use crate::viz::streaming::data_source::{
-    DataSchema, DataSource, DataWindow, GraphEdge, GraphMetadata, GraphNode, LayoutAlgorithm};
+    DataSchema, DataSource, DataWindow, GraphEdge, GraphMetadata, GraphNode, LayoutAlgorithm,
+};
 use crate::viz::streaming::NodePosition;
-use crate::entities::Node;
 use crate::viz::VizModule;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -56,6 +57,28 @@ pub enum ConflictResolution {
     DomainPrefix,
     /// Automatically generate new IDs for conflicts
     AutoRemap,
+}
+
+/// Options controlling GraphTable merge behaviour
+#[derive(Clone, Debug)]
+pub struct MergeOptions {
+    pub strategy: ConflictResolution,
+}
+
+impl MergeOptions {
+    pub fn new(strategy: ConflictResolution) -> Self {
+        Self { strategy }
+    }
+
+    pub fn domain_prefix() -> Self {
+        Self::new(ConflictResolution::DomainPrefix)
+    }
+}
+
+impl Default for MergeOptions {
+    fn default() -> Self {
+        MergeOptions::domain_prefix()
+    }
 }
 
 impl Default for ValidationPolicy {
@@ -392,9 +415,39 @@ impl GraphTable {
         stats
     }
 
+    /// Merge GraphTables using the provided options
+    pub fn merge<I>(tables: I, opts: MergeOptions) -> GraphResult<Self>
+    where
+        I: IntoIterator<Item = GraphTable>,
+    {
+        let mut tables_vec: Vec<GraphTable> = tables.into_iter().collect();
+
+        if tables_vec.is_empty() {
+            return Err(GraphError::InvalidInput(
+                "Cannot merge empty list of tables".to_string(),
+            ));
+        }
+
+        if tables_vec.len() == 1 {
+            return Ok(tables_vec.pop().unwrap());
+        }
+
+        match opts.strategy {
+            ConflictResolution::DomainPrefix | ConflictResolution::AutoRemap => {
+                Self::merge_with_domain_prefix(tables_vec)
+            }
+            ConflictResolution::Fail => Self::merge_with_collision_detection(tables_vec, true),
+            ConflictResolution::KeepFirst
+            | ConflictResolution::KeepSecond
+            | ConflictResolution::MergeAttributes => {
+                Self::merge_with_attribute_strategy(tables_vec, opts.strategy)
+            }
+        }
+    }
+
     /// Merge multiple GraphTables into a single GraphTable
     /// Handles UID collisions and domain mapping
-    pub fn merge(tables: Vec<GraphTable>) -> GraphResult<Self> {
+    fn merge_with_domain_prefix(tables: Vec<GraphTable>) -> GraphResult<Self> {
         if tables.is_empty() {
             return Err(GraphError::InvalidInput(
                 "Cannot merge empty list of tables".to_string(),
@@ -503,46 +556,6 @@ impl GraphTable {
         let merged_edges = EdgesTable::new(edge_tuples);
 
         Ok(GraphTable::new(merged_nodes, merged_edges))
-    }
-
-    /// Merge with another GraphTable using conflict resolution strategy
-    pub fn merge_with(
-        &mut self,
-        other: GraphTable,
-        strategy: ConflictResolution,
-    ) -> GraphResult<()> {
-        let merged = Self::merge_with_strategy(vec![self.clone(), other], strategy)?;
-        *self = merged;
-        Ok(())
-    }
-
-    /// Merge multiple GraphTables with specific conflict resolution strategy
-    pub fn merge_with_strategy(
-        tables: Vec<GraphTable>,
-        strategy: ConflictResolution,
-    ) -> GraphResult<Self> {
-        if tables.is_empty() {
-            return Err(GraphError::InvalidInput(
-                "Cannot merge empty list of tables".to_string(),
-            ));
-        }
-
-        if tables.len() == 1 {
-            return Ok(tables.into_iter().next().unwrap());
-        }
-
-        match strategy {
-            ConflictResolution::DomainPrefix | ConflictResolution::AutoRemap => {
-                // Use the default merge which already implements domain prefixing
-                Self::merge(tables)
-            }
-            ConflictResolution::Fail => Self::merge_with_collision_detection(tables, true),
-            ConflictResolution::KeepFirst
-            | ConflictResolution::KeepSecond
-            | ConflictResolution::MergeAttributes => {
-                Self::merge_with_attribute_strategy(tables, strategy)
-            }
-        }
     }
 
     /// Merge with collision detection - fail on conflicts if strict = true
@@ -725,7 +738,7 @@ impl GraphTable {
             tables.push(table);
         }
 
-        Self::merge_with_strategy(tables, ConflictResolution::DomainPrefix)
+        Self::merge(tables, MergeOptions::domain_prefix())
     }
 
     /// Add domain metadata to all nodes and edges in this table
@@ -1234,7 +1247,9 @@ impl Table for GraphTable {
         if nodes_has_all && !edges_has_all {
             // Pivot nodes only
             Ok(Self {
-                nodes: self.nodes.pivot_table(index_cols, columns_col, values_col, agg_func)?,
+                nodes: self
+                    .nodes
+                    .pivot_table(index_cols, columns_col, values_col, agg_func)?,
                 edges: self.edges.clone(),
                 policy: self.policy.clone(),
             })
@@ -1242,13 +1257,17 @@ impl Table for GraphTable {
             // Pivot edges only
             Ok(Self {
                 nodes: self.nodes.clone(),
-                edges: self.edges.pivot_table(index_cols, columns_col, values_col, agg_func)?,
+                edges: self
+                    .edges
+                    .pivot_table(index_cols, columns_col, values_col, agg_func)?,
                 policy: self.policy.clone(),
             })
         } else if nodes_has_all && edges_has_all {
             // Both have the columns - prefer nodes (consistent with other operations)
             Ok(Self {
-                nodes: self.nodes.pivot_table(index_cols, columns_col, values_col, agg_func)?,
+                nodes: self
+                    .nodes
+                    .pivot_table(index_cols, columns_col, values_col, agg_func)?,
                 edges: self.edges.clone(),
                 policy: self.policy.clone(),
             })
@@ -1321,10 +1340,6 @@ impl Table for GraphTable {
                 policy: self.policy.clone(),
             })
         }
-    }
-
-    fn iter(&self) -> TableIterator<Self> {
-        TableIterator::new(self.clone())
     }
 }
 

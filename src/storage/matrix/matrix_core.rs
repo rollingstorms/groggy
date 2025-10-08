@@ -17,7 +17,7 @@ use crate::storage::advanced_matrix::{
 use crate::storage::array::NumArray;
 use crate::storage::table::BaseTable;
 use crate::types::{AttrValue, NodeId};
-use crate::viz::display::{DisplayConfig};
+use crate::viz::display::DisplayConfig;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -155,6 +155,12 @@ impl<T: NumericType> GraphMatrix<T> {
             UnifiedMatrix::new(1, 1).expect("Failed to create minimal matrix")
         });
         Self::from_storage(storage)
+    }
+
+    /// Check whether the matrix contains any data
+    pub fn is_empty(&self) -> bool {
+        let shape = self.storage.shape();
+        shape.rows == 0 || shape.cols == 0
     }
 
     /// Create identity matrix (using ones as placeholder until eye is implemented)

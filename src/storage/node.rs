@@ -202,9 +202,10 @@ impl NodeOperations for EntityNode {
 
     fn neighborhood(&self, hops: usize) -> GraphResult<Box<dyn SubgraphOperations>> {
         // Use existing NeighborhoodSampler for efficient neighborhood expansion
-        let graph = self.graph_ref.borrow_mut();
-        // Use NeighborhoodSampler directly
+        let binding = self.graph_ref();
         let mut neighborhood_sampler = NeighborhoodSampler::new();
+        neighborhood_sampler.set_graph_ref(&binding);
+        let graph = binding.borrow_mut();
         let result = neighborhood_sampler.unified_neighborhood(
             &graph.pool(),
             graph.space(),

@@ -627,11 +627,7 @@ impl TableArray {
     /// Get first n rows from each table in the array
     /// Returns a new TableArray with head(n) applied to each table
     pub fn head(&self, n: usize) -> TableArray {
-        let head_tables: Vec<BaseTable> = self
-            .tables
-            .iter()
-            .map(|table| table.head(n))
-            .collect();
+        let head_tables: Vec<BaseTable> = self.tables.iter().map(|table| table.head(n)).collect();
 
         if let Some(ref keys) = self.group_keys {
             TableArray::from_tables_with_keys(head_tables, keys.clone())
@@ -643,11 +639,7 @@ impl TableArray {
     /// Get last n rows from each table in the array
     /// Returns a new TableArray with tail(n) applied to each table
     pub fn tail(&self, n: usize) -> TableArray {
-        let tail_tables: Vec<BaseTable> = self
-            .tables
-            .iter()
-            .map(|table| table.tail(n))
-            .collect();
+        let tail_tables: Vec<BaseTable> = self.tables.iter().map(|table| table.tail(n)).collect();
 
         if let Some(ref keys) = self.group_keys {
             TableArray::from_tables_with_keys(tail_tables, keys.clone())
@@ -668,7 +660,10 @@ impl TableArray {
         }
 
         if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(sampled_tables, keys.clone()))
+            Ok(TableArray::from_tables_with_keys(
+                sampled_tables,
+                keys.clone(),
+            ))
         } else {
             Ok(TableArray::from_tables(sampled_tables))
         }
@@ -685,7 +680,10 @@ impl TableArray {
         }
 
         if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(selected_tables, keys.clone()))
+            Ok(TableArray::from_tables_with_keys(
+                selected_tables,
+                keys.clone(),
+            ))
         } else {
             Ok(TableArray::from_tables(selected_tables))
         }
@@ -702,7 +700,10 @@ impl TableArray {
         }
 
         if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(sorted_tables, keys.clone()))
+            Ok(TableArray::from_tables_with_keys(
+                sorted_tables,
+                keys.clone(),
+            ))
         } else {
             Ok(TableArray::from_tables(sorted_tables))
         }
@@ -719,7 +720,10 @@ impl TableArray {
         }
 
         if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(tables_with_dropped_columns, keys.clone()))
+            Ok(TableArray::from_tables_with_keys(
+                tables_with_dropped_columns,
+                keys.clone(),
+            ))
         } else {
             Ok(TableArray::from_tables(tables_with_dropped_columns))
         }
@@ -736,7 +740,10 @@ impl TableArray {
         }
 
         if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(renamed_tables, keys.clone()))
+            Ok(TableArray::from_tables_with_keys(
+                renamed_tables,
+                keys.clone(),
+            ))
         } else {
             Ok(TableArray::from_tables(renamed_tables))
         }
@@ -756,7 +763,10 @@ impl TableArray {
         }
 
         if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(applied_tables, keys.clone()))
+            Ok(TableArray::from_tables_with_keys(
+                applied_tables,
+                keys.clone(),
+            ))
         } else {
             Ok(TableArray::from_tables(applied_tables))
         }
@@ -780,7 +790,10 @@ impl TableArray {
 
     /// Apply a function to each table and return an array of the results
     /// The function can return any AttrValue-compatible type
-    pub fn apply_to_array<F>(&self, func: F) -> GraphResult<crate::storage::array::BaseArray<AttrValue>>
+    pub fn apply_to_array<F>(
+        &self,
+        func: F,
+    ) -> GraphResult<crate::storage::array::BaseArray<AttrValue>>
     where
         F: Fn(&BaseTable) -> GraphResult<AttrValue>,
     {
@@ -796,7 +809,12 @@ impl TableArray {
 
     /// Apply a function to each table and reduce to a single value
     /// This is useful for operations like sum of all table statistics
-    pub fn apply_reduce<F, T, R>(&self, func: F, init: R, reduce: impl Fn(R, T) -> R) -> GraphResult<R>
+    pub fn apply_reduce<F, T, R>(
+        &self,
+        func: F,
+        init: R,
+        reduce: impl Fn(R, T) -> R,
+    ) -> GraphResult<R>
     where
         F: Fn(&BaseTable) -> GraphResult<T>,
     {
@@ -848,7 +866,10 @@ impl TableArray {
         }
 
         if let Some(ref keys) = self.group_keys {
-            Ok(TableArray::from_tables_with_keys(described_tables, keys.clone()))
+            Ok(TableArray::from_tables_with_keys(
+                described_tables,
+                keys.clone(),
+            ))
         } else {
             Ok(TableArray::from_tables(described_tables))
         }
@@ -1008,9 +1029,9 @@ impl TableArray {
                         AttrValue::Null => {} // Skip null values
                         _ => {
                             return Err(crate::errors::GraphError::InvalidInput(format!(
-                                "Cannot compute standard deviation of non-numeric data in column '{}'",
-                                column
-                            )))
+                            "Cannot compute standard deviation of non-numeric data in column '{}'",
+                            column
+                        )))
                         }
                     }
                 }
@@ -1034,16 +1055,26 @@ impl TableArray {
         let ordering = match (a, b) {
             (AttrValue::Int(a), AttrValue::Int(b)) => a.cmp(b),
             (AttrValue::SmallInt(a), AttrValue::SmallInt(b)) => a.cmp(b),
-            (AttrValue::Float(a), AttrValue::Float(b)) => a.partial_cmp(b).unwrap_or(Ordering::Equal),
-            (AttrValue::Int(a), AttrValue::Float(b)) => (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal),
-            (AttrValue::Float(a), AttrValue::Int(b)) => a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal),
-            (AttrValue::SmallInt(a), AttrValue::Float(b)) => (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal),
-            (AttrValue::Float(a), AttrValue::SmallInt(b)) => a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal),
+            (AttrValue::Float(a), AttrValue::Float(b)) => {
+                a.partial_cmp(b).unwrap_or(Ordering::Equal)
+            }
+            (AttrValue::Int(a), AttrValue::Float(b)) => {
+                (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal)
+            }
+            (AttrValue::Float(a), AttrValue::Int(b)) => {
+                a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal)
+            }
+            (AttrValue::SmallInt(a), AttrValue::Float(b)) => {
+                (*a as f32).partial_cmp(b).unwrap_or(Ordering::Equal)
+            }
+            (AttrValue::Float(a), AttrValue::SmallInt(b)) => {
+                a.partial_cmp(&(*b as f32)).unwrap_or(Ordering::Equal)
+            }
             (AttrValue::SmallInt(a), AttrValue::Int(b)) => (*a as i64).cmp(b),
             (AttrValue::Int(a), AttrValue::SmallInt(b)) => a.cmp(&(*b as i64)),
             _ => {
                 return Err(crate::errors::GraphError::InvalidInput(
-                    "Cannot compare non-numeric values".to_string()
+                    "Cannot compare non-numeric values".to_string(),
                 ))
             }
         };

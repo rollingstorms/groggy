@@ -2,6 +2,7 @@
 //!
 //! Provides a typed container for collections of PySubgraph objects with full ArrayOps support
 
+use crate::ffi::entities::meta_node::PyMetaNode;
 use crate::ffi::subgraphs::subgraph::PySubgraph;
 use groggy::storage::array::{ArrayOps, ArrayIterator};
 use pyo3::prelude::*;
@@ -218,6 +219,53 @@ impl PySubgraphArray {
     /// Collect all subgraphs into a Python list (for compatibility with iterator patterns)
     fn collect(&self) -> Vec<PySubgraph> {
         self.to_list()
+    }
+
+    /// Collapse each subgraph using the Subgraph.collapse API and materialize meta-nodes.
+    #[pyo3(signature = (
+        node_aggs = None,
+        edge_aggs = None,
+        edge_strategy = "aggregate",
+        node_strategy = "extract",
+        preset = None,
+        include_edge_count = true,
+        mark_entity_type = true,
+        entity_type = "meta",
+        allow_missing_attributes = true
+    ))]
+    fn collapse(
+        &self,
+        py: Python,
+        node_aggs: Option<&PyAny>,
+        edge_aggs: Option<&PyAny>,
+        edge_strategy: &str,
+        node_strategy: &str,
+        preset: Option<String>,
+        include_edge_count: bool,
+        mark_entity_type: bool,
+        entity_type: &str,
+        allow_missing_attributes: bool,
+    ) -> PyResult<Vec<Py<PyMetaNode>>> {
+        let mut results = Vec::with_capacity(self.inner.len());
+
+        for subgraph in self.inner.iter() {
+            let meta_node = subgraph.collapse(
+                py,
+                node_aggs,
+                edge_aggs,
+                edge_strategy,
+                node_strategy,
+                preset.clone(),
+                include_edge_count,
+                mark_entity_type,
+                entity_type,
+                allow_missing_attributes,
+            )?;
+            let meta_node = meta_node.extract::<Py<PyMetaNode>>(py)?;
+            results.push(meta_node);
+        }
+
+        Ok(results)
     }
 
     /// Apply table() to all subgraphs and return PyTableArray

@@ -23,8 +23,8 @@
 //! ```
 
 use super::base_array::BaseArray;
-use crate::storage::table::BaseTable;
 use crate::errors::GraphError;
+use crate::storage::table::BaseTable;
 use std::fmt;
 
 /// Array of arrays with aggregation support
@@ -183,11 +183,8 @@ impl ArrayArray<f64> {
                 }
 
                 let mean = arr.iter().sum::<f64>() / arr.len() as f64;
-                let variance = arr
-                    .iter()
-                    .map(|&x| (x - mean).powi(2))
-                    .sum::<f64>()
-                    / (arr.len() - 1) as f64;
+                let variance =
+                    arr.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (arr.len() - 1) as f64;
 
                 variance.sqrt()
             })
@@ -231,9 +228,7 @@ impl ArrayArray<f64> {
 
         if let Some(keys) = &self.keys {
             // Create table with group keys
-            let key_col: Vec<AttrValue> = keys.iter()
-                .map(|s| AttrValue::Text(s.clone()))
-                .collect();
+            let key_col: Vec<AttrValue> = keys.iter().map(|s| AttrValue::Text(s.clone())).collect();
             let name = self
                 .key_name
                 .as_ref()
@@ -243,9 +238,8 @@ impl ArrayArray<f64> {
         }
 
         // Add aggregation column
-        let value_col: Vec<AttrValue> = values.iter()
-            .map(|&v| AttrValue::Float(v as f32))
-            .collect();
+        let value_col: Vec<AttrValue> =
+            values.iter().map(|&v| AttrValue::Float(v as f32)).collect();
         columns.insert(agg_name.to_string(), BaseArray::from_attr_values(value_col));
 
         BaseTable::from_columns(columns)
@@ -335,9 +329,7 @@ mod tests {
 
     #[test]
     fn test_std_aggregation() {
-        let arrays = vec![
-            BaseArray::from(vec![1.0, 2.0, 3.0, 4.0, 5.0]),
-        ];
+        let arrays = vec![BaseArray::from(vec![1.0, 2.0, 3.0, 4.0, 5.0])];
         let arr_arr = ArrayArray::new(arrays);
 
         let stds = arr_arr.std();

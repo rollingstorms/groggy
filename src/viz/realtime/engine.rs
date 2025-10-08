@@ -12,13 +12,12 @@ use crate::viz::embeddings::flat_embedding::{compute_flat_embedding, FlatEmbedCo
 use crate::viz::embeddings::{EmbeddingMethod, GraphEmbeddingExt};
 use crate::viz::projection::GraphProjectionExt;
 use crate::viz::realtime::accessor::{
-    EngineSnapshot, EngineUpdate,
-    PositionsPayload, UpdateEnvelope,
+    EngineSnapshot, EngineUpdate, PositionsPayload, UpdateEnvelope,
 };
 use crate::viz::realtime::engine_sync::EngineSyncManager;
 use crate::viz::realtime::interaction::{
-    CanvasDragPolicy, GlobeController, HoneycombController, InteractionCommand,
-    NodeDragEvent, NodeDragPolicy, PanController, PointerEvent,     ViewState3D, WheelEvent,
+    CanvasDragPolicy, GlobeController, HoneycombController, InteractionCommand, NodeDragEvent,
+    NodeDragPolicy, PanController, PointerEvent, ViewState3D, WheelEvent,
 };
 use crate::viz::streaming::data_source::Position;
 use serde_json::json;

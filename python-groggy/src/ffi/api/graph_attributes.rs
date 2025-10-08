@@ -9,6 +9,7 @@ use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
 use groggy::{AttrName, AttrValue, EdgeId, NodeId};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use pyo3::PyObject;
 use std::collections::HashMap;
 
 /// Clean attribute operations - 12 essential methods only
@@ -279,41 +280,8 @@ impl PyGraphAttrMut {
     {
         let mut attr_values = Vec::new();
         for (id_py, value_py) in node_dict.iter() {
-            // First try direct extraction
-            let id: T = match id_py.extract::<T>() {
-                Ok(direct_id) => direct_id,
-                Err(_) => {
-                    // Try flexible conversions by creating Python objects and extracting from them
-                    if let Ok(int_id) = id_py.extract::<i64>() {
-                        // Try converting int to string and then extracting
-                        let py_str = pyo3::types::PyString::new(py, &int_id.to_string());
-                        py_str.extract::<T>().map_err(|_| {
-                            pyo3::exceptions::PyTypeError::new_err(
-                                format!("Cannot convert integer key '{}' to expected ID type", int_id)
-                            )
-                        })?
-                    } else if let Ok(str_id) = id_py.extract::<String>() {
-                        // Try parsing string as int and extracting
-                        if let Ok(parsed_int) = str_id.parse::<i64>() {
-                            let py_int = parsed_int.to_object(py);
-                            py_int.extract::<T>(py).map_err(|_| {
-                                pyo3::exceptions::PyTypeError::new_err(
-                                    format!("Cannot convert string key '{}' to expected ID type", str_id)
-                                )
-                            })?
-                        } else {
-                            return Err(pyo3::exceptions::PyTypeError::new_err(
-                                format!("Cannot parse string key '{}' as integer", str_id)
-                            ));
-                        }
-                    } else {
-                        return Err(pyo3::exceptions::PyTypeError::new_err(
-                            format!("Key type '{}' cannot be converted to ID type", id_py.get_type().name()?)
-                        ));
-                    }
-                }
-            };
-            
+            let id: T = self.extract_entity_id(py, id_py)?;
+
             let attr_value = python_value_to_attr_value(value_py)?;
             attr_values.push((id, attr_value));
         }
@@ -323,7 +291,7 @@ impl PyGraphAttrMut {
     /// Parse column-centric format: {"nodes": [node_ids], "values": [values]}
     fn parse_column_centric_format<T>(
         &self,
-        _py: Python,
+        py: Python,
         data_dict: &PyDict,
     ) -> PyResult<Vec<(T, AttrValue)>>
     where
@@ -336,19 +304,20 @@ impl PyGraphAttrMut {
             pyo3::exceptions::PyKeyError::new_err("Missing 'values' key in column-centric format")
         })?;
 
-        let ids: Vec<T> = ids_list.extract()?;
+        let ids_objects: Vec<PyObject> = ids_list.extract()?;
         let values: &PyList = values_list.extract()?;
 
-        if ids.len() != values.len() {
+        if ids_objects.len() != values.len() {
             return Err(pyo3::exceptions::PyValueError::new_err(format!(
                 "Length mismatch: {} nodes vs {} values",
-                ids.len(),
+                ids_objects.len(),
                 values.len()
             )));
         }
 
         let mut attr_values = Vec::new();
-        for (id, value_py) in ids.into_iter().zip(values.iter()) {
+        for (id_obj, value_py) in ids_objects.iter().zip(values.iter()) {
+            let id = self.extract_entity_id::<T>(py, id_obj.as_ref(py))?;
             let attr_value = python_value_to_attr_value(value_py)?;
             attr_values.push((id, attr_value));
         }
@@ -392,4 +361,59 @@ impl PyGraphAttrMut {
         ))
     }
     */
+}
+
+impl PyGraphAttrMut {
+    fn extract_entity_id<T>(&self, py: Python, id_py: &PyAny) -> PyResult<T>
+    where
+        T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
+    {
+        if let Ok(id) = id_py.extract::<T>() {
+            return Ok(id);
+        }
+
+        if let Ok(int_id) = id_py.extract::<i64>() {
+            return self.convert_int_to_target::<T>(py, int_id);
+        }
+
+        if let Ok(float_id) = id_py.extract::<f64>() {
+            if float_id.fract().abs() <= f64::EPSILON {
+                return self.convert_int_to_target::<T>(py, float_id as i64);
+            }
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                format!("ID value {} must be an integer-compatible float", float_id)
+            ));
+        }
+
+        if let Ok(str_id) = id_py.extract::<String>() {
+            if let Ok(parsed_int) = str_id.parse::<i64>() {
+                return self.convert_int_to_target::<T>(py, parsed_int);
+            }
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                format!("Cannot parse string key '{}' as integer", str_id)
+            ));
+        }
+
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            format!("Key type '{}' cannot be converted to ID type", id_py.get_type().name()?)
+        ))
+    }
+
+    fn convert_int_to_target<T>(&self, py: Python, int_id: i64) -> PyResult<T>
+    where
+        T: for<'py> FromPyObject<'py> + Copy + std::fmt::Display,
+    {
+        if int_id < 0 {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                format!("ID value {} must be non-negative", int_id)
+            ));
+        }
+
+        let py_int = int_id.to_object(py);
+        py_int.extract::<T>(py).map_err(|_| {
+            pyo3::exceptions::PyTypeError::new_err(
+                format!("Cannot convert integer key '{}' to expected ID type", int_id)
+            )
+        })
+    }
 }

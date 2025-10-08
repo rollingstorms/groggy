@@ -88,59 +88,102 @@ impl DataSourceRealtimeAccessor {
                 // Complex vector types - convert to string representations for display
                 AttrValue::FloatVec(vec) => {
                     if vec.len() <= 10 {
-                        AttrValue::Text(format!("[{}]", vec.iter().map(|f| format!("{:.2}", f)).collect::<Vec<_>>().join(", ")))
+                        AttrValue::Text(format!(
+                            "[{}]",
+                            vec.iter()
+                                .map(|f| format!("{:.2}", f))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ))
                     } else {
-                        AttrValue::Text(format!("[{} values: {:.2}..{:.2}]", vec.len(), vec.first().unwrap_or(&0.0), vec.last().unwrap_or(&0.0)))
+                        AttrValue::Text(format!(
+                            "[{} values: {:.2}..{:.2}]",
+                            vec.len(),
+                            vec.first().unwrap_or(&0.0),
+                            vec.last().unwrap_or(&0.0)
+                        ))
                     }
                 }
                 AttrValue::IntVec(vec) => {
                     if vec.len() <= 10 {
-                        AttrValue::Text(format!("[{}]", vec.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(", ")))
+                        AttrValue::Text(format!(
+                            "[{}]",
+                            vec.iter()
+                                .map(|i| i.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ))
                     } else {
-                        AttrValue::Text(format!("[{} values: {}..{}]", vec.len(), vec.first().unwrap_or(&0), vec.last().unwrap_or(&0)))
+                        AttrValue::Text(format!(
+                            "[{} values: {}..{}]",
+                            vec.len(),
+                            vec.first().unwrap_or(&0),
+                            vec.last().unwrap_or(&0)
+                        ))
                     }
                 }
                 AttrValue::TextVec(vec) => {
                     if vec.len() <= 5 {
                         AttrValue::Text(format!("[{}]", vec.join(", ")))
                     } else {
-                        AttrValue::Text(format!("[{} items: {}, ...]", vec.len(), vec.first().map(|s| s.as_str()).unwrap_or("")))
+                        AttrValue::Text(format!(
+                            "[{} items: {}, ...]",
+                            vec.len(),
+                            vec.first().map(|s| s.as_str()).unwrap_or("")
+                        ))
                     }
                 }
                 AttrValue::BoolVec(vec) => {
                     let true_count = vec.iter().filter(|&&b| b).count();
-                    AttrValue::Text(format!("[{} bools: {} true, {} false]", vec.len(), true_count, vec.len() - true_count))
+                    AttrValue::Text(format!(
+                        "[{} bools: {} true, {} false]",
+                        vec.len(),
+                        true_count,
+                        vec.len() - true_count
+                    ))
                 }
 
                 // Complex reference types - convert to descriptive strings
                 AttrValue::SubgraphRef(id) => AttrValue::Text(format!("Subgraph({})", id)),
-                AttrValue::NodeArray(ref arr) => AttrValue::Text(format!("NodeArray({} nodes)", arr.len())),
-                AttrValue::EdgeArray(ref arr) => AttrValue::Text(format!("EdgeArray({} edges)", arr.len())),
+                AttrValue::NodeArray(ref arr) => {
+                    AttrValue::Text(format!("NodeArray({} nodes)", arr.len()))
+                }
+                AttrValue::EdgeArray(ref arr) => {
+                    AttrValue::Text(format!("EdgeArray({} edges)", arr.len()))
+                }
 
                 // Binary/compressed data - show metadata only
-                AttrValue::Bytes(ref bytes) => AttrValue::Text(format!("Bytes({} bytes)", bytes.len())),
+                AttrValue::Bytes(ref bytes) => {
+                    AttrValue::Text(format!("Bytes({} bytes)", bytes.len()))
+                }
                 AttrValue::CompressedText(ref data) => {
                     let ratio = data.compression_ratio();
-                    AttrValue::Text(format!("CompressedText({} bytes, {:.1}x compression)", data.data.len(), 1.0 / ratio))
+                    AttrValue::Text(format!(
+                        "CompressedText({} bytes, {:.1}x compression)",
+                        data.data.len(),
+                        1.0 / ratio
+                    ))
                 }
                 AttrValue::CompressedFloatVec(ref data) => {
                     let ratio = data.compression_ratio();
-                    AttrValue::Text(format!("CompressedFloatVec({} bytes, {:.1}x compression)", data.data.len(), 1.0 / ratio))
+                    AttrValue::Text(format!(
+                        "CompressedFloatVec({} bytes, {:.1}x compression)",
+                        data.data.len(),
+                        1.0 / ratio
+                    ))
                 }
 
                 // JSON - convert to string representation
-                AttrValue::Json(ref json) => {
-                    match serde_json::to_string(json) {
-                        Ok(json_str) => {
-                            if json_str.len() <= 100 {
-                                AttrValue::Text(json_str)
-                            } else {
-                                AttrValue::Text(format!("JSON({} chars)", json_str.len()))
-                            }
+                AttrValue::Json(ref json) => match serde_json::to_string(json) {
+                    Ok(json_str) => {
+                        if json_str.len() <= 100 {
+                            AttrValue::Text(json_str)
+                        } else {
+                            AttrValue::Text(format!("JSON({} chars)", json_str.len()))
                         }
-                        Err(_) => AttrValue::Text("JSON(parse error)".to_string()),
                     }
-                }
+                    Err(_) => AttrValue::Text("JSON(parse error)".to_string()),
+                },
             };
 
             sanitized.insert(key, safe_value);
@@ -300,12 +343,7 @@ impl DataSourceRealtimeAccessor {
     }
 
     /// Scale a value to a range [min, max] based on column statistics
-    fn scale_value(
-        &self,
-        value: f64,
-        col_name: &str,
-        range: Option<(f64, f64)>,
-    ) -> f64 {
+    fn scale_value(&self, value: f64, col_name: &str, range: Option<(f64, f64)>) -> f64 {
         // Default range for auto-scaling (5-20px for node sizes)
         let (min_val, max_val) = range.unwrap_or((5.0, 20.0));
 
@@ -440,7 +478,8 @@ impl DataSourceRealtimeAccessor {
                 }
 
                 // Sanitize attributes to prevent [object Object] display issues
-                let sanitized_attributes = self.sanitize_attributes_for_realtime(graph_node.attributes.clone());
+                let sanitized_attributes =
+                    self.sanitize_attributes_for_realtime(graph_node.attributes.clone());
 
                 // Create base node
                 let mut node = Node::new(node_id, sanitized_attributes.clone());
@@ -455,54 +494,99 @@ impl DataSourceRealtimeAccessor {
                             if let Some(ref scale_type) = config.color_scale_type {
                                 if scale_type == "linear" || scale_type == "gradient" {
                                     // Gradient: map numeric values to colors
-                                    if let Some(value) = self.resolve_f64_param(&VizParameter::Column(col_name.clone()), idx, &sanitized_attributes) {
+                                    if let Some(value) = self.resolve_f64_param(
+                                        &VizParameter::Column(col_name.clone()),
+                                        idx,
+                                        &sanitized_attributes,
+                                    ) {
                                         if let Some(stats) = self.get_column_stats(col_name) {
-                                            let gradient_name = if let Some(ref palette) = config.color_palette {
-                                                palette.first().map(|s| s.as_str()).unwrap_or("grayscale")
-                                            } else {
-                                                "grayscale"
-                                            };
-                                            node.color = Some(self.value_to_gradient_color(value, stats.min, stats.max, gradient_name));
+                                            let gradient_name =
+                                                if let Some(ref palette) = config.color_palette {
+                                                    palette
+                                                        .first()
+                                                        .map(|s| s.as_str())
+                                                        .unwrap_or("grayscale")
+                                                } else {
+                                                    "grayscale"
+                                                };
+                                            node.color = Some(self.value_to_gradient_color(
+                                                value,
+                                                stats.min,
+                                                stats.max,
+                                                gradient_name,
+                                            ));
                                         }
                                     }
                                 } else if scale_type == "categorical" {
                                     // Categorical: hash string values to distinct colors
-                                    if let Some(value) = self.resolve_string_param(&VizParameter::Column(col_name.clone()), idx, &sanitized_attributes) {
+                                    if let Some(value) = self.resolve_string_param(
+                                        &VizParameter::Column(col_name.clone()),
+                                        idx,
+                                        &sanitized_attributes,
+                                    ) {
                                         node.color = Some(self.value_to_categorical_color(&value));
                                     }
                                 } else {
                                     // Other scale types: treat as direct string
-                                    node.color = self.resolve_string_param(&config.node_color, idx, &sanitized_attributes);
+                                    node.color = self.resolve_string_param(
+                                        &config.node_color,
+                                        idx,
+                                        &sanitized_attributes,
+                                    );
                                 }
                             } else {
                                 // No scale_type: treat as direct string
-                                node.color = self.resolve_string_param(&config.node_color, idx, &sanitized_attributes);
+                                node.color = self.resolve_string_param(
+                                    &config.node_color,
+                                    idx,
+                                    &sanitized_attributes,
+                                );
                             }
                         }
                         _ => {
                             // Direct value or array
-                            node.color = self.resolve_string_param(&config.node_color, idx, &sanitized_attributes);
+                            node.color = self.resolve_string_param(
+                                &config.node_color,
+                                idx,
+                                &sanitized_attributes,
+                            );
                         }
                     }
 
                     // Resolve size and apply scaling if range is specified
-                    if let Some(raw_size) = self.resolve_f64_param(&config.node_size, idx, &sanitized_attributes) {
+                    if let Some(raw_size) =
+                        self.resolve_f64_param(&config.node_size, idx, &sanitized_attributes)
+                    {
                         // Check if we need to scale based on column reference
                         use crate::viz::realtime::VizParameter;
                         if let VizParameter::Column(ref col_name) = config.node_size {
-                            node.size = Some(self.scale_value(raw_size, col_name, config.node_size_range));
+                            node.size =
+                                Some(self.scale_value(raw_size, col_name, config.node_size_range));
                         } else {
                             node.size = Some(raw_size);
                         }
                     }
 
-                    node.shape = self.resolve_string_param(&config.node_shape, idx, &sanitized_attributes);
-                    node.opacity = self.resolve_f64_param(&config.node_opacity, idx, &sanitized_attributes);
-                    node.border_color = self.resolve_string_param(&config.node_border_color, idx, &sanitized_attributes);
-                    node.border_width = self.resolve_f64_param(&config.node_border_width, idx, &sanitized_attributes);
-                    node.label = self.resolve_string_param(&config.node_label, idx, &sanitized_attributes);
-                    node.label_size = self.resolve_f64_param(&config.label_size, idx, &sanitized_attributes);
-                    node.label_color = self.resolve_string_param(&config.label_color, idx, &sanitized_attributes);
+                    node.shape =
+                        self.resolve_string_param(&config.node_shape, idx, &sanitized_attributes);
+                    node.opacity =
+                        self.resolve_f64_param(&config.node_opacity, idx, &sanitized_attributes);
+                    node.border_color = self.resolve_string_param(
+                        &config.node_border_color,
+                        idx,
+                        &sanitized_attributes,
+                    );
+                    node.border_width = self.resolve_f64_param(
+                        &config.node_border_width,
+                        idx,
+                        &sanitized_attributes,
+                    );
+                    node.label =
+                        self.resolve_string_param(&config.node_label, idx, &sanitized_attributes);
+                    node.label_size =
+                        self.resolve_f64_param(&config.label_size, idx, &sanitized_attributes);
+                    node.label_color =
+                        self.resolve_string_param(&config.label_color, idx, &sanitized_attributes);
                 }
 
                 node
@@ -548,10 +632,12 @@ impl DataSourceRealtimeAccessor {
                 }
 
                 // Sanitize edge attributes to prevent [object Object] display issues
-                let sanitized_attributes = self.sanitize_attributes_for_realtime(graph_edge.attributes.clone());
+                let sanitized_attributes =
+                    self.sanitize_attributes_for_realtime(graph_edge.attributes.clone());
 
                 // Create base edge with actual edge ID
-                let mut edge = Edge::new(edge_id, source_id, target_id, sanitized_attributes.clone());
+                let mut edge =
+                    Edge::new(edge_id, source_id, target_id, sanitized_attributes.clone());
 
                 // Apply styling from VizConfig if present
                 if let Some(ref config) = self.viz_config {
@@ -561,49 +647,92 @@ impl DataSourceRealtimeAccessor {
                         VizParameter::Column(col_name) => {
                             if let Some(ref scale_type) = config.color_scale_type {
                                 if scale_type == "linear" || scale_type == "gradient" {
-                                    if let Some(value) = self.resolve_f64_param(&VizParameter::Column(col_name.clone()), idx, &sanitized_attributes) {
+                                    if let Some(value) = self.resolve_f64_param(
+                                        &VizParameter::Column(col_name.clone()),
+                                        idx,
+                                        &sanitized_attributes,
+                                    ) {
                                         if let Some(stats) = self.get_column_stats(col_name) {
-                                            let gradient_name = if let Some(ref palette) = config.color_palette {
-                                                palette.first().map(|s| s.as_str()).unwrap_or("grayscale")
-                                            } else {
-                                                "grayscale"
-                                            };
-                                            edge.color = Some(self.value_to_gradient_color(value, stats.min, stats.max, gradient_name));
+                                            let gradient_name =
+                                                if let Some(ref palette) = config.color_palette {
+                                                    palette
+                                                        .first()
+                                                        .map(|s| s.as_str())
+                                                        .unwrap_or("grayscale")
+                                                } else {
+                                                    "grayscale"
+                                                };
+                                            edge.color = Some(self.value_to_gradient_color(
+                                                value,
+                                                stats.min,
+                                                stats.max,
+                                                gradient_name,
+                                            ));
                                         }
                                     }
                                 } else if scale_type == "categorical" {
-                                    if let Some(value) = self.resolve_string_param(&VizParameter::Column(col_name.clone()), idx, &sanitized_attributes) {
+                                    if let Some(value) = self.resolve_string_param(
+                                        &VizParameter::Column(col_name.clone()),
+                                        idx,
+                                        &sanitized_attributes,
+                                    ) {
                                         edge.color = Some(self.value_to_categorical_color(&value));
                                     }
                                 } else {
-                                    edge.color = self.resolve_string_param(&config.edge_color, idx, &sanitized_attributes);
+                                    edge.color = self.resolve_string_param(
+                                        &config.edge_color,
+                                        idx,
+                                        &sanitized_attributes,
+                                    );
                                 }
                             } else {
-                                edge.color = self.resolve_string_param(&config.edge_color, idx, &sanitized_attributes);
+                                edge.color = self.resolve_string_param(
+                                    &config.edge_color,
+                                    idx,
+                                    &sanitized_attributes,
+                                );
                             }
                         }
                         _ => {
-                            edge.color = self.resolve_string_param(&config.edge_color, idx, &sanitized_attributes);
+                            edge.color = self.resolve_string_param(
+                                &config.edge_color,
+                                idx,
+                                &sanitized_attributes,
+                            );
                         }
                     }
 
                     // Resolve width and apply scaling if range is specified
-                    if let Some(raw_width) = self.resolve_f64_param(&config.edge_width, idx, &sanitized_attributes) {
+                    if let Some(raw_width) =
+                        self.resolve_f64_param(&config.edge_width, idx, &sanitized_attributes)
+                    {
                         use crate::viz::realtime::VizParameter;
                         if let VizParameter::Column(ref col_name) = config.edge_width {
-                            edge.width = Some(self.scale_value(raw_width, col_name, config.edge_width_range));
+                            edge.width = Some(self.scale_value(
+                                raw_width,
+                                col_name,
+                                config.edge_width_range,
+                            ));
                         } else {
                             edge.width = Some(raw_width);
                         }
                     }
 
-                    edge.opacity = self.resolve_f64_param(&config.edge_opacity, idx, &sanitized_attributes);
-                    edge.style = self.resolve_string_param(&config.edge_style, idx, &sanitized_attributes);
+                    edge.opacity =
+                        self.resolve_f64_param(&config.edge_opacity, idx, &sanitized_attributes);
+                    edge.style =
+                        self.resolve_string_param(&config.edge_style, idx, &sanitized_attributes);
 
                     // Edge label support
-                    edge.label = self.resolve_string_param(&config.edge_label, idx, &sanitized_attributes);
-                    edge.label_size = self.resolve_f64_param(&config.edge_label_size, idx, &sanitized_attributes);
-                    edge.label_color = self.resolve_string_param(&config.edge_label_color, idx, &sanitized_attributes);
+                    edge.label =
+                        self.resolve_string_param(&config.edge_label, idx, &sanitized_attributes);
+                    edge.label_size =
+                        self.resolve_f64_param(&config.edge_label_size, idx, &sanitized_attributes);
+                    edge.label_color = self.resolve_string_param(
+                        &config.edge_label_color,
+                        idx,
+                        &sanitized_attributes,
+                    );
                 }
 
                 edge
@@ -871,7 +1000,9 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                                 let b_val = b.attributes.get(&sort_col.column);
 
                                 let cmp = match (a_val, b_val) {
-                                    (Some(av), Some(bv)) => av.partial_cmp(bv).unwrap_or(std::cmp::Ordering::Equal),
+                                    (Some(av), Some(bv)) => {
+                                        av.partial_cmp(bv).unwrap_or(std::cmp::Ordering::Equal)
+                                    }
                                     (Some(_), None) => std::cmp::Ordering::Less,
                                     (None, Some(_)) => std::cmp::Ordering::Greater,
                                     (None, None) => std::cmp::Ordering::Equal,
@@ -913,7 +1044,9 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                 for node in nodes_window {
                     let mut row = vec![serde_json::Value::Number(node.id.into())];
                     for key in headers.iter().skip(1) {
-                        let value = node.attributes.get(key)
+                        let value = node
+                            .attributes
+                            .get(key)
                             .map(|v| attr_value_to_json(v))
                             .unwrap_or(serde_json::Value::Null);
                         row.push(value);
@@ -963,7 +1096,9 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                                 let b_val = b.attributes.get(&sort_col.column);
 
                                 let cmp = match (a_val, b_val) {
-                                    (Some(av), Some(bv)) => av.partial_cmp(bv).unwrap_or(std::cmp::Ordering::Equal),
+                                    (Some(av), Some(bv)) => {
+                                        av.partial_cmp(bv).unwrap_or(std::cmp::Ordering::Equal)
+                                    }
                                     (Some(_), None) => std::cmp::Ordering::Less,
                                     (None, Some(_)) => std::cmp::Ordering::Greater,
                                     (None, None) => std::cmp::Ordering::Equal,
@@ -989,7 +1124,8 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                 let edges_window = &edges[offset..end];
 
                 // Build headers from all unique attributes across all edges in window
-                let mut headers = vec!["ID".to_string(), "Source".to_string(), "Target".to_string()];
+                let mut headers =
+                    vec!["ID".to_string(), "Source".to_string(), "Target".to_string()];
                 let mut attr_keys = std::collections::HashSet::new();
                 for edge in edges_window {
                     for key in edge.attributes.keys() {
@@ -1009,7 +1145,9 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                         serde_json::Value::Number(edge.target.into()),
                     ];
                     for key in headers.iter().skip(3) {
-                        let value = edge.attributes.get(key)
+                        let value = edge
+                            .attributes
+                            .get(key)
                             .map(|v| attr_value_to_json(v))
                             .unwrap_or(serde_json::Value::Null);
                         row.push(value);
@@ -1033,7 +1171,7 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
 fn attr_value_to_json(attr: &AttrValue) -> serde_json::Value {
     match attr {
         AttrValue::Float(f) => serde_json::Value::Number(
-            serde_json::Number::from_f64(*f as f64).unwrap_or_else(|| serde_json::Number::from(0))
+            serde_json::Number::from_f64(*f as f64).unwrap_or_else(|| serde_json::Number::from(0)),
         ),
         AttrValue::Int(i) => serde_json::Value::Number((*i).into()),
         AttrValue::Text(s) => serde_json::Value::String(s.clone()),

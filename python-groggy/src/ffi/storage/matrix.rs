@@ -90,6 +90,11 @@ impl PyGraphMatrix {
         Ok(Self { inner: matrix })
     }
 
+    /// Check whether the matrix contains any rows or columns
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
     /// Create a zero matrix with specified dimensions and type
     #[classmethod]
     fn zeros(
@@ -457,15 +462,34 @@ impl PyGraphMatrix {
         Py::new(py, PyGraphMatrix { inner: transposed })
     }
 
-    /// Matrix multiplication - multiply this matrix with another
-    /// Returns: new GraphMatrix that is the product of self * other
-    fn multiply(&self, py: Python, other: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
-        let result_matrix = self.inner.multiply(&other.inner).map_err(|e| {
-            PyRuntimeError::new_err(format!("Matrix multiplication failed: {:?}", e))
-        })?;
+    /// Matrix multiplication supporting either another matrix or a scalar factor
+    /// - When passed a GraphMatrix, performs matrix multiplication (self * other)
+    /// - When passed a numeric scalar, performs scalar multiplication
+    fn multiply(&self, py: Python, operand: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
+        // Attempt matrix multiplication first (matrix operand)
+        if let Ok(matrix_obj) = operand.extract::<Py<PyGraphMatrix>>() {
+            let matrix_ref = matrix_obj.borrow(py);
+            let result_matrix = self.inner.multiply(&matrix_ref.inner).map_err(|e| {
+                PyRuntimeError::new_err(format!("Matrix multiplication failed: {:?}", e))
+            })?;
 
-        let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
-        Py::new(py, py_result)
+            let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
+            return Py::new(py, py_result);
+        }
+
+        // Fallback: try scalar multiplication
+        if let Ok(scalar) = operand.extract::<f64>() {
+            let result_matrix = self.inner.scalar_multiply(scalar).map_err(|e| {
+                PyRuntimeError::new_err(format!("Scalar multiplication failed: {:?}", e))
+            })?;
+
+            let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
+            return Py::new(py, py_result);
+        }
+
+        Err(PyTypeError::new_err(
+            "GraphMatrix.multiply expects another GraphMatrix or a numeric scalar",
+        ))
     }
 
     /// Matrix inverse (Phase 5 - placeholder for now)
@@ -1071,38 +1095,18 @@ impl PyGraphMatrix {
     /// Matrix multiplication operator (@)
     /// Implements: matrix1 @ matrix2
     fn __matmul__(&self, py: Python, other: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
-        self.multiply(py, other)
+        let result_matrix = self.inner.multiply(&other.inner).map_err(|e| {
+            PyRuntimeError::new_err(format!("Matrix multiplication failed: {:?}", e))
+        })?;
+
+        let py_result = PyGraphMatrix::from_graph_matrix(result_matrix);
+        Py::new(py, py_result)
     }
 
     /// Matrix multiplication operator (*) 
     /// Implements: matrix1 * matrix2 (matrix multiplication, not element-wise)
     fn __mul__(&self, py: Python, other: &PyAny) -> PyResult<Py<PyGraphMatrix>> {
-        // Try scalar multiplication first
-        if let Ok(scalar) = other.extract::<f64>() {
-            let (rows, cols) = self.inner.shape();
-            
-            // Create arrays with scalar values
-            let mut arrays = Vec::new();
-            for _ in 0..cols {
-                arrays.push(groggy::storage::array::NumArray::new(vec![scalar; rows]));
-            }
-            
-            let scalar_matrix = groggy::storage::GraphMatrix::from_arrays(arrays)
-                .map_err(|e| PyRuntimeError::new_err(format!("Scalar multiplication failed: {:?}", e)))?;
-            
-            let result = self.inner.elementwise_multiply(&scalar_matrix).map_err(|e| 
-                PyRuntimeError::new_err(format!("Scalar multiplication failed: {:?}", e)))?;
-            
-            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
-        }
-        
-        // Try matrix multiplication
-        if let Ok(other_matrix) = other.extract::<PyRef<PyGraphMatrix>>() {
-            let result = &self.inner * &other_matrix.inner;
-            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
-        }
-        
-        Err(PyTypeError::new_err("Unsupported operand type for matrix multiplication"))
+        self.multiply(py, other)
     }
 
     /// Matrix addition operator (+)

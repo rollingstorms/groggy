@@ -2,7 +2,7 @@
 //!
 //! Handles WebSocket connections and bridges engine messages to clients.
 
-use crate::errors::{GraphResult};
+use crate::errors::GraphResult;
 use crate::viz::realtime::accessor::{ControlMsg, EngineSnapshot, EngineUpdate};
 use serde_json;
 use std::collections::HashMap;
@@ -51,7 +51,7 @@ pub struct TableDataWindow {
     pub rows: Vec<Vec<serde_json::Value>>,
     pub total_rows: usize,
     pub start_offset: usize,
-    pub data_type: String,  // "nodes" or "edges"
+    pub data_type: String, // "nodes" or "edges"
 }
 
 /// WebSocket bridge for managing client connections and message broadcasting
@@ -122,24 +122,33 @@ impl WsBridge {
                             // Debug message
                         }
                         "RequestTableData" => {
-                            use crate::viz::realtime::accessor::{TableDataType, SortColumn};
-                            let offset = obj.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                            let window_size = obj.get("window_size").and_then(|v| v.as_u64()).unwrap_or(100) as usize;
-                            let data_type_str = obj.get("data_type").and_then(|v| v.as_str()).unwrap_or("nodes");
+                            use crate::viz::realtime::accessor::{SortColumn, TableDataType};
+                            let offset =
+                                obj.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                            let window_size =
+                                obj.get("window_size")
+                                    .and_then(|v| v.as_u64())
+                                    .unwrap_or(100) as usize;
+                            let data_type_str = obj
+                                .get("data_type")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("nodes");
                             let data_type = match data_type_str {
                                 "edges" => TableDataType::Edges,
                                 _ => TableDataType::Nodes,
                             };
 
                             // Parse sort_columns array
-                            let sort_columns = obj.get("sort_columns")
+                            let sort_columns = obj
+                                .get("sort_columns")
                                 .and_then(|v| v.as_array())
                                 .map(|arr| {
                                     arr.iter()
                                         .filter_map(|item| {
                                             let obj = item.as_object()?;
                                             let column = obj.get("column")?.as_str()?.to_string();
-                                            let direction = obj.get("direction")?.as_str()?.to_string();
+                                            let direction =
+                                                obj.get("direction")?.as_str()?.to_string();
                                             Some(SortColumn { column, direction })
                                         })
                                         .collect()
@@ -228,53 +237,94 @@ impl WsBridge {
                 crate::types::AttrValue::Null => "null".to_string(),
                 crate::types::AttrValue::FloatVec(vec) => {
                     if vec.len() <= 10 {
-                        format!("[{}]", vec.iter().map(|f| format!("{:.2}", f)).collect::<Vec<_>>().join(", "))
+                        format!(
+                            "[{}]",
+                            vec.iter()
+                                .map(|f| format!("{:.2}", f))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
                     } else {
-                        format!("[{} values: {:.2}..{:.2}]", vec.len(), vec.first().unwrap_or(&0.0), vec.last().unwrap_or(&0.0))
+                        format!(
+                            "[{} values: {:.2}..{:.2}]",
+                            vec.len(),
+                            vec.first().unwrap_or(&0.0),
+                            vec.last().unwrap_or(&0.0)
+                        )
                     }
-                },
+                }
                 crate::types::AttrValue::IntVec(vec) => {
                     if vec.len() <= 10 {
-                        format!("[{}]", vec.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(", "))
+                        format!(
+                            "[{}]",
+                            vec.iter()
+                                .map(|i| i.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
                     } else {
-                        format!("[{} values: {}..{}]", vec.len(), vec.first().unwrap_or(&0), vec.last().unwrap_or(&0))
+                        format!(
+                            "[{} values: {}..{}]",
+                            vec.len(),
+                            vec.first().unwrap_or(&0),
+                            vec.last().unwrap_or(&0)
+                        )
                     }
-                },
+                }
                 crate::types::AttrValue::TextVec(vec) => {
                     if vec.len() <= 5 {
                         format!("[{}]", vec.join(", "))
                     } else {
-                        format!("[{} items: {}, ...]", vec.len(), vec.first().map(|s| s.as_str()).unwrap_or(""))
+                        format!(
+                            "[{} items: {}, ...]",
+                            vec.len(),
+                            vec.first().map(|s| s.as_str()).unwrap_or("")
+                        )
                     }
-                },
+                }
                 crate::types::AttrValue::BoolVec(vec) => {
                     let true_count = vec.iter().filter(|&&b| b).count();
-                    format!("[{} bools: {} true, {} false]", vec.len(), true_count, vec.len() - true_count)
-                },
+                    format!(
+                        "[{} bools: {} true, {} false]",
+                        vec.len(),
+                        true_count,
+                        vec.len() - true_count
+                    )
+                }
                 crate::types::AttrValue::SubgraphRef(id) => format!("Subgraph({})", id),
-                crate::types::AttrValue::NodeArray(arr) => format!("NodeArray({} nodes)", arr.len()),
-                crate::types::AttrValue::EdgeArray(arr) => format!("EdgeArray({} edges)", arr.len()),
+                crate::types::AttrValue::NodeArray(arr) => {
+                    format!("NodeArray({} nodes)", arr.len())
+                }
+                crate::types::AttrValue::EdgeArray(arr) => {
+                    format!("EdgeArray({} edges)", arr.len())
+                }
                 crate::types::AttrValue::Bytes(bytes) => format!("Bytes({} bytes)", bytes.len()),
                 crate::types::AttrValue::CompressedText(data) => {
                     let ratio = data.compression_ratio();
-                    format!("CompressedText({} bytes, {:.1}x compression)", data.data.len(), 1.0 / ratio)
-                },
+                    format!(
+                        "CompressedText({} bytes, {:.1}x compression)",
+                        data.data.len(),
+                        1.0 / ratio
+                    )
+                }
                 crate::types::AttrValue::CompressedFloatVec(data) => {
                     let ratio = data.compression_ratio();
-                    format!("CompressedFloatVec({} bytes, {:.1}x compression)", data.data.len(), 1.0 / ratio)
-                },
-                crate::types::AttrValue::Json(json) => {
-                    match serde_json::to_string(json) {
-                        Ok(json_str) => {
-                            if json_str.len() <= 100 {
-                                json_str
-                            } else {
-                                format!("JSON({} chars)", json_str.len())
-                            }
-                        }
-                        Err(_) => "JSON(parse error)".to_string(),
-                    }
+                    format!(
+                        "CompressedFloatVec({} bytes, {:.1}x compression)",
+                        data.data.len(),
+                        1.0 / ratio
+                    )
                 }
+                crate::types::AttrValue::Json(json) => match serde_json::to_string(json) {
+                    Ok(json_str) => {
+                        if json_str.len() <= 100 {
+                            json_str
+                        } else {
+                            format!("JSON({} chars)", json_str.len())
+                        }
+                    }
+                    Err(_) => "JSON(parse error)".to_string(),
+                },
             }
         };
 
@@ -392,7 +442,10 @@ impl WsBridge {
         let clients = self.clients.lock().await;
         if let Some(client_tx) = clients.get(&client_id) {
             client_tx.send(message).map_err(|e| {
-                crate::errors::GraphError::InvalidInput(format!("Failed to send to client {}: {}", client_id, e))
+                crate::errors::GraphError::InvalidInput(format!(
+                    "Failed to send to client {}: {}",
+                    client_id, e
+                ))
             })?;
         }
         Ok(())
@@ -407,7 +460,7 @@ impl WsBridge {
         // Debug message
 
         // Convert to WebSocket stream (skip handshake since we already did it)
-        use futures_util::{StreamExt};
+        use futures_util::StreamExt;
 
         let ws_stream = WebSocketStream::from_raw_socket(
             stream,

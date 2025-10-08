@@ -48,6 +48,7 @@ class APIMethodDiscovery:
                 return False
             
             print("Importing Groggy...")
+            sys.path.append("/Users/michaelroth/Documents/Code/groggy/")
             import groggy
             
             # Create sample data using the correct API patterns from PHASE_1_2_USAGE_EXAMPLE.py

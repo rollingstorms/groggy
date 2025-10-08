@@ -475,14 +475,12 @@ impl RealtimeServer {
                             content_type,
                             content.len()
                         );
-                        stream
-                            .write_all(header.as_bytes())
-                            .await
-                            .map_err(|e| io_error_to_graph_error(e, "write_http_response", "tcp_stream"))?;
-                        stream
-                            .write_all(content)
-                            .await
-                            .map_err(|e| io_error_to_graph_error(e, "write_http_response", "tcp_stream"))?;
+                        stream.write_all(header.as_bytes()).await.map_err(|e| {
+                            io_error_to_graph_error(e, "write_http_response", "tcp_stream")
+                        })?;
+                        stream.write_all(content).await.map_err(|e| {
+                            io_error_to_graph_error(e, "write_http_response", "tcp_stream")
+                        })?;
                         // ✅ DEBUG: Embedded static file {} served to {}
                     }
                     None => {
@@ -491,14 +489,12 @@ impl RealtimeServer {
                             "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: {}\r\n\r\n",
                             body.len()
                         );
-                        stream
-                            .write_all(header.as_bytes())
-                            .await
-                            .map_err(|e| io_error_to_graph_error(e, "write_http_response", "tcp_stream"))?;
-                        stream
-                            .write_all(body.as_bytes())
-                            .await
-                            .map_err(|e| io_error_to_graph_error(e, "write_http_response", "tcp_stream"))?;
+                        stream.write_all(header.as_bytes()).await.map_err(|e| {
+                            io_error_to_graph_error(e, "write_http_response", "tcp_stream")
+                        })?;
+                        stream.write_all(body.as_bytes()).await.map_err(|e| {
+                            io_error_to_graph_error(e, "write_http_response", "tcp_stream")
+                        })?;
                     }
                 }
             }
@@ -558,7 +554,7 @@ impl RealtimeServer {
                             format!("{{\"error\": \"Failed to serialize nodes: {}\"}}", e)
                         })
                     }
-                    None => "{\"error\": \"No snapshot available\"}".to_string()
+                    None => "{\"error\": \"No snapshot available\"}".to_string(),
                 };
 
                 let response = format!(
@@ -568,9 +564,10 @@ impl RealtimeServer {
                 );
 
                 let mut stream = buf_stream.into_inner();
-                stream.write_all(response.as_bytes()).await.map_err(|e| {
-                    io_error_to_graph_error(e, "write_debug_nodes", "tcp_stream")
-                })?;
+                stream
+                    .write_all(response.as_bytes())
+                    .await
+                    .map_err(|e| io_error_to_graph_error(e, "write_debug_nodes", "tcp_stream"))?;
             }
             ("GET", "/debug/edges") => {
                 // 🔍 DEBUG: Serving debug edges endpoint
@@ -582,7 +579,7 @@ impl RealtimeServer {
                             format!("{{\"error\": \"Failed to serialize edges: {}\"}}", e)
                         })
                     }
-                    None => "{\"error\": \"No snapshot available\"}".to_string()
+                    None => "{\"error\": \"No snapshot available\"}".to_string(),
                 };
 
                 let response = format!(
@@ -592,9 +589,10 @@ impl RealtimeServer {
                 );
 
                 let mut stream = buf_stream.into_inner();
-                stream.write_all(response.as_bytes()).await.map_err(|e| {
-                    io_error_to_graph_error(e, "write_debug_edges", "tcp_stream")
-                })?;
+                stream
+                    .write_all(response.as_bytes())
+                    .await
+                    .map_err(|e| io_error_to_graph_error(e, "write_debug_edges", "tcp_stream"))?;
             }
             ("GET", "/debug/snapshot") => {
                 // 🔍 DEBUG: Serving complete debug snapshot
@@ -762,7 +760,7 @@ impl RealtimeServer {
                             format!("{{\"error\": \"Failed to serialize snapshot: {}\"}}", e)
                         })
                     }
-                    None => "{\"error\": \"No snapshot available\"}".to_string()
+                    None => "{\"error\": \"No snapshot available\"}".to_string(),
                 };
 
                 let response = format!(
@@ -804,7 +802,6 @@ impl RealtimeServer {
         if let Some(ref accessor) = self.accessor {
             match accessor.initial_snapshot() {
                 Ok(snapshot) => {
-
                     // Create visualization engine with the snapshot data
                     let temp_graph = crate::api::graph::Graph::new();
                     let engine_config = RealTimeVizConfig::default();
@@ -1118,7 +1115,12 @@ impl RealtimeServer {
             ControlMsg::NodeDrag { event } => {
                 // 🖱️  DEBUG: Node drag event {:?}
             }
-            ControlMsg::RequestTableData { offset, window_size, data_type, sort_columns } => {
+            ControlMsg::RequestTableData {
+                offset,
+                window_size,
+                data_type,
+                sort_columns,
+            } => {
                 // 📊 DEBUG: Table data request: offset={}, window_size={}, type={:?}
             }
         }

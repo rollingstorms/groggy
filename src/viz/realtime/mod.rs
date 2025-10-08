@@ -13,20 +13,16 @@
 //! - Adaptive quality controls for performance optimization
 //! - Comprehensive monitoring and debugging capabilities
 
-use crate::errors::{};
 use crate::storage::matrix::GraphMatrix;
-use crate::viz::embeddings::{EmbeddingConfig};
+use crate::viz::embeddings::EmbeddingConfig;
 use crate::viz::projection::{
-    HoneycombConfig, InterpolationConfig, ProjectionConfig, ProjectionMethod,
-    QualityConfig,
+    HoneycombConfig, InterpolationConfig, ProjectionConfig, ProjectionMethod, QualityConfig,
 };
 use crate::viz::streaming::data_source::Position;
-use crate::viz::streaming::types::{};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
-use std::sync::{};
 use std::time::{Duration, Instant};
 
 pub mod accessor;
@@ -918,38 +914,66 @@ impl VizConfig {
     }
 
     /// Validate that array parameters have the correct length
-    pub fn validate_array_lengths(&self, node_count: usize, edge_count: usize) -> Result<(), String> {
+    pub fn validate_array_lengths(
+        &self,
+        node_count: usize,
+        edge_count: usize,
+    ) -> Result<(), String> {
         // Validate node-related arrays
         if let VizParameter::Array(arr) = &self.node_color {
             if arr.len() != node_count {
-                return Err(format!("node_color array length {} doesn't match node count {}", arr.len(), node_count));
+                return Err(format!(
+                    "node_color array length {} doesn't match node count {}",
+                    arr.len(),
+                    node_count
+                ));
             }
         }
         if let VizParameter::Array(arr) = &self.node_size {
             if arr.len() != node_count {
-                return Err(format!("node_size array length {} doesn't match node count {}", arr.len(), node_count));
+                return Err(format!(
+                    "node_size array length {} doesn't match node count {}",
+                    arr.len(),
+                    node_count
+                ));
             }
         }
         if let VizParameter::Array(arr) = &self.x {
             if arr.len() != node_count {
-                return Err(format!("x array length {} doesn't match node count {}", arr.len(), node_count));
+                return Err(format!(
+                    "x array length {} doesn't match node count {}",
+                    arr.len(),
+                    node_count
+                ));
             }
         }
         if let VizParameter::Array(arr) = &self.y {
             if arr.len() != node_count {
-                return Err(format!("y array length {} doesn't match node count {}", arr.len(), node_count));
+                return Err(format!(
+                    "y array length {} doesn't match node count {}",
+                    arr.len(),
+                    node_count
+                ));
             }
         }
 
         // Validate edge-related arrays
         if let VizParameter::Array(arr) = &self.edge_color {
             if arr.len() != edge_count {
-                return Err(format!("edge_color array length {} doesn't match edge count {}", arr.len(), edge_count));
+                return Err(format!(
+                    "edge_color array length {} doesn't match edge count {}",
+                    arr.len(),
+                    edge_count
+                ));
             }
         }
         if let VizParameter::Array(arr) = &self.edge_width {
             if arr.len() != edge_count {
-                return Err(format!("edge_width array length {} doesn't match edge count {}", arr.len(), edge_count));
+                return Err(format!(
+                    "edge_width array length {} doesn't match edge count {}",
+                    arr.len(),
+                    edge_count
+                ));
             }
         }
 

@@ -3,7 +3,7 @@
 # DO NOT EDIT MANUALLY - regenerate with: python scripts/generate_stubs.py
 
 from __future__ import annotations  # Enable forward references
-from typing import Any, List, Dict, Optional, Tuple, Union, Iterator
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
 # Module-level functions
 
@@ -282,6 +282,18 @@ class ArrayArray:
         """
         ...
 
+    def is_empty(self) -> bool:
+        """
+        Return whether the table contains any rows.
+        """
+        ...
+
+    def is_empty(self) -> bool:
+        """
+        Return whether the array contains any elements.
+        """
+        ...
+
     def __repr__(self) -> str:
         """
         Return repr(self).
@@ -516,6 +528,12 @@ class BaseArray:
         """
         ...
 
+    def contains(self, value: Any) -> bool:
+        """
+        Return whether the array contains the provided numeric value.
+        """
+        ...
+
     def __repr__(self) -> str:
         """
         Return repr(self).
@@ -528,10 +546,22 @@ class BaseArray:
         """
         ...
 
+    def to_list(self) -> List[Any]:
+        """
+        Return the array contents as a standard Python list.
+        """
+        ...
+
+    def contains(self, value: Any) -> bool:
+        """
+        Return whether the array contains the provided value.
+        """
+        ...
+
     def append(self, *args, **kwargs) -> Any:
         """
         Append a single element (standard Python method)
-        
+
         # Arguments
         * `element` - Value to append to the array
         
@@ -1977,7 +2007,7 @@ class BaseTable:
 
     def iter(self, *args, **kwargs) -> Any:
         """
-        Get table iterator for chaining
+        Return an iterator over table rows (alias for iter(table)).
         """
         ...
 
@@ -2880,6 +2910,26 @@ class ComponentsArray:
         """
         ...
 
+    def collapse(
+        self,
+        node_aggs: Optional[Any] = ...,
+        edge_aggs: Optional[Any] = ...,
+        edge_strategy: str = ...,
+        node_strategy: str = ...,
+        preset: Optional[str] = ...,
+        include_edge_count: bool = ...,
+        mark_entity_type: bool = ...,
+        entity_type: str = ...,
+        allow_missing_attributes: bool = ...,
+    ) -> List[MetaNode]:
+        """
+        Collapse each component into a MetaNode and add it to the graph.
+
+        Returns:
+            List[MetaNode]: meta-nodes generated from each connected component.
+        """
+        ...
+
     def filter(self, *args, **kwargs) -> Any:
         """
         Direct delegation: Apply filter to components
@@ -3393,6 +3443,12 @@ class EdgesAccessor:
     def viz(self) -> Any:
         """
         Get viz accessor for visualization operations
+        """
+        ...
+
+    def is_empty(self) -> bool:
+        """
+        Return whether both node and edge tables are empty.
         """
         ...
 
@@ -3966,7 +4022,7 @@ class EdgesTable:
 
     def iter(self, *args, **kwargs) -> Any:
         """
-        Get table iterator for chaining
+        Return an iterator over table rows (alias for iter(table)).
         """
         ...
 
@@ -4140,6 +4196,12 @@ class Graph:
     def nodes(self) -> NodesAccessor:
         """
         Get nodes accessor for fluent API (g.nodes property)
+        """
+        ...
+
+    def is_empty(self) -> bool:
+        """
+        Return whether the graph has no nodes and edges.
         """
         ...
 
@@ -4605,6 +4667,12 @@ class GraphMatrix:
         """
         ...
 
+    def is_empty(self) -> bool:
+        """
+        Return whether the matrix has no rows or columns.
+        """
+        ...
+
     def __eq__(self, other: Any) -> bool:
         """
         Return self==value.
@@ -4898,10 +4966,9 @@ class GraphMatrix:
         """
         ...
 
-    def multiply(self, *args, **kwargs) -> Any:
+    def multiply(self, other: Union["GraphMatrix", float, int]) -> "GraphMatrix":
         """
-        Matrix multiplication - multiply this matrix with another
-        Returns: new GraphMatrix that is the product of self * other
+        Multiply by another matrix (self * other) or scale by a numeric value.
         """
         ...
 
@@ -5310,21 +5377,10 @@ class GraphTable:
         """
         ...
 
-    def merge(self, *args, **kwargs) -> Any:
+    @staticmethod
+    def merge(tables: List["GraphTable"], strategy: str = ...) -> "GraphTable":
         """
-        Merge multiple GraphTables into one
-        """
-        ...
-
-    def merge_with(self, *args, **kwargs) -> Any:
-        """
-        Merge with another GraphTable
-        """
-        ...
-
-    def merge_with_strategy(self, *args, **kwargs) -> Any:
-        """
-        Merge with conflict resolution strategy
+        Merge multiple GraphTables using the specified conflict resolution strategy.
         """
         ...
 
@@ -7288,7 +7344,7 @@ class NodesTable:
 
     def iter(self, *args, **kwargs) -> Any:
         """
-        Get table iterator for chaining
+        Return an iterator over table rows (alias for iter(table)).
         """
         ...
 
@@ -8230,27 +8286,6 @@ class Subgraph:
         """
         ...
 
-    def collapse_to_node(self, *args, **kwargs) -> Any:
-        """
-        Collapse subgraph to a single node with aggregated attributes
-        """
-        ...
-
-    def collapse_to_node_with_defaults(self, *args, **kwargs) -> Any:
-        """
-        Collapse subgraph to a single node with enhanced missing attribute handling
-        
-        # Arguments
-        * `agg_functions` - Dictionary of {attribute_name: aggregation_function}
-        * `defaults` - Optional dictionary of {attribute_name: default_value} for missing attributes
-        
-        # Behavior  
-        * Errors by default when aggregating non-existent attributes (strict validation)
-        * Uses provided defaults for missing attributes when specified
-        * Count aggregation always works regardless of attribute existence
-        """
-        ...
-
     def connected_components(self, *args, **kwargs) -> ComponentsArray:
         """
         Get connected components within this subgraph (lazy array)
@@ -8448,9 +8483,17 @@ class Subgraph:
         """
         ...
 
-    def neighborhood(self, *args, **kwargs) -> Any:
+    def neighborhood(
+        self,
+        center_nodes: Union[int, Sequence[int], None] = ...,
+        hops: int = ...,
+    ) -> SubgraphArray:
         """
-        Compute neighborhoods from this subgraph, returning a PyNeighborhoodResult
+        Compute neighborhoods from this subgraph and return them as a `SubgraphArray`.
+
+        When `center_nodes` is `None`, the expansion seeds from all nodes in the
+        current subgraph. The parameter accepts either a single integer node id or
+        any sequence of integer node ids.
         """
         ...
 
@@ -8673,6 +8716,26 @@ class SubgraphArray:
     def collect(self, *args, **kwargs) -> Any:
         """
         Collect all subgraphs into a Python list (for compatibility with iterator patterns)
+        """
+        ...
+
+    def collapse(
+        self,
+        node_aggs: Optional[Any] = ...,
+        edge_aggs: Optional[Any] = ...,
+        edge_strategy: str = ...,
+        node_strategy: str = ...,
+        preset: Optional[str] = ...,
+        include_edge_count: bool = ...,
+        mark_entity_type: bool = ...,
+        entity_type: str = ...,
+        allow_missing_attributes: bool = ...,
+    ) -> List[MetaNode]:
+        """
+        Collapse every subgraph into a MetaNode and add it to the parent graph.
+
+        Returns:
+            List[MetaNode]: freshly materialized meta-nodes, one per input subgraph.
         """
         ...
 

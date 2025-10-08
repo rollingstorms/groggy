@@ -1318,6 +1318,10 @@ impl PyNodesAccessor {
     pub fn set_attrs_internal(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         use crate::ffi::api::graph_attributes::PyGraphAttrMut;
 
+        if attrs_dict.is_empty() {
+            return Err(PyValueError::new_err("attrs_dict is missing required attribute mappings"));
+        }
+
         // Normalize input so we always work with attribute-centric format:
         // {"attr": {node_id: value}}. Users can also pass
         // {node_id: {"attr": value}} and we'll adapt it here.
@@ -2436,14 +2440,8 @@ impl PyEdgesAccessor {
             graph.edge_ids()
         };
         
-        // Convert edge IDs to f64 for NumArray (better for numerical operations)
-        let values: Vec<f64> = edge_ids
-            .into_iter()
-            .map(|id| id as f64)
-            .collect();
-            
-        // Create NumArray for ID operations
-        Ok(PyNumArray::new(values))
+        let values: Vec<i64> = edge_ids.into_iter().map(|id| id as i64).collect();
+        Ok(PyNumArray::new_int64(values))
     }
 
     /// Get source node IDs for all edges
@@ -2466,9 +2464,8 @@ impl PyEdgesAccessor {
             graph.edge_sources()
         };
         
-        // Convert to f64 for NumArray consistency
-        let values: Vec<f64> = sources.into_iter().map(|id| id as f64).collect();
-        Ok(PyNumArray::new(values))
+        let values: Vec<i64> = sources.into_iter().map(|id| id as i64).collect();
+        Ok(PyNumArray::new_int64(values))
     }
 
     /// Get target node IDs for all edges  
@@ -2491,9 +2488,8 @@ impl PyEdgesAccessor {
             graph.edge_targets()
         };
         
-        // Convert to f64 for NumArray consistency
-        let values: Vec<f64> = targets.into_iter().map(|id| id as f64).collect();
-        Ok(PyNumArray::new(values))
+        let values: Vec<i64> = targets.into_iter().map(|id| id as i64).collect();
+        Ok(PyNumArray::new_int64(values))
     }
 
     /// Convert edge attributes to matrix
@@ -2797,6 +2793,10 @@ impl PyEdgesAccessor {
     /// Set attributes for multiple edges (bulk operation) - internal method callable from Rust
     pub fn set_attrs_internal(&self, py: Python, attrs_dict: &PyDict) -> PyResult<()> {
         use crate::ffi::api::graph_attributes::PyGraphAttrMut;
+
+        if attrs_dict.is_empty() {
+            return Err(PyValueError::new_err("attrs_dict is missing required attribute mappings"));
+        }
 
         // Create a mutable graph attributes handler
         let mut attr_handler = PyGraphAttrMut::new(self.graph.clone());

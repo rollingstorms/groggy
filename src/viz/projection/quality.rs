@@ -1,6 +1,6 @@
 //! Quality metrics and validation for projection systems
 
-use super::{QualityConfig};
+use super::QualityConfig;
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;

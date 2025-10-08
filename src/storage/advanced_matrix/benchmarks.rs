@@ -6,7 +6,7 @@
 use crate::storage::advanced_matrix::{
     backend::{BackendHint, BackendSelector, ComputeBackend, ComputeBackendExt, OperationType},
     numeric_type::{DType, NumericType},
-    unified_matrix::{MatrixError},
+    unified_matrix::MatrixError,
 };
 use std::collections::HashMap;
 use std::sync::Arc;

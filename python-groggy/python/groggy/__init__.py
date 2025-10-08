@@ -220,6 +220,9 @@ __all__ = [
 # for now we focus on the main graph structures
 
 # Widget auto-loading for production experience (like Plotly)
+# DISABLED: Auto-loading can cause JavaScript errors in some environments
+# Users can manually enable widgets if needed by calling:
+#   from groggy.widgets.widget_loader import auto_load_widget; auto_load_widget()
 def _setup_widget_environment():
     """Set up widget environment for seamless Jupyter integration."""
     try:
@@ -234,7 +237,7 @@ def _setup_widget_environment():
         pass
 
 # Auto-setup when groggy is imported (production-ready experience)
-_setup_widget_environment()
+# _setup_widget_environment()  # DISABLED - uncomment to enable auto-loading
 
 # Viz accessors are now implemented directly in Rust FFI
 

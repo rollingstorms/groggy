@@ -2,7 +2,7 @@
 
 use super::{EasingFunction, InterpolationConfig, InterpolationMethod};
 use crate::errors::{GraphError, GraphResult};
-use crate::viz::projection::honeycomb::{HoneycombGrid};
+use crate::viz::projection::honeycomb::HoneycombGrid;
 use crate::viz::streaming::data_source::Position;
 use std::collections::HashMap;
 

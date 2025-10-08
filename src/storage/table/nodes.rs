@@ -2,14 +2,15 @@
 
 use super::base::BaseTable;
 use super::base::InteractiveConfig;
-use super::traits::{Table, TableIterator};
+use super::traits::Table;
 use crate::errors::{GraphError, GraphResult};
-use crate::storage::array::{BaseArray};
+use crate::storage::array::BaseArray;
 use crate::types::{AttrValue, NodeId};
 use crate::viz::display::{ColumnSchema, DataType};
 use crate::viz::streaming::data_source::{
     DataSchema, DataSource, DataWindow, GraphEdge, GraphMetadata, GraphNode, LayoutAlgorithm,
-    NodePosition, Position, };
+    NodePosition, Position,
+};
 use crate::viz::VizModule;
 use std::collections::{HashMap, HashSet};
 
@@ -392,7 +393,9 @@ impl Table for NodesTable {
         agg_func: &str,
     ) -> GraphResult<Self> {
         Ok(Self {
-            base: self.base.pivot_table(index_cols, columns_col, values_col, agg_func)?,
+            base: self
+                .base
+                .pivot_table(index_cols, columns_col, values_col, agg_func)?,
         })
     }
 
@@ -406,10 +409,6 @@ impl Table for NodesTable {
         Ok(Self {
             base: self.base.melt(id_vars, value_vars, var_name, value_name)?,
         })
-    }
-
-    fn iter(&self) -> TableIterator<Self> {
-        TableIterator::new(self.clone())
     }
 }
 

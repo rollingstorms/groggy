@@ -4,7 +4,8 @@
 
 use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
 use crate::ffi::utils::graph_error_to_py_err;
-use groggy::traits::SubgraphOperations;
+use groggy::subgraphs::{NeighborhoodResult, NeighborhoodSubgraph};
+use groggy::traits::{NeighborhoodOperations, SubgraphOperations};
 use groggy::{AttrName, GraphError, NodeId};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -83,84 +84,85 @@ impl PyGraphAnalysis {
         let radius = radius.unwrap_or(1);
         let _max_nodes = max_nodes.unwrap_or(100);
 
+        let graph_handle = {
+            let graph = self.graph.borrow(py);
+            graph.inner.clone()
+        };
+
         // DELEGATION: Choose appropriate core method based on input parameters
-        let result =
-            {
-                match center_nodes.len() {
-                    0 => Err(GraphError::EmptyGraph {
-                        operation: "neighborhood: No center nodes provided".to_string(),
-                    }),
-                    1 => {
-                        let node_id = center_nodes[0];
-                        if radius == 1 {
-                            // Single node, 1-hop: use single_neighborhood
-                            let graph_ref = self.graph.borrow_mut(py);
-                            let result = graph_ref.inner.borrow_mut().neighborhood(node_id).map(
-                                |subgraph| {
-                                    let size = subgraph.node_set().len();
-                                    groggy::subgraphs::NeighborhoodResult {
-                                        neighborhoods: vec![subgraph],
-                                        total_neighborhoods: 1,
-                                        largest_neighborhood_size: size,
-                                        execution_time: std::time::Duration::from_millis(0),
-                                    }
-                                },
-                            );
-                            drop(graph_ref);
-                            result
-                        } else {
-                            // Single node, k-hop: use k_hop_neighborhood
-                            let graph_ref = self.graph.borrow_mut(py);
-                            let result = graph_ref
-                                .inner
-                                .borrow_mut()
-                                .k_hop_neighborhood(node_id, radius)
-                                .map(|subgraph| {
-                                    let size = subgraph.node_set().len();
-                                    groggy::subgraphs::NeighborhoodResult {
-                                        neighborhoods: vec![subgraph],
-                                        total_neighborhoods: 1,
-                                        largest_neighborhood_size: size,
-                                        execution_time: std::time::Duration::from_millis(0),
-                                    }
-                                });
-                            drop(graph_ref);
-                            result
+        let mut result = match center_nodes.len() {
+            0 => Err(GraphError::EmptyGraph {
+                operation: "neighborhood: No center nodes provided".to_string(),
+            }),
+            1 => {
+                let node_id = center_nodes[0];
+                if radius == 1 {
+                    let mut graph_mut = graph_handle.borrow_mut();
+                    let subgraph = graph_mut.neighborhood(node_id);
+                    drop(graph_mut);
+                    subgraph.map(|subgraph| {
+                        let size = subgraph.node_set().len();
+                        NeighborhoodResult {
+                            neighborhoods: vec![subgraph],
+                            total_neighborhoods: 1,
+                            largest_neighborhood_size: size,
+                            execution_time: std::time::Duration::from_millis(0),
                         }
-                    }
-                    _ => {
-                        if radius == 1 {
-                            // Multiple nodes, 1-hop: use multi_neighborhood
-                            let graph_ref = self.graph.borrow_mut(py);
-                            let result = graph_ref
-                                .inner
-                                .borrow_mut()
-                                .multi_neighborhood(&center_nodes);
-                            drop(graph_ref);
-                            result
-                        } else {
-                            // Multiple nodes, k-hop: use unified_neighborhood
-                            let graph_ref = self.graph.borrow_mut(py);
-                            let result = graph_ref
-                                .inner
-                                .borrow_mut()
-                                .unified_neighborhood(&center_nodes, radius)
-                                .map(|subgraph| {
-                                    let size = subgraph.node_set().len();
-                                    groggy::subgraphs::NeighborhoodResult {
-                                        neighborhoods: vec![subgraph],
-                                        total_neighborhoods: 1,
-                                        largest_neighborhood_size: size,
-                                        execution_time: std::time::Duration::from_millis(0),
-                                    }
-                                });
-                            drop(graph_ref);
-                            result
+                    })
+                } else {
+                    let mut graph_mut = graph_handle.borrow_mut();
+                    let subgraph = graph_mut.k_hop_neighborhood(node_id, radius);
+                    drop(graph_mut);
+                    subgraph.map(|subgraph| {
+                        let size = subgraph.node_set().len();
+                        NeighborhoodResult {
+                            neighborhoods: vec![subgraph],
+                            total_neighborhoods: 1,
+                            largest_neighborhood_size: size,
+                            execution_time: std::time::Duration::from_millis(0),
                         }
-                    }
+                    })
                 }
-                .map_err(graph_error_to_py_err)
-            }?;
+            }
+            _ => {
+                if radius == 1 {
+                    let mut graph_mut = graph_handle.borrow_mut();
+                    let result = graph_mut.multi_neighborhood(&center_nodes);
+                    drop(graph_mut);
+                    result
+                } else {
+                    let mut graph_mut = graph_handle.borrow_mut();
+                    let subgraph = graph_mut.unified_neighborhood(&center_nodes, radius);
+                    drop(graph_mut);
+                    subgraph.map(|subgraph| {
+                        let size = subgraph.node_set().len();
+                        NeighborhoodResult {
+                            neighborhoods: vec![subgraph],
+                            total_neighborhoods: 1,
+                            largest_neighborhood_size: size,
+                            execution_time: std::time::Duration::from_millis(0),
+                        }
+                    })
+                }
+            }
+        }
+        .map_err(graph_error_to_py_err)?;
+
+        // Rehydrate neighborhoods so their graph references point at the live graph handle
+        let neighborhoods = result
+            .neighborhoods
+            .into_iter()
+            .map(|neighborhood| {
+                NeighborhoodSubgraph::from_stored(
+                    graph_handle.clone(),
+                    neighborhood.node_set().clone(),
+                    neighborhood.edge_set().clone(),
+                    neighborhood.central_nodes().to_vec(),
+                    neighborhood.hops(),
+                )
+            })
+            .collect();
+        result.neighborhoods = neighborhoods;
 
         Ok(PyNeighborhoodResult { inner: result })
     }

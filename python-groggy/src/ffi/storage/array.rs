@@ -58,7 +58,27 @@ impl PyBaseArray {
     fn __len__(&self) -> usize {
         self.inner.len()
     }
-    
+
+    /// Check whether the array contains any elements
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Check whether the array contains the provided value
+    fn contains(&self, item: &PyAny) -> PyResult<bool> {
+        let attr_value = python_value_to_attr_value(item)?;
+        Ok(self.inner.contains(&attr_value))
+    }
+
+    /// Convert the array to a plain Python list
+    fn to_list(&self, py: Python) -> PyResult<Vec<PyObject>> {
+        let mut items = Vec::with_capacity(self.inner.len());
+        for value in self.inner.iter() {
+            items.push(attr_value_to_python_value(py, value)?);
+        }
+        Ok(items)
+    }
+
     /// Advanced index access supporting multiple indexing types
     /// Supports: 
     /// - Single integer: array[5], array[-1]
@@ -127,7 +147,7 @@ impl PyBaseArray {
         };
         
         format!(
-            "BaseArray[{}] {} (dtype: {})\n💡 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
+            "BaseArray[{}] {} (dtype: {})",
             len, preview, dtype
         )
     }
@@ -1769,7 +1789,7 @@ impl PyNodesArray {
         };
         
         format!(
-            "NodesArray[{}] {} node_ids\n💡 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
+            "NodesArray[{}] {} node_ids",
             len, preview
         )
     }
@@ -1920,7 +1940,7 @@ impl PyEdgesArray {
         };
         
         format!(
-            "EdgesArray[{}] {} edge_ids\n💡 Use .interactive() for rich table view or .interactive_embed() for Jupyter",
+            "EdgesArray[{}] {} edge_ids",
             len, preview
         )
     }

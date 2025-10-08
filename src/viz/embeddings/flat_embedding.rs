@@ -12,9 +12,7 @@
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::{
-    neural::autodiff::{AutoDiffTensor},
-    operations::MatrixOperations,
-    unified_matrix::UnifiedMatrix,
+    neural::autodiff::AutoDiffTensor, operations::MatrixOperations, unified_matrix::UnifiedMatrix,
 };
 use crate::storage::matrix::GraphMatrix;
 use crate::viz::streaming::data_source::Position;

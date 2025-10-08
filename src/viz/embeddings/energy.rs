@@ -8,8 +8,7 @@ use super::{EmbeddingEngine, EnergyFunction};
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::advanced_matrix::{
-    neural::autodiff::{AutoDiffTensor},
-    unified_matrix::UnifiedMatrix,
+    neural::autodiff::AutoDiffTensor, unified_matrix::UnifiedMatrix,
 };
 use crate::storage::matrix::GraphMatrix;
 use crate::types::NodeId;

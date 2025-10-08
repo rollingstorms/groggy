@@ -423,10 +423,12 @@ impl Ord for AttrValue {
                 Ordering::Equal
             }),
             (Bytes(a), Bytes(b)) => a.cmp(b),
-            (CompressedText(a), CompressedText(b)) => match (a.decompress_text(), b.decompress_text()) {
-                (Ok(lhs), Ok(rhs)) => AttrValue::cmp_text_content(lhs.as_str(), rhs.as_str()),
-                _ => a.data.cmp(&b.data),
-            },
+            (CompressedText(a), CompressedText(b)) => {
+                match (a.decompress_text(), b.decompress_text()) {
+                    (Ok(lhs), Ok(rhs)) => AttrValue::cmp_text_content(lhs.as_str(), rhs.as_str()),
+                    _ => a.data.cmp(&b.data),
+                }
+            }
             (CompressedFloatVec(a), CompressedFloatVec(b)) => a.data.cmp(&b.data),
 
             // Cross-type comparisons - order by type discriminant first

@@ -4,7 +4,7 @@
 //! of the graph Laplacian to embed nodes in high-dimensional space while
 //! preserving graph structure.
 
-use super::{EmbeddingEngine};
+use super::EmbeddingEngine;
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;

@@ -6,7 +6,6 @@
 use crate::api::graph::Graph;
 use crate::errors::GraphResult;
 use crate::storage::matrix::GraphMatrix;
-use crate::types::{};
 
 pub mod debug;
 pub mod energy;

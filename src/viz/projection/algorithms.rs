@@ -1,6 +1,6 @@
 //! Projection algorithms for mapping high-dimensional embeddings to 2D coordinates
 
-use super::{ProjectionEngine};
+use super::ProjectionEngine;
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;

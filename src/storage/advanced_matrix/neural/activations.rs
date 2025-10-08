@@ -4,11 +4,11 @@
 //! activation functions with automatic SIMD vectorization and differentiation support.
 
 use crate::storage::advanced_matrix::{
-    backend::{OperationType},
+    backend::OperationType,
     numeric_type::NumericType,
     unified_matrix::{MatrixError, MatrixResult, UnifiedMatrix},
 };
-use std::f64::consts::{PI};
+use std::f64::consts::PI;
 
 /// Trait for activation functions with forward and backward passes
 pub trait ActivationFunction<T: NumericType> {

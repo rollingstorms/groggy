@@ -4,15 +4,16 @@
 //! This replaces the 800+ line complex version with pure delegation to existing trait methods.
 
 use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
+use crate::ffi::storage::subgraph_array::PySubgraphArray;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
 use groggy::subgraphs::Subgraph;
-use groggy::traits::{SubgraphOperations, GraphEntity};
+use groggy::traits::{NeighborhoodOperations, SubgraphOperations, GraphEntity};
 use groggy::{AttrValue, EdgeId, NodeId, SimilarityMetric};
 use groggy::storage::array::BaseArray;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 // Import FFI types we need to preserve compatibility
 use crate::ffi::api::graph::PyGraph;
@@ -21,6 +22,7 @@ use crate::ffi::storage::array::PyBaseArray;
 use crate::PyNumArray;
 use crate::ffi::storage::components::PyComponentsArray;
 use crate::ffi::viz_accessor::VizAccessor;
+use crate::ffi::utils::python_value_to_attr_value;
 // use crate::ffi::storage::table::PyBaseTable; // Temporarily disabled
 
 /// Python wrapper for core Subgraph - Pure delegation to existing trait methods
@@ -838,16 +840,42 @@ impl PySubgraph {
         ))
     }
 
-    /// Compute neighborhoods from this subgraph, returning a PyNeighborhoodResult
+    /// Compute neighborhoods from this subgraph and return them as a SubgraphArray
+    #[pyo3(signature = (center_nodes = None, hops = 1))]
     pub fn neighborhood(
         &self,
         py: Python,
-        central_nodes: Vec<NodeId>,
+        center_nodes: Option<&PyAny>,
         hops: usize,
-    ) -> PyResult<PyNeighborhoodResult> {
+    ) -> PyResult<PySubgraphArray> {
         // Just wrap the graph_analysis version - create a temporary PyGraph from our core graph
         use crate::ffi::api::graph::PyGraph;
         use crate::ffi::api::graph_analysis::PyGraphAnalysis;
+
+        // Normalize central node identifiers into a Vec<NodeId>
+        let central_nodes_vec = match center_nodes {
+            Some(arg) => {
+                if let Ok(single) = arg.extract::<NodeId>() {
+                    vec![single]
+                } else if let Ok(many) = arg.extract::<Vec<NodeId>>() {
+                    many
+                } else {
+                    let seq = arg.iter()?;
+                    let mut nodes = Vec::new();
+                    for item in seq {
+                        nodes.push(item?.extract::<NodeId>()?);
+                    }
+                    nodes
+                }
+            }
+            None => self.inner.node_set().iter().copied().collect(),
+        };
+
+        if central_nodes_vec.is_empty() {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "neighborhood() requires at least one center node",
+            ));
+        }
 
         // Create a temporary PyGraph wrapper
         let py_graph = PyGraph {
@@ -857,7 +885,23 @@ impl PySubgraph {
 
         // Create PyGraphAnalysis and delegate to it
         let mut analysis_handler = PyGraphAnalysis::new(Py::new(py, py_graph)?)?;
-        analysis_handler.neighborhood(py, central_nodes, Some(hops), None)
+        let result = analysis_handler.neighborhood(py, central_nodes_vec, Some(hops), None)?;
+        let PyNeighborhoodResult { inner } = result;
+        let neighborhoods = inner.neighborhoods;
+
+        // Convert the NeighborhoodResult into a SubgraphArray for Python consumption
+        let mut subgraphs = Vec::with_capacity(neighborhoods.len());
+        for neighborhood in neighborhoods.into_iter() {
+            let core_subgraph = groggy::subgraphs::Subgraph::new(
+                neighborhood.graph_ref(),
+                neighborhood.node_set().clone(),
+                neighborhood.edge_set().clone(),
+                format!("neighborhood_hops_{}", neighborhood.hops()),
+            );
+            subgraphs.push(PySubgraph::from_core_subgraph(core_subgraph)?);
+        }
+
+        Ok(PySubgraphArray::new(subgraphs))
     }
 
     /// Sample k nodes from this subgraph randomly
@@ -1179,86 +1223,6 @@ impl PySubgraph {
         ))
     }
 
-    /// Collapse subgraph to a single node with aggregated attributes
-    fn collapse_to_node(&self, _py: Python, agg_functions: &pyo3::types::PyDict) -> PyResult<NodeId> {
-        self.collapse_to_node_with_defaults(_py, agg_functions, None)
-    }
-
-    /// Collapse subgraph to a single node with enhanced missing attribute handling
-    /// 
-    /// # Arguments
-    /// * `agg_functions` - Dictionary of {attribute_name: aggregation_function}
-    /// * `defaults` - Optional dictionary of {attribute_name: default_value} for missing attributes
-    /// 
-    /// # Behavior  
-    /// * Errors by default when aggregating non-existent attributes (strict validation)
-    /// * Uses provided defaults for missing attributes when specified
-    /// * Count aggregation always works regardless of attribute existence
-    fn collapse_to_node_with_defaults(
-        &self, 
-        _py: Python, 
-        agg_functions: &pyo3::types::PyDict,
-        defaults: Option<&pyo3::types::PyDict>
-    ) -> PyResult<NodeId> {
-        use crate::ffi::subgraphs::hierarchical::parse_aggregation_functions;
-        
-        // Convert Python dict to HashMap<String, String> for compatibility
-        let mut agg_strings = HashMap::new();
-        for (key, value) in agg_functions {
-            let attr_name = key.extract::<String>()?;
-            let func_str = if let Ok(s) = value.extract::<String>() {
-                s
-            } else {
-                return Err(pyo3::exceptions::PyTypeError::new_err(
-                    "Aggregation function must be a string"
-                ));
-            };
-            agg_strings.insert(attr_name, func_str);
-        }
-
-        // Convert defaults dict if provided
-        let defaults_map = if let Some(defaults_dict) = defaults {
-            let mut defaults_map = HashMap::new();
-            for (key, value) in defaults_dict {
-                let attr_name = key.extract::<String>()?;
-                // Convert Python value to AttrValue using the same logic as PyAttrValue::py_new
-                let attr_value = if let Ok(b) = value.extract::<bool>() {
-                    AttrValue::Bool(b)
-                } else if let Ok(i) = value.extract::<i64>() {
-                    AttrValue::Int(i)
-                } else if let Ok(f) = value.extract::<f64>() {
-                    AttrValue::Float(f as f32)
-                } else if let Ok(f) = value.extract::<f32>() {
-                    AttrValue::Float(f)
-                } else if let Ok(s) = value.extract::<String>() {
-                    AttrValue::Text(s)
-                } else if let Ok(vec) = value.extract::<Vec<f32>>() {
-                    AttrValue::FloatVec(vec)
-                } else if let Ok(vec) = value.extract::<Vec<f64>>() {
-                    let f32_vec: Vec<f32> = vec.into_iter().map(|f| f as f32).collect();
-                    AttrValue::FloatVec(f32_vec)
-                } else if let Ok(bytes) = value.extract::<Vec<u8>>() {
-                    AttrValue::Bytes(bytes)
-                } else {
-                    return Err(pyo3::exceptions::PyTypeError::new_err(
-                        "Unsupported default value type. Supported: int, float, str, bool, List[float], bytes"
-                    ));
-                };
-                defaults_map.insert(attr_name.into(), attr_value);
-            }
-            defaults_map
-        } else {
-            HashMap::new()
-        };
-
-        match self.inner.collapse_to_node_with_defaults(agg_strings, defaults_map) {
-            Ok(node_id) => Ok(node_id),
-            Err(e) => Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
-                "Failed to collapse subgraph: {}", e
-            ))),
-        }
-    }
-
     /// Enhanced collapse supporting three syntax forms for flexible aggregation
     /// 
     /// # Supported Syntax Forms:
@@ -1370,7 +1334,7 @@ impl PySubgraph {
         entity_type = "meta",
         allow_missing_attributes = true
     ))]
-    fn collapse(
+    pub fn collapse(
         &self,
         py: Python,
         node_aggs: Option<&PyAny>,
@@ -1425,11 +1389,9 @@ impl PySubgraph {
         
         // Execute using appropriate method based on allow_missing_attributes
         let meta_node = if allow_missing_attributes {
-            // Use collapse_to_node_with_defaults - allows missing attributes
             plan.add_to_graph_with_defaults(&self.inner)
                 .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e)))?
         } else {
-            // Use strict collapse_to_node_with_edge_config - fails on missing attributes
             plan.add_to_graph(&self.inner)
                 .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create meta-node: {}", e)))?
         };

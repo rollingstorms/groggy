@@ -122,6 +122,43 @@ impl NumericArrayData {
             },
         }
     }
+
+    /// Check whether the array contains the provided value
+    fn contains_py(&self, item: &PyAny) -> PyResult<bool> {
+        match self {
+            NumericArrayData::Bool(arr) => {
+                let value = item.extract::<bool>()?;
+                Ok(arr.iter().copied().any(|candidate| candidate == value))
+            }
+            NumericArrayData::Int32(arr) => {
+                let raw = item.extract::<i64>()?;
+                let value = i32::try_from(raw).map_err(|_| {
+                    pyo3::exceptions::PyValueError::new_err(format!(
+                        "Value {} out of range for int32", raw
+                    ))
+                })?;
+                Ok(arr.iter().copied().any(|candidate| candidate == value))
+            }
+            NumericArrayData::Int64(arr) => {
+                let value = item.extract::<i64>()?;
+                Ok(arr.iter().copied().any(|candidate| candidate == value))
+            }
+            NumericArrayData::Float32(arr) => {
+                let value = item.extract::<f64>()? as f32;
+                Ok(arr
+                    .iter()
+                    .copied()
+                    .any(|candidate| (candidate - value).abs() <= f32::EPSILON))
+            }
+            NumericArrayData::Float64(arr) => {
+                let value = item.extract::<f64>()?;
+                Ok(arr
+                    .iter()
+                    .copied()
+                    .any(|candidate| (candidate - value).abs() <= f64::EPSILON))
+            }
+        }
+    }
 }
 
 impl PyNumArray {
@@ -445,7 +482,12 @@ impl PyNumArray {
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
-    
+
+    /// Check whether the array contains the provided value
+    fn contains(&self, item: &PyAny) -> PyResult<bool> {
+        self.inner.contains_py(item)
+    }
+
     /// Get element at index or perform advanced indexing
     fn __getitem__(&self, py: Python, index: &PyAny) -> PyResult<PyObject> {
         use groggy::storage::array::AdvancedIndexing;

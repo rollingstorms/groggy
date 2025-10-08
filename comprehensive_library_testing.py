@@ -20,6 +20,8 @@ from collections import defaultdict
 sys.path.append('python')
 sys.path.append('documentation/meta_api_discovery')
 
+# Add groggy root directory to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     import groggy as gr
     from api_meta_graph_extractor import APIMetaGraphExtractor

@@ -357,7 +357,7 @@ class TestGraphQueries:
             if attr_names:
                 # Try accessing the first available attribute
                 first_attr = attr_names[0]
-                attr_values = attributed_graph.view()[first_attr]
+                attr_values = attributed_graph[first_attr]
                 assert attr_values is not None
                 # Should return some kind of array or accessor
                 assert hasattr(attr_values, '__len__') or hasattr(attr_values, '__iter__')

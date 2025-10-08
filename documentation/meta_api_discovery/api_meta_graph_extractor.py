@@ -9,7 +9,8 @@ to extract the essential meta-graph structure:
 
 This replaces the complex 3-step process with a single focused extraction.
 """
-
+import sys
+sys.path.append("/Users/michaelroth/Documents/Code/groggy/")
 import groggy
 import inspect
 import re

@@ -17,4 +17,4 @@ pub use graph_table::{
 };
 pub use nodes::NodesTable;
 pub use table_array::TableArray;
-pub use traits::{Table, TableIterator, TableOperation};
+pub use traits::{Table, TableRow, TableRowIterator};

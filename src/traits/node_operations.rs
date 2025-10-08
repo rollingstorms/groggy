@@ -239,8 +239,9 @@ pub trait NodeOperations: GraphEntity {
     fn neighborhood(&self, hops: usize) -> GraphResult<Box<dyn SubgraphOperations>> {
         // Use existing NeighborhoodSampler for efficient neighborhood expansion (same as EntityNode)
         let binding = self.graph_ref();
-        let graph = binding.borrow_mut();
         let mut neighborhood_sampler = crate::subgraphs::neighborhood::NeighborhoodSampler::new();
+        neighborhood_sampler.set_graph_ref(&binding);
+        let graph = binding.borrow_mut();
         let result = neighborhood_sampler.unified_neighborhood(
             &graph.pool(),
             graph.space(),

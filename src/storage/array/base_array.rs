@@ -772,50 +772,68 @@ impl BaseArray<AttrValue> {
         Ok(sum_squared_diff / (count - 1) as f64)
     }
 
-    /// Find minimum value in the array
+    /// Find minimum value in the array (numeric only)
     pub fn min(&self) -> crate::errors::GraphResult<AttrValue> {
-        let mut min_val: Option<AttrValue> = None;
+        let mut min_val: Option<(AttrValue, f64)> = None;
 
         for val in self.inner.iter() {
-            match val {
-                AttrValue::Null => continue, // Skip null values
-                _ => match &min_val {
-                    None => min_val = Some(val.clone()),
-                    Some(current_min) => {
-                        if Self::compare_values(val, current_min)? < 0 {
-                            min_val = Some(val.clone());
-                        }
-                    }
-                },
+            if matches!(val, AttrValue::Null) {
+                continue;
+            }
+
+            let numeric = match Self::extract_numeric(val) {
+                Some(value) => value,
+                None => {
+                    return Err(crate::errors::GraphError::InvalidInput(format!(
+                        "Cannot compute min of non-numeric data type: {:?}",
+                        val
+                    )));
+                }
+            };
+
+            match &mut min_val {
+                Some((_current_attr, current_numeric)) if numeric >= *current_numeric => {}
+                _ => {
+                    min_val = Some((val.clone(), numeric));
+                }
             }
         }
 
-        min_val.ok_or_else(|| {
+        min_val.map(|(value, _)| value).ok_or_else(|| {
             crate::errors::GraphError::InvalidInput(
                 "Cannot find minimum of empty array".to_string(),
             )
         })
     }
 
-    /// Find maximum value in the array
+    /// Find maximum value in the array (numeric only)
     pub fn max(&self) -> crate::errors::GraphResult<AttrValue> {
-        let mut max_val: Option<AttrValue> = None;
+        let mut max_val: Option<(AttrValue, f64)> = None;
 
         for val in self.inner.iter() {
-            match val {
-                AttrValue::Null => continue, // Skip null values
-                _ => match &max_val {
-                    None => max_val = Some(val.clone()),
-                    Some(current_max) => {
-                        if Self::compare_values(val, current_max)? > 0 {
-                            max_val = Some(val.clone());
-                        }
-                    }
-                },
+            if matches!(val, AttrValue::Null) {
+                continue;
+            }
+
+            let numeric = match Self::extract_numeric(val) {
+                Some(value) => value,
+                None => {
+                    return Err(crate::errors::GraphError::InvalidInput(format!(
+                        "Cannot compute max of non-numeric data type: {:?}",
+                        val
+                    )));
+                }
+            };
+
+            match &mut max_val {
+                Some((_current_attr, current_numeric)) if numeric <= *current_numeric => {}
+                _ => {
+                    max_val = Some((val.clone(), numeric));
+                }
             }
         }
 
-        max_val.ok_or_else(|| {
+        max_val.map(|(value, _)| value).ok_or_else(|| {
             crate::errors::GraphError::InvalidInput(
                 "Cannot find maximum of empty array".to_string(),
             )
@@ -892,6 +910,16 @@ impl BaseArray<AttrValue> {
             Ordering::Equal => 0,
             Ordering::Greater => 1,
         })
+    }
+
+    /// Extract a numeric value for comparison-based operations
+    fn extract_numeric(value: &AttrValue) -> Option<f64> {
+        match value {
+            AttrValue::Int(i) => Some(*i as f64),
+            AttrValue::SmallInt(i) => Some(*i as f64),
+            AttrValue::Float(f) => Some(*f as f64),
+            _ => None,
+        }
     }
 
     /// Detect missing/null values in the array
@@ -1048,10 +1076,10 @@ impl BaseArray<AttrValue> {
         &self,
         sort: bool,
         ascending: bool,
-        dropna: bool
+        dropna: bool,
     ) -> crate::errors::GraphResult<crate::storage::table::BaseTable> {
-        use std::collections::HashMap;
         use crate::types::AttrValue;
+        use std::collections::HashMap;
 
         // Count frequencies
         let mut counts: HashMap<String, (AttrValue, usize)> = HashMap::new();
@@ -1095,7 +1123,7 @@ impl BaseArray<AttrValue> {
 
         let table = crate::storage::table::BaseTable::with_column_order(
             columns,
-            vec!["value".to_string(), "count".to_string()]
+            vec!["value".to_string(), "count".to_string()],
         )?;
 
         Ok(table)
@@ -1133,10 +1161,7 @@ impl BaseArray<AttrValue> {
     where
         F: Fn(&AttrValue) -> AttrValue,
     {
-        let transformed_data: Vec<AttrValue> = self.inner
-            .iter()
-            .map(|value| func(value))
-            .collect();
+        let transformed_data: Vec<AttrValue> = self.inner.iter().map(|value| func(value)).collect();
 
         BaseArray::from_attr_values(transformed_data)
     }
@@ -1169,7 +1194,7 @@ impl BaseArray<AttrValue> {
     pub fn quantile(&self, q: f64, interpolation: &str) -> crate::errors::GraphResult<AttrValue> {
         if q < 0.0 || q > 1.0 {
             return Err(crate::errors::GraphError::InvalidInput(
-                "Quantile must be between 0.0 and 1.0".to_string()
+                "Quantile must be between 0.0 and 1.0".to_string(),
             ));
         }
 
@@ -1181,7 +1206,7 @@ impl BaseArray<AttrValue> {
                 AttrValue::SmallInt(i) => numeric_values.push(*i as f64),
                 AttrValue::Float(f) => numeric_values.push(*f as f64),
                 AttrValue::Null => continue, // Skip nulls
-                _ => continue, // Skip non-numeric values
+                _ => continue,               // Skip non-numeric values
             }
         }
 
@@ -1231,9 +1256,12 @@ impl BaseArray<AttrValue> {
                     numeric_values[upper_index]
                 }
             }
-            _ => return Err(crate::errors::GraphError::InvalidInput(
-                format!("Invalid interpolation method: {}", interpolation)
-            ))
+            _ => {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Invalid interpolation method: {}",
+                    interpolation
+                )))
+            }
         };
 
         Ok(AttrValue::Float(result as f32))
@@ -1247,7 +1275,11 @@ impl BaseArray<AttrValue> {
     ///
     /// # Returns
     /// BaseArray containing the computed quantiles
-    pub fn quantiles(&self, quantiles: &[f64], interpolation: &str) -> crate::errors::GraphResult<BaseArray<AttrValue>> {
+    pub fn quantiles(
+        &self,
+        quantiles: &[f64],
+        interpolation: &str,
+    ) -> crate::errors::GraphResult<BaseArray<AttrValue>> {
         let mut results = Vec::with_capacity(quantiles.len());
 
         for &q in quantiles {
@@ -1269,10 +1301,14 @@ impl BaseArray<AttrValue> {
     /// let median = array.percentile(50.0, "linear")?; // 50th percentile = median
     /// let quartiles = array.percentiles(&[25.0, 50.0, 75.0], "linear")?;
     /// ```
-    pub fn get_percentile(&self, percentile: f64, interpolation: &str) -> crate::errors::GraphResult<AttrValue> {
+    pub fn get_percentile(
+        &self,
+        percentile: f64,
+        interpolation: &str,
+    ) -> crate::errors::GraphResult<AttrValue> {
         if percentile < 0.0 || percentile > 100.0 {
             return Err(crate::errors::GraphError::InvalidInput(
-                "Percentile must be between 0.0 and 100.0".to_string()
+                "Percentile must be between 0.0 and 100.0".to_string(),
             ));
         }
 
@@ -1280,13 +1316,18 @@ impl BaseArray<AttrValue> {
     }
 
     /// Compute multiple percentiles for the array
-    pub fn percentiles(&self, percentiles: &[f64], interpolation: &str) -> crate::errors::GraphResult<BaseArray<AttrValue>> {
+    pub fn percentiles(
+        &self,
+        percentiles: &[f64],
+        interpolation: &str,
+    ) -> crate::errors::GraphResult<BaseArray<AttrValue>> {
         // Validate all percentiles first
         for &p in percentiles {
             if p < 0.0 || p > 100.0 {
-                return Err(crate::errors::GraphError::InvalidInput(
-                    format!("Percentile {} must be between 0.0 and 100.0", p)
-                ));
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Percentile {} must be between 0.0 and 100.0",
+                    p
+                )));
             }
         }
 
@@ -1319,7 +1360,11 @@ impl BaseArray<AttrValue> {
     /// // Perfect positive correlation
     /// let corr = array1.corr(&array2, "pearson")?; // AttrValue::Float(1.0)
     /// ```
-    pub fn corr(&self, other: &BaseArray<AttrValue>, method: &str) -> crate::errors::GraphResult<AttrValue> {
+    pub fn corr(
+        &self,
+        other: &BaseArray<AttrValue>,
+        method: &str,
+    ) -> crate::errors::GraphResult<AttrValue> {
         // Extract numeric values from both arrays, filtering out non-numeric and null values
         let mut values1: Vec<f64> = Vec::new();
         let mut values2: Vec<f64> = Vec::new();
@@ -1368,9 +1413,12 @@ impl BaseArray<AttrValue> {
                 // Kendall's tau correlation
                 self.kendall_correlation(&values1, &values2)?
             }
-            _ => return Err(crate::errors::GraphError::InvalidInput(
-                format!("Invalid correlation method: {}. Use 'pearson', 'spearman', or 'kendall'", method)
-            ))
+            _ => {
+                return Err(crate::errors::GraphError::InvalidInput(format!(
+                    "Invalid correlation method: {}. Use 'pearson', 'spearman', or 'kendall'",
+                    method
+                )))
+            }
         };
 
         Ok(AttrValue::Float(correlation as f32))
@@ -1390,7 +1438,11 @@ impl BaseArray<AttrValue> {
     /// let cov = array1.cov(&array2, 1)?; // Sample covariance
     /// let cov_pop = array1.cov(&array2, 0)?; // Population covariance
     /// ```
-    pub fn cov(&self, other: &BaseArray<AttrValue>, ddof: i32) -> crate::errors::GraphResult<AttrValue> {
+    pub fn cov(
+        &self,
+        other: &BaseArray<AttrValue>,
+        ddof: i32,
+    ) -> crate::errors::GraphResult<AttrValue> {
         // Extract numeric values from both arrays
         let mut values1: Vec<f64> = Vec::new();
         let mut values2: Vec<f64> = Vec::new();
@@ -1432,10 +1484,12 @@ impl BaseArray<AttrValue> {
         let mean2: f64 = values2.iter().sum::<f64>() / values2.len() as f64;
 
         // Calculate covariance
-        let covariance: f64 = values1.iter()
+        let covariance: f64 = values1
+            .iter()
             .zip(values2.iter())
             .map(|(x1, x2)| (x1 - mean1) * (x2 - mean2))
-            .sum::<f64>() / (values1.len() as f64 - ddof as f64);
+            .sum::<f64>()
+            / (values1.len() as f64 - ddof as f64);
 
         Ok(AttrValue::Float(covariance as f32))
     }
@@ -1472,10 +1526,8 @@ impl BaseArray<AttrValue> {
 
     /// Helper function to compute ranks for Spearman correlation
     fn compute_ranks(&self, values: &[f64]) -> Vec<f64> {
-        let mut indexed_values: Vec<(usize, f64)> = values.iter()
-            .enumerate()
-            .map(|(i, &v)| (i, v))
-            .collect();
+        let mut indexed_values: Vec<(usize, f64)> =
+            values.iter().enumerate().map(|(i, &v)| (i, v)).collect();
 
         // Sort by value
         indexed_values.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -1573,18 +1625,22 @@ impl BaseArray<AttrValue> {
                         "mean" => window_data.iter().sum::<f64>() / window_data.len() as f64,
                         "sum" => window_data.iter().sum::<f64>(),
                         "min" => window_data.iter().cloned().fold(f64::INFINITY, f64::min),
-                        "max" => window_data.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                        "max" => window_data
+                            .iter()
+                            .cloned()
+                            .fold(f64::NEG_INFINITY, f64::max),
                         "std" => {
                             let mean = window_data.iter().sum::<f64>() / window_data.len() as f64;
-                            let variance = window_data.iter()
-                                .map(|x| (x - mean).powi(2))
-                                .sum::<f64>() / window_data.len() as f64;
+                            let variance =
+                                window_data.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
+                                    / window_data.len() as f64;
                             variance.sqrt()
                         }
                         _ => {
-                            return Err(crate::errors::GraphError::InvalidInput(
-                                format!("Unsupported rolling operation: {}", operation),
-                            ));
+                            return Err(crate::errors::GraphError::InvalidInput(format!(
+                                "Unsupported rolling operation: {}",
+                                operation
+                            )));
                         }
                     };
                     result_values.push(AttrValue::Float(result as f32));
@@ -1623,18 +1679,21 @@ impl BaseArray<AttrValue> {
                     "mean" => window_data.iter().sum::<f64>() / window_data.len() as f64,
                     "sum" => window_data.iter().sum::<f64>(),
                     "min" => window_data.iter().cloned().fold(f64::INFINITY, f64::min),
-                    "max" => window_data.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                    "max" => window_data
+                        .iter()
+                        .cloned()
+                        .fold(f64::NEG_INFINITY, f64::max),
                     "std" => {
                         let mean = window_data.iter().sum::<f64>() / window_data.len() as f64;
-                        let variance = window_data.iter()
-                            .map(|x| (x - mean).powi(2))
-                            .sum::<f64>() / window_data.len() as f64;
+                        let variance = window_data.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
+                            / window_data.len() as f64;
                         variance.sqrt()
                     }
                     _ => {
-                        return Err(crate::errors::GraphError::InvalidInput(
-                            format!("Unsupported expanding operation: {}", operation),
-                        ));
+                        return Err(crate::errors::GraphError::InvalidInput(format!(
+                            "Unsupported expanding operation: {}",
+                            operation
+                        )));
                     }
                 };
                 result_values.push(AttrValue::Float(result as f32));

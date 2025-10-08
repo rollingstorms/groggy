@@ -33,7 +33,7 @@ use crate::viz::VizModule;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
 /*
@@ -105,6 +105,9 @@ pub struct Graph {
     /// Handles 1-hop, k-hop, and multi-node neighborhood generation
     neighborhood_sampler: NeighborhoodSampler,
 
+    /// Weak self-reference so components can access the live graph instance
+    self_reference: Option<Weak<RefCell<Graph>>>,
+
     /*
     === TRANSACTION MANAGEMENT ===
     Track what's changed since last commit
@@ -161,6 +164,7 @@ impl Graph {
             query_engine: QueryEngine::new(),
             traversal_engine: TraversalEngine::new(),
             neighborhood_sampler: NeighborhoodSampler::new(),
+            self_reference: None,
             change_tracker: ChangeTracker::new(),
             config,
         }
@@ -192,9 +196,33 @@ impl Graph {
             query_engine: QueryEngine::new(),
             traversal_engine: TraversalEngine::new(),
             neighborhood_sampler: NeighborhoodSampler::new(),
+            self_reference: None,
             change_tracker: ChangeTracker::new(),
             config,
         }
+    }
+
+    /// Convert this graph into an `Rc<RefCell<Graph>>`, wiring internal back-references.
+    ///
+    /// This is the safest way to obtain a shared handle required by entities and subgraphs.
+    pub fn into_shared(self) -> Rc<RefCell<Self>> {
+        let graph_rc = Rc::new(RefCell::new(self));
+        {
+            let mut graph_mut = graph_rc.borrow_mut();
+            graph_mut.attach_self_reference(&graph_rc);
+        }
+        graph_rc
+    }
+
+    /// Attach a self reference so helpers like `NeighborhoodSampler` can access the live graph.
+    pub fn attach_self_reference(&mut self, graph_ref: &Rc<RefCell<Graph>>) {
+        self.self_reference = Some(Rc::downgrade(graph_ref));
+        self.neighborhood_sampler.set_graph_ref(graph_ref);
+    }
+
+    /// Retrieve a shared reference to this graph if one has been registered.
+    pub fn shared_reference(&self) -> Option<Rc<RefCell<Graph>>> {
+        self.self_reference.as_ref().and_then(|weak| weak.upgrade())
     }
 
     /// Load an existing graph from storage
@@ -325,6 +353,21 @@ impl Graph {
     /// Check if this graph is undirected
     pub fn is_undirected(&self) -> bool {
         matches!(self.config.graph_type, crate::types::GraphType::Undirected)
+    }
+
+    /// Get the number of active nodes in the graph
+    pub fn node_count(&self) -> usize {
+        self.space.node_count()
+    }
+
+    /// Get the number of active edges in the graph
+    pub fn edge_count(&self) -> usize {
+        self.space.edge_count()
+    }
+
+    /// Check whether the graph has no nodes or edges
+    pub fn is_empty(&self) -> bool {
+        self.node_count() == 0 && self.edge_count() == 0
     }
 
     /*
@@ -2424,7 +2467,7 @@ impl Graph {
     where
         T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
-        use crate::storage::matrix::{GraphMatrix};
+        use crate::storage::matrix::GraphMatrix;
 
         let mut nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
         nodes.sort(); // Sort to ensure consistent ordering (creation order)
@@ -2577,7 +2620,7 @@ impl Graph {
     where
         T: crate::storage::advanced_matrix::NumericType + crate::storage::matrix::FromAttrValue<T>,
     {
-        use crate::storage::matrix::{GraphMatrix};
+        use crate::storage::matrix::GraphMatrix;
 
         let nodes: Vec<NodeId> = self.space.get_active_nodes().iter().copied().collect();
         let edge_ids: Vec<EdgeId> = self.space.get_active_edges().iter().copied().collect();

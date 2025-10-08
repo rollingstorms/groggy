@@ -273,7 +273,7 @@ impl InteractionController for HoneycombController {
         match ev.phase {
             PointerPhase::Start => {
                 self.drag_start = Some((0.0, 0.0)); // Will be updated with actual position
-                // 🫸 DEBUG: Honeycomb pointer start, 
+                                                    // 🫸 DEBUG: Honeycomb pointer start,
             }
             PointerPhase::Move => {
                 if self.drag_start.is_some() {
@@ -323,7 +323,7 @@ impl InteractionController for HoneycombController {
             PointerPhase::End => {
                 self.drag_start = None;
                 self.dragging_node = None;
-                // 🫸 DEBUG: Honeycomb pointer end, 
+                // 🫸 DEBUG: Honeycomb pointer end,
             }
         }
         commands
@@ -335,7 +335,7 @@ impl InteractionController for HoneycombController {
             WheelEvent::Zoom { delta: _ } => {
                 // Zoom could trigger auto-scaling adjustments
                 if self.auto_scale_enabled {
-                    // 🔍 DEBUG: Honeycomb zoom - considering auto-scale adjustments, 
+                    // 🔍 DEBUG: Honeycomb zoom - considering auto-scale adjustments,
                 }
             }
             WheelEvent::Rotate { delta } => {

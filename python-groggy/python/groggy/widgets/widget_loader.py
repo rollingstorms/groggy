@@ -47,23 +47,27 @@ def load_widget_js():
     """Load widget JavaScript in Jupyter environment (automatic registration)."""
     try:
         # Early-exit if the federated plugin is active or module is already resolvable
+        # FIXED: Wrap in an IIFE to allow return statement
         js_code_with_guard = """
         // Early-exit if the federated plugin is active or module is already resolvable
-        try {
-          const labHasPlugin =
-            !!(window.jupyterapp && window.jupyterapp._pluginMap &&
-               [...window.jupyterapp._pluginMap.keys()].some(k => k.includes('groggy-widgets:plugin')));
+        (function() {
+          try {
+            const labHasPlugin =
+              !!(window.jupyterapp && window.jupyterapp._pluginMap &&
+                 [...window.jupyterapp._pluginMap.keys()].some(k => k.includes('groggy-widgets:plugin')));
 
-          const moduleIsDefined =
-            (window.requirejs && window.requirejs.defined && window.requirejs.defined('groggy-widgets')) ||
-            (window.require   && window.require.defined    && window.require.defined('groggy-widgets'));
+            const moduleIsDefined =
+              (window.requirejs && window.requirejs.defined && window.requirejs.defined('groggy-widgets')) ||
+              (window.require   && window.require.defined    && window.require.defined('groggy-widgets'));
 
-          if (labHasPlugin || moduleIsDefined) {
-            console.log('🧹 Skipping fallback loader: federated groggy-widgets is present.');
-            // IMPORTANT: do not patch loadClass or define AMD here
-            return; // Skip all fallback registration
-          }
-        } catch(e) {/* swallow */}
+            if (labHasPlugin || moduleIsDefined) {
+              console.log('🧹 Skipping fallback loader: federated groggy-widgets is present.');
+              // IMPORTANT: do not patch loadClass or define AMD here
+              return; // Skip all fallback registration
+            }
+          } catch(e) {/* swallow */}
+        
+        // Continue with widget registration if we didn't return early
         """
         
         # Get the widget JavaScript content
@@ -457,6 +461,7 @@ def load_widget_js():
             }}
             
         }})();
+        })(); // Close the IIFE wrapper from early-exit guard
         """
         
         # Display the JavaScript

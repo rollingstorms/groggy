@@ -3,7 +3,7 @@
 //! This module provides additional operations and utilities for the unified matrix system.
 
 use crate::storage::advanced_matrix::{
-        numeric_type::NumericType,
+    numeric_type::NumericType,
     unified_matrix::{MatrixError, MatrixResult, UnifiedMatrix},
 };
 

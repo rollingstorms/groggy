@@ -147,8 +147,9 @@ impl PyGraph {
         } else {
             RustGraph::new_undirected()
         };
+        let inner = rust_graph.into_shared();
         Ok(Self {
-            inner: Rc::new(RefCell::new(rust_graph)),
+            inner,
             cached_view: RefCell::new(None),
         })
     }
@@ -404,6 +405,12 @@ impl PyGraph {
         let node_ids = self.inner.borrow_mut().node_ids();
         let py_int_array = crate::ffi::storage::num_array::PyIntArray::from_node_ids(node_ids);
         Py::new(py, py_int_array)
+    }
+
+    /// Check whether the graph contains any nodes or edges
+    fn is_empty(&self) -> bool {
+        let graph_ref = self.inner.borrow();
+        graph_ref.is_empty()
     }
 
     /// Get all active edge IDs as IntArray  
