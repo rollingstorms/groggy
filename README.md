@@ -2,7 +2,7 @@
 
 **A graph analytics library for Python with a Rust core**
 
-<div align="center">
+<div align="left">
   <img src="img/groggy.svg" alt="Groggy Logo" width="300"/>
 </div>
 
@@ -47,7 +47,7 @@ younger_nodes = g.nodes[g.nodes["age"] < 30]
 # Run a graph algorithm
 g.connected_components(inplace=True, label='component')
 
-# Viz the graph
+# Viz. the graph
 g.viz.show(node_color="component")
 ```
 
