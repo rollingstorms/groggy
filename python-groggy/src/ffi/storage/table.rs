@@ -6,13 +6,11 @@ use crate::ffi::storage::array::PyBaseArray;
 use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
 use crate::ffi::storage::num_array::PyNumArray;
 use crate::ffi::viz_accessor::VizAccessor;
-use groggy::storage::{ArrayOps, array::{BaseArray, NumArray}, table::{BaseTable, NodesTable, EdgesTable, Table}};
+use groggy::storage::{array::ArrayOps, array::BaseArray, table::{BaseTable, NodesTable, EdgesTable, Table}};
 use groggy::viz::streaming::data_source::DataSource as VizDataSource;  // Import DataSource trait for streaming methods
-use groggy::viz::VizModule;
 use groggy::types::{NodeId, EdgeId, AttrValue, AttrValueType};
 use std::collections::HashMap;
 use std::cell::RefCell;
-use std::sync::Arc;
 use serde_json::{Map, Value};
 
 // =============================================================================
@@ -433,7 +431,7 @@ impl PyBaseTable {
     /// - t[mask, "note"] = "keep"         # Set rows matching boolean condition
     /// - t[5, "name"] = "Alice"           # Set single cell
     pub fn __setitem__(&mut self, key: &PyAny, value: &PyAny) -> PyResult<()> {
-        use pyo3::types::{PySlice, PyTuple, PyList, PyString};
+        use pyo3::types::{PyTuple, PyList};
         
         // Handle different key types
         if let Ok(tuple) = key.downcast::<PyTuple>() {
@@ -644,7 +642,7 @@ impl PyBaseTable {
 
     /// Enable subscripting: table[column_name], table[slice], or table[boolean_mask]
     pub fn __getitem__(&self, key: &PyAny) -> PyResult<PyObject> {
-        use pyo3::types::{PyString, PySlice};
+        use pyo3::types::PySlice;
         let py = key.py();
         
         if let Ok(column_name) = key.extract::<String>() {
@@ -2583,7 +2581,7 @@ impl PyBaseTable {
     
     /// Parse column key from various formats (string, list of strings, etc.)
     fn parse_column_key(&self, col_key: &PyAny) -> PyResult<Vec<String>> {
-        use pyo3::types::{PyString, PyList};
+        use pyo3::types::PyList;
         
         if let Ok(col_name) = col_key.extract::<String>() {
             // Single column name: "score"
@@ -2890,7 +2888,7 @@ impl PyNodesTable {
     /// Returns:
     ///     PyNodesTable: A new table with the attributes added
     pub fn with_attributes(&self, attr_name: &PyAny, attributes: &PyAny) -> PyResult<Self> {
-        use pyo3::types::{PyDict, PyList};
+        
         
         // Handle attr_name (can be string or other types)
         let attr_name_str = if let Ok(name) = attr_name.extract::<String>() {
@@ -3187,7 +3185,7 @@ impl PyNodesTable {
     
     /// Enable subscripting: table[column_name] or table[slice]  
     pub fn __getitem__(&self, key: &PyAny) -> PyResult<PyObject> {
-        use pyo3::types::{PyString, PySlice};
+        use pyo3::types::PySlice;
         let py = key.py();
         
         if let Ok(column_name) = key.extract::<String>() {
@@ -3217,7 +3215,7 @@ impl PyNodesTable {
         } else if let Ok(column_names) = key.extract::<Vec<String>>() {
             // Multi-column access: table[['col1', 'col2', ...]]
             // For NodesTable, we need to ensure required columns are included
-            let mut required_columns = vec!["node_id".to_string()];
+            let required_columns = vec!["node_id".to_string()];
             let mut all_columns = required_columns.clone();
             
             // Add requested columns that aren't already required
@@ -4019,7 +4017,7 @@ impl PyEdgesTable {
     
     /// Enable subscripting: table[column_name] or table[slice]
     pub fn __getitem__(&self, key: &PyAny) -> PyResult<PyObject> {
-        use pyo3::types::{PyString, PySlice};
+        use pyo3::types::PySlice;
         let py = key.py();
         
         if let Ok(column_name) = key.extract::<String>() {
@@ -4049,7 +4047,7 @@ impl PyEdgesTable {
         } else if let Ok(column_names) = key.extract::<Vec<String>>() {
             // Multi-column access: table[['col1', 'col2', ...]]
             // For EdgesTable, we need to ensure required columns are included
-            let mut required_columns = vec!["edge_id".to_string(), "source".to_string(), "target".to_string()];
+            let required_columns = vec!["edge_id".to_string(), "source".to_string(), "target".to_string()];
             let mut all_columns = required_columns.clone();
             
             // Add requested columns that aren't already required
@@ -5635,7 +5633,7 @@ pub struct PyNodesTableArray {
 impl PyNodesTableArray {
     /// Helper: Extract a column from all tables and return as ArrayArray
     fn extract_column(&self, py: Python, column_name: &str) -> PyResult<PyObject> {
-        use groggy::storage::array::{ArrayArray, BaseArray};
+        use groggy::storage::array::ArrayArray;
         use groggy::types::AttrValue;
 
         let mut arrays = Vec::new();

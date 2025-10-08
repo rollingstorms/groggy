@@ -3,9 +3,8 @@
 //! This module implements the delegation traits for existing FFI types,
 //! enabling universal method availability across the object hierarchy.
 
-use super::traits::{SubgraphOps, TableOps, GraphOps, BaseArrayOps, NumArrayOps};
-use super::error_handling::{DelegationResult, DelegationError};
-use groggy::types::{NodeId, EdgeId, AttrValue};
+use super::traits::{SubgraphOps, TableOps, BaseArrayOps};
+use groggy::types::AttrValue;
 use pyo3::PyResult;
 
 // Implement SubgraphOps for PySubgraph

@@ -4,9 +4,8 @@
 //! enabling universal method availability across the delegation system.
 
 use super::traits::{
-    SubgraphOps, TableOps, GraphOps, BaseArrayOps, NumArrayOps, DelegatingIterator
+    TableOps, BaseArrayOps, NumArrayOps, DelegatingIterator
 };
-use groggy::types::{NodeId, EdgeId, AttrValue};
 use pyo3::PyResult;
 
 /// Generic forwarding array that delegates to inner array implementations

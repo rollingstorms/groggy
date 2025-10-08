@@ -10,16 +10,5 @@ pub mod implementations;
 pub mod examples;
 
 // Re-export the main traits for easy access
-pub use traits::{
-    SubgraphOps, TableOps, GraphOps, 
-    BaseArrayOps, NumArrayOps,
-    DelegatingIterator
-};
 
-pub use forwarding::{
-    ForwardingArray, ForwardingIterator
-};
 
-pub use error_handling::{
-    DelegationResult, DelegationError
-};

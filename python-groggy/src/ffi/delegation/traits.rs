@@ -3,8 +3,7 @@
 //! These traits separate algorithms from carriers, enabling any array type
 //! or iterator to delegate operations to optimized implementations.
 
-use std::collections::HashSet;
-use groggy::types::{NodeId, EdgeId, AttrValue};
+use groggy::types::{NodeId, AttrValue};
 use pyo3::PyResult;
 
 /// Operations available on subgraph objects

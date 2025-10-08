@@ -5,7 +5,7 @@
 use groggy::storage::array::BaseArray;
 use groggy::storage::GraphMatrix;
 use groggy::storage::array::NumArray;
-use groggy::types::{AttrValue as RustAttrValue, AttrValueType};
+use groggy::types::AttrValue as RustAttrValue;
 use pyo3::exceptions::{
     PyImportError, PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError,
     PyValueError,
@@ -17,7 +17,6 @@ use pyo3::types::PyType;
 // Use utility functions from utils module
 use crate::ffi::storage::array::PyBaseArray;
 use crate::ffi::storage::num_array::PyNumArray;
-use crate::ffi::utils::attr_value_to_python_value;
 
 /// Python wrapper for GraphMatrix - general-purpose matrix for collections of GraphArrays
 #[derive(Clone)]
@@ -782,7 +781,7 @@ impl PyGraphMatrix {
         let show_all_cols = cols <= max_display_cols;
         
         // Calculate column widths for alignment
-        let mut col_widths = vec![8; if show_all_cols { cols } else { max_display_cols }];
+        let col_widths = vec![8; if show_all_cols { cols } else { max_display_cols }];
         
         // Display matrix in mathematical bracket format
         let display_rows = if show_all_rows { rows } else { 5 };

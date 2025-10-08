@@ -1,11 +1,8 @@
 use groggy::storage::array::{BaseArray, ArrayIterator, ArrayOps};
 use pyo3::prelude::*;
 use pyo3::types::PyFunction;
-use std::sync::Arc;
 use crate::ffi::storage::accessors::PyNodesAccessor;
-use crate::ffi::storage::subgraph_array::PySubgraphArray;
 use crate::ffi::storage::table_array::PyTableArray;
-use groggy::viz::VizModule;
 use crate::ffi::viz_accessor::VizAccessor;
 
 /// NodesArray: Collection of NodesAccessor objects with delegation to BaseArray
