@@ -55,7 +55,7 @@ pub fn networkx_graph_to_python(py: Python, nx_graph: &NetworkXGraph) -> PyResul
         }
 
         // Only pass edge attributes if they exist
-        if edge_attrs.len() > 0 {
+        if !edge_attrs.is_empty() {
             graph.call_method("add_edge", (edge.source, edge.target), Some(edge_attrs))?;
         } else {
             graph.call_method1("add_edge", (edge.source, edge.target))?;

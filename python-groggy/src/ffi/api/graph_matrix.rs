@@ -59,7 +59,7 @@ impl PyGraphMatrixHelper {
     }
 
     /// Convert graph to attribute matrix - PURE DELEGATION to core
-    pub fn to_matrix(&mut self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
+    pub fn to_matrix(&self, py: Python) -> PyResult<Py<PyGraphMatrix>> {
         use crate::ffi::storage::matrix::PyGraphMatrix;
 
         // DELEGATION: Use core to_matrix implementation (graph.rs:2383)

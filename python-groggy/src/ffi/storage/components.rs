@@ -34,6 +34,11 @@ impl PyComponentsArray {
         self.components_data.len()
     }
 
+    /// Check if the components array is empty
+    pub fn is_empty(&self) -> bool {
+        self.components_data.is_empty()
+    }
+
     /// Create new ComponentsArray from trait objects (internal use)
     pub fn from_components(
         components: Vec<Box<dyn groggy::traits::SubgraphOperations>>,
@@ -309,9 +314,10 @@ impl PyComponentsArray {
         for (component_nodes, component_edges) in &self.components_data {
             // Add nodes from this component
             for &node_id in component_nodes {
-                if !node_mapping.contains_key(&node_id) {
+                use std::collections::hash_map::Entry;
+                if let Entry::Vacant(e) = node_mapping.entry(node_id) {
                     let new_node_id = viz_graph.add_node();
-                    node_mapping.insert(node_id, new_node_id);
+                    e.insert(new_node_id);
 
                     // Copy node attributes
                     if let Ok(attrs) = self.graph_ref.borrow().get_node_attrs(node_id) {

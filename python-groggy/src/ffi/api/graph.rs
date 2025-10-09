@@ -1374,10 +1374,10 @@ impl PyGraph {
 
     /// Convert graph to attribute matrix - delegates to PyGraphMatrixHelper
     fn to_matrix(
-        &mut self,
+        &self,
         py: Python,
     ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
-        let mut matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
+        let matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
         matrix_handler.to_matrix(py)
     }
 

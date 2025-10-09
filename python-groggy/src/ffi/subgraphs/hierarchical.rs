@@ -404,11 +404,9 @@ impl PyEdgeAggregationConfig {
 pub fn parse_edge_config(edge_config_dict: Option<&PyDict>) -> PyResult<EdgeAggregationConfig> {
     if let Some(config_dict) = edge_config_dict {
         // Try to extract as EdgeAggregationConfig object first
-        if let Ok(config) = config_dict.get_item("_config") {
-            if let Some(config_obj) = config {
-                if let Ok(py_config) = config_obj.extract::<PyEdgeAggregationConfig>() {
-                    return Ok(py_config.inner);
-                }
+        if let Ok(Some(config_obj)) = config_dict.get_item("_config") {
+            if let Ok(py_config) = config_obj.extract::<PyEdgeAggregationConfig>() {
+                return Ok(py_config.inner);
             }
         }
 

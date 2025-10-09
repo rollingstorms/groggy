@@ -9,6 +9,11 @@ use pyo3::prelude::*;
 use std::sync::Arc;
 
 /// Specialized array for PySubgraph objects
+///
+/// Note: Uses Arc<Vec<PySubgraph>> for zero-copy sharing. PySubgraph is marked
+/// as `unsendable` so this won't be used across threads. Arc is used here for
+/// efficient cloning/sharing within a single thread.
+#[allow(clippy::arc_with_non_send_sync)]
 #[pyclass(name = "SubgraphArray", unsendable)]
 #[derive(Clone)]
 pub struct PySubgraphArray {

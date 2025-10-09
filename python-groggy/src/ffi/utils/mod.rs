@@ -6,6 +6,6 @@ pub mod config;
 pub mod convert;
 pub mod indexing;
 pub mod matrix_indexing;
-pub mod utils;
+pub mod helpers;
 
-pub use utils::*;
+pub use helpers::*;

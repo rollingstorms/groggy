@@ -2743,16 +2743,10 @@ impl PyEdgesAccessor {
             for &edge_id in &edge_ids {
                 if let Ok((source, target)) = graph_ref.edge_endpoints(edge_id) {
                     // Add source node if not already added
-                    if !node_map.contains_key(&source) {
-                        let new_node_id = viz_graph.add_node();
-                        node_map.insert(source, new_node_id);
-                    }
+                    node_map.entry(source).or_insert_with(|| viz_graph.add_node());
 
                     // Add target node if not already added
-                    if !node_map.contains_key(&target) {
-                        let new_node_id = viz_graph.add_node();
-                        node_map.insert(target, new_node_id);
-                    }
+                    node_map.entry(target).or_insert_with(|| viz_graph.add_node());
 
                     // Add the edge
                     if let Some(&new_source) = node_map.get(&source) {
