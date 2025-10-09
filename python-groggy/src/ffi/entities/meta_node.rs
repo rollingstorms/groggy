@@ -253,9 +253,8 @@ impl PyMetaNode {
         use groggy::types::AttrName;
 
         // Convert String keys to AttrName
-        let rust_agg_functions: std::collections::HashMap<AttrName, String> = agg_functions
-            .into_iter()
-            .collect();
+        let rust_agg_functions: std::collections::HashMap<AttrName, String> =
+            agg_functions.into_iter().collect();
 
         self.inner.re_aggregate(rust_agg_functions).map_err(|e| {
             PyRuntimeError::new_err(format!("Failed to re-aggregate meta-node: {}", e))

@@ -18,13 +18,13 @@ pub mod table_array; // Phase 2: Specialized arrays (OLD implementation)
 pub mod table_array_core; // NEW: Core-delegating TableArray
 pub mod views; // Essential FFI - keep enabled // Phase 2: Specialized arrays
 
- // Array of arrays with aggregation
- // Re-enabled NEW BaseTable FFI for Phase 5 // Statistical array with numerical operations
-                  // Removed: bool_array and simple_stats_array exports - functionality integrated into unified NumArray
- // Essential FFI
- // Phase 2: Specialized arrays
- // Phase 2: Specialized arrays
- // Phase 2: Specialized arrays
- // Phase 2: Specialized arrays (OLD implementation)
- // NEW: Core-delegating TableArray
- // Essential FFI // Phase 2: Specialized arrays
+// Array of arrays with aggregation
+// Re-enabled NEW BaseTable FFI for Phase 5 // Statistical array with numerical operations
+// Removed: bool_array and simple_stats_array exports - functionality integrated into unified NumArray
+// Essential FFI
+// Phase 2: Specialized arrays
+// Phase 2: Specialized arrays
+// Phase 2: Specialized arrays
+// Phase 2: Specialized arrays (OLD implementation)
+// NEW: Core-delegating TableArray
+// Essential FFI // Phase 2: Specialized arrays

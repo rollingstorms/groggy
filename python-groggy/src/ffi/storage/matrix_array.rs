@@ -351,7 +351,7 @@ impl PyMatrixArrayIterator {
     }
 
     /// Apply a mathematical transformation to each matrix
-    fn transform(&mut self,_operation: String) -> PyResult<Self> {
+    fn transform(&mut self, _operation: String) -> PyResult<Self> {
         let elements = self.inner.clone().into_vec();
         let mut transformed = Vec::new();
 

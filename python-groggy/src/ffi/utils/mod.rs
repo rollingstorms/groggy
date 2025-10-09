@@ -4,8 +4,8 @@
 
 pub mod config;
 pub mod convert;
+pub mod helpers;
 pub mod indexing;
 pub mod matrix_indexing;
-pub mod helpers;
 
 pub use helpers::*;

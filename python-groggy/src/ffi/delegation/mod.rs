@@ -59,12 +59,10 @@
 // and not yet integrated into the Python API
 #![allow(dead_code)]
 
-pub mod traits;
-pub mod forwarding;
 pub mod error_handling;
-pub mod implementations;
 pub mod examples;
+pub mod forwarding;
+pub mod implementations;
+pub mod traits;
 
 // Re-export the main traits for easy access
-
-

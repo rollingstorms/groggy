@@ -1609,7 +1609,7 @@ impl PyNodesAccessor {
     /// print(g.get_node_attr(node_id, 'name'))  # 'Alice'
     /// print(g.nodes.table())  # Shows Alice in the table
     /// ```
-    pub fn append(&self,_py: Python, attrs_dict: &PyDict) -> PyResult<NodeId> {
+    pub fn append(&self, _py: Python, attrs_dict: &PyDict) -> PyResult<NodeId> {
         let mut graph = self.graph.borrow_mut();
 
         // Create a new node in the graph
@@ -1661,7 +1661,7 @@ impl PyNodesAccessor {
     /// # All nodes are immediately available
     /// print(len(g.nodes))  # Increased by 3
     /// ```
-    pub fn extend(&self,_py: Python, rows_data: &pyo3::types::PyList) -> PyResult<Vec<NodeId>> {
+    pub fn extend(&self, _py: Python, rows_data: &pyo3::types::PyList) -> PyResult<Vec<NodeId>> {
         let mut graph = self.graph.borrow_mut();
         let mut new_node_ids = Vec::new();
 
@@ -2669,10 +2669,7 @@ impl PyEdgesAccessor {
             }
 
             if has_all_attrs {
-                groups
-                    .entry(key_values)
-                    .or_default()
-                    .push(edge_id);
+                groups.entry(key_values).or_default().push(edge_id);
             }
         }
 
@@ -2741,10 +2738,14 @@ impl PyEdgesAccessor {
             for &edge_id in &edge_ids {
                 if let Ok((source, target)) = graph_ref.edge_endpoints(edge_id) {
                     // Add source node if not already added
-                    node_map.entry(source).or_insert_with(|| viz_graph.add_node());
+                    node_map
+                        .entry(source)
+                        .or_insert_with(|| viz_graph.add_node());
 
                     // Add target node if not already added
-                    node_map.entry(target).or_insert_with(|| viz_graph.add_node());
+                    node_map
+                        .entry(target)
+                        .or_insert_with(|| viz_graph.add_node());
 
                     // Add the edge
                     if let Some(&new_source) = node_map.get(&source) {

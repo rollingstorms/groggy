@@ -1,9 +1,9 @@
 //! Error handling for the delegation system
-//! 
+//!
 //! Provides robust error propagation and handling for delegation operations,
 //! including try_map and Result propagation patterns.
 
-use pyo3::{PyResult, PyErr};
+use pyo3::{PyErr, PyResult};
 use std::fmt;
 
 /// Result type for delegation operations
@@ -31,10 +31,14 @@ impl fmt::Display for DelegationError {
         match self {
             DelegationError::ForwardingError(msg) => write!(f, "Forwarding error: {}", msg),
             DelegationError::ConversionError(msg) => write!(f, "Conversion error: {}", msg),
-            DelegationError::ArrayOperationError(msg) => write!(f, "Array operation error: {}", msg),
+            DelegationError::ArrayOperationError(msg) => {
+                write!(f, "Array operation error: {}", msg)
+            }
             DelegationError::IteratorError(msg) => write!(f, "Iterator error: {}", msg),
             DelegationError::PythonError(err) => write!(f, "Python error: {}", err),
-            DelegationError::UnsupportedOperation(msg) => write!(f, "Unsupported operation: {}", msg),
+            DelegationError::UnsupportedOperation(msg) => {
+                write!(f, "Unsupported operation: {}", msg)
+            }
         }
     }
 }
@@ -71,31 +75,31 @@ impl From<DelegationError> for PyErr {
 /// Trait for try-mapping operations that can fail
 pub trait TryMapOps<T> {
     type Output;
-    
+
     /// Try to map over elements, collecting successes and handling errors gracefully
     fn try_map<U, F, E>(&self, f: F) -> DelegationResult<Vec<U>>
-    where 
+    where
         F: Fn(&T) -> Result<U, E>,
         E: Into<DelegationError>;
-    
+
     /// Try to map over elements, stopping at first error
     fn try_map_fail_fast<U, F, E>(&self, f: F) -> DelegationResult<Vec<U>>
-    where 
+    where
         F: Fn(&T) -> Result<U, E>,
         E: Into<DelegationError>;
-    
+
     /// Try to map over elements, collecting both successes and errors
     fn try_map_collect_errors<U, F, E>(&self, f: F) -> (Vec<U>, Vec<DelegationError>)
-    where 
+    where
         F: Fn(&T) -> Result<U, E>,
         E: Into<DelegationError>;
 }
 
 impl<T> TryMapOps<T> for Vec<T> {
     type Output = Vec<T>;
-    
+
     fn try_map<U, F, E>(&self, f: F) -> DelegationResult<Vec<U>>
-    where 
+    where
         F: Fn(&T) -> Result<U, E>,
         E: Into<DelegationError>,
     {
@@ -108,30 +112,30 @@ impl<T> TryMapOps<T> for Vec<T> {
         }
         Ok(results)
     }
-    
+
     fn try_map_fail_fast<U, F, E>(&self, f: F) -> DelegationResult<Vec<U>>
-    where 
+    where
         F: Fn(&T) -> Result<U, E>,
         E: Into<DelegationError>,
     {
         self.try_map(f) // Same as try_map for Vec
     }
-    
+
     fn try_map_collect_errors<U, F, E>(&self, f: F) -> (Vec<U>, Vec<DelegationError>)
-    where 
+    where
         F: Fn(&T) -> Result<U, E>,
         E: Into<DelegationError>,
     {
         let mut successes = Vec::new();
         let mut errors = Vec::new();
-        
+
         for item in self.iter() {
             match f(item) {
                 Ok(result) => successes.push(result),
                 Err(e) => errors.push(e.into()),
             }
         }
-        
+
         (successes, errors)
     }
 }
@@ -140,19 +144,22 @@ impl<T> TryMapOps<T> for Vec<T> {
 pub trait DelegationResultExt<T> {
     /// Convert PyResult to DelegationResult
     fn into_delegation_result(self) -> DelegationResult<T>;
-    
+
     /// Map error with additional context
     fn map_delegation_error<F>(self, f: F) -> DelegationResult<T>
-    where F: FnOnce(PyErr) -> DelegationError;
+    where
+        F: FnOnce(PyErr) -> DelegationError;
 }
 
 impl<T> DelegationResultExt<T> for PyResult<T> {
     fn into_delegation_result(self) -> DelegationResult<T> {
         self.map_err(DelegationError::from)
     }
-    
+
     fn map_delegation_error<F>(self, f: F) -> DelegationResult<T>
-    where F: FnOnce(PyErr) -> DelegationError {
+    where
+        F: FnOnce(PyErr) -> DelegationError,
+    {
         self.map_err(f)
     }
 }
@@ -161,20 +168,20 @@ impl<T> DelegationResultExt<T> for PyResult<T> {
 pub trait SafeDelegation<T> {
     /// Safely delegate operation with error recovery
     fn safe_delegate<U, F, R>(&self, operation: F, recovery: R) -> DelegationResult<U>
-    where 
+    where
         F: Fn(&T) -> DelegationResult<U>,
         R: Fn(&DelegationError) -> Option<U>;
-    
+
     /// Chain delegation operations with error propagation
     fn chain_delegate<U, V, F1, F2>(&self, op1: F1, op2: F2) -> DelegationResult<V>
-    where 
+    where
         F1: Fn(&T) -> DelegationResult<U>,
         F2: Fn(U) -> DelegationResult<V>;
 }
 
 impl<T> SafeDelegation<T> for T {
     fn safe_delegate<U, F, R>(&self, operation: F, recovery: R) -> DelegationResult<U>
-    where 
+    where
         F: Fn(&T) -> DelegationResult<U>,
         R: Fn(&DelegationError) -> Option<U>,
     {
@@ -186,9 +193,9 @@ impl<T> SafeDelegation<T> for T {
             },
         }
     }
-    
+
     fn chain_delegate<U, V, F1, F2>(&self, op1: F1, op2: F2) -> DelegationResult<V>
-    where 
+    where
         F1: Fn(&T) -> DelegationResult<U>,
         F2: Fn(U) -> DelegationResult<V>,
     {
@@ -219,16 +226,16 @@ macro_rules! try_map_delegate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_try_map_success() {
         let numbers = vec![1, 2, 3, 4, 5];
         let result = numbers.try_map(|x| Ok::<i32, String>(x * 2));
-        
+
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), vec![2, 4, 6, 8, 10]);
     }
-    
+
     #[test]
     fn test_try_map_error() {
         let numbers = vec![1, 2, 0, 4, 5]; // 0 will cause division error
@@ -239,10 +246,10 @@ mod tests {
                 Ok(10 / x)
             }
         });
-        
+
         assert!(result.is_err());
     }
-    
+
     #[test]
     fn test_try_map_collect_errors() {
         let numbers = vec![1, 2, 0, 4, 0];
@@ -253,7 +260,7 @@ mod tests {
                 Ok(10 / x)
             }
         });
-        
+
         assert_eq!(successes, vec![10, 5, 2]);
         assert_eq!(errors.len(), 2);
     }

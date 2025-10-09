@@ -405,7 +405,7 @@ impl PySubgraphArray {
     ///     components = g.connected_components()
     ///     summary = components.summary()
     ///     print(summary)
-    fn summary(&self,_py: Python) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+    fn summary(&self, _py: Python) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
         use groggy::storage::array::BaseArray;
         use groggy::storage::table::BaseTable;
         use groggy::types::AttrValue;
@@ -570,7 +570,7 @@ impl PySubgraphArray {
     /// dept_groups = g.nodes.group_by('department')
     /// merged_graph = dept_groups.merge()
     /// ```
-    fn merge(&self,_py: Python) -> PyResult<crate::ffi::api::graph::PyGraph> {
+    fn merge(&self, _py: Python) -> PyResult<crate::ffi::api::graph::PyGraph> {
         use std::cell::RefCell;
         use std::collections::HashSet;
         use std::rc::Rc;

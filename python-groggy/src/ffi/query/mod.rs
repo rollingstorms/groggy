@@ -6,4 +6,3 @@
 pub mod query;
 pub mod query_parser;
 pub mod traversal;
-

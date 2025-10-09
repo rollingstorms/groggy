@@ -6,7 +6,7 @@
 use pyo3::prelude::*;
 
 /// Register all classes and functions with the Python module
-    #[allow(dead_code)]
+#[allow(dead_code)]
 pub fn register_classes(_py: Python, _m: &PyModule) -> PyResult<()> {
     // For now, return Ok - we'll add class registrations as we implement them
     // Example:

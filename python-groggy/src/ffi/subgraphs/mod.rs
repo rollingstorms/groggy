@@ -7,4 +7,3 @@ pub mod composer;
 pub mod hierarchical;
 pub mod neighborhood;
 pub mod subgraph;
-

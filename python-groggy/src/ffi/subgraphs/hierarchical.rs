@@ -310,8 +310,7 @@ impl PyEdgeAggregationFunction {
 
 /// Python wrapper for EdgeAggregationConfig
 #[pyclass(name = "EdgeAggregationConfig", unsendable)]
-#[derive(Clone)]
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct PyEdgeAggregationConfig {
     pub inner: EdgeAggregationConfig,
 }
@@ -478,7 +477,6 @@ impl PyMetaNodeOld {
     fn subgraph(&self, py: Python) -> PyResult<Option<PyObject>> {
         use crate::ffi::subgraphs::subgraph::PySubgraph;
         use groggy::subgraphs::Subgraph;
-        
 
         if let Some(subgraph_id) = self.inner.contained_subgraph_id() {
             // Get the graph reference
@@ -589,7 +587,7 @@ impl PyMetaNodeOld {
 /// Convert aggregation functions dict from Python to Rust
 #[allow(dead_code)]
 pub fn parse_aggregation_functions(
-   _py: Python,
+    _py: Python,
     agg_dict: &PyDict,
 ) -> PyResult<HashMap<AttrName, AggregationFunction>> {
     let mut functions = HashMap::new();

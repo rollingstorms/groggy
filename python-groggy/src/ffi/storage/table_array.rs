@@ -2,7 +2,6 @@
 //!
 //! Provides a typed container for collections of table objects with full ArrayOps support
 
-
 use pyo3::prelude::*;
 use std::sync::Arc;
 
@@ -84,7 +83,6 @@ impl PyTableArray {
     fn extract_column(&self, py: Python, column_name: &str) -> PyResult<PyObject> {
         use crate::ffi::storage::array::PyBaseArray;
         use groggy::storage::array::ArrayArray;
-        
 
         let mut arrays = Vec::new();
         let mut keys = Vec::new();

@@ -310,10 +310,8 @@ impl PyBaseArray {
     /// Similar to pandas Series.isna()
     fn isna(&self) -> PyBaseArray {
         let bool_array = self.inner.isna();
-        let attr_values: Vec<RustAttrValue> = bool_array
-            .into_iter()
-            .map(RustAttrValue::Bool)
-            .collect();
+        let attr_values: Vec<RustAttrValue> =
+            bool_array.into_iter().map(RustAttrValue::Bool).collect();
         PyBaseArray {
             inner: BaseArray::new(attr_values),
         }
@@ -324,10 +322,8 @@ impl PyBaseArray {
     /// Similar to pandas Series.notna()
     fn notna(&self) -> PyBaseArray {
         let bool_array = self.inner.notna();
-        let attr_values: Vec<RustAttrValue> = bool_array
-            .into_iter()
-            .map(RustAttrValue::Bool)
-            .collect();
+        let attr_values: Vec<RustAttrValue> =
+            bool_array.into_iter().map(RustAttrValue::Bool).collect();
         PyBaseArray {
             inner: BaseArray::new(attr_values),
         }
@@ -1451,8 +1447,7 @@ impl PyBaseArray {
     /// reversed_array = array.reverse()
     /// ```
     pub fn reverse(&self) -> Self {
-        let mut reversed_values: Vec<groggy::types::AttrValue> =
-            self.inner.data().to_vec();
+        let mut reversed_values: Vec<groggy::types::AttrValue> = self.inner.data().to_vec();
         reversed_values.reverse();
 
         Self {

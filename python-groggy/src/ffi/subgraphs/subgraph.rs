@@ -1121,7 +1121,7 @@ impl PySubgraph {
             Ok(Some(boxed_subgraph)) => {
                 // Create a concrete Subgraph from the trait object data
                 use groggy::subgraphs::Subgraph;
-                
+
                 let concrete_subgraph = Subgraph::new(
                     self.inner.graph(),
                     boxed_subgraph.node_set().clone(),
@@ -1146,7 +1146,7 @@ impl PySubgraph {
             Ok(boxed_subgraph) => {
                 // Create a concrete Subgraph from the trait object data
                 use groggy::subgraphs::Subgraph;
-                
+
                 let concrete_subgraph = Subgraph::new(
                     self.inner.graph(),
                     boxed_subgraph.node_set().clone(),
@@ -1170,7 +1170,7 @@ impl PySubgraph {
             Ok(boxed_subgraph) => {
                 // Create a concrete Subgraph from the trait object data
                 use groggy::subgraphs::Subgraph;
-                
+
                 let concrete_subgraph = Subgraph::new(
                     self.inner.graph(),
                     boxed_subgraph.node_set().clone(),

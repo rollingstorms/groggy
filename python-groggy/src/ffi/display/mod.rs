@@ -39,7 +39,7 @@ impl PyDisplayConfig {
 
     /// Create DisplayConfig with default values
     #[staticmethod]
-    #[allow(clippy::should_implement_trait)]  // Intentional: static method for Python API
+    #[allow(clippy::should_implement_trait)] // Intentional: static method for Python API
     pub fn default() -> Self {
         Self {
             config: groggy::display::DisplayConfig::default(),

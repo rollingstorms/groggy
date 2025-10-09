@@ -78,9 +78,7 @@ impl PyGraph {
             // Create a column for each matrix column as NumArray
             for col_idx in 0..cols {
                 let column_values: Vec<f64> = (0..rows)
-                    .map(|row_idx| {
-                        adjacency_matrix.get(row_idx, col_idx).unwrap_or(0.0)
-                    })
+                    .map(|row_idx| adjacency_matrix.get(row_idx, col_idx).unwrap_or(0.0))
                     .collect();
 
                 let num_array = PyNumArray::new(column_values);
@@ -1375,10 +1373,7 @@ impl PyGraph {
     }
 
     /// Convert graph to attribute matrix - delegates to PyGraphMatrixHelper
-    fn to_matrix(
-        &self,
-        py: Python,
-    ) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
+    fn to_matrix(&self, py: Python) -> PyResult<Py<crate::ffi::storage::matrix::PyGraphMatrix>> {
         let matrix_handler = PyGraphMatrixHelper::new(Py::new(py, self.clone())?)?;
         matrix_handler.to_matrix(py)
     }
