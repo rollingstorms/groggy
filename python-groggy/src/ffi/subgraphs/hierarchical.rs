@@ -311,16 +311,9 @@ impl PyEdgeAggregationFunction {
 /// Python wrapper for EdgeAggregationConfig
 #[pyclass(name = "EdgeAggregationConfig", unsendable)]
 #[derive(Clone)]
+#[derive(Default)]
 pub struct PyEdgeAggregationConfig {
     pub inner: EdgeAggregationConfig,
-}
-
-impl Default for PyEdgeAggregationConfig {
-    fn default() -> Self {
-        Self {
-            inner: EdgeAggregationConfig::default(),
-        }
-    }
 }
 
 #[pymethods]

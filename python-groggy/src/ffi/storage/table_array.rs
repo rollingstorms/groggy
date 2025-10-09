@@ -2,7 +2,7 @@
 //!
 //! Provides a typed container for collections of table objects with full ArrayOps support
 
-use groggy::storage::array::ArrayOps;
+
 use pyo3::prelude::*;
 use std::sync::Arc;
 

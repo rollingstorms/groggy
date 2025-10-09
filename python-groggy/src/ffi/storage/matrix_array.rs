@@ -1,7 +1,7 @@
 use crate::ffi::storage::matrix::PyGraphMatrix;
 use crate::ffi::storage::subgraph_array::PySubgraphArray;
 use crate::ffi::storage::table_array::PyTableArray;
-use groggy::storage::array::{ArrayIterator, ArrayOps, NumArray};
+use groggy::storage::array::{ArrayIterator, NumArray};
 use pyo3::prelude::*;
 use pyo3::types::PyFunction;
 
@@ -209,7 +209,7 @@ impl PyMatrixArray {
     fn filter(&self, predicate: &PyFunction) -> PyResult<Self> {
         let mut filtered = Vec::new();
 
-        Python::with_gil(|py| {
+        Python::with_gil(|_py| {
             for matrix in &self.matrices {
                 match predicate.call1((matrix.clone(),)) {
                     Ok(result) => {
@@ -369,7 +369,7 @@ impl PyMatrixArrayIterator {
         let elements = self.inner.clone().into_vec();
         let mut filtered = Vec::new();
 
-        Python::with_gil(|py| {
+        Python::with_gil(|_py| {
             for matrix in elements {
                 match predicate.call1((matrix.clone(),)) {
                     Ok(result) => {

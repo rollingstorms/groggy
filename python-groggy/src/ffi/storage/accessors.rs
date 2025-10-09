@@ -1907,10 +1907,8 @@ impl PyEdgesAccessor {
             // This aligns with how attribute arrays are built in _get_edge_attribute_column
             for (index, &edge_id) in all_edge_ids.iter().enumerate() {
                 // Use index position into BaseArray to get boolean value
-                if let Some(attr_value) = base_array.inner.get(index) {
-                    if let groggy::AttrValue::Bool(true) = attr_value {
-                        selected_edges.push(edge_id);
-                    }
+                if let Some(groggy::AttrValue::Bool(true)) = base_array.inner.get(index) {
+                    selected_edges.push(edge_id);
                 }
             }
 
@@ -2644,7 +2642,7 @@ impl PyEdgesAccessor {
 
         // Determine which edges to group
         let edge_ids: Vec<groggy::EdgeId> = if let Some(ref constrained) = self.constrained_edges {
-            constrained.iter().copied().collect::<Vec<groggy::EdgeId>>()
+            constrained.to_vec()
         } else {
             graph.edge_ids()
         };
@@ -2668,7 +2666,7 @@ impl PyEdgesAccessor {
             if has_all_attrs {
                 groups
                     .entry(key_values)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(edge_id);
             }
         }

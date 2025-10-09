@@ -365,7 +365,7 @@ impl PyGraphMatrix {
         match self.inner.get_row(row) {
             Some(row_array) => {
                 // GraphMatrix is always f64, so create f64 PyNumArray
-                let values: Vec<f64> = row_array.iter().copied().collect();
+                let values: Vec<f64> = row_array.to_vec();
                 let py_num_array = PyNumArray::new_float64(values);
                 Ok(Py::new(py, py_num_array)?.to_object(py))
             }
@@ -384,7 +384,7 @@ impl PyGraphMatrix {
         match self.inner.get_column_by_name(&name) {
             Some(column) => {
                 // GraphMatrix columns are always f64, so create f64 PyNumArray
-                let values: Vec<f64> = column.iter().copied().collect();
+                let values: Vec<f64> = column.to_vec();
                 let py_num_array = PyNumArray::new_float64(values);
                 Ok(Py::new(py, py_num_array)?.to_object(py))
             }
@@ -397,7 +397,7 @@ impl PyGraphMatrix {
         match self.inner.get_column(col) {
             Some(column) => {
                 // GraphMatrix columns are always f64, so create f64 PyNumArray
-                let values: Vec<f64> = column.iter().copied().collect();
+                let values: Vec<f64> = column.to_vec();
                 let py_num_array = PyNumArray::new_float64(values);
                 Ok(Py::new(py, py_num_array)?.to_object(py))
             }
@@ -422,7 +422,7 @@ impl PyGraphMatrix {
             match self.inner.get_row(i) {
                 Some(row_array) => {
                     // GraphMatrix rows are always f64, so create f64 PyNumArray
-                    let values: Vec<f64> = row_array.iter().copied().collect();
+                    let values: Vec<f64> = row_array.to_vec();
                     let py_num_array = PyNumArray::new_float64(values);
                     row_arrays.push(Py::new(py, py_num_array)?.to_object(py));
                 }
@@ -442,7 +442,7 @@ impl PyGraphMatrix {
             match self.inner.get_column(i) {
                 Some(col_array) => {
                     // GraphMatrix columns are always f64, so create f64 PyNumArray
-                    let values: Vec<f64> = col_array.iter().copied().collect();
+                    let values: Vec<f64> = col_array.to_vec();
                     let py_num_array = PyNumArray::new_float64(values);
                     col_arrays.push(Py::new(py, py_num_array)?.to_object(py));
                 }
@@ -588,7 +588,7 @@ impl PyGraphMatrix {
         })?;
         
         // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
-        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let f64_values: Vec<f64> = result_array.to_vec();
         let num_array = PyNumArray::new(f64_values);
         Ok(Py::new(py, num_array)?.to_object(py))
     }
@@ -610,7 +610,7 @@ impl PyGraphMatrix {
         })?;
         
         // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
-        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let f64_values: Vec<f64> = result_array.to_vec();
         let num_array = PyNumArray::new(f64_values);
         Ok(Py::new(py, num_array)?.to_object(py))
     }
@@ -632,7 +632,7 @@ impl PyGraphMatrix {
         })?;
         
         // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
-        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let f64_values: Vec<f64> = result_array.to_vec();
         let num_array = PyNumArray::new(f64_values);
         Ok(Py::new(py, num_array)?.to_object(py))
     }
@@ -654,7 +654,7 @@ impl PyGraphMatrix {
         })?;
         
         // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
-        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let f64_values: Vec<f64> = result_array.to_vec();
         let num_array = PyNumArray::new(f64_values);
         Ok(Py::new(py, num_array)?.to_object(py))
     }
@@ -676,7 +676,7 @@ impl PyGraphMatrix {
         })?;
         
         // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
-        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let f64_values: Vec<f64> = result_array.to_vec();
         let num_array = PyNumArray::new(f64_values);
         Ok(Py::new(py, num_array)?.to_object(py))
     }
@@ -698,7 +698,7 @@ impl PyGraphMatrix {
         })?;
         
         // Statistical results are numerical NumArray<f64>, convert directly to PyNumArray
-        let f64_values: Vec<f64> = result_array.iter().cloned().collect();
+        let f64_values: Vec<f64> = result_array.to_vec();
         let num_array = PyNumArray::new(f64_values);
         Ok(Py::new(py, num_array)?.to_object(py))
     }

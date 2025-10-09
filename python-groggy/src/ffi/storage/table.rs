@@ -8,7 +8,7 @@ use crate::ffi::storage::array::PyBaseArray;
 use crate::ffi::utils::{attr_value_to_python_value, python_value_to_attr_value};
 use crate::ffi::storage::num_array::PyNumArray;
 use crate::ffi::viz_accessor::VizAccessor;
-use groggy::storage::{array::ArrayOps, array::BaseArray, table::{BaseTable, NodesTable, EdgesTable, Table}};
+use groggy::storage::{array::BaseArray, table::{BaseTable, NodesTable, EdgesTable, Table}};
 use groggy::viz::streaming::data_source::DataSource as VizDataSource;  // Import DataSource trait for streaming methods
 use groggy::types::{NodeId, EdgeId, AttrValue, AttrValueType};
 use std::collections::HashMap;

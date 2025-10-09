@@ -1,4 +1,4 @@
-use groggy::storage::array::{BaseArray, ArrayIterator, ArrayOps};
+use groggy::storage::array::{BaseArray, ArrayIterator};
 use pyo3::prelude::*;
 use pyo3::types::PyFunction;
 use crate::ffi::storage::accessors::PyEdgesAccessor;
@@ -122,7 +122,7 @@ impl PyEdgesArray {
     fn filter(&self, predicate: &PyFunction) -> PyResult<Self> {
         let mut filtered = Vec::new();
         
-        Python::with_gil(|py| {
+        Python::with_gil(|_py| {
             for accessor in self.base.iter() {
                 match predicate.call1((accessor.clone(),)) {
                     Ok(result) => {
@@ -310,7 +310,7 @@ impl PyEdgesArrayIterator {
         let elements = self.inner.clone().into_vec();
         let mut filtered = Vec::new();
         
-        Python::with_gil(|py| {
+        Python::with_gil(|_py| {
             for accessor in elements {
                 match predicate.call1((accessor.clone(),)) {
                     Ok(result) => {

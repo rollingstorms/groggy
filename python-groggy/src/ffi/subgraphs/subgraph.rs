@@ -1233,7 +1233,6 @@ impl PySubgraph {
     /// })
     /// ```
     // === HIERARCHICAL OPERATIONS ===
-
     /// Get parent meta-node if this subgraph is contained within one
     /// NOTE: This feature is not yet implemented - always returns None
     fn parent_meta_node(&self, _py: Python) -> PyResult<Option<PyObject>> {

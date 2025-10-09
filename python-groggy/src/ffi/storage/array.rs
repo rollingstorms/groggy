@@ -1452,7 +1452,7 @@ impl PyBaseArray {
     /// ```
     pub fn reverse(&self) -> Self {
         let mut reversed_values: Vec<groggy::types::AttrValue> =
-            self.inner.data().iter().cloned().collect();
+            self.inner.data().to_vec();
         reversed_values.reverse();
 
         Self {

@@ -255,7 +255,6 @@ impl PyMetaNode {
         // Convert String keys to AttrName
         let rust_agg_functions: std::collections::HashMap<AttrName, String> = agg_functions
             .into_iter()
-            .map(|(k, v)| (k, v))
             .collect();
 
         self.inner.re_aggregate(rust_agg_functions).map_err(|e| {

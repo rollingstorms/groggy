@@ -11,7 +11,7 @@ use pyo3::prelude::*;
 #[pyfunction]
 pub fn relu(py: Python, matrix: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
     // For now, implement ReLU element-wise using existing matrix operations
-    let (rows, cols) = matrix.inner.shape();
+    let (_rows, cols) = matrix.inner.shape();
 
     // Create arrays for the result
     let mut result_arrays = Vec::new();
@@ -40,7 +40,7 @@ pub fn relu(py: Python, matrix: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
 /// Implements: nn.sigmoid(matrix) -> matrix
 #[pyfunction]
 pub fn sigmoid(py: Python, matrix: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
-    let (rows, cols) = matrix.inner.shape();
+    let (_rows, cols) = matrix.inner.shape();
 
     let mut result_arrays = Vec::new();
 
@@ -69,7 +69,7 @@ pub fn sigmoid(py: Python, matrix: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>
 /// Implements: nn.tanh(matrix) -> matrix  
 #[pyfunction]
 pub fn tanh(py: Python, matrix: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
-    let (rows, cols) = matrix.inner.shape();
+    let (_rows, cols) = matrix.inner.shape();
 
     let mut result_arrays = Vec::new();
 
@@ -152,7 +152,7 @@ pub fn softmax(py: Python, matrix: &PyGraphMatrix, dim: i32) -> PyResult<Py<PyGr
 /// Implements: nn.gelu(matrix) -> matrix
 #[pyfunction]
 pub fn gelu(py: Python, matrix: &PyGraphMatrix) -> PyResult<Py<PyGraphMatrix>> {
-    let (rows, cols) = matrix.inner.shape();
+    let (_rows, cols) = matrix.inner.shape();
 
     let mut result_arrays = Vec::new();
 
