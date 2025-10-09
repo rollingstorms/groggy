@@ -1977,6 +1977,7 @@ impl PyGraph {
     /// - warm_view: Whether to warm the view cache (default: true)
     /// - warm_traversal: Whether to warm traversal caches (default: true)
     /// - sample_node: Optional specific node to use for traversal warming (default: first node)
+    ///
     /// Future cache optimization
     #[allow(dead_code)]
     fn warm_caches(

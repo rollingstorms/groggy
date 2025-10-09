@@ -39,6 +39,15 @@ impl Clone for PyBaseTable {
     }
 }
 
+impl Default for PyBaseTable {
+    fn default() -> Self {
+        Self {
+            table: BaseTable::new(),
+            server_guards: RefCell::new(Vec::new()),
+        }
+    }
+}
+
 #[pymethods]
 impl PyBaseTable {
     /// Create a new empty BaseTable
@@ -530,7 +539,7 @@ impl PyBaseTable {
         
         // Convert to PyBaseTable objects
         let py_tables: Vec<PyBaseTable> = grouped_tables.into_iter()
-            .map(|table| PyBaseTable::from_table(table))
+            .map(PyBaseTable::from_table)
             .collect();
         
         Ok(PyTableArray {
@@ -592,7 +601,7 @@ impl PyBaseTable {
         let mut data_dict = std::collections::HashMap::new();
         
         for col_name in self.table.column_names() {
-            if let Some(column) = self.table.column(&col_name) {
+            if let Some(column) = self.table.column(col_name) {
                 // Convert BaseArray to AttrValue list and then to Python list
                 let attr_values = column.data();
                 let py_objects: Vec<_> = attr_values.iter()
@@ -631,7 +640,7 @@ impl PyBaseTable {
                 let mut new_columns = std::collections::HashMap::new();
 
                 for col_name in self.table.column_names() {
-                    if let Some(column) = self.table.column(&col_name) {
+                    if let Some(column) = self.table.column(col_name) {
                         // Try to convert the column to the requested type
                         // For now, just clone - full type conversion would require more logic
                         new_columns.insert(col_name.clone(), column.clone());
@@ -1586,7 +1595,7 @@ impl PyBaseTable {
     /// new_table = table.drop_duplicates(["name", "age"])
     /// ```
     pub fn drop_duplicates(&self, subset: Option<Vec<String>>) -> PyResult<Self> {
-        let subset_slice = subset.as_ref().map(|v| v.as_slice());
+        let subset_slice = subset.as_deref();
         let result = self.table.drop_duplicates(subset_slice)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Drop duplicates failed: {}", e)))?;
 
@@ -1625,7 +1634,7 @@ impl PyBaseTable {
 
         // Convert boolean mask to BaseArray<AttrValue>
         let mask_attr_values: Vec<AttrValue> = mask.into_iter()
-            .map(|b| AttrValue::Bool(b))
+            .map(AttrValue::Bool)
             .collect();
 
         Ok(PyBaseArray {
@@ -2379,7 +2388,7 @@ impl PyBaseTable {
     /// BaseArray with shifted values
     pub fn shift(&self, column: &str, periods: i32, fill_value: Option<PyObject>) -> PyResult<crate::ffi::storage::array::PyBaseArray> {
         let rust_fill_value = if let Some(py_value) = fill_value {
-            Python::with_gil(|py| python_value_to_attr_value(&py_value.as_ref(py)))?
+            Python::with_gil(|py| python_value_to_attr_value(py_value.as_ref(py)))?
         } else {
             AttrValue::Null
         };
@@ -2907,9 +2916,9 @@ impl PyNodesTable {
         };
         
         // TODO: Implement attribute conversion (temporarily disabled to fix compilation)
-        return Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
+        Err(PyErr::new::<pyo3::exceptions::PyNotImplementedError, _>(
             "with_attributes method temporarily disabled - under development"
-        ));
+        ))
     }
     
     /// Filter nodes by attribute value
@@ -2928,7 +2937,7 @@ impl PyNodesTable {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             
         Ok(values.into_iter()
-            .map(|v| crate::ffi::types::PyAttrValue::new(v))
+            .map(crate::ffi::types::PyAttrValue::new)
             .collect())
     }
     
@@ -3757,7 +3766,7 @@ impl PyEdgesTable {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
             
         Ok(values.into_iter()
-            .map(|v| crate::ffi::types::PyAttrValue::new(v))
+            .map(crate::ffi::types::PyAttrValue::new)
             .collect())
     }
     
@@ -4637,7 +4646,7 @@ impl PyGraphTable {
     pub fn from_federated_bundles(bundle_paths: Vec<&str>, domain_names: Option<Vec<String>>) -> PyResult<PyGraphTable> {
         use std::path::Path;
         
-        let paths: Vec<&Path> = bundle_paths.iter().map(|s| Path::new(s)).collect();
+        let paths: Vec<&Path> = bundle_paths.iter().map(Path::new).collect();
         
         let table = groggy::storage::table::GraphTable::from_federated_bundles(paths, domain_names)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;

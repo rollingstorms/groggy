@@ -48,7 +48,7 @@ impl NumericArrayData {
     }
 
     /// Check if empty
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
@@ -495,7 +495,7 @@ impl PyNumArray {
     }
 
     /// Check if empty
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 

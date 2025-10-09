@@ -856,17 +856,17 @@ impl PyGraphMatrix {
         let mut col_widths = vec![5; sample_cols]; // minimum width of 5
         
         // Check header widths
-        for j in 0..sample_cols {
+        for (j, width) in col_widths.iter_mut().enumerate().take(sample_cols) {
             let header = format!("col_{}", j);
-            col_widths[j] = std::cmp::max(col_widths[j], header.len());
+            *width = std::cmp::max(*width, header.len());
         }
         
         // Check data widths
         for i in 0..sample_rows {
-            for j in 0..sample_cols {
+            for (j, width) in col_widths.iter_mut().enumerate().take(sample_cols) {
                 if let Some(value) = self.inner.get(i, j) {
                     let value_str = format!("{}", value);
-                    col_widths[j] = std::cmp::max(col_widths[j], value_str.len());
+                    *width = std::cmp::max(*width, value_str.len());
                 }
             }
         }
@@ -970,10 +970,7 @@ impl PyGraphMatrix {
             // html.push_str(&format!(r#"<th class="row-header">{}</th>"#, row));
             // Data cells
             for col in 0..cols {
-                let value = match self.inner.get(row, col) {
-                    Some(v) => v,
-                    None => 0.0,
-                };
+                let value = self.inner.get(row, col).unwrap_or(0.0);
                 let formatted_value = if value.abs() < 1e-10 { 
                     "0.0".to_string() 
                 } else { 
@@ -1123,13 +1120,13 @@ impl PyGraphMatrix {
                 .map_err(|e| PyRuntimeError::new_err(format!("Scalar addition failed: {:?}", e)))?;
             
             let result = &self.inner + &scalar_matrix;
-            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
+            return Py::new(py, PyGraphMatrix { inner: result });
         }
         
         // Try matrix addition
         if let Ok(other_matrix) = other.extract::<PyRef<PyGraphMatrix>>() {
             let result = &self.inner + &other_matrix.inner;
-            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
+            return Py::new(py, PyGraphMatrix { inner: result });
         }
         
         Err(PyTypeError::new_err("Unsupported operand type for matrix addition"))
@@ -1152,13 +1149,13 @@ impl PyGraphMatrix {
                 .map_err(|e| PyRuntimeError::new_err(format!("Scalar subtraction failed: {:?}", e)))?;
             
             let result = &self.inner - &scalar_matrix;
-            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
+            return Py::new(py, PyGraphMatrix { inner: result });
         }
         
         // Try matrix subtraction
         if let Ok(other_matrix) = other.extract::<PyRef<PyGraphMatrix>>() {
             let result = &self.inner - &other_matrix.inner;
-            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
+            return Py::new(py, PyGraphMatrix { inner: result });
         }
         
         Err(PyTypeError::new_err("Unsupported operand type for matrix subtraction"))
@@ -1208,7 +1205,7 @@ impl PyGraphMatrix {
             let result = self.inner.elementwise_multiply(&reciprocal_matrix).map_err(|e| 
                 PyRuntimeError::new_err(format!("Division failed: {:?}", e)))?;
             
-            return Ok(Py::new(py, PyGraphMatrix { inner: result })?);
+            return Py::new(py, PyGraphMatrix { inner: result });
         }
         
         Err(PyTypeError::new_err("Matrix division only supports scalar divisor"))
@@ -1231,7 +1228,7 @@ impl PyGraphMatrix {
         let result = self.inner.elementwise_multiply(&neg_one_matrix).map_err(|e| 
             PyRuntimeError::new_err(format!("Negation failed: {:?}", e)))?;
         
-        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+        Py::new(py, PyGraphMatrix { inner: result })
     }
 
     /// Absolute value operator (abs)
@@ -1256,7 +1253,7 @@ impl PyGraphMatrix {
         let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
             .map_err(|e| PyRuntimeError::new_err(format!("Absolute value operation failed: {:?}", e)))?;
         
-        Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?)
+        Py::new(py, PyGraphMatrix { inner: result_matrix })
     }
 
     /// Comparison operator (>)
@@ -1281,7 +1278,7 @@ impl PyGraphMatrix {
             let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
                 .map_err(|e| PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e)))?;
             
-            return Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?);
+            return Py::new(py, PyGraphMatrix { inner: result_matrix });
         }
         
         Err(PyTypeError::new_err("Comparison operations only support scalar values"))
@@ -1309,7 +1306,7 @@ impl PyGraphMatrix {
             let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
                 .map_err(|e| PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e)))?;
             
-            return Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?);
+            return Py::new(py, PyGraphMatrix { inner: result_matrix });
         }
         
         Err(PyTypeError::new_err("Comparison operations only support scalar values"))
@@ -1337,7 +1334,7 @@ impl PyGraphMatrix {
             let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
                 .map_err(|e| PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e)))?;
             
-            return Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?);
+            return Py::new(py, PyGraphMatrix { inner: result_matrix });
         }
         
         Err(PyTypeError::new_err("Comparison operations only support scalar values"))
@@ -1365,7 +1362,7 @@ impl PyGraphMatrix {
             let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
                 .map_err(|e| PyRuntimeError::new_err(format!("Comparison operation failed: {:?}", e)))?;
             
-            return Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?);
+            return Py::new(py, PyGraphMatrix { inner: result_matrix });
         }
         
         Err(PyTypeError::new_err("Comparison operations only support scalar values"))
@@ -1433,7 +1430,7 @@ impl PyGraphMatrix {
         for i in 0..rows {
             let mut row = Vec::new();
             for j in 0..cols {
-                let val = materialized.get(i, j).unwrap_or_else(|| Default::default());
+                let val = materialized.get(i, j).unwrap_or_else(Default::default);
                 row.push(val.to_object(py));
             }
             py_matrix.push(row);
@@ -1660,7 +1657,7 @@ impl PyGraphMatrix {
             })
             .collect();
         
-        let values = numeric_values.map_err(|e| PyTypeError::new_err(e))?;
+        let values = numeric_values.map_err(PyTypeError::new_err)?;
         
         // Reshape into column vectors (row-major to column-major)
         let mut columns = Vec::new();
@@ -1853,7 +1850,7 @@ impl PyGraphMatrix {
             PyRuntimeError::new_err(format!("Cholesky decomposition failed: {:?}", e))
         })?;
         
-        Ok(Py::new(py, PyGraphMatrix { inner: l_matrix })?)
+        Py::new(py, PyGraphMatrix { inner: l_matrix })
     }
 
     /// Eigenvalue decomposition: A * V = V * Λ
@@ -1887,7 +1884,7 @@ impl PyGraphMatrix {
             PyRuntimeError::new_err(format!("Matrix tiling failed: {:?}", e))
         })?;
         
-        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+        Py::new(py, PyGraphMatrix { inner: result })
     }
 
     /// Repeat elements of the matrix along a specified axis
@@ -1897,7 +1894,7 @@ impl PyGraphMatrix {
             PyRuntimeError::new_err(format!("Matrix repeat failed: {:?}", e))
         })?;
         
-        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+        Py::new(py, PyGraphMatrix { inner: result })
     }
 
     /// Element-wise absolute value
@@ -1906,7 +1903,7 @@ impl PyGraphMatrix {
             PyRuntimeError::new_err(format!("Element-wise abs failed: {:?}", e))
         })?;
         
-        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+        Py::new(py, PyGraphMatrix { inner: result })
     }
 
     /// Element-wise exponential (e^x)
@@ -1915,7 +1912,7 @@ impl PyGraphMatrix {
             PyRuntimeError::new_err(format!("Element-wise exp failed: {:?}", e))
         })?;
         
-        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+        Py::new(py, PyGraphMatrix { inner: result })
     }
 
     /// Element-wise natural logarithm
@@ -1924,7 +1921,7 @@ impl PyGraphMatrix {
             PyRuntimeError::new_err(format!("Element-wise log failed: {:?}", e))
         })?;
         
-        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+        Py::new(py, PyGraphMatrix { inner: result })
     }
 
     /// Element-wise square root
@@ -1933,7 +1930,7 @@ impl PyGraphMatrix {
             PyRuntimeError::new_err(format!("Element-wise sqrt failed: {:?}", e))
         })?;
         
-        Ok(Py::new(py, PyGraphMatrix { inner: result })?)
+        Py::new(py, PyGraphMatrix { inner: result })
     }
 
     // === CONVERSION OPERATIONS ===
@@ -2002,7 +1999,7 @@ impl PyGraphMatrix {
         let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
             .map_err(|e| PyRuntimeError::new_err(format!("Apply operation failed: {:?}", e)))?;
         
-        Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?)
+        Py::new(py, PyGraphMatrix { inner: result_matrix })
     }
 
     /// Map a Python function over matrix elements (alias for apply)
@@ -2038,7 +2035,7 @@ impl PyGraphMatrix {
         let result_matrix = groggy::storage::GraphMatrix::from_arrays(result_arrays)
             .map_err(|e| PyRuntimeError::new_err(format!("Filter operation failed: {:?}", e)))?;
         
-        Ok(Py::new(py, PyGraphMatrix { inner: result_matrix })?)
+        Py::new(py, PyGraphMatrix { inner: result_matrix })
     }
 
     // === ITERATION SUPPORT ===

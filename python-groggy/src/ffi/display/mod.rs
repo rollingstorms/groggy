@@ -9,17 +9,9 @@ use std::collections::HashMap;
 
 /// Python wrapper for DisplayConfig
 #[pyclass(name = "DisplayConfig", module = "groggy.display")]
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct PyDisplayConfig {
     config: groggy::display::DisplayConfig,
-}
-
-impl Default for PyDisplayConfig {
-    fn default() -> Self {
-        Self {
-            config: groggy::display::DisplayConfig::default(),
-        }
-    }
 }
 
 #[pymethods]
@@ -47,6 +39,7 @@ impl PyDisplayConfig {
 
     /// Create DisplayConfig with default values
     #[staticmethod]
+    #[allow(clippy::should_implement_trait)]  // Intentional: static method for Python API
     pub fn default() -> Self {
         Self {
             config: groggy::display::DisplayConfig::default(),
