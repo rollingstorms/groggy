@@ -442,7 +442,8 @@ class TestSubgraphOperationsCore(SubgraphTestBase, SubgraphOperationsTestMixin):
         assert isinstance(adjacency, dict), "adjacency_list() should return dict"
         assert adjacency, "Adjacency list should include entries"
 
-        matrix = subgraph.adjacency_matrix()
+        # Use to_matrix() to get adjacency matrix representation
+        matrix = subgraph.to_matrix()
         rows, cols = matrix.shape
         assert rows == cols == subgraph.node_count(), "Adjacency matrix dimensions should match node count"
 
