@@ -135,6 +135,8 @@ impl PyComponentsArray {
         entity_type = "meta",
         allow_missing_attributes = true
     ))]
+    // TODO: Refactor to use config/builder pattern
+    #[allow(clippy::too_many_arguments)]
     fn collapse(
         &self,
         py: Python,
@@ -462,6 +464,8 @@ impl PyComponentsIterator {
 
     /// Collapse subgraphs into meta-nodes with aggregations
     /// Enables: g.connected_components().iter().collapse({'avg_age': ('mean', 'age')})
+    // TODO: Refactor to use config/builder pattern
+    #[allow(clippy::too_many_arguments)]
     fn collapse(slf: PyRefMut<Self>, aggs: &PyDict) -> PyResult<PyMetaNodeIterator> {
         // Convert PyDict to HashMap<String, String> for now
         let mut agg_map = std::collections::HashMap::new();

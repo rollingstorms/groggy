@@ -454,6 +454,8 @@ impl PyGraph {
 
     /// Add multiple edges at once
     #[pyo3(signature = (edges, node_mapping = None, uid_key = None, source = None, target = None, warm_cache = None))]
+    // TODO: Refactor to use config/builder pattern
+    #[allow(clippy::too_many_arguments)]
     fn add_edges(
         &mut self,
         py: Python,

@@ -1316,6 +1316,8 @@ impl PySubgraph {
         entity_type = "meta",
         allow_missing_attributes = true
     ))]
+    // TODO: Refactor to use config/builder pattern
+    #[allow(clippy::too_many_arguments)]
     pub fn collapse(
         &self,
         py: Python,

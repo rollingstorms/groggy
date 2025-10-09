@@ -23,6 +23,7 @@ pub struct PySubgraphArray {
 
 impl PySubgraphArray {
     /// Create new PySubgraphArray from vector of subgraphs
+    #[allow(clippy::arc_with_non_send_sync)]
     pub fn new(subgraphs: Vec<PySubgraph>) -> Self {
         Self {
             inner: Arc::new(subgraphs),
@@ -240,6 +241,8 @@ impl PySubgraphArray {
         entity_type = "meta",
         allow_missing_attributes = true
     ))]
+    // TODO: Refactor to use config/builder pattern
+    #[allow(clippy::too_many_arguments)]
     fn collapse(
         &self,
         py: Python,
