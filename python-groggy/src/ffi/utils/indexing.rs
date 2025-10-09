@@ -103,6 +103,13 @@ pub fn python_index_to_slice_index(py: Python, index: &PyAny) -> PyResult<SliceI
 }
 
 /// Convert Python slice indices with length constraint
+///
+/// # Future Feature
+///
+/// Designed for advanced slicing operations. Currently unused as basic
+/// indexing patterns handle most use cases. Will be integrated when
+/// NumPy-style advanced indexing is added to the Python API.
+#[allow(dead_code)]
 pub fn python_slice_to_slice_index(
    _py: Python,
     slice: &PySlice,

@@ -72,6 +72,7 @@ pub use ffi::viz_accessor::VizAccessor;
 ///   gr.num_array([1.0, 2.5, 3.7])
 #[pyfunction]
 #[pyo3(signature = (values))]
+#[allow(dead_code)]
 fn num_array(values: Vec<f64>) -> PyResult<PyNumArray> {
     Ok(PyNumArray::new(values))
 }
@@ -408,6 +409,7 @@ fn table(py: Python, data: &PyAny) -> PyResult<PyObject> {
 /// Create NumArray with bool dtype (replaces BoolArray constructor)
 #[pyfunction]
 #[pyo3(name = "bool_array")]
+#[allow(dead_code)]
 fn bool_array_factory(values: Vec<bool>) -> PyNumArray {
     PyNumArray::new_bool(values)
 }
@@ -431,6 +433,7 @@ fn zeros_bool_factory(size: usize) -> PyNumArray {
 /// Integer array factory function (backward compatibility)
 #[pyfunction]
 #[pyo3(name = "int_array")]
+#[allow(dead_code)]
 fn int_array_factory(values: Vec<i64>) -> PyNumArray {
     PyNumArray::new_int64(values)
 }

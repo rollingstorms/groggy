@@ -400,6 +400,7 @@ impl PyEdgeAggregationConfig {
 }
 
 /// Parse edge aggregation configuration from Python dict
+#[allow(dead_code)]
 pub fn parse_edge_config(edge_config_dict: Option<&PyDict>) -> PyResult<EdgeAggregationConfig> {
     if let Some(config_dict) = edge_config_dict {
         // Try to extract as EdgeAggregationConfig object first
@@ -588,6 +589,7 @@ impl PyMetaNodeOld {
 }
 
 /// Convert aggregation functions dict from Python to Rust
+#[allow(dead_code)]
 pub fn parse_aggregation_functions(
    _py: Python,
     agg_dict: &PyDict,
@@ -620,6 +622,7 @@ pub fn parse_aggregation_functions(
 }
 
 /// Helper functions for hierarchical operations on subgraphs
+#[allow(dead_code)]
 pub trait PyHierarchicalOperations {
     /// Collapse subgraph to meta-node with attribute aggregation
     fn add_to_graph(&self, py: Python, agg_functions: Option<&PyDict>) -> PyResult<PyObject>;

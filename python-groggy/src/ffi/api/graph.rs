@@ -51,48 +51,54 @@ impl PyAggregationResult {
     }
 }
 
-/// Convert AdjacencyMatrix to Python object - DELEGATION helper
-impl PyGraph {
-    pub(crate) fn adjacency_matrix_to_py_object(
-        &self,
-        py: Python,
-        matrix: groggy::AdjacencyMatrix,
-    ) -> PyResult<PyObject> {
-        use crate::ffi::storage::matrix::PyGraphMatrix;
-        use pyo3::types::PyDict;
-
-        // Create metadata dict
-        let result_dict = PyDict::new(py);
-        let (rows, cols) = matrix.shape();
-        result_dict.set_item("size", (rows, cols))?;
-        result_dict.set_item("is_sparse", matrix.is_sparse())?;
-        result_dict.set_item("type", "adjacency_matrix")?;
-
-        // Convert to GraphMatrix for structured access
-        match self.adjacency_matrix_to_graph_matrix(matrix) {
-            Ok(graph_matrix) => {
-                let py_matrix = PyGraphMatrix {
-                    inner: graph_matrix,
-                };
-                result_dict.set_item("matrix", Py::new(py, py_matrix)?)?;
-            }
-            Err(_) => {
-                // Fallback to basic matrix representation
-                result_dict.set_item("matrix", py.None())?;
-                result_dict.set_item("error", "Matrix conversion failed")?;
-            }
-        }
-
-        Ok(result_dict.to_object(py))
-    }
-}
-
 /// Python wrapper for the main Graph
 #[pyclass(name = "Graph", unsendable)]
 pub struct PyGraph {
     pub inner: Rc<RefCell<RustGraph>>,
     // Cache for the full graph view to avoid expensive recreation
     pub cached_view: RefCell<Option<(u64, Py<PySubgraph>)>>, // (version, cached_subgraph)
+}
+
+impl PyGraph {
+    /// Convert core AdjacencyMatrix to GraphMatrix for Python FFI
+    ///
+    /// Helper function used by laplacian_matrix() to convert the result
+    /// from core library format to Python-accessible GraphMatrix.
+    pub(crate) fn adjacency_matrix_to_graph_matrix(
+        &self,
+        adjacency_matrix: groggy::AdjacencyMatrix,
+    ) -> PyResult<groggy::GraphMatrix> {
+        use crate::ffi::storage::num_array::PyNumArray;
+
+        // Extract matrix data and convert to NumArrays (numerical adjacency data)
+        let (rows, cols) = adjacency_matrix.shape();
+        let mut py_arrays: Vec<PyObject> = Vec::with_capacity(cols);
+
+        Python::with_gil(|py| {
+            // Create a column for each matrix column as NumArray
+            for col_idx in 0..cols {
+                let column_values: Vec<f64> = (0..rows)
+                    .map(|row_idx| {
+                        adjacency_matrix.get(row_idx, col_idx).unwrap_or(0.0)
+                    })
+                    .collect();
+
+                let num_array = PyNumArray::new(column_values);
+                py_arrays.push(Py::new(py, num_array)?.to_object(py));
+            }
+
+            // Create GraphMatrix using the new constructor that accepts PyObject arrays
+            let matrix = crate::ffi::storage::matrix::PyGraphMatrix::new(py, py_arrays)?;
+
+            // Set proper column names
+            let column_names: Vec<String> = (0..cols).map(|i| format!("col_{}", i)).collect();
+
+            let mut inner_matrix = matrix.inner;
+            inner_matrix.set_column_names(column_names);
+
+            Ok(inner_matrix)
+        })
+    }
 }
 
 impl Clone for PyGraph {
@@ -1873,50 +1879,6 @@ impl PyGraph {
 
 // Internal methods for FFI integration (not exposed to Python)
 impl PyGraph {
-    /// Get shared reference to the graph for creating RustSubgraphs
-    /// Convert core AdjacencyMatrix to GraphMatrix for Python FFI
-    pub(crate) fn adjacency_matrix_to_graph_matrix(
-        &self,
-        adjacency_matrix: groggy::AdjacencyMatrix,
-    ) -> PyResult<groggy::GraphMatrix> {
-        
-        use crate::ffi::storage::num_array::PyNumArray;
-        
-        
-
-        // Extract matrix data and convert to NumArrays (numerical adjacency data)
-        // Phase 2.2: Updated to use NumArray since adjacency matrices are always numerical
-        let (rows, cols) = adjacency_matrix.shape();
-        let mut py_arrays: Vec<PyObject> = Vec::with_capacity(cols);
-
-        Python::with_gil(|py| {
-            // Create a column for each matrix column as NumArray
-            for col_idx in 0..cols {
-                let column_values: Vec<f64> = (0..rows)
-                    .map(|row_idx| {
-                        // GraphMatrix.get() now returns Option<&f64>
-                        adjacency_matrix.get(row_idx, col_idx).unwrap_or(0.0)
-                    })
-                    .collect();
-
-                // Create NumArray since adjacency matrices are always numerical
-                let num_array = PyNumArray::new(column_values);
-                py_arrays.push(Py::new(py, num_array)?.to_object(py));
-            }
-
-            // Create GraphMatrix using the new constructor that accepts PyObject arrays
-            let matrix = crate::ffi::storage::matrix::PyGraphMatrix::new(py, py_arrays)?;
-
-            // Set proper column names (for now, use default names)
-            let column_names: Vec<String> = (0..cols).map(|i| format!("col_{}", i)).collect();
-
-            // Update the GraphMatrix with proper column names
-            let mut inner_matrix = matrix.inner;
-            inner_matrix.set_column_names(column_names);
-
-            Ok(inner_matrix)
-        })
-    }
     /// Internal helper methods for accessors/views
     pub fn create_node_view_internal(
         graph: Py<PyGraph>,

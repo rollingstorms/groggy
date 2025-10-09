@@ -85,7 +85,14 @@ fn networkx_value_to_python(py: Python, value: &NetworkXValue) -> PyResult<PyObj
 
 /// Convert a Python NetworkX graph to our internal NetworkXGraph representation
 ///
-/// This is for future bidirectional conversion support.
+/// # Future Feature
+///
+/// This function is designed for bidirectional NetworkX conversion support,
+/// allowing users to import NetworkX graphs into Groggy. Currently unused as
+/// the primary use case is exporting Groggy graphs to NetworkX format.
+///
+/// Planned for future release when import functionality is added to the Python API.
+#[allow(dead_code)]
 pub fn python_to_networkx_graph(py: Python, py_graph: &PyAny) -> PyResult<NetworkXGraph> {
     // Check if it's a NetworkX graph
     let networkx = py
@@ -163,6 +170,12 @@ pub fn python_to_networkx_graph(py: Python, py_graph: &PyAny) -> PyResult<Networ
 }
 
 /// Convert a Python value to NetworkXValue
+///
+/// # Future Feature
+///
+/// Helper function for bidirectional NetworkX conversion. Currently unused but
+/// will be needed when importing NetworkX graphs into Groggy.
+#[allow(dead_code)]
 fn python_to_networkx_value(py_value: &PyAny) -> PyResult<NetworkXValue> {
     if py_value.is_none() {
         Ok(NetworkXValue::Null)

@@ -23,7 +23,13 @@ use serde_json::{Map, Value};
 #[pyclass(name = "BaseTable", module = "groggy")]
 pub struct PyBaseTable {
     pub(crate) table: BaseTable,
-    // Keep-alive guards for streaming servers spawned by this table
+    /// Keep-alive guards for streaming servers spawned by this table
+    ///
+    /// # Future Feature
+    ///
+    /// Designed to hold server handles for active visualization streams.
+    /// Currently unused as streaming is not yet exposed in the Python API.
+    #[allow(dead_code)]
     server_guards: RefCell<Vec<groggy::viz::streaming::types::ServerHandle>>,
 }
 

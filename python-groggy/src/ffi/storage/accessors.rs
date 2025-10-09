@@ -1360,7 +1360,8 @@ impl PyNodesAccessor {
         // Normalize input so we always work with attribute-centric format:
         // {"attr": {node_id: value}}. Users can also pass
         // {node_id: {"attr": value}} and we'll adapt it here.
-        let mut normalized_holder: Option<Py<PyDict>> = None;
+        // Note: holder is needed to keep normalized dict alive, though not directly read
+        let mut _normalized_holder: Option<Py<PyDict>> = None;
         let mut attrs_dict_ref = attrs_dict;
 
         if let Some((first_key, _)) = attrs_dict.iter().next() {
@@ -1394,8 +1395,8 @@ impl PyNodesAccessor {
                     }
                 }
 
-                normalized_holder = Some(normalized.into());
-                attrs_dict_ref = normalized_holder.as_ref().unwrap().as_ref(py);
+                _normalized_holder = Some(normalized.into());
+                attrs_dict_ref = _normalized_holder.as_ref().unwrap().as_ref(py);
             }
         }
 
@@ -1431,6 +1432,12 @@ impl PyNodesAccessor {
     }
 
     /// Apply auto-slicing to remove columns that are all NaN/None for the given node set
+    ///
+    /// # Future Feature
+    ///
+    /// Designed for automatic column pruning in table operations. Currently unused but
+    /// planned for future optimization passes.
+    #[allow(dead_code)]
     fn apply_node_auto_slice(
         &self,
         table: groggy::storage::table::BaseTable,
@@ -2995,6 +3002,11 @@ impl PyEdgesAccessor {
     }
 
     /// Apply auto-slicing to remove columns that are all NaN/None for the given edge set
+    ///
+    /// # Future Feature
+    ///
+    /// Designed for automatic column pruning in table operations for edges.
+    #[allow(dead_code)]
     fn apply_edge_auto_slice(
         &self,
         table: groggy::storage::table::BaseTable,

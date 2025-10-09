@@ -982,6 +982,7 @@ except Exception as e:
 }
 
 /// Extract port number from iframe HTML
+#[allow(dead_code)]
 fn extract_port_from_iframe(iframe_html: &str) -> Option<u16> {
     // Simple regex-free port extraction
     if let Some(start) = iframe_html.find("http://127.0.0.1:") {
