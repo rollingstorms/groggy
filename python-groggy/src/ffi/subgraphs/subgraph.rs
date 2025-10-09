@@ -1602,6 +1602,8 @@ impl PySubgraph {
 }
 
 /// Parse enhanced aggregation specification from Python dict supporting three syntax forms
+/// Future feature for enhanced aggregation
+#[allow(dead_code)]
 fn parse_enhanced_aggregation_spec(
     py_dict: &pyo3::types::PyDict,
 ) -> PyResult<Vec<groggy::traits::subgraph_operations::AggregationSpec>> {

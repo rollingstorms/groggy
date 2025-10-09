@@ -1092,18 +1092,24 @@ impl PyNumArrayIterator {
 
 /// Create NumArray with int64 dtype (replaces IntArray)
 #[pyfunction]
+/// Future feature: direct array construction
+#[allow(dead_code)]
 pub fn int_array(values: Vec<i64>) -> PyNumArray {
     PyNumArray::new_int64(values)
 }
 
 /// Create NumArray with bool dtype (replaces BoolArray)  
 #[pyfunction]
+/// Future feature: direct array construction
+#[allow(dead_code)]
 pub fn bool_array(values: Vec<bool>) -> PyNumArray {
     PyNumArray::new_bool(values)
 }
 
 /// Create NumArray with float64 dtype
 #[pyfunction]
+/// Future feature: direct array construction
+#[allow(dead_code)]
 pub fn num_array(values: Vec<f64>) -> PyNumArray {
     PyNumArray::new_float64(values)
 }

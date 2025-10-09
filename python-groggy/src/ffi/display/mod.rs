@@ -181,6 +181,8 @@ fn python_to_json_value(py_obj: PyObject) -> PyResult<Value> {
 }
 
 /// Helper trait to convert tables to display data
+/// Future feature for display data conversion
+#[allow(dead_code)]
 pub trait ToDisplayData {
     fn to_display_data(&self) -> HashMap<String, Value>;
 }

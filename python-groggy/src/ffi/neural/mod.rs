@@ -21,6 +21,8 @@ pub fn neural(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 /// Create neural submodule for registration
+/// Future feature: neural network submodule
+#[allow(dead_code)]
 pub fn create_neural_submodule(py: Python) -> PyResult<&PyModule> {
     PyModule::new(py, "neural")
 }

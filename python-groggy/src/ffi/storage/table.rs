@@ -5596,7 +5596,9 @@ impl PyTableArray {
 enum AggregationKind {
     Mean,
     Max,
+    #[allow(dead_code)]
     Min,
+    #[allow(dead_code)]
     Sum,
     All,
 }

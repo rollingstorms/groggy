@@ -2079,6 +2079,8 @@ impl PyMatrixRowIterator {
 // Implement display data conversion for PyGraphMatrix
 impl PyGraphMatrix {
     /// Convert matrix to display data format expected by Rust formatter
+    /// Future feature
+    #[allow(dead_code)]
     fn to_display_data(&self) -> HashMap<String, serde_json::Value> {
         let mut data = HashMap::new();
         
