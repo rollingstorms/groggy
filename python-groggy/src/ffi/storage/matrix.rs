@@ -238,11 +238,7 @@ impl PyGraphMatrix {
     /// Get gradient matrix (None if no gradients computed yet)
     #[getter]
     fn grad(&self, py: Python) -> Option<Py<Self>> {
-        if let Some(grad_matrix) = self.inner.grad() {
-            Some(Py::new(py, PyGraphMatrix { inner: grad_matrix }).unwrap())
-        } else {
-            None
-        }
+        self.inner.grad().map(|grad_matrix| Py::new(py, PyGraphMatrix { inner: grad_matrix }).unwrap())
     }
 
     // === AUTOMATIC DIFFERENTIATION ===

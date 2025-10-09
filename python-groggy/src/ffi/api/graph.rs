@@ -1952,6 +1952,8 @@ impl PyGraph {
     ///
     /// Use this after large bulk operations (add_edges, add_nodes) before running algorithms
     /// like BFS, DFS, connected_components, etc. for optimal performance.
+    /// Future cache optimization
+    #[allow(dead_code)]
     fn warm_caches_after_bulk_operation(&mut self, py: Python) -> PyResult<()> {
         // 1. Warm the view cache by creating a full graph view
         // This is the most commonly accessed cache for algorithms
@@ -1975,6 +1977,8 @@ impl PyGraph {
     /// - warm_view: Whether to warm the view cache (default: true)
     /// - warm_traversal: Whether to warm traversal caches (default: true)
     /// - sample_node: Optional specific node to use for traversal warming (default: first node)
+    /// Future cache optimization
+    #[allow(dead_code)]
     fn warm_caches(
         &mut self,
         py: Python,
@@ -2242,6 +2246,8 @@ impl PyGraph {
     ///         "total_weight": "sum",
     ///         "avg_degree": "mean"
     ///     })
+    /// Future cache optimization
+    #[allow(dead_code)]
     fn add_subgraphs(
         &self,
         py: Python,

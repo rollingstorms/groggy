@@ -175,7 +175,7 @@ impl PyBaseArray {
 
     fn tail(&self, n: usize) -> Self {
         let len = self.inner.len();
-        let start = if len > n { len - n } else { 0 };
+        let start = len.saturating_sub(n);
         let data: Vec<RustAttrValue> = self.inner.iter().skip(start).cloned().collect();
         PyBaseArray {
             inner: BaseArray::new(data),
@@ -312,7 +312,7 @@ impl PyBaseArray {
         let bool_array = self.inner.isna();
         let attr_values: Vec<RustAttrValue> = bool_array
             .into_iter()
-            .map(|b| RustAttrValue::Bool(b))
+            .map(RustAttrValue::Bool)
             .collect();
         PyBaseArray {
             inner: BaseArray::new(attr_values),
@@ -326,7 +326,7 @@ impl PyBaseArray {
         let bool_array = self.inner.notna();
         let attr_values: Vec<RustAttrValue> = bool_array
             .into_iter()
-            .map(|b| RustAttrValue::Bool(b))
+            .map(RustAttrValue::Bool)
             .collect();
         PyBaseArray {
             inner: BaseArray::new(attr_values),
@@ -1798,7 +1798,7 @@ impl PyBaseArray {
     /// New BaseArray with shifted values
     pub fn shift(&self, periods: i32, fill_value: Option<PyObject>) -> PyResult<Self> {
         let rust_fill_value = if let Some(py_value) = fill_value {
-            Python::with_gil(|py| python_value_to_attr_value(&py_value.as_ref(py)))?
+            Python::with_gil(|py| python_value_to_attr_value(py_value.as_ref(py)))?
         } else {
             groggy::AttrValue::Null
         };

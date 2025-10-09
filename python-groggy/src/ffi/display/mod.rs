@@ -14,6 +14,14 @@ pub struct PyDisplayConfig {
     config: groggy::display::DisplayConfig,
 }
 
+impl Default for PyDisplayConfig {
+    fn default() -> Self {
+        Self {
+            config: groggy::display::DisplayConfig::default(),
+        }
+    }
+}
+
 #[pymethods]
 impl PyDisplayConfig {
     /// Create new DisplayConfig with default settings

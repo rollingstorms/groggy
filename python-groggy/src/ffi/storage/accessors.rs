@@ -301,10 +301,8 @@ impl PyNodesAccessor {
             // This aligns with how attribute arrays are built in _get_node_attribute_column
             for (index, &node_id) in all_node_ids.iter().enumerate() {
                 // Use index position into BaseArray to get boolean value
-                if let Some(attr_value) = base_array.inner.get(index) {
-                    if let groggy::AttrValue::Bool(true) = attr_value {
-                        selected_nodes.push(node_id);
-                    }
+                if let Some(groggy::AttrValue::Bool(true)) = base_array.inner.get(index) {
+                    selected_nodes.push(node_id);
                 }
             }
 
