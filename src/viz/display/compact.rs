@@ -89,14 +89,14 @@ impl CompactFormatter {
 
     /// Format table using minimal required width (compact mode)
     pub fn format_minimal_width(&self, data: &DataWindow, config: &DisplayConfig) -> String {
-        let col_widths = self.calculate_compact_widths(&data, config);
-        self.render_table_with_widths(&data, &col_widths, config)
+        let col_widths = self.calculate_compact_widths(data, config);
+        self.render_table_with_widths(data, &col_widths, config)
     }
 
     /// Format table using full width distribution (legacy compatibility)
     pub fn format_full_width(&self, data: &DataWindow, config: &DisplayConfig) -> String {
-        let col_widths = self.calculate_full_widths(&data, config, 120); // Default terminal width
-        self.render_table_with_widths(&data, &col_widths, config)
+        let col_widths = self.calculate_full_widths(data, config, 120); // Default terminal width
+        self.render_table_with_widths(data, &col_widths, config)
     }
 
     /// Calculate minimal column widths based on content
@@ -284,9 +284,9 @@ impl CompactFormatter {
 
         // Try to preserve JSON structure hints
         if value.starts_with('{') && value.ends_with('}') {
-            format!("{{...}}")
+            "{...}".to_string()
         } else if value.starts_with('[') && value.ends_with(']') {
-            format!("[...]")
+            "[...]".to_string()
         } else {
             self.truncate_string(value, max_width)
         }

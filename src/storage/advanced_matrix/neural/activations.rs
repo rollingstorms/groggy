@@ -299,7 +299,7 @@ impl ActivationOps {
         matrix: &mut UnifiedMatrix<T>,
         row: usize,
         col: usize,
-        value: T,
+        _value: T,
     ) -> MatrixResult<()> {
         let shape = matrix.shape();
         if row >= shape.rows || col >= shape.cols {
@@ -316,9 +316,9 @@ impl ActivationOps {
 
     /// Helper to transform elements (simplified)
     fn transform_elements<T: NumericType, F>(
-        input: &UnifiedMatrix<T>,
-        result: &mut UnifiedMatrix<T>,
-        func: F,
+        _input: &UnifiedMatrix<T>,
+        _result: &mut UnifiedMatrix<T>,
+        _func: F,
     ) -> MatrixResult<()>
     where
         F: Fn(T) -> T + Send + Sync,

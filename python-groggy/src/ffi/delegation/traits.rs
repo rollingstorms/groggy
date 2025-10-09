@@ -222,7 +222,7 @@ impl<T> Iterator for DelegatingIterator<T> {
 // Trait implementations for delegating operations across iterator elements
 impl DelegatingIterator<crate::ffi::subgraphs::subgraph::PySubgraph> {
     /// Apply neighborhood operation to each subgraph in the iterator
-    pub fn neighborhood(self, radius: Option<usize>) -> DelegatingIterator<crate::ffi::subgraphs::subgraph::PySubgraph> {
+    pub fn neighborhood(self,_radius: Option<usize>) -> DelegatingIterator<crate::ffi::subgraphs::subgraph::PySubgraph> {
         // For now, return a placeholder - full implementation would map the operation
         // This shows the pattern for trait-based delegation
         self
@@ -234,19 +234,19 @@ impl DelegatingIterator<crate::ffi::subgraphs::subgraph::PySubgraph> {
     }
     
     /// Sample from each subgraph
-    pub fn sample(self, k: usize) -> DelegatingIterator<crate::ffi::subgraphs::subgraph::PySubgraph> {
+    pub fn sample(self,_k: usize) -> DelegatingIterator<crate::ffi::subgraphs::subgraph::PySubgraph> {
         self // Placeholder - would map sample operation
     }
 }
 
 impl DelegatingIterator<crate::ffi::storage::table::PyNodesTable> {
     /// Apply aggregation to each table in the iterator
-    pub fn agg(self, spec: String) -> DelegatingIterator<crate::ffi::storage::table::PyBaseTable> {
+    pub fn agg(self,_spec: String) -> DelegatingIterator<crate::ffi::storage::table::PyBaseTable> {
         DelegatingIterator::new(std::iter::empty()) // Placeholder
     }
     
     /// Filter each table in the iterator (specialized implementation)
-    pub fn filter_table(self, expr: String) -> DelegatingIterator<crate::ffi::storage::table::PyNodesTable> {
+    pub fn filter_table(self,_expr: String) -> DelegatingIterator<crate::ffi::storage::table::PyNodesTable> {
         self // Placeholder - would map filter operation
     }
 }

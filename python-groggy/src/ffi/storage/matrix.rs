@@ -2,6 +2,8 @@
 //!
 //! Python bindings for GraphMatrix - general-purpose matrix operations.
 
+#![allow(unused_variables)]
+
 use groggy::storage::array::BaseArray;
 use groggy::storage::GraphMatrix;
 use groggy::storage::array::NumArray;

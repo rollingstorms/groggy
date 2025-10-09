@@ -85,7 +85,7 @@ impl FromStr for LayoutKind {
     type Err = LayoutKindParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let normalized = s.trim().to_lowercase().replace('-', "_").replace(' ', "_");
+        let normalized = s.trim().to_lowercase().replace(['-', ' '], "_");
 
         let kind = match normalized.as_str() {
             "honeycomb" => LayoutKind::Honeycomb,

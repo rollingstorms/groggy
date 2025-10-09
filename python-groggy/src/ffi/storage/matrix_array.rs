@@ -326,7 +326,7 @@ impl PyMatrixArrayIterator {
 
         let mut result = Vec::new();
 
-        for (a, b) in self_elements.iter().zip(other_elements.iter()) {
+        for (a, _b) in self_elements.iter().zip(other_elements.iter()) {
             // For now, just return the first matrix as placeholder
             // In full implementation, would perform matrix multiplication
             result.push(a.clone());
@@ -351,7 +351,7 @@ impl PyMatrixArrayIterator {
     }
 
     /// Apply a mathematical transformation to each matrix
-    fn transform(&mut self, operation: String) -> PyResult<Self> {
+    fn transform(&mut self,_operation: String) -> PyResult<Self> {
         let elements = self.inner.clone().into_vec();
         let mut transformed = Vec::new();
 

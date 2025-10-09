@@ -149,7 +149,7 @@ impl PyEdgesArray {
     }
     
     /// Filter EdgesAccessor objects by weight threshold (if edges have weights)
-    fn filter_by_weight(&self, min_weight: f64) -> PyResult<Self> {
+    fn filter_by_weight(&self,_min_weight: f64) -> PyResult<Self> {
         let mut filtered = Vec::new();
         
         // For now, just return all edges as placeholder
@@ -242,11 +242,11 @@ impl PyEdgesArray {
     /// VizAccessor for launching interactive visualization
     pub fn interactive(
         &self,
-        port: Option<u16>,
-        layout: Option<String>,
-        theme: Option<String>,
-        width: Option<u32>,
-        height: Option<u32>
+       _port: Option<u16>,
+       _layout: Option<String>,
+       _theme: Option<String>,
+       _width: Option<u32>,
+       _height: Option<u32>
     ) -> PyResult<VizAccessor> {
         // Convert EdgesArray to table for visualization via delegation  
         // For now, delegate through the base interactive method
@@ -327,7 +327,7 @@ impl PyEdgesArrayIterator {
     }
     
     /// Filter by weight threshold
-    fn filter_by_weight(&mut self, min_weight: f64) -> PyResult<Self> {
+    fn filter_by_weight(&mut self,_min_weight: f64) -> PyResult<Self> {
         let elements = self.inner.clone().into_vec();
         let mut filtered = Vec::new();
         

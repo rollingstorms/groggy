@@ -232,14 +232,11 @@ impl BaseArray<AttrValue> {
         let mut valid_indices = Vec::new();
 
         for (idx, value) in self.inner.iter().enumerate() {
-            match value {
-                AttrValue::Int(id) => {
-                    if *id >= 0 {
-                        node_ids.push(*id as crate::types::NodeId);
-                        valid_indices.push(idx);
-                    }
+            if let AttrValue::Int(id) = value {
+                if *id >= 0 {
+                    node_ids.push(*id as crate::types::NodeId);
+                    valid_indices.push(idx);
                 }
-                _ => {}
             }
         }
 
@@ -277,14 +274,11 @@ impl BaseArray<AttrValue> {
         let mut valid_indices = Vec::new();
 
         for (idx, value) in self.inner.iter().enumerate() {
-            match value {
-                AttrValue::Int(id) => {
-                    if *id >= 0 {
-                        edge_ids.push(*id as crate::types::EdgeId);
-                        valid_indices.push(idx);
-                    }
+            if let AttrValue::Int(id) = value {
+                if *id >= 0 {
+                    edge_ids.push(*id as crate::types::EdgeId);
+                    valid_indices.push(idx);
                 }
-                _ => {}
             }
         }
 
@@ -438,7 +432,7 @@ impl BaseArray<AttrValue> {
         let sample_size = match (n, fraction) {
             (Some(n_val), None) => n_val,
             (None, Some(frac)) => {
-                if frac < 0.0 || frac > 1.0 {
+                if !(0.0..=1.0).contains(&frac) {
                     return Err(crate::errors::GraphError::InvalidInput(
                         "Fraction must be between 0.0 and 1.0".to_string(),
                     ));
@@ -1108,7 +1102,7 @@ impl BaseArray<AttrValue> {
     where
         F: Fn(&AttrValue) -> AttrValue,
     {
-        let transformed_data: Vec<AttrValue> = self.inner.iter().map(|value| func(value)).collect();
+        let transformed_data: Vec<AttrValue> = self.inner.iter().map(func).collect();
 
         BaseArray::from_attr_values(transformed_data)
     }
@@ -1139,7 +1133,7 @@ impl BaseArray<AttrValue> {
     /// let quartiles = array.quantiles(&[0.25, 0.5, 0.75], "linear")?;
     /// ```
     pub fn quantile(&self, q: f64, interpolation: &str) -> crate::errors::GraphResult<AttrValue> {
-        if q < 0.0 || q > 1.0 {
+        if !(0.0..=1.0).contains(&q) {
             return Err(crate::errors::GraphError::InvalidInput(
                 "Quantile must be between 0.0 and 1.0".to_string(),
             ));
@@ -1253,7 +1247,7 @@ impl BaseArray<AttrValue> {
         percentile: f64,
         interpolation: &str,
     ) -> crate::errors::GraphResult<AttrValue> {
-        if percentile < 0.0 || percentile > 100.0 {
+        if !(0.0..=100.0).contains(&percentile) {
             return Err(crate::errors::GraphError::InvalidInput(
                 "Percentile must be between 0.0 and 100.0".to_string(),
             ));
@@ -1270,7 +1264,7 @@ impl BaseArray<AttrValue> {
     ) -> crate::errors::GraphResult<BaseArray<AttrValue>> {
         // Validate all percentiles first
         for &p in percentiles {
-            if p < 0.0 || p > 100.0 {
+            if !(0.0..=100.0).contains(&p) {
                 return Err(crate::errors::GraphError::InvalidInput(format!(
                     "Percentile {} must be between 0.0 and 100.0",
                     p
@@ -1761,15 +1755,13 @@ impl BaseArray<AttrValue> {
         if periods > 0 {
             // Shift right
             let shift = periods as usize;
-            for i in shift..self.data().len() {
-                result_values[i] = self.data()[i - shift].clone();
-            }
+            result_values[shift..self.data().len()]
+                .clone_from_slice(&self.data()[..(self.data().len() - shift)]);
         } else {
             // Shift left
             let shift = (-periods) as usize;
-            for i in 0..(self.data().len() - shift) {
-                result_values[i] = self.data()[i + shift].clone();
-            }
+            result_values[..(self.data().len() - shift)]
+                .clone_from_slice(&self.data()[shift..]);
         }
 
         Ok(BaseArray::from_attr_values(result_values))

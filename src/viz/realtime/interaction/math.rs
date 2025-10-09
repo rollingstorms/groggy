@@ -1,3 +1,6 @@
+//! Math utilities for interaction handling
+#![allow(clippy::wrong_self_convention)]
+
 #[inline]
 pub fn clamp(value: f64, min: f64, max: f64) -> f64 {
     value.max(min).min(max)

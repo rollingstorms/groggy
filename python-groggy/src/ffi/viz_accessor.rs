@@ -40,7 +40,7 @@ fn find_available_port(start_port: u16) -> Result<u16, String> {
                 // Port is available - no debug needed unless verbose
                 return Ok(port);
             }
-            Err(e) => {
+            Err(_e) => {
                 // Port unavailable - continue trying next port
                 continue;
             }
@@ -866,7 +866,7 @@ display(HTML(r'''{html}'''))
             use groggy::viz::realtime::accessor::ControlMsg;
 
             // Build the control message
-            let control_msg = ControlMsg::ChangeLayout {
+            let _control_msg = ControlMsg::ChangeLayout {
                 algorithm: layout.clone(),
                 params: layout_params.clone(),
             };

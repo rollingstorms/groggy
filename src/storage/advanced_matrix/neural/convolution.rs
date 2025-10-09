@@ -255,7 +255,7 @@ impl<T: NumericType> Conv2D<T> {
     }
 
     /// Calculate padding amounts based on configuration
-    fn calculate_padding(&self, input_h: usize, input_w: usize) -> (usize, usize) {
+    fn calculate_padding(&self, _input_h: usize, _input_w: usize) -> (usize, usize) {
         let (kernel_h, kernel_w) = self.config.kernel_size;
         let (dilation_h, dilation_w) = self.config.dilation;
 
@@ -355,11 +355,11 @@ impl<T: NumericType> ConvTensor<T> {
     pub fn set_batch_slice(
         &mut self,
         batch_idx: usize,
-        slice: &UnifiedMatrix<T>,
-        height: usize,
-        width: usize,
+        _slice: &UnifiedMatrix<T>,
+        _height: usize,
+        _width: usize,
     ) -> MatrixResult<()> {
-        let (batch_size, channels, _, _) = self.dimensions;
+        let (batch_size, _channels, _, _) = self.dimensions;
         if batch_idx >= batch_size {
             return Err(MatrixError::InvalidIndex {
                 row: batch_idx,
@@ -411,9 +411,9 @@ pub struct ConvolutionOps;
 impl ConvolutionOps {
     /// Direct convolution (for small kernels)
     pub fn direct_conv2d<T: NumericType>(
-        input: &ConvTensor<T>,
-        kernel: &UnifiedMatrix<T>,
-        config: &ConvolutionConfig,
+        _input: &ConvTensor<T>,
+        _kernel: &UnifiedMatrix<T>,
+        _config: &ConvolutionConfig,
     ) -> MatrixResult<ConvTensor<T>> {
         // Implementation for direct convolution
         // Used when im2col overhead is too high (small kernels, small inputs)
@@ -422,9 +422,9 @@ impl ConvolutionOps {
 
     /// FFT-based convolution (for large kernels)
     pub fn fft_conv2d<T: NumericType>(
-        input: &ConvTensor<T>,
-        kernel: &UnifiedMatrix<T>,
-        config: &ConvolutionConfig,
+        _input: &ConvTensor<T>,
+        _kernel: &UnifiedMatrix<T>,
+        _config: &ConvolutionConfig,
     ) -> MatrixResult<ConvTensor<T>> {
         // Implementation using FFT for large kernel convolutions
         todo!("FFT convolution implementation")
@@ -432,9 +432,9 @@ impl ConvolutionOps {
 
     /// Winograd convolution (optimized for 3x3 kernels)
     pub fn winograd_conv2d<T: NumericType>(
-        input: &ConvTensor<T>,
-        kernel: &UnifiedMatrix<T>,
-        config: &ConvolutionConfig,
+        _input: &ConvTensor<T>,
+        _kernel: &UnifiedMatrix<T>,
+        _config: &ConvolutionConfig,
     ) -> MatrixResult<ConvTensor<T>> {
         // Implementation using Winograd algorithm
         todo!("Winograd convolution implementation")

@@ -3,6 +3,8 @@
 //! The main engine that orchestrates the complete real-time visualization pipeline,
 //! combining Phase 1 (embeddings), Phase 2 (projections), and Phase 3 (streaming).
 
+#![allow(clippy::arc_with_non_send_sync)]
+
 use super::*;
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
@@ -251,7 +253,7 @@ impl RealTimeVizEngine {
 
         // Initialize incremental update manager
         let graph = self.graph.lock().unwrap();
-        self.incremental_manager.initialize(&*graph)?;
+        self.incremental_manager.initialize(&graph)?;
 
         Ok(())
     }
@@ -851,7 +853,7 @@ impl RealTimeVizEngine {
 
                     match compute_flat_embedding(
                         embedding,
-                        &*self.graph.lock().unwrap(),
+                        &self.graph.lock().unwrap(),
                         &flat_config,
                     ) {
                         Ok(flat_positions) => {
@@ -946,7 +948,7 @@ impl RealTimeVizEngine {
     /// Apply force-directed layout algorithm with parameters
     fn apply_force_directed_layout(
         &self,
-        graph: &Graph,
+        _graph: &Graph,
         embedding: &GraphMatrix,
         params: &std::collections::HashMap<String, String>,
     ) -> GraphResult<Vec<Position>> {
@@ -998,7 +1000,7 @@ impl RealTimeVizEngine {
     /// Apply circular layout algorithm with parameters using embedding for ordering
     fn apply_circular_layout(
         &self,
-        graph: &Graph,
+        _graph: &Graph,
         embedding: &GraphMatrix,
         params: &std::collections::HashMap<String, String>,
     ) -> GraphResult<Vec<Position>> {
@@ -1061,7 +1063,7 @@ impl RealTimeVizEngine {
     /// Apply grid layout algorithm with parameters
     fn apply_grid_layout(
         &self,
-        graph: &Graph,
+        _graph: &Graph,
         embedding: &GraphMatrix,
         params: &std::collections::HashMap<String, String>,
     ) -> GraphResult<Vec<Position>> {
@@ -1318,12 +1320,12 @@ impl RealTimeVizEngine {
         }
 
         // Create new GraphMatrix with transformed data
-        Ok(GraphMatrix::from_row_major_data(
+        GraphMatrix::from_row_major_data(
             transformed_data,
             n_nodes,
             n_dims,
             None,
-        )?)
+        )
     }
 
     async fn apply_nd_rotation(
@@ -1416,12 +1418,12 @@ impl RealTimeVizEngine {
             rotated_data[base_idx + axis_j] = new_xj;
         }
 
-        Ok(GraphMatrix::from_row_major_data(
+        GraphMatrix::from_row_major_data(
             rotated_data,
             n_nodes,
             n_dims,
             None,
-        )?)
+        )
     }
 
     async fn process_interaction_commands(
@@ -1584,7 +1586,7 @@ impl RealTimeVizEngine {
 
             for (i, node_pos) in snapshot.positions.iter().enumerate() {
                 // Convert N-dimensional coords to 2D for display
-                let x = if node_pos.coords.len() > 0 {
+                let x = if !node_pos.coords.is_empty() {
                     node_pos.coords[0]
                 } else {
                     0.0
@@ -1716,7 +1718,7 @@ impl RealTimeVizEngine {
                 if let Some(&position_index) = state.node_index.get(&node_id) {
                     if let Some(pos) = state.positions.get_mut(position_index) {
                         // Apply delta to x,y coordinates
-                        if delta.len() > 0 {
+                        if !delta.is_empty() {
                             pos.x += delta[0];
                         }
                         if delta.len() > 1 {
@@ -1737,7 +1739,7 @@ impl RealTimeVizEngine {
                     if let Some(&position_index) = state.node_index.get(&node_pos.node_id) {
                         if let Some(pos) = state.positions.get_mut(position_index) {
                             // Convert N-dimensional coords to 2D for display
-                            if node_pos.coords.len() > 0 {
+                            if !node_pos.coords.is_empty() {
                                 pos.x = node_pos.coords[0];
                             }
                             if node_pos.coords.len() > 1 {
@@ -1988,14 +1990,11 @@ impl RealTimeVizEngine {
         if !activation_commands.is_empty() {
             // We need to spawn a task to process async commands, but for now just log them
             for cmd in activation_commands {
-                match cmd {
-                    InteractionCommand::ExposeAutoScaleControls {
-                        target_occupancy,
-                        min_cell_size,
-                        enabled,
-                    } => {}
-                    _ => {}
-                }
+                if let InteractionCommand::ExposeAutoScaleControls {
+                        target_occupancy: _,
+                        min_cell_size: _,
+                        enabled: _,
+                    } = cmd {}
             }
         }
     }

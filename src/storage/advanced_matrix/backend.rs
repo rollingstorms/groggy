@@ -4,6 +4,9 @@
 //! to intelligently select the optimal compute backend based on operation type,
 //! matrix size, and available hardware.
 
+#![allow(clippy::borrowed_box)]
+#![allow(clippy::missing_safety_doc)]
+
 use crate::storage::advanced_matrix::numeric_type::{DType, NumericType};
 use std::collections::HashMap;
 use std::fmt::Debug;

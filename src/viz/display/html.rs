@@ -33,7 +33,7 @@ impl HtmlRenderer {
             r#"<div class="groggy-display-container" data-theme="{}">"#,
             theme.name
         ));
-        html.push_str(&format!(r#"<div class="groggy-table-container">"#));
+        html.push_str(r#"<div class="groggy-table-container">"#);
         // Main table element
         html.push_str(&format!(
             r#"<table class="groggy-table {}">"#,
@@ -270,7 +270,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let mut result = String::new();
         let mut digit_count = 0;
 
-        for (i, &ch) in chars.iter().rev().enumerate() {
+        for (_i, &ch) in chars.iter().rev().enumerate() {
             if ch.is_ascii_digit() {
                 if digit_count > 0 && digit_count % 3 == 0 {
                     result.push(',');

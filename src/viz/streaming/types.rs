@@ -218,7 +218,7 @@ pub fn data_window_to_json(window: &DataWindow) -> JsonDataWindow {
     let clean_rows: Vec<Vec<WireCell>> = window
         .rows
         .iter()
-        .map(|row| row.iter().map(|attr| attr_to_wire(attr)).collect())
+        .map(|row| row.iter().map(attr_to_wire).collect())
         .collect();
 
     JsonDataWindow {
@@ -601,7 +601,7 @@ impl From<super::virtual_scroller::VirtualScrollError> for StreamingError {
 pub type StreamingResult<T> = Result<T, StreamingError>;
 
 /// HTML escape utility function
-// (moved) html_escape is defined in html.rs
+/// (moved) html_escape is defined in html.rs
 // ============================================================================
 // Phase 7: Interactive Features - Supporting Data Structures
 // ============================================================================

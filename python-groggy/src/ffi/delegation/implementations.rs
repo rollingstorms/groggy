@@ -9,7 +9,7 @@ use pyo3::PyResult;
 
 // Implement SubgraphOps for PySubgraph
 impl SubgraphOps for crate::ffi::subgraphs::subgraph::PySubgraph {
-    fn neighborhood(&self, radius: Option<usize>) -> PyResult<crate::ffi::subgraphs::subgraph::PySubgraph> {
+    fn neighborhood(&self, _radius: Option<usize>) -> PyResult<crate::ffi::subgraphs::subgraph::PySubgraph> {
         // Delegate to existing neighborhood method if available, or implement here
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Neighborhood expansion via trait delegation not yet implemented"
@@ -23,7 +23,7 @@ impl SubgraphOps for crate::ffi::subgraphs::subgraph::PySubgraph {
         ))
     }
     
-    fn sample(&self, k: usize) -> PyResult<crate::ffi::subgraphs::subgraph::PySubgraph> {
+    fn sample(&self, _k: usize) -> PyResult<crate::ffi::subgraphs::subgraph::PySubgraph> {
         // Delegate to existing sample method
         // For now, use placeholder - would call self.sample(k) when available
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
@@ -31,7 +31,7 @@ impl SubgraphOps for crate::ffi::subgraphs::subgraph::PySubgraph {
         ))
     }
     
-    fn filter_nodes(&self, query: &str) -> PyResult<crate::ffi::subgraphs::subgraph::PySubgraph> {
+    fn filter_nodes(&self, _query: &str) -> PyResult<crate::ffi::subgraphs::subgraph::PySubgraph> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Node filtering via trait delegation not yet implemented"
         ))
@@ -58,43 +58,43 @@ impl SubgraphOps for crate::ffi::subgraphs::subgraph::PySubgraph {
 
 // Implement TableOps for PyNodesTable
 impl TableOps for crate::ffi::storage::table::PyNodesTable {
-    fn agg(&self, spec: &str) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+    fn agg(&self, _spec: &str) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Table aggregation via trait delegation not yet implemented"
         ))
     }
     
-    fn filter(&self, expr: &str) -> PyResult<Self> {
+    fn filter(&self, _expr: &str) -> PyResult<Self> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Table filtering via trait delegation not yet implemented"
         ))
     }
     
-    fn group_by(&self, columns: &[&str]) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+    fn group_by(&self, _columns: &[&str]) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Table grouping via trait delegation not yet implemented"
         ))
     }
     
-    fn join(&self, other: &Self, on: &str) -> PyResult<Self> {
+    fn join(&self, _other: &Self, _on: &str) -> PyResult<Self> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Table join via trait delegation not yet implemented"
         ))
     }
     
-    fn sort_by(&self, column: &str, ascending: bool) -> PyResult<Self> {
+    fn sort_by(&self, _column: &str, _ascending: bool) -> PyResult<Self> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Table sorting via trait delegation not yet implemented"
         ))
     }
     
-    fn select(&self, columns: &[&str]) -> PyResult<Self> {
+    fn select(&self, _columns: &[&str]) -> PyResult<Self> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Column selection via trait delegation not yet implemented"
         ))
     }
     
-    fn unique(&self, column: &str) -> PyResult<Vec<AttrValue>> {
+    fn unique(&self, _column: &str) -> PyResult<Vec<AttrValue>> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Unique values via trait delegation not yet implemented"
         ))
@@ -108,43 +108,43 @@ impl TableOps for crate::ffi::storage::table::PyNodesTable {
 
 // Implement TableOps for PyEdgesTable
 impl TableOps for crate::ffi::storage::table::PyEdgesTable {
-    fn agg(&self, spec: &str) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+    fn agg(&self, _spec: &str) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Edges table aggregation via trait delegation not yet implemented"
         ))
     }
     
-    fn filter(&self, expr: &str) -> PyResult<Self> {
+    fn filter(&self, _expr: &str) -> PyResult<Self> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Edges table filtering via trait delegation not yet implemented"
         ))
     }
     
-    fn group_by(&self, columns: &[&str]) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
+    fn group_by(&self, _columns: &[&str]) -> PyResult<crate::ffi::storage::table::PyBaseTable> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Edges table grouping via trait delegation not yet implemented"
         ))
     }
     
-    fn join(&self, other: &Self, on: &str) -> PyResult<Self> {
+    fn join(&self, _other: &Self, _on: &str) -> PyResult<Self> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Edges table join via trait delegation not yet implemented"
         ))
     }
     
-    fn sort_by(&self, column: &str, ascending: bool) -> PyResult<Self> {
+    fn sort_by(&self, _column: &str, _ascending: bool) -> PyResult<Self> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Edges table sorting via trait delegation not yet implemented"
         ))
     }
     
-    fn select(&self, columns: &[&str]) -> PyResult<Self> {
+    fn select(&self, _columns: &[&str]) -> PyResult<Self> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Edges column selection via trait delegation not yet implemented"
         ))
     }
     
-    fn unique(&self, column: &str) -> PyResult<Vec<AttrValue>> {
+    fn unique(&self, _column: &str) -> PyResult<Vec<AttrValue>> {
         Err(pyo3::exceptions::PyNotImplementedError::new_err(
             "Edges unique values via trait delegation not yet implemented"
         ))
@@ -206,7 +206,7 @@ impl GraphOps for crate::ffi::api::graph::PyGraph {
 pub fn forward_subgraph_operations<T: SubgraphOps>(
     subgraphs: &[T], 
     operation: &str,
-    params: &[&str]
+    _params: &[&str]
 ) -> Vec<PyResult<()>> {
     let mut results = Vec::new();
     
@@ -238,7 +238,7 @@ pub trait DynamicDelegation {
 
 // Example implementation showing how objects can provide dynamic delegation
 impl DynamicDelegation for crate::ffi::subgraphs::subgraph::PySubgraph {
-    fn delegate_operation(&self, operation: &str, params: &[&str]) -> PyResult<String> {
+    fn delegate_operation(&self, operation: &str, _params: &[&str]) -> PyResult<String> {
         match operation {
             "density" => {
                 let density = self.density()?;

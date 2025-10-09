@@ -145,7 +145,7 @@ where
 
     /// Calculate the percentile (0.0 to 1.0)
     pub fn percentile(&self, p: f64) -> Option<f64> {
-        if self.is_empty() || p < 0.0 || p > 1.0 {
+        if self.is_empty() || !(0.0..=1.0).contains(&p) {
             return None;
         }
 
@@ -361,14 +361,10 @@ impl NumArray<f64> {
 
     /// SIMD-optimized variance for f64 arrays
     pub fn variance_simd(&self) -> Option<f64> {
-        if let Some(mean) = self.mean_simd() {
-            Some(simd_optimizations::simd_variance(
+        self.mean_simd().map(|mean| simd_optimizations::simd_variance(
                 self.base.as_slice(),
                 mean,
             ))
-        } else {
-            None
-        }
     }
 
     /// SIMD-optimized min for f64 arrays

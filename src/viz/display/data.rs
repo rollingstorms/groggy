@@ -3,6 +3,8 @@
 //! This module defines the common data structures that all display types
 //! (tables, arrays, matrices) convert to for unified rendering.
 
+#![allow(clippy::wrong_self_convention)]
+
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

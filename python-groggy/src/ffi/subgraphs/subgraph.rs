@@ -901,7 +901,7 @@ impl PySubgraph {
         }
 
         // Simple sampling: take first k nodes (for now - would use proper random sampling in production)
-        let sampled_nodes: Vec<NodeId> = node_ids.into_iter().take(k).collect();
+        let _sampled_nodes: Vec<NodeId> = node_ids.into_iter().take(k).collect();
 
         // For now, just return a clone of the original subgraph as a placeholder
         // In a full implementation, we would properly create an induced subgraph

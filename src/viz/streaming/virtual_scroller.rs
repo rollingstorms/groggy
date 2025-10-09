@@ -148,7 +148,7 @@ impl VirtualScrollManager {
     /// Check if scroll requires data update
     fn needs_data_update(&self, old_offset: usize, new_offset: usize) -> bool {
         let threshold = self.window_size / 4; // Update when scrolled 25% of window
-        (new_offset as i64 - old_offset as i64).abs() as usize > threshold
+        (new_offset as i64 - old_offset as i64).unsigned_abs() as usize > threshold
     }
 
     /// Get window from cache

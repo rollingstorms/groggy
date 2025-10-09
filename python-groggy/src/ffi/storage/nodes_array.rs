@@ -214,11 +214,11 @@ impl PyNodesArray {
     /// VizAccessor for launching interactive visualization
     pub fn interactive(
         &self,
-        port: Option<u16>,
-        layout: Option<String>,
-        theme: Option<String>,
-        width: Option<u32>,
-        height: Option<u32>
+       _port: Option<u16>,
+       _layout: Option<String>,
+       _theme: Option<String>,
+       _width: Option<u32>,
+       _height: Option<u32>
     ) -> PyResult<VizAccessor> {
         // Convert NodesArray to table for visualization via delegation  
         // For now, delegate through the base interactive method

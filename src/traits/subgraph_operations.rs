@@ -957,7 +957,7 @@ pub trait SubgraphOperations: GraphEntity {
                     // Create separate meta-edges for each original edge (TODO: implement properly)
                     // For now, fall back to aggregate behavior
                     self.create_aggregated_meta_edge(
-                        &mut *graph,
+                        &mut graph,
                         meta_node_id,
                         target_node,
                         edge_count,
@@ -967,7 +967,7 @@ pub trait SubgraphOperations: GraphEntity {
                 }
                 ExternalEdgeStrategy::Aggregate => {
                     self.create_aggregated_meta_edge(
-                        &mut *graph,
+                        &mut graph,
                         meta_node_id,
                         target_node,
                         edge_count,
@@ -977,7 +977,7 @@ pub trait SubgraphOperations: GraphEntity {
                 }
                 ExternalEdgeStrategy::Count => {
                     self.create_count_meta_edge(
-                        &mut *graph,
+                        &mut graph,
                         meta_node_id,
                         target_node,
                         edge_count,

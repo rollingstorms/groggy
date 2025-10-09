@@ -4,6 +4,8 @@
 //! through subgraph collapse operations. It replaces the complex EdgeAggregationConfig
 //! system with a simpler, more discoverable interface.
 
+#![allow(clippy::wrong_self_convention)]
+
 use crate::entities::MetaNode;
 use crate::errors::{GraphError, GraphResult};
 use crate::traits::{NodeStrategy, SubgraphOperations};

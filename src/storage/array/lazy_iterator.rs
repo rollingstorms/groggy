@@ -85,7 +85,7 @@ impl<T> LazyArrayIterator<T> {
                     }
                     LazyOperation::Filter(_) => {
                         // Pessimistic estimate: 50% pass through filters
-                        size = size / 2;
+                        size /= 2;
                     }
                     LazyOperation::FilterNodes(_) | LazyOperation::FilterEdges(_) => {
                         // Conservative estimate: 70% pass through graph filters

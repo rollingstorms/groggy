@@ -574,10 +574,10 @@ impl NeighborhoodSampler {
             use std::collections::hash_map::DefaultHasher;
             use std::hash::{Hash, Hasher};
             let mut hasher = DefaultHasher::new();
-            let mut sorted_nodes: Vec<NodeId> = nodes_vec.iter().copied().collect();
+            let mut sorted_nodes: Vec<NodeId> = nodes_vec.to_vec();
             sorted_nodes.sort();
             sorted_nodes.hash(&mut hasher);
-            let mut sorted_edges: Vec<EdgeId> = induced_edges.iter().copied().collect();
+            let mut sorted_edges: Vec<EdgeId> = induced_edges.to_vec();
             sorted_edges.sort();
             sorted_edges.hash(&mut hasher);
             "neighborhood".hash(&mut hasher);

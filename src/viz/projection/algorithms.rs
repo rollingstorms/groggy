@@ -89,7 +89,7 @@ impl ProjectionEngine for PCAProjection {
     fn project_embedding(
         &self,
         embedding: &GraphMatrix,
-        graph: &Graph,
+        _graph: &Graph,
     ) -> GraphResult<Vec<Position>> {
         self.validate_embedding(embedding)?;
 
@@ -597,7 +597,7 @@ impl ProjectionEngine for EnergyBasedProjection {
     fn project_embedding(
         &self,
         embedding: &GraphMatrix,
-        graph: &Graph,
+        _graph: &Graph,
     ) -> GraphResult<Vec<Position>> {
         self.validate_embedding(embedding)?;
 

@@ -65,6 +65,7 @@ pub struct Edge {
     pub opacity: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub style: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub curvature: Option<f64>, // 0 = straight, positive = curve right, negative = curve left
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,

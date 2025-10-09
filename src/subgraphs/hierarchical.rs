@@ -358,11 +358,11 @@ impl MetaNode {
 
         for attr_name in potential_attrs {
             // Only add if we don't already have it from the pool
-            if !attributes.contains_key(&AttrName::from(attr_name)) {
+            if let std::collections::hash_map::Entry::Vacant(e) = attributes.entry(AttrName::from(attr_name)) {
                 if let Some(value) =
                     graph.get_node_attr(self.node_id, &AttrName::from(attr_name))?
                 {
-                    attributes.insert(AttrName::from(attr_name), value);
+                    e.insert(value);
                 }
             }
         }

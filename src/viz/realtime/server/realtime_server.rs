@@ -119,10 +119,8 @@ impl RealtimeServer {
                         if self.verbose >= 1 {
                             // Failed to load snapshot into engine
                         }
-                    } else {
-                        if self.verbose >= 2 {
-                            // Engine initialized with snapshot
-                        }
+                    } else if self.verbose >= 2 {
+                        // Engine initialized with snapshot
                     }
 
                     // Create control message channel between WebSocket bridge and engine
@@ -809,10 +807,8 @@ impl RealtimeServer {
                         if self.verbose >= 1 {
                             // Failed to load snapshot into engine
                         }
-                    } else {
-                        if self.verbose >= 2 {
-                            // Engine initialized with snapshot
-                        }
+                    } else if self.verbose >= 2 {
+                        // Engine initialized with snapshot
                     }
 
                     // Create control message channel between WebSocket bridge and engine
@@ -879,7 +875,7 @@ impl RealtimeServer {
         eprintln!("Visualization server: http://127.0.0.1:{}/", actual_port);
 
         // Notify that the server is ready
-        if let Err(_) = ready_tx.send(actual_port) {
+        if ready_tx.send(actual_port).is_err() {
             // ⚠️  DEBUG: Failed to send ready signal
         }
 

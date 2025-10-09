@@ -4,6 +4,8 @@
 //! of the graph Laplacian to embed nodes in high-dimensional space while
 //! preserving graph structure.
 
+#![allow(clippy::wrong_self_convention)]
+
 use super::EmbeddingEngine;
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};

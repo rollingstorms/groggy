@@ -596,7 +596,7 @@ impl PyMetaNodeOld {
 
 /// Convert aggregation functions dict from Python to Rust
 pub fn parse_aggregation_functions(
-    py: Python,
+   _py: Python,
     agg_dict: &PyDict,
 ) -> PyResult<HashMap<AttrName, AggregationFunction>> {
     let mut functions = HashMap::new();

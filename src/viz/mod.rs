@@ -129,6 +129,7 @@ impl VizModule {
     }
 
     /// Start realtime visualization server
+    /// pub fn server(&mut self, port: Option<u16>) -> GraphResult<RenderResult> {
     // pub fn server(&mut self, port: Option<u16>) -> GraphResult<RenderResult> {
     //     eprintln!("🚀 INFO: server() called - starting REALTIME backend server!");
     //     let options = RenderOptions {
@@ -1175,14 +1176,10 @@ impl VizModule {
             .map(|l| format!("{:?}", l).to_lowercase())
             .unwrap_or_else(|| "force-directed".to_string());
         let theme = options
-            .theme
-            .as_ref()
-            .map(|s| s.as_str())
+            .theme.as_deref()
             .unwrap_or("light");
         let title = options
-            .title
-            .as_ref()
-            .map(|s| s.as_str())
+            .title.as_deref()
             .unwrap_or("Graph Visualization");
 
         // Replace template variables
@@ -1402,6 +1399,7 @@ pub enum ExportFormat {
 
 /// Active interactive visualization session
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum InteractiveViz {
     /// Traditional streaming visualization
     Streaming {
@@ -1486,7 +1484,7 @@ impl InteractiveViz {
                 // Create a data source accessor from the engine's graph
                 let graph_arc = realtime_viz.engine.get_graph();
                 let graph_guard = graph_arc.lock().unwrap();
-                let data_source = Arc::new(GraphDataSource::new(&*graph_guard));
+                let data_source = Arc::new(GraphDataSource::new(&graph_guard));
                 drop(graph_guard); // Release the lock early
                 let accessor: Arc<dyn crate::viz::realtime::accessor::RealtimeVizAccessor> =
                     Arc::new(DataSourceRealtimeAccessor::with_verbosity(

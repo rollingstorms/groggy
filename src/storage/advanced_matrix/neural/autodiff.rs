@@ -298,7 +298,7 @@ impl<T: NumericType> ComputationGraph<T> {
     ) -> MatrixResult<UnifiedMatrix<T>> {
         match &node.operation {
             Operation::Leaf => {
-                return Err(MatrixError::ComputationError(
+                Err(MatrixError::ComputationError(
                     "Leaf node requested for forward compute without cached value".to_string(),
                 ))
             }

@@ -252,7 +252,7 @@ impl<T> Iterator for ForwardingIterator<T> {
 // Implement forwarding for specific array types used in the system
 impl ForwardingArray<crate::ffi::subgraphs::subgraph::PySubgraph> {
     /// Forward neighborhood operation to each subgraph
-    pub fn neighborhood(&self, radius: Option<usize>) -> PyResult<ForwardingArray<crate::ffi::subgraphs::subgraph::PySubgraph>> {
+    pub fn neighborhood(&self,_radius: Option<usize>) -> PyResult<ForwardingArray<crate::ffi::subgraphs::subgraph::PySubgraph>> {
         // Placeholder implementation - would apply neighborhood to each subgraph
         // For now, return self to demonstrate the pattern
         Ok(ForwardingArray::new(vec![]))
@@ -267,13 +267,13 @@ impl ForwardingArray<crate::ffi::subgraphs::subgraph::PySubgraph> {
 
 impl ForwardingArray<crate::ffi::storage::table::PyNodesTable> {
     /// Forward aggregation to each table
-    pub fn agg(&self, spec: &str) -> PyResult<ForwardingArray<crate::ffi::storage::table::PyBaseTable>> {
+    pub fn agg(&self,_spec: &str) -> PyResult<ForwardingArray<crate::ffi::storage::table::PyBaseTable>> {
         // Placeholder implementation - would aggregate each table
         Ok(ForwardingArray::new(vec![]))
     }
     
     /// Forward filter operation to each table
-    pub fn filter_tables(&self, expr: &str) -> PyResult<ForwardingArray<crate::ffi::storage::table::PyNodesTable>> {
+    pub fn filter_tables(&self,_expr: &str) -> PyResult<ForwardingArray<crate::ffi::storage::table::PyNodesTable>> {
         // Placeholder implementation - would filter each table
         Ok(ForwardingArray::new(vec![]))
     }

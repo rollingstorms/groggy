@@ -506,7 +506,7 @@ impl GraphTable {
                         let new_source = domain_mapping
                             .get(&original_source)
                             .copied()
-                            .unwrap_or_else(|| {
+                            .unwrap_or({
                                 // If source node not found in current domain, keep original
                                 original_source
                             });
@@ -514,7 +514,7 @@ impl GraphTable {
                         let new_target = domain_mapping
                             .get(&original_target)
                             .copied()
-                            .unwrap_or_else(|| {
+                            .unwrap_or({
                                 // If target node not found in current domain, keep original
                                 original_target
                             });

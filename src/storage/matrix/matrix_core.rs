@@ -588,7 +588,7 @@ impl<T: NumericType> GraphMatrix<T> {
             return Ok(result);
         }
 
-        if p < 0.0 || p > 1.0 {
+        if !(0.0..=1.0).contains(&p) {
             return Err(GraphError::InvalidInput(format!(
                 "Dropout probability must be between 0 and 1, got {}",
                 p
@@ -2122,7 +2122,7 @@ impl<T: NumericType> GraphMatrix<T> {
             + Copy,
     {
         let (rows, cols) = self.shape();
-        let (b_rows, b_cols) = b.shape();
+        let (b_rows, _b_cols) = b.shape();
 
         if rows != cols {
             return Err(GraphError::InvalidInput(format!(

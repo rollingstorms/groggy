@@ -460,7 +460,7 @@ impl<T: NumericType> FusionEngine<T> {
         &self,
         graph: &mut ComputationGraph<T>,
         opportunity: &FusionOpportunity,
-        kernel: &FusionKernel<T>,
+        _kernel: &FusionKernel<T>,
     ) -> MatrixResult<NodeId> {
         // Determine inputs and output shape for fused operation
         let input_nodes = self.get_fusion_inputs(graph, &opportunity.node_ids)?;

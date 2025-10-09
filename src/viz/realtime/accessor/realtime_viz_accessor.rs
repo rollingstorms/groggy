@@ -301,10 +301,10 @@ impl DataSourceRealtimeAccessor {
             VizParameter::Array(arr) => arr.get(node_idx).cloned(),
             VizParameter::Column(col_name) => {
                 // Try to extract value from attributes
-                attributes.get(col_name).and_then(|attr| match attr {
-                    AttrValue::Text(s) => Some(s.clone()),
-                    AttrValue::CompactText(s) => Some(s.as_str().to_string()),
-                    _ => Some(format!("{:?}", attr)), // Convert other types to string
+                attributes.get(col_name).map(|attr| match attr {
+                    AttrValue::Text(s) => s.clone(),
+                    AttrValue::CompactText(s) => s.as_str().to_string(),
+                    _ => format!("{:?}", attr), // Convert other types to string
                 })
             }
             VizParameter::Value(val) => Some(val.clone()),
@@ -924,7 +924,7 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                                 .unwrap_or(80.0),
                         };
                     }
-                    Err(err) => {
+                    Err(_err) => {
                         if self.verbose >= 1 {
                             // Debug message
                         }
@@ -1047,7 +1047,7 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                         let value = node
                             .attributes
                             .get(key)
-                            .map(|v| attr_value_to_json(v))
+                            .map(attr_value_to_json)
                             .unwrap_or(serde_json::Value::Null);
                         row.push(value);
                     }
@@ -1148,7 +1148,7 @@ impl RealtimeVizAccessor for DataSourceRealtimeAccessor {
                         let value = edge
                             .attributes
                             .get(key)
-                            .map(|v| attr_value_to_json(v))
+                            .map(attr_value_to_json)
                             .unwrap_or(serde_json::Value::Null);
                         row.push(value);
                     }

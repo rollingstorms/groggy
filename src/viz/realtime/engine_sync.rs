@@ -166,7 +166,7 @@ impl EngineSyncManager {
                     }
                     existing.last_timestamp = timestamp;
                     existing.update_count += 1;
-                    return true;
+                    true
                 } else {
                     // Start new coalescing entry
                     self.position_coalescing.insert(
@@ -179,7 +179,7 @@ impl EngineSyncManager {
                             update_count: 1,
                         },
                     );
-                    return true;
+                    true
                 }
             }
             EngineUpdate::NodeChanged { id, attributes } => {
@@ -211,11 +211,11 @@ impl EngineSyncManager {
                         coalesced = true;
                     }
                 }
-                return coalesced;
+                coalesced
             }
             _ => {
                 // Don't coalesce other update types
-                return false;
+                false
             }
         }
     }
@@ -303,7 +303,7 @@ impl EngineSyncManager {
     async fn flush_oldest_updates(&mut self) -> GraphResult<()> {
         let flush_count = self.max_batch_size;
         for _ in 0..flush_count {
-            if let Some(_) = self.pending_updates.pop_front() {
+            if self.pending_updates.pop_front().is_some() {
                 // Just discard - this is emergency mode
             } else {
                 break;

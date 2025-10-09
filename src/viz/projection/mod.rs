@@ -4,6 +4,8 @@
 //! node embeddings to 2D honeycomb grid coordinates while preserving neighborhood
 //! relationships and enabling smooth real-time transitions.
 
+#![allow(clippy::wrong_self_convention)]
+
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::storage::matrix::GraphMatrix;

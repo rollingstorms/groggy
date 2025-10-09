@@ -1,0 +1,451 @@
+# Unused Symbols Report (variables, fields, functions/methods)
+# Workspace: /Users/michaelroth/Documents/Code/groggy
+# Total unused symbols: 317
+
+## Totals by category
+- variable: 284
+- field: 17
+- function: 16
+
+## Variables
+== Crate: embedding_integration_tests ==
+
+  File: tests/embedding_integration_tests.rs
+    - embedding2 (at 191:9)
+
+== Crate: groggy ==
+
+  File: src/api/graph.rs
+    - node_id (at 272:25)
+    - node_id (at 272:25)
+    - i (at 2559:36)
+    - i (at 2559:36)
+    - i (at 2560:41)
+    - i (at 2560:41)
+    - f (at 2561:38)
+    - f (at 2561:38)
+    - b (at 2562:37)
+    - b (at 2562:37)
+
+  File: src/storage/advanced_matrix/memory.rs
+    - buffer3 (at 610:13)
+
+  File: src/storage/advanced_matrix/neural/activations.rs
+    - row_start (at 210:17)
+    - row_start (at 210:17)
+    - backend (at 254:13)
+    - backend (at 254:13)
+    - value (at 302:9)
+    - value (at 302:9)
+    - input (at 319:9)
+    - input (at 319:9)
+    - result (at 320:9)
+    - result (at 320:9)
+    - func (at 321:9)
+    - func (at 321:9)
+    - backend (at 337:13)
+    - backend (at 337:13)
+    - backend (at 354:13)
+    - backend (at 354:13)
+    - leaky_relu_type (at 518:13)
+    - elu_type (at 519:13)
+
+  File: src/storage/advanced_matrix/neural/convolution.rs
+    - weight_size (at 105:13)
+    - weight_size (at 105:13)
+    - input_h (at 257:33)
+    - input_h (at 257:33)
+    - input_w (at 257:49)
+    - input_w (at 257:49)
+    - start_idx (at 346:13)
+    - start_idx (at 346:13)
+    - slice (at 356:9)
+    - slice (at 356:9)
+    - height (at 357:9)
+    - height (at 357:9)
+    - width (at 358:9)
+    - width (at 358:9)
+    - channels (at 360:26)
+    - channels (at 360:26)
+    - input (at 376:5)
+    - input (at 376:5)
+    - input (at 412:9)
+    - input (at 412:9)
+    - kernel (at 413:9)
+    - kernel (at 413:9)
+    - config (at 414:9)
+    - config (at 414:9)
+    - input (at 423:9)
+    - input (at 423:9)
+    - kernel (at 424:9)
+    - kernel (at 424:9)
+    - config (at 425:9)
+    - config (at 425:9)
+    - input (at 433:9)
+    - input (at 433:9)
+    - kernel (at 434:9)
+    - kernel (at 434:9)
+    - config (at 435:9)
+    - config (at 435:9)
+
+  File: src/storage/advanced_matrix/neural/fusion.rs
+    - kernel (at 463:9)
+    - kernel (at 463:9)
+    - node_id (at 549:14)
+    - node_id (at 549:14)
+    - gamma (at 664:13)
+    - gamma (at 664:13)
+    - beta (at 665:13)
+    - beta (at 665:13)
+
+  File: src/storage/advanced_matrix/unified_matrix.rs
+    - backend (at 495:13)
+    - backend (at 495:13)
+
+  File: src/storage/array/benchmark.rs
+    - array (at 227:13)
+    - array (at 227:13)
+
+  File: src/storage/array/iterator.rs
+    - graph_ref (at 175:21)
+    - graph_ref (at 175:21)
+    - graph_ref (at 275:21)
+    - graph_ref (at 275:21)
+
+  File: src/storage/array/lazy_iterator.rs
+    - evaluator (at 366:17)
+    - evaluator (at 366:17)
+
+  File: src/storage/array/simd_optimizations.rs
+    - remainder (at 16:9)
+    - remainder (at 16:9)
+    - remainder (at 64:9)
+    - remainder (at 64:9)
+    - remainder (at 116:9)
+    - remainder (at 116:9)
+    - remainder (at 159:9)
+    - remainder (at 159:9)
+
+  File: src/storage/matrix/matrix_core.rs
+    - rows (at 115:14)
+    - rows (at 115:14)
+    - b_cols (at 2122:22)
+    - b_cols (at 2122:22)
+    - new_cols (at 2892:21)
+    - new_cols (at 2892:21)
+
+  File: src/storage/table/base.rs
+    - dtype (at 293:17)
+    - dtype (at 293:17)
+    - dtype (at 345:13)
+    - dtype (at 345:13)
+
+  File: src/storage/table/edges.rs
+    - predicate (at 182:13)
+    - predicate (at 182:13)
+
+  File: src/storage/table/graph_table.rs
+    - merged_policy (at 460:13)
+    - merged_policy (at 460:13)
+    - merged_policy (at 604:13)
+    - merged_policy (at 604:13)
+    - domain (at 744:39)
+    - domain (at 744:39)
+    - node_id (at 747:18)
+    - node_id (at 747:18)
+    - config (at 989:31)
+    - config (at 989:31)
+
+  File: src/storage/table/table_array.rs
+    - first_table (at 333:13)
+    - first_table (at 333:13)
+
+  File: src/subgraphs/component.rs
+    - boundary (at 575:13)
+
+  File: src/subgraphs/hierarchical.rs
+    - common_agg_patterns (at 308:13)
+    - common_agg_patterns (at 308:13)
+
+  File: src/traits/meta_operations.rs
+    - agg_functions (at 86:28)
+    - agg_functions (at 86:28)
+
+  File: src/utils/convert.rs
+    - edge2 (at 405:13)
+
+  File: src/viz/display/html.rs
+    - i (at 273:14)
+    - i (at 273:14)
+    - config (at 420:13)
+
+  File: src/viz/embeddings/energy.rs
+    - grad (at 160:13)
+    - grad (at 160:13)
+
+  File: src/viz/embeddings/flat_embedding.rs
+    - unified_embedding (at 76:9)
+    - unified_embedding (at 76:9)
+    - dist_sq_safe (at 252:17)
+    - dist_sq_safe (at 252:17)
+    - radius (at 306:51)
+    - radius (at 306:51)
+
+  File: src/viz/embeddings/mod.rs
+    - chunk_size (at 403:47)
+    - chunk_size (at 403:47)
+
+  File: src/viz/embeddings/spectral.rs
+    - result3 (at 446:13)
+
+  File: src/viz/layouts/mod.rs
+    - nodes (at 239:62)
+    - nodes (at 239:62)
+
+  File: src/viz/projection/algorithms.rs
+    - graph (at 92:9)
+    - graph (at 92:9)
+    - graph (at 600:9)
+    - graph (at 600:9)
+
+  File: src/viz/realtime/accessor/realtime_viz_accessor.rs
+    - ds_meta (at 797:13)
+    - ds_meta (at 797:13)
+    - rotation_x (at 848:25)
+    - rotation_x (at 848:25)
+    - rotation_y (at 852:25)
+    - rotation_y (at 852:25)
+    - err (at 927:25)
+    - err (at 927:25)
+
+  File: src/viz/realtime/engine.rs
+    - control_tx (at 247:14)
+    - control_tx (at 247:14)
+    - radians (at 495:47)
+    - radians (at 495:47)
+    - e (at 870:37)
+    - e (at 870:37)
+    - e (at 876:29)
+    - e (at 876:29)
+    - graph (at 948:9)
+    - graph (at 948:9)
+    - iterations (at 955:13)
+    - iterations (at 955:13)
+    - charge (at 959:13)
+    - charge (at 959:13)
+    - distance (at 963:13)
+    - distance (at 963:13)
+    - graph (at 1000:9)
+    - graph (at 1000:9)
+    - graph (at 1063:9)
+    - graph (at 1063:9)
+    - sync_updates (at 1574:13)
+    - sync_updates (at 1574:13)
+    - node (at 1690:37)
+    - node (at 1690:37)
+    - node_id (at 1693:39)
+    - node_id (at 1693:39)
+    - edge (at 1696:37)
+    - edge (at 1696:37)
+    - edge_id (at 1699:39)
+    - edge_id (at 1699:39)
+    - id (at 1702:41)
+    - id (at 1702:41)
+    - attributes (at 1702:45)
+    - attributes (at 1702:45)
+    - id (at 1705:41)
+    - id (at 1705:41)
+    - attributes (at 1705:45)
+    - attributes (at 1705:45)
+    - target_occupancy (at 1989:25)
+    - target_occupancy (at 1989:25)
+    - min_cell_size (at 1990:25)
+    - min_cell_size (at 1990:25)
+    - enabled (at 1991:25)
+    - enabled (at 1991:25)
+
+  File: src/viz/realtime/server/realtime_server.rs
+    - e (at 120:32)
+    - e (at 120:32)
+    - e (at 147:40)
+    - e (at 147:40)
+    - e (at 156:21)
+    - e (at 156:21)
+    - e (at 204:52)
+    - e (at 204:52)
+    - e (at 211:29)
+    - e (at 211:29)
+    - e (at 248:40)
+    - e (at 248:40)
+    - e (at 258:48)
+    - e (at 258:48)
+    - e (at 270:48)
+    - e (at 270:48)
+    - e (at 282:48)
+    - e (at 282:48)
+    - e (at 292:48)
+    - e (at 292:48)
+    - e (at 302:48)
+    - e (at 302:48)
+    - e (at 312:48)
+    - e (at 312:48)
+    - e (at 810:32)
+    - e (at 810:32)
+    - e (at 847:56)
+    - e (at 847:56)
+    - e (at 864:21)
+    - e (at 864:21)
+    - e (at 912:52)
+    - e (at 912:52)
+    - e (at 919:29)
+    - e (at 919:29)
+    - e (at 957:40)
+    - e (at 957:40)
+    - e (at 966:48)
+    - e (at 966:48)
+    - e (at 978:48)
+    - e (at 978:48)
+    - e (at 990:48)
+    - e (at 990:48)
+    - e (at 1000:48)
+    - e (at 1000:48)
+    - e (at 1010:48)
+    - e (at 1010:48)
+    - e (at 1020:48)
+    - e (at 1020:48)
+    - mode (at 1105:52)
+    - mode (at 1105:52)
+    - event (at 1108:35)
+    - event (at 1108:35)
+    - event (at 1111:33)
+    - event (at 1111:33)
+    - event (at 1114:36)
+    - event (at 1114:36)
+    - offset (at 1118:17)
+    - offset (at 1118:17)
+    - window_size (at 1119:17)
+    - window_size (at 1119:17)
+    - data_type (at 1120:17)
+    - data_type (at 1120:17)
+    - sort_columns (at 1121:17)
+    - sort_columns (at 1121:17)
+
+  File: src/viz/realtime/server/ws_bridge.rs
+    - control_msg (at 86:19)
+    - control_msg (at 86:19)
+    - algorithm (at 100:33)
+    - algorithm (at 100:33)
+    - params (at 105:33)
+    - params (at 105:33)
+    - k (at 117:33)
+    - k (at 117:33)
+    - params (at 118:33)
+    - params (at 118:33)
+    - client_count (at 431:13)
+    - client_count (at 431:13)
+    - addr (at 458:9)
+    - addr (at 458:9)
+    - clients_clone (at 523:13)
+    - clients_clone (at 523:13)
+    - e (at 590:33)
+    - e (at 590:33)
+    - e (at 599:25)
+    - e (at 599:25)
+    - e (at 625:24)
+    - e (at 625:24)
+    - e (at 656:24)
+    - e (at 656:24)
+
+  File: src/viz/streaming/data_source.rs
+    - algorithm (at 72:30)
+    - algorithm (at 72:30)
+
+
+## Fields
+== Crate: groggy ==
+
+  File: src/storage/advanced_matrix/memory.rs
+    - backend_views (at 208:5)
+
+  File: src/storage/advanced_matrix/neural/autodiff.rs
+    - gradients (at 1125:5)
+
+  File: src/storage/advanced_matrix/neural/convolution.rs
+    - im2col_buffer (at 92:5)
+    - data (at 307:5)
+
+  File: src/storage/array/specialized.rs
+    - name (at 102:5)
+    - name (at 166:5)
+
+  File: src/storage/matrix/matrix_core.rs
+    - graph (at 103:5)
+    - memory_pool (at 103:5)
+    - properties (at 103:5)
+
+  File: src/storage/table/base.rs
+    - streaming_server (at 43:5)
+
+  File: src/viz/layouts/mod.rs
+    - energy (at 79:5)
+
+  File: src/viz/mod.rs
+    - config (at 1648:5)
+
+  File: src/viz/realtime/engine.rs
+    - animation_controllers (at 66:5)
+
+  File: src/viz/realtime/engine_sync.rs
+    - sequence_id (at 39:5)
+    - first_timestamp (at 47:5)
+    - first_timestamp (at 59:5)
+
+  File: src/viz/realtime/interaction/mod.rs
+    - drag_sensitivity (at 148:5)
+
+
+## Functions
+== Crate: groggy ==
+
+  File: src/storage/advanced_matrix/backends/numpy.rs
+    - check_availability (at 30:8)
+
+  File: src/storage/advanced_matrix/memory.rs
+    - as_mut_ptr (at 133:8)
+
+  File: src/storage/advanced_matrix/neural/autodiff.rs
+    - ensure_same_graph (at 871:8)
+
+  File: src/storage/array/base_array.rs
+    - compare_values (at 863:8)
+
+  File: src/storage/table/base.rs
+    - attr_value_to_display_value (at 5960:8)
+    - attr_value_to_primitive_value (at 5960:8)
+
+  File: src/subgraphs/composer.rs
+    - convert_to_agg_functions (at 627:8)
+
+  File: src/subgraphs/visualization.rs
+    - compute_force_directed_layout (at 379:8)
+
+  File: src/viz/embeddings/mod.rs
+    - method (at 412:35)
+    - method (at 412:35)
+
+  File: src/viz/layouts/mod.rs
+    - pixel_to_hex (at 1207:8)
+
+  File: src/viz/mod.rs
+    - render_streaming (at 284:8)
+
+  File: src/viz/realtime/engine.rs
+    - generate_update (at 2306:14)
+
+  File: src/viz/realtime/server/ws_bridge.rs
+    - method (at 112:33)
+    - method (at 112:33)
+
+  File: src/viz/streaming/util.rs
+    - attr_value_to_json (at 28:4)
+

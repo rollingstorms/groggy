@@ -1,5 +1,7 @@
 //! Python FFI for BaseTable system
 
+#![allow(unused_variables)]
+
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
 use crate::ffi::storage::array::PyBaseArray;

@@ -69,7 +69,7 @@ pub trait DataSource: Send + Sync + std::fmt::Debug {
     }
 
     /// Compute layout positions for nodes
-    fn compute_layout(&self, algorithm: LayoutAlgorithm) -> Vec<NodePosition> {
+    fn compute_layout(&self, _algorithm: LayoutAlgorithm) -> Vec<NodePosition> {
         Vec::new()
     }
 }

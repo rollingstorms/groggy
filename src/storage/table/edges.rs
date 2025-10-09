@@ -628,7 +628,7 @@ impl Table for EdgesTable {
         let base_groups = self.base.group_by(columns)?;
         base_groups
             .into_iter()
-            .map(|base| Self::from_base_table(base))
+            .map(Self::from_base_table)
             .collect()
     }
 

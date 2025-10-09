@@ -247,7 +247,7 @@ impl std::fmt::Display for BoolArray {
                 }
                 write!(f, "{}", val)?;
             }
-            write!(f, "])\n")?;
+            writeln!(f, "])")?;
 
             // Show indexed values
             for (i, &val) in self.inner.iter().enumerate() {
@@ -269,7 +269,7 @@ impl std::fmt::Display for BoolArray {
                 }
                 write!(f, "{}", val)?;
             }
-            write!(f, "], length={})\n", self.length)?;
+            writeln!(f, "], length={})", self.length)?;
         }
 
         // Statistics

@@ -225,7 +225,7 @@ impl Benchmarker {
         // In a real implementation, you'd use a memory profiler
 
         let _array = TestArray::new(data.to_vec());
-        let base_memory = data.len() * std::mem::size_of::<AttrValue>();
+        let base_memory = std::mem::size_of_val(data);
 
         // Estimate eager evaluation memory usage
         // (creates intermediate collections at each step)

@@ -1265,7 +1265,7 @@ impl PyNodesAccessor {
         }
 
         // Apply auto-slicing: remove columns that are all null for this node set
-        let node_set: std::collections::HashSet<groggy::NodeId> =
+        let _node_set: std::collections::HashSet<groggy::NodeId> =
             constrained_nodes.iter().copied().collect();
         let mut columns_to_keep = Vec::new();
 
@@ -1604,7 +1604,7 @@ impl PyNodesAccessor {
     /// print(g.get_node_attr(node_id, 'name'))  # 'Alice'
     /// print(g.nodes.table())  # Shows Alice in the table
     /// ```
-    pub fn append(&self, py: Python, attrs_dict: &PyDict) -> PyResult<NodeId> {
+    pub fn append(&self,_py: Python, attrs_dict: &PyDict) -> PyResult<NodeId> {
         let mut graph = self.graph.borrow_mut();
 
         // Create a new node in the graph
@@ -1656,7 +1656,7 @@ impl PyNodesAccessor {
     /// # All nodes are immediately available
     /// print(len(g.nodes))  # Increased by 3
     /// ```
-    pub fn extend(&self, py: Python, rows_data: &pyo3::types::PyList) -> PyResult<Vec<NodeId>> {
+    pub fn extend(&self,_py: Python, rows_data: &pyo3::types::PyList) -> PyResult<Vec<NodeId>> {
         let mut graph = self.graph.borrow_mut();
         let mut new_node_ids = Vec::new();
 

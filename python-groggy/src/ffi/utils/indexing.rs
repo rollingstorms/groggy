@@ -104,7 +104,7 @@ pub fn python_index_to_slice_index(py: Python, index: &PyAny) -> PyResult<SliceI
 
 /// Convert Python slice indices with length constraint
 pub fn python_slice_to_slice_index(
-    py: Python,
+   _py: Python,
     slice: &PySlice,
     length: usize,
 ) -> PyResult<SliceIndex> {

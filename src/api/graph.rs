@@ -2499,7 +2499,7 @@ impl Graph {
 
             // Check ALL values in this attribute to detect type
             for &node_id in &nodes {
-                let value_result = pool_ref.get_node_attribute(node_id, &attr_name);
+                let value_result = pool_ref.get_node_attribute(node_id, attr_name);
                 if let Ok(Some(attr_val)) = value_result {
                     match attr_val {
                         AttrValue::Int(_) => {
@@ -2546,7 +2546,7 @@ impl Graph {
             let pool_ref = self.pool.borrow();
             for attr_name in &valid_attribute_names {
                 // For each COLUMN (attribute)
-                let value_result = pool_ref.get_node_attribute(node_id, &attr_name);
+                let value_result = pool_ref.get_node_attribute(node_id, attr_name);
                 let value = match value_result {
                     Ok(Some(ref attr_val)) => attr_val,
                     _ => &AttrValue::Null,
@@ -2554,10 +2554,10 @@ impl Graph {
 
                 // Convert using LCD logic - all numerical types should convert to T
                 let numeric_value = match value {
-                    AttrValue::Int(i) => T::from_attr_value(value)?,
-                    AttrValue::SmallInt(i) => T::from_attr_value(value)?,
-                    AttrValue::Float(f) => T::from_attr_value(value)?,
-                    AttrValue::Bool(b) => T::from_attr_value(value)?,
+                    AttrValue::Int(_i) => T::from_attr_value(value)?,
+                    AttrValue::SmallInt(_i) => T::from_attr_value(value)?,
+                    AttrValue::Float(_f) => T::from_attr_value(value)?,
+                    AttrValue::Bool(_b) => T::from_attr_value(value)?,
                     AttrValue::Null => T::from_attr_value(value)?, // Should convert to 0
                     _ => {
                         // Skip non-numeric (shouldn't happen due to filtering)

@@ -175,10 +175,10 @@ impl MatrixBenchmarkSuite {
             .backend_selector
             .available_backends()
             .into_iter()
-            .filter_map(|name| {
+            .map(|name| {
                 // This is simplified - in practice you'd need to get backend by name
                 // For now, we'll use the auto-selected backend
-                Some(name)
+                name
             })
             .collect();
 
@@ -399,7 +399,7 @@ impl MatrixBenchmarkSuite {
                     ));
                 }
             }
-            report.push_str("\n");
+            report.push('\n');
         }
 
         // Backend comparison section
@@ -430,7 +430,7 @@ impl MatrixBenchmarkSuite {
             ));
         }
 
-        report.push_str("\n");
+        report.push('\n');
         report.push_str("🎯 Performance Targets (from plan):\n");
         report.push_str("  Matrix Multiply (1K×1K): Target 31.4x improvement (350ms vs 11.0s)\n");
         report.push_str("  SVD Decomposition (1K×1K): Target 52.9x improvement (850ms vs 45.0s)\n");

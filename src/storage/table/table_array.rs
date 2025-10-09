@@ -446,11 +446,7 @@ impl TableArray {
     pub fn take(&self, n: usize) -> TableArray {
         let taken_tables = self.tables.iter().take(n).cloned().collect();
 
-        let taken_keys = if let Some(ref keys) = self.group_keys {
-            Some(keys.iter().take(n).cloned().collect())
-        } else {
-            None
-        };
+        let taken_keys = self.group_keys.as_ref().map(|keys| keys.iter().take(n).cloned().collect());
 
         if let Some(keys) = taken_keys {
             TableArray::from_tables_with_keys(taken_tables, keys)
@@ -463,11 +459,7 @@ impl TableArray {
     pub fn skip(&self, n: usize) -> TableArray {
         let skipped_tables = self.tables.iter().skip(n).cloned().collect();
 
-        let skipped_keys = if let Some(ref keys) = self.group_keys {
-            Some(keys.iter().skip(n).cloned().collect())
-        } else {
-            None
-        };
+        let skipped_keys = self.group_keys.as_ref().map(|keys| keys.iter().skip(n).cloned().collect());
 
         if let Some(keys) = skipped_keys {
             TableArray::from_tables_with_keys(skipped_tables, keys)

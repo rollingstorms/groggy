@@ -376,7 +376,7 @@ impl ForceDirectedLayout {
             if let Some(&idx) = node_indices.get(&constraint.node_id) {
                 match &constraint.constraint_type {
                     ConstraintType::Fixed(pos) => {
-                        state.positions[idx] = pos.clone();
+                        state.positions[idx] = *pos;
                         state.velocities[idx] = Position { x: 0.0, y: 0.0 };
                     }
                     ConstraintType::CircularBounds(radius) => {
@@ -508,7 +508,7 @@ impl LayoutEngine for ForceDirectedLayout {
         let positions = nodes
             .iter()
             .enumerate()
-            .map(|(i, node)| (node.id.clone(), state.positions[i].clone()))
+            .map(|(i, node)| (node.id.clone(), state.positions[i]))
             .collect();
 
         Ok(positions)
@@ -1035,7 +1035,6 @@ impl LayoutRegistry {
 }
 
 /// Example custom layout implementations
-
 /// Grid layout implementation
 pub fn create_grid_layout_plugin() -> (LayoutPlugin, Arc<LayoutFunction>) {
     let plugin = LayoutPlugin {
@@ -1336,7 +1335,7 @@ impl LayoutEngine for HoneycombLayout {
         let result = nodes
             .iter()
             .enumerate()
-            .map(|(i, node)| (node.id.clone(), positions[i].clone()))
+            .map(|(i, node)| (node.id.clone(), positions[i]))
             .collect();
 
         Ok(result)
@@ -1603,7 +1602,7 @@ impl EnergyBasedLayout {
 
             // Try random perturbation
             let node_idx = fastrand::usize(..positions.len());
-            let old_position = positions[node_idx].clone();
+            let old_position = positions[node_idx];
 
             // Generate random perturbation
             let dx = (fastrand::f64() - 0.5) * self.perturbation_strength * temperature
@@ -1697,7 +1696,7 @@ impl LayoutEngine for EnergyBasedLayout {
         let result = nodes
             .iter()
             .enumerate()
-            .map(|(i, node)| (node.id.clone(), positions[i].clone()))
+            .map(|(i, node)| (node.id.clone(), positions[i]))
             .collect();
 
         Ok(result)

@@ -124,12 +124,10 @@ impl BaseArray {
         let mut valid_indices = Vec::new();
 
         for (index, val) in self.data.iter().enumerate() {
-            match val {
-                AttrValue::Int(i) => {
-                    node_ids.push(*i as crate::types::NodeId);
-                    valid_indices.push(index);
-                }
-                _ => {} // Skip invalid values
+            // Skip invalid values
+            if let AttrValue::Int(i) = val {
+                node_ids.push(*i as crate::types::NodeId);
+                valid_indices.push(index);
             }
         }
 
@@ -142,12 +140,10 @@ impl BaseArray {
         let mut valid_indices = Vec::new();
 
         for (index, val) in self.data.iter().enumerate() {
-            match val {
-                AttrValue::Int(i) => {
-                    edge_ids.push(*i as crate::types::EdgeId);
-                    valid_indices.push(index);
-                }
-                _ => {} // Skip invalid values
+            // Skip invalid values
+            if let AttrValue::Int(i) = val {
+                edge_ids.push(*i as crate::types::EdgeId);
+                valid_indices.push(index);
             }
         }
 
@@ -194,7 +190,7 @@ impl BaseArray {
             new_data.push(self.data[idx].clone());
         }
 
-        Ok(Self::new(new_data, self.dtype.clone()))
+        Ok(Self::new(new_data, self.dtype))
     }
 
     // =================================================================
@@ -229,7 +225,7 @@ impl BaseArray {
             .filter_map(|(val, &keep)| if keep { Some(val.clone()) } else { None })
             .collect();
 
-        Ok(Self::new(filtered_data, self.dtype.clone()))
+        Ok(Self::new(filtered_data, self.dtype))
     }
 
     /// Slice this array
@@ -238,7 +234,7 @@ impl BaseArray {
         let start = std::cmp::min(start, end);
 
         let sliced_data = self.data[start..end].to_vec();
-        Self::new(sliced_data, self.dtype.clone())
+        Self::new(sliced_data, self.dtype)
     }
 
     // =================================================================
@@ -313,7 +309,7 @@ impl BaseArray {
     pub fn head(&self, n: usize) -> BaseArray {
         let head_data: Vec<AttrValue> = self.data.iter().take(n).cloned().collect();
 
-        BaseArray::new(head_data, self.dtype.clone())
+        BaseArray::new(head_data, self.dtype)
     }
 
     /// Get the last n elements (tail operation)
@@ -325,7 +321,7 @@ impl BaseArray {
         };
         let tail_data: Vec<AttrValue> = self.data.iter().skip(start_idx).cloned().collect();
 
-        BaseArray::new(tail_data, self.dtype.clone())
+        BaseArray::new(tail_data, self.dtype)
     }
 
     /// Get unique values in the array
@@ -338,7 +334,7 @@ impl BaseArray {
             .cloned()
             .collect();
 
-        BaseArray::new(unique_data, self.dtype.clone())
+        BaseArray::new(unique_data, self.dtype)
     }
 
     /// Count occurrences of each value

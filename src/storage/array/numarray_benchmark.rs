@@ -116,7 +116,7 @@ impl NumArrayBenchmarkResults {
                     improvement
                 ));
             } else {
-                report.push_str("\n");
+                report.push('\n');
             }
         }
 
@@ -484,7 +484,7 @@ impl NumArrayBenchmarker {
             }
 
             // Show baseline comparison if available
-            if let Some(speedup) = results.baseline_improvement(&operation) {
+            if let Some(speedup) = results.baseline_improvement(operation) {
                 if speedup > 1.0 {
                     println!("  🚀 {:.2}x faster than naive implementation", speedup);
                 } else {

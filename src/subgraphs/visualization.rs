@@ -313,7 +313,7 @@ impl DataSource for SubgraphDataSource {
                     .enumerate()
                     .map(|(i, node)| NodePosition {
                         node_id: node.id.to_string(),
-                        position: positions[i].clone(),
+                        position: positions[i],
                     })
                     .collect()
             }

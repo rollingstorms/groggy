@@ -573,7 +573,7 @@ impl BaseTable {
         }
 
         if let Some(frac) = fraction {
-            if frac < 0.0 || frac > 1.0 {
+            if !(0.0..=1.0).contains(&frac) {
                 return Err(crate::errors::GraphError::InvalidInput(
                     "Fraction must be between 0.0 and 1.0".to_string(),
                 ));
@@ -1469,7 +1469,7 @@ impl BaseTable {
 
     /// Interactive display method (placeholder for Phase 3)
     pub fn interactive_display(&self, config: Option<DisplayConfig>) -> String {
-        let config = config.unwrap_or_else(|| DisplayConfig::interactive());
+        let config = config.unwrap_or_else(DisplayConfig::interactive);
         self.rich_display(Some(config))
     }
 
@@ -1763,11 +1763,9 @@ impl BaseTable {
         } else if pattern.starts_with('%') && pattern.ends_with('%') {
             let inner = &pattern[1..pattern.len() - 1];
             text.contains(inner)
-        } else if pattern.starts_with('%') {
-            let suffix = &pattern[1..];
+        } else if let Some(suffix) = pattern.strip_prefix('%') {
             text.ends_with(suffix)
-        } else if pattern.ends_with('%') {
-            let prefix = &pattern[..pattern.len() - 1];
+        } else if let Some(prefix) = pattern.strip_suffix('%') {
             text.starts_with(prefix)
         } else if pattern.contains('_') {
             // Basic single character wildcard support
@@ -3508,10 +3506,10 @@ impl BaseTable {
                     let q25_idx = (sorted_values.len() as f64 * 0.25) as usize;
                     let q75_idx = (sorted_values.len() as f64 * 0.75) as usize;
                     q25s.push(AttrValue::Float(
-                        sorted_values.get(q25_idx).unwrap_or(&0.0).clone() as f32,
+                        *sorted_values.get(q25_idx).unwrap_or(&0.0) as f32,
                     ));
                     q75s.push(AttrValue::Float(
-                        sorted_values.get(q75_idx).unwrap_or(&0.0).clone() as f32,
+                        *sorted_values.get(q75_idx).unwrap_or(&0.0) as f32,
                     ));
                 } else {
                     // Non-numeric columns
@@ -4344,12 +4342,10 @@ impl BaseTable {
                             }
                             crate::types::AttrValue::Float(f) => {
                                 // Skip NaN values (common with meta nodes)
-                                if !f.is_nan() {
-                                    if min_val.is_none()
-                                        || self.compare_values(value, min_val.as_ref().unwrap()) < 0
-                                    {
-                                        min_val = Some(value.clone());
-                                    }
+                                if !f.is_nan() && (min_val.is_none()
+                                    || self.compare_values(value, min_val.as_ref().unwrap()) < 0)
+                                {
+                                    min_val = Some(value.clone());
                                 }
                             }
                             _ => {} // Skip non-numeric values and nulls for min/max
@@ -4372,12 +4368,10 @@ impl BaseTable {
                             }
                             crate::types::AttrValue::Float(f) => {
                                 // Skip NaN values (common with meta nodes)
-                                if !f.is_nan() {
-                                    if max_val.is_none()
-                                        || self.compare_values(value, max_val.as_ref().unwrap()) > 0
-                                    {
-                                        max_val = Some(value.clone());
-                                    }
+                                if !f.is_nan() && (max_val.is_none()
+                                    || self.compare_values(value, max_val.as_ref().unwrap()) > 0)
+                                {
+                                    max_val = Some(value.clone());
                                 }
                             }
                             _ => {} // Skip non-numeric values and nulls for min/max
@@ -5202,7 +5196,7 @@ impl BaseTable {
                 if let Some(column) = self.columns.get(col_name) {
                     let stats_result = self.calculate_column_statistics(column)?;
 
-                    let stat_value = match stat.as_ref() {
+                    let stat_value = match *stat {
                         "count" => AttrValue::Float(stats_result.count as f32),
                         "mean" => AttrValue::Float(stats_result.mean as f32),
                         "std" => AttrValue::Float(stats_result.std as f32),

@@ -2,6 +2,8 @@
 //!
 //! Python bindings for statistical arrays and matrices.
 
+#![allow(unused_variables)]
+
 use groggy::entities::meta_node::MetaNode;
 use groggy::storage::array::{
     ArrayIterator, ArrayOps, BaseArray, EdgesArray, MetaNodeArray, NodesArray,

@@ -26,7 +26,7 @@ pub fn simd_sum(data: &[f64]) -> f64 {
             data[chunk_start + 2],
             data[chunk_start + 3],
         ]);
-        simd_sum = simd_sum + chunk;
+        simd_sum += chunk;
     }
 
     // Sum the SIMD register and add remainder
@@ -74,7 +74,7 @@ pub fn simd_variance(data: &[f64], mean: f64) -> f64 {
 
         let diff = chunk - mean_vec;
         let squared_diff = diff * diff;
-        variance_sum = variance_sum + squared_diff;
+        variance_sum += squared_diff;
     }
 
     // Sum the SIMD register and add remainder
