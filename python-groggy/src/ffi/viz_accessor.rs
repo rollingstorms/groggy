@@ -3,7 +3,7 @@
 //! Provides a pandas-like .viz accessor for visualization operations on subgraphs,
 //! arrays, and tables with support for different backends (jupyter, server).
 
-use futures_util::{SinkExt, StreamExt};
+use futures_util::SinkExt;
 use groggy::viz::streaming::GraphDataSource;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -650,7 +650,7 @@ r#"<div style="position: relative;">
 </div>"#, actual_port);
 
             Ok((actual_port, iframe_html))
-        }).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}", e)))?;
+        }).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
         // Register server
         {

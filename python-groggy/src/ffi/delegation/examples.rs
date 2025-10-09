@@ -3,7 +3,7 @@
 //! This module shows how the delegation architecture enables infinite
 //! method chaining and universal operation availability.
 
-use super::traits::{TableOps, BaseArrayOps, NumArrayOps, DelegatingIterator};
+use super::traits::{BaseArrayOps, NumArrayOps, DelegatingIterator};
 use super::forwarding::ForwardingArray;
 use super::error_handling::TryMapOps;
 use pyo3::PyResult;

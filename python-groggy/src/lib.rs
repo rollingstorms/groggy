@@ -273,7 +273,6 @@ fn table(py: Python, data: PyObject, columns: Option<Vec<String>>) -> PyResult<P
     }
 }
 */
-
 /// Merge multiple graphs into a single new graph
 ///
 /// Examples:

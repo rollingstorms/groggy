@@ -91,7 +91,7 @@ impl PySubgraph {
         // Create GraphDataSource directly from the subgraph's underlying graph
         // The subgraph already filters to the right nodes/edges
         let graph_ref = self.inner.graph();
-        let graph_data_source = GraphDataSource::new(&*graph_ref.borrow());
+        let graph_data_source = GraphDataSource::new(&graph_ref.borrow());
 
         let viz_accessor = crate::ffi::viz_accessor::VizAccessor::with_data_source(
             graph_data_source,
@@ -1232,7 +1232,6 @@ impl PySubgraph {
     ///     "total_salary": {"func": "sum", "source": "salary", "default": 0}
     /// })
     /// ```
-
     // === HIERARCHICAL OPERATIONS ===
 
     /// Get parent meta-node if this subgraph is contained within one
@@ -1269,7 +1268,7 @@ impl PySubgraph {
         use groggy::subgraphs::HierarchicalOperations;
 
         // Check if any child meta-nodes exist
-        self.inner.child_meta_nodes().unwrap_or_default().len() > 0
+        !self.inner.child_meta_nodes().unwrap_or_default().is_empty()
     }
 
     /// Get all meta-nodes within this subgraph
@@ -1584,14 +1583,14 @@ impl PySubgraph {
             for &edge_id in self.inner.edge_set() {
                 if let Ok((source, target)) = graph_borrow.edge_endpoints(edge_id) {
                     if source == node_id && self.inner.contains_node(target) {
-                        neighbors.push(target as usize);
+                        neighbors.push(target);
                     } else if target == node_id && self.inner.contains_node(source) {
-                        neighbors.push(source as usize);
+                        neighbors.push(source);
                     }
                 }
             }
 
-            result_dict.set_item(node_id as usize, neighbors)?;
+            result_dict.set_item(node_id, neighbors)?;
         }
 
         Ok(result_dict.into())
@@ -1635,7 +1634,7 @@ impl PySubgraph {
         // Convert to PySubgraph objects
         let py_subgraphs: Result<Vec<_>, _> = subgraphs
             .into_iter()
-            .map(|subgraph| PySubgraph::from_core_subgraph(subgraph))
+            .map(PySubgraph::from_core_subgraph)
             .collect();
 
         let py_subgraphs = py_subgraphs?;
@@ -1667,7 +1666,7 @@ fn parse_enhanced_aggregation_spec(
             // FORM 2: Tuple - {"avg_age": ("mean", "age")}
             let (func_str, source_str) = tuple;
             groggy::traits::subgraph_operations::AggregationSpec {
-                target_attr: target_attr,
+                target_attr,
                 function: func_str.to_string(),
                 source_attr: source_str.map(|s| s.to_string()),
                 default_value: None,
@@ -1716,10 +1715,10 @@ fn parse_enhanced_aggregation_spec(
             };
 
             groggy::traits::subgraph_operations::AggregationSpec {
-                target_attr: target_attr,
+                target_attr,
                 function: func_str,
-                source_attr: source_attr,
-                default_value: default_value,
+                source_attr,
+                default_value,
             }
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(format!(

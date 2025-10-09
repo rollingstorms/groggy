@@ -56,7 +56,6 @@ impl PyBaseArray {
     //         inner: BaseArray::new(attr_values),
     //     })
     // }
-
     /// Get the number of elements (len())
     fn __len__(&self) -> usize {
         self.inner.len()

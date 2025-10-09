@@ -138,7 +138,7 @@ pub fn softmax(py: Python, matrix: &PyGraphMatrix, dim: i32) -> PyResult<Py<PyGr
     // Create NumArrays from the result
     let num_arrays: Vec<groggy::storage::array::NumArray<f64>> = result_arrays
         .into_iter()
-        .map(|values| groggy::storage::array::NumArray::new(values))
+        .map(groggy::storage::array::NumArray::new)
         .collect();
 
     let result_matrix = groggy::storage::GraphMatrix::from_arrays(num_arrays)

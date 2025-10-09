@@ -2058,7 +2058,6 @@ impl PyBaseTable {
     /// # Remove rows at indices 0, 2, and 5
     /// new_table = table.drop_rows([0, 2, 5])
     /// ```
-
     /// Compute quantile for a specific column (pandas-style quantile)
     ///
     /// # Arguments

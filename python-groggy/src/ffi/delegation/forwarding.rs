@@ -4,7 +4,7 @@
 //! enabling universal method availability across the delegation system.
 
 use super::traits::{
-    TableOps, BaseArrayOps, NumArrayOps, DelegatingIterator
+    BaseArrayOps, NumArrayOps, DelegatingIterator
 };
 use pyo3::PyResult;
 
@@ -28,7 +28,7 @@ impl<T> ForwardingArray<T> {
     where 
         T: Clone + 'static 
     {
-        let cloned_items: Vec<T> = self.items.iter().cloned().collect();
+        let cloned_items: Vec<T> = self.items.to_vec();
         DelegatingIterator::new(cloned_items.into_iter())
     }
     
@@ -166,7 +166,7 @@ impl NumArrayOps for ForwardingArray<f64> {
     }
     
     fn percentile(&self, p: f64) -> PyResult<Option<f64>> {
-        if self.items.is_empty() || p < 0.0 || p > 100.0 {
+        if self.items.is_empty() || !(0.0..=100.0).contains(&p) {
             return Ok(None);
         }
         
