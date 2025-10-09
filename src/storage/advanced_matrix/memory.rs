@@ -287,12 +287,12 @@ impl<T: NumericType> SharedBuffer<T> {
     }
 
     /// Get read-only access to the data
-    pub fn data(&self) -> MemoryResult<std::sync::RwLockReadGuard<AlignedBuffer<T>>> {
+    pub fn data(&self) -> MemoryResult<std::sync::RwLockReadGuard<'_, AlignedBuffer<T>>> {
         self.buffer.read().map_err(|_| MemoryError::BufferInUse)
     }
 
     /// Get mutable access to the data
-    pub fn data_mut(&self) -> MemoryResult<std::sync::RwLockWriteGuard<AlignedBuffer<T>>> {
+    pub fn data_mut(&self) -> MemoryResult<std::sync::RwLockWriteGuard<'_, AlignedBuffer<T>>> {
         self.mark_modified();
         self.buffer.write().map_err(|_| MemoryError::BufferInUse)
     }

@@ -934,7 +934,7 @@ impl BaseArray<AttrValue> {
 
     /// Get string accessor for text operations
     /// Provides pandas-like string operations (.str.upper(), .str.contains(), etc.)
-    pub fn str(&self) -> StringAccessor {
+    pub fn str(&self) -> StringAccessor<'_> {
         StringAccessor::new(self)
     }
 
