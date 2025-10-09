@@ -62,7 +62,7 @@ impl PyBaseArray {
     }
 
     /// Check whether the array contains any elements
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 

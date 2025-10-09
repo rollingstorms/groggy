@@ -815,6 +815,7 @@ display(HTML(r'''{html}'''))
     }
 
     /// Parse layout parameters from Python kwargs
+    #[allow(dead_code)]
     fn parse_layout_parameters(
         &self,
         kwargs: &PyDict,
@@ -847,6 +848,7 @@ display(HTML(r'''{html}'''))
     }
 
     /// Update existing server with new layout parameters via WebSocket ControlMsg
+    #[allow(dead_code)]
     fn update_existing_server(
         &self,
         py: Python,
