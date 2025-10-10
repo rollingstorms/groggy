@@ -1,0 +1,120 @@
+site_name: Groggy Documentation
+site_description: High-performance graph analytics library for Python with a Rust core
+site_author: Groggy Contributors
+site_url: https://groggy.dev
+
+repo_name: rollingstorms/groggy
+repo_url: https://github.com/rollingstorms/groggy
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            heading_level: 2
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - About Groggy: about.md
+      - Installation: install.md
+      - Quickstart: quickstart.md
+  - Concepts:
+      - Overview: concepts/overview.md
+      - Origins & Design: concepts/origins.md
+      - Architecture: concepts/architecture.md
+      - Connected Views: concepts/connected-views.md
+  - User Guide:
+      - Graph Core: guide/graph-core.md
+      - Subgraphs: guide/subgraphs.md
+      - Accessors: guide/accessors.md
+      - SubgraphArrays: guide/subgraph-arrays.md
+      - Tables: guide/tables.md
+      - Arrays: guide/arrays.md
+      - Matrices: guide/matrices.md
+      - Algorithms: guide/algorithms.md
+      - Neural Networks: guide/neural.md
+      - Integration: guide/integration.md
+      - Performance: guide/performance.md
+  - API Reference:
+      - Graph Objects:
+          - Graph: api/graph.md
+          - Subgraph: api/subgraph.md
+          - SubgraphArray: api/subgrapharray.md
+      - Accessors:
+          - NodesAccessor: api/nodesaccessor.md
+          - EdgesAccessor: api/edgesaccessor.md
+      - Tables:
+          - GraphTable: api/graphtable.md
+          - NodesTable: api/nodestable.md
+          - EdgesTable: api/edgestable.md
+          - BaseTable: api/basetable.md
+      - Arrays:
+          - NumArray: api/numarray.md
+          - NodesArray: api/nodesarray.md
+          - EdgesArray: api/edgesarray.md
+      - Matrices:
+          - GraphMatrix: api/graphmatrix.md
+  - Appendices:
+      - Overview: appendices/index.md
+      - Glossary: appendices/glossary.md
+      - Design Decisions: appendices/design-decisions.md
+      - Performance Cookbook: appendices/performance-cookbook.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/rollingstorms/groggy
