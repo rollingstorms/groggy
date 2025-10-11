@@ -68,7 +68,7 @@ Groggy is built in three layers, each with a specific purpose:
 ```
 ┌──────────────────────────────────────┐
 │        Python API Layer              │  User-facing
-│  (Graph, Table, Array, Matrix)       │  Intuitive, chainable
+│          (Thin Wrapper)              │  Intuitive, chainable
 ├──────────────────────────────────────┤
 │          FFI Bridge                  │  Translation only
 │         (PyO3 bindings)              │  No business logic
@@ -92,7 +92,6 @@ Groggy is built in three layers, each with a specific purpose:
 
 ### Python API
 - User-facing interface
-- Delegation and chaining
 - Integration with PyData ecosystem
 - Notebook-friendly display
 

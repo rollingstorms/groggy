@@ -1,8 +1,51 @@
 # Groggy Documentation Plan
 
-**Status:** Draft - In Development
+**Status:** In Progress - Stage 1 (Phase 1)
 **Created:** October 9, 2025
+**Last Updated:** October 9, 2025
 **Purpose:** Comprehensive roadmap for creating usage-driven documentation covering all Groggy modules
+
+---
+
+## 🎯 Current Status Summary
+
+**Major Milestone: API Reference Restructuring Complete! ✅**
+
+### What's Done (Oct 9, 2025):
+- ✅ **API reference skeleton pages created** (13 pages with method tables for 501 methods)
+- ✅ **Two-track documentation strategy implemented**
+  - Track 1: Theory/Usage Guides (`docs/guide/`)
+  - Track 2: Pure API Reference (`docs/api/`)
+- ✅ **Front Matter complete** (About, Install, Quickstart, Concepts)
+- ✅ **Graph Core guide complete** (`docs/guide/graph-core.md`)
+
+### What's Next:
+- 🔄 **Expand API reference pages** - Fill in method descriptions, parameters, examples for all 501 methods
+- 🔄 **Create theory guides** for Subgraphs, Accessors, Tables, Arrays, Matrices
+- 🔄 **Update mkdocs.yml** with navigation for all API pages
+- 🔄 **Validate examples** and build documentation site
+
+### Progress by Object Type:
+
+| Object Type | API Skeleton | API Details | Theory Guide | Status |
+|-------------|--------------|-------------|--------------|--------|
+| Graph | ✅ (65 methods) | ⏳ 0% | ✅ Complete | Skeleton only |
+| Subgraph | ✅ (60 methods) | ⏳ 0% | ⏳ Pending | Skeleton only |
+| SubgraphArray | ✅ (14 methods) | ⏳ 0% | ⏳ Pending | Skeleton only |
+| Accessors | ✅ (31 methods) | ⏳ 0% | ⏳ Pending | Skeleton only |
+| Tables | ✅ (193 methods) | ⏳ 0% | ⏳ Pending | Skeleton only |
+| Arrays | ✅ (45 methods) | ⏳ 0% | ⏳ Pending | Skeleton only |
+| GraphMatrix | ✅ (93 methods) | ⏳ 0% | ⏳ Pending | Skeleton only |
+| **TOTAL** | **✅ 501 methods** | **⏳ 0% documented** | **10% complete** | **Skeletons: 100%** |
+
+### Key Achievement:
+**Infrastructure Ready:** Created skeleton API pages with method tables from meta-graph. Now need to expand each method with:
+- Parameter descriptions and types
+- Return value explanations
+- Usage examples
+- Edge cases and notes
+
+The two-track approach separates theory from reference, making it clear what needs to be filled in.
 
 ---
 
@@ -383,21 +426,55 @@ groggy/
         └── documentation_plan.md  # This file
 ```
 
-**API Documentation Philosophy:**
+**API Documentation Philosophy - TWO-TRACK APPROACH:**
 
-The API reference is NOT just auto-generated signatures. Each API page follows this structure:
+Given **501 methods across 14 core objects**, we use a **two-track documentation strategy**:
 
-1. **Conceptual Overview** - How this object fits into Groggy's architecture
-2. **Theory & Design** - Why it exists, what problem it solves, architectural context
-3. **Object Transformations** - What this can become (delegation chains)
-4. **Core Methods** - Hand-written documentation with:
-   - Purpose in context of the architecture
-   - Usage examples from tests
-   - Return types and transformation patterns
-   - Performance characteristics
-   - Related methods and cross-references
-5. **Common Patterns** - Real-world usage combining multiple methods
-6. **Auto-generated Reference** - Complete signature list (supplementary)
+### Track 1: Theory/Usage Guides (`docs/guide/`)
+
+**Purpose:** Teach concepts, patterns, and real-world usage
+
+**Structure:**
+- **Conceptual Overview** - How this object fits into Groggy's architecture
+- **Architecture & Design** - Why it exists, what problem it solves
+- **Usage Patterns** - Real-world examples combining multiple methods
+- **Common Workflows** - Step-by-step tutorials
+- **Best Practices** - Performance tips, anti-patterns to avoid
+- **Integration Examples** - How to use with pandas, numpy, networkx
+
+**Template:** `documentation/templates/api_page_template.md`
+
+### Track 2: Pure API Reference (`docs/api/`)
+
+**Purpose:** Systematic method documentation for all objects
+
+**Structure:**
+- **Overview** - One-sentence description, use cases, related objects
+- **Complete Method Reference** - Table of ALL methods with return types and status
+- **Method Categories** - Organized by purpose (Creation, Query, Transform, Algorithm, State, I/O)
+- **Object Transformations** - Explicit transformation paths
+- **See Also** - Links to theory guides
+
+**Template:** `documentation/templates/pure_api_reference_template.md`
+
+**Data Source:** Comprehensive test meta-graph
+- Empirically discovered return types
+- Test success/failure status
+- 501 methods across 14 core objects validated
+
+### Why This Approach?
+
+**Separation of Concerns:**
+- ✅ **Theory guides** teach concepts without overwhelming with methods
+- ✅ **API reference** provides systematic complete coverage
+- ✅ **Scale**: Script-generated API pages ensure no method is missed
+- ✅ **Maintenance**: Regenerate API pages from meta-graph as code evolves
+- ✅ **Clarity**: Users know where to look (learning vs. reference)
+
+**Note on mkdocstrings:**
+- mkdocstrings **does not work** with Rust/PyO3 classes (no Python docstrings)
+- Instead: Generate method tables from comprehensive test meta-graph
+- Provides empirical return types and test status
 
 **Example: API page for Graph**
 ```markdown
@@ -513,143 +590,180 @@ alice = g.add_node(name="Alice", age=30)
 
 ## Implementation Plan
 
-### Stage 0: Front Matter & Toolchain Setup (Week 1)
+### Stage 0: Front Matter & Toolchain Setup (Week 1) ✅ COMPLETE
 - [x] Create this planning document
-- [ ] Install and configure MkDocs + Material theme
-- [ ] Set up mkdocstrings for Python API documentation
-- [ ] Configure documentation build pipeline
-- [ ] Create base documentation structure (directories, templates)
-- [ ] Set up GitHub Pages/Vercel deployment
-- [ ] Establish example validation pipeline
-- [ ] Chapter 0: About Groggy (what/why, audience, scope)
-- [ ] Chapter 0.1: Install (pip, maturin, from source)
-- [ ] Chapter 0.2: Quickstart (5-minute graph→table→array→matrix path)
-- [ ] Chapter 0.3: Concepts & Architecture
-  - [ ] Executive overview & philosophy
-  - [ ] Origins: Ultralight example (GraphSpace, GraphPool, HistoryForest)
-  - [ ] Three-tier architecture (Rust Core ↔ FFI ↔ Python)
-  - [ ] Core ideas: structure vs info, versioning, columnar
-  - [ ] Connected views: Graph↔Table↔Array↔Matrix
-  - [ ] Visualization preview & roadmap
+- [x] Install and configure MkDocs + Material theme
+- [x] Set up mkdocstrings for Python API documentation
+- [x] Configure documentation build pipeline (mkdocs.yml)
+- [x] Create base documentation structure (directories, templates)
+- [ ] Set up GitHub Pages/Vercel deployment (deferred to later)
+- [ ] Establish example validation pipeline (deferred to later)
+- [x] Chapter 0: About Groggy (what/why, audience, scope) → `docs/about.md`
+- [x] Chapter 0.1: Install (pip, maturin, from source) → `docs/install.md`
+- [x] Chapter 0.2: Quickstart (5-minute graph→table→array→matrix path) → `docs/quickstart.md`
+- [x] Chapter 0.3: Concepts & Architecture
+  - [x] Executive overview & philosophy → `docs/concepts/overview.md`
+  - [x] Origins: Ultralight example (GraphSpace, GraphPool, HistoryForest) → `docs/concepts/origins.md`
+  - [x] Three-tier architecture (Rust Core ↔ FFI ↔ Python) → `docs/concepts/architecture.md`
+  - [x] Core ideas: structure vs info, versioning, columnar → `docs/concepts/architecture.md`
+  - [x] Connected views: Graph↔Table↔Array↔Matrix → `docs/concepts/connected-views.md`
+  - [ ] Visualization preview & roadmap (deferred - not critical for v1)
 
-### Stage 1: Core Foundation - Phase 1 (Weeks 2-3)
-- [ ] Chapter 1: Graph Core
-  - [ ] Graph creation and initialization
-  - [ ] Node CRUD operations
-  - [ ] Edge CRUD operations
-  - [ ] Attribute management
-  - [ ] Basic graph properties
-- [ ] Chapter 2: Subgraphs
+### Stage 1: Core Foundation - Phase 1 (Weeks 2-3) - IN PROGRESS
+
+**Theory/Usage Guides:**
+- [x] Chapter 1: Graph Core → `docs/guide/graph-core.md`
+  - [x] Graph creation and initialization
+  - [x] Node CRUD operations
+  - [x] Edge CRUD operations
+  - [x] Attribute management
+  - [x] Basic graph properties
+  - [x] State management and version control
+  - [x] Complete examples
+- [ ] Chapter 2: Subgraphs → `docs/guide/subgraphs.md`
   - [ ] Creating subgraphs (slicing, filtering)
   - [ ] Subgraph operations
   - [ ] Relationship to parent graph
   - [ ] Converting back to Graph
-- [ ] Chapter 3: Accessors
+  - [ ] Common patterns and workflows
+- [ ] Chapter 3: Accessors → `docs/guide/accessors.md`
   - [ ] NodesAccessor and EdgesAccessor
   - [ ] Attribute access patterns
   - [ ] Bulk operations
-- [ ] **API Reference (Phase 1):**
-  - [ ] `api/graph.md` - Hand-craft with architecture context, theory, transformations
-  - [ ] `api/subgraph.md` - Emphasize view concept, relationship to Graph
-  - [ ] `api/accessors.md` - Document nodes/edges accessor patterns
-  - [ ] Each page: Conceptual overview → Theory → Transformations → Methods → Patterns
-- [ ] Validate all examples run successfully
+  - [ ] Filtering and selection
+- [ ] Chapter 3.5: SubgraphArray → `docs/guide/subgraph-arrays.md`
+  - [ ] Working with collections of subgraphs
+  - [ ] Component analysis
+  - [ ] Delegation chains
+
+**API Reference Skeleton (Infrastructure Complete ✅):**
+- [x] **Two-track restructuring completed (Oct 9, 2025)**
+- [x] Deleted old mixed-purpose API pages
+- [x] Created pure API reference template
+- [x] Generated 13 skeleton API reference pages (501 methods listed):
+  - [x] `api/graph.md` (65 methods listed)
+  - [x] `api/subgraph.md` (60 methods listed)
+  - [x] `api/subgrapharray.md` (14 methods listed)
+  - [x] `api/nodesaccessor.md` (15 methods listed)
+  - [x] `api/edgesaccessor.md` (16 methods listed)
+  - [x] `api/graphtable.md` (22 methods listed)
+  - [x] `api/nodestable.md` (33 methods listed)
+  - [x] `api/edgestable.md` (37 methods listed)
+  - [x] `api/basetable.md` (101 methods listed)
+  - [x] `api/numarray.md` (17 methods listed)
+  - [x] `api/nodesarray.md` (13 methods listed)
+  - [x] `api/edgesarray.md` (15 methods listed)
+  - [x] `api/graphmatrix.md` (93 methods listed)
+- [x] Script: `documentation/scripts/generate_pure_api_pages.py`
+- [x] All methods categorized by purpose
+- [x] Empirical return types from meta-graph
+- [x] Transformation paths documented
+
+**API Reference Details (IN PROGRESS ⏳):**
+- [ ] Expand each method with full documentation:
+  - [ ] Parameter descriptions and types
+  - [ ] Return value explanations
+  - [ ] Usage examples from tests
+  - [ ] Edge cases and notes
+  - [ ] Cross-references to related methods
+
+**Next Steps:**
+- [ ] Expand API reference details for all 501 methods
+- [ ] Create theory guides for Subgraphs, Accessors, SubgraphArray
+- [ ] Update mkdocs.yml navigation with all API pages
+- [ ] Validate all examples run successfully (deferred - will validate at end)
 
 ### Stage 2: Tabular Layer - Phase 2 (Weeks 4-5)
-- [ ] Chapter 4: Base Tables
+
+**Theory/Usage Guides:**
+- [ ] Chapter 4: Tables Overview → `docs/guide/tables.md`
   - [ ] Table fundamentals
+  - [ ] GraphTable, NodesTable, EdgesTable
   - [ ] Table operations (head, tail, shape)
   - [ ] Column operations
-  - [ ] Table transformations
-- [ ] Chapter 5: Nodes & Edges Tables
-  - [ ] NodesTable and EdgesTable operations
-  - [ ] Attribute columns
   - [ ] Filtering and selection
-- [ ] Chapter 6: Graph Tables
-  - [ ] GraphTable as unified view
   - [ ] Bundle operations (save/load)
   - [ ] Merge operations
   - [ ] Graph reconstruction
-- [ ] **API Reference (Phase 2):**
-  - [ ] `api/table.md` - Columnar storage explanation, why tables matter
-  - [ ] `api/nodes-table.md` - NodesTable with architecture context
-  - [ ] `api/edges-table.md` - EdgesTable relationships
-  - [ ] `api/graph-table.md` - Unified view concept, bundle format theory
-  - [ ] Each page: Conceptual overview → Theory → Transformations → Methods → Patterns
-- [ ] Create comprehensive table usage guide
+  - [ ] Integration with pandas
+
+**API Reference (COMPLETE ✅):**
+- [x] `api/graphtable.md` (22 methods) - Already generated
+- [x] `api/nodestable.md` (33 methods) - Already generated
+- [x] `api/edgestable.md` (37 methods) - Already generated
+- [x] `api/basetable.md` (101 methods) - Already generated
+
+**Note:** API reference pages already exist from Stage 1 restructuring. Only theory guides remain.
 
 ### Stage 3: Array Layer - Phase 3 (Weeks 6-7)
-- [ ] Chapter 7: Base Arrays
+
+**Theory/Usage Guides:**
+- [ ] Chapter 5: Arrays Overview → `docs/guide/arrays.md`
   - [ ] Array fundamentals
+  - [ ] Array types (NumArray, NodesArray, EdgesArray)
   - [ ] Array operations
-  - [ ] Type system
-  - [ ] Array transformations
-- [ ] Chapter 8: Numeric Arrays
-  - [ ] NumArray for numerical data
-  - [ ] Statistical operations
-  - [ ] Aggregations
+  - [ ] Statistical operations and aggregations
   - [ ] Numpy interop
-- [ ] Chapter 9: Graph Arrays
-  - [ ] SubgraphArray
-  - [ ] ComponentsArray
   - [ ] Array delegation patterns
   - [ ] Chaining examples
-- [ ] Chapter 10: Specialized Arrays
-  - [ ] NodesArray and EdgesArray
-  - [ ] MetaNodeArray
-  - [ ] Custom array types
-- [ ] **API Reference (Phase 3):**
-  - [ ] `api/base-array.md` - Columnar attributes, array as view concept
-  - [ ] `api/num-array.md` - Numeric operations, why separate from base
-  - [ ] `api/subgraph-array.md` - Array of subgraphs, delegation chains theory
-  - [ ] `api/nodes-array.md` - NodesArray transformations
-  - [ ] `api/edges-array.md` - EdgesArray transformations
-  - [ ] Each page: Conceptual overview → Theory → Transformations → Methods → Patterns
-- [ ] Document delegation chains comprehensively
+
+**API Reference (COMPLETE ✅):**
+- [x] `api/numarray.md` (17 methods) - Already generated
+- [x] `api/nodesarray.md` (13 methods) - Already generated
+- [x] `api/edgesarray.md` (15 methods) - Already generated
+- [x] `api/subgrapharray.md` (14 methods) - Already generated (from Phase 1)
+
+**Note:** API reference pages already exist from Stage 1 restructuring. Only theory guides remain.
+**Note:** BaseArray had no methods in test data (abstract base class), no API page generated.
 
 ### Stage 4: Matrix & Advanced - Phase 4 (Weeks 8-9)
-- [ ] Chapter 11: Matrix Base
+
+**Theory/Usage Guides:**
+- [ ] Chapter 6: Matrices → `docs/guide/matrices.md`
   - [ ] Matrix fundamentals
-  - [ ] Matrix operations
-  - [ ] Sparse vs dense
-  - [ ] Linear algebra operations
-- [ ] Chapter 12: Graph Matrices
   - [ ] Adjacency matrices
   - [ ] Laplacian matrices
   - [ ] Spectral embeddings
   - [ ] Matrix-graph conversions
-- [ ] Chapter 13: Algorithms
+  - [ ] Sparse vs dense
+  - [ ] Linear algebra operations
+- [ ] Chapter 7: Algorithms → `docs/guide/algorithms.md`
   - [ ] Connected components
   - [ ] Shortest paths
   - [ ] Centrality measures
   - [ ] Community detection
-- [ ] Chapter 14: Neural Networks
+  - [ ] When to use each algorithm
+- [ ] Chapter 8: Neural Networks → `docs/guide/neural.md`
   - [ ] Neural graph modules
   - [ ] Automatic differentiation
   - [ ] Gradient computation
   - [ ] Training workflows
-- [ ] **API Reference (Phase 4):**
-  - [ ] `api/graph-matrix.md` - Graph as matrix projection, spectral theory
-  - [ ] `api/algorithms.md` - Algorithm design philosophy, when to use each
-  - [ ] `api/neural.md` - Neural module architecture, autodiff theory
-  - [ ] Each page: Conceptual overview → Theory → Transformations → Methods → Patterns
+
+**API Reference (COMPLETE ✅):**
+- [x] `api/graphmatrix.md` (93 methods) - Already generated
+
+**Note:** GraphMatrix API reference already exists. Algorithms and Neural modules need API pages if they have dedicated object types (to be determined from test data).
 
 ### Stage 5: Integration & Advanced Topics - Phase 5 (Week 10)
-- [ ] Chapter 15: Integration
+
+**Theory/Usage Guides:**
+- [ ] Chapter 9: Integration → `docs/guide/integration.md`
   - [ ] NetworkX compatibility
   - [ ] Pandas integration
   - [ ] Numpy/SciPy interop
   - [ ] Import/export workflows
-- [ ] Chapter 16: Performance
+  - [ ] Built-in graph generators
+- [ ] Chapter 10: Performance → `docs/guide/performance.md`
   - [ ] Benchmarking patterns
   - [ ] Optimization techniques
   - [ ] Memory management
   - [ ] Scaling considerations
-- [ ] **API Reference (Phase 5):**
-  - [ ] `api/generators.md` - Built-in graph generators, use cases
-  - [ ] `api/io.md` - Import/export philosophy, format choices
-  - [ ] `api/networkx-compat.md` - Interop design, when to convert
-  - [ ] Each page: Conceptual overview → Theory → Transformations → Methods → Patterns
+
+**API Reference:**
+- [ ] Determine if generators, IO, or other integration modules need dedicated API pages
+- [ ] Generate if they have object types in meta-graph
+
+**Validation:**
 - [ ] Cross-reference validation across all API pages
 - [ ] Example index creation
 - [ ] Verify all transformation paths documented
