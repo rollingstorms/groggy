@@ -17,6 +17,7 @@ use pyo3::types::{PyDict, PyList, PyType};
 use serde_json::{Map, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::os::raw::c_long;
 
 // =============================================================================
 // PyBaseTable - Python wrapper for BaseTable
@@ -769,7 +770,7 @@ impl PyBaseTable {
             Ok(PyBaseTable::from_table(single_row_table).into_py(py))
         } else if let Ok(slice) = key.downcast::<PySlice>() {
             // Slice access: table[start:end]
-            let indices = slice.indices(self.table.nrows() as i64)?;
+            let indices = slice.indices(self.table.nrows() as c_long)?;
             let start = indices.start as usize;
             let stop = indices.stop as usize;
             let step = indices.step as usize;
@@ -3142,7 +3143,7 @@ impl PyBaseTable {
         let py = slice.py();
         let table_len = self.table.nrows();
 
-        let indices = slice.indices(table_len as i64).map_err(|e| {
+        let indices = slice.indices(table_len as c_long).map_err(|e| {
             PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid slice: {}", e))
         })?;
 
@@ -3727,7 +3728,7 @@ impl PyNodesTable {
             .into_py(py))
         } else if let Ok(slice) = key.downcast::<PySlice>() {
             // Slice access: table[start:end]
-            let indices = slice.indices(self.table.nrows() as i64)?;
+            let indices = slice.indices(self.table.nrows() as c_long)?;
             let start = indices.start as usize;
             let stop = indices.stop as usize;
             let step = indices.step as usize;
@@ -4658,7 +4659,7 @@ impl PyEdgesTable {
             .into_py(py))
         } else if let Ok(slice) = key.downcast::<PySlice>() {
             // Slice access: table[start:end]
-            let indices = slice.indices(self.table.nrows() as i64)?;
+            let indices = slice.indices(self.table.nrows() as c_long)?;
             let start = indices.start as usize;
             let stop = indices.stop as usize;
             let step = indices.step as usize;

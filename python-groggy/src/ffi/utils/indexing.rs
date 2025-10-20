@@ -5,6 +5,7 @@
 use groggy::storage::array::{BoolArray, SliceIndex};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PySlice, PyTuple};
+use std::os::raw::c_long;
 // PyBoolArray functionality integrated into unified NumArray
 
 /// Convert Python indexing object to SliceIndex
@@ -16,14 +17,14 @@ pub fn python_index_to_slice_index(py: Python, index: &PyAny) -> PyResult<SliceI
 
     // Handle Python slice object
     if let Ok(slice) = index.downcast::<PySlice>() {
-        let indices = slice.indices(i64::MAX)?;
+        let indices = slice.indices(c_long::MAX)?;
         return Ok(SliceIndex::Range {
-            start: if indices.start == 0 && indices.stop == i64::MAX as isize {
+            start: if indices.start == 0 && indices.stop == c_long::MAX as isize {
                 None
             } else {
                 Some(indices.start as i64)
             },
-            stop: if indices.stop == i64::MAX as isize {
+            stop: if indices.stop == c_long::MAX as isize {
                 None
             } else {
                 Some(indices.stop as i64)
@@ -115,7 +116,7 @@ pub fn python_slice_to_slice_index(
     slice: &PySlice,
     length: usize,
 ) -> PyResult<SliceIndex> {
-    let indices = slice.indices(length as i64)?;
+    let indices = slice.indices(length as c_long)?;
     Ok(SliceIndex::Range {
         start: if indices.start == 0 && indices.stop == length as isize {
             None

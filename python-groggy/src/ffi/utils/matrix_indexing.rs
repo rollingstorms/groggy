@@ -5,6 +5,7 @@
 use groggy::storage::matrix::{MatrixIndex, MatrixSlice};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PySlice, PyTuple};
+use std::os::raw::c_long;
 // PyBoolArray functionality integrated into unified NumArray
 
 /// Convert a single Python index to MatrixIndex
@@ -16,14 +17,14 @@ pub fn python_to_matrix_index(py: Python, index: &PyAny) -> PyResult<MatrixIndex
 
     // Handle Python slice object
     if let Ok(slice) = index.downcast::<PySlice>() {
-        let indices = slice.indices(i64::MAX)?;
+        let indices = slice.indices(c_long::MAX)?;
         return Ok(MatrixIndex::Range {
-            start: if indices.start == 0 && indices.stop == i64::MAX as isize {
+            start: if indices.start == 0 && indices.stop == c_long::MAX as isize {
                 None
             } else {
                 Some(indices.start as i64)
             },
-            stop: if indices.stop == i64::MAX as isize {
+            stop: if indices.stop == c_long::MAX as isize {
                 None
             } else {
                 Some(indices.stop as i64)
