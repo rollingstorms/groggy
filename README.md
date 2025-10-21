@@ -1,5 +1,6 @@
-<div align="left"><img src="img/groggy.svg" alt="Groggy Logo" width="300"/>
+<div align="left"><img src="img/groggy.svg" alt="Groggy Logo" width="600"/>
 </div>
+
 # Groggy
 
 **A graph analytics library for Python with a Rust core**
