@@ -2007,11 +2007,13 @@ impl PyGraph {
             .and_then(|obj| obj.extract(py))
     }
 
-    /// Get viz accessor - delegates via Python.
-    pub fn viz(slf: PyRef<Self>, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
-        use pyo3::types::PyTuple;
-        Self::call_on_view(slf, py, "viz", PyTuple::empty(py))
-            .and_then(|obj| obj.extract(py))
+    /// Visualization accessor matching the subgraph API.
+    #[getter]
+    pub fn viz(
+        slf: PyRef<Self>,
+        py: Python,
+    ) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
+        Self::with_full_view(&slf, py, |subgraph, py_ctx| subgraph.viz(py_ctx))
     }
 
     // === SET OPERATIONS (Placeholders) ===

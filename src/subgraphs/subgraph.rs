@@ -1432,7 +1432,7 @@ mod tests {
         use crate::traits::SubgraphOperations;
         let components = SubgraphOperations::connected_components(&subgraph).unwrap();
         // Connected components test completed
-        assert!(components.len() >= 1); // At least the triangle should form one component
+        assert!(!components.is_empty()); // At least the triangle should form one component
 
         // Test induced subgraph
         let induced = subgraph.induced_subgraph(&[node1, node2]).unwrap();

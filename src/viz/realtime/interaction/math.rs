@@ -102,7 +102,7 @@ impl Quat {
         self
     }
 
-    // Note: Intentionally not implementing Mul trait to avoid operator overloading  
+    // Note: Intentionally not implementing Mul trait to avoid operator overloading
     #[allow(clippy::should_implement_trait)]
     pub fn mul(self, other: Self) -> Self {
         Self {

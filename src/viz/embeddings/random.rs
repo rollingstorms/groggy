@@ -325,7 +325,7 @@ mod tests {
             for j in 0..2 {
                 let val = matrix.get(i, j).unwrap();
                 assert!(
-                    val >= -1.0 && val <= 1.0,
+                    (-1.0..=1.0).contains(&val),
                     "Value {} not in range [-1, 1]",
                     val
                 );

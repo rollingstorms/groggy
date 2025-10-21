@@ -278,70 +278,6 @@ impl<T> From<NumArray<T>> for BaseArray<T> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_basic_stats() {
-        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let num_array = NumArray::new(data);
-
-        assert_eq!(num_array.len(), 5);
-        assert_eq!(num_array.mean(), Some(3.0));
-        assert_eq!(num_array.sum(), 15.0);
-        assert_eq!(num_array.min(), Some(1.0));
-        assert_eq!(num_array.max(), Some(5.0));
-        assert_eq!(num_array.median(), Some(3.0));
-    }
-
-    #[test]
-    fn test_correlation() {
-        let x = NumArray::new(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
-        let y = NumArray::new(vec![2.0, 4.0, 6.0, 8.0, 10.0]);
-
-        let correlation = x.correlate(&y);
-        assert!(correlation.is_some());
-        // Perfect positive correlation should be close to 1.0
-        assert!((correlation.unwrap() - 1.0).abs() < 0.001);
-    }
-
-    #[test]
-    fn test_element_wise_operations() {
-        let a = NumArray::new(vec![1.0, 2.0, 3.0]);
-        let b = NumArray::new(vec![4.0, 5.0, 6.0]);
-
-        let sum = a.add(&b);
-        assert!(sum.is_some());
-        assert_eq!(sum.unwrap().base.clone_vec(), vec![5.0, 7.0, 9.0]);
-
-        let scaled = a.multiply(2.0);
-        assert_eq!(scaled.base.clone_vec(), vec![2.0, 4.0, 6.0]);
-    }
-
-    #[test]
-    fn test_empty_num_array() {
-        let empty: NumArray<f64> = NumArray::new(vec![]);
-
-        assert!(empty.is_empty());
-        assert_eq!(empty.mean(), None);
-        assert_eq!(empty.min(), None);
-        assert_eq!(empty.max(), None);
-    }
-
-    #[test]
-    fn test_describe() {
-        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let num_array = NumArray::new(data);
-        let summary = num_array.describe();
-
-        assert_eq!(summary.count, 5);
-        assert!(summary.is_valid());
-        assert_eq!(summary.mean, Some(3.0));
-        assert_eq!(summary.median, Some(3.0));
-    }
-}
-
 // SIMD-optimized implementations specifically for f64 arrays
 impl NumArray<f64> {
     /// SIMD-optimized sum for f64 arrays
@@ -413,5 +349,69 @@ impl NumArray<f64> {
             // Use regular sort for smaller arrays
             self.median()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_stats() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let num_array = NumArray::new(data);
+
+        assert_eq!(num_array.len(), 5);
+        assert_eq!(num_array.mean(), Some(3.0));
+        assert_eq!(num_array.sum(), 15.0);
+        assert_eq!(num_array.min(), Some(1.0));
+        assert_eq!(num_array.max(), Some(5.0));
+        assert_eq!(num_array.median(), Some(3.0));
+    }
+
+    #[test]
+    fn test_correlation() {
+        let x = NumArray::new(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        let y = NumArray::new(vec![2.0, 4.0, 6.0, 8.0, 10.0]);
+
+        let correlation = x.correlate(&y);
+        assert!(correlation.is_some());
+        // Perfect positive correlation should be close to 1.0
+        assert!((correlation.unwrap() - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_element_wise_operations() {
+        let a = NumArray::new(vec![1.0, 2.0, 3.0]);
+        let b = NumArray::new(vec![4.0, 5.0, 6.0]);
+
+        let sum = a.add(&b);
+        assert!(sum.is_some());
+        assert_eq!(sum.unwrap().base.clone_vec(), vec![5.0, 7.0, 9.0]);
+
+        let scaled = a.multiply(2.0);
+        assert_eq!(scaled.base.clone_vec(), vec![2.0, 4.0, 6.0]);
+    }
+
+    #[test]
+    fn test_empty_num_array() {
+        let empty: NumArray<f64> = NumArray::new(vec![]);
+
+        assert!(empty.is_empty());
+        assert_eq!(empty.mean(), None);
+        assert_eq!(empty.min(), None);
+        assert_eq!(empty.max(), None);
+    }
+
+    #[test]
+    fn test_describe() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let num_array = NumArray::new(data);
+        let summary = num_array.describe();
+
+        assert_eq!(summary.count, 5);
+        assert!(summary.is_valid());
+        assert_eq!(summary.mean, Some(3.0));
+        assert_eq!(summary.median, Some(3.0));
     }
 }

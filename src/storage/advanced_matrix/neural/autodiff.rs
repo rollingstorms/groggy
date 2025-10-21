@@ -1220,7 +1220,7 @@ mod tests {
         let data = vec![1.0, 2.0, 3.0, 4.0];
         let tensor = AutoDiffTensor::from_data(data.clone(), (2, 2), true).unwrap();
 
-        assert_eq!(tensor.requires_grad, true);
+        assert!(tensor.requires_grad);
         assert_eq!(tensor.data.rows(), 2);
         assert_eq!(tensor.data.cols(), 2);
 

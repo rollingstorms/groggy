@@ -128,7 +128,7 @@ pub trait AdvancedIndexing<T> {
 
     /// Get length for index validation
     fn len(&self) -> usize;
-    
+
     /// Check if empty
     fn is_empty(&self) -> bool {
         self.len() == 0

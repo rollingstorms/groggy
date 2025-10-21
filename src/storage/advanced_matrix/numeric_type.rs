@@ -542,8 +542,8 @@ mod tests {
         assert_eq!(i64::add(i64::MAX, 1), i64::MAX); // Saturating add
 
         // Test bool operations
-        assert_eq!(bool::add(true, false), true); // Logical OR
-        assert_eq!(bool::mul(true, false), false); // Logical AND
+        assert!(bool::add(true, false)); // Logical OR
+        assert!(!bool::mul(true, false)); // Logical AND
     }
 
     #[test]

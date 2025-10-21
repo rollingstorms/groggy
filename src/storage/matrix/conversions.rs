@@ -105,8 +105,8 @@ mod tests {
     #[test]
     fn test_f64_conversions() {
         assert_eq!(
-            <f64 as FromAttrValue<f64>>::from_attr_value(&AttrValue::Float(3.14)).unwrap(),
-            3.14
+            <f64 as FromAttrValue<f64>>::from_attr_value(&AttrValue::Float(3.5)).unwrap(),
+            3.5
         );
         assert_eq!(
             <f64 as FromAttrValue<f64>>::from_attr_value(&AttrValue::Int(42)).unwrap(),
@@ -138,7 +138,7 @@ mod tests {
             42
         );
         assert_eq!(
-            <i64 as FromAttrValue<i64>>::from_attr_value(&AttrValue::Float(3.14)).unwrap(),
+            <i64 as FromAttrValue<i64>>::from_attr_value(&AttrValue::Float(3.5)).unwrap(),
             3
         );
         assert_eq!(
@@ -153,27 +153,16 @@ mod tests {
 
     #[test]
     fn test_bool_conversions() {
-        assert_eq!(
-            <bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Bool(true)).unwrap(),
-            true
-        );
-        assert_eq!(
-            <bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Int(1)).unwrap(),
-            true
-        );
-        assert_eq!(
-            <bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Int(0)).unwrap(),
-            false
-        );
-        assert_eq!(
+        assert!(<bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Bool(true)).unwrap());
+        assert!(<bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Int(1)).unwrap());
+        assert!(!<bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Int(0)).unwrap());
+        assert!(
             <bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Text("true".to_string()))
-                .unwrap(),
-            true
+                .unwrap()
         );
-        assert_eq!(
-            <bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Text("false".to_string()))
-                .unwrap(),
-            false
+        assert!(
+            !<bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Text("false".to_string()))
+                .unwrap()
         );
     }
 }

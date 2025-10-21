@@ -756,7 +756,7 @@ mod tests {
 
     #[test]
     fn test_element_wise_ops() {
-        let ops = vec![
+        let ops = [
             ElementWiseOp::Add,
             ElementWiseOp::Multiply,
             ElementWiseOp::Subtract,

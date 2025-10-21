@@ -561,8 +561,10 @@ mod tests {
 
         // Ease-in should be slower at start
         let ease_in_mid = {
-            let mut config = InterpolationConfig::default();
-            config.easing = EasingFunction::EaseIn;
+            let config = InterpolationConfig {
+                easing: EasingFunction::EaseIn,
+                ..Default::default()
+            };
             let engine = InterpolationEngine::new(config);
             engine.apply_easing(0.5)
         };
@@ -570,8 +572,10 @@ mod tests {
 
         // Ease-out should be faster at start
         let ease_out_mid = {
-            let mut config = InterpolationConfig::default();
-            config.easing = EasingFunction::EaseOut;
+            let config = InterpolationConfig {
+                easing: EasingFunction::EaseOut,
+                ..Default::default()
+            };
             let engine = InterpolationEngine::new(config);
             engine.apply_easing(0.5)
         };

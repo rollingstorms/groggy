@@ -581,7 +581,8 @@ mod tests {
                 embedding_data.push((i as f64 + j as f64 * 0.1) * 0.3); // Deterministic "random"
             }
         }
-        let embedding = GraphMatrix::from_row_major_data(embedding_data, n_nodes, n_dims, None).unwrap();
+        let embedding =
+            GraphMatrix::from_row_major_data(embedding_data, n_nodes, n_dims, None).unwrap();
 
         // Create a connected graph
         let mut graph = Graph::new();
