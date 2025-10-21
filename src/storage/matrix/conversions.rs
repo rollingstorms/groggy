@@ -104,36 +104,75 @@ mod tests {
 
     #[test]
     fn test_f64_conversions() {
-        assert_eq!(f64::from_attr_value(&AttrValue::Float(3.14)).unwrap(), 3.14);
-        assert_eq!(f64::from_attr_value(&AttrValue::Int(42)).unwrap(), 42.0);
-        assert_eq!(f64::from_attr_value(&AttrValue::Bool(true)).unwrap(), 1.0);
-        assert_eq!(f64::from_attr_value(&AttrValue::Bool(false)).unwrap(), 0.0);
         assert_eq!(
-            f64::from_attr_value(&AttrValue::String("2.5".to_string())).unwrap(),
+            <f64 as FromAttrValue<f64>>::from_attr_value(&AttrValue::Float(3.14)).unwrap(),
+            3.14
+        );
+        assert_eq!(
+            <f64 as FromAttrValue<f64>>::from_attr_value(&AttrValue::Int(42)).unwrap(),
+            42.0
+        );
+        assert_eq!(
+            <f64 as FromAttrValue<f64>>::from_attr_value(&AttrValue::Bool(true)).unwrap(),
+            1.0
+        );
+        assert_eq!(
+            <f64 as FromAttrValue<f64>>::from_attr_value(&AttrValue::Bool(false)).unwrap(),
+            0.0
+        );
+        assert_eq!(
+            <f64 as FromAttrValue<f64>>::from_attr_value(&AttrValue::Text("2.5".to_string()))
+                .unwrap(),
             2.5
         );
-        assert_eq!(f64::from_attr_value(&AttrValue::None).unwrap(), 0.0);
+        assert_eq!(
+            <f64 as FromAttrValue<f64>>::from_attr_value(&AttrValue::Null).unwrap(),
+            0.0
+        );
     }
 
     #[test]
     fn test_i64_conversions() {
-        assert_eq!(i64::from_attr_value(&AttrValue::Int(42)).unwrap(), 42);
-        assert_eq!(i64::from_attr_value(&AttrValue::Float(3.14)).unwrap(), 3);
-        assert_eq!(i64::from_attr_value(&AttrValue::Bool(true)).unwrap(), 1);
-        assert_eq!(i64::from_attr_value(&AttrValue::Bool(false)).unwrap(), 0);
+        assert_eq!(
+            <i64 as FromAttrValue<i64>>::from_attr_value(&AttrValue::Int(42)).unwrap(),
+            42
+        );
+        assert_eq!(
+            <i64 as FromAttrValue<i64>>::from_attr_value(&AttrValue::Float(3.14)).unwrap(),
+            3
+        );
+        assert_eq!(
+            <i64 as FromAttrValue<i64>>::from_attr_value(&AttrValue::Bool(true)).unwrap(),
+            1
+        );
+        assert_eq!(
+            <i64 as FromAttrValue<i64>>::from_attr_value(&AttrValue::Bool(false)).unwrap(),
+            0
+        );
     }
 
     #[test]
     fn test_bool_conversions() {
-        assert_eq!(bool::from_attr_value(&AttrValue::Bool(true)).unwrap(), true);
-        assert_eq!(bool::from_attr_value(&AttrValue::Int(1)).unwrap(), true);
-        assert_eq!(bool::from_attr_value(&AttrValue::Int(0)).unwrap(), false);
         assert_eq!(
-            bool::from_attr_value(&AttrValue::String("true".to_string())).unwrap(),
+            <bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Bool(true)).unwrap(),
             true
         );
         assert_eq!(
-            bool::from_attr_value(&AttrValue::String("false".to_string())).unwrap(),
+            <bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Int(1)).unwrap(),
+            true
+        );
+        assert_eq!(
+            <bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Int(0)).unwrap(),
+            false
+        );
+        assert_eq!(
+            <bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Text("true".to_string()))
+                .unwrap(),
+            true
+        );
+        assert_eq!(
+            <bool as FromAttrValue<bool>>::from_attr_value(&AttrValue::Text("false".to_string()))
+                .unwrap(),
             false
         );
     }
