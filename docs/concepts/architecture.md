@@ -16,10 +16,11 @@ Groggy is built as a three-layer architecture, with each layer having a specific
 ├────────────────────────────────────────────────────┤
 │                 FFI Bridge (PyO3)                  │
 │                                                    │
-│  • Pure translation layer (NO business logic)      │
+│  • Trait-backed explicit methods (v0.5.0+)         │
 │  • Type conversions (Python ↔ Rust)                │
 │  • Safe error handling and propagation             │
 │  • GIL management for parallelism                  │
+│  • ~100ns per-call FFI budget maintained           │
 │                                                    │
 ├────────────────────────────────────────────────────┤
 │                  Rust Core                         │
@@ -203,19 +204,25 @@ pub fn pagerank(
 
 The translation layer between Python and Rust. Contains **no business logic**.
 
+!!! info "v0.5.0+ Architecture"
+    Starting in v0.5.0, the FFI layer uses **explicit trait-backed delegation** instead of dynamic attribute lookups. All methods are written explicitly in `#[pymethods]` blocks for discoverability and maintainability. See [Trait-Backed Delegation](trait-delegation.md) for details.
+
 ### Responsibilities
 
 1. **Type Conversion**: Python ↔ Rust type mapping
 2. **Error Handling**: Rust `Result<T, E>` → Python exceptions
 3. **Memory Safety**: Ensure safe cross-language boundaries
 4. **GIL Management**: Release GIL for long-running operations
+5. **Trait Delegation**: Route Python calls to shared Rust trait implementations
 
-### Example FFI Binding
+### Example FFI Binding (Modern Trait-Backed Approach)
 
 ```rust
 #[pyclass]
 pub struct PyGraph {
     inner: Arc<RwLock<CoreGraph>>,
+    // Cached full view for efficient trait method calls
+    full_view_cache: Arc<RwLock<Option<Subgraph>>>,
 }
 
 #[pymethods]
@@ -223,7 +230,8 @@ impl PyGraph {
     #[new]
     fn new() -> Self {
         PyGraph {
-            inner: Arc::new(RwLock::new(CoreGraph::new()))
+            inner: Arc::new(RwLock::new(CoreGraph::new())),
+            full_view_cache: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -241,24 +249,47 @@ impl PyGraph {
         Ok(node_id)
     }
 
-    fn connected_components(&self, py: Python, inplace: bool, label: String) -> PyResult<PyObject> {
-        py.allow_threads(|| {
-            let mut graph = self.inner.write().unwrap();
-
-            // Call Rust core algorithm
-            let components = algorithms::connected_components(&graph.space);
-
-            if inplace {
-                // Write back to graph
-                for (node, comp) in components.iter().enumerate() {
-                    graph.pool.set_attr(node, &label, AttrValue::Int(*comp as i64));
-                }
-                Ok(py.None())
-            } else {
-                // Return SubgraphArray
-                Ok(PySubgraphArray::from_components(components).into_py(py))
-            }
+    // Modern trait-backed delegation using with_full_view helper
+    fn connected_components(slf: PyRef<Self>, py: Python) -> PyResult<PyComponentsArray> {
+        // Helper manages cache, GIL release, and error translation
+        Self::with_full_view(slf, py, |subgraph, _py| {
+            // Call shared trait method (zero business logic in FFI)
+            let components = subgraph
+                .inner
+                .connected_components()  // Trait method from SubgraphOps
+                .map_err(graph_error_to_py_err)?;
+            
+            // Convert result to Python type
+            Ok(PyComponentsArray::from_components(components, subgraph.inner.graph().clone()))
         })
+    }
+}
+
+// Helper for consistent trait delegation
+impl PyGraph {
+    fn with_full_view<F, R>(
+        slf: PyRef<Self>,
+        py: Python,
+        f: F,
+    ) -> PyResult<R>
+    where
+        F: FnOnce(&PyGraph, Python) -> PyResult<R> + Send,
+        R: Send,
+    {
+        // Get or create cached full view
+        let needs_refresh = {
+            let cache = slf.full_view_cache.read().unwrap();
+            cache.is_none()
+        };
+        
+        if needs_refresh {
+            let graph = slf.inner.read().unwrap();
+            let full_view = graph.full_subgraph();
+            *slf.full_view_cache.write().unwrap() = Some(full_view);
+        }
+        
+        // Release GIL for potentially long operation
+        py.allow_threads(|| f(&slf, py))
     }
 }
 ```

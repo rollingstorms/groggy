@@ -77,6 +77,7 @@ nav:
       - Origins & Design: concepts/origins.md
       - Architecture: concepts/architecture.md
       - Connected Views: concepts/connected-views.md
+      - Trait-Backed Delegation: concepts/trait-delegation.md
   - User Guide:
       - Graph Core: guide/graph-core.md
       - Subgraphs: guide/subgraphs.md

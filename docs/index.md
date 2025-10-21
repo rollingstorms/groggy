@@ -47,8 +47,11 @@ Groggy takes this further: every node and edge can have attributes stored in an 
 
 - **Rust core** for memory-safe, high-performance operations
 - **Columnar storage** for efficient bulk attribute operations
-- **Delegation chains** for expressive, composable workflows
+- **Explicit trait-backed methods** (v0.5.0+) for 20x faster FFI calls and full IDE support
 - **Git-like versioning** for time-travel queries
+
+!!! success "v0.5.0+ Performance & Discoverability"
+    Groggy now uses explicit PyO3 methods backed by Rust traits instead of dynamic delegation, providing 20x faster method calls (~100ns FFI overhead), complete IDE autocomplete support, and clearer stack traces. See [Trait-Backed Delegation](concepts/trait-delegation.md) for details.
 
 ---
 
