@@ -1,14 +1,12 @@
+<div align="left"><img src="img/groggy.svg" alt="Groggy Logo" width="300"/>
+</div>
 # Groggy
 
 **A graph analytics library for Python with a Rust core**
 
-<div align="left">
-  <img src="img/groggy.svg" alt="Groggy Logo" width="300"/>
-</div>
-
 ---
 
-## 🚀 **What is Groggy?**
+## 👀 **What is Groggy?**
 
 Groggy is a modern graph analytics library that combines **graph topology** with **tabular data operations**. Built with a high-performance Rust core and intuitive Python API, Groggy lets you seamlessly work with graph data using familiar table-like operations.
 
