@@ -706,7 +706,7 @@ impl BaseArray<AttrValue> {
         numeric_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let len = numeric_values.len();
-        if len % 2 == 0 {
+        if len.is_multiple_of(2) {
             // Even number of values - average of middle two
             let mid1 = numeric_values[len / 2 - 1];
             let mid2 = numeric_values[len / 2];

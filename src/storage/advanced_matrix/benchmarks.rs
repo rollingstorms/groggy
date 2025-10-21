@@ -175,11 +175,6 @@ impl MatrixBenchmarkSuite {
             .backend_selector
             .available_backends()
             .into_iter()
-            .map(|name| {
-                // This is simplified - in practice you'd need to get backend by name
-                // For now, we'll use the auto-selected backend
-                name
-            })
             .collect();
 
         if backends.is_empty() {

@@ -417,7 +417,7 @@ mod tests {
     #[test]
     fn test_boolean_formatting() {
         let renderer = HtmlRenderer::new();
-        let config = DisplayConfig::default();
+        let _config = DisplayConfig::default();
 
         assert_eq!(renderer.format_boolean_value("true"), "✓");
         assert_eq!(renderer.format_boolean_value("false"), "✗");

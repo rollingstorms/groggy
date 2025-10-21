@@ -124,7 +124,7 @@ pub enum ProjectionMethod {
     CustomMatrix {
         /// Pre-computed 2D projection matrix
         #[serde(skip)]
-        projection_matrix: GraphMatrix,
+        projection_matrix: Box<GraphMatrix>,
     },
 
     /// Energy-based projection with custom forces
@@ -396,7 +396,7 @@ impl ProjectionEngineFactory {
             }
 
             ProjectionMethod::CustomMatrix { projection_matrix } => Ok(Box::new(
-                algorithms::CustomMatrixProjection::new(projection_matrix.clone()),
+                algorithms::CustomMatrixProjection::new((**projection_matrix).clone()),
             )),
 
             ProjectionMethod::EnergyBased {

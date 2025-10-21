@@ -833,7 +833,7 @@ impl CompressedData {
 
     /// Decode run-length encoded data
     fn run_length_decode(input: &[u8]) -> Result<Vec<u8>, &'static str> {
-        if input.len() % 2 != 0 {
+        if !input.len().is_multiple_of(2) {
             return Err("Invalid run-length encoded data");
         }
 

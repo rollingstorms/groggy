@@ -402,7 +402,7 @@ mod tests {
             .unwrap();
 
         let _edge1 = graph.add_edge(node1, node2).unwrap();
-        let edge2 = graph.add_edge(node2, node3).unwrap();
+        let _edge2 = graph.add_edge(node2, node3).unwrap();
 
         // Create subgraph with just node2 and node3
         use std::cell::RefCell;

@@ -572,7 +572,7 @@ mod tests {
         // DFS algorithm test completed
 
         // Test boundary nodes (should be empty for a single component)
-        let boundary = component.boundary_nodes().unwrap();
+        let _boundary = component.boundary_nodes().unwrap();
         // Boundary nodes test completed
 
         // Component algorithm tests passed

@@ -1,4 +1,4 @@
-# 📚 Groggy Documentation
+# 📚 Groggy Notes
 
 Welcome to the comprehensive documentation for the Groggy project.
 

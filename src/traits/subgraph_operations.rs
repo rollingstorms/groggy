@@ -649,7 +649,8 @@ pub trait SubgraphOperations: GraphEntity {
     /// - Errors by default when aggregating non-existent attributes (strict validation)
     /// - Uses provided defaults for missing attributes when specified
     /// - Count aggregation always works regardless of attribute existence
-    /// Collapse subgraph with both defaults for missing attributes AND edge configuration
+    ///
+    ///   Collapse subgraph with both defaults for missing attributes AND edge configuration
     fn collapse_to_node_with_defaults_and_edge_config(
         &self,
         agg_functions: HashMap<AttrName, String>,
@@ -820,7 +821,8 @@ pub trait SubgraphOperations: GraphEntity {
     /// - External edge handling: copy, aggregate, count, or none
     /// - Meta-to-meta edge strategy: auto, explicit, or none
     /// - Per-attribute aggregation functions with defaults
-    /// Aggregate attribute with defaults for missing values
+    ///
+    ///   Aggregate attribute with defaults for missing values
     fn aggregate_attribute_with_defaults(
         &self,
         attr_name: &str,

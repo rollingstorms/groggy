@@ -1,15 +1,15 @@
-<div align="left"><img src="img/groggy.svg" alt="Groggy Logo" width="600"/>
+<div align="left"><img src="img/groggy.svg" alt="groggy Logo" width="600"/>
 </div>
 
-# Groggy
+# groggy
 
 **A graph analytics library for Python with a Rust core**
 
 ---
 
-## 👀 **What is Groggy?**
+## 👀 **What is groggy?**
 
-Groggy is a modern graph analytics library that combines **graph topology** with **tabular data operations**. Built with a high-performance Rust core and intuitive Python API, Groggy lets you seamlessly work with graph data using familiar table-like operations.
+groggy is a modern graph analytics library that combines **graph topology** with **tabular data operations**. Built with a high-performance Rust core and intuitive Python API, groggy lets you seamlessly work with graph data using familiar table-like operations.
 
 ## **Quick Start:**
 
@@ -68,13 +68,13 @@ Edges aren't just lines on a diagram — they represent interactions, flows, dep
 - Bridges between otherwise disconnected groups
 - Patterns that point to anomalies, generalizations, or insights
 
-Groggy builds on these ideas and takes them further: every node and edge can have attributes that are stored in a equally efficient format.
+groggy builds on these ideas and takes them further: every node and edge can have attributes that are stored in a equally efficient format.
 That means your "graph" isn't just dots and lines — it's a rich, living dataset:
 - Nodes can store labels, features, embeddings, or metadata
 - Edges can carry weights, timestamps, permissions, or scores
 - You can analyze both structure and data, as a graph or as a table, together.
 
-Whether you're exploring dynamic networks, running graph algorithms, or building machine learning pipelines, Groggy aims to be a modular, high-performance foundation. It's designed for thinking in graphs — not only visualizing them, but querying, transforming, and learning from them.
+Whether you're exploring dynamic networks, running graph algorithms, or building machine learning pipelines, groggy aims to be a modular, high-performance foundation. It's designed for thinking in graphs — not only visualizing them, but querying, transforming, and learning from them.
 
 ⸻
 
@@ -121,7 +121,7 @@ print(names.head(5))
 ## 3) Attributes are the heart and soul of the graph
 
 You can define attributes at creation time (kwargs), or later with set_attrs.
-Make up any attribute names; Groggy persists them.
+Make up any attribute names; groggy persists them.
 
 ```python
 # At creation:
@@ -230,7 +230,7 @@ Three tiers:
 	•	**FFI Bridge** — a slim foreign-function interface that exposes Rust capabilities safely.
 	•	**Python API** — the user-facing surface that reads like you think, with chains, masks, and friendly data interchange.
 
-This separation keeps Groggy fast, composable, and future-proof while still feeling Pythonic.
+This separation keeps groggy fast, composable, and future-proof while still feeling Pythonic.
 
 ⸻
 
@@ -253,7 +253,7 @@ maturin develop --release
 ### Quick Test
 ```python
 import groggy as gr
-print("Groggy installed successfully! 🎉")
+print("groggy installed successfully! 🎉")
 ```
 
 ⸻
@@ -312,10 +312,10 @@ python tests/test_documentation_validation.py
 
 ## Contributing
 
-Groggy is open and evolving. We'd love your ideas, experiments, and critiques.
+groggy is open and evolving. We'd love your ideas, experiments, and critiques.
 	•	Open an issue to propose features, UX improvements, or docs tweaks.
 	•	Send a PR for bug fixes, performance wins, or new generators/datasets.
-	•	Share how you're using Groggy — real examples shape the roadmap.
+	•	Share how you're using groggy — real examples shape the roadmap.
 
 Before contributing, please:
 	•	Run the tests locally (unit + integration where applicable).
@@ -334,7 +334,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-Groggy builds on the excellent work of:
+groggy builds on the excellent work of:
 - **Rust ecosystem**: Especially PyO3 for Python bindings
 - **Graph libraries**: NetworkX, igraph, and others for inspiration  
 - **Data science tools**: Pandas, NumPy for API design patterns

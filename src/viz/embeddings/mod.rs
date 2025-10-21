@@ -111,7 +111,7 @@ pub enum EmbeddingMethod {
     CustomMatrix {
         /// Pre-computed embedding matrix
         #[serde(skip)]
-        matrix: GraphMatrix,
+        matrix: Box<GraphMatrix>,
     },
 
     /// Composite embedding combining multiple methods
@@ -271,7 +271,7 @@ impl EmbeddingEngineFactory {
             ))),
 
             EmbeddingMethod::CustomMatrix { matrix } => {
-                Ok(Box::new(CustomMatrixEmbedding::new(matrix.clone())))
+                Ok(Box::new(CustomMatrixEmbedding::new((**matrix).clone())))
             }
 
             EmbeddingMethod::Composite {

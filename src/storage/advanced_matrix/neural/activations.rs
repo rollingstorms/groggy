@@ -526,8 +526,8 @@ mod tests {
     #[test]
     fn test_activation_type_enum() {
         let relu_type = ActivationType::ReLU;
-        let leaky_relu_type = ActivationType::LeakyReLU(0.01);
-        let elu_type = ActivationType::ELU(1.0);
+        let _leaky_relu_type = ActivationType::LeakyReLU(0.01);
+        let _elu_type = ActivationType::ELU(1.0);
 
         assert_eq!(relu_type, ActivationType::ReLU);
         assert_ne!(relu_type, ActivationType::GELU);

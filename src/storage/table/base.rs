@@ -3476,7 +3476,7 @@ impl BaseTable {
                     // Calculate median
                     let mut sorted_values = numeric_values.clone();
                     sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                    let median_val = if sorted_values.len() % 2 == 0 {
+                    let median_val = if sorted_values.len().is_multiple_of(2) {
                         (sorted_values[sorted_values.len() / 2 - 1]
                             + sorted_values[sorted_values.len() / 2])
                             / 2.0

@@ -197,8 +197,10 @@ impl VizModule {
             );
         }
 
-        let mut options = RenderOptions::default();
-        options.verbose = Some(verbose);
+        let options = RenderOptions {
+            verbose: Some(verbose),
+            ..Default::default()
+        };
         self.render(VizBackend::Realtime, options)
     }
 

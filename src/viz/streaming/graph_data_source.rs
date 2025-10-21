@@ -295,10 +295,12 @@ impl DataSource for GraphDataSource {
                 energy_optimization,
                 iterations,
             } => {
-                let mut layout = HoneycombLayout::default();
-                layout.cell_size = cell_size;
-                layout.energy_optimization = energy_optimization;
-                layout.iterations = iterations;
+                let layout = HoneycombLayout {
+                    cell_size,
+                    energy_optimization,
+                    iterations,
+                    ..Default::default()
+                };
 
                 layout
                     .compute_layout(&nodes, &edges)

@@ -970,11 +970,11 @@ mod tests {
     #[test]
     #[ignore] // gemv method not currently implemented in NativeBackend
     fn test_native_backend_gemv() {
-        let backend = NativeBackend;
+        let _backend = NativeBackend;
 
-        let matrix = vec![1.0, 2.0, 3.0, 4.0]; // [[1, 2], [3, 4]]
-        let vector = vec![5.0, 6.0];
-        let mut result = vec![0.0; 2];
+        let _matrix = vec![1.0, 2.0, 3.0, 4.0]; // [[1, 2], [3, 4]]
+        let _vector = vec![5.0, 6.0];
+        let _result = vec![0.0; 2];
 
         // backend
         //     .gemv(&matrix, (2, 2), &vector, &mut result, 1.0, 0.0)

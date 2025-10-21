@@ -401,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_compute_flat_embedding_empty() {
-        let empty_embedding = GraphMatrix::from_row_major_data(Vec::new(), 0, 0).unwrap();
+        let empty_embedding = GraphMatrix::from_row_major_data(Vec::new(), 0, 0, None).unwrap();
         let graph = Graph::new();
         let config = FlatEmbedConfig::default();
 
@@ -415,7 +415,7 @@ mod tests {
     #[test]
     fn test_compute_flat_embedding_single_node() {
         let embedding_data = vec![1.0, 2.0, 3.0]; // Single node, 3D embedding
-        let embedding = GraphMatrix::from_row_major_data(embedding_data, 1, 3).unwrap();
+        let embedding = GraphMatrix::from_row_major_data(embedding_data, 1, 3, None).unwrap();
 
         let mut graph = Graph::new();
         let _node = graph.add_node();
@@ -443,7 +443,7 @@ mod tests {
             1.0, 0.0, // Node 0: (1, 0)
             0.0, 1.0, // Node 1: (0, 1)
         ];
-        let embedding = GraphMatrix::from_row_major_data(embedding_data, 2, 2).unwrap();
+        let embedding = GraphMatrix::from_row_major_data(embedding_data, 2, 2, None).unwrap();
 
         let mut graph = Graph::new();
         let node_a = graph.add_node();
@@ -498,7 +498,7 @@ mod tests {
     #[test]
     fn test_optimization_loop_stability() {
         // Test that the optimization loop doesn't explode or produce NaN
-        let mut positions = AutoDiffTensor::from_data(
+        let positions = AutoDiffTensor::from_data(
             vec![0.1, 0.1, -0.1, 0.1, 0.0, -0.1], // 3 nodes
             (3, 2),
             true,
@@ -548,7 +548,7 @@ mod tests {
     fn test_flat_embedding_matrix_wrapper() {
         // Test the convenience wrapper function
         let embedding_data = vec![1.0, 0.0, 0.0, 1.0]; // 2 nodes, 2D
-        let embedding = GraphMatrix::from_row_major_data(embedding_data, 2, 2).unwrap();
+        let embedding = GraphMatrix::from_row_major_data(embedding_data, 2, 2, None).unwrap();
 
         let config = FlatEmbedConfig {
             iterations: 10,
@@ -581,7 +581,7 @@ mod tests {
                 embedding_data.push((i as f64 + j as f64 * 0.1) * 0.3); // Deterministic "random"
             }
         }
-        let embedding = GraphMatrix::from_row_major_data(embedding_data, n_nodes, n_dims).unwrap();
+        let embedding = GraphMatrix::from_row_major_data(embedding_data, n_nodes, n_dims, None).unwrap();
 
         // Create a connected graph
         let mut graph = Graph::new();

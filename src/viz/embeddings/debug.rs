@@ -480,7 +480,7 @@ impl<T: super::EmbeddingEngine> super::EmbeddingEngine for DebuggableEmbedding<T
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::viz::embeddings::random::RandomEmbedding;
+    use crate::viz::embeddings::{random::RandomEmbedding, EmbeddingEngine};
 
     fn path_graph(n: usize) -> Graph {
         let mut graph = Graph::new();

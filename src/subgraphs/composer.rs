@@ -40,7 +40,8 @@ impl Default for EdgeStrategy {
 }
 
 impl EdgeStrategy {
-    /// Parse edge strategy from string
+    /// Parse edge strategy from string (intentionally not implementing FromStr trait to avoid ambiguity)
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> GraphResult<Self> {
         match s.to_lowercase().as_str() {
             "aggregate" => Ok(EdgeStrategy::Aggregate),

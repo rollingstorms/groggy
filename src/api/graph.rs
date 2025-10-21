@@ -2256,7 +2256,7 @@ impl Graph {
                 let mut numeric_values: Vec<f64> = values.iter().map(extract_numeric).collect();
                 numeric_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
                 let mid = numeric_values.len() / 2;
-                if numeric_values.len() % 2 == 0 {
+                if numeric_values.len().is_multiple_of(2) {
                     (numeric_values[mid - 1] + numeric_values[mid]) / 2.0
                 } else {
                     numeric_values[mid]

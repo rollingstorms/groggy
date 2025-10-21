@@ -399,7 +399,7 @@ impl DataSourceRealtimeAccessor {
     }
 
     /// Auto-assign curvature to multi-edges between same node pairs and self-loops
-    fn apply_auto_curvature(&self, edges: &mut Vec<Edge>) {
+    fn apply_auto_curvature(&self, edges: &mut [Edge]) {
         use std::collections::HashMap;
 
         // Group edges by (source, target) pair (treating undirected as same)
@@ -1274,7 +1274,7 @@ mod tests {
         }
 
         fn get_column_types(&self) -> Vec<DataType> {
-            vec![DataType::Integer, DataType::Text]
+            vec![DataType::Integer, DataType::String]
         }
 
         fn get_column_names(&self) -> Vec<String> {
@@ -1331,7 +1331,7 @@ mod tests {
     #[test]
     fn test_control_messages() {
         let mock_ds = Arc::new(MockDataSource::new());
-        let mut accessor = DataSourceRealtimeAccessor::new(mock_ds);
+        let accessor = DataSourceRealtimeAccessor::new(mock_ds);
 
         // Test embedding change
         let control = ControlMsg::ChangeEmbedding {
@@ -1341,6 +1341,6 @@ mod tests {
         };
 
         accessor.apply_control(control).unwrap();
-        assert_eq!(accessor.embedding_dimensions, 3);
+        assert_eq!(*accessor.embedding_dimensions.read().unwrap(), 3);
     }
 }

@@ -609,7 +609,7 @@ mod tests {
         pool.deallocate(buffer2);
 
         // Allocate again - should reuse
-        let buffer3 = pool.allocate(100).unwrap();
+        let _buffer3 = pool.allocate(100).unwrap();
         let stats = pool.stats();
 
         assert!(stats.cache_hit_rate > 0.0);

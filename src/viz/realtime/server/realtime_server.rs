@@ -508,11 +508,10 @@ impl RealtimeServer {
                     }
                 }
 
-                if is_websocket && sec_websocket_key.is_some() {
+                if let Some(websocket_key) = is_websocket.then_some(()).and(sec_websocket_key) {
                     // 🔌 DEBUG: WebSocket upgrade request from {}
 
                     // Perform WebSocket handshake manually
-                    let websocket_key = sec_websocket_key.unwrap();
                     let accept_key = Self::generate_websocket_accept(&websocket_key);
 
                     let response = format!(

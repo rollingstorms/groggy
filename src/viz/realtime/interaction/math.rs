@@ -18,14 +18,18 @@ impl Vec3 {
         Self { x, y, z }
     }
 
+    // Note: Intentionally not implementing Add/Sub/Mul traits to avoid operator overloading
+    #[allow(clippy::should_implement_trait)]
     pub fn add(self, other: Self) -> Self {
         Self::new(self.x + other.x, self.y + other.y, self.z + other.z)
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn sub(self, other: Self) -> Self {
         Self::new(self.x - other.x, self.y - other.y, self.z - other.z)
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn mul(self, scalar: f64) -> Self {
         Self::new(self.x * scalar, self.y * scalar, self.z * scalar)
     }
@@ -98,6 +102,8 @@ impl Quat {
         self
     }
 
+    // Note: Intentionally not implementing Mul trait to avoid operator overloading  
+    #[allow(clippy::should_implement_trait)]
     pub fn mul(self, other: Self) -> Self {
         Self {
             w: self.w * other.w - self.x * other.x - self.y * other.y - self.z * other.z,

@@ -25,7 +25,10 @@ pub enum WsMessage {
     },
     /// Update message for incremental changes
     #[serde(rename = "update")]
-    Update { version: u32, payload: EngineUpdate },
+    Update {
+        version: u32,
+        payload: Box<EngineUpdate>,
+    },
     /// Control message from client to server
     #[serde(rename = "control")]
     Control { version: u32, payload: ControlMsg },
@@ -74,10 +77,8 @@ impl WsBridge {
         // Debug message
 
         // First, try to parse as the expected WsMessage format (Python format)
-        if let Ok(ws_msg) = serde_json::from_str::<WsMessage>(text) {
-            if let WsMessage::Control { .. } = ws_msg {
-                // Debug message
-            }
+        if let Ok(WsMessage::Control { .. }) = serde_json::from_str::<WsMessage>(text) {
+            // Debug message
         }
 
         // If that fails, try to parse as direct JSON formats that UI might send
@@ -547,7 +548,7 @@ impl WsBridge {
                         if let Ok(update) = update {
                             let message = WsMessage::Update {
                                 version: 1,
-                                payload: update,
+                                payload: Box::new(update),
                             };
                             if let Ok(json) = serde_json::to_string(&message) {
                                 let mut sender = ws_sender_clone.lock().await;

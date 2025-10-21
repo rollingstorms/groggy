@@ -347,7 +347,6 @@ impl DataSource for SubgraphDataSource {
                 iterations: _,
             } => {
                 // Honeycomb/hexagonal grid layout
-                let cell_size = cell_size;
                 let sqrt3 = 3.0_f64.sqrt();
                 let hex_width = cell_size * sqrt3;
                 let hex_height = cell_size * 1.5;

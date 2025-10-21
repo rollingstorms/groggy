@@ -45,6 +45,7 @@ ctrlc = "3.4" # Ctrl+C signal handling
 [features]
 default = []
 python = ["pyo3"]
+integration_tests_disabled = []
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

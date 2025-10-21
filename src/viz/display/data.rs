@@ -157,7 +157,8 @@ impl fmt::Display for DataType {
 }
 
 impl DataType {
-    /// Parse data type from string representation
+    /// Parse data type from string representation (intentionally not implementing FromStr trait to avoid ambiguity)
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "string" | "str" | "text" => DataType::String,
