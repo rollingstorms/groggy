@@ -1599,6 +1599,106 @@ impl PySubgraph {
             py_subgraphs,
         ))
     }
+
+    /// Enable property-style attribute access for node/edge attributes.
+    ///
+    /// Returns a dictionary mapping IDs to attribute values when accessing
+    /// node or edge attribute names (e.g., `subgraph.age` returns {id: age_value}).
+    fn __getattr__(&self, py: Python, name: String) -> PyResult<PyObject> {
+        use pyo3::exceptions::PyAttributeError;
+        use pyo3::types::PyDict;
+        use std::collections::HashSet;
+
+        // Prevent access to special Python attributes
+        match name.as_str() {
+            "__dict__"
+            | "__class__"
+            | "__module__"
+            | "__doc__"
+            | "__weakref__"
+            | "__slots__" => {
+                return Err(PyAttributeError::new_err(format!(
+                    "'Subgraph' object has no attribute '{}'",
+                    name
+                )));
+            }
+            _ => {}
+        }
+
+        // Get all available node attribute names in this subgraph
+        let graph_rc = self.inner.graph().clone();
+        let graph_ref = graph_rc.borrow();
+        let mut all_node_attrs = HashSet::new();
+        for node_id in self.inner.node_set() {
+            if let Ok(attrs) = graph_ref.get_node_attrs(*node_id) {
+                for attr_name in attrs.keys() {
+                    all_node_attrs.insert(attr_name.clone());
+                }
+            }
+        }
+
+        // Get all available edge attribute names in this subgraph
+        let mut all_edge_attrs = HashSet::new();
+        for edge_id in self.inner.edge_set() {
+            if let Ok(attrs) = graph_ref.get_edge_attrs(*edge_id) {
+                for attr_name in attrs.keys() {
+                    all_edge_attrs.insert(attr_name.clone());
+                }
+            }
+        }
+
+        // Check if this is a node attribute name
+        if all_node_attrs.contains(&name) {
+            let result_dict = PyDict::new(py);
+
+            for node_id in self.inner.node_set() {
+                match graph_ref.get_node_attr(*node_id, &name) {
+                    Ok(Some(attr_value)) => {
+                        let py_value =
+                            crate::ffi::utils::attr_value_to_python_value(py, &attr_value)?;
+                        result_dict.set_item(node_id, py_value)?;
+                    }
+                    Ok(None) => {
+                        result_dict.set_item(node_id, py.None())?;
+                    }
+                    Err(_) => continue,
+                }
+            }
+
+            return Ok(result_dict.to_object(py));
+        }
+
+        // Check if this is an edge attribute name
+        if all_edge_attrs.contains(&name) {
+            let result_dict = PyDict::new(py);
+
+            for edge_id in self.inner.edge_set() {
+                match graph_ref.get_edge_attr(*edge_id, &name) {
+                    Ok(Some(attr_value)) => {
+                        let py_value =
+                            crate::ffi::utils::attr_value_to_python_value(py, &attr_value)?;
+                        result_dict.set_item(edge_id, py_value)?;
+                    }
+                    Ok(None) => {
+                        result_dict.set_item(edge_id, py.None())?;
+                    }
+                    Err(_) => continue,
+                }
+            }
+
+            return Ok(result_dict.to_object(py));
+        }
+
+        // Convert to Vec for error message
+        let node_attrs_vec: Vec<String> = all_node_attrs.into_iter().collect();
+        let edge_attrs_vec: Vec<String> = all_edge_attrs.into_iter().collect();
+
+        // Attribute not found
+        Err(PyAttributeError::new_err(format!(
+            "'Subgraph' object has no attribute '{}'. Available node attributes: {:?}, Available edge attributes: {:?}",
+            name, node_attrs_vec, edge_attrs_vec
+        )))
+    }
 }
 
 /// Parse enhanced aggregation specification from Python dict supporting three syntax forms

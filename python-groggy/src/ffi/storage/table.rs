@@ -3918,8 +3918,28 @@ impl PyNodesTable {
         Ok(formatted)
     }
 
-    /// Delegate to BaseTable for missing methods (enables rich display)
+    /// Delegate to BaseTable for missing methods, or provide column access
     pub fn __getattr__(&self, py: Python, name: &str) -> PyResult<PyObject> {
+        use pyo3::exceptions::PyAttributeError;
+        use pyo3::types::PyString;
+        
+        // Prevent access to special Python attributes
+        if name.starts_with("__") {
+            return Err(PyAttributeError::new_err(format!(
+                "'NodesTable' object has no attribute '{}'",
+                name
+            )));
+        }
+        
+        // Check if this is a column name - if so, return the column as an array
+        let columns = self.table.base_table().columns();
+        if columns.contains_key(name) {
+            // Return the column via __getitem__
+            let py_str = PyString::new(py, name);
+            return self.__getitem__(py_str.as_ref());
+        }
+        
+        // Otherwise delegate to BaseTable for methods
         let base_table = self.base_table();
         let base_obj = base_table.into_py(py);
         base_obj.getattr(py, name)
@@ -4869,8 +4889,28 @@ impl PyEdgesTable {
         Ok(formatted)
     }
 
-    /// Delegate to BaseTable for missing methods (enables rich display)
+    /// Delegate to BaseTable for missing methods, or provide column access
     pub fn __getattr__(&self, py: Python, name: &str) -> PyResult<PyObject> {
+        use pyo3::exceptions::PyAttributeError;
+        use pyo3::types::PyString;
+        
+        // Prevent access to special Python attributes
+        if name.starts_with("__") {
+            return Err(PyAttributeError::new_err(format!(
+                "'EdgesTable' object has no attribute '{}'",
+                name
+            )));
+        }
+        
+        // Check if this is a column name - if so, return the column as an array
+        let columns = self.table.base_table().columns();
+        if columns.contains_key(name) {
+            // Return the column via __getitem__
+            let py_str = PyString::new(py, name);
+            return self.__getitem__(py_str.as_ref());
+        }
+        
+        // Otherwise delegate to BaseTable for methods
         let base_table = self.base_table();
         let base_obj = base_table.into_py(py);
         base_obj.getattr(py, name)
