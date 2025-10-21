@@ -378,9 +378,10 @@ mod tests {
         let means = arr_arr.mean();
         let table = arr_arr.to_table_with_aggregation("mean", means).unwrap();
 
+        use crate::storage::table::traits::Table;
         assert!(table.has_column("group_key"));
         assert!(table.has_column("mean"));
-        assert_eq!(table.row_count(), 2);
+        assert_eq!(table.nrows(), 2);
     }
 
     #[test]
@@ -395,9 +396,10 @@ mod tests {
         let means = arr_arr.mean();
         let table = arr_arr.to_table_with_aggregation("mean", means).unwrap();
 
+        use crate::storage::table::traits::Table;
         assert!(table.has_column("label"));
         assert!(table.has_column("mean"));
-        assert_eq!(table.row_count(), 2);
+        assert_eq!(table.nrows(), 2);
     }
 
     #[test]
@@ -411,7 +413,8 @@ mod tests {
         let means = arr_arr.mean();
         let table = arr_arr.to_table_with_aggregation("mean", means).unwrap();
 
+        use crate::storage::table::traits::Table;
         assert!(table.has_column("mean"));
-        assert_eq!(table.row_count(), 2);
+        assert_eq!(table.nrows(), 2);
     }
 }

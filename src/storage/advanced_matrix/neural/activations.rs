@@ -500,15 +500,27 @@ mod tests {
     fn test_relu_properties() {
         // Test with f64 matrices when available
         let relu = ReLU;
-        assert_eq!(relu.name(), "ReLU");
+        assert_eq!(<ReLU as ActivationFunction<f64>>::name(&relu), "ReLU");
     }
 
     #[test]
     fn test_activation_function_names() {
-        assert_eq!(relu::<f64>().name(), "ReLU");
-        assert_eq!(gelu::<f64>().name(), "GELU");
-        assert_eq!(sigmoid::<f64>().name(), "Sigmoid");
-        assert_eq!(tanh::<f64>().name(), "Tanh");
+        assert_eq!(
+            <ReLU as ActivationFunction<f64>>::name(&relu::<f64>()),
+            "ReLU"
+        );
+        assert_eq!(
+            <GELU as ActivationFunction<f64>>::name(&gelu::<f64>()),
+            "GELU"
+        );
+        assert_eq!(
+            <Sigmoid as ActivationFunction<f64>>::name(&sigmoid::<f64>()),
+            "Sigmoid"
+        );
+        assert_eq!(
+            <Tanh as ActivationFunction<f64>>::name(&tanh::<f64>()),
+            "Tanh"
+        );
     }
 
     #[test]
