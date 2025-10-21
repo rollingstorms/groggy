@@ -503,21 +503,15 @@ impl GraphTable {
                         let original_target = targets[idx];
 
                         // Remap source and target using domain mapping
-                        let new_source = domain_mapping
-                            .get(&original_source)
-                            .copied()
-                            .unwrap_or({
-                                // If source node not found in current domain, keep original
-                                original_source
-                            });
+                        let new_source = domain_mapping.get(&original_source).copied().unwrap_or({
+                            // If source node not found in current domain, keep original
+                            original_source
+                        });
 
-                        let new_target = domain_mapping
-                            .get(&original_target)
-                            .copied()
-                            .unwrap_or({
-                                // If target node not found in current domain, keep original
-                                original_target
-                            });
+                        let new_target = domain_mapping.get(&original_target).copied().unwrap_or({
+                            // If target node not found in current domain, keep original
+                            original_target
+                        });
 
                         // Get edge attributes
                         let mut edge_attrs = HashMap::new();

@@ -1760,8 +1760,7 @@ impl BaseArray<AttrValue> {
         } else {
             // Shift left
             let shift = (-periods) as usize;
-            result_values[..(self.data().len() - shift)]
-                .clone_from_slice(&self.data()[shift..]);
+            result_values[..(self.data().len() - shift)].clone_from_slice(&self.data()[shift..]);
         }
 
         Ok(BaseArray::from_attr_values(result_values))

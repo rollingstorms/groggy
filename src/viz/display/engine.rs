@@ -63,11 +63,13 @@ impl DisplayEngine {
                 // For now, return HTML with interactive button
                 // Will be replaced with actual WebSocket server in Phase 3
                 let mut html = self.format_html(data);
-                html.push_str(r#"<div class="interactive-placeholder">
+                html.push_str(
+                    r#"<div class="interactive-placeholder">
                     <button onclick="alert('Interactive mode coming in Phase 3!')">
                         Launch Interactive View →
                     </button>
-                    </div>"#);
+                    </div>"#,
+                );
                 html
             }
         }

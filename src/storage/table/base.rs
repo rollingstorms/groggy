@@ -4342,8 +4342,10 @@ impl BaseTable {
                             }
                             crate::types::AttrValue::Float(f) => {
                                 // Skip NaN values (common with meta nodes)
-                                if !f.is_nan() && (min_val.is_none()
-                                    || self.compare_values(value, min_val.as_ref().unwrap()) < 0)
+                                if !f.is_nan()
+                                    && (min_val.is_none()
+                                        || self.compare_values(value, min_val.as_ref().unwrap())
+                                            < 0)
                                 {
                                     min_val = Some(value.clone());
                                 }
@@ -4368,8 +4370,10 @@ impl BaseTable {
                             }
                             crate::types::AttrValue::Float(f) => {
                                 // Skip NaN values (common with meta nodes)
-                                if !f.is_nan() && (max_val.is_none()
-                                    || self.compare_values(value, max_val.as_ref().unwrap()) > 0)
+                                if !f.is_nan()
+                                    && (max_val.is_none()
+                                        || self.compare_values(value, max_val.as_ref().unwrap())
+                                            > 0)
                                 {
                                     max_val = Some(value.clone());
                                 }

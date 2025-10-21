@@ -297,11 +297,9 @@ impl<T: NumericType> ComputationGraph<T> {
         node: &ComputationNode<T>,
     ) -> MatrixResult<UnifiedMatrix<T>> {
         match &node.operation {
-            Operation::Leaf => {
-                Err(MatrixError::ComputationError(
-                    "Leaf node requested for forward compute without cached value".to_string(),
-                ))
-            }
+            Operation::Leaf => Err(MatrixError::ComputationError(
+                "Leaf node requested for forward compute without cached value".to_string(),
+            )),
 
             Operation::Add => {
                 let inputs = self.get_input_values(&node.inputs)?;

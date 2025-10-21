@@ -346,10 +346,7 @@ impl Table for NodesTable {
 
     fn group_by(&self, columns: &[String]) -> GraphResult<Vec<Self>> {
         let base_groups = self.base.group_by(columns)?;
-        base_groups
-            .into_iter()
-            .map(Self::from_base_table)
-            .collect()
+        base_groups.into_iter().map(Self::from_base_table).collect()
     }
 
     fn select(&self, column_names: &[String]) -> GraphResult<Self> {

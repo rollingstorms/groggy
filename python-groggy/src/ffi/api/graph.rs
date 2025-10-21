@@ -136,6 +136,49 @@ impl PyGraph {
 
         Ok(Box::new(full_subgraph))
     }
+
+    /// Helper to execute operations on the cached full-graph view.
+    ///
+    /// This helper uses the cached `view()` method to avoid repeatedly creating
+    /// subgraphs for delegation. The view is cached and reused across calls when
+    /// the graph hasn't been modified.
+    pub(crate) fn with_full_view<'py, R, F>(
+        graph_ref: PyRef<'py, Self>,
+        py: Python<'py>,
+        f: F,
+    ) -> PyResult<R>
+    where
+        F: for<'a> FnOnce(PyRef<'a, PySubgraph>, Python<'a>) -> PyResult<R>,
+    {
+        let view = Self::view(graph_ref, py)?;
+        f(view.borrow(py), py)
+    }
+
+    /// Helper to call a Python method on the cached full-graph view.
+    ///
+    /// This is useful for methods that are defined in PySubgraph's #[pymethods]
+    /// but not exposed as pub fn (Python-only visibility).
+    pub(crate) fn call_on_view<'py>(
+        graph_ref: PyRef<'py, Self>,
+        py: Python<'py>,
+        method_name: &str,
+        args: &pyo3::types::PyTuple,
+    ) -> PyResult<PyObject> {
+        let view = Self::view(graph_ref, py)?;
+        view.call_method1(py, method_name, args)
+    }
+
+    /// Helper to call a Python method with keyword args on the cached full-graph view.
+    pub(crate) fn call_on_view_kwargs<'py>(
+        graph_ref: PyRef<'py, Self>,
+        py: Python<'py>,
+        method_name: &str,
+        args: &pyo3::types::PyTuple,
+        kwargs: Option<&PyDict>,
+    ) -> PyResult<PyObject> {
+        let view = Self::view(graph_ref, py)?;
+        view.call_method(py, method_name, args, kwargs)
+    }
 }
 
 #[pymethods]
@@ -1691,6 +1734,381 @@ impl PyGraph {
 
         let result = subgraph.is_connected().map_err(graph_error_to_py_err)?;
         Ok(result)
+    }
+
+    // === EXPLICIT DELEGATION METHODS ===
+    // These methods avoid expensive dynamic __getattr__ delegation by explicitly
+    // forwarding to the cached full-graph subgraph view.
+
+    /// Find connected components in the graph.
+    pub fn connected_components(
+        slf: PyRef<Self>,
+        py: Python,
+    ) -> PyResult<crate::ffi::storage::components::PyComponentsArray> {
+        Self::with_full_view(slf, py, |subgraph, _py| {
+            let components = subgraph
+                .inner
+                .connected_components()
+                .map_err(graph_error_to_py_err)?;
+            Ok(crate::ffi::storage::components::PyComponentsArray::from_components(
+                components,
+                subgraph.inner.graph().clone(),
+            ))
+        })
+    }
+
+    /// Calculate clustering coefficient (not yet implemented in core).
+    #[pyo3(signature = (_node_id = None))]
+    pub fn clustering_coefficient(
+        slf: PyRef<Self>,
+        py: Python,
+        _node_id: Option<NodeId>,
+    ) -> PyResult<f64> {
+        Self::with_full_view(slf, py, |_subgraph, _py| {
+            Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                "Clustering coefficient not yet implemented - coming in future version",
+            ))
+        })
+    }
+
+    /// Calculate transitivity (not yet implemented in core).
+    pub fn transitivity(slf: PyRef<Self>, py: Python) -> PyResult<f64> {
+        Self::with_full_view(slf, py, |_subgraph, _py| {
+            Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                "Transitivity not yet implemented - coming in future version",
+            ))
+        })
+    }
+
+    /// Check if path exists between two nodes.
+    pub fn has_path(
+        slf: PyRef<Self>,
+        py: Python,
+        source: NodeId,
+        target: NodeId,
+    ) -> PyResult<bool> {
+        Self::with_full_view(slf, py, |subgraph, _py| {
+            subgraph
+                .inner
+                .bfs(source, None)
+                .map(|bfs_subgraph| bfs_subgraph.contains_node(target))
+                .map_err(graph_error_to_py_err)
+        })
+    }
+
+    /// Sample k random nodes from the graph.
+    pub fn sample(slf: PyRef<Self>, py: Python, k: usize) -> PyResult<PySubgraph> {
+        Self::with_full_view(slf, py, |subgraph, _py| subgraph.sample(k))
+    }
+
+    /// Create induced subgraph from list of nodes.
+    pub fn induced_subgraph(
+        slf: PyRef<Self>,
+        py: Python,
+        nodes: Vec<NodeId>,
+    ) -> PyResult<PySubgraph> {
+        Self::with_full_view(slf, py, |subgraph, _py| {
+            let trait_subgraph = subgraph
+                .inner
+                .induced_subgraph(&nodes)
+                .map_err(graph_error_to_py_err)?;
+            let node_set = trait_subgraph.node_set().clone();
+            let edge_set = trait_subgraph.edge_set().clone();
+            let graph_ref = subgraph.inner.graph().clone();
+            let concrete_subgraph = Subgraph::new(
+                graph_ref,
+                node_set,
+                edge_set,
+                "induced_subgraph".to_string(),
+            );
+            PySubgraph::from_core_subgraph(concrete_subgraph)
+        })
+    }
+
+    /// Create subgraph from list of edges.
+    pub fn subgraph_from_edges(
+        slf: PyRef<Self>,
+        py: Python,
+        edges: Vec<EdgeId>,
+    ) -> PyResult<PySubgraph> {
+        Self::with_full_view(slf, py, |subgraph, _py| {
+            let trait_subgraph = subgraph
+                .inner
+                .subgraph_from_edges(&edges)
+                .map_err(graph_error_to_py_err)?;
+            let node_set = trait_subgraph.node_set().clone();
+            let edge_set = trait_subgraph.edge_set().clone();
+            let graph_ref = subgraph.inner.graph().clone();
+            let concrete_subgraph = Subgraph::new(
+                graph_ref,
+                node_set,
+                edge_set,
+                "subgraph_from_edges".to_string(),
+            );
+            PySubgraph::from_core_subgraph(concrete_subgraph)
+        })
+    }
+
+    /// Get summary string describing the graph.
+    pub fn summary(slf: PyRef<Self>, py: Python) -> PyResult<String> {
+        Self::with_full_view(slf, py, |subgraph, _py| {
+            let node_count = subgraph.inner.node_count();
+            let edge_count = subgraph.inner.edge_count();
+            let density = subgraph.inner.density();
+            Ok(format!(
+                "Graph: {} nodes, {} edges, density={:.3}",
+                node_count, edge_count, density
+            ))
+        })
+    }
+
+    // === DEGREE METHODS (via Python method calls) ===
+
+    /// Get degree for nodes - delegates via Python method call.
+    #[pyo3(signature = (nodes = None, *, full_graph = false))]
+    pub fn degree(
+        slf: PyRef<Self>,
+        py: Python,
+        nodes: Option<&PyAny>,
+        full_graph: bool,
+    ) -> PyResult<PyObject> {
+        use pyo3::types::PyTuple;
+        let args = PyTuple::new(py, &[nodes.map(|n| n.to_object(py)).unwrap_or_else(|| py.None())]);
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("full_graph", full_graph)?;
+        Self::call_on_view_kwargs(slf, py, "degree", args, Some(kwargs))
+    }
+
+    /// Get in-degree for nodes - delegates via Python method call.
+    #[pyo3(signature = (nodes = None, *, full_graph = false))]
+    pub fn in_degree(
+        slf: PyRef<Self>,
+        py: Python,
+        nodes: Option<&PyAny>,
+        full_graph: bool,
+    ) -> PyResult<PyObject> {
+        use pyo3::types::PyTuple;
+        let args = PyTuple::new(py, &[nodes.map(|n| n.to_object(py)).unwrap_or_else(|| py.None())]);
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("full_graph", full_graph)?;
+        Self::call_on_view_kwargs(slf, py, "in_degree", args, Some(kwargs))
+    }
+
+    /// Get out-degree for nodes - delegates via Python method call.
+    #[pyo3(signature = (nodes = None, *, full_graph = false))]
+    pub fn out_degree(
+        slf: PyRef<Self>,
+        py: Python,
+        nodes: Option<&PyAny>,
+        full_graph: bool,
+    ) -> PyResult<PyObject> {
+        use pyo3::types::PyTuple;
+        let args = PyTuple::new(py, &[nodes.map(|n| n.to_object(py)).unwrap_or_else(|| py.None())]);
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("full_graph", full_graph)?;
+        Self::call_on_view_kwargs(slf, py, "out_degree", args, Some(kwargs))
+    }
+
+    // === CONVERSION METHODS (via Python) ===
+
+    /// Convert to NodesAccessor - delegates via Python.
+    pub fn to_nodes(slf: PyRef<Self>, py: Python) -> PyResult<crate::ffi::storage::accessors::PyNodesAccessor> {
+        Self::with_full_view(slf, py, |subgraph, _py| subgraph.to_nodes())
+    }
+
+    /// Convert to EdgesAccessor - delegates via Python.
+    pub fn to_edges(slf: PyRef<Self>, py: Python) -> PyResult<crate::ffi::storage::accessors::PyEdgesAccessor> {
+        Self::with_full_view(slf, py, |subgraph, _py| subgraph.to_edges())
+    }
+
+    /// Get edges table - delegates via Python.
+    pub fn edges_table(slf: PyRef<Self>, py: Python) -> PyResult<PyObject> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "edges_table", PyTuple::empty(py))
+    }
+
+    /// Convert to independent Graph - delegates via Python.
+    pub fn to_graph(slf: PyRef<Self>, py: Python) -> PyResult<PyObject> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "to_graph", PyTuple::empty(py))
+    }
+
+    // === TOPOLOGY/ANALYSIS (via Python) ===
+
+    /// Check if edge exists between nodes - delegates via Python.
+    pub fn has_edge_between(
+        slf: PyRef<Self>,
+        py: Python,
+        source: NodeId,
+        target: NodeId,
+    ) -> PyResult<bool> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "has_edge_between", PyTuple::new(py, &[source, target]))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    /// Calculate similarity - delegates via Python.
+    #[pyo3(signature = (other, metric = "jaccard"))]
+    pub fn calculate_similarity(
+        slf: PyRef<Self>,
+        py: Python,
+        other: &PySubgraph,
+        metric: &str,
+    ) -> PyResult<f64> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "calculate_similarity", PyTuple::new(py, &[Py::new(py, other.clone())?.to_object(py), metric.to_object(py)]))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    /// Get shortest path as subgraph - delegates via Python.
+    pub fn shortest_path_subgraph(
+        slf: PyRef<Self>,
+        py: Python,
+        source: NodeId,
+        target: NodeId,
+    ) -> PyResult<Option<PySubgraph>> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "shortest_path_subgraph", PyTuple::new(py, &[source, target]))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    // === ATTRIBUTE ACCESS (via Python) ===
+
+    /// Get node attribute - delegates via Python.
+    pub fn get_node_attribute(
+        slf: PyRef<Self>,
+        py: Python,
+        node_id: NodeId,
+        attr_name: String,
+    ) -> PyResult<Option<PyObject>> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "get_node_attribute", PyTuple::new(py, &[node_id.to_object(py), attr_name.to_object(py)]))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    /// Get edge attribute - delegates via Python.
+    pub fn get_edge_attribute(
+        slf: PyRef<Self>,
+        py: Python,
+        edge_id: EdgeId,
+        attr_name: String,
+    ) -> PyResult<Option<PyObject>> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "get_edge_attribute", PyTuple::new(py, &[edge_id.to_object(py), attr_name.to_object(py)]))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    // === UTILITY METHODS (via Python) ===
+
+    /// Get entity type - delegates via Python.
+    pub fn entity_type(slf: PyRef<Self>, py: Python) -> PyResult<String> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "entity_type", PyTuple::empty(py))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    /// Get viz accessor - delegates via Python.
+    pub fn viz(slf: PyRef<Self>, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "viz", PyTuple::empty(py))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    // === SET OPERATIONS (Placeholders) ===
+
+    /// Merge with another subgraph (not yet implemented).
+    pub fn merge_with(
+        slf: PyRef<Self>,
+        py: Python,
+        other: &PySubgraph,
+    ) -> PyResult<PySubgraph> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "merge_with", PyTuple::new(py, &[Py::new(py, other.clone())?.to_object(py)]))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    /// Intersect with another subgraph (not yet implemented).
+    pub fn intersect_with(
+        slf: PyRef<Self>,
+        py: Python,
+        other: &PySubgraph,
+    ) -> PyResult<PySubgraph> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "intersect_with", PyTuple::new(py, &[Py::new(py, other.clone())?.to_object(py)]))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    /// Subtract another subgraph (not yet implemented).
+    pub fn subtract_from(
+        slf: PyRef<Self>,
+        py: Python,
+        other: &PySubgraph,
+    ) -> PyResult<PySubgraph> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "subtract_from", PyTuple::new(py, &[Py::new(py, other.clone())?.to_object(py)]))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    // === HIERARCHICAL METHODS (via Python) ===
+
+    /// Get parent meta-node - delegates via Python.
+    pub fn parent_meta_node(
+        slf: PyRef<Self>,
+        py: Python,
+    ) -> PyResult<Option<PyObject>> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "parent_meta_node", PyTuple::empty(py))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    /// Get child meta-nodes - delegates via Python.
+    pub fn child_meta_nodes(
+        slf: PyRef<Self>,
+        py: Python,
+    ) -> PyResult<Vec<PyObject>> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "child_meta_nodes", PyTuple::empty(py))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    /// Check if has meta-nodes - delegates via Python.
+    pub fn has_meta_nodes(slf: PyRef<Self>, py: Python) -> PyResult<bool> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "has_meta_nodes", PyTuple::empty(py))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    /// Get all meta-nodes - delegates via Python.
+    pub fn meta_nodes(slf: PyRef<Self>, py: Python) -> PyResult<Vec<PyObject>> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "meta_nodes", PyTuple::empty(py))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    /// Get hierarchy level - delegates via Python.
+    pub fn hierarchy_level(slf: PyRef<Self>, py: Python) -> PyResult<usize> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "hierarchy_level", PyTuple::empty(py))
+            .and_then(|obj| obj.extract(py))
+    }
+
+    /// Collapse subgraph - delegates via Python.
+    pub fn collapse(
+        slf: PyRef<Self>,
+        py: Python,
+        aggregations: &PyDict,
+    ) -> PyResult<PyObject> {
+        use pyo3::types::PyTuple;
+        Self::call_on_view(slf, py, "collapse", PyTuple::new(py, &[aggregations.to_object(py)]))
+    }
+
+    /// Get adjacency list (not yet implemented).
+    pub fn adjacency_list(slf: PyRef<Self>, py: Python) -> PyResult<PyObject> {
+        Self::with_full_view(slf, py, |_subgraph, _py| {
+            Err(pyo3::exceptions::PyNotImplementedError::new_err(
+                "adjacency_list not yet implemented"
+            ))
+        })
     }
 
     /// Convert this graph to a NetworkX graph

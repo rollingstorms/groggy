@@ -361,10 +361,8 @@ impl NumArray<f64> {
 
     /// SIMD-optimized variance for f64 arrays
     pub fn variance_simd(&self) -> Option<f64> {
-        self.mean_simd().map(|mean| simd_optimizations::simd_variance(
-                self.base.as_slice(),
-                mean,
-            ))
+        self.mean_simd()
+            .map(|mean| simd_optimizations::simd_variance(self.base.as_slice(), mean))
     }
 
     /// SIMD-optimized min for f64 arrays

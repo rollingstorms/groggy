@@ -27,16 +27,14 @@ pub use table::*;
 
 // Re-export advanced_matrix items (canonical benchmark items)
 pub use advanced_matrix::{
-    AdvancedMemoryPool, BenchmarkConfig, BenchmarkResult, BlasBackend, BlasType, MatrixLayout,
-    MatrixBenchmarkSuite, MemoryError, MemoryResult, NumPyBackend, SharedBuffer,
-    DType, NumericType, UnifiedMatrix,
-    quick_benchmark as matrix_quick_benchmark,
+    quick_benchmark as matrix_quick_benchmark, AdvancedMemoryPool, BenchmarkConfig,
+    BenchmarkResult, BlasBackend, BlasType, DType, MatrixBenchmarkSuite, MatrixLayout, MemoryError,
+    MemoryResult, NumPyBackend, NumericType, SharedBuffer, UnifiedMatrix,
 };
 
 // Re-export array items (using different name for conflicting benchmark)
 pub use array::{
-    ArrayArray, BaseArray, BoolArray, NumArray, StatsSummary,
-    AdvancedIndexing, SliceIndex, LazyArrayIterator, QueryEvaluator, BatchQueryEvaluator,
-    quick_benchmark as array_quick_benchmark,
-    Benchmarker, BenchmarkConfig as ArrayBenchmarkConfig,
+    quick_benchmark as array_quick_benchmark, AdvancedIndexing, ArrayArray, BaseArray,
+    BatchQueryEvaluator, BenchmarkConfig as ArrayBenchmarkConfig, Benchmarker, BoolArray,
+    LazyArrayIterator, NumArray, QueryEvaluator, SliceIndex, StatsSummary,
 };

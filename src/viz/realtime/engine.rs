@@ -1320,12 +1320,7 @@ impl RealTimeVizEngine {
         }
 
         // Create new GraphMatrix with transformed data
-        GraphMatrix::from_row_major_data(
-            transformed_data,
-            n_nodes,
-            n_dims,
-            None,
-        )
+        GraphMatrix::from_row_major_data(transformed_data, n_nodes, n_dims, None)
     }
 
     async fn apply_nd_rotation(
@@ -1418,12 +1413,7 @@ impl RealTimeVizEngine {
             rotated_data[base_idx + axis_j] = new_xj;
         }
 
-        GraphMatrix::from_row_major_data(
-            rotated_data,
-            n_nodes,
-            n_dims,
-            None,
-        )
+        GraphMatrix::from_row_major_data(rotated_data, n_nodes, n_dims, None)
     }
 
     async fn process_interaction_commands(
@@ -1991,10 +1981,11 @@ impl RealTimeVizEngine {
             // We need to spawn a task to process async commands, but for now just log them
             for cmd in activation_commands {
                 if let InteractionCommand::ExposeAutoScaleControls {
-                        target_occupancy: _,
-                        min_cell_size: _,
-                        enabled: _,
-                    } = cmd {}
+                    target_occupancy: _,
+                    min_cell_size: _,
+                    enabled: _,
+                } = cmd
+                {}
             }
         }
     }

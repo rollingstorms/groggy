@@ -1175,12 +1175,8 @@ impl VizModule {
             .as_ref()
             .map(|l| format!("{:?}", l).to_lowercase())
             .unwrap_or_else(|| "force-directed".to_string());
-        let theme = options
-            .theme.as_deref()
-            .unwrap_or("light");
-        let title = options
-            .title.as_deref()
-            .unwrap_or("Graph Visualization");
+        let theme = options.theme.as_deref().unwrap_or("light");
+        let title = options.title.as_deref().unwrap_or("Graph Visualization");
 
         // Replace template variables
         let html = html_template
