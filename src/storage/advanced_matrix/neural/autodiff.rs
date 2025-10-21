@@ -1178,7 +1178,6 @@ pub fn backward_pass<T: NumericType>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::advanced_matrix::unified_matrix::UnifiedMatrix;
 
     #[test]
     fn test_computation_graph_creation() {

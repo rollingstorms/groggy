@@ -197,8 +197,6 @@ fn python_to_networkx_value(py_value: &PyAny) -> PyResult<NetworkXValue> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use groggy::convert::*;
-    use std::collections::HashMap;
 
     #[test]
     fn test_networkx_value_conversion() {
@@ -213,13 +211,13 @@ mod tests {
             let py_val = networkx_value_to_python(py, &int_val).unwrap();
             assert_eq!(py_val.extract::<i64>(py).unwrap(), 42);
 
-            let float_val = NetworkXValue::Float(3.14);
+            let float_val = NetworkXValue::Float(3.141592);
             let py_val = networkx_value_to_python(py, &float_val).unwrap();
-            assert!((py_val.extract::<f64>(py).unwrap() - 3.14).abs() < f64::EPSILON);
+            assert!((py_val.extract::<f64>(py).unwrap() - 3.141592).abs() < f64::EPSILON);
 
             let bool_val = NetworkXValue::Boolean(true);
             let py_val = networkx_value_to_python(py, &bool_val).unwrap();
-            assert_eq!(py_val.extract::<bool>(py).unwrap(), true);
+            assert!(py_val.extract::<bool>(py).unwrap());
 
             let null_val = NetworkXValue::Null;
             let py_val = networkx_value_to_python(py, &null_val).unwrap();

@@ -123,7 +123,7 @@ mod tests {
         assert!(adj.is_valid_adjacency());
 
         // Test statistical operations work
-        let degrees = adj.node_degrees();
+        let degrees = adj.node_degrees().unwrap();
         assert_eq!(degrees.len(), 3);
 
         // Test Laplacian conversion
@@ -139,9 +139,9 @@ mod tests {
         let adj = AdjacencyMatrixBuilder::from_weighted_edges(&nodes, &weighted_edges).unwrap();
 
         // Verify weighted values
-        assert_eq!(adj.get(0, 1), Some(&0.5)); // node 1 -> node 2
-        assert_eq!(adj.get(1, 2), Some(&1.5)); // node 2 -> node 3
-        assert_eq!(adj.get(0, 2), Some(&2.0)); // node 1 -> node 3
+        assert_eq!(adj.get(0, 1), Some(0.5)); // node 1 -> node 2
+        assert_eq!(adj.get(1, 2), Some(1.5)); // node 2 -> node 3
+        assert_eq!(adj.get(0, 2), Some(2.0)); // node 1 -> node 3
 
         // Test normalization
         let normalized = adj.to_normalized_laplacian(0.5, 1).unwrap();

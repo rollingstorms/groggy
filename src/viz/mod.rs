@@ -128,8 +128,7 @@ impl VizModule {
         }
     }
 
-    /// Start realtime visualization server
-    /// pub fn server(&mut self, port: Option<u16>) -> GraphResult<RenderResult> {
+    // Start realtime visualization server
     // pub fn server(&mut self, port: Option<u16>) -> GraphResult<RenderResult> {
     //     eprintln!("🚀 INFO: server() called - starting REALTIME backend server!");
     //     let options = RenderOptions {

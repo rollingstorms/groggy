@@ -1943,7 +1943,7 @@ impl PyGraph {
         target: NodeId,
     ) -> PyResult<bool> {
         use pyo3::types::PyTuple;
-        Self::call_on_view(slf, py, "has_edge_between", PyTuple::new(py, &[source, target]))
+        Self::call_on_view(slf, py, "has_edge_between", PyTuple::new(py, [source, target]))
             .and_then(|obj| obj.extract(py))
     }
 
@@ -1968,7 +1968,7 @@ impl PyGraph {
         target: NodeId,
     ) -> PyResult<Option<PySubgraph>> {
         use pyo3::types::PyTuple;
-        Self::call_on_view(slf, py, "shortest_path_subgraph", PyTuple::new(py, &[source, target]))
+        Self::call_on_view(slf, py, "shortest_path_subgraph", PyTuple::new(py, [source, target]))
             .and_then(|obj| obj.extract(py))
     }
 
@@ -2144,6 +2144,127 @@ impl PyGraph {
 
     /// Enable property-style attribute access (g.age instead of g.nodes['age'])
     /// This method is called when accessing attributes that don't exist as methods
+    /// Call experimental prototype methods.
+    ///
+    /// **Experimental API**: This method provides access to prototype graph operations
+    /// that are under development and not yet part of the stable API. Methods available
+    /// here depend on the `experimental-delegation` feature flag.
+    ///
+    /// # Usage
+    ///
+    /// ```python
+    /// # Enable experimental features:
+    /// # - At build time: maturin develop --features experimental-delegation
+    /// # - At runtime: GROGGY_EXPERIMENTAL=1 python script.py
+    ///
+    /// # Call experimental method
+    /// result = graph.experimental("pagerank", damping=0.85)
+    ///
+    /// # List available experimental methods
+    /// methods = graph.experimental("list")
+    ///
+    /// # Get method description
+    /// info = graph.experimental("describe", "pagerank")
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `method_name` - Name of the experimental method to call, or special commands:
+    ///   - "list" - Returns list of available experimental methods
+    ///   - "describe" - Requires second arg with method name, returns description
+    /// * `args` - Positional arguments to pass to the method
+    /// * `kwargs` - Keyword arguments to pass to the method
+    ///
+    /// # Returns
+    ///
+    /// Result of the experimental method call, or metadata for list/describe commands.
+    ///
+    /// # Errors
+    ///
+    /// - `AttributeError` if method not found or experimental features not enabled
+    /// - Method-specific errors depending on the called function
+    ///
+    /// # Stability
+    ///
+    /// **No stability guarantees**. Experimental methods may:
+    /// - Change signature without notice
+    /// - Be renamed or removed
+    /// - Move to stable API with different names
+    /// - Have incomplete implementations
+    ///
+    /// Use only for prototyping and research. Production code should use stable API.
+    #[pyo3(signature = (method_name, *args, **_kwargs))]
+    pub fn experimental(
+        _slf: PyRef<Self>,
+        py: Python,
+        method_name: &str,
+        args: &PyTuple,
+        _kwargs: Option<&PyDict>,
+    ) -> PyResult<PyObject> {
+        use pyo3::types::PyList;
+
+        let registry = crate::ffi::experimental::get_registry();
+
+        // Handle special commands
+        match method_name {
+            "list" => {
+                let methods = registry.list_methods();
+                let py_list = PyList::new(py, methods);
+                return Ok(py_list.into());
+            }
+            "describe" => {
+                if args.is_empty() {
+                    return Err(pyo3::exceptions::PyValueError::new_err(
+                        "describe requires method name as argument",
+                    ));
+                }
+                let target_method: &str = args.get_item(0)?.extract()?;
+                match registry.describe(target_method) {
+                    Some(desc) => return Ok(desc.to_object(py)),
+                    None => {
+                        return Err(pyo3::exceptions::PyAttributeError::new_err(format!(
+                            "Method '{}' not found in experimental registry",
+                            target_method
+                        )))
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        // Check if experimental features are enabled
+        #[cfg(not(feature = "experimental-delegation"))]
+        {
+            Err(pyo3::exceptions::PyAttributeError::new_err(
+                format!(
+                    "Experimental method '{}' not available. Rebuild with --features experimental-delegation or set GROGGY_EXPERIMENTAL=1",
+                    method_name
+                )
+            ))
+        }
+
+        // Call the experimental method
+        #[cfg(feature = "experimental-delegation")]
+        {
+            let obj = slf.into_py(py);
+            registry.call(method_name, obj, py, args, kwargs)
+        }
+    }
+
+    /// Dynamic attribute access for node and edge attribute dictionaries.
+    ///
+    /// **Intentional dynamic pattern**: This method remains dynamic to support runtime
+    /// attribute dictionary projection. When accessing `graph.age`, it returns a dict of
+    /// `{node_id: age_value}` for all nodes with that attribute.
+    ///
+    /// This is inherently data-dependent and cannot be made static since:
+    /// - Attribute names are defined by users at runtime (e.g., "age", "salary", "title")
+    /// - Different graphs have different attribute schemas
+    /// - Attributes can be added/removed dynamically during graph operations
+    ///
+    /// All **method** calls have been moved to explicit implementations above to provide
+    /// IDE discoverability and avoid expensive delegation. Only **attribute data** access
+    /// remains dynamic here.
     fn __getattr__(&self, py: Python, name: String) -> PyResult<PyObject> {
         use pyo3::exceptions::PyAttributeError;
         use pyo3::types::PyDict;
@@ -2186,7 +2307,9 @@ impl PyGraph {
             _ => {}
         }
 
+        // INTENTIONAL DYNAMIC PATTERN: Node attribute dictionary projection
         // Check if this is a node attribute name that exists in the graph
+        // Returns {node_id: value} dict for data analysis workflows
         let all_node_attrs = self.all_node_attribute_names();
         if all_node_attrs.contains(&name) {
             // Return a dictionary mapping node IDs to their attribute values
@@ -2214,7 +2337,9 @@ impl PyGraph {
             return Ok(result_dict.to_object(py));
         }
 
+        // INTENTIONAL DYNAMIC PATTERN: Edge attribute dictionary projection
         // Check if this is an edge attribute name that exists in the graph
+        // Returns {edge_id: value} dict for edge analysis workflows
         let all_edge_attrs = self.all_edge_attribute_names();
         if all_edge_attrs.contains(&name) {
             // Return a dictionary mapping edge IDs to their attribute values

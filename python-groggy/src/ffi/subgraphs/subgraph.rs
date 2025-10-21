@@ -1600,10 +1600,19 @@ impl PySubgraph {
         ))
     }
 
-    /// Enable property-style attribute access for node/edge attributes.
+    /// Dynamic attribute access for node and edge attribute dictionaries within subgraph.
     ///
-    /// Returns a dictionary mapping IDs to attribute values when accessing
-    /// node or edge attribute names (e.g., `subgraph.age` returns {id: age_value}).
+    /// **Intentional dynamic pattern**: Enables property-style attribute access for runtime
+    /// data analysis. When accessing `subgraph.age`, returns a dict of `{node_id: age_value}`
+    /// for nodes in this subgraph.
+    ///
+    /// This pattern remains dynamic because:
+    /// - Attribute names are user-defined and vary per graph (e.g., "age", "weight", "label")
+    /// - Subgraphs inherit attributes from parent graph, making schema data-dependent
+    /// - Common in data science workflows: `sg.age.mean()`, `sg.salary.sum()`
+    ///
+    /// All subgraph **methods** (sample, filter, bfs, etc.) are explicitly defined above.
+    /// Only **attribute data** projections remain dynamic for ergonomic data access.
     fn __getattr__(&self, py: Python, name: String) -> PyResult<PyObject> {
         use pyo3::exceptions::PyAttributeError;
         use pyo3::types::PyDict;
@@ -1647,7 +1656,9 @@ impl PySubgraph {
             }
         }
 
-        // Check if this is a node attribute name
+        // INTENTIONAL DYNAMIC PATTERN: Node attribute dictionary projection
+        // Check if this is a node attribute name within this subgraph's nodes
+        // Returns {node_id: value} dict scoped to subgraph's node set
         if all_node_attrs.contains(&name) {
             let result_dict = PyDict::new(py);
 
@@ -1668,7 +1679,9 @@ impl PySubgraph {
             return Ok(result_dict.to_object(py));
         }
 
-        // Check if this is an edge attribute name
+        // INTENTIONAL DYNAMIC PATTERN: Edge attribute dictionary projection
+        // Check if this is an edge attribute name within this subgraph's edges
+        // Returns {edge_id: value} dict scoped to subgraph's edge set
         if all_edge_attrs.contains(&name) {
             let result_dict = PyDict::new(py);
 

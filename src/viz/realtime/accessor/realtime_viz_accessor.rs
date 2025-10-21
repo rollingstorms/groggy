@@ -1186,7 +1186,7 @@ fn attr_value_to_json(attr: &AttrValue) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::viz::display::{ColumnSchema, DataType};
+    use crate::viz::display::DataType;
     use crate::viz::streaming::data_source::{
         DataSchema, DataWindow, GraphEdge, GraphMetadata, GraphNode,
     };

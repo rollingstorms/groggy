@@ -10,6 +10,9 @@ pub mod types;
 // Utility functions
 pub mod utils;
 
+// Experimental delegation system (feature-gated)
+pub mod experimental;
+
 // API FFI bindings (mirror main project api/)
 pub mod api;
 

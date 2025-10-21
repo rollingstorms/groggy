@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn test_list_conversion() {
         Python::with_gil(|py| {
-            let list = pyo3::types::PyList::new(py, &[0i64, 2i64, 4i64]);
+            let list = pyo3::types::PyList::new(py, [0i64, 2i64, 4i64]);
             let slice_index = python_index_to_slice_index(py, list).unwrap();
 
             match slice_index {

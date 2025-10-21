@@ -3918,7 +3918,20 @@ impl PyNodesTable {
         Ok(formatted)
     }
 
-    /// Delegate to BaseTable for missing methods, or provide column access
+    /// Dynamic column access and method delegation for NodesTable.
+    ///
+    /// **Intentional dynamic pattern**: Enables column projection via attribute access.
+    /// When accessing `nodes_table.age`, returns the "age" column as a NumArray, equivalent
+    /// to `nodes_table['age']` but more ergonomic for data analysis.
+    ///
+    /// This pattern remains dynamic because:
+    /// - Column names are data-dependent and vary per table (user-defined schemas)
+    /// - Common in pandas/polars-style workflows: `table.age.mean()`, `table.name.unique()`
+    /// - Allows seamless integration with Python data science tools
+    ///
+    /// All table **methods** (sort_by, filter, select, group_by, etc.) are explicitly
+    /// defined above. Only **column access** remains dynamic for ergonomic data workflows.
+    /// Falls back to BaseTable for display/formatting methods.
     pub fn __getattr__(&self, py: Python, name: &str) -> PyResult<PyObject> {
         use pyo3::exceptions::PyAttributeError;
         use pyo3::types::PyString;
@@ -3931,7 +3944,9 @@ impl PyNodesTable {
             )));
         }
         
+        // INTENTIONAL DYNAMIC PATTERN: Column projection
         // Check if this is a column name - if so, return the column as an array
+        // Provides pandas-like syntax: table.column_name instead of table['column_name']
         let columns = self.table.base_table().columns();
         if columns.contains_key(name) {
             // Return the column via __getitem__
@@ -4889,7 +4904,20 @@ impl PyEdgesTable {
         Ok(formatted)
     }
 
-    /// Delegate to BaseTable for missing methods, or provide column access
+    /// Dynamic column access and method delegation for EdgesTable.
+    ///
+    /// **Intentional dynamic pattern**: Enables column projection via attribute access.
+    /// When accessing `edges_table.weight`, returns the "weight" column as a NumArray,
+    /// equivalent to `edges_table['weight']` but more ergonomic for data analysis.
+    ///
+    /// This pattern remains dynamic because:
+    /// - Column names are data-dependent and vary per table (user-defined schemas)
+    /// - Common in pandas/polars-style workflows: `table.weight.mean()`, `table.label.unique()`
+    /// - Allows seamless integration with Python data science tools
+    ///
+    /// All table **methods** (sort_by, filter, select, group_by, etc.) are explicitly
+    /// defined above. Only **column access** remains dynamic for ergonomic data workflows.
+    /// Falls back to BaseTable for display/formatting methods.
     pub fn __getattr__(&self, py: Python, name: &str) -> PyResult<PyObject> {
         use pyo3::exceptions::PyAttributeError;
         use pyo3::types::PyString;
@@ -4902,7 +4930,9 @@ impl PyEdgesTable {
             )));
         }
         
+        // INTENTIONAL DYNAMIC PATTERN: Column projection
         // Check if this is a column name - if so, return the column as an array
+        // Provides pandas-like syntax: table.column_name instead of table['column_name']
         let columns = self.table.base_table().columns();
         if columns.contains_key(name) {
             // Return the column via __getitem__

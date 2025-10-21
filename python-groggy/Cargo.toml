@@ -7,6 +7,12 @@ edition = "2021"
 name = "_groggy"
 crate-type = ["cdylib"]
 
+[features]
+default = []
+# Experimental delegation: enables prototype trait methods and PyGraph.experimental() API
+# Enable with: GROGGY_EXPERIMENTAL=1 or cargo build --features experimental-delegation
+experimental-delegation = []
+
 [lints.rust]
 non_local_definitions = "allow"
 

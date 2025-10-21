@@ -600,8 +600,8 @@ impl From<super::virtual_scroller::VirtualScrollError> for StreamingError {
 
 pub type StreamingResult<T> = Result<T, StreamingError>;
 
-/// HTML escape utility function
-/// (moved) html_escape is defined in html.rs
+// HTML escape utility function
+// (moved) html_escape is defined in html.rs
 // ============================================================================
 // Phase 7: Interactive Features - Supporting Data Structures
 // ============================================================================

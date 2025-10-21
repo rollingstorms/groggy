@@ -495,7 +495,6 @@ pub fn softmax<T: NumericType>(input: &UnifiedMatrix<T>) -> MatrixResult<Unified
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::advanced_matrix::unified_matrix::UnifiedMatrix;
 
     #[test]
     fn test_relu_properties() {
