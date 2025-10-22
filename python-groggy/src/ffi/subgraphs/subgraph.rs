@@ -85,7 +85,7 @@ impl PySubgraph {
 
     /// Get viz accessor for visualization operations
     #[getter]
-    fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
+    pub(crate) fn viz(&self, py: Python) -> PyResult<Py<crate::ffi::viz_accessor::VizAccessor>> {
         use groggy::viz::streaming::GraphDataSource;
 
         // Create GraphDataSource directly from the subgraph's underlying graph
@@ -1620,12 +1620,7 @@ impl PySubgraph {
 
         // Prevent access to special Python attributes
         match name.as_str() {
-            "__dict__"
-            | "__class__"
-            | "__module__"
-            | "__doc__"
-            | "__weakref__"
-            | "__slots__" => {
+            "__dict__" | "__class__" | "__module__" | "__doc__" | "__weakref__" | "__slots__" => {
                 return Err(PyAttributeError::new_err(format!(
                     "'Subgraph' object has no attribute '{}'",
                     name
