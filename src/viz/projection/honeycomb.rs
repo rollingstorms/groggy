@@ -329,7 +329,7 @@ impl HoneycombGrid {
 
         // Generate all hex centers in a circular region
         let hex_centers = self.generate_hex_centers_in_circle(positions.len() * 2);
-        
+
         // Scale the hex centers from unit circle to pixel space (multiply by cell_size * 100)
         let scale_factor = self.config.cell_size * 100.0;
         let scaled_hex_centers: Vec<Position> = hex_centers

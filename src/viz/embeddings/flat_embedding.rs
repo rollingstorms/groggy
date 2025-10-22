@@ -155,7 +155,10 @@ fn optimize_flat_positions(
         if let Err(e) = energy.backward() {
             // If gradient computation fails (e.g., due to slicing issues),
             // just return the current positions
-            eprintln!("Warning: Gradient computation failed at iteration {}: {:?}", iteration, e);
+            eprintln!(
+                "Warning: Gradient computation failed at iteration {}: {:?}",
+                iteration, e
+            );
             return Ok(positions);
         }
 
@@ -221,7 +224,8 @@ fn compute_flat_energy(
 
     // Apply mean over edges for stability
     if !edges.is_empty() {
-        let edge_count_tensor = positions.like_from_data(vec![edges.len() as f64], (1, 1), false)?;
+        let edge_count_tensor =
+            positions.like_from_data(vec![edges.len() as f64], (1, 1), false)?;
         edge_energy = edge_energy.multiply(&edge_count_tensor)?; // Normalize by edge count
     }
 
@@ -386,18 +390,19 @@ mod tests {
         // For a truly empty graph (0 nodes), we can't create a valid matrix
         // Just test that compute_flat_embedding handles an empty vector correctly
         let graph = Graph::new();
-        
+
         // Since we can't create a 0x3 matrix, let's just verify the early return logic
         // by directly calling with a minimal valid matrix or skipping matrix creation
         // For now, we'll test with a minimal 1-node case that gets filtered to 0
-        
-        let empty_embedding = GraphMatrix::from_row_major_data(vec![0.0, 0.0, 0.0], 1, 3, None).unwrap();
+
+        let empty_embedding =
+            GraphMatrix::from_row_major_data(vec![0.0, 0.0, 0.0], 1, 3, None).unwrap();
         let config = FlatEmbedConfig::default();
-        
+
         // With no nodes added to graph, this should handle gracefully
         let result = compute_flat_embedding(&empty_embedding, &graph, &config);
         assert!(result.is_ok());
-        
+
         let positions = result.unwrap();
         // Should return 1 position since embedding has 1 row
         assert_eq!(positions.len(), 1);

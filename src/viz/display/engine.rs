@@ -302,7 +302,10 @@ mod tests {
         // Should be compact (reasonably narrow)
         let lines: Vec<&str> = output.lines().collect();
         if let Some(first_line) = lines.first() {
-            assert!(first_line.len() < 150, "Compact mode should be reasonably narrow");
+            assert!(
+                first_line.len() < 150,
+                "Compact mode should be reasonably narrow"
+            );
         }
 
         // Should truncate long names or show some reasonable formatting

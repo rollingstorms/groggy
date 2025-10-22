@@ -149,9 +149,7 @@ impl ArrayArray<f64> {
                 if arr.is_empty() {
                     0.0
                 } else {
-                    arr.iter()
-                        .cloned()
-                        .fold(f64::INFINITY, |a, b| a.min(b))
+                    arr.iter().cloned().fold(f64::INFINITY, |a, b| a.min(b))
                 }
             })
             .collect()
@@ -168,9 +166,7 @@ impl ArrayArray<f64> {
                 if arr.is_empty() {
                     0.0
                 } else {
-                    arr.iter()
-                        .cloned()
-                        .fold(f64::NEG_INFINITY, |a, b| a.max(b))
+                    arr.iter().cloned().fold(f64::NEG_INFINITY, |a, b| a.max(b))
                 }
             })
             .collect()
