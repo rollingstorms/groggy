@@ -107,6 +107,35 @@ impl PyEdge {
         }
     }
 
+    /// Get edge attribute via attribute access (edge.relationship)
+    ///
+    /// This enables dot notation access to edge attributes:
+    /// edge.relationship instead of edge['relationship']
+    ///
+    /// # Arguments
+    /// * `name` - Attribute name to retrieve
+    ///
+    /// # Returns
+    /// The attribute value if it exists
+    ///
+    /// # Raises
+    /// * `AttributeError` - If the attribute doesn't exist
+    fn __getattr__(&self, py: Python, name: &str) -> PyResult<Py<PyAny>> {
+        use groggy::traits::GraphEntity;
+
+        match self.inner.get_attribute(&name.into()) {
+            Ok(Some(attr_value)) => crate::ffi::utils::attr_value_to_python_value(py, &attr_value),
+            Ok(None) => Err(pyo3::exceptions::PyAttributeError::new_err(format!(
+                "'Edge' object has no attribute '{}'",
+                name
+            ))),
+            Err(e) => Err(PyRuntimeError::new_err(format!(
+                "Failed to get edge attribute: {}",
+                e
+            ))),
+        }
+    }
+
     /// Get the edge's source node ID
     ///
     /// # Returns

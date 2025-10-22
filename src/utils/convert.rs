@@ -263,8 +263,12 @@ pub fn networkx_to_graph(nx_graph: NetworkXGraph) -> GraphResult<Graph> {
         let new_node_id = graph.add_node();
         node_id_map.insert(nx_node.id, new_node_id);
 
-        // Set node attributes
+        // Set node attributes (skip entity_type as it's automatically managed)
         for (attr_name, nx_value) in &nx_node.attributes {
+            // Skip entity_type - it's immutable and set automatically by add_node
+            if attr_name == "entity_type" {
+                continue;
+            }
             let attr_value = networkx_value_to_attr_value(nx_value)?;
             graph.set_node_attr(new_node_id, attr_name.clone(), attr_value)?;
         }

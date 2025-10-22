@@ -3,7 +3,7 @@
 ## Project Structure & Architecture
 - Three-tier layout: Rust core in `src/`, FFI translation only in `python-groggy/src/ffi/`, and user-facing Python API in `python-groggy/python/groggy/`.
 - Keep algorithms and data structures in Rust; FFI should marshal types, handle errors, and release the GIL for long calls via `py.allow_threads()`.
-- Python integration tests reside in `tests/`; Rust unit and integration tests live alongside their modules. Planning notes, personas, and experiments belong in `documentation/` or `archive/`.
+- Python integration tests reside in `tests/`; Rust unit and integration tests live alongside their modules. Planning notes, personas, and experiments belong in `notes/` or `archive/`.
 - Shared assets and demos live in `web/`, `docs/`, and `img/`; update existing themes instead of cloning new variants.
 
 ## Build, Test, and Development Commands
@@ -28,4 +28,4 @@
 - Rust changes require `cargo test` plus targeted suites covering new logic; add fixtures under `tests/data/` for cross-language regressions.
 - Validate documentation and notebook examples you touch to keep persona-driven artifacts trustworthy.
 - Commits follow the historical style (`feat:`, `fix:`, or a crisp imperative sentence); PRs list executed test commands, call out API changes, and embed visual diffs for UI updates.
-- Reference persona responsibilities from `documentation/planning/personas/` when requesting specialized reviews (e.g., Bridge for FFI, Rusty for performance).
+- Reference persona responsibilities from `notes/planning/personas/` when requesting specialized reviews (e.g., Bridge for FFI, Rusty for performance).

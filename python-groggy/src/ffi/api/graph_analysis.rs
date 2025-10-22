@@ -3,12 +3,14 @@
 //! PyGraphAnalysis helper class that handles all graph analysis operations.
 
 use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
+use crate::ffi::storage::table::PyBaseTable;
+use crate::ffi::storage::array::PyBaseArray;
 use crate::ffi::utils::graph_error_to_py_err;
 use groggy::subgraphs::{NeighborhoodResult, NeighborhoodSubgraph};
 use groggy::traits::{NeighborhoodOperations, SubgraphOperations};
 use groggy::{AttrName, GraphError, NodeId};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyList;
 
 use super::graph::PyGraph;
 
@@ -22,33 +24,15 @@ impl PyGraphAnalysis {
     pub fn new(graph: Py<PyGraph>) -> PyResult<PyGraphAnalysis> {
         Ok(PyGraphAnalysis { graph })
     }
-    /// Get neighbors of nodes - PURE DELEGATION to core
+    /// Get neighbors of nodes - Enhanced to accept int, list, BaseArray, NumArray
+    /// 
+    /// Returns BaseTable with columns (node_id, neighbor_id) for bulk operations
+    /// or List[NodeId] for single node queries (backward compatibility)
     pub fn neighbors(&mut self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
         if let Some(nodes_input) = nodes {
-            // Handle multiple nodes
-            if let Ok(node_list) = nodes_input.extract::<Vec<NodeId>>() {
-                let result_dict = PyDict::new(py);
-
-                for node in node_list {
-                    // DELEGATION: Use core neighbors implementation (graph.rs:866)
-                    let neighbors = {
-                        let graph_ref = self.graph.borrow(py);
-                        let result = graph_ref
-                            .inner
-                            .borrow()
-                            .neighbors(node)
-                            .map_err(graph_error_to_py_err);
-                        drop(graph_ref);
-                        result
-                    }?;
-
-                    let py_neighbors = PyList::new(py, neighbors);
-                    result_dict.set_item(node, py_neighbors)?;
-                }
-
-                Ok(result_dict.to_object(py))
-            } else if let Ok(single_node) = nodes_input.extract::<NodeId>() {
-                // Handle single node
+            // Try to extract as single int first (most common case)
+            if let Ok(single_node) = nodes_input.extract::<NodeId>() {
+                // Single node: return list for backward compatibility
                 let neighbors = {
                     let graph_ref = self.graph.borrow(py);
                     let result = graph_ref
@@ -60,12 +44,94 @@ impl PyGraphAnalysis {
                     result
                 }?;
 
-                Ok(PyList::new(py, neighbors).to_object(py))
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
-                    "nodes must be a NodeId or list of NodeIds",
-                ))
+                return Ok(PyList::new(py, neighbors).to_object(py));
             }
+
+            // Try to extract as list of ints
+            if let Ok(node_list) = nodes_input.extract::<Vec<NodeId>>() {
+                // Multiple nodes: use bulk operation, return BaseTable
+                let table = {
+                    let graph_ref = self.graph.borrow(py);
+                    let result = graph_ref
+                        .inner
+                        .borrow()
+                        .neighbors_bulk(&node_list)
+                        .map_err(graph_error_to_py_err);
+                    drop(graph_ref);
+                    result
+                }?;
+
+                let py_table = Py::new(py, PyBaseTable::from_table(table))?;
+                return Ok(py_table.to_object(py));
+            }
+
+            // Try to extract from BaseArray
+            if let Ok(base_array) = nodes_input.extract::<PyRef<PyBaseArray>>() {
+                // Extract node IDs from BaseArray
+                let node_ids: Vec<NodeId> = base_array
+                    .inner
+                    .as_slice()
+                    .iter()
+                    .filter_map(|v| {
+                        if let groggy::types::AttrValue::Int(id) = v {
+                            Some(*id as NodeId)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                // Use bulk operation
+                let table = {
+                    let graph_ref = self.graph.borrow(py);
+                    let result = graph_ref
+                        .inner
+                        .borrow()
+                        .neighbors_bulk(&node_ids)
+                        .map_err(graph_error_to_py_err);
+                    drop(graph_ref);
+                    result
+                }?;
+
+                let py_table = Py::new(py, PyBaseTable::from_table(table))?;
+                return Ok(py_table.to_object(py));
+            }
+
+            // Try to extract from NumArray (via its base property)
+            if let Ok(num_array) = nodes_input.getattr("base") {
+                if let Ok(base_array) = num_array.extract::<PyRef<PyBaseArray>>() {
+                    let node_ids: Vec<NodeId> = base_array
+                        .inner
+                        .as_slice()
+                        .iter()
+                        .filter_map(|v| {
+                            if let groggy::types::AttrValue::Int(id) = v {
+                                Some(*id as NodeId)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                    let table = {
+                        let graph_ref = self.graph.borrow(py);
+                        let result = graph_ref
+                            .inner
+                            .borrow()
+                            .neighbors_bulk(&node_ids)
+                            .map_err(graph_error_to_py_err);
+                        drop(graph_ref);
+                        result
+                    }?;
+
+                    let py_table = Py::new(py, PyBaseTable::from_table(table))?;
+                    return Ok(py_table.to_object(py));
+                }
+            }
+
+            Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                "nodes must be a NodeId, list of NodeIds, BaseArray, or NumArray",
+            ))
         } else {
             Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                 "nodes parameter is required",

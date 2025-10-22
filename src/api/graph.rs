@@ -428,11 +428,15 @@ impl Graph {
         // WORF SAFETY: Set entity_type efficiently using direct pool access
         // This bypasses the expensive validation in set_node_attr_internal
         let entity_type_attr: AttrName = "entity_type".into();
-        let _ = self.pool.borrow_mut().set_attr(
-            entity_type_attr,
+        let index = self.pool.borrow_mut().set_attr(
+            entity_type_attr.clone(),
             AttrValue::Text("base".to_string()),
             true,
         );
+
+        // Register the index in GraphSpace so the attribute is queryable
+        self.space
+            .set_node_attr_index(node_id, entity_type_attr, index);
 
         node_id
     }
@@ -449,15 +453,26 @@ impl Graph {
         // Single bulk change tracking update
         self.change_tracker.record_nodes_addition(&node_ids);
 
-        // WORF SAFETY: Set entity_type for all new nodes efficiently
-        // Use direct pool access to avoid per-node validation overhead
+        // WORF SAFETY: Set entity_type for all new nodes efficiently using bulk operation
+        // Build bulk attribute data structure
         let entity_type_attr: AttrName = "entity_type".into();
         let base_value = AttrValue::Text("base".to_string());
-        for _node_id in &node_ids {
-            let _ =
-                self.pool
-                    .borrow_mut()
-                    .set_attr(entity_type_attr.clone(), base_value.clone(), true);
+        let mut attrs_values = HashMap::new();
+        let entity_type_values: Vec<(NodeId, AttrValue)> = node_ids
+            .iter()
+            .map(|&node_id| (node_id, base_value.clone()))
+            .collect();
+        attrs_values.insert(entity_type_attr.clone(), entity_type_values);
+
+        // Use vectorized bulk pool operation
+        let index_changes = self.pool.borrow_mut().set_bulk_attrs(attrs_values, true);
+
+        // Register all indices in GraphSpace in bulk
+        if let Some(entity_indices) = index_changes.get(&entity_type_attr) {
+            for &(node_id, new_index) in entity_indices {
+                self.space
+                    .set_node_attr_index(node_id, entity_type_attr.clone(), new_index);
+            }
         }
 
         node_ids
@@ -522,45 +537,70 @@ impl Graph {
 
     /// Add all nodes and edges from another graph to this graph
     pub fn add_graph(&mut self, other: &Graph) -> Result<(), GraphError> {
-        // Add all nodes from the other graph
+        // Step 1: Create ID mapping by adding nodes
         let other_nodes = other.node_ids();
         let node_count = other_nodes.len();
 
-        if node_count > 0 {
-            let _new_nodes = self.add_nodes(node_count);
+        if node_count == 0 {
+            return Ok(()); // Nothing to add
         }
 
-        // Add all edges from the other graph
-        let other_edges = other.edge_ids();
-        let mut edges_to_add = Vec::new();
+        // Create new nodes and build ID mapping
+        let new_nodes = self.add_nodes(node_count);
+        let mut id_map: HashMap<NodeId, NodeId> = HashMap::new();
 
-        for edge_id in other_edges {
-            if let Ok((source, target)) = other.edge_endpoints(edge_id) {
-                // Map the node IDs from other graph to this graph
-                // For now, assume 1:1 mapping based on node creation order
-                // TODO: Implement proper node ID mapping if needed
-                edges_to_add.push((source, target));
-            }
+        for (old_id, new_id) in other_nodes.iter().zip(new_nodes.iter()) {
+            id_map.insert(*old_id, *new_id);
         }
 
-        if !edges_to_add.is_empty() {
-            let _edge_ids = self.add_edges(&edges_to_add);
-        }
-
-        // Copy node attributes from the other graph
-        for node_id in other_nodes {
-            if let Ok(attrs) = other.get_node_attrs(node_id) {
+        // Step 2: Copy node attributes using the new IDs
+        for (&old_id, &new_id) in &id_map {
+            if let Ok(attrs) = other.get_node_attrs(old_id) {
                 for (attr_name, attr_value) in attrs {
-                    let _ = self.set_node_attr(node_id, attr_name, attr_value);
+                    // Skip entity_type as it's already set by add_nodes
+                    if attr_name == "entity_type" {
+                        continue;
+                    }
+                    // Use the new ID, not the old one
+                    let _ = self.set_node_attr(new_id, attr_name, attr_value);
                 }
             }
         }
 
-        // Copy edge attributes from the other graph
-        for edge_id in other.edge_ids() {
-            if let Ok(attrs) = other.get_edge_attrs(edge_id) {
+        // Step 3: Add edges using remapped node IDs
+        let other_edges = other.edge_ids();
+        let mut edges_to_add = Vec::new();
+        let mut edge_id_pairs = Vec::new(); // Track (old_edge_id, position_in_edges_to_add)
+
+        for (idx, edge_id) in other_edges.iter().enumerate() {
+            if let Ok((old_source, old_target)) = other.edge_endpoints(*edge_id) {
+                // Map old node IDs to new node IDs
+                if let (Some(&new_source), Some(&new_target)) =
+                    (id_map.get(&old_source), id_map.get(&old_target))
+                {
+                    edges_to_add.push((new_source, new_target));
+                    edge_id_pairs.push((*edge_id, idx));
+                } else {
+                    // Skip edges with unmapped nodes (shouldn't happen but be safe)
+                    eprintln!("Warning: Skipping edge with unmapped nodes");
+                    continue;
+                }
+            }
+        }
+
+        // Add all edges and build edge ID mapping
+        let new_edge_ids = if !edges_to_add.is_empty() {
+            self.add_edges(&edges_to_add)
+        } else {
+            Vec::new()
+        };
+
+        // Step 4: Copy edge attributes using the new edge IDs
+        for ((old_edge_id, _), &new_edge_id) in edge_id_pairs.iter().zip(new_edge_ids.iter()) {
+            if let Ok(attrs) = other.get_edge_attrs(*old_edge_id) {
                 for (attr_name, attr_value) in attrs {
-                    let _ = self.set_edge_attr(edge_id, attr_name, attr_value);
+                    // Use the new edge ID, not the old one
+                    let _ = self.set_edge_attr(new_edge_id, attr_name, attr_value);
                 }
             }
         }
@@ -1412,6 +1452,63 @@ impl Graph {
             // Node exists but has no neighbors
             Ok(Vec::new())
         }
+    }
+
+    /// Get neighbors for multiple nodes in bulk - returns columnar BaseArray
+    /// 
+    /// This is the optimized bulk operation for neighbor queries.
+    /// Instead of returning a dict, returns a BaseArray with columns:
+    /// - "node_id": the queried node
+    /// - "neighbor_id": each neighbor (one row per neighbor)
+    ///
+    /// PERFORMANCE: O(1) snapshot retrieval + O(N*avg_degree) neighbor extraction
+    pub fn neighbors_bulk(
+        &self,
+        nodes: &[NodeId],
+    ) -> Result<crate::storage::table::BaseTable, GraphError> {
+        use crate::storage::array::BaseArray;
+        use crate::storage::table::BaseTable;
+
+        // Validate all nodes exist first
+        for &node in nodes {
+            if !self.space.contains_node(node) {
+                return Err(GraphError::NodeNotFound {
+                    node_id: node,
+                    operation: "get neighbors bulk".to_string(),
+                    suggestion: "Check if all nodes exist with contains_node()".to_string(),
+                });
+            }
+        }
+
+        // Get fresh adjacency snapshot once for all queries
+        let (_, _, _, neighbors_map) = self.space.snapshot(&self.pool.borrow());
+
+        // Build columnar data: node_id, neighbor_id pairs
+        let mut node_ids = Vec::new();
+        let mut neighbor_ids = Vec::new();
+
+        for &node in nodes {
+            if let Some(neighbors) = neighbors_map.get(&node) {
+                for (neighbor, _) in neighbors {
+                    node_ids.push(node);
+                    neighbor_ids.push(*neighbor);
+                }
+            }
+            // If node has no neighbors, we don't add any rows for it
+        }
+
+        // Create BaseArrays
+        let mut columns = HashMap::new();
+        columns.insert(
+            "node_id".to_string(),
+            BaseArray::from_node_ids(node_ids),
+        );
+        columns.insert(
+            "neighbor_id".to_string(),
+            BaseArray::from_node_ids(neighbor_ids),
+        );
+
+        BaseTable::from_columns(columns)
     }
 
     /// Get columnar topology vectors for efficient subgraph operations
@@ -2777,11 +2874,37 @@ impl Graph {
             }
         }
 
+        // Collect old indices for change tracking before the bulk update
+        let mut old_indices: HashMap<AttrName, HashMap<NodeId, Option<usize>>> = HashMap::new();
+        for (attr_name, node_values) in &attrs_values {
+            let mut attr_old_indices = HashMap::new();
+            for &(node_id, _) in node_values {
+                let old_index = self.space.get_node_attr_index(node_id, attr_name);
+                attr_old_indices.insert(node_id, old_index);
+            }
+            old_indices.insert(attr_name.clone(), attr_old_indices);
+        }
+
         // Use optimized vectorized pool operation
         let index_changes = self.pool.borrow_mut().set_bulk_attrs(attrs_values, true);
 
-        // Update space attribute indices in bulk
+        // Update space attribute indices and record changes for history
         for (attr_name, entity_indices) in index_changes {
+            let attr_old_indices = old_indices.get(&attr_name).unwrap();
+
+            // Build change records for the tracker
+            let changes: Vec<_> = entity_indices
+                .iter()
+                .map(|&(node_id, new_index)| {
+                    let old_index = attr_old_indices.get(&node_id).copied().flatten();
+                    (node_id, attr_name.clone(), old_index, new_index)
+                })
+                .collect();
+
+            // Record changes in change tracker
+            self.change_tracker.record_attr_changes(&changes, true);
+
+            // Update space indices
             for (node_id, new_index) in entity_indices {
                 self.space
                     .set_node_attr_index(node_id, attr_name.clone(), new_index);
@@ -2809,11 +2932,37 @@ impl Graph {
             }
         }
 
+        // Collect old indices for change tracking before the bulk update
+        let mut old_indices: HashMap<AttrName, HashMap<EdgeId, Option<usize>>> = HashMap::new();
+        for (attr_name, edge_values) in &attrs_values {
+            let mut attr_old_indices = HashMap::new();
+            for &(edge_id, _) in edge_values {
+                let old_index = self.space.get_edge_attr_index(edge_id, attr_name);
+                attr_old_indices.insert(edge_id, old_index);
+            }
+            old_indices.insert(attr_name.clone(), attr_old_indices);
+        }
+
         // Use optimized vectorized pool operation
         let index_changes = self.pool.borrow_mut().set_bulk_attrs(attrs_values, false);
 
-        // Update space attribute indices in bulk
+        // Update space attribute indices and record changes for history
         for (attr_name, entity_indices) in index_changes {
+            let attr_old_indices = old_indices.get(&attr_name).unwrap();
+
+            // Build change records for the tracker
+            let changes: Vec<_> = entity_indices
+                .iter()
+                .map(|&(edge_id, new_index)| {
+                    let old_index = attr_old_indices.get(&edge_id).copied().flatten();
+                    (edge_id, attr_name.clone(), old_index, new_index)
+                })
+                .collect();
+
+            // Record changes in change tracker
+            self.change_tracker.record_attr_changes(&changes, false);
+
+            // Update space indices
             for (edge_id, new_index) in entity_indices {
                 self.space
                     .set_edge_attr_index(edge_id, attr_name.clone(), new_index);
@@ -3101,3 +3250,272 @@ FUTURE EXTENSIBILITY:
 - Multiple storage backends (in-memory, disk-based, distributed)
 - Custom attribute types beyond the basic AttrValue enum
 */
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_node_entity_type_indexed() {
+        // Test that entity_type is properly indexed after add_node
+        let mut graph = Graph::new();
+        let node_id = graph.add_node();
+
+        // Should be able to retrieve entity_type attribute
+        let entity_type = graph
+            .get_node_attr(node_id, &"entity_type".into())
+            .expect("Failed to get entity_type")
+            .expect("entity_type should be set");
+
+        assert_eq!(entity_type, AttrValue::Text("base".to_string()));
+    }
+
+    #[test]
+    fn test_add_nodes_entity_type_indexed() {
+        // Test that entity_type is properly indexed after add_nodes bulk operation
+        let mut graph = Graph::new();
+        let node_ids = graph.add_nodes(5);
+
+        assert_eq!(node_ids.len(), 5);
+
+        // All nodes should have entity_type attribute queryable
+        for node_id in node_ids {
+            let entity_type = graph
+                .get_node_attr(node_id, &"entity_type".into())
+                .expect("Failed to get entity_type")
+                .expect("entity_type should be set");
+
+            assert_eq!(entity_type, AttrValue::Text("base".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_bulk_node_attrs_tracked() {
+        // Test that bulk attribute updates are recorded in change tracker
+        let mut graph = Graph::new();
+        let node_ids = graph.add_nodes(3);
+
+        // Commit initial state
+        graph
+            .commit("Initial commit".to_string(), "test".to_string())
+            .expect("Commit should succeed");
+
+        // Build bulk attribute update
+        let mut attrs_values = HashMap::new();
+        let label_values = vec![
+            (node_ids[0], AttrValue::Text("Node A".to_string())),
+            (node_ids[1], AttrValue::Text("Node B".to_string())),
+            (node_ids[2], AttrValue::Text("Node C".to_string())),
+        ];
+        attrs_values.insert("label".into(), label_values);
+
+        // Apply bulk update
+        graph
+            .set_node_attrs(attrs_values)
+            .expect("Bulk update should succeed");
+
+        // Should be able to commit (which means changes were tracked)
+        // If changes weren't tracked, this would fail with NoChangesToCommit
+        let result = graph.commit("Bulk attribute update".to_string(), "test".to_string());
+        assert!(
+            result.is_ok(),
+            "Commit should succeed when changes are tracked"
+        );
+
+        // Verify attributes were actually set
+        assert_eq!(
+            graph.get_node_attr(node_ids[0], &"label".into()).unwrap(),
+            Some(AttrValue::Text("Node A".to_string()))
+        );
+        assert_eq!(
+            graph.get_node_attr(node_ids[1], &"label".into()).unwrap(),
+            Some(AttrValue::Text("Node B".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_bulk_edge_attrs_tracked() {
+        // Test that bulk edge attribute updates are recorded in change tracker
+        let mut graph = Graph::new();
+        let node_ids = graph.add_nodes(4);
+
+        // Add some edges
+        let edge1 = graph
+            .add_edge(node_ids[0], node_ids[1])
+            .expect("Add edge should succeed");
+        let edge2 = graph
+            .add_edge(node_ids[1], node_ids[2])
+            .expect("Add edge should succeed");
+        let edge3 = graph
+            .add_edge(node_ids[2], node_ids[3])
+            .expect("Add edge should succeed");
+
+        // Commit initial state
+        graph
+            .commit("Initial commit".to_string(), "test".to_string())
+            .expect("Commit should succeed");
+
+        // Build bulk edge attribute update
+        let mut attrs_values = HashMap::new();
+        let weight_values = vec![
+            (edge1, AttrValue::Float(1.5)),
+            (edge2, AttrValue::Float(2.0)),
+            (edge3, AttrValue::Float(3.5)),
+        ];
+        attrs_values.insert("weight".into(), weight_values);
+
+        // Apply bulk update
+        graph
+            .set_edge_attrs(attrs_values)
+            .expect("Bulk update should succeed");
+
+        // Should be able to commit (which means changes were tracked)
+        // If changes weren't tracked, this would fail with NoChangesToCommit
+        let result = graph.commit("Bulk edge attribute update".to_string(), "test".to_string());
+        assert!(
+            result.is_ok(),
+            "Commit should succeed when changes are tracked"
+        );
+
+        // Verify attributes were actually set
+        assert_eq!(
+            graph.get_edge_attr(edge1, &"weight".into()).unwrap(),
+            Some(AttrValue::Float(1.5))
+        );
+        assert_eq!(
+            graph.get_edge_attr(edge2, &"weight".into()).unwrap(),
+            Some(AttrValue::Float(2.0))
+        );
+    }
+
+    #[test]
+    fn test_add_graph_topology_preserved() {
+        // Test that add_graph properly clones topology with remapped IDs
+        let mut source_graph = Graph::new();
+
+        // Build source graph with 3 nodes and 2 edges
+        let src_nodes = source_graph.add_nodes(3);
+        let src_edge1 = source_graph
+            .add_edge(src_nodes[0], src_nodes[1])
+            .expect("Add edge should succeed");
+        let src_edge2 = source_graph
+            .add_edge(src_nodes[1], src_nodes[2])
+            .expect("Add edge should succeed");
+
+        // Add node attributes
+        source_graph
+            .set_node_attr(
+                src_nodes[0],
+                "name".into(),
+                AttrValue::Text("A".to_string()),
+            )
+            .unwrap();
+        source_graph
+            .set_node_attr(
+                src_nodes[1],
+                "name".into(),
+                AttrValue::Text("B".to_string()),
+            )
+            .unwrap();
+        source_graph
+            .set_node_attr(
+                src_nodes[2],
+                "name".into(),
+                AttrValue::Text("C".to_string()),
+            )
+            .unwrap();
+
+        // Verify source graph has the attributes
+        assert_eq!(
+            source_graph
+                .get_node_attr(src_nodes[0], &"name".into())
+                .unwrap(),
+            Some(AttrValue::Text("A".to_string())),
+            "Source graph should have attribute on node 0"
+        );
+
+        // Add edge attributes
+        source_graph
+            .set_edge_attr(src_edge1, "weight".into(), AttrValue::Float(1.0))
+            .unwrap();
+        source_graph
+            .set_edge_attr(src_edge2, "weight".into(), AttrValue::Float(2.0))
+            .unwrap();
+
+        // Create target graph and merge
+        let mut target_graph = Graph::new();
+        target_graph
+            .add_graph(&source_graph)
+            .expect("add_graph should succeed");
+
+        // Verify topology
+        assert_eq!(target_graph.node_count(), 3, "Should have 3 nodes");
+        assert_eq!(target_graph.edge_count(), 2, "Should have 2 edges");
+
+        // Verify node attributes were copied (check that we have nodes with names A, B, C)
+        let target_nodes = target_graph.node_ids();
+        let mut found_names = Vec::new();
+        for node_id in target_nodes {
+            let attr_result = target_graph.get_node_attr(node_id, &"name".into());
+            if let Ok(Some(attr_val)) = attr_result {
+                // Handle both Text and CompactText variants
+                let name = match attr_val {
+                    AttrValue::Text(s) => s,
+                    AttrValue::CompactText(cs) => cs.as_str().to_string(),
+                    _ => continue,
+                };
+                found_names.push(name);
+            }
+        }
+        found_names.sort();
+        assert_eq!(
+            found_names,
+            vec!["A".to_string(), "B".to_string(), "C".to_string()],
+            "All node names should be copied"
+        );
+
+        // Verify edge attributes were copied (check that we have edges with weights 1.0 and 2.0)
+        let target_edges = target_graph.edge_ids();
+        let mut found_weights = Vec::new();
+        for edge_id in target_edges {
+            if let Ok(Some(AttrValue::Float(weight))) =
+                target_graph.get_edge_attr(edge_id, &"weight".into())
+            {
+                found_weights.push(weight);
+            }
+        }
+        found_weights.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(
+            found_weights,
+            vec![1.0, 2.0],
+            "All edge weights should be copied"
+        );
+    }
+
+    #[test]
+    fn test_neighbors_bulk() {
+        use crate::storage::table::traits::Table;
+        
+        // Test bulk neighbors operation returns proper BaseTable
+        let mut graph = Graph::new();
+        
+        // Create a small graph: 0->1, 0->2, 1->2, 2->3
+        let nodes = graph.add_nodes(4);
+        graph.add_edge(nodes[0], nodes[1]).unwrap();
+        graph.add_edge(nodes[0], nodes[2]).unwrap();
+        graph.add_edge(nodes[1], nodes[2]).unwrap();
+        graph.add_edge(nodes[2], nodes[3]).unwrap();
+        
+        // Query neighbors for multiple nodes
+        let query_nodes = vec![nodes[0], nodes[1], nodes[2]];
+        let table = graph.neighbors_bulk(&query_nodes).expect("neighbors_bulk should succeed");
+        
+        // Verify table has correct columns
+        assert!(table.has_column("node_id"), "Should have node_id column");
+        assert!(table.has_column("neighbor_id"), "Should have neighbor_id column");
+        
+        // Verify we have neighbor relationships  
+        // (exact count depends on directed/undirected graph type)
+        assert!(table.nrows() >= 3, "Should have at least 3 neighbor relationships");
+    }
+}
