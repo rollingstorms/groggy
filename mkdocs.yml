@@ -1,7 +1,7 @@
 site_name: Groggy Documentation
 site_description: High-performance graph analytics library for Python with a Rust core
 site_author: Groggy Contributors
-site_url: https://groggy.dev
+site_url: https://rollingstorms.github.io/groggy/
 
 repo_name: rollingstorms/groggy
 repo_url: https://github.com/rollingstorms/groggy

@@ -13,11 +13,11 @@ build:
     post_install:
       # Install maturin and build the Rust extension
       - pip install maturin
-      - maturin develop --release
+      - cd python-groggy && maturin develop --release
 
-# Build documentation in the "docs/" directory with Sphinx
-sphinx:
-  configuration: docs/source/conf.py
+# Build documentation with MkDocs
+mkdocs:
+  configuration: mkdocs.yml
   fail_on_warning: false
 
 # Optionally build your docs in additional formats such as PDF and ePub
@@ -28,8 +28,6 @@ formats:
 # Install Python dependencies
 python:
   install:
-    - requirements: docs/docs-requirements.txt
+    - requirements: docs/requirements.txt
     - method: pip
-      path: .
-      extra_requirements:
-        - docs
+      path: python-groggy

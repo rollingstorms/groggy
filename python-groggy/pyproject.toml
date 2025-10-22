@@ -6,6 +6,7 @@ build-backend = "maturin"
 name = "groggy"
 version = "0.5.0"
 description = "High-performance graph analytics library with Rust core"
+readme = "../README.md"
 authors = [
     {name = "Groggy Team"}
 ]
@@ -17,6 +18,13 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["description"]
+
+[project.urls]
+Homepage = "https://github.com/rollingstorms/groggy"
+Documentation = "https://rollingstorms.github.io/groggy/"
+Repository = "https://github.com/rollingstorms/groggy"
+"Bug Tracker" = "https://github.com/rollingstorms/groggy/issues"
+Changelog = "https://github.com/rollingstorms/groggy/releases"
 
 [tool.maturin]
 python-source = "python"
