@@ -1455,7 +1455,7 @@ impl Graph {
     }
 
     /// Get neighbors for multiple nodes in bulk - returns columnar BaseArray
-    /// 
+    ///
     /// This is the optimized bulk operation for neighbor queries.
     /// Instead of returning a dict, returns a BaseArray with columns:
     /// - "node_id": the queried node
@@ -1499,10 +1499,7 @@ impl Graph {
 
         // Create BaseArrays
         let mut columns = HashMap::new();
-        columns.insert(
-            "node_id".to_string(),
-            BaseArray::from_node_ids(node_ids),
-        );
+        columns.insert("node_id".to_string(), BaseArray::from_node_ids(node_ids));
         columns.insert(
             "neighbor_id".to_string(),
             BaseArray::from_node_ids(neighbor_ids),
@@ -3495,27 +3492,35 @@ mod tests {
     #[test]
     fn test_neighbors_bulk() {
         use crate::storage::table::traits::Table;
-        
+
         // Test bulk neighbors operation returns proper BaseTable
         let mut graph = Graph::new();
-        
+
         // Create a small graph: 0->1, 0->2, 1->2, 2->3
         let nodes = graph.add_nodes(4);
         graph.add_edge(nodes[0], nodes[1]).unwrap();
         graph.add_edge(nodes[0], nodes[2]).unwrap();
         graph.add_edge(nodes[1], nodes[2]).unwrap();
         graph.add_edge(nodes[2], nodes[3]).unwrap();
-        
+
         // Query neighbors for multiple nodes
         let query_nodes = vec![nodes[0], nodes[1], nodes[2]];
-        let table = graph.neighbors_bulk(&query_nodes).expect("neighbors_bulk should succeed");
-        
+        let table = graph
+            .neighbors_bulk(&query_nodes)
+            .expect("neighbors_bulk should succeed");
+
         // Verify table has correct columns
         assert!(table.has_column("node_id"), "Should have node_id column");
-        assert!(table.has_column("neighbor_id"), "Should have neighbor_id column");
-        
-        // Verify we have neighbor relationships  
+        assert!(
+            table.has_column("neighbor_id"),
+            "Should have neighbor_id column"
+        );
+
+        // Verify we have neighbor relationships
         // (exact count depends on directed/undirected graph type)
-        assert!(table.nrows() >= 3, "Should have at least 3 neighbor relationships");
+        assert!(
+            table.nrows() >= 3,
+            "Should have at least 3 neighbor relationships"
+        );
     }
 }
