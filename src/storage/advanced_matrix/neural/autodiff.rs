@@ -1234,7 +1234,7 @@ mod tests {
         let b_data = vec![3.0, 4.0];
 
         let a = AutoDiffTensor::from_data(a_data, (1, 2), true).unwrap();
-        let b = AutoDiffTensor::from_data(b_data, (1, 2), true).unwrap();
+        let b = a.like_from_data(b_data, (1, 2), true).unwrap();
 
         let c = a.add(&b).unwrap();
         let result_data = c.data.to_vec().unwrap();
@@ -1249,7 +1249,7 @@ mod tests {
         let b_data = vec![2.0, 3.0];
 
         let a = AutoDiffTensor::from_data(a_data, (1, 2), true).unwrap();
-        let b = AutoDiffTensor::from_data(b_data, (1, 2), true).unwrap();
+        let b = a.like_from_data(b_data, (1, 2), true).unwrap();
 
         let c = a.subtract(&b).unwrap();
         let result_data = c.data.to_vec().unwrap();
@@ -1264,7 +1264,7 @@ mod tests {
         let b_data = vec![4.0, 5.0];
 
         let a = AutoDiffTensor::from_data(a_data, (1, 2), true).unwrap();
-        let b = AutoDiffTensor::from_data(b_data, (1, 2), true).unwrap();
+        let b = a.like_from_data(b_data, (1, 2), true).unwrap();
 
         let c = a.multiply(&b).unwrap();
         let result_data = c.data.to_vec().unwrap();
@@ -1280,8 +1280,8 @@ mod tests {
         let c_data = vec![0.5, 0.5];
 
         let a = AutoDiffTensor::from_data(a_data, (1, 2), true).unwrap();
-        let b = AutoDiffTensor::from_data(b_data, (1, 2), true).unwrap();
-        let c = AutoDiffTensor::from_data(c_data, (1, 2), true).unwrap();
+        let b = a.like_from_data(b_data, (1, 2), true).unwrap();
+        let c = a.like_from_data(c_data, (1, 2), true).unwrap();
 
         // Compute (a + b) * c
         let sum = a.add(&b).unwrap();
@@ -1298,7 +1298,7 @@ mod tests {
         let y_data = vec![3.0];
 
         let x = AutoDiffTensor::from_data(x_data, (1, 1), true).unwrap();
-        let y = AutoDiffTensor::from_data(y_data, (1, 1), true).unwrap();
+        let y = x.like_from_data(y_data, (1, 1), true).unwrap();
 
         let z = x.add(&y).unwrap();
         assert_eq!(z.data.to_vec().unwrap(), vec![5.0]);
@@ -1321,7 +1321,7 @@ mod tests {
         let y_data = vec![2.0];
 
         let x = AutoDiffTensor::from_data(x_data, (1, 1), true).unwrap();
-        let y = AutoDiffTensor::from_data(y_data, (1, 1), true).unwrap();
+        let y = x.like_from_data(y_data, (1, 1), true).unwrap();
 
         let z = x.subtract(&y).unwrap();
         assert_eq!(z.data.to_vec().unwrap(), vec![3.0]);
@@ -1344,7 +1344,7 @@ mod tests {
         let y_data = vec![4.0];
 
         let x = AutoDiffTensor::from_data(x_data.clone(), (1, 1), true).unwrap();
-        let y = AutoDiffTensor::from_data(y_data.clone(), (1, 1), true).unwrap();
+        let y = x.like_from_data(y_data.clone(), (1, 1), true).unwrap();
 
         let z = x.multiply(&y).unwrap();
         assert_eq!(z.data.to_vec().unwrap(), vec![12.0]);
@@ -1367,7 +1367,7 @@ mod tests {
         let y_data = vec![2.0];
 
         let x = AutoDiffTensor::from_data(x_data.clone(), (1, 1), true).unwrap();
-        let y = AutoDiffTensor::from_data(y_data.clone(), (1, 1), true).unwrap();
+        let y = x.like_from_data(y_data.clone(), (1, 1), true).unwrap();
 
         let sum = x.add(&y).unwrap(); // x + y = 7
         let diff = x.subtract(&y).unwrap(); // x - y = 3
@@ -1390,7 +1390,7 @@ mod tests {
         let b_data = vec![5.0, 6.0, 7.0, 8.0]; // 2x2 matrix
 
         let a = AutoDiffTensor::from_data(a_data, (2, 2), true).unwrap();
-        let b = AutoDiffTensor::from_data(b_data, (2, 2), true).unwrap();
+        let b = a.like_from_data(b_data, (2, 2), true).unwrap();
 
         let c = a.matmul(&b).unwrap();
         let result = c.data.to_vec().unwrap();
@@ -1441,7 +1441,7 @@ mod tests {
 
         // Function: f(x, y) = x^2 + x*y + y^2 (approximated as x*x + x*y + y*y)
         let x = AutoDiffTensor::from_data(vec![x_val], (1, 1), true).unwrap();
-        let y = AutoDiffTensor::from_data(vec![y_val], (1, 1), true).unwrap();
+        let y = x.like_from_data(vec![y_val], (1, 1), true).unwrap();
 
         let x2 = x.multiply(&x).unwrap();
         let xy = x.multiply(&y).unwrap();
@@ -1482,7 +1482,7 @@ mod tests {
     #[test]
     fn test_graph_topology_order() {
         let x = AutoDiffTensor::from_data(vec![1.0], (1, 1), true).unwrap();
-        let y = AutoDiffTensor::from_data(vec![2.0], (1, 1), true).unwrap();
+        let y = x.like_from_data(vec![2.0], (1, 1), true).unwrap();
 
         let z1 = x.add(&y).unwrap();
         let z2 = x.multiply(&y).unwrap();
@@ -1499,7 +1499,7 @@ mod tests {
     #[test]
     fn grad_scalar_times_scalar_const() {
         let x = AutoDiffTensor::from_data(vec![1.5], (1, 1), true).unwrap();
-        let two = AutoDiffTensor::from_data(vec![2.0], (1, 1), false).unwrap();
+        let two = x.like_from_data(vec![2.0], (1, 1), false).unwrap();
         let u = x.multiply(&two).unwrap(); // u = 2x
         u.backward().unwrap();
         let g = x.grad().unwrap().get(0, 0).unwrap().to_f64();

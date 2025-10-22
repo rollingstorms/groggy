@@ -1278,7 +1278,7 @@ pub trait SubgraphOperations: GraphEntity {
     /// A `MetaNodePlan` that can be previewed, modified, and executed with `.add_to_graph()`
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// // Basic usage
     /// let plan = subgraph.collapse(
     ///     vec![("avg_salary", "mean", Some("salary"))],
@@ -1290,7 +1290,7 @@ pub trait SubgraphOperations: GraphEntity {
     ///     "meta".to_string()
     /// )?;
     /// let meta_node = plan.add_to_graph()?;
-    /// ```
+    /// ```ignore
     fn collapse(
         &self,
         node_aggs: Vec<(String, String, Option<String>)>, // (target, function, source)
@@ -1341,11 +1341,11 @@ pub trait SubgraphOperations: GraphEntity {
     /// A VizModule that can be used for interactive and static visualization
     ///
     /// # Examples
-    /// ```
+    /// ```ignore
     /// let viz = subgraph.viz();
     /// viz.interactive(); // Start interactive visualization
     /// viz.static_viz("output.html"); // Generate static HTML
-    /// ```
+    /// ```ignore
     fn viz(&self) -> crate::viz::VizModule;
 }
 

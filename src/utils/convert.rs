@@ -377,7 +377,7 @@ mod tests {
         // Check edge attributes
         let edge_data = &nx_graph.edges[0];
         match edge_data.attributes.get("weight").unwrap() {
-            NetworkXValue::Float(weight) => assert_eq!(*weight, 0.8),
+            NetworkXValue::Float(weight) => assert!((*weight - 0.8).abs() < 1e-6),
             _ => panic!("Expected float attribute"),
         }
     }

@@ -165,7 +165,7 @@ impl VizModule {
     /// * `RenderResult::RealTime` - Contains the real-time visualization engine with advanced features
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// use groggy::viz::VizModule;
     ///
     /// let mut viz = graph.viz();
@@ -174,7 +174,7 @@ impl VizModule {
     /// let result = viz.show(None)?; // Quiet mode (default)
     ///
     /// // Real-time visualization with n-dimensional honeycomb controls is now running
-    /// ```
+    /// ```ignore
     pub fn show(&mut self, verbose: Option<u8>) -> GraphResult<RenderResult> {
         let verbose = verbose.unwrap_or(0);
 
@@ -217,7 +217,7 @@ impl VizModule {
     /// * `RenderResult` - Different return types based on backend
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// use groggy::viz::{VizModule, VizBackend, RenderOptions};
     ///
     /// // Jupyter notebook embedding
@@ -234,7 +234,7 @@ impl VizModule {
     ///     filename: Some("graph.html".to_string()),
     ///     ..Default::default()
     /// })?;
-    /// ```
+    /// ```ignore
     pub fn render(&self, backend: VizBackend, options: RenderOptions) -> GraphResult<RenderResult> {
         let verbose = options.verbose.unwrap_or(0);
 

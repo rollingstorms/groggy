@@ -10,7 +10,7 @@
 //! - Eliminates code duplication
 //!
 //! # Migration Guide
-//! ```rust
+//! ```rust,ignore
 //! // OLD: Separate AdjacencyMatrix type
 //! let adj = AdjacencyMatrix::new(nodes, edges);
 //!

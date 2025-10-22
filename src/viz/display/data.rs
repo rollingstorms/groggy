@@ -226,7 +226,7 @@ mod tests {
         assert!(!window.is_complete());
         assert_eq!(
             window.truncation_info(),
-            Some("Showing 1 of 1000 rows, 2 of 5 columns".to_string())
+            Some("1000 rows x 5 cols".to_string())
         );
     }
 

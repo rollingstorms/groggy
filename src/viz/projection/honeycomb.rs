@@ -329,22 +329,32 @@ impl HoneycombGrid {
 
         // Generate all hex centers in a circular region
         let hex_centers = self.generate_hex_centers_in_circle(positions.len() * 2);
+        
+        // Scale the hex centers from unit circle to pixel space (multiply by cell_size * 100)
+        let scale_factor = self.config.cell_size * 100.0;
+        let scaled_hex_centers: Vec<Position> = hex_centers
+            .iter()
+            .map(|pos| Position {
+                x: pos.x * scale_factor,
+                y: pos.y * scale_factor,
+            })
+            .collect();
 
         // Use unique assignment algorithm (greedy global nearest neighbor)
-        let assignments = self.assign_unique_cells(positions, &hex_centers)?;
+        let assignments = self.assign_unique_cells(positions, &scaled_hex_centers)?;
 
         let mut result_positions = Vec::with_capacity(positions.len());
 
         for (node_idx, &hex_center_idx) in assignments.iter().enumerate() {
-            if hex_center_idx >= hex_centers.len() {
+            if hex_center_idx >= scaled_hex_centers.len() {
                 return Err(crate::errors::GraphError::InvalidInput(format!(
                     "Invalid hex center assignment: {} >= {}",
                     hex_center_idx,
-                    hex_centers.len()
+                    scaled_hex_centers.len()
                 )));
             }
 
-            let hex_center_pos = hex_centers[hex_center_idx];
+            let hex_center_pos = scaled_hex_centers[hex_center_idx];
             let hex_coord = self.pixel_to_hex(&hex_center_pos);
 
             // Track the assignment

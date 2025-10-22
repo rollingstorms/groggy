@@ -683,7 +683,7 @@ mod tests {
 
         // Check that meta-node has the subgraph reference
         let subgraph_ref = graph_ref
-            .get_node_attr(meta_node_id.node_id(), &"contained_subgraph".into())
+            .get_node_attr(meta_node_id.node_id(), &"contains_subgraph".into())
             .unwrap();
         assert!(matches!(subgraph_ref, Some(AttrValue::SubgraphRef(_))));
 

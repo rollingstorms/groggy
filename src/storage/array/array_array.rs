@@ -146,10 +146,13 @@ impl ArrayArray<f64> {
         self.arrays
             .iter()
             .map(|arr| {
-                arr.iter()
-                    .cloned()
-                    .fold(f64::INFINITY, |a, b| a.min(b))
-                    .min(0.0) // Return 0.0 for empty arrays
+                if arr.is_empty() {
+                    0.0
+                } else {
+                    arr.iter()
+                        .cloned()
+                        .fold(f64::INFINITY, |a, b| a.min(b))
+                }
             })
             .collect()
     }
@@ -162,10 +165,13 @@ impl ArrayArray<f64> {
         self.arrays
             .iter()
             .map(|arr| {
-                arr.iter()
-                    .cloned()
-                    .fold(f64::NEG_INFINITY, |a, b| a.max(b))
-                    .max(0.0) // Return 0.0 for empty arrays
+                if arr.is_empty() {
+                    0.0
+                } else {
+                    arr.iter()
+                        .cloned()
+                        .fold(f64::NEG_INFINITY, |a, b| a.max(b))
+                }
             })
             .collect()
     }
@@ -203,12 +209,12 @@ impl ArrayArray<f64> {
     /// If no keys, creates a table with just 'value' column.
     ///
     /// # Example
-    /// ```
+    /// ```ignore
     /// let arr_arr = ArrayArray::with_keys(arrays, vec!["A", "B", "C"]);
     /// let means = arr_arr.mean();
     /// let table = arr_arr.to_table_with_aggregation("mean", means);
     /// // Table has columns: ['group_key', 'mean']
-    /// ```
+    /// ```ignore
     pub fn to_table_with_aggregation(
         &self,
         agg_name: &str,

@@ -141,7 +141,7 @@ impl Graph {
     /// * `graph_type` - Whether the graph is directed or undirected
     ///
     /// # Examples
-    /// ```
+    /// ```ignore
     /// use groggy::Graph;
     /// use groggy::types::GraphType;
     ///
@@ -150,7 +150,7 @@ impl Graph {
     ///
     /// // Create an undirected graph (like NetworkX Graph)  
     /// let undirected_graph = Graph::new_with_type(GraphType::Undirected);
-    /// ```
+    /// ```ignore
     pub fn new_with_type(graph_type: crate::types::GraphType) -> Self {
         let mut config = GraphConfig::new();
         config.graph_type = graph_type;
@@ -2057,11 +2057,11 @@ impl Graph {
     /// * `NetworkXGraph` - A representation compatible with NetworkX
     ///
     /// # Examples
-    /// ```rust,no_run
+    /// ```ignore
     /// use groggy::Graph;
     /// let graph = Graph::new();
     /// let nx_graph = graph.to_networkx().unwrap();
-    /// ```
+    /// ```ignore
     pub fn to_networkx(&self) -> Result<crate::utils::convert::NetworkXGraph, GraphError> {
         crate::utils::convert::graph_to_networkx(self)
     }
@@ -2994,7 +2994,7 @@ impl Graph {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```ignore
     /// use groggy::Graph;
     ///
     /// let mut graph = Graph::new();

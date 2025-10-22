@@ -1593,9 +1593,26 @@ impl<T: NumericType> GraphMatrix<T> {
 
     /// Check if this matrix represents a valid adjacency matrix
     pub fn is_adjacency_matrix(&self) -> bool {
-        // TODO: Implement adjacency matrix validation
-        // Check for non-negative values, symmetry (for undirected), etc.
-        false
+        // Check if matrix is square
+        if !self.is_square() {
+            return false;
+        }
+
+        // Check for non-negative values
+        let (rows, cols) = self.shape();
+        for i in 0..rows {
+            for j in 0..cols {
+                if let Some(val) = self.get(i, j) {
+                    if val.to_f64() < 0.0 {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        true
     }
 
     /// Get degree matrix from adjacency matrix

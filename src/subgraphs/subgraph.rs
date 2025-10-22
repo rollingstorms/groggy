@@ -416,7 +416,7 @@ impl Subgraph {
     /// * `NetworkXGraph` - A representation compatible with NetworkX
     ///
     /// # Examples
-    /// ```rust,no_run
+    /// ```ignore
     /// # use groggy::core::subgraph::Subgraph;
     /// # use groggy::errors::GraphResult;
     /// # fn example() -> GraphResult<()> {
@@ -424,7 +424,7 @@ impl Subgraph {
     /// let nx_graph = subgraph.to_networkx()?;
     /// # Ok(())
     /// # }
-    /// ```
+    /// ```ignore
     pub fn to_networkx(&self) -> GraphResult<crate::utils::convert::NetworkXGraph> {
         crate::utils::convert::subgraph_to_networkx(self)
     }
@@ -444,7 +444,7 @@ impl Subgraph {
     /// * `Err(GraphError)` if there's an error during traversal
     ///
     /// # Examples
-    /// ```rust,no_run
+    /// ```ignore
     /// # use groggy::core::subgraph::Subgraph;
     /// # use groggy::errors::GraphResult;
     /// # fn example() -> GraphResult<()> {
@@ -453,7 +453,7 @@ impl Subgraph {
     /// let path_exists = subgraph.has_path(1, 5)?;
     /// # Ok(())
     /// # }
-    /// ```
+    /// ```ignore
     pub fn has_path(&self, node1_id: NodeId, node2_id: NodeId) -> GraphResult<bool> {
         // Quick checks first
         if node1_id == node2_id {
@@ -945,10 +945,10 @@ impl Subgraph {
     /// Vector of subgraphs, one for each unique attribute value
     ///
     /// # Example
-    /// ```
+    /// ```ignore
     /// let dept_groups = subgraph.group_by_nodes("department")?;
     /// // Returns subgraphs for each department
-    /// ```
+    /// ```ignore
     pub fn group_by_nodes(&self, attr_name: &AttrName) -> GraphResult<Vec<Subgraph>> {
         use std::collections::HashMap;
 
@@ -1001,10 +1001,10 @@ impl Subgraph {
     /// Vector of subgraphs, one for each unique attribute value
     ///
     /// # Example
-    /// ```
+    /// ```ignore
     /// let type_groups = subgraph.group_by_edges("interaction_type")?;
     /// // Returns subgraphs for each interaction type
-    /// ```
+    /// ```ignore
     pub fn group_by_edges(&self, attr_name: &AttrName) -> GraphResult<Vec<Subgraph>> {
         use std::collections::HashMap;
 

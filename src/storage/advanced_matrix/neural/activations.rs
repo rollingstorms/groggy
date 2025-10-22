@@ -316,15 +316,21 @@ impl ActivationOps {
 
     /// Helper to transform elements (simplified)
     fn transform_elements<T: NumericType, F>(
-        _input: &UnifiedMatrix<T>,
-        _result: &mut UnifiedMatrix<T>,
-        _func: F,
+        input: &UnifiedMatrix<T>,
+        result: &mut UnifiedMatrix<T>,
+        func: F,
     ) -> MatrixResult<()>
     where
         F: Fn(T) -> T + Send + Sync,
     {
-        // This would need actual implementation with matrix storage access
-        // For now, this is a placeholder that shows the intended interface
+        let shape = input.shape();
+        for i in 0..shape.rows {
+            for j in 0..shape.cols {
+                let val = input.get(i, j)?;
+                let transformed = func(val);
+                result.set(i, j, transformed)?;
+            }
+        }
         Ok(())
     }
 

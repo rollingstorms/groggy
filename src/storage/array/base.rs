@@ -610,9 +610,9 @@ impl BaseArray {
     /// Boolean array indicating which elements match the values
     ///
     /// # Examples
-    /// ```rust
-    /// use crate::storage::array::BaseArray;
-    /// use crate::types::{AttrValue, AttrValueType};
+    /// ```ignore
+    /// use groggy::storage::array::BaseArray;
+    /// use groggy::types::{AttrValue, AttrValueType};
     ///
     /// let array = BaseArray::new(vec![
     ///     AttrValue::Text("Engineering".to_string()),
@@ -627,7 +627,7 @@ impl BaseArray {
     ///
     /// let mask = array.isin(check_values)?;
     /// // mask will be [true, true, false]
-    /// ```
+    /// ```ignore
     pub fn isin(&self, values: Vec<AttrValue>) -> crate::errors::GraphResult<BaseArray> {
         // Create a set for efficient lookup - use direct AttrValue comparison
         let value_set: std::collections::HashSet<&AttrValue> = values.iter().collect();

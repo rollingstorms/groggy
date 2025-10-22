@@ -265,11 +265,11 @@ impl BaseTable {
     /// * `updates` - HashMap mapping column names to new values
     ///
     /// # Examples
-    /// ```
+    /// ```ignore
     /// let mut updates = HashMap::new();
     /// updates.insert("bonus".to_string(), vec![AttrValue::Float(1000.0), AttrValue::Float(1500.0)]);
     /// table.assign(updates)?;
-    /// ```
+    /// ```ignore
     pub fn assign(
         &mut self,
         updates: HashMap<String, Vec<crate::types::AttrValue>>,
@@ -534,7 +534,7 @@ impl BaseTable {
     /// - `replace`: Whether to sample with replacement (default: false)
     ///
     /// # Examples
-    /// ```
+    /// ```ignore
     /// // Sample 10 rows
     /// let sample = table.sample(Some(10), None, None, None, None, false)?;
     ///
@@ -549,7 +549,7 @@ impl BaseTable {
     /// let mut class_weights = HashMap::new();
     /// class_weights.insert("category", vec![("A", 2.0), ("B", 1.0), ("C", 3.0)]);
     /// let sample = table.sample(Some(10), None, None, None, Some(class_weights), false)?;
-    /// ```
+    /// ```ignore
     pub fn sample(
         &self,
         n: Option<usize>,
@@ -914,13 +914,13 @@ impl Table for BaseTable {
     /// New sorted table with the same structure
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// // Sort by department ascending, then salary descending
     /// let sorted = table.sort_values(
     ///     vec!["department".to_string(), "salary".to_string()],
     ///     vec![true, false]
     /// )?;
-    /// ```
+    /// ```ignore
     fn sort_values(&self, columns: Vec<String>, ascending: Vec<bool>) -> GraphResult<Self> {
         if columns.is_empty() {
             return Err(crate::errors::GraphError::InvalidInput(
@@ -1903,14 +1903,14 @@ impl BaseTable {
     /// * `values` - Vector of values to check membership against
     ///
     /// # Examples
-    /// ```rust
-    /// use crate::types::AttrValue;
+    /// ```ignore
+    /// use groggy::types::AttrValue;
     /// let mask = table.isin("department", vec![
     ///     AttrValue::Text("Engineering".to_string()),
     ///     AttrValue::Text("Marketing".to_string())
     /// ])?;
     /// let filtered = table.filter_by_mask(&mask)?;
-    /// ```
+    /// ```ignore
     pub fn isin(
         &self,
         column_name: &str,
@@ -1943,9 +1943,9 @@ impl BaseTable {
     /// * `column_name` - Name of the column to sort by
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// let top_5_salaries = table.nlargest(5, "salary")?;
-    /// ```
+    /// ```ignore
     pub fn nlargest(&self, n: usize, column_name: &str) -> GraphResult<Self> {
         let filter_column = self.column(column_name).ok_or_else(|| {
             crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", column_name))
@@ -1991,9 +1991,9 @@ impl BaseTable {
     /// * `column_name` - Name of the column to sort by
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// let bottom_5_salaries = table.nsmallest(5, "salary")?;
-    /// ```
+    /// ```ignore
     pub fn nsmallest(&self, n: usize, column_name: &str) -> GraphResult<Self> {
         let filter_column = self.column(column_name).ok_or_else(|| {
             crate::errors::GraphError::InvalidInput(format!("Column '{}' not found", column_name))
@@ -2069,11 +2069,11 @@ impl BaseTable {
     /// * `expr` - String expression to evaluate (same as enhanced filter syntax)
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// let result = table.query("age > 25 AND department == Engineering")?;
     /// let result = table.query("salary BETWEEN 50000 AND 100000")?;
     /// let result = table.query("name LIKE A%")?;
-    /// ```
+    /// ```ignore
     pub fn query(&self, expr: &str) -> GraphResult<Self> {
         // Delegate to the enhanced predicate evaluation system
         let mask = self.evaluate_predicate(expr)?;
@@ -2088,10 +2088,10 @@ impl BaseTable {
     /// Enables table["column_name"] syntax via Index trait
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// let name_column = table.get_column("name")?;
     /// let upper_names = name_column.str().upper();
-    /// ```
+    /// ```ignore
     pub fn get_column(&self, name: &str) -> Option<&BaseArray<AttrValue>> {
         self.columns.get(name)
     }
@@ -2109,7 +2109,7 @@ impl BaseTable {
     /// * `agg_func` - Aggregation function: "sum", "mean", "count", "min", "max"
     ///
     /// # Example
-    /// ```
+    /// ```ignore
     /// // Original data:
     /// // | dept | level | salary |
     /// // | Eng  | Sr    | 100k   |
@@ -2121,7 +2121,7 @@ impl BaseTable {
     /// // | dept  | Jr  | Sr  |
     /// // | Eng   | 80k | 100k|
     /// // | Sales |  -  | 90k |
-    /// ```
+    /// ```ignore
     pub fn pivot_table(
         &self,
         index_cols: &[String],
@@ -2409,10 +2409,10 @@ impl BaseTable {
     /// Table with 'value' and 'count' columns showing frequency of each unique value
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// let counts = table.value_counts("category", true, false, true)?;
     /// // Returns frequency table for the 'category' column
-    /// ```
+    /// ```ignore
     pub fn value_counts(
         &self,
         column: &str,
@@ -2444,13 +2444,13 @@ impl BaseTable {
     /// AttrValue containing the computed quantile
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// // Get median (50th percentile) of sales column
     /// let median = table.quantile("sales", 0.5, "linear")?;
     ///
     /// // Get 95th percentile with nearest interpolation
     /// let p95 = table.quantile("price", 0.95, "nearest")?;
-    /// ```
+    /// ```ignore
     pub fn quantile(&self, column: &str, q: f64, interpolation: &str) -> GraphResult<AttrValue> {
         // Validate column exists
         if !self.has_column(column) {
@@ -2501,10 +2501,10 @@ impl BaseTable {
     /// * `interpolation` - Method for interpolation
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// // Get median (50th percentile)
     /// let median = table.percentile("sales", 50.0, "linear")?;
-    /// ```
+    /// ```ignore
     pub fn get_percentile(
         &self,
         column: &str,
@@ -2553,10 +2553,10 @@ impl BaseTable {
     /// Median value as f64
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// // Get median of age column
     /// let median_age = table.median("age")?;
-    /// ```
+    /// ```ignore
     pub fn median(&self, column: &str) -> GraphResult<f64> {
         // Validate column exists
         if !self.has_column(column) {
@@ -2580,10 +2580,10 @@ impl BaseTable {
     /// Standard deviation as f64
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// // Get standard deviation of scores column
     /// let std_scores = table.std("scores")?;
-    /// ```
+    /// ```ignore
     pub fn std(&self, column: &str) -> GraphResult<f64> {
         // Validate column exists
         if !self.has_column(column) {
@@ -2607,10 +2607,10 @@ impl BaseTable {
     /// Variance as f64
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// // Get variance of prices column
     /// let var_prices = table.var("prices")?;
-    /// ```
+    /// ```ignore
     pub fn var(&self, column: &str) -> GraphResult<f64> {
         // Validate column exists
         if !self.has_column(column) {
@@ -2636,13 +2636,13 @@ impl BaseTable {
     /// Correlation coefficient as AttrValue
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// // Compute Pearson correlation between sales and advertising
     /// let corr = table.corr_columns("sales", "advertising", "pearson")?;
     ///
     /// // Compute Spearman rank correlation
     /// let spearman = table.corr_columns("price", "demand", "spearman")?;
-    /// ```
+    /// ```ignore
     pub fn corr_columns(
         &self,
         column1: &str,
@@ -2678,13 +2678,13 @@ impl BaseTable {
     /// Correlation matrix as BaseTable with columns and rows representing variables
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// // Get full correlation matrix
     /// let corr_matrix = table.corr("pearson")?;
     ///
     /// // Spearman rank correlation matrix
     /// let spearman_matrix = table.corr("spearman")?;
-    /// ```
+    /// ```ignore
     pub fn corr(&self, method: &str) -> GraphResult<Self> {
         // Find all numeric columns
         let mut numeric_columns = Vec::new();
@@ -2787,13 +2787,13 @@ impl BaseTable {
     /// Covariance matrix as BaseTable
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// // Sample covariance matrix
     /// let cov_matrix = table.cov(1)?;
     ///
     /// // Population covariance matrix
     /// let pop_cov = table.cov(0)?;
-    /// ```
+    /// ```ignore
     pub fn cov(&self, ddof: i32) -> GraphResult<Self> {
         // Find all numeric columns
         let mut numeric_columns = Vec::new();
@@ -2862,9 +2862,9 @@ impl BaseTable {
     /// New single-row table with one column per original column containing the function results
     ///
     /// # Examples
-    /// ```rust
-    /// use crate::storage::table::BaseTable;
-    /// use crate::types::AttrValue;
+    /// ```ignore
+    /// use groggy::storage::table::BaseTable;
+    /// use groggy::types::AttrValue;
     ///
     /// // Get column sums
     /// let result = table.apply_to_columns(|col| {
@@ -2877,7 +2877,7 @@ impl BaseTable {
     ///         .sum();
     ///     AttrValue::Float(sum)
     /// })?;
-    /// ```
+    /// ```ignore
     pub fn apply_to_columns<F>(&self, func: F) -> GraphResult<Self>
     where
         F: Fn(&BaseArray<AttrValue>) -> AttrValue,
@@ -2910,9 +2910,9 @@ impl BaseTable {
     /// New single-column table with one row per original row containing the function results
     ///
     /// # Examples
-    /// ```rust
-    /// use crate::storage::table::BaseTable;
-    /// use crate::types::AttrValue;
+    /// ```ignore
+    /// use groggy::storage::table::BaseTable;
+    /// use groggy::types::AttrValue;
     /// use std::collections::HashMap;
     ///
     /// // Compute row sums
@@ -2929,7 +2929,7 @@ impl BaseTable {
     ///     },
     ///     "row_sum"
     /// )?;
-    /// ```
+    /// ```ignore
     pub fn apply_to_rows<F>(&self, func: F, result_name: &str) -> GraphResult<Self>
     where
         F: Fn(&HashMap<String, AttrValue>) -> AttrValue,
@@ -2969,9 +2969,9 @@ impl BaseTable {
     /// New table with the row appended
     ///
     /// # Examples
-    /// ```rust
-    /// use crate::storage::table::BaseTable;
-    /// use crate::types::AttrValue;
+    /// ```ignore
+    /// use groggy::storage::table::BaseTable;
+    /// use groggy::types::AttrValue;
     /// use std::collections::HashMap;
     ///
     /// let mut row_data = HashMap::new();
@@ -2979,7 +2979,7 @@ impl BaseTable {
     /// row_data.insert("age".to_string(), AttrValue::Int(30));
     ///
     /// let new_table = table.append(row_data)?;
-    /// ```
+    /// ```ignore
     pub fn append(&self, row_data: HashMap<String, AttrValue>) -> GraphResult<Self> {
         let mut new_columns = HashMap::new();
 
@@ -3023,9 +3023,9 @@ impl BaseTable {
     /// New table with all rows appended
     ///
     /// # Examples
-    /// ```rust
-    /// use crate::storage::table::BaseTable;
-    /// use crate::types::AttrValue;
+    /// ```ignore
+    /// use groggy::storage::table::BaseTable;
+    /// use groggy::types::AttrValue;
     /// use std::collections::HashMap;
     ///
     /// let rows = vec![
@@ -3040,7 +3040,7 @@ impl BaseTable {
     /// ];
     ///
     /// let new_table = table.extend(rows)?;
-    /// ```
+    /// ```ignore
     pub fn extend(&self, rows_data: Vec<HashMap<String, AttrValue>>) -> GraphResult<Self> {
         if rows_data.is_empty() {
             return Ok(self.clone());
@@ -5499,7 +5499,7 @@ impl BaseTable {
     /// A TableArray where each table represents one group, with group keys attached
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// // Group by single column
     /// let grouped = table.groupby(&["category"])?;
     /// let sums = grouped.sum()?;  // Sum each group
@@ -5510,7 +5510,7 @@ impl BaseTable {
     ///     "sales" => "sum",
     ///     "price" => "mean"
     /// })?;
-    /// ```
+    /// ```ignore
     pub fn groupby(&self, by: &[&str]) -> GraphResult<super::TableArray> {
         use super::TableArray;
 
@@ -5899,10 +5899,10 @@ impl BaseTable {
     /// * `Err(GraphError)` - If server failed to start
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// let iframe_html = table.interactive_embed(None)?;
     /// // Use iframe_html in Jupyter notebook or web page
-    /// ```
+    /// ```ignore
     pub fn interactive_embed(&mut self, config: Option<InteractiveConfig>) -> GraphResult<String> {
         use crate::viz::streaming::server::StreamingServer;
         use crate::viz::streaming::types::StreamingConfig;

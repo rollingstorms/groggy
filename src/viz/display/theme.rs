@@ -320,9 +320,9 @@ mod tests {
         let dark_theme = theme_system.get_theme("dark");
         assert_eq!(dark_theme.name, "dark");
 
-        // Fallback to light theme for unknown theme
+        // Fallback to sleek theme for unknown theme
         let unknown_theme = theme_system.get_theme("nonexistent");
-        assert_eq!(unknown_theme.name, "light");
+        assert_eq!(unknown_theme.name, "sleek");
     }
 
     #[test]
@@ -356,8 +356,9 @@ mod tests {
     #[test]
     fn test_builtin_theme_enum() {
         let all_themes = BuiltInTheme::all();
-        assert_eq!(all_themes.len(), 4);
+        assert_eq!(all_themes.len(), 5);
 
+        assert_eq!(BuiltInTheme::Sleek.name(), "sleek");
         assert_eq!(BuiltInTheme::Light.name(), "light");
         assert_eq!(BuiltInTheme::Dark.name(), "dark");
         assert_eq!(BuiltInTheme::Publication.name(), "publication");

@@ -511,7 +511,7 @@ mod tests {
         let config = EmbeddingConfig::default();
         let engine = EmbeddingEngineFactory::create_engine(&config);
         assert!(engine.is_ok());
-        assert_eq!(engine.unwrap().name(), "spectral");
+        assert_eq!(engine.unwrap().name(), "spectral_normalized");
     }
 
     #[test]

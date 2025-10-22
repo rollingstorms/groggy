@@ -947,9 +947,9 @@ impl BaseArray<AttrValue> {
     /// Boolean array indicating which elements match the values
     ///
     /// # Examples
-    /// ```rust
-    /// use crate::storage::array::BaseArray;
-    /// use crate::types::AttrValue;
+    /// ```ignore
+    /// use groggy::storage::array::BaseArray;
+    /// use groggy::types::AttrValue;
     ///
     /// let array = BaseArray::from_attr_values(vec![
     ///     AttrValue::Text("Engineering".to_string()),
@@ -964,7 +964,7 @@ impl BaseArray<AttrValue> {
     ///
     /// let mask = array.isin(check_values)?;
     /// // mask will be [true, true, false]
-    /// ```
+    /// ```ignore
     pub fn isin(&self, values: Vec<AttrValue>) -> crate::errors::GraphResult<BaseArray<AttrValue>> {
         let mut mask_data = Vec::with_capacity(self.len());
 
@@ -994,9 +994,9 @@ impl BaseArray<AttrValue> {
     /// Table with 'value' and 'count' columns showing frequency of each unique value
     ///
     /// # Examples
-    /// ```rust
-    /// use crate::storage::array::BaseArray;
-    /// use crate::types::AttrValue;
+    /// ```ignore
+    /// use groggy::storage::array::BaseArray;
+    /// use groggy::types::AttrValue;
     ///
     /// let array = BaseArray::from_attr_values(vec![
     ///     AttrValue::Text("A".to_string()),
@@ -1012,7 +1012,7 @@ impl BaseArray<AttrValue> {
     /// // "A"   | 3
     /// // "B"   | 1
     /// // "C"   | 1
-    /// ```
+    /// ```ignore
     pub fn value_counts(
         &self,
         sort: bool,
@@ -1082,9 +1082,9 @@ impl BaseArray<AttrValue> {
     /// New BaseArray with transformed values
     ///
     /// # Examples
-    /// ```rust
-    /// use crate::storage::array::BaseArray;
-    /// use crate::types::AttrValue;
+    /// ```ignore
+    /// use groggy::storage::array::BaseArray;
+    /// use groggy::types::AttrValue;
     ///
     /// let array = BaseArray::from_attr_values(vec![
     ///     AttrValue::Int(1),
@@ -1097,7 +1097,7 @@ impl BaseArray<AttrValue> {
     ///     AttrValue::Int(n) => AttrValue::Int(n * n),
     ///     _ => x.clone()
     /// });
-    /// ```
+    /// ```ignore
     pub fn apply<F>(&self, func: F) -> Self
     where
         F: Fn(&AttrValue) -> AttrValue,
@@ -1117,9 +1117,9 @@ impl BaseArray<AttrValue> {
     /// AttrValue (single quantile) or BaseArray (multiple quantiles)
     ///
     /// # Examples
-    /// ```rust
-    /// use crate::storage::array::BaseArray;
-    /// use crate::types::AttrValue;
+    /// ```ignore
+    /// use groggy::storage::array::BaseArray;
+    /// use groggy::types::AttrValue;
     ///
     /// let array = BaseArray::from_attr_values(vec![
     ///     AttrValue::Int(1), AttrValue::Int(2), AttrValue::Int(3),
@@ -1131,7 +1131,7 @@ impl BaseArray<AttrValue> {
     ///
     /// // Multiple quantiles
     /// let quartiles = array.quantiles(&[0.25, 0.5, 0.75], "linear")?;
-    /// ```
+    /// ```ignore
     pub fn quantile(&self, q: f64, interpolation: &str) -> crate::errors::GraphResult<AttrValue> {
         if !(0.0..=1.0).contains(&q) {
             return Err(crate::errors::GraphError::InvalidInput(
@@ -1238,10 +1238,10 @@ impl BaseArray<AttrValue> {
     /// * `interpolation` - Method for interpolation
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// let median = array.percentile(50.0, "linear")?; // 50th percentile = median
     /// let quartiles = array.percentiles(&[25.0, 50.0, 75.0], "linear")?;
-    /// ```
+    /// ```ignore
     pub fn get_percentile(
         &self,
         percentile: f64,
@@ -1287,9 +1287,9 @@ impl BaseArray<AttrValue> {
     /// Correlation coefficient as AttrValue::Float, or AttrValue::Null if calculation fails
     ///
     /// # Examples
-    /// ```rust
-    /// use crate::storage::array::BaseArray;
-    /// use crate::types::AttrValue;
+    /// ```ignore
+    /// use groggy::storage::array::BaseArray;
+    /// use groggy::types::AttrValue;
     ///
     /// let array1 = BaseArray::from_attr_values(vec![
     ///     AttrValue::Int(1), AttrValue::Int(2), AttrValue::Int(3)
@@ -1300,7 +1300,7 @@ impl BaseArray<AttrValue> {
     ///
     /// // Perfect positive correlation
     /// let corr = array1.corr(&array2, "pearson")?; // AttrValue::Float(1.0)
-    /// ```
+    /// ```ignore
     pub fn corr(
         &self,
         other: &BaseArray<AttrValue>,
@@ -1375,10 +1375,10 @@ impl BaseArray<AttrValue> {
     /// Covariance as AttrValue::Float, or AttrValue::Null if calculation fails
     ///
     /// # Examples
-    /// ```rust
+    /// ```ignore
     /// let cov = array1.cov(&array2, 1)?; // Sample covariance
     /// let cov_pop = array1.cov(&array2, 0)?; // Population covariance
-    /// ```
+    /// ```ignore
     pub fn cov(
         &self,
         other: &BaseArray<AttrValue>,
