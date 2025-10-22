@@ -11,8 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This release represents a fundamental transformation of Groggy from a graph library into a comprehensive graph analytics platform with visualization, the foundation for neural networks, and graph<->table operations.
 
-**Scale**: 444 files changed, +198,158 net lines of code, 78 commits
-
 ---
 
 ### ✨ Added
@@ -221,23 +219,6 @@ This release represents a fundamental transformation of Groggy from a graph libr
 
 ---
 
-### 📈 Statistics
-
-```
-Files changed: 444
-Lines added: 208,568
-Lines removed: 10,410
-Net addition: +198,158 lines
-
-Major components:
-- Visualization: ~25,000 lines
-- Storage layer: ~20,000 lines
-- Testing: ~15,000 lines
-- Type stubs: ~9,300 lines
-- Documentation: ~50,000 lines
-```
-
----
 
 ### 🚀 Upgrade Guide
 
