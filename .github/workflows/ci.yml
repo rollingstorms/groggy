@@ -41,6 +41,8 @@ jobs:
         pip install maturin pytest networkx pandas
     
     - name: Build and install
+      env:
+        PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
       run: |
         source .venv/bin/activate
         cd python-groggy
