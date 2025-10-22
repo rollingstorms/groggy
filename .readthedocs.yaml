@@ -13,7 +13,8 @@ build:
     post_install:
       # Install maturin and build the Rust extension
       - pip install maturin
-      - cd python-groggy && maturin develop --release
+      - cd python-groggy && maturin build --release
+      - pip install python-groggy/target/wheels/*.whl
 
 # Build documentation with MkDocs
 mkdocs:
