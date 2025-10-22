@@ -3,7 +3,7 @@ use crate::ffi::storage::subgraph_array::PySubgraphArray;
 use crate::ffi::storage::table_array::PyTableArray;
 use groggy::storage::array::{ArrayIterator, NumArray};
 use pyo3::prelude::*;
-use pyo3::types::PyFunction;
+use pyo3::types::PyAny;
 
 /// MatrixArray: Collection of GraphMatrix objects with delegation to NumArray
 /// Provides basic array operations plus statistical operations on matrix collections
@@ -206,7 +206,7 @@ impl PyMatrixArray {
     }
 
     /// Filter matrices using a Python predicate function
-    fn filter(&self, predicate: &PyFunction) -> PyResult<Self> {
+    fn filter(&self, predicate: &PyAny) -> PyResult<Self> {
         let mut filtered = Vec::new();
 
         Python::with_gil(|_py| {
@@ -365,7 +365,7 @@ impl PyMatrixArrayIterator {
     }
 
     /// Filter matrices using a Python predicate function
-    fn filter(&mut self, predicate: &PyFunction) -> PyResult<Self> {
+    fn filter(&mut self, predicate: &PyAny) -> PyResult<Self> {
         let elements = self.inner.clone().into_vec();
         let mut filtered = Vec::new();
 

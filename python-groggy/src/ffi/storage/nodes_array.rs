@@ -3,7 +3,7 @@ use crate::ffi::storage::table_array::PyTableArray;
 use crate::ffi::viz_accessor::VizAccessor;
 use groggy::storage::array::{ArrayIterator, BaseArray};
 use pyo3::prelude::*;
-use pyo3::types::PyFunction;
+use pyo3::types::PyAny;
 
 /// NodesArray: Collection of NodesAccessor objects with delegation to BaseArray
 /// Provides basic array operations and graph-specific transformations
@@ -107,7 +107,7 @@ impl PyNodesArray {
     }
 
     /// Filter NodesAccessor objects using a Python predicate function
-    fn filter(&self, predicate: &PyFunction) -> PyResult<Self> {
+    fn filter(&self, predicate: &PyAny) -> PyResult<Self> {
         let mut filtered = Vec::new();
 
         Python::with_gil(|_py| {
@@ -275,7 +275,7 @@ impl PyNodesArrayIterator {
     }
 
     /// Filter the iterator using a Python predicate function
-    fn filter(&mut self, predicate: &PyFunction) -> PyResult<Self> {
+    fn filter(&mut self, predicate: &PyAny) -> PyResult<Self> {
         let elements = self.inner.clone().into_vec();
         let mut filtered = Vec::new();
 
