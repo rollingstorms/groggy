@@ -1319,6 +1319,38 @@ Since builders let users specify function calls, we must restrict them:
 
 ## Open Questions & Future Extensions
 
+### Temporal Extensions
+
+**See [temporal-extensions-plan.md](temporal-extensions-plan.md) for detailed specification.**
+
+Treat the ChangeTracker history as a typed time-series by adding TemporalSnapshot handles that expose `graph.snapshot_at(commit_id|timestamp)` returning an immutable subgraph plus lineage metadata. Index history edges and attributes by commit time in GraphSpace so that `neighbors_bulk` and other columnar operations can take temporal selectors (`as_of`, `between`) without manual joins.
+
+Extend AlgorithmContext with a temporal scope (current commit, window bounds, compare-to snapshot) and helper methods like `ctx.delta(prev, cur)` that return columnar diffs. Add Rust steps for common temporal primitives—`diff_nodes`, `diff_edges`, `window_aggregate`, `temporal_filter`—so pipeline specs can compose temporal logic without bespoke kernels.
+
+Surface a Python builder shim (`step.snapshot(as_of=...)`, `step.diff(ref="prior")`) that serializes to those new steps, keeping the DSL intuitive. Document the temporal contract (snapshot immutability, window semantics, cost hints) so algorithm authors know how to leverage history consistently.
+
+### Experimental Algorithm Families
+
+We already have most of the plumbing to spin up several experimental families without rewriting the core; we just need a few focused primitives and registry entries:
+
+**Streaming/Incremental Updates** – Add `step.delta_apply` (consume ChangeTracker batches) and a lightweight IncrementalContext so we can prototype rolling centrality, incremental LPA, or online anomaly detection by reusing existing kernels on changed nodes only.
+
+**Structural Embeddings** – Register step primitives like `walk_sample`, `coalesce_neighbors`, and matrix ops (`step.sparse_mm`) to cover Node2Vec/DeepWalk-style pipelines; expose a Python facade that composes sampling → feature extraction → projection.
+
+**Motif & Pattern Mining** – Implement a reusable `step.enumerate_motifs(k)` over the columnar neighbor table and couple it with aggregation steps; this unlocks subgraph counting, triangle-based clustering coefficients, and frequent pattern discovery.
+
+**Graph Feature Engineering** – Offer columnar transforms (`step.encode_attr`, `step.normalize_degree`, `step.bin_numeric`) so feature pipelines for downstream ML can be authored entirely through DSL specs, then pushed into Rust for performance.
+
+**Temporal Analytics** – With the history hooks discussed above, add foundational steps (`step.diff`, `step.window_stat`) to support burst detection, churn scoring, or temporal community drift analyses.
+
+**Reachability & Flow** – Define queue-based primitives (`step.bfs_frontier`, `step.push_relabel`) that store frontier state in scratch columns; these cover breadth-first search variants, max-flow/min-cut sketches, and label reachability transforms.
+
+**Graph Sketches & Sampling** – Provide `step.sample_edges`/`reservoir_k` and `step.minhash_signature` for quick similarity estimates or approximate query pipelines; these keep experimentation cheap without full scans.
+
+**Explainability Hooks** – Add `step.trace_path` and `step.collect_evidence` that capture per-vertex contributions during algorithm execution, enabling prototypes of influence scoring or explanation graphs.
+
+Each bucket just needs a small set of reusable Rust "step" implementations plus DSL surface bindings, so we can iterate quickly while keeping execution in the core.
+
 ### Stateful Algorithms
 
 Some algorithms maintain state across invocations (e.g., incremental community detection). Consider:
