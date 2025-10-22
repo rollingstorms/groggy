@@ -1,6 +1,6 @@
 # Trait-Backed Delegation Architecture
 
-**Status**: Implemented in v0.5.0+
+**Status**: Implemented in v0.5.1+
 
 ---
 

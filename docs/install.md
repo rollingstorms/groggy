@@ -104,7 +104,7 @@ print(f"Groggy {gr.__version__} installed successfully!")
 
 Expected output:
 ```
-Groggy 0.5.0 installed successfully!
+Groggy 0.5.1 installed successfully!
 ```
 
 ---

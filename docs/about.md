@@ -141,7 +141,7 @@ Optimize for **bulk operations** over single-item loops:
 
 Groggy is under active development. The core architecture is stable, but the API is still evolving based on user feedback and real-world usage patterns.
 
-Current version: **0.5.0**
+Current version: **0.5.1**
 
 See the [changelog](https://github.com/rollingstorms/groggy/releases) for recent updates and the [roadmap](https://github.com/rollingstorms/groggy/milestones) for planned features.
 

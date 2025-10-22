@@ -5,7 +5,7 @@ All notable changes to Groggy will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2025-10-21
+## [0.5.1] - 2025-10-21
 
 ### 🎉 Release - Getting to a working state
 
@@ -279,7 +279,7 @@ The 198,000+ lines of additions establish Groggy as a serious platform for graph
 
 ### 🔗 Links
 
-- **Full Changelog**: https://github.com/rollingstorms/groggy/compare/v0.4.0...v0.5.0
+- **Full Changelog**: https://github.com/rollingstorms/groggy/compare/v0.4.0...v0.5.1
 - **Documentation**: https://groggy.readthedocs.io
 - **Issues**: https://github.com/rollingstorms/groggy/issues
 
@@ -329,7 +329,7 @@ Initial public release with core graph functionality.
 
 ---
 
-[0.5.0]: https://github.com/rollingstorms/groggy/compare/v0.4.0...v0.5.0
+[0.5.1]: https://github.com/rollingstorms/groggy/compare/v0.4.0...v0.5.1
 [0.4.0]: https://github.com/rollingstorms/groggy/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/rollingstorms/groggy/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/rollingstorms/groggy/compare/v0.2.0...v0.2.1

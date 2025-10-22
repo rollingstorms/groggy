@@ -120,7 +120,7 @@ if not _DISPLAY_AVAILABLE:
         shape = data.get('shape', (0, 0))
         return f"GraphTable(shape={shape})"
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 __all__ = [
     "Graph",
     "Subgraph",

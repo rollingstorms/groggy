@@ -15,8 +15,8 @@ Groggy's performance comes from:
 5. **Attribute-first design**: Fast filtering and queries on node/edge attributes
 6. **Explicit trait-backed delegation**: Direct PyO3 methods (100ns FFI budget) instead of dynamic lookups
 
-!!! info "Trait-Backed Delegation (v0.5.0+)"
-    Starting in v0.5.0, Groggy uses explicit PyO3 methods backed by Rust traits rather than dynamic `__getattr__` delegation. This provides:
+!!! info "Trait-Backed Delegation (v0.5.1+)"
+    Starting in v0.5.1, Groggy uses explicit PyO3 methods backed by Rust traits rather than dynamic `__getattr__` delegation. This provides:
     
     - **20x faster method calls**: ~100ns per FFI call vs ~2000ns for dynamic lookup
     - **Better IDE support**: All methods discoverable via autocomplete

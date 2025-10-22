@@ -16,7 +16,7 @@ Groggy is built as a three-layer architecture, with each layer having a specific
 ├────────────────────────────────────────────────────┤
 │                 FFI Bridge (PyO3)                  │
 │                                                    │
-│  • Trait-backed explicit methods (v0.5.0+)         │
+│  • Trait-backed explicit methods (v0.5.1+)         │
 │  • Type conversions (Python ↔ Rust)                │
 │  • Safe error handling and propagation             │
 │  • GIL management for parallelism                  │
@@ -204,8 +204,8 @@ pub fn pagerank(
 
 The translation layer between Python and Rust. Contains **no business logic**.
 
-!!! info "v0.5.0+ Architecture"
-    Starting in v0.5.0, the FFI layer uses **explicit trait-backed delegation** instead of dynamic attribute lookups. All methods are written explicitly in `#[pymethods]` blocks for discoverability and maintainability. See [Trait-Backed Delegation](trait-delegation.md) for details.
+!!! info "v0.5.1+ Architecture"
+    Starting in v0.5.1, the FFI layer uses **explicit trait-backed delegation** instead of dynamic attribute lookups. All methods are written explicitly in `#[pymethods]` blocks for discoverability and maintainability. See [Trait-Backed Delegation](trait-delegation.md) for details.
 
 ### Responsibilities
 
