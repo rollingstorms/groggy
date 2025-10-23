@@ -1391,6 +1391,7 @@ sg.apply(label_propagation(max_iter=5))
 - [ ] Architecture doc (this document) in `docs/`
 - [ ] API reference for Rust algorithms
 - [ ] Python API documentation
+- [ ] Python stubs
 - [ ] Tutorial: Using pre-built algorithms
 - [ ] Tutorial: Building custom algorithms
 - [ ] Migration guide from current API
