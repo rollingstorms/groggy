@@ -15,6 +15,19 @@ Groggy's algorithms fall into several categories:
 - **Community**: Community detection, clustering
 - **Spectral**: Eigenvalue-based methods
 
+### Running Algorithms
+
+You have three convenient ways to execute an algorithm:
+
+```python
+result = sg.apply(algo)                     # Subgraph.apply()
+result = gr.pipeline([algo1, algo2])(sg)    # Pipeline object
+result = gr.apply(sg, [algo1, algo2, ...])  # Convenience helper
+```
+
+For bespoke combinations you can also build a custom pipeline using the
+[Builder DSL](builder.md) and then call `sg.apply(custom_algo)`.
+
 ---
 
 ## Graph Traversal

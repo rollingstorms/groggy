@@ -90,6 +90,16 @@ Comprehensive tutorials with working examples:
   - Centrality measures
   - Community detection
 
+- **[pipeline.md](guide/pipeline.md)** - Pipeline API
+  - `Pipeline` objects
+  - `apply()` helper
+  - Subgraph.apply()
+
+- **[builder.md](guide/builder.md)** - Custom pipelines
+  - Builder DSL
+  - Step primitives
+  - Executing custom algorithms
+
 - **[neural.md](guide/neural.md)** - Neural networks
   - Graph embeddings
   - GNN integration
@@ -152,6 +162,9 @@ Complete method documentation for all objects:
   - Filtered views
   - Subgraph operations
   - Conversion methods
+
+- **[pipeline.md](api/pipeline.md)** - Pipeline and apply helpers
+- **[builder.md](api/builder.md)** - Builder DSL API
 
 - **[graphmatrix.md](api/graphmatrix.md)** - GraphMatrix class (93 methods)
   - Matrix operations

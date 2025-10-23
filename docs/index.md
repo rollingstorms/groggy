@@ -18,6 +18,14 @@ Install Groggy and build your first graph
 Comprehensive tutorials and examples
 → [User Guide](guide/graph-core.md)
 
+### :material-flowchart: Pipelines
+Compose and reuse algorithm sequences
+→ [Pipeline Guide](guide/pipeline.md)
+
+### :material-hammer-wrench: Builder DSL
+Compose custom pipelines that execute in Rust
+→ [Builder Guide](guide/builder.md)
+
 ### :material-api: API Reference
 Detailed API documentation with theory and examples
 → [API Reference](api/graph.md)

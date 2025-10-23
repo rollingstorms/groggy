@@ -214,6 +214,7 @@ The translation layer between Python and Rust. Contains **no business logic**.
 3. **Memory Safety**: Ensure safe cross-language boundaries
 4. **GIL Management**: Release GIL for long-running operations
 5. **Trait Delegation**: Route Python calls to shared Rust trait implementations
+6. **Builder Pipelines**: Execute JSON step specs through `builder.step_pipeline`
 
 ### Example FFI Binding (Modern Trait-Backed Approach)
 

@@ -1382,18 +1382,18 @@ sg.apply(label_propagation(max_iter=5))
 
 - [ ] Unit tests for all Python APIs
 - [ ] Integration tests with real graphs
-- [ ] Tests for builder DSL
+- [x] Tests for builder DSL
 - [ ] Performance regression tests
 - [ ] Cross-platform tests (Linux, macOS, Windows)
 
 #### 6.3 Documentation
 
-- [ ] Architecture doc (this document) in `docs/`
+- [x] Architecture doc (this document) in `docs/`
 - [ ] API reference for Rust algorithms
-- [ ] Python API documentation
-- [ ] Python stubs
-- [ ] Tutorial: Using pre-built algorithms
-- [ ] Tutorial: Building custom algorithms
+- [x] Python API documentation
+- [x] Python stubs
+- [x] Tutorial: Using pre-built algorithms
+- [x] Tutorial: Building custom algorithms
 - [ ] Migration guide from current API
 - [ ] Performance guide and best practices
 

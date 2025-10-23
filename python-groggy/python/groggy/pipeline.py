@@ -10,25 +10,34 @@ from groggy.algorithms.base import AlgorithmHandle
 def apply(subgraph, algorithm_or_pipeline):
     """
     Apply an algorithm or pipeline to a subgraph.
-    
-    Convenience function that creates and executes a pipeline in one call.
-    
+
+    This convenience helper accepts the same inputs as ``Subgraph.apply``:
+
+    * a single ``AlgorithmHandle`` (runs one algorithm)
+    * a list/tuple of handles (runs them sequentially)
+    * an existing ``Pipeline`` instance
+
     Args:
         subgraph: The subgraph to process
-        algorithm_or_pipeline: Either an AlgorithmHandle, a Pipeline, or a list of algorithms
-        
+        algorithm_or_pipeline: Algorithm handle, list of handles, or ``Pipeline``
+
     Returns:
         Processed subgraph with algorithm results
-        
+
     Example:
-        >>> from groggy import algorithms, apply
+        >>> from groggy import algorithms, builder, apply
         >>> result = apply(subgraph, algorithms.centrality.pagerank())
         >>>
-        >>> # Or with multiple algorithms
         >>> result = apply(subgraph, [
-        ...     algorithms.centrality.pagerank(),
-        ...     algorithms.community.lpa()
+        ...     algorithms.centrality.pagerank(max_iter=20, output_attr="pr"),
+        ...     algorithms.pathfinding.bfs(start_attr="is_start", output_attr="dist")
         ... ])
+        >>>
+        >>> b = builder("degree")
+        >>> nodes = b.init_nodes(default=0.0)
+        >>> b.attach_as("degree", b.node_degrees(nodes))
+        >>> custom = b.build()
+        >>> result = apply(subgraph, custom)
     """
     if isinstance(algorithm_or_pipeline, Pipeline):
         return algorithm_or_pipeline(subgraph)
@@ -54,14 +63,14 @@ class Pipeline:
     Example:
         >>> from groggy import pipeline
         >>> from groggy.algorithms import centrality, pathfinding
-        >>> 
+        >>>
         >>> pipe = pipeline([
-        ...     centrality.pagerank(max_iter=20),
-        ...     pathfinding.bfs(start_attr="is_start")
+        ...     centrality.pagerank(max_iter=20, output_attr="pr"),
+        ...     pathfinding.bfs(start_attr="is_start", output_attr="dist")
         ... ])
-        >>> result = subgraph.apply(pipe)
+        >>> result = subgraph.apply(pipe)     # fluent style
         >>> # Or equivalently:
-        >>> result = pipe(subgraph)
+        >>> result = pipe(subgraph)           # callable pipeline
     """
     
     def __init__(self, algorithms: List[Union[AlgorithmHandle, dict]]):
@@ -174,12 +183,11 @@ def pipeline(algorithms: List[Union[AlgorithmHandle, dict]]) -> Pipeline:
         Pipeline object ready to execute
         
     Example:
-        >>> from groggy import pipeline
-        >>> from groggy.algorithms import centrality
-        >>> 
+        >>> from groggy import pipeline, algorithms
+        >>>
         >>> pipe = pipeline([
-        ...     centrality.pagerank(max_iter=20),
-        ...     centrality.betweenness()
+        ...     algorithms.centrality.pagerank(max_iter=20, output_attr="pr"),
+        ...     algorithms.community.lpa(output_attr="community")
         ... ])
         >>> result = pipe(subgraph)
     """

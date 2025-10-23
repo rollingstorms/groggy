@@ -123,6 +123,19 @@ print(g.nodes["component"].head())
 # Number of components
 num_components = len(g.nodes["component"].unique())
 print(f"Graph has {num_components} component(s)")
+
+# Run multiple algorithms in one pass (PageRank + BFS)
+g.nodes.set_attrs({alice: {"is_start": True}})
+
+multi = gr.apply(
+    g.view(),
+    [
+        gr.algorithms.centrality.pagerank(output_attr="pr"),
+        gr.algorithms.pathfinding.bfs(start_attr="is_start", output_attr="dist"),
+    ],
+)
+
+print(multi.nodes.table()[["pr", "dist"]].head())
 ```
 
 ---
