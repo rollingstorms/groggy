@@ -279,15 +279,12 @@ groggy/
 │   ├── src/               # Rust-to-Python FFI layer  
 │   └── python/groggy/     # Python package code
 ├── docs/                  # Sphinx documentation (RST)
-├── documentation/         # Development docs (Markdown)
+├── notes/                 # Development docs (Markdown)
 │   ├── development/       # Development documentation  
 │   ├── planning/          # Architecture plans  
 │   ├── releases/          # Release notes
 │   └── examples/          # Usage examples
-├── tests/                 # Python validation and integration tests
-├── notebooks/             # Jupyter notebooks for testing/demos
-├── examples/              # Example code and demos
-└── benchmarks/            # Performance benchmarks
+└── tests/                 # Python validation and integration tests
 ```
 
 ### Building & Testing

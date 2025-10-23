@@ -1,18 +1,6 @@
-//! Python Module Registration
-//!
-//! This module handles registration of all Python classes and functions
-//! for the Groggy library.
-
 use pyo3::prelude::*;
 
-/// Register all classes and functions with the Python module
 #[allow(dead_code)]
-pub fn register_classes(_py: Python, _m: &PyModule) -> PyResult<()> {
-    // For now, return Ok - we'll add class registrations as we implement them
-    // Example:
-    // m.add_class::<PyGraph>()?;
-    // m.add_class::<PySubgraph>()?;
-    // m.add_class::<PyGraphArray>()?;
-
+pub fn register_submodules(_py: Python<'_>, _m: &PyModule) -> PyResult<()> {
     Ok(())
 }

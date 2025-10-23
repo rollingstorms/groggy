@@ -12,5 +12,6 @@ pub mod graph_attributes;
 pub mod graph_matrix;
 pub mod graph_query;
 pub mod graph_version;
+pub mod pipeline;
 
 // Re-export API FFI types

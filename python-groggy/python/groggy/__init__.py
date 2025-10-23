@@ -107,6 +107,13 @@ from .imports import (
     from_dict,
 )
 
+# Import algorithm and pipeline APIs (Phase 4)
+from .pipeline import pipeline, Pipeline, apply
+from . import algorithms
+
+# Import builder DSL (Phase 5)
+from .builder import builder, AlgorithmBuilder, VarHandle
+
 # Provide fallback functions if display module is not available
 if not _DISPLAY_AVAILABLE:
     def format_array(data):
@@ -209,6 +216,15 @@ __all__ = [
     "MetaNode",
     # Neural network module
     "neural",
+    # Algorithm and pipeline APIs (Phase 4)
+    "pipeline",
+    "Pipeline",
+    "apply",
+    "algorithms",
+    # Builder DSL (Phase 5)
+    "builder",
+    "AlgorithmBuilder",
+    "VarHandle",
 ]
 
 # Apply visualization capabilities to main data structures
@@ -240,6 +256,28 @@ def _setup_widget_environment():
 # _setup_widget_environment()  # DISABLED - uncomment to enable auto-loading
 
 # Viz accessors are now implemented directly in Rust FFI
+
+# Add convenience method to Subgraph for method chaining
+def _subgraph_apply(self, algorithm_or_pipeline):
+    """
+    Apply an algorithm or pipeline to this subgraph.
+    
+    Convenience method for fluent method chaining.
+    
+    Args:
+        algorithm_or_pipeline: AlgorithmHandle, Pipeline, or list of algorithms
+        
+    Returns:
+        Processed subgraph with algorithm results
+        
+    Example:
+        >>> result = sg.apply(algorithms.centrality.pagerank()).table()
+        >>> result = sg.apply([algo1, algo2, algo3]).viz.draw()
+    """
+    return apply(self, algorithm_or_pipeline)
+
+# Monkey-patch the method onto Subgraph
+Subgraph.apply = _subgraph_apply
 
 def _jupyter_labextension_paths():
     """

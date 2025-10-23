@@ -3,6 +3,9 @@
 //! Pure delegation to core Subgraph with ALL the same methods as the current PySubgraph.
 //! This replaces the 800+ line complex version with pure delegation to existing trait methods.
 
+use crate::ffi::api::pipeline::{
+    py_build_pipeline, py_drop_pipeline, py_run_pipeline, PyPipelineHandle,
+};
 use crate::ffi::storage::subgraph_array::PySubgraphArray;
 use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
@@ -12,7 +15,8 @@ use groggy::traits::{GraphEntity, NeighborhoodOperations, SubgraphOperations};
 use groggy::{AttrValue, EdgeId, NodeId, SimilarityMetric};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList, PyTuple};
+use pyo3::{PyCell, PyObject};
 use std::collections::HashSet;
 
 // Import FFI types we need to preserve compatibility
@@ -48,6 +52,81 @@ impl PySubgraph {
         Err(PyRuntimeError::new_err(
             "from_trait_object not yet implemented - use concrete Subgraph types",
         ))
+    }
+
+    fn try_apply_pipeline_object(
+        &self,
+        py: Python,
+        candidate: &PyAny,
+    ) -> PyResult<Option<PySubgraph>> {
+        if !(candidate.hasattr("_ensure_built")? && candidate.hasattr("_handle")?) {
+            return Ok(None);
+        }
+
+        candidate.call_method0("_ensure_built")?;
+        let handle_obj = candidate.getattr("_handle")?;
+        if handle_obj.is_none() {
+            return Err(PyRuntimeError::new_err(
+                "Pipeline could not be built for apply(); _handle is None",
+            ));
+        }
+
+        let result = {
+            let handle_cell: &PyCell<PyPipelineHandle> =
+                handle_obj.downcast().map_err(|_| {
+                    PyTypeError::new_err(
+                        "apply() expected pipeline._handle to be a PyPipelineHandle",
+                    )
+                })?;
+            let handle_ref = handle_cell.borrow();
+            py_run_pipeline(py, &handle_ref, self)?
+        };
+
+        Ok(Some(result))
+    }
+
+    fn algorithm_to_spec(py: Python, algo: &PyAny) -> PyResult<PyObject> {
+        if let Ok(dict) = algo.downcast::<PyDict>() {
+            return Ok(dict.into());
+        }
+
+        if algo.hasattr("to_spec")? {
+            let spec_any = algo.call_method0("to_spec")?;
+            if !spec_any.is_instance_of::<PyDict>() {
+                return Err(PyTypeError::new_err(
+                    "AlgorithmHandle.to_spec() must return a dict",
+                ));
+            }
+            return Ok(spec_any.into_py(py));
+        }
+
+        Err(PyTypeError::new_err(
+            "apply() expected an AlgorithmHandle or spec dict",
+        ))
+    }
+
+    fn collect_algorithm_specs(py: Python, candidate: &PyAny) -> PyResult<Vec<PyObject>> {
+        let mut specs = Vec::new();
+
+        if let Ok(list) = candidate.downcast::<PyList>() {
+            for item in list.iter() {
+                specs.push(Self::algorithm_to_spec(py, item)?);
+            }
+        } else if let Ok(tuple) = candidate.downcast::<PyTuple>() {
+            for item in tuple.iter() {
+                specs.push(Self::algorithm_to_spec(py, item)?);
+            }
+        } else {
+            specs.push(Self::algorithm_to_spec(py, candidate)?);
+        }
+
+        if specs.is_empty() {
+            return Err(PyTypeError::new_err(
+                "apply() requires at least one algorithm to execute",
+            ));
+        }
+
+        Ok(specs)
     }
 }
 
@@ -140,6 +219,29 @@ impl PySubgraph {
     /// Check if an edge exists in this subgraph
     fn has_edge(&self, edge_id: EdgeId) -> bool {
         self.inner.contains_edge(edge_id) // SubgraphOperations::contains_edge()
+    }
+
+    /// Apply algorithms or pipelines to produce a new subgraph with computed attributes.
+    ///
+    /// Supports three usage forms:
+    /// 1. `subgraph.apply(algorithm_handle)`
+    /// 2. `subgraph.apply([algo1, algo2, ...])`
+    /// 3. `subgraph.apply(pipeline.Pipeline([...]))`
+    pub fn apply(&self, py: Python, algorithm_or_pipeline: &PyAny) -> PyResult<PySubgraph> {
+        if let Some(result) = self.try_apply_pipeline_object(py, algorithm_or_pipeline)? {
+            return Ok(result);
+        }
+
+        let specs = Self::collect_algorithm_specs(py, algorithm_or_pipeline)?;
+        let spec_list = PyList::empty(py);
+        for spec in specs {
+            spec_list.append(spec)?;
+        }
+
+        let handle = py_build_pipeline(py, spec_list.as_ref())?;
+        let run_result = py_run_pipeline(py, &handle, self);
+        py_drop_pipeline(&handle);
+        run_result
     }
 
     // === Analysis Methods - delegate to SubgraphOperations ===

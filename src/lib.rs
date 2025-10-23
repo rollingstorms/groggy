@@ -140,7 +140,8 @@ pub mod errors;
 pub mod types;
 
 // Core functionality
-pub mod core; // Core data structures and algorithms
+pub mod algorithms;
+pub mod core; // Core data structures and algorithms // Algorithm runtime and pipeline system
 
 // Reorganized module structure
 pub mod entities; // Concrete entity implementations (Node, MetaNode, Edge, MetaEdge)

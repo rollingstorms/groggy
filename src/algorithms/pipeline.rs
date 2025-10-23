@@ -76,6 +76,7 @@ impl PipelineBuilder {
 
     /// Validate and instantiate the pipeline using the registry.
     pub fn build(self, registry: &Registry) -> Result<Pipeline> {
+        crate::algorithms::ensure_algorithms_registered();
         validate_specs(&self.specs, registry)?;
         let mut steps = Vec::with_capacity(self.specs.len());
 
@@ -226,7 +227,29 @@ mod tests {
     fn builder_validates_unknown_algorithm() {
         let registry = Registry::default();
         let builder = PipelineBuilder::new().with_algorithm("missing", |_| {});
-        let err = builder.build(&registry).unwrap_err();
+        let err = builder.build(&registry).err().expect("expected error");
         assert!(err.to_string().contains("unknown algorithm"));
+    }
+
+    #[test]
+    fn pipeline_spec_roundtrip() {
+        let spec = PipelineSpec {
+            steps: vec![AlgorithmSpec {
+                id: "demo".to_string(),
+                params: AlgorithmParams::new(),
+            }],
+        };
+        let json = serde_json::to_string(&spec).expect("serialize");
+        let decoded: PipelineSpec = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(decoded.steps.len(), 1);
+        assert_eq!(decoded.steps[0].id, "demo");
+    }
+
+    #[test]
+    fn validation_rejects_missing_identifier() {
+        let registry = Registry::default();
+        let builder = PipelineBuilder::new().with_algorithm("   ", |_| {});
+        let err = builder.build(&registry).err().expect("expected error");
+        assert!(err.to_string().contains("missing an identifier"));
     }
 }

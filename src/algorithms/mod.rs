@@ -7,14 +7,19 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::subgraphs::Subgraph;
+use crate::types::AttrValue;
 
+pub mod builder;
+pub mod centrality;
+pub mod community;
+pub mod pathfinding;
 pub mod pipeline;
 pub mod registry;
 pub mod steps;
@@ -22,9 +27,30 @@ pub mod steps;
 pub use pipeline::{AlgorithmSpec, Pipeline, PipelineBuilder, PipelineSpec};
 pub use registry::{global_registry, AlgorithmFactory, Registry};
 pub use steps::{
-    global_step_registry, register_core_steps, Step, StepMetadata, StepRegistry, StepScope,
-    StepSpec, StepValue,
+    ensure_core_steps_registered, global_step_registry, register_core_steps, Step, StepMetadata,
+    StepRegistry, StepScope, StepSpec, StepValue,
 };
+
+static ALGORITHMS_INIT: Once = Once::new();
+
+/// Ensure that all built-in algorithms and step primitives are registered.
+pub fn ensure_algorithms_registered() {
+    ensure_core_steps_registered();
+    ALGORITHMS_INIT.call_once(|| {
+        if let Err(err) = community::register_algorithms(global_registry()) {
+            panic!("failed to register core algorithms: {err}");
+        }
+        if let Err(err) = centrality::register_algorithms(global_registry()) {
+            panic!("failed to register centrality algorithms: {err}");
+        }
+        if let Err(err) = pathfinding::register_algorithms(global_registry()) {
+            panic!("failed to register pathfinding algorithms: {err}");
+        }
+        if let Err(err) = builder::register_algorithms(global_registry()) {
+            panic!("failed to register builder algorithms: {err}");
+        }
+    });
+}
 
 /// Performance classification for algorithms and primitive steps.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -159,6 +185,12 @@ impl AlgorithmParams {
         self.values.get(key)
     }
 
+    /// Require an integer parameter.
+    pub fn expect_int(&self, key: &str) -> Result<i64> {
+        self.get_int(key)
+            .ok_or_else(|| anyhow!("missing required integer parameter '{key}'"))
+    }
+
     /// Fetch an integer parameter if present.
     pub fn get_int(&self, key: &str) -> Option<i64> {
         match self.get(key) {
@@ -166,6 +198,12 @@ impl AlgorithmParams {
             Some(AlgorithmParamValue::Float(v)) => Some(*v as i64),
             _ => None,
         }
+    }
+
+    /// Require a float parameter.
+    pub fn expect_float(&self, key: &str) -> Result<f64> {
+        self.get_float(key)
+            .ok_or_else(|| anyhow!("missing required float parameter '{key}'"))
     }
 
     /// Fetch a float parameter if present.
@@ -177,12 +215,24 @@ impl AlgorithmParams {
         }
     }
 
+    /// Require a boolean parameter.
+    pub fn expect_bool(&self, key: &str) -> Result<bool> {
+        self.get_bool(key)
+            .ok_or_else(|| anyhow!("missing required boolean parameter '{key}'"))
+    }
+
     /// Fetch a boolean parameter if present.
     pub fn get_bool(&self, key: &str) -> Option<bool> {
         match self.get(key) {
             Some(AlgorithmParamValue::Bool(v)) => Some(*v),
             _ => None,
         }
+    }
+
+    /// Require a text parameter.
+    pub fn expect_text(&self, key: &str) -> Result<&str> {
+        self.get_text(key)
+            .ok_or_else(|| anyhow!("missing required text parameter '{key}'"))
     }
 
     /// Fetch a text parameter if present.
@@ -240,6 +290,38 @@ impl AlgorithmParamValue {
             AlgorithmParamValue::TextList(v) => Some(AttrValue::TextVec(v.clone())),
             AlgorithmParamValue::Json(v) => Some(AttrValue::Json(v.to_string())),
             AlgorithmParamValue::None => Some(AttrValue::Null),
+        }
+    }
+
+    /// Attempt to construct a parameter value from a graph attribute.
+    pub fn from_attr_value(value: AttrValue) -> Option<Self> {
+        match value {
+            AttrValue::Float(v) => Some(AlgorithmParamValue::Float(f64::from(v))),
+            AttrValue::Int(v) => Some(AlgorithmParamValue::Int(v)),
+            AttrValue::Bool(v) => Some(AlgorithmParamValue::Bool(v)),
+            AttrValue::Text(v) => Some(AlgorithmParamValue::Text(v)),
+            AttrValue::FloatVec(v) => Some(AlgorithmParamValue::FloatList(
+                v.into_iter().map(f64::from).collect(),
+            )),
+            AttrValue::IntVec(v) => Some(AlgorithmParamValue::IntList(v)),
+            AttrValue::TextVec(v) => Some(AlgorithmParamValue::TextList(v)),
+            AttrValue::BoolVec(v) => Some(AlgorithmParamValue::BoolList(v)),
+            AttrValue::CompactText(v) => Some(AlgorithmParamValue::Text(v.as_str().to_string())),
+            AttrValue::SmallInt(v) => Some(AlgorithmParamValue::Int(v as i64)),
+            AttrValue::Json(v) => serde_json::from_str::<serde_json::Value>(&v)
+                .ok()
+                .map(AlgorithmParamValue::Json),
+            AttrValue::CompressedText(data) => {
+                data.decompress_text().ok().map(AlgorithmParamValue::Text)
+            }
+            AttrValue::CompressedFloatVec(data) => data.decompress_float_vec().ok().map(|vals| {
+                AlgorithmParamValue::FloatList(vals.into_iter().map(f64::from).collect())
+            }),
+            AttrValue::Null => Some(AlgorithmParamValue::None),
+            AttrValue::Bytes(_)
+            | AttrValue::SubgraphRef(_)
+            | AttrValue::NodeArray(_)
+            | AttrValue::EdgeArray(_) => None,
         }
     }
 }
@@ -471,5 +553,20 @@ mod tests {
             val.as_attr_value(),
             Some(AttrValue::Text("hello".to_string()))
         );
+    }
+
+    #[test]
+    fn expect_helpers_validate_presence() {
+        let mut params = AlgorithmParams::new();
+        params.set_int("iters", 5);
+        params.set_float("alpha", 0.3);
+        params.set_bool("flag", true);
+        params.set_text("mode", "fast");
+
+        assert_eq!(params.expect_int("iters").unwrap(), 5);
+        assert!((params.expect_float("alpha").unwrap() - 0.3).abs() < f64::EPSILON);
+        assert_eq!(params.expect_bool("flag").unwrap(), true);
+        assert_eq!(params.expect_text("mode").unwrap(), "fast");
+        assert!(params.expect_int("missing").is_err());
     }
 }

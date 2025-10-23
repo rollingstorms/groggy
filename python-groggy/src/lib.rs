@@ -478,6 +478,11 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyGraphTable>()?; // Re-enabled for Phase 5 completion
                                     // m.add_class::<PyGroupBy>()?; // Still disabled
     m.add_class::<PyBaseTable>()?; // Re-enabled for Phase 5 completion
+
+    // Register pipeline submodule
+    let pipeline_mod = PyModule::new(py, "pipeline")?;
+    crate::ffi::api::pipeline::pipeline(py, pipeline_mod)?;
+    m.add_submodule(pipeline_mod)?;
     m.add_class::<PyNodesTable>()?; // Re-enabled for Phase 5 completion
     m.add_class::<PyEdgesTable>()?; // Re-enabled for Phase 5 completion
 
