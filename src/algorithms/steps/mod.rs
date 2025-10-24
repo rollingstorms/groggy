@@ -1148,7 +1148,7 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         |spec| {
             let output_var = spec.params.expect_text("output")?.to_string();
             let predicate_type = spec.params.expect_text("predicate")?;
-            
+
             let predicate = match predicate_type {
                 "created_after" => {
                     let commit = spec.params.expect_int("commit")? as u64;
@@ -1169,7 +1169,7 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 }
                 other => return Err(anyhow!("Unknown temporal predicate: {}", other)),
             };
-            
+
             Ok(Box::new(TemporalFilterStep::new(predicate, output_var)))
         },
     )?;

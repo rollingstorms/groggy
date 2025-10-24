@@ -23,6 +23,8 @@ pip install groggy
 
 ```python
 import groggy as gr
+from groggy.algorithms.centrality import pagerank
+from groggy.algorithms.community import label_propagation
 
 # Create a new graph
 g = gr.Graph()
@@ -46,8 +48,14 @@ younger_nodes = g.nodes[g.nodes["age"] < 30]
 # Run a graph algorithm
 g.connected_components(inplace=True, label='component')
 
+# Pipeline-style algorithms with g.apply()
+g.apply(pagerank(max_iter=10, output_attr="score"))
+print(g.nodes.table().sort_by("score").tail(10))
+
+g.apply(label_propagation(output_attr="label"))
+
 # Viz. the graph
-g.viz.show(node_color="component")
+g.viz.show(node_color="label")
 ```
 
 ## **A Little Graph Theory:**
@@ -263,28 +271,23 @@ print("groggy installed successfully! 🎉")
 ### Project Structure
 ```
 groggy/
-├── src/                   # Rust core library  
-│   ├── core/              # Core data structures and algorithms (with unit tests)
-│   ├── api/               # High-level graph API
-│   ├── display/           # Rich formatting and display
-│   ├── entities/          # GraphEntity system
-│   ├── query/             # Query and filtering
-│   ├── state/             # State management and history
-│   ├── storage/           # Columnar storage backend
-│   ├── subgraphs/         # Subgraph operations
-│   ├── traits/            # Core traits and interfaces
-│   ├── utils/             # Utilities and helpers
-│   └── viz/               # Visualization components
-├── python-groggy/         # Python bindings and package
-│   ├── src/               # Rust-to-Python FFI layer  
-│   └── python/groggy/     # Python package code
-├── docs/                  # Sphinx documentation (RST)
-├── notes/                 # Development docs (Markdown)
-│   ├── development/       # Development documentation  
-│   ├── planning/          # Architecture plans  
-│   ├── releases/          # Release notes
-│   └── examples/          # Usage examples
-└── tests/                 # Python validation and integration tests
+├── src/                          # Rust core library
+│   ├── algorithms/               # Algorithm registry, pipeline steps, builders
+│   ├── api/                      # High-level graph API surface
+│   ├── core/                     # Core data structures and engines
+│   ├── temporal/                 # Temporal snapshots, index, context helpers
+│   ├── viz/                      # Visualization adapters
+│   └── …                         # (query, storage, traits, utils, etc.)
+├── python-groggy/
+│   ├── src/ffi/                  # PyO3 FFI bindings (marshalling only)
+│   └── python/groggy/
+│       ├── algorithms/           # Python algorithm shims & DSL
+│       ├── builder.py            # Pipeline builder entry points
+│       ├── graph.py              # Graph facade over the Rust core
+│       └── …                     # Display helpers, viz, generators, widgets
+├── docs/                         # MkDocs documentation site
+├── notes/                        # Architecture plans, personas, experiments
+└── tests/                        # Python integration + cross-language suites
 ```
 
 ### Building & Testing

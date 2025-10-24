@@ -32,7 +32,7 @@ pub use steps::{
     StepRegistry, StepScope, StepSpec, StepValue,
 };
 pub use temporal::{
-    ChangedEntities, ChangeType, EdgeAttrChange, NodeAttrChange, TemporalDelta, TemporalMetadata,
+    ChangeType, ChangedEntities, EdgeAttrChange, NodeAttrChange, TemporalDelta, TemporalMetadata,
     TemporalScope,
 };
 
@@ -517,7 +517,8 @@ impl Context {
         prev: &crate::temporal::TemporalSnapshot,
         cur: &crate::temporal::TemporalSnapshot,
     ) -> Result<temporal::TemporalDelta> {
-        temporal::TemporalDelta::compute(prev, cur).map_err(|e| anyhow!("delta computation failed: {}", e))
+        temporal::TemporalDelta::compute(prev, cur)
+            .map_err(|e| anyhow!("delta computation failed: {}", e))
     }
 
     /// Get entities that changed within the current temporal scope's window.
@@ -556,7 +557,8 @@ impl Context {
                 {
                     entities.add_node(node_id, temporal::ChangeType::Created);
                 } else if !index.node_exists_at(node_id, commit_id)
-                    && (commit_id == 0 || index.node_exists_at(node_id, commit_id.saturating_sub(1)))
+                    && (commit_id == 0
+                        || index.node_exists_at(node_id, commit_id.saturating_sub(1)))
                 {
                     entities.add_node(node_id, temporal::ChangeType::Deleted);
                 } else {
@@ -571,7 +573,8 @@ impl Context {
                 {
                     entities.add_edge(edge_id, temporal::ChangeType::Created);
                 } else if !index.edge_exists_at(edge_id, commit_id)
-                    && (commit_id == 0 || index.edge_exists_at(edge_id, commit_id.saturating_sub(1)))
+                    && (commit_id == 0
+                        || index.edge_exists_at(edge_id, commit_id.saturating_sub(1)))
                 {
                     entities.add_edge(edge_id, temporal::ChangeType::Deleted);
                 } else {

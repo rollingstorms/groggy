@@ -455,18 +455,18 @@ mod tests {
     #[test]
     fn test_node_lifetime_tracking() {
         let mut index = TemporalIndex::new();
-        
+
         // Node 1 created at commit 5
         index.node_lifetime.insert(1, (5, None));
-        
+
         assert!(!index.node_exists_at(1, 4)); // Before creation
-        assert!(index.node_exists_at(1, 5));  // At creation
+        assert!(index.node_exists_at(1, 5)); // At creation
         assert!(index.node_exists_at(1, 10)); // After creation
-        
+
         // Node 1 deleted at commit 15
         index.node_lifetime.insert(1, (5, Some(15)));
-        
-        assert!(index.node_exists_at(1, 10));  // Before deletion
+
+        assert!(index.node_exists_at(1, 10)); // Before deletion
         assert!(!index.node_exists_at(1, 15)); // At deletion
         assert!(!index.node_exists_at(1, 20)); // After deletion
     }
@@ -476,7 +476,7 @@ mod tests {
         let mut index = TemporalIndex::new();
         let node_id = 1;
         let attr = "status".to_string();
-        
+
         // Add attribute changes
         let key = (node_id, attr.clone());
         index.node_attr_timeline.insert(
@@ -487,7 +487,7 @@ mod tests {
                 (15, AttrValue::Text("active".into())),
             ],
         );
-        
+
         // Query at different commits
         assert_eq!(
             index.node_attr_at_commit(node_id, &attr, 3),

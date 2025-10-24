@@ -71,6 +71,8 @@ Groggy takes this further: every node and edge can have attributes stored in an 
 # Remember: everything is a graph.
 
 import groggy as gr
+from groggy.algorithms.centrality import pagerank
+from groggy.algorithms.community import label_propagation
 
 # ───────────────────────────────────────────────
 # 1. Build a tiny graph
@@ -115,7 +117,15 @@ num_components = len(g.nodes["component"].unique())
 print(f"\nConnected components: {num_components}")
 
 # ───────────────────────────────────────────────
-# 5. Views → Array → Matrix
+# 5. Pipeline algorithms with g.apply()
+# ───────────────────────────────────────────────
+g.apply(pagerank(max_iter=10, output_attr="score"))
+print(g.nodes.table().sort_by("score").tail(10))
+
+g.apply(label_propagation(output_attr="label"))
+
+# ───────────────────────────────────────────────
+# 6. Views → Array → Matrix
 # ───────────────────────────────────────────────
 ages = g.nodes["age"]
 mean_age = ages.mean()
@@ -125,10 +135,10 @@ L = g.laplacian_matrix()
 print(f"Laplacian shape: {L.shape}")
 
 # ───────────────────────────────────────────────
-# 6. Viz → view the graph, color by computed attribute
+# 7. Viz → view the graph, color by computed attribute
 # ───────────────────────────────────────────────
 print("\nRendering visualization...")
-g.viz.show(node_color="component")
+g.viz.show(node_color="label")
 ```
 
 ---

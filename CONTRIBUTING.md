@@ -90,6 +90,40 @@ pytest tests/test_specific_feature.py
 cargo test specific_module
 ```
 
+## Continuous Integration & Deployment
+
+Groggy uses GitHub Actions to safeguard the project across languages:
+
+- `.github/workflows/test.yml` runs the full lint/test matrix. It enforces `cargo fmt -- --check`, `cargo clippy -- -D warnings`, `cargo test`, and builds/tests the Python extension on Ubuntu, macOS, and Windows for Python 3.8–3.12.
+- `.github/workflows/ci.yml` is a lighter Python regression sweep on pushes/PRs to `main`, rebuilding with Maturin and running `pytest tests/` for Python 3.8–3.12.
+- `.github/workflows/docs.yml` rebuilds the extension and publishes the MkDocs site when `main` updates.
+- `.github/workflows/publish.yml` produces release wheels/SDists for all supported targets and uploads them to PyPI on tagged releases.
+
+Knowing what CI enforces lets you mirror the same checks locally and avoid round-trips during review.
+
+### Pre-PR Checklist
+
+Run the commands below before pushing to ensure parity with CI and keep warnings out of review threads:
+
+```bash
+# Rust formatting, linting, and tests
+cargo fmt --all
+cargo clippy --all-targets -- -D warnings
+cargo check --all-features
+cargo test --all-targets
+
+# Rebuild the Python extension after Rust/FFI edits
+maturin develop --release
+
+# Python formatting and linting
+black .
+isort .
+pre-commit run --all-files
+
+# Python tests
+pytest tests -q
+```
+
 ## Submitting Changes
 
 ### Pull Request Process
