@@ -682,14 +682,14 @@ pipeline = (
 
 **Goal**: Efficient history-aware queries
 
-- [ ] Implement `TemporalIndex` structure
-- [ ] Build index from ChangeTracker history
-- [ ] Add `neighbors_at_commit` and `neighbors_between` to GraphSpace
-- [ ] Extend `node_attrs_history` for attribute timelines
-- [ ] Optimize index build for large histories (incremental updates)
-- [ ] FFI bindings for temporal selectors
-- [ ] Python API: `neighbors(as_of=...)`, `neighbors(between=...)`
-- [ ] Benchmarks for temporal queries vs. manual filtering
+- [x] Implement `TemporalIndex` structure
+- [x] Build index from ChangeTracker history
+- [x] Add `neighbors_at_commit` and `neighbors_between` to GraphSpace
+- [x] Extend `node_attrs_history` for attribute timelines
+- [x] Optimize index build for large histories (incremental updates)
+- [x] FFI bindings for temporal selectors
+- [x] Python API: `neighbors(as_of=...)`, `neighbors(between=...)`
+- [x] Benchmarks for temporal queries vs. manual filtering
 
 **Deliverable**: Columnar operations accept temporal selectors with <10% overhead vs. present-time queries.
 

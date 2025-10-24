@@ -123,6 +123,14 @@ impl TemporalSnapshot {
         &self.existence
     }
 
+    pub fn node_exists(&self, node_id: NodeId) -> bool {
+        self.existence.contains_node(node_id)
+    }
+
+    pub fn edge_exists(&self, edge_id: EdgeId) -> bool {
+        self.existence.contains_edge(edge_id)
+    }
+
     pub fn node_attr(&self, node_id: NodeId, attr: &AttrName) -> Option<AttrValue> {
         self.node_attributes
             .get(&node_id)

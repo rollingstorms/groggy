@@ -1,8 +1,8 @@
 use crate::ffi::subgraphs::subgraph::PySubgraph;
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::graph_error_to_py_err;
-use groggy::temporal::{ExistenceIndex, TemporalSnapshot};
-use groggy::types::{AttrName, EdgeId, NodeId};
+use groggy::temporal::{ExistenceIndex, IndexStatistics, TemporalIndex, TemporalSnapshot};
+use groggy::types::{AttrName, EdgeId, NodeId, StateId};
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
@@ -117,5 +117,225 @@ impl PyExistenceIndex {
 
     fn edges(&self) -> Vec<u64> {
         self.inner.edges().iter().map(|id| *id as u64).collect()
+    }
+}
+
+/// Python wrapper for TemporalIndex
+#[pyclass(name = "TemporalIndex", unsendable)]
+pub struct PyTemporalIndex {
+    pub inner: TemporalIndex,
+}
+
+#[pymethods]
+impl PyTemporalIndex {
+    fn node_exists_at(&self, node_id: u64, commit_id: u64) -> bool {
+        self.inner.node_exists_at(node_id as NodeId, commit_id as StateId)
+    }
+
+    fn edge_exists_at(&self, edge_id: u64, commit_id: u64) -> bool {
+        self.inner.edge_exists_at(edge_id as EdgeId, commit_id as StateId)
+    }
+
+    fn nodes_at_commit(&self, commit_id: u64) -> Vec<u64> {
+        self.inner
+            .nodes_at_commit(commit_id as StateId)
+            .into_iter()
+            .map(|id| id as u64)
+            .collect()
+    }
+
+    fn edges_at_commit(&self, commit_id: u64) -> Vec<u64> {
+        self.inner
+            .edges_at_commit(commit_id as StateId)
+            .into_iter()
+            .map(|id| id as u64)
+            .collect()
+    }
+
+    fn neighbors_at_commit(&self, node_id: u64, commit_id: u64) -> Vec<u64> {
+        self.inner
+            .neighbors_at_commit(node_id as NodeId, commit_id as StateId)
+            .into_iter()
+            .map(|id| id as u64)
+            .collect()
+    }
+
+    fn neighbors_bulk_at_commit(
+        &self,
+        nodes: Vec<u64>,
+        commit_id: u64,
+    ) -> HashMap<u64, Vec<u64>> {
+        let node_ids: Vec<NodeId> = nodes.iter().map(|id| *id as NodeId).collect();
+        self.inner
+            .neighbors_bulk_at_commit(&node_ids, commit_id as StateId)
+            .into_iter()
+            .map(|(node, neighbors)| {
+                (
+                    node as u64,
+                    neighbors.into_iter().map(|n| n as u64).collect(),
+                )
+            })
+            .collect()
+    }
+
+    fn neighbors_in_window(
+        &self,
+        node_id: u64,
+        start_commit: u64,
+        end_commit: u64,
+    ) -> Vec<u64> {
+        self.inner
+            .neighbors_in_window(
+                node_id as NodeId,
+                start_commit as StateId,
+                end_commit as StateId,
+            )
+            .into_iter()
+            .map(|id| id as u64)
+            .collect()
+    }
+
+    fn node_attr_at_commit(
+        &self,
+        node_id: u64,
+        attr: &str,
+        commit_id: u64,
+    ) -> Option<PyAttrValue> {
+        self.inner
+            .node_attr_at_commit(
+                node_id as NodeId,
+                &AttrName::from(attr.to_string()),
+                commit_id as StateId,
+            )
+            .map(PyAttrValue::new)
+    }
+
+    fn node_attr_history(
+        &self,
+        node_id: u64,
+        attr: &str,
+        from_commit: u64,
+        to_commit: u64,
+    ) -> Vec<(u64, PyAttrValue)> {
+        self.inner
+            .node_attr_history(
+                node_id as NodeId,
+                &AttrName::from(attr.to_string()),
+                from_commit as StateId,
+                to_commit as StateId,
+            )
+            .into_iter()
+            .map(|(cid, val)| (cid as u64, PyAttrValue::new(val)))
+            .collect()
+    }
+
+    fn edge_attr_at_commit(
+        &self,
+        edge_id: u64,
+        attr: &str,
+        commit_id: u64,
+    ) -> Option<PyAttrValue> {
+        self.inner
+            .edge_attr_at_commit(
+                edge_id as EdgeId,
+                &AttrName::from(attr.to_string()),
+                commit_id as StateId,
+            )
+            .map(PyAttrValue::new)
+    }
+
+    fn edge_attr_history(
+        &self,
+        edge_id: u64,
+        attr: &str,
+        from_commit: u64,
+        to_commit: u64,
+    ) -> Vec<(u64, PyAttrValue)> {
+        self.inner
+            .edge_attr_history(
+                edge_id as EdgeId,
+                &AttrName::from(attr.to_string()),
+                from_commit as StateId,
+                to_commit as StateId,
+            )
+            .into_iter()
+            .map(|(cid, val)| (cid as u64, PyAttrValue::new(val)))
+            .collect()
+    }
+
+    fn commits_in_time_range(&self, start_ts: u64, end_ts: u64) -> Vec<u64> {
+        self.inner
+            .commits_in_time_range(start_ts, end_ts)
+            .into_iter()
+            .map(|cid| cid as u64)
+            .collect()
+    }
+
+    fn nodes_changed_in_commit(&self, commit_id: u64) -> Vec<u64> {
+        self.inner
+            .nodes_changed_in_commit(commit_id as StateId)
+            .into_iter()
+            .map(|id| id as u64)
+            .collect()
+    }
+
+    fn edges_changed_in_commit(&self, commit_id: u64) -> Vec<u64> {
+        self.inner
+            .edges_changed_in_commit(commit_id as StateId)
+            .into_iter()
+            .map(|id| id as u64)
+            .collect()
+    }
+
+    fn statistics(&self) -> PyIndexStatistics {
+        PyIndexStatistics {
+            inner: self.inner.statistics(),
+        }
+    }
+}
+
+/// Python wrapper for IndexStatistics
+#[pyclass(name = "IndexStatistics")]
+#[derive(Clone)]
+pub struct PyIndexStatistics {
+    pub inner: IndexStatistics,
+}
+
+#[pymethods]
+impl PyIndexStatistics {
+    #[getter]
+    fn total_nodes(&self) -> usize {
+        self.inner.total_nodes
+    }
+
+    #[getter]
+    fn total_edges(&self) -> usize {
+        self.inner.total_edges
+    }
+
+    #[getter]
+    fn total_commits(&self) -> usize {
+        self.inner.total_commits
+    }
+
+    #[getter]
+    fn node_attr_timelines(&self) -> usize {
+        self.inner.node_attr_timelines
+    }
+
+    #[getter]
+    fn edge_attr_timelines(&self) -> usize {
+        self.inner.edge_attr_timelines
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "IndexStatistics(nodes={}, edges={}, commits={}, node_attr_timelines={}, edge_attr_timelines={})",
+            self.inner.total_nodes,
+            self.inner.total_edges,
+            self.inner.total_commits,
+            self.inner.node_attr_timelines,
+            self.inner.edge_attr_timelines
+        )
     }
 }

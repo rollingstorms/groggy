@@ -520,6 +520,8 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHistoryStatistics>()?;
     m.add_class::<ffi::temporal::PyTemporalSnapshot>()?;
     m.add_class::<ffi::temporal::PyExistenceIndex>()?;
+    m.add_class::<ffi::temporal::PyTemporalIndex>()?;
+    m.add_class::<ffi::temporal::PyIndexStatistics>()?;
     m.add_class::<PyHistoricalView>()?;
 
     // Register specialized entity types

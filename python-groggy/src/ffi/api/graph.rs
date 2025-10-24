@@ -10,6 +10,7 @@ use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 // Import all graph modules
@@ -1548,6 +1549,66 @@ impl PyGraph {
             .snapshot_at_timestamp(timestamp)
             .map_err(graph_error_to_py_err)?;
         Ok(PyTemporalSnapshot { inner: snapshot })
+    }
+
+    /// Build a temporal index from the graph history for efficient temporal queries.
+    ///
+    /// The temporal index provides O(log n) or better lookups for:
+    /// - When nodes/edges were created/deleted
+    /// - Which nodes/edges existed at any commit
+    /// - Attribute value timelines
+    /// - Neighbors at specific commits or within time windows
+    fn build_temporal_index(&self) -> PyResult<crate::ffi::temporal::PyTemporalIndex> {
+        let index = self
+            .inner
+            .borrow()
+            .build_temporal_index()
+            .map_err(graph_error_to_py_err)?;
+        Ok(crate::ffi::temporal::PyTemporalIndex { inner: index })
+    }
+
+    /// Get neighbors of nodes as they existed at a specific commit.
+    fn neighbors_at_commit(
+        &self,
+        node_ids: Vec<NodeId>,
+        commit_id: StateId,
+    ) -> PyResult<HashMap<NodeId, Vec<NodeId>>> {
+        self.inner
+            .borrow()
+            .neighbors_at_commit(&node_ids, commit_id)
+            .map_err(graph_error_to_py_err)
+    }
+
+    /// Get neighbors that existed at any point within a commit range.
+    fn neighbors_in_window(
+        &self,
+        node_id: NodeId,
+        start_commit: StateId,
+        end_commit: StateId,
+    ) -> PyResult<Vec<NodeId>> {
+        self.inner
+            .borrow()
+            .neighbors_in_window(node_id, start_commit, end_commit)
+            .map_err(graph_error_to_py_err)
+    }
+
+    /// Get attribute value history for a node within a commit range.
+    fn node_attr_history(
+        &self,
+        node_id: NodeId,
+        attr: &str,
+        from_commit: StateId,
+        to_commit: StateId,
+    ) -> PyResult<Vec<(StateId, PyAttrValue)>> {
+        let history = self
+            .inner
+            .borrow()
+            .node_attr_history(node_id, &attr.to_string(), from_commit, to_commit)
+            .map_err(graph_error_to_py_err)?;
+        Ok(history
+            .into_iter()
+            .map(|(cid, val)| (cid, PyAttrValue::new(val)))
+            .collect())
     }
 
     // === STATE METHODS ===

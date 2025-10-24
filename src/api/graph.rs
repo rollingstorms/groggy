@@ -2077,6 +2077,59 @@ impl Graph {
         TemporalSnapshot::at_timestamp(&self.history, timestamp)
     }
 
+    /// Build a temporal index from the history for efficient temporal queries.
+    ///
+    /// The temporal index provides O(log n) or better lookups for:
+    /// - When nodes/edges were created/deleted
+    /// - Which nodes/edges existed at any commit
+    /// - Attribute value timelines
+    /// - Neighbors at specific commits or within time windows
+    ///
+    /// This is a one-time build operation that processes all commits.
+    /// The resulting index can then be used for many temporal queries.
+    pub fn build_temporal_index(&self) -> Result<crate::temporal::TemporalIndex, GraphError> {
+        crate::temporal::TemporalIndex::from_history(&self.history)
+    }
+
+    /// Get neighbors of nodes as they existed at a specific commit.
+    ///
+    /// This uses a temporal index for efficient lookups. If you need to make many
+    /// temporal queries, build the index once with `build_temporal_index()` and
+    /// use it directly.
+    pub fn neighbors_at_commit(
+        &self,
+        node_ids: &[NodeId],
+        commit_id: StateId,
+    ) -> Result<HashMap<NodeId, Vec<NodeId>>, GraphError> {
+        let index = self.build_temporal_index()?;
+        Ok(index.neighbors_bulk_at_commit(node_ids, commit_id))
+    }
+
+    /// Get neighbors that existed at any point within a commit range.
+    pub fn neighbors_in_window(
+        &self,
+        node_id: NodeId,
+        start_commit: StateId,
+        end_commit: StateId,
+    ) -> Result<Vec<NodeId>, GraphError> {
+        let index = self.build_temporal_index()?;
+        Ok(index.neighbors_in_window(node_id, start_commit, end_commit))
+    }
+
+    /// Get attribute value history for a node within a commit range.
+    ///
+    /// Returns all attribute changes that occurred during [from_commit, to_commit].
+    pub fn node_attr_history(
+        &self,
+        node_id: NodeId,
+        attr: &AttrName,
+        from_commit: StateId,
+        to_commit: StateId,
+    ) -> Result<Vec<(StateId, AttrValue)>, GraphError> {
+        let index = self.build_temporal_index()?;
+        Ok(index.node_attr_history(node_id, attr, from_commit, to_commit))
+    }
+
     /// Compare two commits and show differences
     pub fn diff_commits(&self, from: StateId, to: StateId) -> Result<CommitDiff, GraphError> {
         let _ = (from, to); // Silence unused parameter warning
