@@ -23,12 +23,17 @@ pub mod pathfinding;
 pub mod pipeline;
 pub mod registry;
 pub mod steps;
+pub mod temporal;
 
 pub use pipeline::{AlgorithmSpec, Pipeline, PipelineBuilder, PipelineSpec};
 pub use registry::{global_registry, AlgorithmFactory, Registry};
 pub use steps::{
     ensure_core_steps_registered, global_step_registry, register_core_steps, Step, StepMetadata,
     StepRegistry, StepScope, StepSpec, StepValue,
+};
+pub use temporal::{
+    ChangedEntities, ChangeType, EdgeAttrChange, NodeAttrChange, TemporalDelta, TemporalMetadata,
+    TemporalScope,
 };
 
 static ALGORITHMS_INIT: Once = Once::new();
@@ -393,6 +398,7 @@ pub struct Context {
     iteration_events: Vec<IterationEvent>,
     active_step: Option<ActiveStep>,
     cancel_token: Option<Arc<AtomicBool>>,
+    temporal_scope: Option<temporal::TemporalScope>,
 }
 
 impl Context {
@@ -405,6 +411,14 @@ impl Context {
     pub fn with_cancel_token(token: Arc<AtomicBool>) -> Self {
         Self {
             cancel_token: Some(token),
+            ..Self::default()
+        }
+    }
+
+    /// Create a context with a temporal scope.
+    pub fn with_temporal_scope(scope: temporal::TemporalScope) -> Self {
+        Self {
+            temporal_scope: Some(scope),
             ..Self::default()
         }
     }
@@ -475,6 +489,98 @@ impl Context {
     /// Provide external visibility into the cancellation token.
     pub fn cancel_token(&self) -> Option<Arc<AtomicBool>> {
         self.cancel_token.as_ref().map(Arc::clone)
+    }
+
+    // === TEMPORAL EXTENSIONS ===
+
+    /// Get the current temporal scope, if set.
+    pub fn temporal_scope(&self) -> Option<&temporal::TemporalScope> {
+        self.temporal_scope.as_ref()
+    }
+
+    /// Set or update the temporal scope for this context.
+    pub fn set_temporal_scope(&mut self, scope: temporal::TemporalScope) {
+        self.temporal_scope = Some(scope);
+    }
+
+    /// Clear the temporal scope.
+    pub fn clear_temporal_scope(&mut self) {
+        self.temporal_scope = None;
+    }
+
+    /// Compute the delta between two temporal snapshots.
+    ///
+    /// This is a convenience method that wraps TemporalDelta::compute,
+    /// allowing algorithms to easily compare snapshots during execution.
+    pub fn delta(
+        &self,
+        prev: &crate::temporal::TemporalSnapshot,
+        cur: &crate::temporal::TemporalSnapshot,
+    ) -> Result<temporal::TemporalDelta> {
+        temporal::TemporalDelta::compute(prev, cur).map_err(|e| anyhow!("delta computation failed: {}", e))
+    }
+
+    /// Get entities that changed within the current temporal scope's window.
+    ///
+    /// This uses the TemporalIndex to identify all nodes and edges that
+    /// were created, deleted, or modified within the time window defined
+    /// by the temporal scope.
+    ///
+    /// Returns an error if no temporal scope with a window is set, or if
+    /// the index is not provided.
+    pub fn changed_entities(
+        &self,
+        index: &crate::temporal::TemporalIndex,
+    ) -> Result<temporal::ChangedEntities> {
+        let scope = self
+            .temporal_scope
+            .as_ref()
+            .ok_or_else(|| anyhow!("no temporal scope set"))?;
+
+        let (start, end) = scope
+            .window
+            .ok_or_else(|| anyhow!("temporal scope has no window defined"))?;
+
+        let mut entities = temporal::ChangedEntities::empty();
+
+        // Get all commits in the window
+        for commit_id in start..=end {
+            let changed_nodes = index.nodes_changed_in_commit(commit_id);
+            let changed_edges = index.edges_changed_in_commit(commit_id);
+
+            // For each changed node/edge, determine the change type
+            for node_id in changed_nodes {
+                // Check if created or deleted at this commit
+                if index.node_exists_at(node_id, commit_id)
+                    && !index.node_exists_at(node_id, commit_id.saturating_sub(1))
+                {
+                    entities.add_node(node_id, temporal::ChangeType::Created);
+                } else if !index.node_exists_at(node_id, commit_id)
+                    && (commit_id == 0 || index.node_exists_at(node_id, commit_id.saturating_sub(1)))
+                {
+                    entities.add_node(node_id, temporal::ChangeType::Deleted);
+                } else {
+                    entities.add_node(node_id, temporal::ChangeType::AttributeModified);
+                }
+            }
+
+            for edge_id in changed_edges {
+                // Similar logic for edges
+                if index.edge_exists_at(edge_id, commit_id)
+                    && !index.edge_exists_at(edge_id, commit_id.saturating_sub(1))
+                {
+                    entities.add_edge(edge_id, temporal::ChangeType::Created);
+                } else if !index.edge_exists_at(edge_id, commit_id)
+                    && (commit_id == 0 || index.edge_exists_at(edge_id, commit_id.saturating_sub(1)))
+                {
+                    entities.add_edge(edge_id, temporal::ChangeType::Deleted);
+                } else {
+                    entities.add_edge(edge_id, temporal::ChangeType::AttributeModified);
+                }
+            }
+        }
+
+        Ok(entities)
     }
 }
 

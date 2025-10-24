@@ -339,3 +339,204 @@ impl PyIndexStatistics {
         )
     }
 }
+
+// === Temporal Context Types ===
+
+use groggy::algorithms::{ChangedEntities, TemporalDelta, TemporalScope};
+
+/// Python wrapper for TemporalScope
+#[pyclass(name = "TemporalScope", unsendable)]
+#[derive(Clone)]
+pub struct PyTemporalScope {
+    pub inner: TemporalScope,
+}
+
+#[pymethods]
+impl PyTemporalScope {
+    #[new]
+    fn new(current_commit: u64, window: Option<(u64, u64)>) -> Self {
+        let scope = if let Some((start, end)) = window {
+            TemporalScope::with_window(current_commit, start, end)
+        } else {
+            TemporalScope::at_commit(current_commit)
+        };
+        Self { inner: scope }
+    }
+
+    #[getter]
+    fn current_commit(&self) -> u64 {
+        self.inner.current_commit
+    }
+
+    #[getter]
+    fn window(&self) -> Option<(u64, u64)> {
+        self.inner.window
+    }
+
+    fn has_window(&self) -> bool {
+        self.inner.has_window()
+    }
+
+    fn has_reference(&self) -> bool {
+        self.inner.has_reference()
+    }
+
+    fn window_size(&self) -> Option<usize> {
+        self.inner.window_size()
+    }
+
+    fn with_metadata(mut slf: PyRefMut<Self>, key: String, value: String) -> PyRefMut<Self> {
+        slf.inner = slf.inner.clone().with_metadata(key, value);
+        slf
+    }
+
+    fn __repr__(&self) -> String {
+        if let Some((start, end)) = self.inner.window {
+            format!(
+                "TemporalScope(commit={}, window=({}, {}))",
+                self.inner.current_commit, start, end
+            )
+        } else {
+            format!("TemporalScope(commit={})", self.inner.current_commit)
+        }
+    }
+}
+
+/// Python wrapper for TemporalDelta
+#[pyclass(name = "TemporalDelta")]
+#[derive(Clone)]
+pub struct PyTemporalDelta {
+    pub inner: TemporalDelta,
+}
+
+#[pymethods]
+impl PyTemporalDelta {
+    #[getter]
+    fn from_commit(&self) -> u64 {
+        self.inner.from_commit
+    }
+
+    #[getter]
+    fn to_commit(&self) -> u64 {
+        self.inner.to_commit
+    }
+
+    #[getter]
+    fn nodes_added(&self) -> Vec<u64> {
+        self.inner.nodes_added.iter().map(|id| *id as u64).collect()
+    }
+
+    #[getter]
+    fn nodes_removed(&self) -> Vec<u64> {
+        self.inner
+            .nodes_removed
+            .iter()
+            .map(|id| *id as u64)
+            .collect()
+    }
+
+    #[getter]
+    fn edges_added(&self) -> Vec<u64> {
+        self.inner.edges_added.iter().map(|id| *id as u64).collect()
+    }
+
+    #[getter]
+    fn edges_removed(&self) -> Vec<u64> {
+        self.inner
+            .edges_removed
+            .iter()
+            .map(|id| *id as u64)
+            .collect()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    fn summary(&self) -> String {
+        self.inner.summary()
+    }
+
+    fn affected_nodes(&self) -> Vec<u64> {
+        self.inner
+            .affected_nodes()
+            .into_iter()
+            .map(|id| id as u64)
+            .collect()
+    }
+
+    fn affected_edges(&self) -> Vec<u64> {
+        self.inner
+            .affected_edges()
+            .into_iter()
+            .map(|id| id as u64)
+            .collect()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "TemporalDelta(commits={}→{}, {})",
+            self.inner.from_commit,
+            self.inner.to_commit,
+            self.inner.summary()
+        )
+    }
+}
+
+/// Python wrapper for ChangedEntities
+#[pyclass(name = "ChangedEntities")]
+#[derive(Clone)]
+pub struct PyChangedEntities {
+    pub inner: ChangedEntities,
+}
+
+#[pymethods]
+impl PyChangedEntities {
+    #[getter]
+    fn modified_nodes(&self) -> Vec<u64> {
+        self.inner
+            .modified_nodes
+            .iter()
+            .map(|id| *id as u64)
+            .collect()
+    }
+
+    #[getter]
+    fn modified_edges(&self) -> Vec<u64> {
+        self.inner
+            .modified_edges
+            .iter()
+            .map(|id| *id as u64)
+            .collect()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    fn total_changes(&self) -> usize {
+        self.inner.total_changes()
+    }
+
+    fn node_change_type(&self, node_id: u64) -> Option<String> {
+        self.inner
+            .node_change_types
+            .get(&(node_id as NodeId))
+            .map(|ct| format!("{:?}", ct))
+    }
+
+    fn edge_change_type(&self, edge_id: u64) -> Option<String> {
+        self.inner
+            .edge_change_types
+            .get(&(edge_id as EdgeId))
+            .map(|ct| format!("{:?}", ct))
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "ChangedEntities(nodes={}, edges={})",
+            self.inner.modified_nodes.len(),
+            self.inner.modified_edges.len()
+        )
+    }
+}

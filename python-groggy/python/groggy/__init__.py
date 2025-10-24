@@ -130,6 +130,9 @@ if not _DISPLAY_AVAILABLE:
 __version__ = "0.5.1"
 TemporalSnapshot = _groggy.TemporalSnapshot
 ExistenceIndex = _groggy.ExistenceIndex
+TemporalScope = _groggy.TemporalScope
+TemporalDelta = _groggy.TemporalDelta
+ChangedEntities = _groggy.ChangedEntities
 
 __all__ = [
     "Graph",
@@ -228,8 +231,12 @@ __all__ = [
     "builder",
     "AlgorithmBuilder",
     "VarHandle",
+    # Temporal extensions
     "TemporalSnapshot",
     "ExistenceIndex",
+    "TemporalScope",
+    "TemporalDelta",
+    "ChangedEntities",
 ]
 
 # Apply visualization capabilities to main data structures

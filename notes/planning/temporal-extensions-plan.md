@@ -251,6 +251,14 @@ history = g.nodes[42].attr["status"].history(from_commit=start, to_commit=end)
 attrs = g.nodes.bulk_attrs("status", as_of=commit_id)
 ```
 
+#### Incremental Index Optimization Strategy
+
+We avoid full replays when new commits land by streaming them through `TemporalIndex::apply_commit`. The ChangeTracker pushes batches of `EntityDelta` events, which we fold into the in-memory lifetime maps and attribute timelines. We keep a `dirty_range` marker so consumers know the index is authoritative through the latest applied commit; on restart we hydrate from the persisted snapshot and then replay only the trailing commits. A background task coalesces GC notifications into compact range removals so the index never drifts from the pruned history.
+
+#### FFI Bindings
+
+The temporal selector entry points are surfaced via `python-groggy/src/ffi/temporal.rs`, exposing `graph_snapshot_at`, `graph_neighbors_at_commit`, and `graph_neighbors_between`. Each wrapper converts `PyAny` arguments into either commit IDs or timestamps, funnels them through the Rust helpers above, and translates `TemporalIndexError` into Python `TemporalSelectorError`. Expensive calls release the GIL with `py.allow_threads(|| ...)`, and the resulting handles are exported through `python-groggy/python/groggy/_temporal.pyi` so the high-level API stays type hinted.
+
 ### 3. AlgorithmContext Temporal Extensions
 
 Extend the algorithm execution context with temporal scope and helper methods.
@@ -697,13 +705,13 @@ pipeline = (
 
 **Goal**: Temporal scope and delta helpers in algorithm context
 
-- [ ] Add `TemporalScope` to `Context`
-- [ ] Implement `ctx.delta(prev, cur)` helper
-- [ ] Add `ctx.changed_entities(window)` helper
-- [ ] Extend pipeline builder to set temporal scope
-- [ ] FFI bindings for context temporal methods
-- [ ] Python API: `ctx.temporal_scope`, `ctx.delta(...)`
-- [ ] Tests for temporal context in algorithms
+- [x] Add `TemporalScope` to `Context`
+- [x] Implement `ctx.delta(prev, cur)` helper
+- [x] Add `ctx.changed_entities(window)` helper
+- [x] Extend pipeline builder to set temporal scope
+- [x] FFI bindings for context temporal methods
+- [x] Python API: `ctx.temporal_scope`, `ctx.delta(...)`
+- [x] Tests for temporal context in algorithms
 
 **Deliverable**: Algorithms can access temporal metadata and compute diffs within pipeline execution.
 
