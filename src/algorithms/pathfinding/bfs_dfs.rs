@@ -118,10 +118,7 @@ impl Algorithm for BfsTraversal {
         let mut attrs = HashMap::new();
         attrs.insert(
             self.output_attr.clone(),
-            distances
-                .into_iter()
-                .map(|(node, value)| (node, value))
-                .collect::<Vec<_>>(),
+            distances.into_iter().collect::<Vec<_>>(),
         );
         subgraph
             .set_node_attrs(attrs)

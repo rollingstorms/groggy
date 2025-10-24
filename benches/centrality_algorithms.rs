@@ -47,7 +47,7 @@ fn bench_betweenness(c: &mut Criterion) {
         b.iter_batched(
             || build_chain(64),
             |subgraph| {
-                let algo = BetweennessCentrality::new(true, "bc".into());
+                let algo = BetweennessCentrality::new(true, None, "bc".into());
                 let mut ctx = Context::new();
                 let _ = algo.execute(&mut ctx, subgraph).unwrap();
             },
@@ -63,7 +63,7 @@ fn bench_closeness(c: &mut Criterion) {
         b.iter_batched(
             || build_chain(64),
             |subgraph| {
-                let algo = ClosenessCentrality::new(true, "cc".into());
+                let algo = ClosenessCentrality::new(true, None, "cc".into());
                 let mut ctx = Context::new();
                 let _ = algo.execute(&mut ctx, subgraph).unwrap();
             },

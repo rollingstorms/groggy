@@ -96,7 +96,7 @@ impl LabelPropagation {
             let label = if let Some(seed_attr) = &self.seed_attr {
                 graph
                     .get_node_attr(node, seed_attr)?
-                    .unwrap_or_else(|| AttrValue::Int(node as i64))
+                    .unwrap_or(AttrValue::Int(node as i64))
             } else {
                 AttrValue::Int(node as i64)
             };
@@ -121,7 +121,7 @@ impl LabelPropagation {
             let label = labels
                 .get(neighbor)
                 .cloned()
-                .unwrap_or_else(|| AttrValue::Int(*neighbor as i64));
+                .unwrap_or(AttrValue::Int(*neighbor as i64));
             *counts.entry(label).or_insert(0) += 1;
         }
 
@@ -168,7 +168,7 @@ impl LabelPropagation {
                 let current = labels
                     .get(&node)
                     .cloned()
-                    .unwrap_or_else(|| AttrValue::Int(node as i64));
+                    .unwrap_or(AttrValue::Int(node as i64));
                 let candidate = self.dominant_label(&neighbors, &labels, &current);
                 if candidate != current {
                     updates += 1;

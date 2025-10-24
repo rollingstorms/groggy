@@ -114,7 +114,8 @@ impl Algorithm for Louvain {
 
         let epsilon = 1e-6;
 
-        for phase in 0..self.max_phases {
+        if self.max_phases > 0 {
+            let phase = 0;
             let phase_start = Instant::now();
             let mut improved = false;
             for _ in 0..self.max_iter {
@@ -170,15 +171,25 @@ impl Algorithm for Louvain {
             );
 
             if !improved {
-                break;
+                // No improvement in this phase – early exit.
+                return self.persist_partition(subgraph, partition);
             }
 
             // NOTE: Full Louvain contracts communities between phases. To keep phase 2 scoped,
             // we stop after the first improvement phase. Additional phases would require
             // graph aggregation which is slated for later roadmap steps.
-            break;
         }
 
+        self.persist_partition(subgraph, partition)
+    }
+}
+
+impl Louvain {
+    fn persist_partition(
+        &self,
+        subgraph: Subgraph,
+        partition: HashMap<NodeId, usize>,
+    ) -> Result<Subgraph> {
         let mut attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>> = HashMap::new();
         attrs.insert(
             self.output_attr.clone(),

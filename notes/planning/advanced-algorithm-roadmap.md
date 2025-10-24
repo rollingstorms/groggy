@@ -1,5 +1,13 @@
 # Advanced Algorithm Roadmap
 
+> **📌 Note**: This document has been split into separate phase files for better organization.
+> 
+> **See**: [`advanced-algorithms/README.md`](advanced-algorithms/README.md) for the restructured documentation.
+> 
+> This file is preserved for reference but may be outdated. Refer to the individual phase files for the most current planning.
+
+---
+
 ## 🎯 Vision & Scope
 
 This roadmap expands Groggy beyond the v0.5 foundations, layering in temporal analytics, advanced
@@ -46,89 +54,35 @@ is out of scope for this roadmap.
 - ✅ 304/304 Rust tests passing, 69/69 Python tests passing
 
 **In Progress**
-- 🚧 Temporal extensions (see `temporal-extensions-plan.md`)
+- 🚧 Temporal extensions (see `temporal-extensions-plan.md` - separate planning document)
 - 🚧 Visualization streaming architecture (see `viz_module/`)
 
 **Upcoming (This Roadmap)**
 - ⏭️ Expanded builder step primitives (Phase 1)
-- ⏭️ Additional algorithm categories (Phases 2-5)
-- ⏭️ Builder / pipeline meta-infrastructure (Phase 6)
-- ⏭️ Testing, benchmarking, and documentation (Phase 7)
+- ⏭️ Additional algorithm categories (Phases 2-4)
+- ⏭️ Builder / pipeline meta-infrastructure (Phase 5)
+- ⏭️ Testing, benchmarking, and documentation (Phase 6)
 
 ---
 
-## Phase 0 – Temporal Foundations
+## Note on Temporal Extensions
 
-**Status**: Detailed planning complete (see `temporal-extensions-plan.md`)  
-**Timeline**: 8-9 weeks  
-**Dependencies**: None (builds on existing ChangeTracker)
+Temporal extensions are documented separately in `temporal-extensions-plan.md` due to their complexity and scope. That plan covers:
+- TemporalSnapshot and ExistenceIndex infrastructure
+- TemporalIndex for efficient history queries
+- AlgorithmContext temporal extensions
+- Temporal algorithm steps (diff, window aggregation, filtering)
+- Integration with existing systems
+- Full implementation roadmap (8-9 weeks)
 
-### Objectives
+This roadmap focuses on expanding the non-temporal algorithm catalog and builder infrastructure.
 
-Transform ChangeTracker history into queryable time-series data through immutable snapshots,
-temporal indexes, and composable temporal algorithm steps.
-
-### Key Deliverables
-
-- [ ] **TemporalSnapshot**: Immutable views into graph state at specific commit/timestamp
-- [ ] **ExistenceIndex**: Fast node/edge membership checks at historical points
-- [ ] **LineageMetadata**: Parent commits, merge info, author tracking
-- [ ] **TemporalIndex**: Efficient history queries via lifetime tracking and commit timelines
-- [ ] **GraphSpace temporal selectors**: `neighbors_at_commit`, `neighbors_between`, `attr_history`
-- [ ] **AlgorithmContext extensions**: Temporal scope, delta helpers, change detection
-- [ ] **Temporal algorithm steps**: `diff_nodes`, `window_aggregate`, `temporal_filter`
-- [ ] **Python snapshot API**: `g.snapshot_at(commit|timestamp)`, temporal builder DSL
-- [ ] **Integration tests**: Snapshot creation, delta computation, temporal pipelines
-- [ ] **Documentation**: Temporal contract, best practices, use case examples
-
-### Success Metrics
-
-- Snapshot creation < 100ms for 1M node graphs with 10K commits
-- Temporal query overhead < 10% vs present-time equivalent
-- Delta computation < 50ms for typical snapshots (10K changes)
-- Window aggregation < 1s for 100K nodes over 100-commit window
-
-### Use Cases Enabled
-
-- Burst detection (sudden activity spikes)
-- Community drift analysis (stability over time)
-- Churn scoring (attribute volatility)
-- Temporal reachability (paths at historical points)
-- Change impact analysis
-
-### Implementation Phases
-
-**Phase 0.1: Core Snapshot Infrastructure (2-3 weeks)**
-- TemporalSnapshot struct with existence indexing
-- `snapshot_at(commit_id)` and `snapshot_at(timestamp)` APIs
-- FFI bindings and Python wrapper
-
-**Phase 0.2: Temporal Index (2 weeks)**
-- TemporalIndex structure with lifetime tracking
-- Columnar temporal selectors in GraphSpace
-- Benchmark temporal queries vs manual filtering
-
-**Phase 0.3: AlgorithmContext Extensions (1-2 weeks)**
-- TemporalScope in Context
-- Delta and change detection helpers
-- FFI bindings for temporal context methods
-
-**Phase 0.4: Temporal Algorithm Steps (2 weeks)**
-- Implement diff, window aggregate, temporal filter steps
-- Python builder shims
-- Integration tests and examples
-
-**Phase 0.5: Documentation & Polish (1 week)**
-- Temporal extensions guide
-- Tutorial notebooks
-- Performance tuning guide
-
-See `temporal-extensions-plan.md` for detailed specifications.
+---
 
 ## Phase 1 – Builder Core Extensions
 
 **Timeline**: 4-6 weeks  
-**Dependencies**: Phase 0 (temporal foundations)
+**Dependencies**: None (can run in parallel with temporal work)
 
 ### Objectives
 
@@ -1077,12 +1031,12 @@ walks = sg.apply(random_walk(
 
 ---
 
-## Phase 5 – New Algorithm Categories
+## New Algorithm Categories (Phases 4A-4D)
 
-This phase introduces entirely new algorithm families, expanding Groggy's capabilities beyond
+These phases introduce entirely new algorithm families, expanding Groggy's capabilities beyond
 traditional community/centrality/pathfinding.
 
-### Phase 5A: Decomposition (Spectral & Factorization)
+### Phase 4A: Decomposition (Spectral & Factorization)
 
 **Timeline**: 6-8 weeks  
 **Dependencies**: Linear algebra library (nalgebra or faer)
@@ -1165,7 +1119,7 @@ Create `src/algorithms/decomposition/` with shared primitives:
 **Notes**: Many depend on external sparse linear algebra. Consider `nalgebra` or `faer`. Benchmark
 eigensolvers carefully (Lanczos convergence, memory usage).
 
-### Phase 5B: Transform (Normalization & Rewriting)
+### Phase 4B: Transform (Normalization & Rewriting)
 
 **Timeline**: 3-4 weeks  
 **Dependencies**: Phase 1 (builder primitives)
@@ -1207,14 +1161,14 @@ Graph transformations: normalization, sampling, projection, and structural rewir
 
 **Notes**: Many are simple transformations. Focus on correct semantics and builder integration.
 
-### Phase 5C: Temporal (Dynamic Graphs)
+### Phase 4C: Temporal (Dynamic Graphs)
 
 **Timeline**: 4-5 weeks  
-**Dependencies**: Phase 0 (temporal foundations)
+**Dependencies**: Temporal Extensions Plan (see `temporal-extensions-plan.md`)
 
 #### Objectives
 
-Temporal variants of standard algorithms, leveraging snapshot and window infrastructure.
+Temporal variants of standard algorithms, leveraging snapshot and window infrastructure from the temporal extensions plan.
 
 #### Algorithms
 
@@ -1241,7 +1195,7 @@ Temporal variants of standard algorithms, leveraging snapshot and window infrast
 **Notes**: Most reuse standard algorithms with temporal scope in Context. Focus on correct window
 semantics and delta handling.
 
-### Phase 5D: Statistical (Graph Measures & Models)
+### Phase 4D: Statistical (Graph Measures & Models)
 
 **Timeline**: 3-4 weeks  
 **Dependencies**: Phase 5A (decomposition for some metrics)
@@ -1279,10 +1233,10 @@ Graph-level statistics, similarity measures, generative models, and entropy metr
 
 **Notes**: Some overlap with community metrics. Centralize where possible.
 
-## Phase 6 – Builder / Pipeline Meta Infrastructure
+## Phase 5 – Builder / Pipeline Meta Infrastructure
 
 **Timeline**: 3-4 weeks  
-**Dependencies**: Phases 1-5 (algorithms using infrastructure)
+**Dependencies**: Phases 1-4 (algorithms using infrastructure)
 
 ### Objectives
 
@@ -1556,7 +1510,7 @@ result = sg.apply(temporal_filter(created_after="2024-01-01"))  # Type preserved
 
 ---
 
-## Phase 7 – Carryover Tasks (Testing, Documentation, Polish)
+## Phase 6 – Carryover Tasks (Testing, Documentation, Polish)
 
 **Timeline**: Ongoing throughout other phases, 2-3 weeks for final polish  
 **Dependencies**: All previous phases
@@ -1880,34 +1834,36 @@ and examples. Address technical debt and polish rough edges.
 ### Gantt Chart (Approximate)
 
 ```
-Phase 0 (Temporal):           [========] (8-9 weeks)
-Phase 1 (Builder Primitives):     [======] (4-6 weeks) - After Phase 0
-Phase 2 (Community):                  [========] (6-8 weeks) - After Phase 1
-Phase 3 (Centrality):                 [======] (4-6 weeks) - After Phase 1
-Phase 4 (Pathfinding):                [=====] (4-5 weeks) - After Phase 1
-Phase 5A (Decomposition):                [========] (6-8 weeks) - After Phase 1
-Phase 5B (Transform):                        [====] (3-4 weeks) - After Phase 1
-Phase 5C (Temporal Algos):                   [=====] (4-5 weeks) - After Phase 0
-Phase 5D (Statistical):                          [====] (3-4 weeks) - After Phase 5A
-Phase 6 (Meta Infra):                                [====] (3-4 weeks) - After Phase 1-5
-Phase 7 (Polish):                [===================================] (Ongoing)
-                                                           [===] (2-3 weeks final)
+Phase 1 (Builder Primitives): [======] (4-6 weeks) - Can start immediately
+Phase 2 (Community):              [========] (6-8 weeks) - After Phase 1
+Phase 3 (Centrality):             [======] (4-6 weeks) - After Phase 1
+Phase 4 (Pathfinding):            [=====] (4-5 weeks) - After Phase 1
+Phase 4A (Decomposition):            [========] (6-8 weeks) - After Phase 1
+Phase 4B (Transform):                    [====] (3-4 weeks) - After Phase 1
+Phase 4C (Temporal Algos):               [=====] (4-5 weeks) - After Temporal Plan
+Phase 4D (Statistical):                      [====] (3-4 weeks) - After Phase 4A
+Phase 5 (Meta Infra):                            [====] (3-4 weeks) - After Phase 1-4
+Phase 6 (Polish):            [===================================] (Ongoing)
+                                                       [===] (2-3 weeks final)
 
-Total: ~30-40 weeks (7-10 months)
+Temporal Extensions (see temporal-extensions-plan.md): [=========] (8-9 weeks, parallel)
+
+Total: ~30-40 weeks (7-10 months) excluding temporal work
 ```
 
 ### Critical Path
 
-1. **Phase 0** (Temporal) is prerequisite for Phase 5C
-2. **Phase 1** (Builder) is prerequisite for Phases 2-5
-3. **Phase 5A** (Decomposition) is prerequisite for Phase 5D and some Phase 2 algorithms
-4. **Phase 7** (Polish) runs concurrently, with final push at end
+1. **Temporal Extensions** run in parallel (see separate plan)
+2. **Phase 1** (Builder) is prerequisite for Phases 2-4
+3. **Phase 4A** (Decomposition) is prerequisite for Phase 4D and some Phase 2 algorithms
+4. **Phase 6** (Polish) runs concurrently, with final push at end
 
 ### Parallelization Opportunities
 
+- Phase 1 can start immediately alongside temporal work
 - Phases 2, 3, 4 can run in parallel after Phase 1 completes
-- Phase 5A-5D can be staggered with partial dependencies
-- Phase 7 tasks distributed throughout (testing, docs as features land)
+- Phase 4A-4D can be staggered with partial dependencies
+- Phase 6 tasks distributed throughout (testing, docs as features land)
 
 ---
 
@@ -1915,16 +1871,16 @@ Total: ~30-40 weeks (7-10 months)
 
 ### Technical Risks
 
-**Risk**: Linear algebra dependencies (Phase 5A) introduce complexity  
+**Risk**: Linear algebra dependencies (Phase 4A) introduce complexity  
 **Mitigation**: Evaluate `nalgebra`, `faer`, and `ndarray` early. Choose based on performance and API ergonomics. Consider optional feature flags.
 
-**Risk**: Builder DSL becomes too complex (Phase 1, 6)  
+**Risk**: Builder DSL becomes too complex (Phase 1, 5)  
 **Mitigation**: Keep primitives simple and composable. Provide high-level macros for common patterns. Gather user feedback early.
 
-**Risk**: FFI overhead grows with more complex types (Phase 6)  
+**Risk**: FFI overhead grows with more complex types (Phase 5)  
 **Mitigation**: Benchmark marshalling costs. Use zero-copy where possible. Profile and optimize hot paths.
 
-**Risk**: Test suite execution time becomes prohibitive (Phase 7)  
+**Risk**: Test suite execution time becomes prohibitive (Phase 6)  
 **Mitigation**: Parallelize tests. Use test categorization (unit, integration, slow). Run full suite in CI, subset locally.
 
 ### Resource Risks
@@ -1978,9 +1934,13 @@ Beyond this roadmap, these families could be explored:
 ## 📝 Conclusion
 
 This roadmap transforms Groggy from a solid foundation (v0.5.0) into a comprehensive graph analytics
-platform. By layering temporal capabilities, expanding the algorithm catalog, and maturing the
-builder/pipeline infrastructure, we enable users to tackle complex graph problems without leaving
-Python or sacrificing performance.
+platform. By expanding the algorithm catalog, maturing the builder/pipeline infrastructure, and
+maintaining rigorous testing and documentation standards, we enable users to tackle complex graph
+problems without leaving Python or sacrificing performance.
+
+**Note**: Temporal analytics capabilities are documented separately in `temporal-extensions-plan.md`.
+This roadmap focuses on expanding the core algorithm library and builder primitives to support
+a wide range of graph analysis workflows.
 
 ### Key Principles Maintained
 
@@ -1995,16 +1955,17 @@ Python or sacrificing performance.
 If this roadmap succeeds, users will:
 - Reach for Groggy instead of NetworkX/igraph for performance-critical workflows
 - Compose custom algorithms without touching Rust
-- Analyze temporal graphs naturally (snapshots, diffs, windows)
+- Leverage temporal analytics for dynamic graph analysis (via separate temporal extensions)
 - Trust Groggy for production workloads (reliability, performance, documentation)
 
 ### Next Steps
 
-1. **Finalize Phase 0** (Temporal) as first major feature
-2. **Expand Phase 1** (Builder primitives) to support advanced compositions
-3. **Incrementally add algorithms** (Phases 2-5) based on user demand
-4. **Continuous polish** (Phase 7) throughout, not just at end
-5. **Gather feedback** from early adopters, adjust priorities
+1. **Begin Phase 1** (Builder primitives) as foundation for algorithm expansion
+2. **Incrementally add algorithms** (Phases 2-4) based on user demand
+3. **Develop meta-infrastructure** (Phase 5) as algorithm catalog grows
+4. **Continuous polish** (Phase 6) throughout, not just at end
+5. **Coordinate with temporal work** (see `temporal-extensions-plan.md`)
+6. **Gather feedback** from early adopters, adjust priorities
 
 This is an ambitious but achievable roadmap. By following the established patterns, maintaining
 discipline around architecture boundaries, and shipping incrementally, we can deliver each phase

@@ -565,7 +565,7 @@ mod tests {
 
         assert_eq!(params.expect_int("iters").unwrap(), 5);
         assert!((params.expect_float("alpha").unwrap() - 0.3).abs() < f64::EPSILON);
-        assert_eq!(params.expect_bool("flag").unwrap(), true);
+        assert!(params.expect_bool("flag").unwrap());
         assert_eq!(params.expect_text("mode").unwrap(), "fast");
         assert!(params.expect_int("missing").is_err());
     }

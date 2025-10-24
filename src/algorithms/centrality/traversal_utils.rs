@@ -21,8 +21,9 @@ pub fn bfs_shortest_paths(
         let dist = distances[&node];
         if let Ok(neighbors) = subgraph.neighbors(node) {
             for neighbor in neighbors {
-                if !distances.contains_key(&neighbor) {
-                    distances.insert(neighbor, dist + 1);
+                if let std::collections::hash_map::Entry::Vacant(entry) = distances.entry(neighbor)
+                {
+                    entry.insert(dist + 1);
                     queue.push_back(neighbor);
                 }
                 if distances[&neighbor] == dist + 1 {
