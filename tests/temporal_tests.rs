@@ -1,4 +1,3 @@
-
 use groggy::{AttrValue, Graph};
 
 #[test]

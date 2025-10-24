@@ -52,7 +52,9 @@ g.connected_components(inplace=True, label='component')
 g.apply(pagerank(max_iter=10, output_attr="score"))
 print(g.nodes.table().sort_by("score").tail(10))
 
-g.apply(label_propagation(output_attr="label"))
+# Run another algorithm - Label Propagation
+g.apply(label_propagation(max_iter=10, output_attr="label"))
+print("Number of Communities Found:", g.nodes["label"].nunique())
 
 # Viz. the graph
 g.viz.show(node_color="label")
