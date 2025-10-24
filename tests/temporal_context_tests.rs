@@ -53,7 +53,7 @@ fn test_context_delta_computation() {
     assert_eq!(delta.nodes_added.len(), 1);
     assert!(delta.nodes_added.contains(&node_c));
     assert_eq!(delta.nodes_removed.len(), 0);
-    assert!(delta.edges_added.len() >= 1); // At least the new edge
+    assert!(!delta.edges_added.is_empty()); // At least the new edge
 }
 
 #[test]
@@ -67,9 +67,13 @@ fn test_context_changed_entities() {
 
     // Make changes
     graph
-        .set_node_attr(node_a, "status".to_string(), AttrValue::Text("active".into()))
+        .set_node_attr(
+            node_a,
+            "status".to_string(),
+            AttrValue::Text("active".into()),
+        )
         .unwrap();
-    let commit2 = graph.commit("v2".to_string(), "test".to_string()).unwrap();
+    let _commit2 = graph.commit("v2".to_string(), "test".to_string()).unwrap();
 
     let node_c = graph.add_node();
     let commit3 = graph.commit("v3".to_string(), "test".to_string()).unwrap();
@@ -125,7 +129,10 @@ fn test_temporal_scope_with_metadata() {
         scope.metadata.tags.get("analysis_type"),
         Some(&"drift".to_string())
     );
-    assert_eq!(scope.metadata.tags.get("user"), Some(&"analyst".to_string()));
+    assert_eq!(
+        scope.metadata.tags.get("user"),
+        Some(&"analyst".to_string())
+    );
 }
 
 #[test]

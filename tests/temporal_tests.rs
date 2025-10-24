@@ -1,4 +1,4 @@
-use groggy::temporal::TemporalSnapshot;
+
 use groggy::{AttrValue, Graph};
 
 #[test]
@@ -91,7 +91,9 @@ fn test_temporal_index_from_graph_history() {
         .set_node_attr(node_b, "label".to_string(), AttrValue::Text("B".into()))
         .unwrap();
 
-    let commit1 = graph.commit("Initial graph".to_string(), "tester".to_string()).unwrap();
+    let commit1 = graph
+        .commit("Initial graph".to_string(), "tester".to_string())
+        .unwrap();
 
     // Add more nodes and modify attributes
     let node_c = graph.add_node();
@@ -99,19 +101,31 @@ fn test_temporal_index_from_graph_history() {
         .set_node_attr(node_c, "label".to_string(), AttrValue::Text("C".into()))
         .unwrap();
     graph
-        .set_node_attr(node_a, "status".to_string(), AttrValue::Text("active".into()))
+        .set_node_attr(
+            node_a,
+            "status".to_string(),
+            AttrValue::Text("active".into()),
+        )
         .unwrap();
 
     let _edge_bc = graph.add_edge(node_b, node_c).unwrap();
 
-    let commit2 = graph.commit("Added node C".to_string(), "tester".to_string()).unwrap();
+    let commit2 = graph
+        .commit("Added node C".to_string(), "tester".to_string())
+        .unwrap();
 
     // Modify attribute
     graph
-        .set_node_attr(node_a, "status".to_string(), AttrValue::Text("inactive".into()))
+        .set_node_attr(
+            node_a,
+            "status".to_string(),
+            AttrValue::Text("inactive".into()),
+        )
         .unwrap();
 
-    let commit3 = graph.commit("Changed status".to_string(), "tester".to_string()).unwrap();
+    let commit3 = graph
+        .commit("Changed status".to_string(), "tester".to_string())
+        .unwrap();
 
     // Build temporal index
     let index = graph.build_temporal_index().unwrap();
@@ -131,13 +145,13 @@ fn test_temporal_index_from_graph_history() {
 
     // Test attribute timeline - use the temporal index for attribute queries
     // Note: Snapshot attribute reconstruction has a known issue, so we use the index directly
-    let status_at_commit2 = index.node_attr_at_commit(node_a, &"status".to_string(), commit2);
-    // The index tracks only explicit changes, so we verify the change was tracked
-    assert!(status_at_commit2.is_some() || true); // Status was set at commit2
+    let _status_at_commit2 = index.node_attr_at_commit(node_a, &"status".to_string(), commit2);
+    // The index tracks only explicit changes
+    // TODO: Add proper attribute value assertions when reconstruction is fixed
 
-    let status_at_commit3 = index.node_attr_at_commit(node_a, &"status".to_string(), commit3);
+    let _status_at_commit3 = index.node_attr_at_commit(node_a, &"status".to_string(), commit3);
     // At commit3, status should reflect the latest change
-    assert!(status_at_commit3.is_some() || true);
+    // TODO: Add proper attribute value assertions when reconstruction is fixed
 
     // Test neighbor queries
     let neighbors_commit1 = index.neighbors_at_commit(node_b, commit1);
@@ -180,14 +194,18 @@ fn test_nodes_changed_in_commit() {
     let node_b = graph.add_node();
     let _edge_ab = graph.add_edge(node_a, node_b).unwrap();
 
-    let commit1 = graph.commit("Initial".to_string(), "test".to_string()).unwrap();
+    let commit1 = graph
+        .commit("Initial".to_string(), "test".to_string())
+        .unwrap();
 
     // Modify only node A
     graph
         .set_node_attr(node_a, "changed".to_string(), AttrValue::Int(1))
         .unwrap();
 
-    let commit2 = graph.commit("Changed A".to_string(), "test".to_string()).unwrap();
+    let commit2 = graph
+        .commit("Changed A".to_string(), "test".to_string())
+        .unwrap();
 
     let index = graph.build_temporal_index().unwrap();
 
@@ -226,6 +244,8 @@ fn test_graph_api_temporal_methods() {
     let neighbors_window = graph.neighbors_in_window(node_a, commit1, commit2).unwrap();
     assert_eq!(neighbors_window.len(), 1);
 
-    let history = graph.node_attr_history(node_a, &"status".to_string(), commit1, commit2).unwrap();
+    let history = graph
+        .node_attr_history(node_a, &"status".to_string(), commit1, commit2)
+        .unwrap();
     assert_eq!(history.len(), 2);
 }

@@ -7,18 +7,13 @@
 //! - Tracking entity lifecycles
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 
-use crate::algorithms::temporal::{ChangedEntities, TemporalDelta, TemporalScope};
 use crate::algorithms::{AlgorithmParamValue, Context, CostHint};
-use crate::subgraphs::Subgraph;
-use crate::temporal::{TemporalIndex, TemporalSnapshot};
-use crate::traits::SubgraphOperations;
-use crate::types::{EdgeId, NodeId, StateId};
+use crate::types::StateId;
 
-use super::{Step, StepMetadata, StepScope, StepValue};
+use super::{Step, StepMetadata, StepScope};
 
 /// Compute differences between two temporal snapshots and store results.
 ///
@@ -30,6 +25,7 @@ use super::{Step, StepMetadata, StepScope, StepValue};
 /// - `<prefix>_nodes_removed`: NodeMap marking removed nodes (value=1)
 /// - `<prefix>_edges_added`: EdgeMap marking added edges (value=1)
 /// - `<prefix>_edges_removed`: EdgeMap marking removed edges (value=1)
+#[allow(dead_code)] // Fields are placeholders for future full implementation
 pub struct DiffNodesStep {
     /// Variable name containing the "before" snapshot (or use context ref)
     before_var: Option<String>,
@@ -81,7 +77,7 @@ impl Step for DiffNodesStep {
         // We need a "current" snapshot to compare against
         // This would typically come from the subgraph's current state
         // For now, we'll create placeholder outputs
-        
+
         let nodes_added = HashMap::new();
         let nodes_removed = HashMap::new();
 
@@ -98,6 +94,7 @@ impl Step for DiffNodesStep {
 }
 
 /// Compute edge differences between temporal snapshots.
+#[allow(dead_code)] // Fields are placeholders for future full implementation
 pub struct DiffEdgesStep {
     before_var: Option<String>,
     after_var: Option<String>,
@@ -160,6 +157,7 @@ impl Step for DiffEdgesStep {
 /// - "avg": Average numeric values
 /// - "min": Minimum value
 /// - "max": Maximum value
+#[allow(dead_code)] // Fields used in placeholder implementation
 pub struct WindowAggregateStep {
     /// Name of the node attribute to aggregate
     attr_name: String,
@@ -183,6 +181,10 @@ pub enum AggregateFunction {
 }
 
 impl AggregateFunction {
+    /// Parse aggregation function from string name.
+    /// This is intentionally not implementing FromStr trait to avoid confusion
+    /// with standard library trait and keep it as an explicit construction method.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
             "count" => Ok(Self::Count),
@@ -196,6 +198,7 @@ impl AggregateFunction {
         }
     }
 
+    #[allow(dead_code)] // Used in tests, will be used when steps are fully implemented
     fn apply(&self, values: &[(StateId, AlgorithmParamValue)]) -> Result<AlgorithmParamValue> {
         if values.is_empty() {
             return Ok(AlgorithmParamValue::None);
@@ -244,6 +247,7 @@ impl AggregateFunction {
 }
 
 /// Helper function to convert AlgorithmParamValue to f64
+#[allow(dead_code)] // Used by apply method which is tested
 fn to_float(val: &AlgorithmParamValue) -> Result<f64> {
     match val {
         AlgorithmParamValue::Int(i) => Ok(*i as f64),
@@ -314,6 +318,7 @@ impl Step for WindowAggregateStep {
 /// - Lifetime (creation to deletion span)
 /// - Change frequency (number of modifications)
 /// - Activity window (active during specific time range)
+#[allow(dead_code)] // Predicate used in future full implementation
 pub struct TemporalFilterStep {
     /// Predicate to apply
     predicate: TemporalPredicate,
@@ -353,11 +358,7 @@ impl TemporalFilterStep {
         Self::new(TemporalPredicate::ExistedAt(commit), output_var)
     }
 
-    pub fn modified_in_range(
-        start: StateId,
-        end: StateId,
-        output_var: impl Into<String>,
-    ) -> Self {
+    pub fn modified_in_range(start: StateId, end: StateId, output_var: impl Into<String>) -> Self {
         Self::new(TemporalPredicate::ModifiedInRange(start, end), output_var)
     }
 }
@@ -395,6 +396,7 @@ impl Step for TemporalFilterStep {
 ///
 /// This step uses the temporal index to identify nodes that were
 /// created, deleted, or had attributes modified within a specified window.
+#[allow(dead_code)] // change_type used in future full implementation
 pub struct MarkChangedNodesStep {
     /// Output variable name
     output_var: String,
