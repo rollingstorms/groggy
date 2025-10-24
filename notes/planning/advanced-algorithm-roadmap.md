@@ -58,7 +58,7 @@ is out of scope for this roadmap.
 - 🚧 Visualization streaming architecture (see `viz_module/`)
 
 **Upcoming (This Roadmap)**
-- ⏭️ Expanded builder step primitives (Phase 1)
+- ✅ Expanded builder step primitives plan finalized (Phase 1)
 - ⏭️ Additional algorithm categories (Phases 2-4)
 - ⏭️ Builder / pipeline meta-infrastructure (Phase 5)
 - ⏭️ Testing, benchmarking, and documentation (Phase 6)
@@ -268,6 +268,8 @@ Beyond individual steps, Phase 1 includes infrastructure for step management:
 - <10ms for complex operations (k_core, triangle_count) on 10K nodes
 - Zero FFI marshaling overhead for in-place operations
 - Clear error messages (90%+ user comprehension without docs)
+
+> **Status**: Phase 1 design scope locked. Implementation tasks remain open and will be tracked in execution milestones.
 
 ### Example: Custom PageRank with Builder
 
@@ -2238,4 +2240,3 @@ Before submitting:
 - [ ] Memory management correct (no leaks)
 
 ---
-

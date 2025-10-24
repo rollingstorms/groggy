@@ -348,6 +348,15 @@ impl HistoryForest {
         commits
     }
 
+    /// Find the commit whose timestamp is <= provided value and closest to it.
+    pub fn commit_at_or_before(&self, timestamp: u64) -> Option<StateId> {
+        self.commits
+            .values()
+            .filter(|commit| commit.timestamp <= timestamp)
+            .max_by_key(|commit| commit.timestamp)
+            .map(|commit| commit.id)
+    }
+
     /// Get the commit history for a specific branch (following parent chain)
     pub fn get_branch_history(
         &self,

@@ -26,6 +26,8 @@ Treat ChangeTracker history as a typed time-series, enabling powerful temporal g
 
 Immutable handle into graph state at a specific point in time.
 
+**Status:** ✅ Implemented (Rust core `src/temporal/snapshot.rs`, accessible via `Graph::snapshot_at_commit` / `Graph::snapshot_at_timestamp`, and exposed in Python as `TemporalSnapshot`).
+
 #### Rust Core
 
 ```rust
@@ -148,9 +150,11 @@ print(snapshot.timestamp)
 print(snapshot.lineage.parent_commits)
 ```
 
-### 2. Temporal Selectors in GraphSpace
+### 2. Temporal Selectors in History/Graph API
 
 Index history by commit time to enable efficient temporal queries.
+
+**Status:** ✅ Implemented via `HistoryForest::commit_at_or_before`, `Graph::snapshot_at_commit`, `Graph::snapshot_at_timestamp`, and `Graph::from_snapshot`.
 
 #### Rust Core
 
@@ -664,13 +668,13 @@ pipeline = (
 
 **Goal**: Basic temporal snapshot creation and queries
 
-- [ ] Implement `TemporalSnapshot` struct with existence indexing
-- [ ] Add `snapshot_at(commit_id)` and `snapshot_at(timestamp)` to Graph
-- [ ] Implement `ExistenceIndex` for fast membership checks
-- [ ] Add `as_subgraph()` conversion
-- [ ] Basic FFI bindings for snapshot creation
-- [ ] Python API: `g.snapshot_at(...)` 
-- [ ] Unit tests for snapshot creation and queries
+- [x] Implement `TemporalSnapshot` struct with existence indexing
+- [x] Add `snapshot_at(commit_id)` and `snapshot_at(timestamp)` to Graph
+- [x] Implement `ExistenceIndex` for fast membership checks
+- [x] Add `as_subgraph()` conversion
+- [x] Basic FFI bindings for snapshot creation
+- [x] Python API: `g.snapshot_at(...)` 
+- [x] Unit tests for snapshot creation and queries
 
 **Deliverable**: Users can create snapshots and query them as immutable subgraphs.
 

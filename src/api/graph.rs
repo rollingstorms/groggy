@@ -23,6 +23,7 @@ use crate::storage::adjacency::{
 };
 use crate::storage::pool::GraphPool;
 use crate::subgraphs::neighborhood::NeighborhoodSampler;
+use crate::temporal::TemporalSnapshot;
 use crate::types::SubgraphId;
 use crate::types::{
     AttrName, AttrValue, BranchName, CompressionStatistics, EdgeId, MemoryEfficiency,
@@ -2066,6 +2067,16 @@ impl Graph {
         HistoricalView::new(&self.history, commit_id)
     }
 
+    /// Build an immutable snapshot of the graph at a given commit.
+    pub fn snapshot_at_commit(&self, commit_id: StateId) -> Result<TemporalSnapshot, GraphError> {
+        TemporalSnapshot::at_commit(&self.history, commit_id)
+    }
+
+    /// Build an immutable snapshot at or before the provided timestamp (seconds since epoch).
+    pub fn snapshot_at_timestamp(&self, timestamp: u64) -> Result<TemporalSnapshot, GraphError> {
+        TemporalSnapshot::at_timestamp(&self.history, timestamp)
+    }
+
     /// Compare two commits and show differences
     pub fn diff_commits(&self, from: StateId, to: StateId) -> Result<CommitDiff, GraphError> {
         let _ = (from, to); // Silence unused parameter warning
@@ -2135,6 +2146,13 @@ impl Graph {
         }
 
         Ok(())
+    }
+
+    /// Construct a fresh graph from a historical snapshot.
+    pub fn from_snapshot(snapshot: crate::state::state::GraphSnapshot) -> Result<Self, GraphError> {
+        let mut graph = Graph::new();
+        graph.reset_to_snapshot(snapshot)?;
+        Ok(graph)
     }
 
     /*

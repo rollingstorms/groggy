@@ -21,6 +21,7 @@ use crate::PyNumArray;
 use crate::ffi::query::query::{PyEdgeFilter, PyNodeFilter};
 use crate::ffi::query::traversal::PyGroupedAggregationResult;
 use crate::ffi::subgraphs::subgraph::PySubgraph;
+use crate::ffi::temporal::PyTemporalSnapshot;
 use crate::ffi::types::PyAttrValue;
 use crate::ffi::utils::{graph_error_to_py_err, python_value_to_attr_value};
 
@@ -1527,6 +1528,26 @@ impl PyGraph {
             }),
             Err(e) => Err(graph_error_to_py_err(e)),
         }
+    }
+
+    /// Build a temporal snapshot at a specific commit.
+    fn snapshot_at_commit(&self, commit_id: StateId) -> PyResult<PyTemporalSnapshot> {
+        let snapshot = self
+            .inner
+            .borrow()
+            .snapshot_at_commit(commit_id)
+            .map_err(graph_error_to_py_err)?;
+        Ok(PyTemporalSnapshot { inner: snapshot })
+    }
+
+    /// Build a temporal snapshot at or before the provided timestamp (seconds since epoch).
+    fn snapshot_at_timestamp(&self, timestamp: u64) -> PyResult<PyTemporalSnapshot> {
+        let snapshot = self
+            .inner
+            .borrow()
+            .snapshot_at_timestamp(timestamp)
+            .map_err(graph_error_to_py_err)?;
+        Ok(PyTemporalSnapshot { inner: snapshot })
     }
 
     // === STATE METHODS ===

@@ -28,6 +28,9 @@ pub mod storage;
 // Subgraphs FFI bindings (mirror main project subgraphs/)
 pub mod subgraphs;
 
+// Temporal snapshot bindings
+pub mod temporal;
+
 // Entity FFI bindings - Trait-based entity wrappers
 pub mod entities;
 

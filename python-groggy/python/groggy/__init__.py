@@ -128,6 +128,9 @@ if not _DISPLAY_AVAILABLE:
         return f"GraphTable(shape={shape})"
 
 __version__ = "0.5.1"
+TemporalSnapshot = _groggy.TemporalSnapshot
+ExistenceIndex = _groggy.ExistenceIndex
+
 __all__ = [
     "Graph",
     "Subgraph",
@@ -225,6 +228,8 @@ __all__ = [
     "builder",
     "AlgorithmBuilder",
     "VarHandle",
+    "TemporalSnapshot",
+    "ExistenceIndex",
 ]
 
 # Apply visualization capabilities to main data structures

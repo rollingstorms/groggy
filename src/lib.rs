@@ -149,6 +149,7 @@ pub mod query; // Query and traversal functionality
 pub mod state; // State management
 pub mod storage; // Storage and view types
 pub mod subgraphs; // Subgraph types and operations
+pub mod temporal; // Temporal snapshot utilities
 pub mod traits;
 pub mod utils; // Utilities and configuration // Graph entity traits
 
@@ -192,6 +193,7 @@ pub use subgraphs::{
     AggregationFunction, ComponentSubgraph, FilteredSubgraph, HierarchicalOperations, MetaNode,
     NeighborhoodSubgraph, SimilarityMetric,
 };
+pub use temporal::TemporalSnapshot;
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
