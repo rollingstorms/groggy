@@ -47,6 +47,20 @@ Practical optimization patterns and recipes for high-performance graph operation
 
 ---
 
+### [Temporal Extensions Guide](temporal-extensions-guide.md)
+Comprehensive guide to temporal graph analytics and time-series features in Groggy.
+
+**What's inside:**
+- Core temporal concepts (snapshots, index, scope, deltas)
+- Common temporal analysis patterns
+- Best practices and performance optimization
+- Example use cases and code
+- Troubleshooting guide
+
+**Use this when:** You need to analyze graph evolution, track changes over time, or perform temporal queries.
+
+---
+
 ## Quick Links
 
 ### By Topic
@@ -55,6 +69,7 @@ Practical optimization patterns and recipes for high-performance graph operation
 - Start with the [Glossary](glossary.md) to understand terminology
 - Read [Design Decisions](design-decisions.md) to understand the architecture
 - Refer to [Performance Cookbook](performance-cookbook.md) for optimization
+- See [Temporal Extensions Guide](temporal-extensions-guide.md) for time-series analysis
 
 **Understanding Architecture:**
 - [Design Decisions](design-decisions.md) - Why these choices?
@@ -65,6 +80,11 @@ Practical optimization patterns and recipes for high-performance graph operation
 - [Performance Cookbook](performance-cookbook.md) - Optimization recipes
 - [Performance Guide](../guide/performance.md) - Comprehensive tutorial
 - [Design Decisions](design-decisions.md) - Performance trade-offs
+
+**Temporal Analysis:**
+- [Temporal Extensions Guide](temporal-extensions-guide.md) - Complete temporal features guide
+- [User Guides](../guide/graph-core.md) - Basic graph operations
+- [API Reference](../api/graph.md) - Temporal API methods
 
 ---
 
@@ -101,6 +121,13 @@ All appendices are designed as quick reference guides. They complement the main 
 **Example use:**
 > "My graph filtering is slow. How do I speed it up?"
 > → Check Recipe 1 in [Performance Cookbook](performance-cookbook.md)
+
+### Temporal Extensions Guide
+**Best for:** Working with temporal data, analyzing graph evolution
+
+**Example use:**
+> "How do I query the graph as it was last week?"
+> → Check the Time-Travel Queries pattern in [Temporal Extensions Guide](temporal-extensions-guide.md)
 
 ---
 

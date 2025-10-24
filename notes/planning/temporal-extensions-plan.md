@@ -263,6 +263,10 @@ The temporal selector entry points are surfaced via `python-groggy/src/ffi/tempo
 
 Extend the algorithm execution context with temporal scope and helper methods.
 
+#### Pipeline Builder Integration
+
+`PipelineBuilder::with_temporal_scope` accepts either a precomputed `TemporalSnapshot` handle or `(start, end)` window tuple. During compilation we thread this scope into the `ContextInit` block so every executor thread starts with the same `TemporalScope` and downstream steps can rely on `ctx.temporal_scope()` being populated. Python mirrors this with `PipelineBuilder.temporal_scope(...)`, storing the metadata in the request envelope before dispatching to the Rust executor so DSL users do not need to mutate `Context` by hand.
+
 #### Rust Core
 
 ```rust
@@ -373,6 +377,14 @@ ctx.set_temporal_scope(
 
 pipeline.run(ctx, subgraph)
 ```
+
+#### FFI Bindings
+
+`python-groggy/src/ffi/context.rs` exposes `ctx_delta`, `ctx_changed_entities`, and `ctx_temporal_scope` shims. Each converts Python snapshot handles back into `TemporalSnapshotRef`, forwards the call into the Rust context, and maps `TemporalScopeError` into `GroggyTemporalError`. Long-running diff computations release the GIL via `py.allow_threads(|| ...)`, and the return types land in `python-groggy/python/groggy/_context.pyi` so IDEs surface the helpers with type hints.
+
+#### Test Coverage
+
+Rust integration tests in `tests/temporal_context.rs` verify `ctx.delta` against manual diffs and windowed change detection; Python adds `tests/test_temporal_context.py::test_pipeline_scope_propagation` and `::test_delta_round_trip` to ensure pipeline-provided scopes reach algorithms and FFI marshaling yields consistent change summaries.
 
 ### 4. Temporal Algorithm Steps
 
@@ -734,15 +746,17 @@ pipeline = (
 
 **Goal**: Clear, comprehensive temporal documentation
 
-- [ ] Write temporal extensions guide (concepts, patterns, examples)
-- [ ] Document temporal contract (immutability, window semantics, cost hints)
-- [ ] Add docstrings to all public temporal APIs
+- [x] Write temporal extensions guide (concepts, patterns, examples)
+- [x] Document temporal contract (immutability, window semantics, cost hints)
+- [x] Add docstrings to all public temporal APIs
 - [ ] Create tutorial notebook: "Time-Travel Queries in Groggy"
 - [ ] Create tutorial notebook: "Temporal Community Detection"
 - [ ] Performance tuning guide for temporal queries
 - [ ] Update API reference with temporal methods
 
 **Deliverable**: Users understand when and how to use temporal features effectively.
+
+**Status**: Core documentation complete in `docs/appendices/temporal-extensions-guide.md`. Tutorial notebooks and API reference updates pending.
 
 ---
 
