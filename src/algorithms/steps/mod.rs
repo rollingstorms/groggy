@@ -5,6 +5,8 @@
 //! Rust. Phase 1 provides a small core set focused on node transformations and
 //! attribute attachment.
 
+pub mod temporal;
+
 use std::collections::HashMap;
 use std::sync::{Arc, Once, OnceLock, RwLock};
 
@@ -16,6 +18,11 @@ use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, EdgeId, NodeId};
 
 use super::{AlgorithmParamValue, AlgorithmParams, Context, CostHint};
+
+pub use temporal::{
+    AggregateFunction, DiffEdgesStep, DiffNodesStep, MarkChangedNodesStep, TemporalFilterStep,
+    TemporalPredicate, WindowAggregateStep,
+};
 
 /// Trait implemented by all step primitives.
 pub trait Step: Send + Sync {
@@ -1065,6 +1072,119 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             Ok(Box::new(NormalizeNodeValuesStep::new(
                 source, target, method, epsilon,
             )))
+        },
+    )?;
+
+    // === Temporal Steps ===
+
+    registry.register(
+        "temporal.diff_nodes",
+        StepMetadata {
+            id: "temporal.diff_nodes".to_string(),
+            description: "Compute node differences between temporal snapshots".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let before_var = spec.params.get_text("before").map(|s| s.to_string());
+            let after_var = spec.params.get_text("after").map(|s| s.to_string());
+            let prefix = spec
+                .params
+                .get_text("output_prefix")
+                .unwrap_or("diff")
+                .to_string();
+            Ok(Box::new(DiffNodesStep::new(before_var, after_var, prefix)))
+        },
+    )?;
+
+    registry.register(
+        "temporal.diff_edges",
+        StepMetadata {
+            id: "temporal.diff_edges".to_string(),
+            description: "Compute edge differences between temporal snapshots".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let before_var = spec.params.get_text("before").map(|s| s.to_string());
+            let after_var = spec.params.get_text("after").map(|s| s.to_string());
+            let prefix = spec
+                .params
+                .get_text("output_prefix")
+                .unwrap_or("diff")
+                .to_string();
+            Ok(Box::new(DiffEdgesStep::new(before_var, after_var, prefix)))
+        },
+    )?;
+
+    registry.register(
+        "temporal.window_aggregate",
+        StepMetadata {
+            id: "temporal.window_aggregate".to_string(),
+            description: "Aggregate attribute values over temporal window".to_string(),
+            cost_hint: CostHint::Quadratic,
+        },
+        |spec| {
+            let attr_name = spec.params.expect_text("attr")?.to_string();
+            let function_str = spec.params.expect_text("function")?;
+            let function = AggregateFunction::from_str(function_str)?;
+            let output_var = spec.params.expect_text("output")?.to_string();
+            let index_var = spec
+                .params
+                .get_text("index_var")
+                .unwrap_or("temporal_index")
+                .to_string();
+            Ok(Box::new(WindowAggregateStep::new(
+                attr_name, function, output_var, index_var,
+            )))
+        },
+    )?;
+
+    registry.register(
+        "temporal.filter",
+        StepMetadata {
+            id: "temporal.filter".to_string(),
+            description: "Filter nodes based on temporal properties".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let output_var = spec.params.expect_text("output")?.to_string();
+            let predicate_type = spec.params.expect_text("predicate")?;
+            
+            let predicate = match predicate_type {
+                "created_after" => {
+                    let commit = spec.params.expect_int("commit")? as u64;
+                    TemporalPredicate::CreatedAfter(commit)
+                }
+                "created_before" => {
+                    let commit = spec.params.expect_int("commit")? as u64;
+                    TemporalPredicate::CreatedBefore(commit)
+                }
+                "existed_at" => {
+                    let commit = spec.params.expect_int("commit")? as u64;
+                    TemporalPredicate::ExistedAt(commit)
+                }
+                "modified_in_range" => {
+                    let start = spec.params.expect_int("start")? as u64;
+                    let end = spec.params.expect_int("end")? as u64;
+                    TemporalPredicate::ModifiedInRange(start, end)
+                }
+                other => return Err(anyhow!("Unknown temporal predicate: {}", other)),
+            };
+            
+            Ok(Box::new(TemporalFilterStep::new(predicate, output_var)))
+        },
+    )?;
+
+    registry.register(
+        "temporal.mark_changed_nodes",
+        StepMetadata {
+            id: "temporal.mark_changed_nodes".to_string(),
+            description: "Mark nodes that changed within time window".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let output_var = spec.params.expect_text("output")?.to_string();
+            let change_type = spec.params.get_text("change_type").map(|s| s.to_string());
+            Ok(Box::new(MarkChangedNodesStep::new(output_var, change_type)))
         },
     )?;
 

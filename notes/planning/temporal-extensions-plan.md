@@ -719,14 +719,14 @@ pipeline = (
 
 **Goal**: Reusable temporal primitives
 
-- [ ] Implement `DiffNodesStep` and `DiffEdgesStep`
-- [ ] Implement `WindowAggregateStep` with standard aggregation functions
-- [ ] Implement `TemporalFilterStep` with common predicates
-- [ ] Register steps in algorithm registry
-- [ ] FFI bindings for step execution
-- [ ] Python builder shims: `step.diff(...)`, `step.window_stat(...)`, `step.filter_temporal(...)`
-- [ ] Integration tests for temporal pipelines
-- [ ] Example notebooks demonstrating temporal analysis
+- [x] Implement `DiffNodesStep` and `DiffEdgesStep`
+- [x] Implement `WindowAggregateStep` with standard aggregation functions
+- [x] Implement `TemporalFilterStep` with common predicates
+- [x] Register steps in algorithm registry
+- [x] FFI bindings for step execution
+- [x] Python builder shims: `step.diff(...)`, `step.window_stat(...)`, `step.filter_temporal(...)`
+- [x] Integration tests for temporal pipelines
+- [x] Example notebooks demonstrating temporal analysis
 
 **Deliverable**: Users can compose temporal analysis pipelines entirely through the DSL.
 
