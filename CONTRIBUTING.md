@@ -106,15 +106,24 @@ Knowing what CI enforces lets you mirror the same checks locally and avoid round
 Run the commands below before pushing to ensure parity with CI and keep warnings out of review threads:
 
 ```bash
-# Rust formatting, linting, and tests
+# === Core Rust Package (src/) ===
+# Always run fmt last after any debugging/development to ensure consistent formatting
 cargo fmt --all
 cargo clippy --all-targets -- -D warnings
 cargo check --all-features
 cargo test --all-targets
 
+# === Python Extension Package (python-groggy/) ===
 # Rebuild the Python extension after Rust/FFI edits
 maturin develop --release
 
+# Run clippy/fmt on the Python extension crate separately
+cd python-groggy
+cargo fmt --all
+cargo clippy --all-targets -- -D warnings
+cd ..
+
+# === Python Code ===
 # Python formatting and linting
 black .
 isort .
@@ -123,6 +132,13 @@ pre-commit run --all-files
 # Python tests
 pytest tests -q
 ```
+
+**Important Notes:**
+- Always run `cargo fmt` **last** after debugging/making changes - it ensures consistent formatting
+- Run clippy/fmt in both the root crate (`src/`) and the Python extension crate (`python-groggy/`)
+- The Python extension has its own Cargo.toml and needs separate checks
+- Rebuild with `maturin develop --release` before running Python tests
+
 
 ## Submitting Changes
 

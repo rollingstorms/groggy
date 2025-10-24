@@ -13,7 +13,8 @@ pub struct PyPipelineHandle {
 }
 
 // Global pipeline registry using OnceLock for thread-safe initialization
-static PIPELINE_REGISTRY: OnceLock<Mutex<HashMap<usize, groggy::algorithms::Pipeline>>> = OnceLock::new();
+static PIPELINE_REGISTRY: OnceLock<Mutex<HashMap<usize, groggy::algorithms::Pipeline>>> =
+    OnceLock::new();
 static NEXT_ID: OnceLock<Mutex<usize>> = OnceLock::new();
 
 fn registry() -> &'static Mutex<HashMap<usize, groggy::algorithms::Pipeline>> {
@@ -38,7 +39,9 @@ pub fn py_build_pipeline(py: Python, spec: &PyAny) -> PyResult<PyPipelineHandle>
     for item in spec.iter()? {
         let item = item?;
         let id: String = item.get_item("id")?.extract()?;
-        let params_any = item.get_item("params").unwrap_or_else(|_| PyNone::get(py).into());
+        let params_any = item
+            .get_item("params")
+            .unwrap_or_else(|_| PyNone::get(py).into());
         let params_dict: HashMap<String, PyAttrValue> = if params_any.is_none() {
             HashMap::new()
         } else {
@@ -48,16 +51,24 @@ pub fn py_build_pipeline(py: Python, spec: &PyAny) -> PyResult<PyPipelineHandle>
             for (key, value) in &params_dict {
                 // Convert PyAttrValue (wrapping AttrValue) to AlgorithmParamValue
                 let param_value = match &value.inner {
-                    groggy::types::AttrValue::Int(i) => groggy::algorithms::AlgorithmParamValue::Int(*i),
-                    groggy::types::AttrValue::SmallInt(i) => groggy::algorithms::AlgorithmParamValue::Int(*i as i64),
-                    groggy::types::AttrValue::Float(f) => groggy::algorithms::AlgorithmParamValue::Float(*f as f64),
-                    groggy::types::AttrValue::Bool(b) => groggy::algorithms::AlgorithmParamValue::Bool(*b),
+                    groggy::types::AttrValue::Int(i) => {
+                        groggy::algorithms::AlgorithmParamValue::Int(*i)
+                    }
+                    groggy::types::AttrValue::SmallInt(i) => {
+                        groggy::algorithms::AlgorithmParamValue::Int(*i as i64)
+                    }
+                    groggy::types::AttrValue::Float(f) => {
+                        groggy::algorithms::AlgorithmParamValue::Float(*f as f64)
+                    }
+                    groggy::types::AttrValue::Bool(b) => {
+                        groggy::algorithms::AlgorithmParamValue::Bool(*b)
+                    }
                     groggy::types::AttrValue::Text(s) => {
                         groggy::algorithms::AlgorithmParamValue::Text(s.clone())
-                    },
+                    }
                     groggy::types::AttrValue::CompactText(s) => {
                         groggy::algorithms::AlgorithmParamValue::Text(s.as_str().to_string())
-                    },
+                    }
                     groggy::types::AttrValue::CompressedText(data) => {
                         // Decompress and convert
                         if let Ok(text) = data.decompress_text() {
@@ -65,19 +76,31 @@ pub fn py_build_pipeline(py: Python, spec: &PyAny) -> PyResult<PyPipelineHandle>
                         } else {
                             continue; // Skip decompression errors
                         }
-                    },
-                    groggy::types::AttrValue::IntVec(v) => groggy::algorithms::AlgorithmParamValue::IntList(v.clone()),
-                    groggy::types::AttrValue::FloatVec(v) => groggy::algorithms::AlgorithmParamValue::FloatList(v.iter().map(|&f| f as f64).collect()),
+                    }
+                    groggy::types::AttrValue::IntVec(v) => {
+                        groggy::algorithms::AlgorithmParamValue::IntList(v.clone())
+                    }
+                    groggy::types::AttrValue::FloatVec(v) => {
+                        groggy::algorithms::AlgorithmParamValue::FloatList(
+                            v.iter().map(|&f| f as f64).collect(),
+                        )
+                    }
                     groggy::types::AttrValue::CompressedFloatVec(data) => {
                         // Decompress float vec
                         if let Ok(floats) = data.decompress_float_vec() {
-                            groggy::algorithms::AlgorithmParamValue::FloatList(floats.iter().map(|&f| f as f64).collect())
+                            groggy::algorithms::AlgorithmParamValue::FloatList(
+                                floats.iter().map(|&f| f as f64).collect(),
+                            )
                         } else {
                             continue; // Skip decompression errors
                         }
-                    },
-                    groggy::types::AttrValue::BoolVec(v) => groggy::algorithms::AlgorithmParamValue::BoolList(v.clone()),
-                    groggy::types::AttrValue::TextVec(v) => groggy::algorithms::AlgorithmParamValue::TextList(v.clone()),
+                    }
+                    groggy::types::AttrValue::BoolVec(v) => {
+                        groggy::algorithms::AlgorithmParamValue::BoolList(v.clone())
+                    }
+                    groggy::types::AttrValue::TextVec(v) => {
+                        groggy::algorithms::AlgorithmParamValue::TextList(v.clone())
+                    }
                     groggy::types::AttrValue::Json(json_str) => {
                         match serde_json::from_str::<serde_json::Value>(json_str) {
                             Ok(value) => groggy::algorithms::AlgorithmParamValue::Json(value),
@@ -85,13 +108,13 @@ pub fn py_build_pipeline(py: Python, spec: &PyAny) -> PyResult<PyPipelineHandle>
                         }
                     }
                     // Skip types that don't have algorithm param equivalents
-                    groggy::types::AttrValue::Bytes(_) 
+                    groggy::types::AttrValue::Bytes(_)
                     | groggy::types::AttrValue::Null
                     | groggy::types::AttrValue::SubgraphRef(_)
                     | groggy::types::AttrValue::NodeArray(_)
                     | groggy::types::AttrValue::EdgeArray(_) => {
                         continue;
-                    },
+                    }
                 };
                 params.insert(key.clone(), param_value);
             }
@@ -118,10 +141,10 @@ pub fn py_run_pipeline(
     let pipeline = registry_guard
         .get(&handle.handle_id)
         .ok_or_else(|| PyRuntimeError::new_err("invalid pipeline handle"))?;
-    
+
     // Clone the inner subgraph for processing
     let subgraph_inner = subgraph.inner.clone();
-    
+
     // NOTE: GIL Release Limitation
     // We cannot release the GIL here because Subgraph contains Rc<RefCell<Graph>>,
     // which is not Send. To enable GIL release for long-running algorithms:
@@ -130,12 +153,12 @@ pub fn py_run_pipeline(
     // 3. Update all graph operations to use RwLock instead of RefCell
     // This would allow: py.allow_threads(|| pipeline.run(...))
     // For now, Python threads will be blocked during algorithm execution.
-    
+
     let mut context = groggy::algorithms::Context::new();
     let result = pipeline
         .run(&mut context, subgraph_inner)
         .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
-    
+
     // Wrap result back in PySubgraph
     // Attribute updates from algorithms are automatically included in the result
     crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(result)
@@ -146,7 +169,7 @@ pub fn py_run_pipeline(
 pub fn py_get_pipeline_context_info() -> PyResult<HashMap<String, PyAttrValue>> {
     // Return information about pipeline execution capabilities
     let mut info = HashMap::new();
-    
+
     info.insert(
         "supports_gil_release".to_string(),
         PyAttrValue::new(groggy::types::AttrValue::Bool(false)),
@@ -155,7 +178,8 @@ pub fn py_get_pipeline_context_info() -> PyResult<HashMap<String, PyAttrValue>> 
         "reason".to_string(),
         PyAttrValue::new(groggy::types::AttrValue::Text(
             "Subgraph uses Rc<RefCell<Graph>> which is not Send. \
-             Refactor to Arc<RwLock<>> to enable parallel execution.".to_string()
+             Refactor to Arc<RwLock<>> to enable parallel execution."
+                .to_string(),
         )),
     );
     info.insert(
@@ -166,7 +190,7 @@ pub fn py_get_pipeline_context_info() -> PyResult<HashMap<String, PyAttrValue>> 
         "bulk_attribute_optimization".to_string(),
         PyAttrValue::new(groggy::types::AttrValue::Bool(true)),
     );
-    
+
     Ok(info)
 }
 
@@ -181,11 +205,11 @@ pub fn py_drop_pipeline(handle: &PyPipelineHandle) {
 pub fn py_get_algorithm_metadata(algorithm_id: &str) -> PyResult<HashMap<String, PyAttrValue>> {
     groggy::algorithms::ensure_algorithms_registered();
     let registry = groggy::algorithms::global_registry();
-    
-    let metadata = registry
-        .metadata(algorithm_id)
-        .ok_or_else(|| PyRuntimeError::new_err(format!("Algorithm '{}' not found", algorithm_id)))?;
-    
+
+    let metadata = registry.metadata(algorithm_id).ok_or_else(|| {
+        PyRuntimeError::new_err(format!("Algorithm '{}' not found", algorithm_id))
+    })?;
+
     let mut map = HashMap::new();
     map.insert(
         "id".to_string(),
@@ -205,13 +229,18 @@ pub fn py_get_algorithm_metadata(algorithm_id: &str) -> PyResult<HashMap<String,
     );
     map.insert(
         "supports_cancellation".to_string(),
-        PyAttrValue::new(groggy::types::AttrValue::Bool(metadata.supports_cancellation)),
+        PyAttrValue::new(groggy::types::AttrValue::Bool(
+            metadata.supports_cancellation,
+        )),
     );
     map.insert(
         "cost_hint".to_string(),
-        PyAttrValue::new(groggy::types::AttrValue::Text(format!("{:?}", metadata.cost_hint))),
+        PyAttrValue::new(groggy::types::AttrValue::Text(format!(
+            "{:?}",
+            metadata.cost_hint
+        ))),
     );
-    
+
     // Return structured parameter metadata
     if !metadata.parameters.is_empty() {
         // Build a JSON representation of parameters manually
@@ -221,18 +250,23 @@ pub fn py_get_algorithm_metadata(algorithm_id: &str) -> PyResult<HashMap<String,
             .map(|param| {
                 let mut fields = vec![
                     format!(r#""name":"{}""#, param.name),
-                    format!(r#""description":"{}""#, param.description.replace('"', r#"\""#)),
+                    format!(
+                        r#""description":"{}""#,
+                        param.description.replace('"', r#"\""#)
+                    ),
                     format!(r#""type":"{}""#, format!("{:?}", param.value_type)),
                     format!(r#""required":{}"#, param.required),
                 ];
-                
+
                 // Include default value if present
                 if let Some(ref default) = param.default_value {
                     let default_text = match default {
                         groggy::algorithms::AlgorithmParamValue::Int(i) => i.to_string(),
                         groggy::algorithms::AlgorithmParamValue::Float(f) => f.to_string(),
                         groggy::algorithms::AlgorithmParamValue::Bool(b) => b.to_string(),
-                        groggy::algorithms::AlgorithmParamValue::Text(s) => format!(r#""{}""#, s.replace('"', r#"\""#)),
+                        groggy::algorithms::AlgorithmParamValue::Text(s) => {
+                            format!(r#""{}""#, s.replace('"', r#"\""#))
+                        }
                         groggy::algorithms::AlgorithmParamValue::IntList(v) => format!("{:?}", v),
                         groggy::algorithms::AlgorithmParamValue::FloatList(v) => format!("{:?}", v),
                         groggy::algorithms::AlgorithmParamValue::BoolList(v) => format!("{:?}", v),
@@ -242,18 +276,18 @@ pub fn py_get_algorithm_metadata(algorithm_id: &str) -> PyResult<HashMap<String,
                     };
                     fields.push(format!(r#""default":{}"#, default_text));
                 }
-                
+
                 format!("{{{}}}", fields.join(","))
             })
             .collect();
-        
+
         let params_json = format!("[{}]", params_json_parts.join(","));
         map.insert(
             "parameters".to_string(),
             PyAttrValue::new(groggy::types::AttrValue::Text(params_json)),
         );
     }
-    
+
     Ok(map)
 }
 
@@ -265,13 +299,13 @@ pub fn py_validate_algorithm_params(
 ) -> PyResult<Vec<String>> {
     groggy::algorithms::ensure_algorithms_registered();
     let registry = groggy::algorithms::global_registry();
-    
-    let metadata = registry
-        .metadata(algorithm_id)
-        .ok_or_else(|| PyRuntimeError::new_err(format!("Algorithm '{}' not found", algorithm_id)))?;
-    
+
+    let metadata = registry.metadata(algorithm_id).ok_or_else(|| {
+        PyRuntimeError::new_err(format!("Algorithm '{}' not found", algorithm_id))
+    })?;
+
     let mut errors = Vec::new();
-    
+
     // Check for missing required parameters
     for param_meta in &metadata.parameters {
         if param_meta.required && !params.contains_key(&param_meta.name) {
@@ -281,38 +315,58 @@ pub fn py_validate_algorithm_params(
             ));
         }
     }
-    
+
     // Check for unknown parameters
-    let valid_param_names: std::collections::HashSet<String> = metadata
-        .parameters
-        .iter()
-        .map(|p| p.name.clone())
-        .collect();
-    
+    let valid_param_names: std::collections::HashSet<String> =
+        metadata.parameters.iter().map(|p| p.name.clone()).collect();
+
     for param_name in params.keys() {
         if !valid_param_names.contains(param_name) {
             errors.push(format!("Unknown parameter '{}'", param_name));
         }
     }
-    
+
     // Type validation (basic)
     for param_meta in &metadata.parameters {
         if let Some(value) = params.get(&param_meta.name) {
             let type_matches = matches!(
                 (&param_meta.value_type, &value.inner),
-                (groggy::algorithms::ParameterType::Int, groggy::types::AttrValue::Int(_))
-                    | (groggy::algorithms::ParameterType::Int, groggy::types::AttrValue::SmallInt(_))
-                    | (groggy::algorithms::ParameterType::Float, groggy::types::AttrValue::Float(_))
-                    | (groggy::algorithms::ParameterType::Bool, groggy::types::AttrValue::Bool(_))
-                    | (groggy::algorithms::ParameterType::Text, groggy::types::AttrValue::Text(_))
-                    | (groggy::algorithms::ParameterType::Text, groggy::types::AttrValue::CompactText(_))
-                    | (groggy::algorithms::ParameterType::IntList, groggy::types::AttrValue::IntVec(_))
-                    | (groggy::algorithms::ParameterType::FloatList, groggy::types::AttrValue::FloatVec(_))
-                    | (groggy::algorithms::ParameterType::BoolList, groggy::types::AttrValue::BoolVec(_))
-                    | (groggy::algorithms::ParameterType::TextList, groggy::types::AttrValue::TextVec(_))
-                    | (groggy::algorithms::ParameterType::Json, groggy::types::AttrValue::Json(_))
+                (
+                    groggy::algorithms::ParameterType::Int,
+                    groggy::types::AttrValue::Int(_)
+                ) | (
+                    groggy::algorithms::ParameterType::Int,
+                    groggy::types::AttrValue::SmallInt(_)
+                ) | (
+                    groggy::algorithms::ParameterType::Float,
+                    groggy::types::AttrValue::Float(_)
+                ) | (
+                    groggy::algorithms::ParameterType::Bool,
+                    groggy::types::AttrValue::Bool(_)
+                ) | (
+                    groggy::algorithms::ParameterType::Text,
+                    groggy::types::AttrValue::Text(_)
+                ) | (
+                    groggy::algorithms::ParameterType::Text,
+                    groggy::types::AttrValue::CompactText(_)
+                ) | (
+                    groggy::algorithms::ParameterType::IntList,
+                    groggy::types::AttrValue::IntVec(_)
+                ) | (
+                    groggy::algorithms::ParameterType::FloatList,
+                    groggy::types::AttrValue::FloatVec(_)
+                ) | (
+                    groggy::algorithms::ParameterType::BoolList,
+                    groggy::types::AttrValue::BoolVec(_)
+                ) | (
+                    groggy::algorithms::ParameterType::TextList,
+                    groggy::types::AttrValue::TextVec(_)
+                ) | (
+                    groggy::algorithms::ParameterType::Json,
+                    groggy::types::AttrValue::Json(_)
+                )
             );
-            
+
             if !type_matches {
                 errors.push(format!(
                     "Parameter '{}' has wrong type: expected {:?}, got {:?}",
@@ -323,7 +377,7 @@ pub fn py_validate_algorithm_params(
             }
         }
     }
-    
+
     Ok(errors)
 }
 
@@ -332,9 +386,9 @@ pub fn py_validate_algorithm_params(
 pub fn py_list_algorithm_categories() -> PyResult<HashMap<String, Vec<String>>> {
     groggy::algorithms::ensure_algorithms_registered();
     let registry = groggy::algorithms::global_registry();
-    
+
     let mut categories: HashMap<String, Vec<String>> = HashMap::new();
-    
+
     for metadata in registry.list() {
         // Extract category from algorithm ID (e.g., "centrality.pagerank" -> "centrality")
         let parts: Vec<&str> = metadata.id.split('.').collect();
@@ -352,7 +406,7 @@ pub fn py_list_algorithm_categories() -> PyResult<HashMap<String, Vec<String>>> 
                 .push(metadata.id.clone());
         }
     }
-    
+
     Ok(categories)
 }
 
@@ -374,7 +428,9 @@ pub fn py_list_algorithms() -> PyResult<Vec<HashMap<String, PyAttrValue>>> {
         );
         map.insert(
             "description".to_string(),
-            PyAttrValue::new(groggy::types::AttrValue::Text(metadata.description.to_string())),
+            PyAttrValue::new(groggy::types::AttrValue::Text(
+                metadata.description.to_string(),
+            )),
         );
         map.insert(
             "version".to_string(),
@@ -382,9 +438,11 @@ pub fn py_list_algorithms() -> PyResult<Vec<HashMap<String, PyAttrValue>>> {
         );
         map.insert(
             "supports_cancellation".to_string(),
-            PyAttrValue::new(groggy::types::AttrValue::Bool(metadata.supports_cancellation)),
+            PyAttrValue::new(groggy::types::AttrValue::Bool(
+                metadata.supports_cancellation,
+            )),
         );
-        
+
         if !metadata.parameters.is_empty() {
             let params_text = metadata
                 .parameters

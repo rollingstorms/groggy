@@ -211,9 +211,11 @@ mod tests {
             let py_val = networkx_value_to_python(py, &int_val).unwrap();
             assert_eq!(py_val.extract::<i64>(py).unwrap(), 42);
 
-            let float_val = NetworkXValue::Float(3.141592);
+            let float_val = NetworkXValue::Float(std::f64::consts::PI);
             let py_val = networkx_value_to_python(py, &float_val).unwrap();
-            assert!((py_val.extract::<f64>(py).unwrap() - 3.141592).abs() < f64::EPSILON);
+            assert!(
+                (py_val.extract::<f64>(py).unwrap() - std::f64::consts::PI).abs() < f64::EPSILON
+            );
 
             let bool_val = NetworkXValue::Boolean(true);
             let py_val = networkx_value_to_python(py, &bool_val).unwrap();

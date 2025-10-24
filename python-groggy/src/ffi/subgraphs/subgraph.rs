@@ -72,12 +72,9 @@ impl PySubgraph {
         }
 
         let result = {
-            let handle_cell: &PyCell<PyPipelineHandle> =
-                handle_obj.downcast().map_err(|_| {
-                    PyTypeError::new_err(
-                        "apply() expected pipeline._handle to be a PyPipelineHandle",
-                    )
-                })?;
+            let handle_cell: &PyCell<PyPipelineHandle> = handle_obj.downcast().map_err(|_| {
+                PyTypeError::new_err("apply() expected pipeline._handle to be a PyPipelineHandle")
+            })?;
             let handle_ref = handle_cell.borrow();
             py_run_pipeline(py, &handle_ref, self)?
         };

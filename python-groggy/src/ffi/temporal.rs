@@ -15,7 +15,7 @@ pub struct PyTemporalSnapshot {
 impl PyTemporalSnapshot {
     #[getter]
     fn commit_id(&self) -> u64 {
-        self.inner.lineage().commit_id as u64
+        self.inner.lineage().commit_id
     }
 
     #[getter]
@@ -34,12 +34,7 @@ impl PyTemporalSnapshot {
     }
 
     fn parents(&self) -> Vec<u64> {
-        self.inner
-            .lineage()
-            .parent_commits
-            .iter()
-            .map(|id| *id as u64)
-            .collect()
+        self.inner.lineage().parent_commits.to_vec()
     }
 
     fn node_exists(&self, node_id: u64) -> bool {
@@ -87,10 +82,7 @@ impl PyTemporalSnapshot {
     }
 
     fn as_subgraph(&self, py: Python<'_>) -> PyResult<Py<PySubgraph>> {
-        let subgraph = self
-            .inner
-            .as_subgraph()
-            .map_err(graph_error_to_py_err)?;
+        let subgraph = self.inner.as_subgraph().map_err(graph_error_to_py_err)?;
         let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;
         Py::new(py, py_subgraph)
     }
@@ -129,11 +121,13 @@ pub struct PyTemporalIndex {
 #[pymethods]
 impl PyTemporalIndex {
     fn node_exists_at(&self, node_id: u64, commit_id: u64) -> bool {
-        self.inner.node_exists_at(node_id as NodeId, commit_id as StateId)
+        self.inner
+            .node_exists_at(node_id as NodeId, commit_id as StateId)
     }
 
     fn edge_exists_at(&self, edge_id: u64, commit_id: u64) -> bool {
-        self.inner.edge_exists_at(edge_id as EdgeId, commit_id as StateId)
+        self.inner
+            .edge_exists_at(edge_id as EdgeId, commit_id as StateId)
     }
 
     fn nodes_at_commit(&self, commit_id: u64) -> Vec<u64> {
@@ -160,11 +154,7 @@ impl PyTemporalIndex {
             .collect()
     }
 
-    fn neighbors_bulk_at_commit(
-        &self,
-        nodes: Vec<u64>,
-        commit_id: u64,
-    ) -> HashMap<u64, Vec<u64>> {
+    fn neighbors_bulk_at_commit(&self, nodes: Vec<u64>, commit_id: u64) -> HashMap<u64, Vec<u64>> {
         let node_ids: Vec<NodeId> = nodes.iter().map(|id| *id as NodeId).collect();
         self.inner
             .neighbors_bulk_at_commit(&node_ids, commit_id as StateId)
@@ -178,12 +168,7 @@ impl PyTemporalIndex {
             .collect()
     }
 
-    fn neighbors_in_window(
-        &self,
-        node_id: u64,
-        start_commit: u64,
-        end_commit: u64,
-    ) -> Vec<u64> {
+    fn neighbors_in_window(&self, node_id: u64, start_commit: u64, end_commit: u64) -> Vec<u64> {
         self.inner
             .neighbors_in_window(
                 node_id as NodeId,
@@ -195,12 +180,7 @@ impl PyTemporalIndex {
             .collect()
     }
 
-    fn node_attr_at_commit(
-        &self,
-        node_id: u64,
-        attr: &str,
-        commit_id: u64,
-    ) -> Option<PyAttrValue> {
+    fn node_attr_at_commit(&self, node_id: u64, attr: &str, commit_id: u64) -> Option<PyAttrValue> {
         self.inner
             .node_attr_at_commit(
                 node_id as NodeId,
@@ -225,16 +205,11 @@ impl PyTemporalIndex {
                 to_commit as StateId,
             )
             .into_iter()
-            .map(|(cid, val)| (cid as u64, PyAttrValue::new(val)))
+            .map(|(cid, val)| (cid, PyAttrValue::new(val)))
             .collect()
     }
 
-    fn edge_attr_at_commit(
-        &self,
-        edge_id: u64,
-        attr: &str,
-        commit_id: u64,
-    ) -> Option<PyAttrValue> {
+    fn edge_attr_at_commit(&self, edge_id: u64, attr: &str, commit_id: u64) -> Option<PyAttrValue> {
         self.inner
             .edge_attr_at_commit(
                 edge_id as EdgeId,
@@ -259,7 +234,7 @@ impl PyTemporalIndex {
                 to_commit as StateId,
             )
             .into_iter()
-            .map(|(cid, val)| (cid as u64, PyAttrValue::new(val)))
+            .map(|(cid, val)| (cid, PyAttrValue::new(val)))
             .collect()
     }
 
@@ -267,7 +242,6 @@ impl PyTemporalIndex {
         self.inner
             .commits_in_time_range(start_ts, end_ts)
             .into_iter()
-            .map(|cid| cid as u64)
             .collect()
     }
 
@@ -412,6 +386,7 @@ pub struct PyTemporalDelta {
 #[pymethods]
 impl PyTemporalDelta {
     #[getter]
+    #[allow(clippy::wrong_self_convention)] // Getter for field, not a constructor
     fn from_commit(&self) -> u64 {
         self.inner.from_commit
     }

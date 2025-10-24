@@ -2,9 +2,9 @@
 //!
 //! PyGraphAnalysis helper class that handles all graph analysis operations.
 
-use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
-use crate::ffi::storage::table::PyBaseTable;
 use crate::ffi::storage::array::PyBaseArray;
+use crate::ffi::storage::table::PyBaseTable;
+use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
 use crate::ffi::utils::graph_error_to_py_err;
 use groggy::subgraphs::{NeighborhoodResult, NeighborhoodSubgraph};
 use groggy::traits::{NeighborhoodOperations, SubgraphOperations};
@@ -25,7 +25,7 @@ impl PyGraphAnalysis {
         Ok(PyGraphAnalysis { graph })
     }
     /// Get neighbors of nodes - Enhanced to accept int, list, BaseArray, NumArray
-    /// 
+    ///
     /// Returns BaseTable with columns (node_id, neighbor_id) for bulk operations
     /// or List[NodeId] for single node queries (backward compatibility)
     pub fn neighbors(&mut self, py: Python, nodes: Option<&PyAny>) -> PyResult<PyObject> {
