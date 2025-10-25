@@ -9,7 +9,7 @@
 //! This structure is built once from ChangeTracker history and provides
 //! O(log n) or better performance for most temporal queries.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::errors::GraphResult;
 use crate::state::history::HistoryForest;
@@ -157,6 +157,27 @@ impl TemporalIndex {
         } else {
             false
         }
+    }
+
+    /// Return the lifetime range (creation, optional deletion) for a node.
+    pub fn node_lifetime_range(&self, node_id: NodeId) -> Option<(StateId, Option<StateId>)> {
+        self.node_lifetime
+            .get(&node_id)
+            .map(|(created, deleted)| (*created, *deleted))
+    }
+
+    /// Get the commit where a node was created.
+    pub fn node_creation_commit(&self, node_id: NodeId) -> Option<StateId> {
+        self.node_lifetime
+            .get(&node_id)
+            .map(|(created, _)| *created)
+    }
+
+    /// Get the commit where a node was deleted, if ever.
+    pub fn node_deletion_commit(&self, node_id: NodeId) -> Option<StateId> {
+        self.node_lifetime
+            .get(&node_id)
+            .and_then(|(_, deleted)| *deleted)
     }
 
     /// Check if an edge existed at a specific commit.
@@ -381,6 +402,20 @@ impl TemporalIndex {
             }
         }
 
+        changed.into_iter().collect()
+    }
+
+    /// Get all nodes that changed (created, deleted, or modified) within a commit range.
+    pub fn nodes_changed_in_range(&self, start: StateId, end: StateId) -> Vec<NodeId> {
+        if start > end {
+            return Vec::new();
+        }
+        let mut changed = HashSet::new();
+        for commit in start..=end {
+            for node in self.nodes_changed_in_commit(commit) {
+                changed.insert(node);
+            }
+        }
         changed.into_iter().collect()
     }
 

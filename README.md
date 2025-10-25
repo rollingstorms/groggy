@@ -49,15 +49,17 @@ younger_nodes = g.nodes[g.nodes["age"] < 30]
 g.connected_components(inplace=True, label='component')
 
 # Pipeline-style algorithms with g.apply()
-g.apply(pagerank(max_iter=10, output_attr="score"))
-print(g.nodes.table().sort_by("score").tail(10))
+g.apply(pagerank(max_iter=10, output_attr="pagerank_score"))
+print(g.nodes.table().sort_by("pagerank_scorescore").tail(10))
 
 # Run another algorithm - Label Propagation
 g.apply(label_propagation(max_iter=10, output_attr="label"))
 print("Number of Communities Found:", g.nodes["label"].nunique())
 
 # Viz. the graph
-g.viz.show(node_color="label")
+g.viz.show(node_color="label", 
+		   edge_color="pagerank_score",
+		   node_label="node_id")
 ```
 
 ## **A Little Graph Theory:**
