@@ -3,13 +3,13 @@
 
 # groggy
 
-**A graph analytics library for Python with a Rust core**
-
+### a graph analytics library for Python with a Rust core
 ---
 
 ## 👀 **What is groggy?**
-
 groggy is a modern graph analytics library that combines **graph topology** with **tabular data operations**. Built with a high-performance Rust core and intuitive Python API, groggy lets you seamlessly work with graph data using familiar table-like operations.
+
+At groggy, we believe structure is computation.
 
 ## **Quick Start:**
 
@@ -61,19 +61,26 @@ g.viz.show(node_color="label",
 		   edge_color="pagerank_score",
 		   node_label="node_id")
 ```
+## **Structural Computing**
+
+groggy isn’t just another graph library — it’s the beginning of a broader idea called structural computing.
+
+In structural computing, relationships themselves become the language of computation.
+It treats tables, graphs, and matrices not as separate data models, but as different views of the same structure — the same underlying memory, reinterpreted through context.
+
+Here, structure and signal are equal — both are first-class citizens.
+Computation flows naturally across form, where structure is computation.
+
+groggy makes a home for that idea — the brick from which the building will rise.
 
 ## **A Little Graph Theory:**
 
 A graph is composed of nodes and edges…or is it vertices and edges? or maybe nodes and links?
-Let's start over.
 
-At its core, **a graph is a network** - a collection of entities (nodes) and the relationships (edges) between them. That's the first truth of graph theory: 
+At its core, **a graph is a network** - a collection of entities (nodes) and the relationships (edges) between them. Those are the first truths of graph theory: 
 
-**Everything is connected.** 
-
-The second truth is more interesting: 
-
-**Connections carry meaning.**
+Everything is connected, and
+connections carry meaning.
 
 Edges aren't just lines on a diagram — they represent interactions, flows, dependencies, or influence. And when you map those connections, entire hidden structures begin to reveal themselves:
 - Communities of related entities
@@ -342,3 +349,4 @@ groggy builds on the excellent work of:
 - **Rust ecosystem**: Especially PyO3 for Python bindings
 - **Graph libraries**: NetworkX, igraph, and others for inspiration  
 - **Data science tools**: Pandas, NumPy for API design patterns
+  
