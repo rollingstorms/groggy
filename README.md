@@ -242,7 +242,7 @@ g.edges.table().to_csv("edges.csv")
 
 ⸻
 
-## 9) Core architecture (how it holds together)
+## 9) Core Architecture
 
 Three tiers:
 	•	**Rust Core** — memory-safe performance, columnar ops, and core graph/state machinery.
@@ -250,8 +250,6 @@ Three tiers:
 	•	**Python API** — the user-facing surface that reads like you think, with chains, masks, and friendly data interchange.
 
 This separation keeps groggy fast, composable, and future-proof while still feeling Pythonic.
-
-⸻
 
 ⸻
 
