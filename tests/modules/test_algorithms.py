@@ -178,11 +178,11 @@ class TestPathfinding:
         """Test neighborhood extraction"""
         graph, node_ids = self.get_test_graph()
 
-        # neighborhood should work (verified in comprehensive tests)
+        # neighborhood should return NeighborhoodArray (specialized SubgraphArray with metadata)
         neighborhood = graph.neighborhood(node_ids[2])
         assert neighborhood is not None, "neighborhood() should return result"
-        assert type(neighborhood).__name__ == 'NeighborhoodResult', \
-            "Should return NeighborhoodResult"
+        assert type(neighborhood).__name__ == 'NeighborhoodArray', \
+            "Should return NeighborhoodArray"
 
     def test_neighbors(self):
         """Test getting node neighbors"""

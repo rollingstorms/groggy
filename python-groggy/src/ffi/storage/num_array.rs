@@ -469,6 +469,16 @@ impl PyNumArray {
     pub fn get_list(&self, py: Python) -> PyResult<PyObject> {
         self.inner.to_list(py)
     }
+
+    /// Convert to int64 vector (public method for indexing)
+    pub fn to_int64_vec(&self) -> Vec<i64> {
+        self.inner.to_int64_vec()
+    }
+
+    /// Convert to bool vector (public method for indexing)
+    pub fn to_bool_vec(&self) -> Vec<bool> {
+        self.inner.to_bool_vec()
+    }
 }
 
 #[pymethods]
@@ -884,6 +894,26 @@ impl PyNumArray {
     /// Count non-null values (for NumArray, all values are non-null by default)
     fn count(&self) -> usize {
         self.inner.len()
+    }
+
+    /// Detect missing/null values in the array
+    /// Returns a boolean NumArray where True indicates a null value
+    /// Similar to pandas Series.isna()
+    /// For NumArray, all values are non-null, so this returns all False
+    fn isna(&self) -> PyNumArray {
+        let len = self.inner.len();
+        let bool_values = vec![false; len];
+        PyNumArray::new_bool(bool_values)
+    }
+
+    /// Detect non-missing/non-null values in the array
+    /// Returns a boolean NumArray where True indicates a non-null value
+    /// Similar to pandas Series.notna()
+    /// For NumArray, all values are non-null, so this returns all True
+    fn notna(&self) -> PyNumArray {
+        let len = self.inner.len();
+        let bool_values = vec![true; len];
+        PyNumArray::new_bool(bool_values)
     }
 
     /// Count unique values

@@ -41,7 +41,7 @@ impl Default for DisplayConfig {
             max_rows: 10,
             max_cols: 8,
             max_width: 120,
-            precision: 2,
+            precision: 6,  // Increased from 2 to 6 for better precision in scientific data
             use_color: console::Term::stdout().features().colors_supported(),
         }
     }

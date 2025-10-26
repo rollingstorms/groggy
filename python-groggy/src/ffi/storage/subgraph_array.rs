@@ -35,6 +35,21 @@ impl PySubgraphArray {
         Self { inner: subgraphs }
     }
 
+    /// Get length of array (public accessor)
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Check if empty (public accessor)
+    pub fn is_empty_pub(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Get reference to inner vec (public accessor)
+    pub fn as_vec(&self) -> &Vec<PySubgraph> {
+        &self.inner
+    }
+
     /// Helper: Extract multiple columns from each subgraph's nodes and return as TableArray
     fn extract_columns_as_tables(&self, py: Python, columns: &[String]) -> PyResult<PyObject> {
         use groggy::storage::array::BaseArray;

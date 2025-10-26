@@ -7,11 +7,10 @@ use crate::ffi::api::pipeline::{
     py_build_pipeline, py_drop_pipeline, py_run_pipeline, PyPipelineHandle,
 };
 use crate::ffi::storage::subgraph_array::PySubgraphArray;
-use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
 // use crate::ffi::core::path_result::PyPathResult; // Unused
 use groggy::storage::array::BaseArray;
 use groggy::subgraphs::Subgraph;
-use groggy::traits::{GraphEntity, NeighborhoodOperations, SubgraphOperations};
+use groggy::traits::{GraphEntity, SubgraphOperations};
 use groggy::{AttrValue, EdgeId, NodeId, SimilarityMetric};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
@@ -972,22 +971,9 @@ impl PySubgraph {
         // Create PyGraphAnalysis and delegate to it
         let mut analysis_handler = PyGraphAnalysis::new(Py::new(py, py_graph)?)?;
         let result = analysis_handler.neighborhood(py, central_nodes_vec, Some(hops), None)?;
-        let PyNeighborhoodResult { inner } = result;
-        let neighborhoods = inner.neighborhoods;
-
-        // Convert the NeighborhoodResult into a SubgraphArray for Python consumption
-        let mut subgraphs = Vec::with_capacity(neighborhoods.len());
-        for neighborhood in neighborhoods.into_iter() {
-            let core_subgraph = groggy::subgraphs::Subgraph::new(
-                neighborhood.graph_ref(),
-                neighborhood.node_set().clone(),
-                neighborhood.edge_set().clone(),
-                format!("neighborhood_hops_{}", neighborhood.hops()),
-            );
-            subgraphs.push(PySubgraph::from_core_subgraph(core_subgraph)?);
-        }
-
-        Ok(PySubgraphArray::new(subgraphs))
+        
+        // Convert the NeighborhoodArray into a SubgraphArray for Python consumption
+        Ok(result.inner().clone())
     }
 
     /// Sample k nodes from this subgraph randomly

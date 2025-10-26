@@ -18,7 +18,7 @@ pub struct PyDisplayConfig {
 impl PyDisplayConfig {
     /// Create new DisplayConfig with default settings
     #[new]
-    #[pyo3(signature = (max_rows=10, max_cols=50, max_width=120, precision=2, use_color=true))]
+    #[pyo3(signature = (max_rows=10, max_cols=50, max_width=120, precision=6, use_color=true))]
     pub fn new(
         max_rows: usize,
         max_cols: usize,
@@ -68,6 +68,18 @@ impl PyDisplayConfig {
     #[setter]
     pub fn set_max_cols(&mut self, value: usize) {
         self.config.max_cols = value;
+    }
+
+    /// Get precision setting
+    #[getter]
+    pub fn precision(&self) -> usize {
+        self.config.precision
+    }
+
+    /// Set precision setting
+    #[setter]
+    pub fn set_precision(&mut self, value: usize) {
+        self.config.precision = value;
     }
 
     /// String representation

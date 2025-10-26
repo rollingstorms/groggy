@@ -4,7 +4,7 @@
 
 use crate::ffi::storage::array::PyBaseArray;
 use crate::ffi::storage::table::PyBaseTable;
-use crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult;
+use crate::ffi::subgraphs::neighborhood::PyNeighborhoodArray;
 use crate::ffi::utils::graph_error_to_py_err;
 use groggy::subgraphs::{NeighborhoodResult, NeighborhoodSubgraph};
 use groggy::traits::{NeighborhoodOperations, SubgraphOperations};
@@ -146,7 +146,7 @@ impl PyGraphAnalysis {
         center_nodes: Vec<NodeId>,
         radius: Option<usize>,
         max_nodes: Option<usize>,
-    ) -> PyResult<PyNeighborhoodResult> {
+    ) -> PyResult<PyNeighborhoodArray> {
         let radius = radius.unwrap_or(1);
         let _max_nodes = max_nodes.unwrap_or(100);
 
@@ -230,7 +230,7 @@ impl PyGraphAnalysis {
             .collect();
         result.neighborhoods = neighborhoods;
 
-        Ok(PyNeighborhoodResult { inner: result })
+        PyNeighborhoodArray::from_result(result)
     }
 
     /// Get shortest path - PURE DELEGATION to core

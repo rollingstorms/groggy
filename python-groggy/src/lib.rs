@@ -32,7 +32,7 @@ pub use ffi::storage::table_array::{
 pub use ffi::storage::table_array_core::{PyTableArrayCore, PyTableArrayCoreIterator};
 pub use ffi::subgraphs::component::PyComponentSubgraph;
 pub use ffi::subgraphs::neighborhood::{
-    PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph,
+    PyNeighborhoodArray, PyNeighborhoodResult, PyNeighborhoodStats, PyNeighborhoodSubgraph,
 };
 // pub use ffi::storage::path_result::PyPathResult; // Unused
 pub use ffi::query::query::{PyAttributeFilter, PyEdgeFilter, PyNodeFilter};
@@ -77,17 +77,62 @@ fn num_array(values: Vec<f64>) -> PyResult<PyNumArray> {
     Ok(PyNumArray::new(values))
 }
 
-/// Create a BaseArray from a Python list or array-like object
+/// Create a BaseArray or specialized array from a Python list
+///
+/// This function intelligently handles:
+/// - Primitive values (int, float, str, bool) -> BaseArray
+/// - Groggy Subgraph objects -> SubgraphArray
+/// - Groggy NeighborhoodSubgraph objects -> SubgraphArray
 ///
 /// Examples:
 ///   gr.array([1, 2, 3, 4])
 ///   gr.array(['a', 'b', 'c'])
 ///   gr.array([1.0, 2.5, 3.7])
+///   gr.array(neighborhood.neighborhoods)  # List of NeighborhoodSubgraph
+///   gr.array([subgraph1, subgraph2])      # List of Subgraph
 #[pyfunction]
 #[pyo3(signature = (values))]
-fn array(values: Vec<PyObject>) -> PyResult<PyBaseArray> {
-    // Convert PyObjects to AttrValues
+fn array(values: Vec<PyObject>) -> PyResult<PyObject> {
     Python::with_gil(|py| {
+        if values.is_empty() {
+            // Empty array -> return empty BaseArray
+            return Ok(PyBaseArray {
+                inner: ::groggy::storage::array::BaseArray::new(vec![]),
+            }
+            .into_py(py));
+        }
+
+        // Check the type of the first element to determine what kind of array to create
+        let first = &values[0];
+
+        // Try to extract as Subgraph
+        if let Ok(_) = first.extract::<crate::ffi::subgraphs::subgraph::PySubgraph>(py) {
+            let subgraphs: Result<Vec<crate::ffi::subgraphs::subgraph::PySubgraph>, _> =
+                values.iter().map(|v| v.extract::<crate::ffi::subgraphs::subgraph::PySubgraph>(py)).collect();
+            
+            if let Ok(subgraphs) = subgraphs {
+                return Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(subgraphs).into_py(py));
+            }
+        }
+
+        // Try to extract as NeighborhoodSubgraph
+        if let Ok(_neighborhood_subgraph) = first.extract::<crate::ffi::subgraphs::neighborhood::PyNeighborhoodSubgraph>(py) {
+            // Convert NeighborhoodSubgraph to regular Subgraph
+            let subgraphs: Result<Vec<crate::ffi::subgraphs::subgraph::PySubgraph>, _> = values
+                .iter()
+                .map(|v| {
+                    let ns = v.extract::<crate::ffi::subgraphs::neighborhood::PyNeighborhoodSubgraph>(py)?;
+                    // Get the underlying subgraph
+                    ns.subgraph(py)
+                })
+                .collect();
+
+            if let Ok(subgraphs) = subgraphs {
+                return Ok(crate::ffi::storage::subgraph_array::PySubgraphArray::new(subgraphs).into_py(py));
+            }
+        }
+
+        // Default: Convert to AttrValues for BaseArray
         let mut attr_values = Vec::new();
         for value in values {
             let attr_value = crate::ffi::utils::python_value_to_attr_value(value.as_ref(py))?;
@@ -95,7 +140,8 @@ fn array(values: Vec<PyObject>) -> PyResult<PyBaseArray> {
         }
         Ok(PyBaseArray {
             inner: ::groggy::storage::array::BaseArray::new(attr_values),
-        })
+        }
+        .into_py(py))
     })
 }
 
@@ -538,6 +584,7 @@ fn _groggy(py: Python, m: &PyModule) -> PyResult<()> {
 
     // Register neighborhood sampling system
     m.add_class::<PyNeighborhoodSubgraph>()?;
+    m.add_class::<PyNeighborhoodArray>()?;
     m.add_class::<PyNeighborhoodResult>()?;
     m.add_class::<PyNeighborhoodStats>()?;
 

@@ -9,7 +9,7 @@ use std::os::raw::c_long;
 // PyBoolArray functionality integrated into unified NumArray
 
 /// Convert Python indexing object to SliceIndex
-pub fn python_index_to_slice_index(py: Python, index: &PyAny) -> PyResult<SliceIndex> {
+pub fn python_index_to_slice_index(_py: Python, index: &PyAny) -> PyResult<SliceIndex> {
     // Handle single integer
     if let Ok(int_val) = index.extract::<i64>() {
         return Ok(SliceIndex::Single(int_val));
@@ -71,10 +71,59 @@ pub fn python_index_to_slice_index(py: Python, index: &PyAny) -> PyResult<SliceI
     if let Ok(num_array) = index.extract::<PyRef<crate::ffi::storage::num_array::PyNumArray>>() {
         if num_array.get_dtype() == "bool" {
             // Extract bool data from unified NumArray
-            let bool_values: Vec<bool> = num_array.get_list(py)?.extract(py)?;
+            let bool_values = num_array.to_bool_vec();
             let bool_array = groggy::storage::BoolArray::new(bool_values);
             return Ok(SliceIndex::BoolArray(bool_array));
+        } else {
+            // Handle NumArray with numeric dtype for fancy indexing
+            let int_values = num_array.to_int64_vec();
+            return Ok(SliceIndex::List(int_values));
         }
+    }
+
+    // Handle BaseArray for indexing
+    if let Ok(base_array) = index.extract::<PyRef<crate::ffi::storage::array::PyBaseArray>>() {
+        // Try to extract as integers for fancy indexing
+        let values: Vec<_> = base_array.inner.iter().cloned().collect();
+        
+        // Check if all values are integers
+        let mut int_indices = Vec::new();
+        let mut is_all_int = true;
+        for val in values.iter() {
+            match val {
+                groggy::types::AttrValue::SmallInt(i) => int_indices.push(*i as i64),
+                groggy::types::AttrValue::Int(i) => int_indices.push(*i),
+                groggy::types::AttrValue::Bool(_) => {
+                    is_all_int = false;
+                    break;
+                }
+                _ => {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(
+                        "BaseArray indexing requires integer or boolean values",
+                    ));
+                }
+            }
+        }
+        
+        if is_all_int {
+            return Ok(SliceIndex::List(int_indices));
+        }
+        
+        // Check if all values are booleans
+        let mut bool_values = Vec::new();
+        for val in values.iter() {
+            match val {
+                groggy::types::AttrValue::Bool(b) => bool_values.push(*b),
+                _ => {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(
+                        "BaseArray must contain all integers or all booleans for indexing",
+                    ));
+                }
+            }
+        }
+        
+        let bool_array = groggy::storage::BoolArray::new(bool_values);
+        return Ok(SliceIndex::BoolArray(bool_array));
     }
 
     // Handle Python list of booleans

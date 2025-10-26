@@ -1328,7 +1328,7 @@ impl PyGraph {
         center_nodes: &PyAny,
         radius: Option<usize>,
         max_nodes: Option<usize>,
-    ) -> PyResult<crate::ffi::subgraphs::neighborhood::PyNeighborhoodResult> {
+    ) -> PyResult<crate::ffi::subgraphs::neighborhood::PyNeighborhoodArray> {
         // Convert center_nodes to Vec<NodeId> - accept both single node and sequence
         let center_nodes_vec = if let Ok(single_node) = center_nodes.extract::<NodeId>() {
             // Single node passed
