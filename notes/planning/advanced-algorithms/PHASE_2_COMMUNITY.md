@@ -17,18 +17,20 @@ must support weighted graphs, provide quality metrics, and compose with pipeline
 ### Planned Additions
 
 #### 2.1 Leiden Algorithm
-**Priority**: High (Louvain improvement)
+**Priority**: High (Louvain improvement)  
+**File**: `src/algorithms/community/leiden.rs`  
+**Status**: ✅ Implementation complete, benchmarking pending
 
 Leiden improves on Louvain by guaranteeing connected communities and faster convergence.
 
-- [ ] Rust core implementation in `src/algorithms/community/leiden.rs`
-- [ ] Move proposal phase with quality function
-- [ ] Refinement phase for connectivity
-- [ ] Aggregation phase
-- [ ] Parameters: `resolution`, `iterations`, `seed`
-- [ ] Integration with existing modularity helpers
-- [ ] Benchmark against Louvain (speed, quality)
-- [ ] Python factory: `groggy.algorithms.community.leiden()`
+- ✅ Rust core implementation in `src/algorithms/community/leiden.rs` (444 lines)
+- ✅ Move proposal phase with quality function
+- ✅ Refinement phase for connectivity using `find_connected_components`
+- ✅ Aggregation phase with hierarchical merging
+- ✅ Parameters: `resolution`, `max_iter`, `max_phases`, `seed`, `output_attr`
+- ✅ Integration with existing modularity helpers (`ModularityData`)
+- ✅ Algorithm factory registered in `community::register_algorithms`
+- ⏸️ Benchmark against Louvain (speed, quality)
 
 **Algorithm Notes:**
 - Use same modularity optimization as Louvain
@@ -37,18 +39,21 @@ Leiden improves on Louvain by guaranteeing connected communities and faster conv
 - Typical iterations: 10-20 for convergence
 
 #### 2.2 Infomap
-**Priority**: High (information-theoretic approach)
+**Priority**: High (information-theoretic approach)  
+**File**: `src/algorithms/community/infomap.rs`  
+**Status**: ✅ Implementation complete, benchmarking pending
 
 Random-walk based community detection using information theory.
 
-- [ ] Rust implementation in `src/algorithms/community/infomap.rs`
-- [ ] Random walk simulation with transition probabilities
-- [ ] Code length computation (map equation)
-- [ ] Two-level partitioning
-- [ ] Hierarchical extension (multi-level)
-- [ ] Parameters: `teleportation`, `num_trials`, `seed`
-- [ ] Support weighted graphs
-- [ ] Python factory: `groggy.algorithms.community.infomap()`
+- ✅ Rust implementation in `src/algorithms/community/infomap.rs` (591 lines)
+- ✅ Random walk simulation with transition probabilities (PageRank-style)
+- ✅ Code length computation (map equation)
+- ✅ Two-level partitioning via node-move optimization
+- ⏸️ Hierarchical extension (multi-level)
+- ✅ Parameters: `teleportation`, `num_trials`, `max_iter`, `seed`, `output_attr`
+- ✅ Support weighted graphs
+- ✅ Algorithm factory registered in `community::register_algorithms`
+- ⏸️ Benchmark against Louvain/Leiden (speed, quality)
 
 **Algorithm Notes:**
 - Minimize description length of random walks
@@ -57,40 +62,53 @@ Random-walk based community detection using information theory.
 - Excellent for flow-based communities
 
 #### 2.3 Girvan-Newman
-**Priority**: Medium (edge betweenness based)
+**Priority**: Medium (edge betweenness based)  
+**File**: `src/algorithms/community/girvan_newman.rs`  
+**Status**: ✅ Implementation complete, benchmarking pending
 
 Hierarchical community detection via iterative edge removal.
 
-- [ ] Rust implementation in `src/algorithms/community/girvan_newman.rs`
-- [ ] Edge betweenness computation (reuse existing centrality)
-- [ ] Iterative edge removal with dendrogram tracking
-- [ ] Modularity-based stopping criterion
-- [ ] Return hierarchical clustering
-- [ ] Parameters: `num_levels` or `modularity_threshold`
-- [ ] Python factory: `groggy.algorithms.community.girvan_newman()`
+- ✅ Rust implementation in `src/algorithms/community/girvan_newman.rs` (656 lines)
+- ✅ Edge betweenness computation using Brandes algorithm (BFS/Dijkstra variants)
+- ✅ Iterative edge removal with modularity tracking at each step
+- ✅ Modularity-based stopping criterion (best partition selection)
+- ✅ Union-Find for efficient component detection after edge removal
+- ✅ Parameters: `num_levels`, `modularity_threshold`, `weight_attr`, `output_attr`
+- ✅ Support for weighted graphs
+- ✅ Algorithm factory registered in `community::register_algorithms`
+- ✅ Tests: small graph (two triangles), Karate club network
+- ⏸️ Benchmark against other hierarchical methods
 
 **Algorithm Notes:**
 - O(m²n) complexity (expensive!)
-- Produces dendrogram (hierarchical structure)
+- Produces hierarchical clustering (dendrogram via best modularity)
 - Good for small graphs (<10K edges)
-- Document performance limitations clearly
+- Returns best partition based on modularity peaks
+- Edge betweenness recomputed after each removal
 
 #### 2.4 Connected Components
-**Priority**: Low (already exists implicitly)
+**Priority**: Low (already exists implicitly)  
+**File**: `src/algorithms/community/components.rs`  
+**Status**: ✅ Complete implementation
 
 Formalize connected component detection as algorithm.
 
-- [ ] Builder-friendly wrapper in `src/algorithms/community/components.rs`
-- [ ] Undirected: Union-Find implementation
-- [ ] Directed: Strongly/weakly connected variants
-- [ ] Support incremental updates
-- [ ] Parameters: `mode` (strong|weak|undirected)
-- [ ] Python factory: `groggy.algorithms.community.connected_components()`
+- ✅ Builder-friendly algorithm in `src/algorithms/community/components.rs` (409 lines)
+- ✅ Undirected: Union-Find implementation with path compression and union by rank
+- ✅ Directed: Tarjan's algorithm for strongly connected components
+- ✅ Directed: Weak connectivity (ignores direction, uses Union-Find)
+- ✅ Parameters: `mode` (strong|weak|undirected), `output_attr`
+- ✅ Algorithm factory registered in `community::register_algorithms`
+- ✅ Comprehensive tests (undirected, strong, weak vs strong comparisons)
+- ⏸️ Support incremental updates (future enhancement)
+- ⏸️ Temporal analysis integration (component evolution tracking)
 
 **Algorithm Notes:**
-- O(m α(n)) with union-find (nearly linear)
+- O(m α(n)) with union-find for undirected/weak (nearly linear)
+- O(m + n) for strong connectivity via Tarjan's algorithm
+- `UnionFind` helper in `src/algorithms/community/utils.rs`
 - Baseline for multi-component graphs
-- Integrate with temporal analysis (component evolution)
+- Uses bulk attribute operations (`set_node_attrs`) for efficiency
 
 #### 2.5 Hierarchical Agglomerative Clustering
 **Priority**: Medium (dendrogram support)
