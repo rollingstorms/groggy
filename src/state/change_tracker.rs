@@ -128,16 +128,33 @@ impl ChangeTracker {
     ) where
         T: Into<usize> + Copy,
     {
-        // Delegate to strategy for bulk recording
-        for &(entity_id, ref attr_name, old_index, new_index) in changes {
-            let id = entity_id.into();
-            if is_node {
-                self.strategy
-                    .record_node_attr_change(id, attr_name.clone(), old_index, new_index);
-            } else {
-                self.strategy
-                    .record_edge_attr_change(id, attr_name.clone(), old_index, new_index);
-            }
+        // Convert to appropriate type and delegate to strategy's bulk method
+        if is_node {
+            let node_changes: Vec<(NodeId, AttrName, Option<usize>, usize)> = changes
+                .iter()
+                .map(|&(entity_id, ref attr_name, old_index, new_index)| {
+                    (
+                        entity_id.into() as NodeId,
+                        attr_name.clone(),
+                        old_index,
+                        new_index,
+                    )
+                })
+                .collect();
+            self.strategy.record_node_attr_changes_bulk(&node_changes);
+        } else {
+            let edge_changes: Vec<(EdgeId, AttrName, Option<usize>, usize)> = changes
+                .iter()
+                .map(|&(entity_id, ref attr_name, old_index, new_index)| {
+                    (
+                        entity_id.into() as EdgeId,
+                        attr_name.clone(),
+                        old_index,
+                        new_index,
+                    )
+                })
+                .collect();
+            self.strategy.record_edge_attr_changes_bulk(&edge_changes);
         }
     }
 

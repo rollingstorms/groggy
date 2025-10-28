@@ -1,21 +1,23 @@
 //! Connected Components algorithm
 //!
-//! Finds connected components in a graph using Union-Find (for undirected graphs)
-//! or recursive traversal (for directed graphs with strong/weak connectivity).
+//! Finds connected components in a graph using optimized TraversalEngine (for undirected graphs)
+//! or Tarjan's algorithm (for directed graphs with strong connectivity).
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 
-use super::utils::UnionFind;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
-    Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
-    ParameterType,
+    Algorithm, AlgorithmMetadata, AlgorithmOutput, AlgorithmParamValue, Context, CostHint,
+    ParameterMetadata, ParameterType,
 };
+use crate::query::traversal::{TraversalEngine, TraversalOptions};
+use crate::subgraphs::subgraph::{ComponentCacheComponent, ComponentCacheMode};
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
-use crate::types::{AttrName, AttrValue, NodeId};
+use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
 
 /// Mode for connected component detection
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,6 +52,16 @@ impl ComponentMode {
     }
 }
 
+impl From<ComponentMode> for ComponentCacheMode {
+    fn from(mode: ComponentMode) -> Self {
+        match mode {
+            ComponentMode::Undirected => ComponentCacheMode::Undirected,
+            ComponentMode::Weak => ComponentCacheMode::Weak,
+            ComponentMode::Strong => ComponentCacheMode::Strong,
+        }
+    }
+}
+
 /// Connected Components algorithm.
 ///
 /// Detects connected components using efficient Union-Find for undirected/weak
@@ -58,6 +70,12 @@ impl ComponentMode {
 pub struct ConnectedComponents {
     mode: ComponentMode,
     output_attr: AttrName,
+}
+
+#[derive(Debug)]
+struct ComponentComputation {
+    node_assignments: Arc<Vec<(NodeId, i64)>>,
+    components: Arc<Vec<Vec<NodeId>>>,
 }
 
 impl ConnectedComponents {
@@ -93,56 +111,137 @@ impl ConnectedComponents {
         }
     }
 
-    /// Compute undirected or weakly connected components using Union-Find
+    /// Compute undirected or weakly connected components using optimized TraversalEngine
+    ///
+    /// This delegates to the fast core implementation that uses BFS with zero-copy
+    /// adjacency snapshot access for maximum performance.
+    ///
+    /// Returns Vec directly to avoid unnecessary HashMap intermediate conversion.
     fn compute_undirected_or_weak(
         &self,
+        ctx: &mut Context,
         subgraph: &Subgraph,
         nodes: &[NodeId],
-    ) -> Result<HashMap<NodeId, i64>> {
-        // Initialize Union-Find
-        let mut uf = UnionFind::new(nodes);
-
-        // Union all edges (ignoring direction for weak connectivity)
-        for node in nodes {
-            if let Ok(neighbors) = subgraph.neighbors(*node) {
-                for neighbor in neighbors {
-                    uf.union(*node, neighbor);
-                }
-            }
+    ) -> Result<ComponentComputation> {
+        let cache_mode: ComponentCacheMode = self.mode.into();
+        if let Some(cached) = subgraph.component_cache_get(cache_mode) {
+            let components_vec: Vec<Vec<NodeId>> = cached
+                .components
+                .iter()
+                .map(|component| component.nodes.iter().copied().collect())
+                .collect();
+            return Ok(ComponentComputation {
+                node_assignments: cached.assignments.clone(),
+                components: Arc::new(components_vec),
+            });
         }
 
-        // Get components and assign sequential IDs
-        let components = uf.get_components();
-        let mut node_to_component = HashMap::new();
-        for (component_id, (_, members)) in components.iter().enumerate() {
-            for &node in members {
-                node_to_component.insert(node, component_id as i64);
+        // Use the fast TraversalEngine implementation (same as sg.connected_components())
+        let mut traversal_engine = TraversalEngine::new();
+        let options = TraversalOptions::default();
+
+        let traversal_result = {
+            let graph_ref = subgraph.graph();
+            let graph_borrow = graph_ref.borrow();
+            let pool = graph_borrow.pool();
+            let space = graph_borrow.space();
+            ctx.with_scoped_timer("community.connected_components.traversal", || {
+                traversal_engine.connected_components_for_nodes(
+                    &pool,
+                    space,
+                    nodes.to_vec(),
+                    options,
+                )
+            })?
+        };
+
+        let mut node_values = Vec::with_capacity(nodes.len());
+        let mut component_nodes = Vec::with_capacity(traversal_result.components.len());
+        let mut cache_components = Vec::with_capacity(traversal_result.components.len());
+
+        for (component_id, component) in traversal_result.components.into_iter().enumerate() {
+            for node in &component.nodes {
+                node_values.push((*node, component_id as i64));
             }
+
+            let node_vec = component.nodes;
+            let edge_vec = component.edges;
+
+            component_nodes.push(node_vec.clone());
+
+            cache_components.push(ComponentCacheComponent {
+                nodes: Arc::new(node_vec),
+                edges: Arc::new(edge_vec),
+            });
         }
 
-        Ok(node_to_component)
+        let assignments_arc = Arc::new(node_values);
+        let components_arc = Arc::new(component_nodes);
+        if !cache_components.is_empty() {
+            subgraph.component_cache_store(
+                cache_mode,
+                assignments_arc.clone(),
+                Arc::new(cache_components),
+            );
+        }
+
+        Ok(ComponentComputation {
+            node_assignments: assignments_arc,
+            components: components_arc,
+        })
     }
 
     /// Compute strongly connected components using Tarjan's algorithm
-    fn compute_strong(&self, subgraph: &Subgraph, nodes: &[NodeId]) -> Result<HashMap<NodeId, i64>> {
+    fn compute_strong(
+        &self,
+        ctx: &mut Context,
+        subgraph: &Subgraph,
+        nodes: &[NodeId],
+    ) -> Result<ComponentComputation> {
+        if let Some(cached) = subgraph.component_cache_get(ComponentCacheMode::Strong) {
+            let components_vec: Vec<Vec<NodeId>> = cached
+                .components
+                .iter()
+                .map(|component| component.nodes.iter().copied().collect())
+                .collect();
+            return Ok(ComponentComputation {
+                node_assignments: cached.assignments.clone(),
+                components: Arc::new(components_vec),
+            });
+        }
+
         // Build adjacency list from edges table
-        let edges_table = subgraph.edges_table()?;
-        let edge_tuples = edges_table.as_tuples()?;
-        
+        let edges_table = ctx
+            .with_scoped_timer("community.connected_components.strong.edges_table", || {
+                subgraph.edges_table()
+            })?;
+        let edge_tuples = ctx
+            .with_scoped_timer("community.connected_components.strong.edge_tuples", || {
+                edges_table.as_tuples()
+            })?;
+
         let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
-        
+
         // Initialize empty adjacency lists for all nodes
         for node in nodes {
             adjacency.insert(*node, Vec::new());
         }
-        
+
         // Build adjacency list from edges (only include edges where both nodes are in our subgraph)
-        let node_set: HashSet<NodeId> = nodes.iter().copied().collect();
-        for (_edge_id, source, target) in edge_tuples {
-            if node_set.contains(&source) && node_set.contains(&target) {
-                adjacency.entry(source).or_insert_with(Vec::new).push(target);
-            }
-        }
+        ctx.with_scoped_timer(
+            "community.connected_components.strong.build_adjacency",
+            || {
+                let node_set: HashSet<NodeId> = nodes.iter().copied().collect();
+                for (_edge_id, source, target) in &edge_tuples {
+                    if node_set.contains(source) && node_set.contains(target) {
+                        adjacency
+                            .entry(*source)
+                            .or_insert_with(Vec::new)
+                            .push(*target);
+                    }
+                }
+            },
+        );
 
         // Tarjan's algorithm state
         let mut index = 0;
@@ -176,13 +275,7 @@ impl ConnectedComponents {
                     if !indices.contains_key(&neighbor) {
                         // Neighbor not yet visited; recurse
                         strongconnect(
-                            neighbor,
-                            index,
-                            stack,
-                            on_stack,
-                            indices,
-                            lowlinks,
-                            components,
+                            neighbor, index, stack, on_stack, indices, lowlinks, components,
                             adjacency,
                         );
                         let neighbor_lowlink = lowlinks[&neighbor];
@@ -213,30 +306,67 @@ impl ConnectedComponents {
         }
 
         // Run Tarjan's algorithm on all unvisited nodes
-        for &node in nodes {
-            if !indices.contains_key(&node) {
-                strongconnect(
-                    node,
-                    &mut index,
-                    &mut stack,
-                    &mut on_stack,
-                    &mut indices,
-                    &mut lowlinks,
-                    &mut components,
-                    &adjacency,
-                );
+        ctx.with_scoped_timer("community.connected_components.strong.tarjan", || {
+            for &node in nodes {
+                if !indices.contains_key(&node) {
+                    strongconnect(
+                        node,
+                        &mut index,
+                        &mut stack,
+                        &mut on_stack,
+                        &mut indices,
+                        &mut lowlinks,
+                        &mut components,
+                        &adjacency,
+                    );
+                }
             }
-        }
+        });
 
-        // Assign component IDs
-        let mut node_to_component = HashMap::new();
+        // Assign component IDs - return Vec directly (no HashMap!)
+        let mut node_values = Vec::with_capacity(nodes.len());
         for (component_id, component) in components.iter().enumerate() {
             for &node in component {
-                node_to_component.insert(node, component_id as i64);
+                node_values.push((node, component_id as i64));
             }
         }
+        let mut cache_components = Vec::with_capacity(components.len());
+        let graph = subgraph.graph();
+        let graph_ref = graph.borrow();
+        let all_edges: Vec<EdgeId> = subgraph.edges().iter().copied().collect();
 
-        Ok(node_to_component)
+        for component_nodes in &components {
+            let node_set: HashSet<NodeId> = component_nodes.iter().copied().collect();
+            let mut edge_vec: Vec<EdgeId> = Vec::new();
+            for edge_id in &all_edges {
+                if let Ok((source, target)) = graph_ref.edge_endpoints(*edge_id) {
+                    if node_set.contains(&source) && node_set.contains(&target) {
+                        edge_vec.push(*edge_id);
+                    }
+                }
+            }
+            cache_components.push(ComponentCacheComponent {
+                nodes: Arc::new(component_nodes.clone()),
+                edges: Arc::new(edge_vec),
+            });
+        }
+
+        drop(graph_ref);
+
+        let assignments_arc = Arc::new(node_values);
+        let components_arc = Arc::new(components);
+        if !cache_components.is_empty() {
+            subgraph.component_cache_store(
+                ComponentCacheMode::Strong,
+                assignments_arc.clone(),
+                Arc::new(cache_components),
+            );
+        }
+
+        Ok(ComponentComputation {
+            node_assignments: assignments_arc,
+            components: components_arc,
+        })
     }
 }
 
@@ -249,28 +379,42 @@ impl Algorithm for ConnectedComponents {
         Self::metadata_template()
     }
 
-    fn execute(&self, _ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let nodes: Vec<NodeId> = subgraph.nodes().iter().copied().collect();
+    fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        let nodes: Vec<NodeId> = ctx
+            .with_scoped_timer("community.connected_components.collect_nodes", || {
+                subgraph.nodes().iter().copied().collect()
+            });
 
-        // Compute components based on mode
-        let node_to_component = match self.mode {
+        // Compute components based on mode - returns assignments and component membership
+        let computation = match self.mode {
             ComponentMode::Undirected | ComponentMode::Weak => {
-                self.compute_undirected_or_weak(&subgraph, &nodes)?
+                self.compute_undirected_or_weak(ctx, &subgraph, &nodes)?
             }
-            ComponentMode::Strong => self.compute_strong(&subgraph, &nodes)?,
+            ComponentMode::Strong => self.compute_strong(ctx, &subgraph, &nodes)?,
         };
 
-        // Prepare bulk attributes as HashMap<AttrName, Vec<(NodeId, AttrValue)>>
-        let node_values: Vec<(NodeId, AttrValue)> = node_to_component
-            .into_iter()
-            .map(|(node, comp_id)| (node, AttrValue::Int(comp_id)))
-            .collect();
+        let ComponentComputation {
+            node_assignments,
+            components,
+        } = computation;
 
-        let mut attrs_map = HashMap::new();
-        attrs_map.insert(self.output_attr.clone(), node_values);
+        if ctx.persist_results() {
+            // Convert to AttrValue in single step (no intermediate HashMap!)
+            let attr_values: Vec<(NodeId, AttrValue)> = node_assignments
+                .iter()
+                .map(|(node, comp_id)| (*node, AttrValue::Int(*comp_id)))
+                .collect();
 
-        // Write results in bulk
-        subgraph.set_node_attrs(attrs_map)?;
+            // Write results in bulk
+            ctx.with_scoped_timer("community.connected_components.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })?;
+        } else {
+            ctx.add_output(
+                format!("{}.components", self.id()),
+                AlgorithmOutput::Components((*components).clone()),
+            );
+        }
 
         Ok(subgraph)
     }
@@ -282,10 +426,7 @@ pub fn register(registry: &Registry) -> Result<()> {
 
     registry.register_with_metadata(id.as_str(), metadata, |spec| {
         // Parse mode
-        let mode_str = spec
-            .params
-            .get_text("mode")
-            .unwrap_or("undirected");
+        let mode_str = spec.params.get_text("mode").unwrap_or("undirected");
         let mode = ComponentMode::from_str(mode_str)?;
 
         // Parse output_attr

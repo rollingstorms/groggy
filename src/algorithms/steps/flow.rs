@@ -8,15 +8,15 @@ use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{Step, StepMetadata, StepScope};
 
 /// Update flow values along a path or set of edges.
-/// 
+///
 /// This step takes an existing flow map and updates it with new flow values,
 /// typically representing flow along an augmenting path in max-flow algorithms.
-/// 
+///
 /// # Parameters
 /// - `flow`: Current flow map (edge id → flow value)
 /// - `delta`: Flow change map (edge id → delta value) or scalar delta
 /// - `target`: Output variable name for updated flow
-/// 
+///
 /// # Flow Conservation
 /// This step does NOT validate flow conservation - that's the responsibility
 /// of the algorithm builder. It simply performs element-wise addition.
@@ -59,13 +59,10 @@ impl Step for FlowUpdateStep {
         }
 
         let flow_map = scope.variables().edge_map(&self.flow)?;
-        
+
         // Try to determine if delta is an edge map or scalar
         // First try edge map, then scalar
-        let is_edge_map = scope
-            .variables()
-            .edge_map(&self.delta)
-            .is_ok();
+        let is_edge_map = scope.variables().edge_map(&self.delta).is_ok();
 
         let mut result = HashMap::with_capacity(flow_map.len());
 
@@ -82,7 +79,7 @@ impl Step for FlowUpdateStep {
                 };
                 result.insert(edge, new_flow);
             }
-            
+
             // Add any edges in delta that weren't in flow (treat original flow as 0)
             for (&edge, delta_val) in delta_map.iter() {
                 if !flow_map.contains_key(&edge) {
@@ -99,22 +96,24 @@ impl Step for FlowUpdateStep {
             }
         }
 
-        scope.variables_mut().set_edge_map(self.target.clone(), result);
+        scope
+            .variables_mut()
+            .set_edge_map(self.target.clone(), result);
         Ok(())
     }
 }
 
 /// Compute residual capacity for each edge given current flow and capacity.
-/// 
+///
 /// For each edge (u, v) with capacity c[u,v] and flow f[u,v]:
 /// - Forward residual: c[u,v] - f[u,v]  (remaining capacity)
 /// - Backward residual: f[u,v]  (flow that can be pushed back)
-/// 
+///
 /// # Parameters
 /// - `capacity`: Edge capacity map (edge id → capacity)
 /// - `flow`: Current flow map (edge id → flow value)
 /// - `target`: Output variable for residual capacity map
-/// 
+///
 /// # Output
 /// Creates an edge map where each edge's value is the residual capacity.
 /// For undirected graphs or when backward edges exist, this handles both
@@ -165,21 +164,16 @@ impl Step for ResidualCapacityStep {
         // Compute residual capacity: residual[e] = capacity[e] - flow[e]
         for (&edge, cap_val) in capacity_map.iter() {
             let flow_val = flow_map.get(&edge).unwrap_or(&AlgorithmParamValue::Int(0));
-            
-            let residual_val = subtract_flow_values(
-                cap_val,
-                flow_val,
-                &self.capacity,
-                &self.flow,
-            )?;
-            
+
+            let residual_val = subtract_flow_values(cap_val, flow_val, &self.capacity, &self.flow)?;
+
             // Only include edges with positive residual capacity
             if is_positive(&residual_val)? {
                 residual.insert(edge, residual_val);
             }
         }
 
-        // For edges with flow but no explicit capacity entry, 
+        // For edges with flow but no explicit capacity entry,
         // backward residual equals the flow (can push back)
         for (&edge, flow_val) in flow_map.iter() {
             if !capacity_map.contains_key(&edge) && is_positive(flow_val)? {
@@ -187,7 +181,9 @@ impl Step for ResidualCapacityStep {
             }
         }
 
-        scope.variables_mut().set_edge_map(self.target.clone(), residual);
+        scope
+            .variables_mut()
+            .set_edge_map(self.target.clone(), residual);
         Ok(())
     }
 }
@@ -291,7 +287,7 @@ mod tests {
         assert!(is_positive(&AlgorithmParamValue::Int(5)).unwrap());
         assert!(!is_positive(&AlgorithmParamValue::Int(0)).unwrap());
         assert!(!is_positive(&AlgorithmParamValue::Int(-5)).unwrap());
-        
+
         assert!(is_positive(&AlgorithmParamValue::Float(0.1)).unwrap());
         assert!(!is_positive(&AlgorithmParamValue::Float(0.0)).unwrap());
         assert!(!is_positive(&AlgorithmParamValue::Float(-1.5)).unwrap());
@@ -302,13 +298,13 @@ mod tests {
         // Int + Float -> Float
         let int_val = AlgorithmParamValue::Int(10);
         let float_val = AlgorithmParamValue::Float(2.5);
-        
+
         let result = add_flow_values(&int_val, &float_val, "i", "f").unwrap();
         match result {
             AlgorithmParamValue::Float(v) => assert!((v - 12.5).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
-        
+
         let result = subtract_flow_values(&float_val, &int_val, "f", "i").unwrap();
         match result {
             AlgorithmParamValue::Float(v) => assert!((v - (-7.5)).abs() < 1e-9),
@@ -321,10 +317,10 @@ mod tests {
         // Zero is not positive
         assert!(!is_positive(&AlgorithmParamValue::Int(0)).unwrap());
         assert!(!is_positive(&AlgorithmParamValue::Float(0.0)).unwrap());
-        
+
         // Very small positive value
         assert!(is_positive(&AlgorithmParamValue::Float(1e-10)).unwrap());
-        
+
         // Negative values
         assert!(!is_positive(&AlgorithmParamValue::Int(-1)).unwrap());
         assert!(!is_positive(&AlgorithmParamValue::Float(-0.001)).unwrap());

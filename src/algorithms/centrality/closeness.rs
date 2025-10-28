@@ -64,23 +64,36 @@ impl ClosenessCentrality {
         }
     }
 
-    fn bfs_distances(subgraph: &Subgraph, source: NodeId) -> Result<HashMap<NodeId, usize>> {
-        let mut dist: HashMap<NodeId, usize> = HashMap::new();
+    fn bfs_distances(
+        source: NodeId,
+        node_to_index: &HashMap<NodeId, usize>,
+        neighbors_map: &std::collections::HashMap<NodeId, Vec<(NodeId, crate::types::EdgeId)>>,
+        distance: &mut Vec<f64>,
+    ) -> Result<()> {
+        let source_idx = node_to_index[&source];
         let mut queue = VecDeque::new();
-        dist.insert(source, 0);
+        distance[source_idx] = 0.0;
         queue.push_back(source);
 
         while let Some(node) = queue.pop_front() {
-            let neighbors = subgraph.neighbors(node)?;
-            for neighbor in neighbors {
-                if !dist.contains_key(&neighbor) {
-                    dist.insert(neighbor, dist[&node] + 1);
-                    queue.push_back(neighbor);
+            let node_idx = node_to_index[&node];
+            let node_dist = distance[node_idx];
+
+            // Direct adjacency access (no subgraph.neighbors() call!)
+            if let Some(neighbors) = neighbors_map.get(&node) {
+                for &(neighbor, _edge_id) in neighbors {
+                    if let Some(&neighbor_idx) = node_to_index.get(&neighbor) {
+                        if distance[neighbor_idx] < 0.0 {
+                            // Not visited
+                            distance[neighbor_idx] = node_dist + 1.0;
+                            queue.push_back(neighbor);
+                        }
+                    }
                 }
             }
         }
 
-        Ok(dist)
+        Ok(())
     }
 
     fn compute(&self, ctx: &mut Context, subgraph: &Subgraph) -> Result<HashMap<NodeId, f64>> {
@@ -90,23 +103,43 @@ impl ClosenessCentrality {
             return Ok(HashMap::new());
         }
 
+        // ⚡ OPTIMIZATION: Get adjacency snapshot ONCE (not per source!)
+        let graph = subgraph.graph();
+        let graph_ref = graph.borrow();
+        let pool = graph_ref.pool();
+        let space = graph_ref.space();
+        let (_, _, _, neighbors_map) = space.snapshot(&pool);
+
+        // ⚡ OPTIMIZATION: Create node ID → index mapping for O(1) array access
+        let node_to_index: HashMap<NodeId, usize> = nodes
+            .iter()
+            .enumerate()
+            .map(|(i, &node)| (node, i))
+            .collect();
+
+        // ⚡ OPTIMIZATION: Pre-allocate distance array (reused for ALL sources!)
+        let mut distance = vec![-1.0; n];
+
         let weight_map = self
             .weight_attr
             .as_ref()
             .map(|attr| collect_edge_weights(subgraph, attr));
 
-        let mut scores: HashMap<NodeId, f64> = HashMap::new();
+        let mut scores: Vec<f64> = vec![0.0; n];
+
         for (idx, &source) in nodes.iter().enumerate() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("closeness cancelled"));
             }
 
+            let source_idx = node_to_index[&source];
             let mut sum = 0.0;
             let mut reachable = 0;
 
             if let Some(ref weights) = weight_map {
+                // Weighted case: use Dijkstra
                 let dist = dijkstra(subgraph, source, |u, v| {
-                    weights.get(&(u, v)).map(|w| *w).unwrap_or(1.0)
+                    weights.get(&(u, v)).copied().unwrap_or(1.0)
                 });
                 for (&target, &d) in &dist {
                     if target == source {
@@ -122,18 +155,27 @@ impl ClosenessCentrality {
                     }
                 }
             } else {
-                let dist = Self::bfs_distances(subgraph, source)?;
-                for (&target, &d) in &dist {
-                    if target == source {
+                // ⚡ Unweighted case: use optimized BFS
+                // Reset distance array (much faster than allocating HashMap!)
+                for i in 0..n {
+                    distance[i] = -1.0;
+                }
+
+                Self::bfs_distances(source, &node_to_index, &neighbors_map, &mut distance)?;
+
+                // Sum distances from distance array
+                for i in 0..n {
+                    if i == source_idx {
                         continue;
                     }
-                    if self.harmonic {
-                        if d > 0 {
-                            sum += 1.0 / d as f64;
+                    let d = distance[i];
+                    if d > 0.0 {
+                        if self.harmonic {
+                            sum += 1.0 / d;
+                        } else {
+                            sum += d;
+                            reachable += 1;
                         }
-                    } else {
-                        sum += d as f64;
-                        reachable += 1;
                     }
                 }
             }
@@ -145,11 +187,18 @@ impl ClosenessCentrality {
             } else {
                 0.0
             };
-            scores.insert(source, score);
+            scores[source_idx] = score;
             ctx.emit_iteration(idx, 0);
         }
 
-        Ok(scores)
+        // Convert Vec → HashMap for result
+        let result: HashMap<NodeId, f64> = nodes
+            .iter()
+            .enumerate()
+            .map(|(i, &node)| (node, scores[i]))
+            .collect();
+
+        Ok(result)
     }
 }
 
@@ -167,18 +216,17 @@ impl Algorithm for ClosenessCentrality {
         let scores = self.compute(ctx, &subgraph)?;
         ctx.record_duration("centrality.closeness", start.elapsed());
 
-        let mut attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>> = HashMap::new();
-        attrs.insert(
-            self.output_attr.clone(),
-            scores
-                .into_iter()
-                .map(|(node, score)| (node, AttrValue::Float(score as f32)))
-                .collect(),
-        );
+        if ctx.persist_results() {
+            let attr_values: Vec<(NodeId, AttrValue)> = scores
+                .iter()
+                .map(|(&node, score)| (node, AttrValue::Float(*score as f32)))
+                .collect();
 
-        subgraph
-            .set_node_attrs(attrs)
+            ctx.with_scoped_timer("centrality.closeness.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })
             .map_err(|err| anyhow!("failed to persist closeness scores: {err}"))?;
+        }
         Ok(subgraph)
     }
 }

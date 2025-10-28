@@ -1218,6 +1218,33 @@ pub trait SubgraphOperations: GraphEntity {
         Ok(())
     }
 
+    /// Optimized variant for setting a single node attribute column
+    fn set_node_attr_column(
+        &self,
+        attr_name: AttrName,
+        node_values: Vec<(NodeId, AttrValue)>,
+    ) -> GraphResult<()> {
+        if node_values.is_empty() {
+            return Ok(());
+        }
+
+        let binding = self.graph_ref();
+        let mut graph = binding.borrow_mut();
+
+        // Filter out nodes that no longer exist
+        let filtered: Vec<(NodeId, AttrValue)> = node_values
+            .into_iter()
+            .filter(|(node_id, _)| graph.space().contains_node(*node_id))
+            .collect();
+
+        if filtered.is_empty() {
+            return Ok(());
+        }
+
+        graph.set_node_attr_column(attr_name, filtered)?;
+        Ok(())
+    }
+
     /// Set edge attributes in bulk using optimized vectorized operations
     ///
     /// # Arguments

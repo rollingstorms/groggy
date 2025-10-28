@@ -2929,9 +2929,12 @@ impl Graph {
         &mut self,
         attrs_values: HashMap<AttrName, Vec<(NodeId, AttrValue)>>,
     ) -> GraphResult<()> {
-        // Batch validation - check all nodes exist upfront
-        for node_values in attrs_values.values() {
+        // Optimized single-pass: validate AND collect old indices simultaneously
+        let mut old_indices: HashMap<AttrName, HashMap<NodeId, Option<usize>>> = HashMap::new();
+        for (attr_name, node_values) in &attrs_values {
+            let mut attr_old_indices = HashMap::new();
             for &(node_id, _) in node_values {
+                // Validate node exists
                 if !self.space.contains_node(node_id) {
                     return Err(crate::errors::GraphError::node_not_found(
                         node_id,
@@ -2939,14 +2942,7 @@ impl Graph {
                     )
                     .into());
                 }
-            }
-        }
-
-        // Collect old indices for change tracking before the bulk update
-        let mut old_indices: HashMap<AttrName, HashMap<NodeId, Option<usize>>> = HashMap::new();
-        for (attr_name, node_values) in &attrs_values {
-            let mut attr_old_indices = HashMap::new();
-            for &(node_id, _) in node_values {
+                // Collect old index for change tracking (single pass with validation)
                 let old_index = self.space.get_node_attr_index(node_id, attr_name);
                 attr_old_indices.insert(node_id, old_index);
             }
@@ -2956,11 +2952,11 @@ impl Graph {
         // Use optimized vectorized pool operation
         let index_changes = self.pool.borrow_mut().set_bulk_attrs(attrs_values, true);
 
-        // Update space attribute indices and record changes for history
+        // Update space attribute indices and record changes (optimized bulk recording)
         for (attr_name, entity_indices) in index_changes {
             let attr_old_indices = old_indices.get(&attr_name).unwrap();
 
-            // Build change records for the tracker
+            // Build change records for bulk recording
             let changes: Vec<_> = entity_indices
                 .iter()
                 .map(|&(node_id, new_index)| {
@@ -2969,7 +2965,7 @@ impl Graph {
                 })
                 .collect();
 
-            // Record changes in change tracker
+            // Use bulk recording API (strategy can optimize internally)
             self.change_tracker.record_attr_changes(&changes, true);
 
             // Update space indices
@@ -2982,14 +2978,65 @@ impl Graph {
         Ok(())
     }
 
+    /// Set a single node attribute column using a pre-built vector of values
+    pub fn set_node_attr_column(
+        &mut self,
+        attr_name: AttrName,
+        mut node_values: Vec<(NodeId, AttrValue)>,
+    ) -> GraphResult<()> {
+        if node_values.is_empty() {
+            return Ok(());
+        }
+
+        // Validate nodes and collect previous indices for change tracking
+        let mut old_indices: HashMap<NodeId, Option<usize>> =
+            HashMap::with_capacity(node_values.len());
+        for (node_id, _) in &node_values {
+            if !self.space.contains_node(*node_id) {
+                return Err(crate::errors::GraphError::node_not_found(
+                    *node_id,
+                    "set bulk node attribute column",
+                )
+                .into());
+            }
+            let previous = self.space.get_node_attr_index(*node_id, &attr_name);
+            old_indices.insert(*node_id, previous);
+        }
+
+        // Preserve deterministic ordering by sorting by node id
+        node_values.sort_unstable_by_key(|(node_id, _)| *node_id);
+
+        // Vectorized column append
+        let index_changes =
+            self.pool
+                .borrow_mut()
+                .set_attr_pairs(attr_name.clone(), node_values, true);
+
+        // Apply space index updates and record change tracker entries
+        let mut change_records = Vec::with_capacity(index_changes.len());
+        for (node_id, new_index) in index_changes {
+            let old_index = old_indices.get(&node_id).copied().flatten();
+            change_records.push((node_id, attr_name.clone(), old_index, new_index));
+            self.space
+                .set_node_attr_index(node_id, attr_name.clone(), new_index);
+        }
+        self.change_tracker
+            .record_attr_changes(&change_records, true);
+
+        Ok(())
+    }
+
     /// Set edge attributes in bulk (delegates to existing bulk operations)
     pub fn set_edge_attrs(
         &mut self,
         attrs_values: HashMap<AttrName, Vec<(EdgeId, AttrValue)>>,
     ) -> GraphResult<()> {
-        // Batch validation - check all edges exist upfront
-        for edge_values in attrs_values.values() {
+        // Optimized single-pass: validate AND collect old indices simultaneously
+        let mut old_indices: HashMap<AttrName, HashMap<EdgeId, Option<usize>>> = HashMap::new();
+        for (attr_name, edge_values) in &attrs_values {
+            let mut attr_old_indices = HashMap::new();
             for &(edge_id, _) in edge_values {
+                // Validate edge exists
                 if !self.space.contains_edge(edge_id) {
                     return Err(crate::errors::GraphError::edge_not_found(
                         edge_id,
@@ -2997,14 +3044,7 @@ impl Graph {
                     )
                     .into());
                 }
-            }
-        }
-
-        // Collect old indices for change tracking before the bulk update
-        let mut old_indices: HashMap<AttrName, HashMap<EdgeId, Option<usize>>> = HashMap::new();
-        for (attr_name, edge_values) in &attrs_values {
-            let mut attr_old_indices = HashMap::new();
-            for &(edge_id, _) in edge_values {
+                // Collect old index for change tracking (single pass with validation)
                 let old_index = self.space.get_edge_attr_index(edge_id, attr_name);
                 attr_old_indices.insert(edge_id, old_index);
             }
@@ -3014,11 +3054,11 @@ impl Graph {
         // Use optimized vectorized pool operation
         let index_changes = self.pool.borrow_mut().set_bulk_attrs(attrs_values, false);
 
-        // Update space attribute indices and record changes for history
+        // Update space attribute indices and record changes (optimized bulk recording)
         for (attr_name, entity_indices) in index_changes {
             let attr_old_indices = old_indices.get(&attr_name).unwrap();
 
-            // Build change records for the tracker
+            // Build change records for bulk recording
             let changes: Vec<_> = entity_indices
                 .iter()
                 .map(|&(edge_id, new_index)| {
@@ -3027,7 +3067,7 @@ impl Graph {
                 })
                 .collect();
 
-            // Record changes in change tracker
+            // Use bulk recording API (strategy can optimize internally)
             self.change_tracker.record_attr_changes(&changes, false);
 
             // Update space indices

@@ -113,13 +113,21 @@ impl Algorithm for PageRank {
             return Ok(subgraph);
         }
 
+        // Build NodeId -> index mapping for Vec-based storage
+        let mut node_to_idx: HashMap<NodeId, usize> = HashMap::with_capacity(n);
+        for (idx, &node) in nodes.iter().enumerate() {
+            node_to_idx.insert(node, idx);
+        }
+
         let damping = self.damping;
         let teleport = 1.0 - damping;
+        let teleport_per_node = teleport / n as f64;
 
-        let personalization = if let Some(attr) = &self.personalization_attr {
-            let mut weights = HashMap::new();
+        // Precompute personalization weights as flat Vec
+        let personalization: Option<Vec<f64>> = if let Some(attr) = &self.personalization_attr {
+            let mut weights = vec![1.0; n];
             let mut total = 0.0;
-            for &node in &nodes {
+            for (idx, &node) in nodes.iter().enumerate() {
                 let value = subgraph
                     .get_node_attribute(node, attr)?
                     .and_then(|v| match v {
@@ -128,14 +136,14 @@ impl Algorithm for PageRank {
                         _ => None,
                     })
                     .unwrap_or(1.0);
+                weights[idx] = value;
                 total += value;
-                weights.insert(node, value);
             }
             if total == 0.0 {
                 None
             } else {
-                for value in weights.values_mut() {
-                    *value /= total;
+                for w in &mut weights {
+                    *w = (*w / total) * teleport;
                 }
                 Some(weights)
             }
@@ -143,9 +151,25 @@ impl Algorithm for PageRank {
             None
         };
 
-        let mut rank: HashMap<NodeId, f64> =
-            nodes.iter().map(|&node| (node, 1.0 / n as f64)).collect();
-        let mut next_rank = rank.clone();
+        // Precompute adjacency lists and out-degrees
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n];
+        let mut out_degree: Vec<f64> = vec![0.0; n];
+        
+        for (idx, &node) in nodes.iter().enumerate() {
+            let neighbors = subgraph.neighbors(node)?;
+            adjacency[idx].reserve(neighbors.len());
+            for neighbor in neighbors {
+                if let Some(&neighbor_idx) = node_to_idx.get(&neighbor) {
+                    adjacency[idx].push(neighbor_idx);
+                }
+            }
+            out_degree[idx] = adjacency[idx].len() as f64;
+        }
+
+        // Initialize rank vectors
+        let init_rank = 1.0 / n as f64;
+        let mut rank: Vec<f64> = vec![init_rank; n];
+        let mut next_rank: Vec<f64> = vec![0.0; n];
 
         let start = Instant::now();
         for iteration in 0..self.max_iter {
@@ -153,57 +177,67 @@ impl Algorithm for PageRank {
                 return Err(anyhow!("pagerank cancelled"));
             }
 
-            let mut residual = 0.0;
-            for &node in &nodes {
-                next_rank.insert(node, 0.0);
-            }
+            // Zero out next_rank buffer
+            next_rank.fill(0.0);
 
-            for &node in &nodes {
-                let outgoing = subgraph.neighbors(node)?;
-                let score = rank[&node];
-                if outgoing.is_empty() {
-                    let distribute = score / n as f64;
-                    for &target in &nodes {
-                        *next_rank.entry(target).or_default() += damping * distribute;
-                    }
-                } else {
-                    let distribute = score / outgoing.len() as f64;
-                    for neighbor in outgoing {
-                        *next_rank.entry(neighbor).or_default() += damping * distribute;
+            // Aggregate sink mass in one pass
+            let mut sink_mass = 0.0;
+            for idx in 0..n {
+                if out_degree[idx] == 0.0 {
+                    sink_mass += rank[idx];
+                }
+            }
+            let sink_contribution = damping * sink_mass / n as f64;
+
+            // Distribute rank from non-sink nodes
+            for idx in 0..n {
+                if out_degree[idx] > 0.0 {
+                    let contrib = damping * rank[idx] / out_degree[idx];
+                    for &neighbor_idx in &adjacency[idx] {
+                        next_rank[neighbor_idx] += contrib;
                     }
                 }
             }
 
-            for &node in &nodes {
-                let base = if let Some(weights) = &personalization {
-                    weights.get(&node).copied().unwrap_or(0.0) * teleport
+            // Add teleport and sink contributions, compute residual
+            let mut max_diff = 0.0;
+            for idx in 0..n {
+                let teleport_contrib = if let Some(weights) = &personalization {
+                    weights[idx]
                 } else {
-                    teleport / n as f64
+                    teleport_per_node
                 };
-                let updated = base + next_rank[&node];
-                residual += (updated - rank[&node]).abs();
-                rank.insert(node, updated);
+                let new_rank = teleport_contrib + next_rank[idx] + sink_contribution;
+                let diff = (new_rank - rank[idx]).abs();
+                if diff > max_diff {
+                    max_diff = diff;
+                }
+                next_rank[idx] = new_rank;
             }
+
+            // Swap buffers instead of copying
+            std::mem::swap(&mut rank, &mut next_rank);
 
             ctx.emit_iteration(iteration, 0);
 
-            if residual <= self.tolerance {
+            if max_diff <= self.tolerance {
                 break;
             }
         }
         ctx.record_duration("centrality.pagerank", start.elapsed());
 
-        let mut attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>> = HashMap::new();
-        attrs.insert(
-            self.output_attr.clone(),
-            rank.into_iter()
-                .map(|(node, score)| (node, AttrValue::Float(score as f32)))
-                .collect(),
-        );
+        if ctx.persist_results() {
+            let attr_values: Vec<(NodeId, AttrValue)> = nodes
+                .iter()
+                .enumerate()
+                .map(|(idx, &node)| (node, AttrValue::Float(rank[idx] as f32)))
+                .collect();
 
-        subgraph
-            .set_node_attrs(attrs)
+            ctx.with_scoped_timer("centrality.pagerank.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })
             .map_err(|err| anyhow!("failed to persist PageRank scores: {err}"))?;
+        }
         Ok(subgraph)
     }
 }

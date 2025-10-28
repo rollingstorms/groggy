@@ -15,6 +15,8 @@ use crate::query::query::{EdgeFilter, NodeFilter, QueryEngine};
 use crate::state::space::GraphSpace;
 use crate::storage::pool::GraphPool;
 use crate::types::{AttrName, AttrValue, EdgeId, NodeId};
+use ahash::AHashMap;
+use bitvec::vec::BitVec;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 // use rayon::prelude::*; // TODO: Re-enable when parallel traversal is implemented
@@ -500,105 +502,304 @@ impl TraversalEngine {
     ) -> GraphResult<ConnectedComponentsResult> {
         let start_time = std::time::Instant::now();
 
-        // Use provided nodes
+        if nodes.is_empty() {
+            return Ok(ConnectedComponentsResult {
+                components: Vec::new(),
+                total_components: 0,
+                largest_component_size: 0,
+                execution_time: start_time.elapsed(),
+                preprocessing_time: std::time::Duration::default(),
+                traversal_time: std::time::Duration::default(),
+                postprocessing_time: std::time::Duration::default(),
+            });
+        }
 
-        // Build adjacency snapshot
-        let (_, _, _, _neighbors) = space.snapshot(pool);
+        let preprocess_start = std::time::Instant::now();
 
-        // 🚀 PERFORMANCE: Use Arc reference directly - no O(E) clone needed!
-        // The Arc allows zero-copy sharing of the adjacency map
+        // Fetch CSR adjacency snapshot for the active graph view
+        let (csr_node_ids_arc, csr_offsets_arc, csr_neighbors_arc, csr_edges_arc) =
+            space.snapshot_csr(pool);
+        let csr_node_ids = csr_node_ids_arc.as_ref();
+        let csr_offsets = csr_offsets_arc.as_ref();
+        let csr_neighbors = csr_neighbors_arc.as_ref();
+        let csr_edges = csr_edges_arc.as_ref();
 
-        // Initialize data structures
-        let mut visited = HashSet::new();
+        // Build CSR index lookup (dense when node ids are compact)
+        let csr_dense_threshold = csr_node_ids.len().saturating_mul(8).max(1);
+        let csr_dense_map = csr_node_ids
+            .last()
+            .copied()
+            .filter(|&max_id| max_id <= csr_dense_threshold);
+
+        let csr_dense_lookup = csr_dense_map.map(|max_id| {
+            let mut mapping = vec![usize::MAX; max_id + 1];
+            for (idx, &node_id) in csr_node_ids.iter().enumerate() {
+                if node_id < mapping.len() {
+                    mapping[node_id] = idx;
+                }
+            }
+            mapping
+        });
+
+        let csr_sparse_lookup = if csr_dense_map.is_none() {
+            let mut mapping = AHashMap::with_capacity(csr_node_ids.len());
+            for (idx, &node_id) in csr_node_ids.iter().enumerate() {
+                mapping.insert(node_id, idx);
+            }
+            Some(mapping)
+        } else {
+            None
+        };
+
+        // Pre-compute CSR indices for the requested node set
+        let mut node_csr_indices: Vec<usize> = Vec::with_capacity(nodes.len());
+        for &node_id in &nodes {
+            let csr_index = if let Some(ref dense) = csr_dense_lookup {
+                if node_id < dense.len() {
+                    dense[node_id]
+                } else {
+                    usize::MAX
+                }
+            } else {
+                csr_sparse_lookup
+                    .as_ref()
+                    .and_then(|map| map.get(&node_id).copied())
+                    .unwrap_or(usize::MAX)
+            };
+            node_csr_indices.push(csr_index);
+        }
+
+        // Build local index mapping (dense when possible)
+        let max_node_id = nodes.iter().copied().max().unwrap_or(0);
+        let local_dense_threshold = nodes.len().saturating_mul(8).max(1);
+        let use_dense_local = max_node_id <= local_dense_threshold;
+
+        let local_dense_lookup = if use_dense_local {
+            let mut mapping = vec![usize::MAX; max_node_id + 1];
+            for (idx, &node_id) in nodes.iter().enumerate() {
+                if node_id < mapping.len() {
+                    mapping[node_id] = idx;
+                }
+            }
+            Some(mapping)
+        } else {
+            None
+        };
+
+        let local_sparse_lookup = if use_dense_local {
+            None
+        } else {
+            let mut mapping = AHashMap::with_capacity(nodes.len());
+            for (idx, &node_id) in nodes.iter().enumerate() {
+                mapping.insert(node_id, idx);
+            }
+            Some(mapping)
+        };
+
+        let max_edge_id = csr_edges.iter().copied().max().unwrap_or(0);
+
+        let mut state = self.state_pool.get_state();
+        state.component_work_queue.clear();
+        state.component_nodes.clear();
+        state.component_ids.resize_with(nodes.len(), || usize::MAX);
+        for id in state.component_ids.iter_mut() {
+            *id = usize::MAX;
+        }
+        state.component_membership.resize(nodes.len(), false);
+        for flag in state.component_membership.iter_mut() {
+            *flag = false;
+        }
+        state.component_edge_marks.resize(max_edge_id + 1, false);
+        state.component_edge_touched.clear();
+
+        let preprocessing_time = preprocess_start.elapsed();
+
+        let traversal_start = std::time::Instant::now();
+        let has_node_filter = options.node_filter.is_some();
+
         let mut components = Vec::new();
-
-        // Main component finding loop
         let mut component_count = 0;
 
-        // 🚀 OPTIMIZATION: Pre-mark nodes with component IDs for O(1) edge validation
-        let mut node_component_id: HashMap<NodeId, usize> = HashMap::new();
+        for (start_index, &start_node) in nodes.iter().enumerate() {
+            if state.component_ids[start_index] != usize::MAX {
+                continue;
+            }
 
-        // 🚀 PERFORMANCE: Convert nodes to HashSet for O(1) lookups instead of O(n) contains()
-        let nodes_set: HashSet<NodeId> = nodes.iter().copied().collect();
+            let csr_index = node_csr_indices[start_index];
+            if csr_index == usize::MAX {
+                continue;
+            }
 
-        // BFS for each unvisited node - O(V + E) total using single optimized loop
-        for &start_node in &nodes {
-            if !visited.contains(&start_node) {
-                // 🚀 FAST: Individual node filtering - only check nodes we actually encounter
-                if !self.should_visit_node(pool, space, start_node, &options)? {
+            if has_node_filter && !self.should_visit_node(pool, space, start_node, &options)? {
+                continue;
+            }
+
+            let mut component_nodes = Vec::new();
+            let mut component_edges = Vec::new();
+
+            state.component_ids[start_index] = component_count;
+            state.component_membership[start_index] = true;
+            state.component_work_queue.clear();
+            state.component_nodes.clear();
+            state.component_work_queue.push(start_index);
+
+            let mut queue_head = 0;
+            while queue_head < state.component_work_queue.len() {
+                let current_index = state.component_work_queue[queue_head];
+                queue_head += 1;
+
+                state.component_nodes.push(current_index);
+
+                let current_node = nodes[current_index];
+                component_nodes.push(current_node);
+
+                let csr_index = node_csr_indices[current_index];
+                if csr_index == usize::MAX {
                     continue;
                 }
 
-                // BFS to find component using single optimized loop
-                let mut component_nodes = Vec::new();
-                let mut component_edges = Vec::new();
-                let mut queue = VecDeque::new();
-                let mut edge_set = HashSet::new(); // O(1) duplicate check
+                let start_offset = csr_offsets[csr_index];
+                let end_offset = csr_offsets[csr_index + 1];
 
-                queue.push_back(start_node);
-                visited.insert(start_node);
-                node_component_id.insert(start_node, component_count);
-
-                while let Some(current) = queue.pop_front() {
-                    component_nodes.push(current);
-
-                    // Get neighbors and process edges in single pass
-                    if let Some(current_neighbors) = _neighbors.get(&current) {
-                        for &(neighbor, edge_id) in current_neighbors {
-                            // 🚀 PERFORMANCE FIX: Use O(1) HashSet lookup instead of O(n) Vec contains
-                            if nodes_set.contains(&neighbor) && !visited.contains(&neighbor) {
-                                // 🚀 FAST: Individual node filtering - only check nodes we actually encounter
-                                if self.should_visit_node(pool, space, neighbor, &options)? {
-                                    visited.insert(neighbor);
-                                    node_component_id.insert(neighbor, component_count);
-                                    queue.push_back(neighbor);
-                                }
+                for pos in start_offset..end_offset {
+                    let neighbor = csr_neighbors[pos];
+                    let neighbor_index = if let Some(ref dense) = local_dense_lookup {
+                        if neighbor < dense.len() {
+                            let idx = dense[neighbor];
+                            if idx != usize::MAX {
+                                Some(idx)
+                            } else {
+                                None
                             }
-
-                            // Add edge if both endpoints are in this component and not already added
-                            if let Some(&neighbor_comp_id) = node_component_id.get(&neighbor) {
-                                if neighbor_comp_id == component_count
-                                    && current < neighbor // Avoid duplicates
-                                    && edge_set.insert(edge_id)
-                                {
-                                    component_edges.push(edge_id);
-                                }
-                            }
+                        } else {
+                            None
                         }
+                    } else {
+                        local_sparse_lookup
+                            .as_ref()
+                            .and_then(|map| map.get(&neighbor).copied())
+                    };
+
+                    let Some(neighbor_index) = neighbor_index else {
+                        continue;
+                    };
+
+                    if state.component_ids[neighbor_index] == usize::MAX {
+                        if has_node_filter
+                            && !self.should_visit_node(pool, space, neighbor, &options)?
+                        {
+                            continue;
+                        }
+
+                        state.component_ids[neighbor_index] = component_count;
+                        state.component_membership[neighbor_index] = true;
+                        state.component_work_queue.push(neighbor_index);
                     }
                 }
+            }
 
-                if !component_nodes.is_empty() {
-                    let component_size = component_nodes.len();
-                    component_count += 1;
-                    components.push(ConnectedComponent {
-                        nodes: component_nodes,
-                        edges: component_edges,
-                        size: component_size,
-                        root: start_node,
-                    });
+            state.component_edge_touched.clear();
+            for &local_index in &state.component_nodes {
+                let csr_index = node_csr_indices[local_index];
+                if csr_index == usize::MAX {
+                    continue;
                 }
+
+                let start_offset = csr_offsets[csr_index];
+                let end_offset = csr_offsets[csr_index + 1];
+
+                for pos in start_offset..end_offset {
+                    let neighbor = csr_neighbors[pos];
+                    let neighbor_index = if let Some(ref dense) = local_dense_lookup {
+                        if neighbor < dense.len() {
+                            let idx = dense[neighbor];
+                            if idx != usize::MAX {
+                                Some(idx)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        local_sparse_lookup
+                            .as_ref()
+                            .and_then(|map| map.get(&neighbor).copied())
+                    };
+
+                    let Some(neighbor_index) = neighbor_index else {
+                        continue;
+                    };
+
+                    if !state.component_membership[neighbor_index] {
+                        continue;
+                    }
+
+                    let edge_id = csr_edges[pos];
+                    if edge_id >= state.component_edge_marks.len() {
+                        state.component_edge_marks.resize(edge_id + 1, false);
+                    }
+
+                    if !state.component_edge_marks[edge_id] {
+                        state.component_edge_marks.set(edge_id, true);
+                        state.component_edge_touched.push(edge_id);
+                        component_edges.push(edge_id);
+                    }
+                }
+            }
+
+            for &edge_id in &state.component_edge_touched {
+                if edge_id < state.component_edge_marks.len() {
+                    state.component_edge_marks.set(edge_id, false);
+                }
+            }
+            state.component_edge_touched.clear();
+
+            for &local_index in &state.component_nodes {
+                state.component_membership[local_index] = false;
+            }
+            state.component_nodes.clear();
+            state.component_work_queue.clear();
+
+            if !component_nodes.is_empty() {
+                let component_size = component_nodes.len();
+                component_count += 1;
+                components.push(ConnectedComponent {
+                    nodes: component_nodes,
+                    edges: component_edges,
+                    size: component_size,
+                    root: start_node,
+                });
             }
         }
 
-        // Sort components by size
+        let traversal_time = traversal_start.elapsed();
+
+        self.state_pool.return_state(state);
+
+        let postprocess_start = std::time::Instant::now();
         components.sort_unstable_by(|a, b| b.size.cmp(&a.size));
+        let postprocessing_time = postprocess_start.elapsed();
 
-        let duration = start_time.elapsed();
-        self.stats.record_traversal(
-            "connected_components".to_string(),
-            components.len(),
-            duration,
-        );
-
+        let execution_time = start_time.elapsed();
         let total_components = components.len();
         let largest_component_size = components.iter().map(|c| c.size).max().unwrap_or(0);
+        let visited_nodes: usize = components.iter().map(|c| c.size).sum();
+
+        self.stats.record_traversal(
+            "connected_components".to_string(),
+            visited_nodes,
+            execution_time,
+        );
 
         Ok(ConnectedComponentsResult {
             components,
             total_components,
             largest_component_size,
-            execution_time: duration,
+            execution_time,
+            preprocessing_time,
+            traversal_time,
+            postprocessing_time,
         })
     }
 
@@ -945,6 +1146,12 @@ impl TraversalStatePool {
                 queue: VecDeque::new(),
                 distances: HashMap::new(),
                 predecessors: HashMap::new(),
+                component_work_queue: Vec::new(),
+                component_nodes: Vec::new(),
+                component_ids: Vec::new(),
+                component_membership: Vec::new(),
+                component_edge_marks: BitVec::new(),
+                component_edge_touched: Vec::new(),
             })
     }
 
@@ -961,6 +1168,12 @@ struct TraversalState {
     queue: VecDeque<NodeId>,
     distances: HashMap<NodeId, f64>,
     predecessors: HashMap<NodeId, NodeId>,
+    component_work_queue: Vec<usize>,
+    component_ids: Vec<usize>,
+    component_nodes: Vec<usize>,
+    component_membership: Vec<bool>,
+    component_edge_marks: BitVec,
+    component_edge_touched: Vec<EdgeId>,
 }
 
 /// Configuration for traversal algorithms
@@ -1088,6 +1301,9 @@ pub struct ConnectedComponentsResult {
     pub total_components: usize,
     pub largest_component_size: usize,
     pub execution_time: std::time::Duration,
+    pub preprocessing_time: std::time::Duration,
+    pub traversal_time: std::time::Duration,
+    pub postprocessing_time: std::time::Duration,
 }
 
 /// A connected component

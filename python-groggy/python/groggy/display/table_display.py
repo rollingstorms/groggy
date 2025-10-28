@@ -9,7 +9,7 @@ from .truncation import truncate_rows, truncate_columns, calculate_column_widths
 class TableDisplayFormatter:
     """Formatter for GraphTable rich display with Polars-style formatting."""
     
-    def __init__(self, max_rows: int = 10, max_cols: int = 20, max_width: int = 120, precision: int = 6):
+    def __init__(self, max_rows: int = 10, max_cols: int = 20, max_width: int = 120, precision: int = 2):
         self.max_rows = max_rows
         self.max_cols = max_cols
         self.max_width = max_width

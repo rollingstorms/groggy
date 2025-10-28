@@ -563,6 +563,44 @@ impl GraphPool {
         all_index_changes
     }
 
+    /// Set a single attribute column with explicit entity/value pairs
+    pub fn set_attr_pairs<T>(
+        &mut self,
+        attr_name: AttrName,
+        entity_values: Vec<(T, AttrValue)>,
+        is_node: bool,
+    ) -> Vec<(T, usize)>
+    where
+        T: Copy,
+    {
+        if entity_values.is_empty() {
+            return Vec::new();
+        }
+
+        let column = if is_node {
+            self.node_attributes
+                .entry(attr_name.clone())
+                .or_insert_with(AttributeColumn::new)
+        } else {
+            self.edge_attributes
+                .entry(attr_name.clone())
+                .or_insert_with(AttributeColumn::new)
+        };
+
+        column.reserve_capacity(entity_values.len());
+        let values: Vec<_> = entity_values
+            .iter()
+            .map(|(_, value)| value.clone())
+            .collect();
+        let (start_idx, _) = column.extend_values(values);
+
+        entity_values
+            .into_iter()
+            .enumerate()
+            .map(|(offset, (entity, _))| (entity, start_idx + offset))
+            .collect()
+    }
+
     /*
     === BULK ATTRIBUTE OPERATIONS ===
     Single unified method for all attribute retrieval needs

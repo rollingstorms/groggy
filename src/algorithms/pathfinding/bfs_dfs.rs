@@ -115,14 +115,17 @@ impl Algorithm for BfsTraversal {
         let distances = self.execute_impl(ctx, &subgraph)?;
         ctx.record_duration("pathfinding.bfs", start.elapsed());
 
-        let mut attrs = HashMap::new();
-        attrs.insert(
-            self.output_attr.clone(),
-            distances.into_iter().collect::<Vec<_>>(),
-        );
-        subgraph
-            .set_node_attrs(attrs)
+        if ctx.persist_results() {
+            let attr_values: Vec<(NodeId, AttrValue)> = distances
+                .iter()
+                .map(|(&node, value)| (node, value.clone()))
+                .collect();
+
+            ctx.with_scoped_timer("pathfinding.bfs.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })
             .map_err(|err| anyhow!("failed to persist bfs results: {err}"))?;
+        }
         Ok(subgraph)
     }
 }
@@ -209,14 +212,17 @@ impl Algorithm for DfsTraversal {
         let order = self.execute_impl(ctx, &subgraph)?;
         ctx.record_duration("pathfinding.dfs", start.elapsed());
 
-        let mut attrs = HashMap::new();
-        attrs.insert(
-            self.output_attr.clone(),
-            order.into_iter().collect::<Vec<_>>(),
-        );
-        subgraph
-            .set_node_attrs(attrs)
+        if ctx.persist_results() {
+            let attr_values: Vec<(NodeId, AttrValue)> = order
+                .iter()
+                .map(|(&node, value)| (node, value.clone()))
+                .collect();
+
+            ctx.with_scoped_timer("pathfinding.dfs.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })
             .map_err(|err| anyhow!("failed to persist dfs results: {err}"))?;
+        }
         Ok(subgraph)
     }
 }

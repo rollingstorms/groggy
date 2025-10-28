@@ -15,8 +15,9 @@ use groggy::{AttrValue, EdgeId, NodeId, SimilarityMetric};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
-use pyo3::{PyCell, PyObject};
+use pyo3::{Py, PyCell, PyObject};
 use std::collections::HashSet;
+use std::time::Instant;
 
 // Import FFI types we need to preserve compatibility
 use crate::ffi::api::graph::PyGraph;
@@ -57,7 +58,8 @@ impl PySubgraph {
         &self,
         py: Python,
         candidate: &PyAny,
-    ) -> PyResult<Option<PySubgraph>> {
+        persist: bool,
+    ) -> PyResult<Option<(PySubgraph, PyObject)>> {
         if !(candidate.hasattr("_ensure_built")? && candidate.hasattr("_handle")?) {
             return Ok(None);
         }
@@ -75,7 +77,7 @@ impl PySubgraph {
                 PyTypeError::new_err("apply() expected pipeline._handle to be a PyPipelineHandle")
             })?;
             let handle_ref = handle_cell.borrow();
-            py_run_pipeline(py, &handle_ref, self)?
+            py_run_pipeline(py, &handle_ref, self, persist)?
         };
 
         Ok(Some(result))
@@ -223,21 +225,67 @@ impl PySubgraph {
     /// 1. `subgraph.apply(algorithm_handle)`
     /// 2. `subgraph.apply([algo1, algo2, ...])`
     /// 3. `subgraph.apply(pipeline.Pipeline([...]))`
-    pub fn apply(&self, py: Python, algorithm_or_pipeline: &PyAny) -> PyResult<PySubgraph> {
-        if let Some(result) = self.try_apply_pipeline_object(py, algorithm_or_pipeline)? {
-            return Ok(result);
+    ///
+    /// Use `return_profile=True` to receive `(subgraph, profile)`; otherwise returns the subgraph alone.
+    #[pyo3(signature = (algorithm_or_pipeline, persist = true, return_profile = false))]
+    pub fn apply(
+        &self,
+        py: Python,
+        algorithm_or_pipeline: &PyAny,
+        persist: bool,
+        return_profile: bool,
+    ) -> PyResult<PyObject> {
+        if let Some((result, profile)) =
+            self.try_apply_pipeline_object(py, algorithm_or_pipeline, persist)?
+        {
+            let subgraph_obj = Py::new(py, result)?.into_py(py);
+            if return_profile {
+                let tuple = PyTuple::new(py, &[subgraph_obj.clone_ref(py), profile]);
+                return Ok(tuple.into());
+            }
+            return Ok(subgraph_obj);
         }
 
+        let collect_start = Instant::now();
         let specs = Self::collect_algorithm_specs(py, algorithm_or_pipeline)?;
+        let collect_elapsed = collect_start.elapsed();
         let spec_list = PyList::empty(py);
         for spec in specs {
             spec_list.append(spec)?;
         }
 
+        let build_start = Instant::now();
         let handle = py_build_pipeline(py, spec_list.as_ref())?;
-        let run_result = py_run_pipeline(py, &handle, self);
+        let build_elapsed = build_start.elapsed();
+
+        let run_call_start = Instant::now();
+        let run_result = py_run_pipeline(py, &handle, self, persist);
+        let run_call_elapsed = run_call_start.elapsed();
         py_drop_pipeline(&handle);
-        run_result
+        let (result, profile) = run_result?;
+
+        if let Ok(profile_dict) = profile.as_ref(py).downcast::<PyDict>() {
+            let python_apply = PyDict::new(py);
+            python_apply.set_item("collect_spec", collect_elapsed.as_secs_f64())?;
+            python_apply.set_item("build_pipeline_py", build_elapsed.as_secs_f64())?;
+            python_apply.set_item("run_pipeline_py", run_call_elapsed.as_secs_f64())?;
+
+            if let Ok(Some(run_time_obj)) = profile_dict.get_item("run_time") {
+                if let Ok(run_time) = run_time_obj.extract::<f64>() {
+                    let overhead = run_call_elapsed.as_secs_f64() - run_time;
+                    python_apply.set_item("run_pipeline_overhead", overhead)?;
+                }
+            }
+
+            profile_dict.set_item("python_apply", python_apply)?;
+        }
+        let subgraph_obj = Py::new(py, result)?.into_py(py);
+        if return_profile {
+            let tuple = PyTuple::new(py, &[subgraph_obj.clone_ref(py), profile]);
+            Ok(tuple.into())
+        } else {
+            Ok(subgraph_obj)
+        }
     }
 
     // === Analysis Methods - delegate to SubgraphOperations ===

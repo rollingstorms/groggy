@@ -6,8 +6,7 @@ use crate::algorithms::community::modularity::ModularityData;
 use crate::algorithms::pathfinding::utils::collect_edge_weights;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
-    Algorithm, AlgorithmMetadata, Context, CostHint, ParameterMetadata,
-    ParameterType,
+    Algorithm, AlgorithmMetadata, Context, CostHint, ParameterMetadata, ParameterType,
 };
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
@@ -100,8 +99,7 @@ impl GirvanNewman {
 
         // For each source node, compute shortest paths and accumulate edge betweenness
         for &source in &nodes {
-            let (order, predecessors, sigma) =
-                self.shortest_paths(subgraph, source, weight_map)?;
+            let (order, predecessors, sigma) = self.shortest_paths(subgraph, source, weight_map)?;
 
             // Accumulate edge betweenness from bottom up
             let mut delta: HashMap<NodeId, f64> = nodes.iter().map(|&v| (v, 0.0)).collect();
@@ -187,10 +185,8 @@ impl GirvanNewman {
             let mut sigma: HashMap<NodeId, f64> = nodes.iter().map(|&v| (v, 0.0)).collect();
             sigma.insert(source, 1.0);
 
-            let mut dist: HashMap<NodeId, f64> = nodes
-                .iter()
-                .map(|&v| (v, f64::INFINITY))
-                .collect();
+            let mut dist: HashMap<NodeId, f64> =
+                nodes.iter().map(|&v| (v, f64::INFINITY)).collect();
             dist.insert(source, 0.0);
 
             #[derive(Copy, Clone, Debug)]
@@ -260,11 +256,7 @@ impl GirvanNewman {
     }
 
     /// Remove edge from active edge set (simulating removal without modifying subgraph)
-    fn remove_edge(
-        active_edges: &mut HashSet<(NodeId, NodeId)>,
-        u: NodeId,
-        v: NodeId,
-    ) {
+    fn remove_edge(active_edges: &mut HashSet<(NodeId, NodeId)>, u: NodeId, v: NodeId) {
         active_edges.remove(&(u, v));
         active_edges.remove(&(v, u));
     }
@@ -472,16 +464,16 @@ impl Algorithm for GirvanNewman {
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let communities = self.compute(ctx, &subgraph)?;
 
-        // Prepare bulk updates
-        let attr_values: Vec<(NodeId, AttrValue)> = communities
-            .into_iter()
-            .map(|(node, comm)| (node, AttrValue::Int(comm as i64)))
-            .collect();
+        if ctx.persist_results() {
+            let attr_values: Vec<(NodeId, AttrValue)> = communities
+                .iter()
+                .map(|(&node, &comm)| (node, AttrValue::Int(comm as i64)))
+                .collect();
 
-        let mut updates = HashMap::new();
-        updates.insert(self.output_attr.clone(), attr_values);
-
-        subgraph.set_node_attrs(updates)?;
+            ctx.with_scoped_timer("community.girvan_newman.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })?;
+        }
 
         Ok(subgraph)
     }
@@ -552,12 +544,8 @@ mod tests {
         graph.add_edge(n5, n3).unwrap();
 
         let nodes: HashSet<NodeId> = vec![n0, n1, n2, n3, n4, n5].into_iter().collect();
-        let subgraph = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
-            nodes,
-            "test".into(),
-        )
-        .unwrap();
+        let subgraph =
+            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
 
         let algo = GirvanNewman::new(Some(5), None, None, "community".into());
 
@@ -567,30 +555,12 @@ mod tests {
         let attr_name: AttrName = "community".to_string();
 
         // Get community assignments
-        let comm_0 = result
-            .get_node_attribute(n0, &attr_name)
-            .unwrap()
-            .unwrap();
-        let comm_1 = result
-            .get_node_attribute(n1, &attr_name)
-            .unwrap()
-            .unwrap();
-        let comm_2 = result
-            .get_node_attribute(n2, &attr_name)
-            .unwrap()
-            .unwrap();
-        let comm_3 = result
-            .get_node_attribute(n3, &attr_name)
-            .unwrap()
-            .unwrap();
-        let comm_4 = result
-            .get_node_attribute(n4, &attr_name)
-            .unwrap()
-            .unwrap();
-        let comm_5 = result
-            .get_node_attribute(n5, &attr_name)
-            .unwrap()
-            .unwrap();
+        let comm_0 = result.get_node_attribute(n0, &attr_name).unwrap().unwrap();
+        let comm_1 = result.get_node_attribute(n1, &attr_name).unwrap().unwrap();
+        let comm_2 = result.get_node_attribute(n2, &attr_name).unwrap().unwrap();
+        let comm_3 = result.get_node_attribute(n3, &attr_name).unwrap().unwrap();
+        let comm_4 = result.get_node_attribute(n4, &attr_name).unwrap().unwrap();
+        let comm_5 = result.get_node_attribute(n5, &attr_name).unwrap().unwrap();
 
         // Nodes 0,1,2 should be in one community
         assert_eq!(comm_0, comm_1);
@@ -627,12 +597,8 @@ mod tests {
         graph.add_edge(n5, n3).unwrap();
 
         let nodes: HashSet<NodeId> = vec![n0, n1, n2, n3, n4, n5].into_iter().collect();
-        let subgraph = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
-            nodes,
-            "test".into(),
-        )
-        .unwrap();
+        let subgraph =
+            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
 
         let algo = GirvanNewman::new(Some(5), None, None, "community".into());
 
@@ -642,22 +608,10 @@ mod tests {
         let attr_name: AttrName = "community".to_string();
 
         // Get community assignments
-        let comm_0 = result
-            .get_node_attribute(n0, &attr_name)
-            .unwrap()
-            .unwrap();
-        let comm_1 = result
-            .get_node_attribute(n1, &attr_name)
-            .unwrap()
-            .unwrap();
-        let comm_2 = result
-            .get_node_attribute(n2, &attr_name)
-            .unwrap()
-            .unwrap();
-        let comm_3 = result
-            .get_node_attribute(n3, &attr_name)
-            .unwrap()
-            .unwrap();
+        let comm_0 = result.get_node_attribute(n0, &attr_name).unwrap().unwrap();
+        let comm_1 = result.get_node_attribute(n1, &attr_name).unwrap().unwrap();
+        let comm_2 = result.get_node_attribute(n2, &attr_name).unwrap().unwrap();
+        let comm_3 = result.get_node_attribute(n3, &attr_name).unwrap().unwrap();
 
         // Nodes within triangles should be in same community
         assert_eq!(comm_0, comm_1);

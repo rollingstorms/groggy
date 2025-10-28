@@ -84,8 +84,32 @@ impl Step for AttachNodeAttrStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        if let Ok(column) = scope.variables().node_column(&self.source) {
+            let mut values = Vec::with_capacity(column.nodes().len());
+            for (node, value) in column.iter() {
+                if ctx.is_cancelled() {
+                    return Err(anyhow!("attach_node_attr cancelled"));
+                }
+                if let Some(attr_value) = value.as_attr_value() {
+                    values.push((node, attr_value));
+                } else {
+                    return Err(anyhow!(
+                        "variable '{}' contains unsupported attribute type",
+                        self.source
+                    ));
+                }
+            }
+
+            if !values.is_empty() {
+                scope
+                    .subgraph()
+                    .set_node_attr_column(self.attr.clone(), values)
+                    .map_err(|err| anyhow!("failed to set node attributes: {err}"))?;
+            }
+            return Ok(());
+        }
+
         let map = scope.variables().node_map(&self.source)?;
-        let mut attrs = HashMap::new();
         let mut values = Vec::with_capacity(map.len());
 
         for (node, value) in map.iter() {
@@ -106,6 +130,7 @@ impl Step for AttachNodeAttrStep {
             return Ok(());
         }
 
+        let mut attrs = HashMap::new();
         attrs.insert(self.attr.clone(), values);
         scope
             .subgraph()

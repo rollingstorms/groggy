@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::subgraphs::Subgraph;
 use crate::temporal::{TemporalIndex, TemporalSnapshot};
+use crate::traits::SubgraphOperations;
 use crate::types::{EdgeId, NodeId};
 
 use super::super::{AlgorithmParamValue, AlgorithmParams, Context, CostHint};
@@ -51,6 +52,8 @@ pub struct StepSpec {
 pub enum StepValue {
     /// Mapping from node id → value.
     NodeMap(HashMap<NodeId, AlgorithmParamValue>),
+    /// Columnar node storage maintaining deterministic order.
+    NodeColumn(NodeColumn),
     /// Mapping from edge id → value.
     EdgeMap(HashMap<EdgeId, AlgorithmParamValue>),
     /// Scalar helper value.
@@ -59,6 +62,51 @@ pub enum StepValue {
     Snapshot(TemporalSnapshot),
     /// Shared temporal index handle for cross-step reuse.
     TemporalIndex(Arc<TemporalIndex>),
+}
+
+#[derive(Clone, Debug)]
+pub struct NodeColumn {
+    nodes: Vec<NodeId>,
+    values: Vec<AlgorithmParamValue>,
+    index: HashMap<NodeId, usize>,
+}
+
+impl NodeColumn {
+    pub fn new(nodes: Vec<NodeId>, values: Vec<AlgorithmParamValue>) -> Self {
+        assert_eq!(nodes.len(), values.len());
+        let mut index = HashMap::with_capacity(nodes.len());
+        for (idx, node) in nodes.iter().copied().enumerate() {
+            index.insert(node, idx);
+        }
+        Self {
+            nodes,
+            values,
+            index,
+        }
+    }
+
+    pub fn get(&self, node: NodeId) -> Option<&AlgorithmParamValue> {
+        self.index.get(&node).and_then(|&idx| self.values.get(idx))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (NodeId, &AlgorithmParamValue)> {
+        self.nodes.iter().copied().zip(self.values.iter())
+    }
+
+    pub fn values_mut(&mut self) -> &mut [AlgorithmParamValue] {
+        &mut self.values
+    }
+
+    pub fn nodes(&self) -> &[NodeId] {
+        &self.nodes
+    }
+
+    pub fn into_pairs(self) -> Vec<(NodeId, AlgorithmParamValue)> {
+        self.nodes
+            .into_iter()
+            .zip(self.values.into_iter())
+            .collect()
+    }
 }
 
 impl StepValue {
@@ -94,6 +142,29 @@ impl StepValue {
 #[derive(Default, Clone, Debug)]
 pub struct StepVariables {
     values: HashMap<String, StepValue>,
+    neighbor_cache: Option<NeighborCache>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct NeighborCache {
+    index: HashMap<NodeId, usize>,
+    adjacency: Vec<Vec<NodeId>>,
+}
+
+impl NeighborCache {
+    fn new(nodes: Vec<NodeId>, adjacency: Vec<Vec<NodeId>>) -> Self {
+        let mut index = HashMap::with_capacity(nodes.len());
+        for (idx, node) in nodes.iter().copied().enumerate() {
+            index.insert(node, idx);
+        }
+        Self { index, adjacency }
+    }
+
+    pub fn neighbors(&self, node: NodeId) -> Option<&[NodeId]> {
+        self.index
+            .get(&node)
+            .and_then(|&idx| self.adjacency.get(idx).map(|v| v.as_slice()))
+    }
 }
 
 impl StepVariables {
@@ -105,11 +176,32 @@ impl StepVariables {
         self.values.insert(name.into(), StepValue::NodeMap(map));
     }
 
+    pub fn set_node_column(&mut self, name: impl Into<String>, column: NodeColumn) {
+        self.values
+            .insert(name.into(), StepValue::NodeColumn(column));
+    }
+
     pub fn node_map(&self, name: &str) -> Result<&HashMap<NodeId, AlgorithmParamValue>> {
         self.values
             .get(name)
             .ok_or_else(|| anyhow!("variable '{name}' not found"))
             .and_then(|value| value.expect_node_map(name))
+    }
+
+    pub fn node_column(&self, name: &str) -> Result<&NodeColumn> {
+        match self.values.get(name) {
+            Some(StepValue::NodeColumn(column)) => Ok(column),
+            Some(_) => Err(anyhow!("variable '{name}' is not stored as a node column")),
+            None => Err(anyhow!("variable '{name}' not found")),
+        }
+    }
+
+    pub fn node_column_mut(&mut self, name: &str) -> Result<&mut NodeColumn> {
+        match self.values.get_mut(name) {
+            Some(StepValue::NodeColumn(column)) => Ok(column),
+            Some(_) => Err(anyhow!("variable '{name}' is not stored as a node column")),
+            None => Err(anyhow!("variable '{name}' not found")),
+        }
     }
 
     pub fn set_scalar(&mut self, name: impl Into<String>, value: AlgorithmParamValue) {
@@ -202,6 +294,19 @@ impl<'a> StepScope<'a> {
 
     pub fn variables_mut(&mut self) -> &mut StepVariables {
         self.variables
+    }
+
+    pub(crate) fn neighbor_cache(&mut self) -> Result<&NeighborCache> {
+        if self.variables.neighbor_cache.is_none() {
+            let nodes: Vec<NodeId> = self.subgraph.nodes().iter().copied().collect();
+            let mut adjacency = Vec::with_capacity(nodes.len());
+            for &node in &nodes {
+                let neighbors = self.subgraph.neighbors(node).map_err(|err| anyhow!(err))?;
+                adjacency.push(neighbors);
+            }
+            self.variables.neighbor_cache = Some(NeighborCache::new(nodes, adjacency));
+        }
+        Ok(self.variables.neighbor_cache.as_ref().unwrap())
     }
 
     pub fn input(&self, _name: &str) -> Result<StepInput<'_>> {

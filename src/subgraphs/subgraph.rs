@@ -24,8 +24,9 @@ use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId, SubgraphId};
 use crate::viz::VizModule;
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use std::sync::Arc;
 
 /// Similarity metrics for comparing subgraphs
 #[derive(Debug, Clone, PartialEq)]
@@ -38,6 +39,31 @@ pub enum SimilarityMetric {
     Cosine,
     /// Overlap coefficient: |A ∩ B| / min(|A|, |B|)
     Overlap,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum ComponentCacheMode {
+    Undirected,
+    Weak,
+    Strong,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ComponentCacheComponent {
+    pub(crate) nodes: Arc<Vec<NodeId>>,
+    pub(crate) edges: Arc<Vec<EdgeId>>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ComponentCacheEntry {
+    pub(crate) version: u64,
+    pub(crate) assignments: Arc<Vec<(NodeId, i64)>>,
+    pub(crate) components: Arc<Vec<ComponentCacheComponent>>,
+}
+
+#[derive(Debug, Default)]
+struct ComponentCacheStore {
+    entries: HashMap<ComponentCacheMode, ComponentCacheEntry>,
 }
 
 /// A Subgraph represents a subset of nodes and edges from a parent Graph
@@ -57,11 +83,11 @@ pub struct Subgraph {
 
     /// Set of node IDs that are included in this subgraph
     /// Operations are filtered to only these nodes
-    nodes: HashSet<NodeId>,
+    nodes: Arc<HashSet<NodeId>>,
 
     /// Set of edge IDs that are included in this subgraph
     /// Usually induced edges (edges between subgraph nodes)
-    edges: HashSet<EdgeId>,
+    edges: Arc<HashSet<EdgeId>>,
 
     /// Metadata about how this subgraph was created
     /// Examples: "filter_nodes", "bfs_traversal", "batch_selection"
@@ -70,6 +96,9 @@ pub struct Subgraph {
     /// Unique identifier for this subgraph (for GraphEntity trait)
     /// TODO: Generate proper IDs through GraphPool storage
     subgraph_id: SubgraphId,
+
+    /// Cached component computations keyed by traversal mode
+    component_cache: Rc<RefCell<ComponentCacheStore>>,
 }
 
 impl Subgraph {
@@ -100,12 +129,16 @@ impl Subgraph {
             hasher.finish() as SubgraphId
         };
 
+        let nodes = Arc::new(nodes);
+        let edges = Arc::new(edges);
+
         Self {
             graph,
             nodes,
             edges,
             subgraph_type,
             subgraph_id,
+            component_cache: Rc::new(RefCell::new(ComponentCacheStore::default())),
         }
     }
 
@@ -117,6 +150,45 @@ impl Subgraph {
     ) -> GraphResult<Self> {
         let edges = Self::calculate_induced_edges(&graph, &nodes)?;
         Ok(Self::new(graph, nodes, edges, subgraph_type))
+    }
+
+    pub(crate) fn component_cache_get(
+        &self,
+        mode: ComponentCacheMode,
+    ) -> Option<ComponentCacheEntry> {
+        let version = {
+            let graph = self.graph.borrow();
+            graph.space().get_version()
+        };
+
+        let cache = self.component_cache.borrow();
+        cache
+            .entries
+            .get(&mode)
+            .filter(|entry| entry.version == version)
+            .cloned()
+    }
+
+    pub(crate) fn component_cache_store(
+        &self,
+        mode: ComponentCacheMode,
+        assignments: Arc<Vec<(NodeId, i64)>>,
+        components: Arc<Vec<ComponentCacheComponent>>,
+    ) {
+        let version = {
+            let graph = self.graph.borrow();
+            graph.space().get_version()
+        };
+
+        let mut cache = self.component_cache.borrow_mut();
+        cache.entries.insert(
+            mode,
+            ComponentCacheEntry {
+                version,
+                assignments,
+                components,
+            },
+        );
     }
 
     /// Calculate induced edges (edges where both endpoints are in the node set) - O(k) OPTIMIZED
@@ -214,7 +286,7 @@ impl Subgraph {
         attribute_columns.insert("node_id".to_string(), Vec::new());
 
         // Collect all nodes in this subgraph
-        for &node_id in &self.nodes {
+        for &node_id in self.nodes.iter() {
             attribute_columns
                 .get_mut("node_id")
                 .unwrap()
@@ -268,7 +340,7 @@ impl Subgraph {
         attribute_columns.insert("target".to_string(), Vec::new());
 
         // Collect all edges in this subgraph
-        for &edge_id in &self.edges {
+        for &edge_id in self.edges.iter() {
             let (source, target) = graph.edge_endpoints(edge_id)?;
 
             // Add required column values
@@ -340,7 +412,7 @@ impl Subgraph {
         let graph_borrow = self.graph.borrow();
 
         // Only consider nodes that are already in this subgraph
-        for &node_id in &self.nodes {
+        for &node_id in self.nodes.iter() {
             let mut matches_all = true;
 
             // Check all filters
@@ -382,7 +454,7 @@ impl Subgraph {
         let graph_borrow = self.graph.borrow();
 
         // Only consider nodes that are already in this subgraph
-        for &node_id in &self.nodes {
+        for &node_id in self.nodes.iter() {
             if let Some(node_attr_value) = graph_borrow.get_node_attr(node_id, attr_name)? {
                 if &node_attr_value == attr_value {
                     filtered_nodes.insert(node_id);
@@ -515,7 +587,7 @@ impl Subgraph {
         let mut values = Vec::new();
         let graph_borrow = self.graph.borrow();
 
-        for &node_id in &self.nodes {
+        for &node_id in self.nodes.iter() {
             if let Some(attr_value) = graph_borrow.get_node_attr(node_id, attr_name)? {
                 values.push(attr_value);
             } else {
@@ -532,7 +604,7 @@ impl Subgraph {
         let mut values = Vec::new();
         let graph_borrow = self.graph.borrow();
 
-        for &edge_id in &self.edges {
+        for &edge_id in self.edges.iter() {
             if let Some(attr_value) = graph_borrow.get_edge_attr(edge_id, attr_name)? {
                 values.push(attr_value);
             } else {
@@ -669,7 +741,7 @@ impl Subgraph {
     ) -> GraphResult<()> {
         let mut graph_borrow = self.graph.borrow_mut();
 
-        for &edge_id in &self.edges {
+        for &edge_id in self.edges.iter() {
             graph_borrow.set_edge_attr(edge_id, attr_name.clone(), attr_value.clone())?;
         }
 
@@ -697,7 +769,7 @@ impl Subgraph {
                 let mut total = 0.0;
                 let mut count = 0;
 
-                for &node_id in &self.nodes {
+                for &node_id in self.nodes.iter() {
                     let coefficient = self.calculate_node_clustering_coefficient(node_id)?;
                     total += coefficient;
                     count += 1;
@@ -772,7 +844,7 @@ impl Subgraph {
         }
 
         // Count triads (connected triples)
-        for &node_id in &self.nodes {
+        for &node_id in self.nodes.iter() {
             let neighbors = graph.neighbors_filtered(node_id, &self.nodes)?;
             let degree = neighbors.len();
 
@@ -809,11 +881,11 @@ impl Subgraph {
     /// Returns new subgraph containing all nodes and edges from both subgraphs
     pub fn merge_with(&self, other: &Subgraph) -> GraphResult<Subgraph> {
         // Union of nodes and edges
-        let mut merged_nodes = self.nodes.clone();
-        merged_nodes.extend(&other.nodes);
+        let mut merged_nodes: HashSet<NodeId> = self.nodes.iter().copied().collect();
+        merged_nodes.extend(other.nodes.iter().copied());
 
-        let mut merged_edges = self.edges.clone();
-        merged_edges.extend(&other.edges);
+        let mut merged_edges: HashSet<EdgeId> = self.edges.iter().copied().collect();
+        merged_edges.extend(other.edges.iter().copied());
 
         // Create merged subgraph with union of nodes and edges
         Ok(Subgraph::new(
@@ -956,7 +1028,7 @@ impl Subgraph {
         let mut groups: HashMap<AttrValue, HashSet<NodeId>> = HashMap::new();
 
         // Group nodes by attribute value
-        for &node_id in &self.nodes {
+        for &node_id in self.nodes.iter() {
             if let Some(attr_value) = graph.get_node_attr(node_id, attr_name)? {
                 groups.entry(attr_value).or_default().insert(node_id);
             }
@@ -972,7 +1044,7 @@ impl Subgraph {
             if !node_group.is_empty() {
                 // Find induced edges for this group of nodes
                 let mut induced_edges = HashSet::new();
-                for &edge_id in &self.edges {
+                for &edge_id in self.edges.iter() {
                     if let Ok((source, target)) = graph.edge_endpoints(edge_id) {
                         if node_group.contains(&source) && node_group.contains(&target) {
                             induced_edges.insert(edge_id);
@@ -1012,7 +1084,7 @@ impl Subgraph {
         let mut groups: HashMap<AttrValue, HashSet<EdgeId>> = HashMap::new();
 
         // Group edges by attribute value
-        for &edge_id in &self.edges {
+        for &edge_id in self.edges.iter() {
             if let Some(attr_value) = graph.get_edge_attr(edge_id, attr_name)? {
                 groups.entry(attr_value).or_default().insert(edge_id);
             }
@@ -1105,11 +1177,11 @@ impl GraphEntity for Subgraph {
 /// This provides the standard subgraph interface using existing efficient storage
 impl SubgraphOperations for Subgraph {
     fn node_set(&self) -> &HashSet<NodeId> {
-        &self.nodes
+        self.nodes.as_ref()
     }
 
     fn edge_set(&self) -> &HashSet<EdgeId> {
-        &self.edges
+        self.edges.as_ref()
     }
 
     fn induced_subgraph(&self, nodes: &[NodeId]) -> GraphResult<Box<dyn SubgraphOperations>> {
@@ -1163,6 +1235,24 @@ impl SubgraphOperations for Subgraph {
     }
 
     fn connected_components(&self) -> GraphResult<Vec<Box<dyn SubgraphOperations>>> {
+        if let Some(cached) = self.component_cache_get(ComponentCacheMode::Undirected) {
+            let mut component_subgraphs = Vec::with_capacity(cached.components.len());
+            for (i, component) in cached.components.iter().enumerate() {
+                // Convert Vec to HashSet on demand - cheaper than storing HashSet
+                let nodes_set: HashSet<NodeId> = component.nodes.iter().copied().collect();
+                let edges_set: HashSet<EdgeId> = component.edges.iter().copied().collect();
+                let component_subgraph = Subgraph::new(
+                    self.graph.clone(),
+                    nodes_set,
+                    edges_set,
+                    format!("{}_component_{}", self.subgraph_type, i),
+                );
+                component_subgraphs
+                    .push(Box::new(component_subgraph) as Box<dyn SubgraphOperations>);
+            }
+            return Ok(component_subgraphs);
+        }
+
         // Use existing efficient TraversalEngine for connected components
         let graph = self.graph.borrow();
         let nodes_vec: Vec<NodeId> = self.nodes.iter().cloned().collect();
@@ -1173,24 +1263,48 @@ impl SubgraphOperations for Subgraph {
         let result = traversal_engine.connected_components_for_nodes(
             &graph.pool(),
             graph.space(),
-            nodes_vec,
+            nodes_vec.clone(),
             options,
         )?;
 
         let mut component_subgraphs = Vec::new();
+        let mut cache_components = Vec::with_capacity(result.components.len());
+        let mut cache_assignments = Vec::with_capacity(nodes_vec.len());
         for (i, component) in result.components.into_iter().enumerate() {
-            let component_nodes: std::collections::HashSet<NodeId> =
-                component.nodes.into_iter().collect();
-            let component_edges: std::collections::HashSet<EdgeId> =
-                component.edges.into_iter().collect();
+            // Store as Vec instead of HashSet - much more memory efficient
+            let component_nodes: Vec<NodeId> = component.nodes;
+            let component_edges: Vec<EdgeId> = component.edges;
 
+            for node in &component_nodes {
+                cache_assignments.push((*node, i as i64));
+            }
+
+            cache_components.push(ComponentCacheComponent {
+                nodes: Arc::new(component_nodes.clone()),
+                edges: Arc::new(component_edges.clone()),
+            });
+
+            // Convert to HashSet for Subgraph construction
+            let nodes_set: HashSet<NodeId> = component_nodes.into_iter().collect();
+            let edges_set: HashSet<EdgeId> = component_edges.into_iter().collect();
+            
             let component_subgraph = Subgraph::new(
                 self.graph.clone(),
-                component_nodes,
-                component_edges,
+                nodes_set,
+                edges_set,
                 format!("{}_component_{}", self.subgraph_type, i),
             );
             component_subgraphs.push(Box::new(component_subgraph) as Box<dyn SubgraphOperations>);
+        }
+
+        drop(graph);
+
+        if !cache_components.is_empty() {
+            self.component_cache_store(
+                ComponentCacheMode::Undirected,
+                Arc::new(cache_assignments),
+                Arc::new(cache_components),
+            );
         }
 
         Ok(component_subgraphs)

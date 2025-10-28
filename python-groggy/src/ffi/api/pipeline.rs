@@ -1,9 +1,10 @@
 use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::Instant;
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use pyo3::types::PyNone;
+use pyo3::types::{PyDict, PyList, PyNone};
 
 use crate::ffi::types::PyAttrValue;
 
@@ -12,12 +13,16 @@ pub struct PyPipelineHandle {
     handle_id: usize,
 }
 
+struct PipelineEntry {
+    pipeline: Arc<groggy::algorithms::Pipeline>,
+    build_time_seconds: f64,
+}
+
 // Global pipeline registry using OnceLock for thread-safe initialization
-static PIPELINE_REGISTRY: OnceLock<Mutex<HashMap<usize, groggy::algorithms::Pipeline>>> =
-    OnceLock::new();
+static PIPELINE_REGISTRY: OnceLock<Mutex<HashMap<usize, PipelineEntry>>> = OnceLock::new();
 static NEXT_ID: OnceLock<Mutex<usize>> = OnceLock::new();
 
-fn registry() -> &'static Mutex<HashMap<usize, groggy::algorithms::Pipeline>> {
+fn registry() -> &'static Mutex<HashMap<usize, PipelineEntry>> {
     PIPELINE_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -121,29 +126,45 @@ pub fn py_build_pipeline(py: Python, spec: &PyAny) -> PyResult<PyPipelineHandle>
         });
     }
 
+    let algo_registry = groggy::algorithms::global_registry();
+    let build_start = Instant::now();
     let pipeline = builder
-        .build(groggy::algorithms::global_registry())
+        .build(algo_registry)
         .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+    let build_elapsed = build_start.elapsed();
+    let build_time_seconds = build_elapsed.as_secs_f64();
     let id = next_id();
-    registry().lock().unwrap().insert(id, pipeline);
+    registry().lock().unwrap().insert(
+        id,
+        PipelineEntry {
+            pipeline: Arc::new(pipeline),
+            build_time_seconds,
+        },
+    );
     Ok(PyPipelineHandle { handle_id: id })
 }
 
 #[pyfunction]
-#[pyo3(name = "run_pipeline")]
+#[pyo3(name = "run_pipeline", signature = (handle, subgraph, *, persist_results = true))]
 pub fn py_run_pipeline(
-    _py: Python,
+    py: Python,
     handle: &PyPipelineHandle,
     subgraph: &crate::ffi::subgraphs::subgraph::PySubgraph,
-) -> PyResult<crate::ffi::subgraphs::subgraph::PySubgraph> {
+    persist_results: bool,
+) -> PyResult<(crate::ffi::subgraphs::subgraph::PySubgraph, PyObject)> {
     // Get the pipeline from registry
-    let registry_guard = registry().lock().unwrap();
-    let pipeline = registry_guard
-        .get(&handle.handle_id)
-        .ok_or_else(|| PyRuntimeError::new_err("invalid pipeline handle"))?;
+    let (pipeline, build_time_seconds) = {
+        let registry_guard = registry().lock().unwrap();
+        let entry = registry_guard
+            .get(&handle.handle_id)
+            .ok_or_else(|| PyRuntimeError::new_err("invalid pipeline handle"))?;
+        (Arc::clone(&entry.pipeline), entry.build_time_seconds)
+    };
 
     // Clone the inner subgraph for processing
+    let clone_start = Instant::now();
     let subgraph_inner = subgraph.inner.clone();
+    let clone_elapsed = clone_start.elapsed();
 
     // NOTE: GIL Release Limitation
     // We cannot release the GIL here because Subgraph contains Rc<RefCell<Graph>>,
@@ -155,13 +176,48 @@ pub fn py_run_pipeline(
     // For now, Python threads will be blocked during algorithm execution.
 
     let mut context = groggy::algorithms::Context::new();
+    context.set_persist_results(persist_results);
+    let run_start = Instant::now();
     let result = pipeline
         .run(&mut context, subgraph_inner)
         .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+    let run_elapsed = run_start.elapsed();
+    let run_time_seconds = run_elapsed.as_secs_f64();
 
-    // Wrap result back in PySubgraph
-    // Attribute updates from algorithms are automatically included in the result
-    crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(result)
+    let timers = context.timer_snapshot();
+    let py_timers = PyDict::new(py);
+    for (key, duration) in timers {
+        py_timers.set_item(key, duration.as_secs_f64())?;
+    }
+
+    let stats = PyDict::new(py);
+    stats.set_item("build_time", build_time_seconds)?;
+    stats.set_item("run_time", run_time_seconds)?;
+    stats.set_item("timers", py_timers)?;
+    stats.set_item("subgraph_clone_time", clone_elapsed.as_secs_f64())?;
+    stats.set_item("persist_results", persist_results)?;
+
+    let outputs = context.take_outputs();
+    let py_outputs = PyDict::new(py);
+    for (key, output) in outputs {
+        match output {
+            groggy::algorithms::AlgorithmOutput::Components(components) => {
+                let py_components = PyList::empty(py);
+                for component in components {
+                    let py_nodes = PyList::empty(py);
+                    for node in component {
+                        py_nodes.append(node)?;
+                    }
+                    py_components.append(py_nodes)?;
+                }
+                py_outputs.set_item(key, py_components)?;
+            }
+        }
+    }
+    stats.set_item("outputs", py_outputs)?;
+
+    let py_subgraph = crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(result)?;
+    Ok((py_subgraph, stats.into()))
 }
 
 #[pyfunction]

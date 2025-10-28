@@ -1,7 +1,9 @@
-import pytest
 import json
 
-from groggy import _groggy
+import pytest
+
+from groggy import _groggy, algorithms
+from groggy.pipeline import Pipeline, apply as pipeline_apply
 
 def build_sample_subgraph():
     g = _groggy.Graph()
@@ -38,9 +40,73 @@ def test_pipeline_roundtrip():
     subgraph = build_sample_subgraph()
 
     handle = _groggy.pipeline.build_pipeline(spec)
-    result = _groggy.pipeline.run_pipeline(handle, subgraph)
+    result, profile = _groggy.pipeline.run_pipeline(handle, subgraph)
     _groggy.pipeline.drop_pipeline(handle)
     assert result is not None
+    assert profile["build_time"] >= 0.0
+    assert profile["run_time"] >= 0.0
+    assert "timers" in profile
+    assert profile["persist_results"] is True
+    assert profile["outputs"] == {}
+
+
+def test_python_pipeline_return_profile():
+    subgraph = build_sample_subgraph()
+    pipe = Pipeline([algorithms.centrality.pagerank(output_attr="profile_pr")])
+
+    result, profile = pipe(subgraph, return_profile=True)
+
+    assert result is not None
+    assert profile is pipe.last_profile()
+    assert profile["run_time"] >= 0.0
+    timers = profile["timers"]
+    assert isinstance(timers, dict)
+    assert any(key.startswith("algorithm.") for key in timers)
+
+
+def test_apply_return_profile_flag():
+    subgraph = build_sample_subgraph()
+    handle = algorithms.centrality.closeness(output_attr="closeness")
+
+    result, profile = pipeline_apply(subgraph, handle, return_profile=True)
+
+    assert result is not None
+    assert "build_time" in profile
+    assert "run_time" in profile
+
+
+def test_subgraph_apply_return_profile():
+    subgraph = build_sample_subgraph()
+    result, profile = subgraph.apply(
+        [algorithms.centrality.betweenness(output_attr="btw")],
+        return_profile=True,
+    )
+
+    assert result is not None
+    assert profile["run_time"] >= 0.0
+    assert "timers" in profile
+    assert "run_time" in profile
+
+
+def test_pipeline_persist_false_outputs():
+    subgraph = build_sample_subgraph()
+    handle = algorithms.community.connected_components(output_attr="comp")
+
+    result, profile = pipeline_apply(
+        subgraph,
+        handle,
+        return_profile=True,
+        persist=False,
+    )
+
+    # Attributes should not be written when persist=False
+    assert "comp" not in result.nodes.attribute_names()
+
+    outputs = profile["outputs"]
+    assert "community.connected_components.components" in outputs
+    components = outputs["community.connected_components.components"]
+    assert isinstance(components, list)
+    assert sum(len(component) for component in components) == len(result.nodes)
 
 
 def test_list_algorithms_includes_pagerank():
@@ -184,7 +250,7 @@ def test_attribute_preservation_through_pipeline():
     }]
     
     handle = _groggy.pipeline.build_pipeline(spec)
-    result = _groggy.pipeline.run_pipeline(handle, sub)
+    result, profile = _groggy.pipeline.run_pipeline(handle, sub)
     _groggy.pipeline.drop_pipeline(handle)
     
     # Verify original attributes are preserved
@@ -221,7 +287,7 @@ def test_bulk_attribute_update_performance():
     start = time.time()
     
     handle = _groggy.pipeline.build_pipeline(spec)
-    result = _groggy.pipeline.run_pipeline(handle, sub)
+    result, profile = _groggy.pipeline.run_pipeline(handle, sub)
     _groggy.pipeline.drop_pipeline(handle)
     
     elapsed = time.time() - start
@@ -265,7 +331,7 @@ def test_multiple_algorithm_attribute_accumulation():
     ]
     
     handle = _groggy.pipeline.build_pipeline(spec)
-    result = _groggy.pipeline.run_pipeline(handle, sub)
+    result, profile = _groggy.pipeline.run_pipeline(handle, sub)
     _groggy.pipeline.drop_pipeline(handle)
     
     # Verify result has nodes
@@ -290,7 +356,7 @@ def test_empty_subgraph_pipeline():
     }]
     
     handle = _groggy.pipeline.build_pipeline(spec)
-    result = _groggy.pipeline.run_pipeline(handle, sub)
+    result, profile = _groggy.pipeline.run_pipeline(handle, sub)
     _groggy.pipeline.drop_pipeline(handle)
     
     # Should return empty subgraph without errors
@@ -317,7 +383,7 @@ def test_subgraph_node_count_preserved():
     }]
     
     handle = _groggy.pipeline.build_pipeline(spec)
-    result = _groggy.pipeline.run_pipeline(handle, sub)
+    result, profile = _groggy.pipeline.run_pipeline(handle, sub)
     _groggy.pipeline.drop_pipeline(handle)
     
     # Node count should be preserved
@@ -350,7 +416,7 @@ def test_pipeline_with_disconnected_components():
     }]
     
     handle = _groggy.pipeline.build_pipeline(spec)
-    result = _groggy.pipeline.run_pipeline(handle, sub)
+    result, profile = _groggy.pipeline.run_pipeline(handle, sub)
     _groggy.pipeline.drop_pipeline(handle)
     
     # Should handle disconnected components
@@ -373,4 +439,3 @@ def test_get_pipeline_context_info():
     # Should confirm bulk optimizations are available
     assert "bulk_attribute_optimization" in info
     assert info["bulk_attribute_optimization"].value == True
-

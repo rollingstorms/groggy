@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::{anyhow, Result};
 
-use crate::algorithms::community::modularity::ModularityData;
+use crate::algorithms::community::modularity::{modularity_delta, ModularityData};
 use crate::algorithms::community::utils::find_connected_components;
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
@@ -58,7 +58,8 @@ impl Leiden {
         AlgorithmMetadata {
             id: "community.leiden".to_string(),
             name: "Leiden".to_string(),
-            description: "Improved modularity optimization with guaranteed connectivity.".to_string(),
+            description: "Improved modularity optimization with guaranteed connectivity."
+                .to_string(),
             version: "0.1.0".to_string(),
             cost_hint: CostHint::Linearithmic,
             supports_cancellation: true,
@@ -114,6 +115,16 @@ impl Leiden {
         let mut changed = false;
         let nodes: Vec<NodeId> = partition.keys().copied().collect();
 
+        // ⚡ OPTIMIZATION: Track community degrees incrementally
+        let mut community_degrees: HashMap<usize, f64> = HashMap::new();
+        for (&node, &comm) in partition.iter() {
+            let deg = data.degree(&node);
+            *community_degrees.entry(comm).or_insert(0.0) += deg;
+        }
+
+        // Track community internal edges (unused but needed for modularity_delta signature)
+        let community_internal: HashMap<usize, f64> = HashMap::new();
+
         for _ in 0..self.max_iter {
             if ctx.is_cancelled() {
                 return Err(anyhow!("Leiden cancelled"));
@@ -123,45 +134,61 @@ impl Leiden {
 
             for &node in &nodes {
                 let current_comm = partition[&node];
-                let neighbors = adjacency.get(&node).cloned().unwrap_or_default();
 
-                // Count connections to each neighboring community
-                let mut comm_weights: HashMap<usize, f64> = HashMap::new();
-                for &neighbor in &neighbors {
-                    let comm = partition[&neighbor];
-                    *comm_weights.entry(comm).or_insert(0.0) += 1.0;
+                // Find candidate communities (neighbors' communities)
+                let mut candidate_comms: HashSet<usize> = HashSet::new();
+                candidate_comms.insert(current_comm);
+                if let Some(neighbors) = adjacency.get(&node) {
+                    for &neighbor in neighbors {
+                        if let Some(&comm) = partition.get(&neighbor) {
+                            candidate_comms.insert(comm);
+                        }
+                    }
                 }
 
-                // Calculate modularity gain for each potential move
-                let node_degree = data.degree(&node);
-                let two_m = 2.0 * data.total_edges();
-
                 let mut best_comm = current_comm;
-                let mut best_gain = 0.0;
+                let mut best_delta = 0.0;
 
-                for (&candidate_comm, &edges_to_comm) in &comm_weights {
-                    if candidate_comm == current_comm {
+                // ⚡ OPTIMIZATION: Use incremental modularity (same as Louvain!)
+                for &candidate in &candidate_comms {
+                    if candidate == current_comm {
                         continue;
                     }
 
-                    // Simplified modularity gain calculation
-                    // ΔQ = (edges_to_comm - expected) / m
-                    let comm_degree: f64 = partition
-                        .iter()
-                        .filter(|(_, &c)| c == candidate_comm)
-                        .map(|(n, _)| data.degree(n))
-                        .sum();
+                    // Calculate delta without expensive iteration
+                    let delta = modularity_delta(
+                        node,
+                        current_comm,
+                        candidate,
+                        partition,
+                        adjacency,
+                        data,
+                        &community_degrees,
+                        &community_internal,
+                    );
 
-                    let gain = (edges_to_comm / two_m)
-                        - self.resolution * (node_degree * comm_degree / (two_m * two_m));
+                    // Apply resolution parameter
+                    let gain = delta * self.resolution;
 
-                    if gain > best_gain {
-                        best_gain = gain;
-                        best_comm = candidate_comm;
+                    if gain > best_delta {
+                        best_delta = gain;
+                        best_comm = candidate;
                     }
                 }
 
+                // Apply best move and update community stats incrementally
                 if best_comm != current_comm {
+                    let node_degree = data.degree(&node);
+
+                    // Update old community
+                    if let Some(deg) = community_degrees.get_mut(&current_comm) {
+                        *deg -= node_degree;
+                    }
+
+                    // Update new community
+                    *community_degrees.entry(best_comm).or_insert(0.0) += node_degree;
+
+                    // Move node
                     partition.insert(node, best_comm);
                     local_changed = true;
                     changed = true;
@@ -305,18 +332,19 @@ impl Algorithm for Leiden {
             }
         }
 
-        // Write results to subgraph
-        let mut attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>> = HashMap::new();
-        let relabeled_partition: Vec<(NodeId, AttrValue)> = partition
-            .into_iter()
-            .map(|(node, comm)| {
-                let relabeled = comm_map[&comm];
-                (node, AttrValue::Int(relabeled as i64))
-            })
-            .collect();
+        if ctx.persist_results() {
+            let attr_values: Vec<(NodeId, AttrValue)> = partition
+                .iter()
+                .map(|(&node, &comm)| {
+                    let relabeled = comm_map[&comm];
+                    (node, AttrValue::Int(relabeled as i64))
+                })
+                .collect();
 
-        attrs.insert(self.output_attr.clone(), relabeled_partition);
-        subgraph.set_node_attrs(attrs)?;
+            ctx.with_scoped_timer("community.leiden.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })?;
+        }
 
         Ok(subgraph)
     }
@@ -411,12 +439,9 @@ mod tests {
     #[test]
     fn test_leiden_empty_graph() {
         let graph = Graph::new();
-        let subgraph = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
-            HashSet::new(),
-            "empty".into(),
-        )
-        .unwrap();
+        let subgraph =
+            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), HashSet::new(), "empty".into())
+                .unwrap();
 
         let leiden = Leiden::new(20, 10, 1.0, None, "community".into()).unwrap();
         let mut ctx = Context::new();

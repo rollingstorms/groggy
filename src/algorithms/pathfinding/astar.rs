@@ -252,11 +252,17 @@ impl Algorithm for AStarPathfinding {
         let path_attr = self.run(ctx, &subgraph)?;
         ctx.record_duration("pathfinding.astar", start.elapsed());
 
-        let mut attrs = HashMap::new();
-        attrs.insert(self.output_attr.clone(), path_attr.into_iter().collect());
-        subgraph
-            .set_node_attrs(attrs)
+        if ctx.persist_results() {
+            let attr_values: Vec<(NodeId, AttrValue)> = path_attr
+                .iter()
+                .map(|(&node, value)| (node, value.clone()))
+                .collect();
+
+            ctx.with_scoped_timer("pathfinding.astar.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })
             .map_err(|err| anyhow!("failed to persist astar path: {err}"))?;
+        }
         Ok(subgraph)
     }
 }

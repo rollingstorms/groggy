@@ -49,6 +49,11 @@ pub struct TopologySnapshot {
     pub sources: Arc<Vec<NodeId>>,
     pub targets: Arc<Vec<NodeId>>,
     pub neighbors: Arc<HashMap<NodeId, Vec<(NodeId, EdgeId)>>>,
+    /// CSR-style adjacency for performance-critical traversals
+    pub node_ids: Arc<Vec<NodeId>>,
+    pub neighbor_offsets: Arc<Vec<usize>>,
+    pub neighbor_nodes: Arc<Vec<NodeId>>,
+    pub neighbor_edges: Arc<Vec<EdgeId>>,
     /// Cached adjacency matrix (computed from neighbors for fast access)
     pub adjacency_matrix: Option<Arc<crate::storage::adjacency::AdjacencyMatrix>>,
     pub version: u64,
@@ -637,23 +642,90 @@ impl GraphSpace {
             }
         }
 
+        // Build CSR adjacency representation for fast traversal access
+        let mut node_ids: Vec<NodeId> = self.active_nodes.iter().copied().collect();
+        node_ids.sort_unstable();
+
+        let mut neighbor_offsets = Vec::with_capacity(node_ids.len() + 1);
+        let mut neighbor_nodes = Vec::new();
+        let mut neighbor_edges = Vec::new();
+
+        for node_id in &node_ids {
+            neighbor_offsets.push(neighbor_nodes.len());
+            if let Some(adj) = neighbors.get(node_id) {
+                neighbor_nodes.extend(adj.iter().map(|(n, _)| *n));
+                neighbor_edges.extend(adj.iter().map(|(_, e)| *e));
+            }
+        }
+        neighbor_offsets.push(neighbor_nodes.len());
+
         // Create Arc-wrapped data for zero-copy sharing
         let edge_ids_arc = Arc::new(edge_ids);
         let sources_arc = Arc::new(sources);
         let targets_arc = Arc::new(targets);
         let neighbors_arc = Arc::new(neighbors);
+        let node_ids_arc = Arc::new(node_ids);
+        let neighbor_offsets_arc = Arc::new(neighbor_offsets);
+        let neighbor_nodes_arc = Arc::new(neighbor_nodes);
+        let neighbor_edges_arc = Arc::new(neighbor_edges);
 
         let snapshot = TopologySnapshot {
             edge_ids: edge_ids_arc.clone(),
             sources: sources_arc.clone(),
             targets: targets_arc.clone(),
             neighbors: neighbors_arc.clone(),
+            node_ids: node_ids_arc.clone(),
+            neighbor_offsets: neighbor_offsets_arc.clone(),
+            neighbor_nodes: neighbor_nodes_arc.clone(),
+            neighbor_edges: neighbor_edges_arc.clone(),
             adjacency_matrix: None, // Will be computed on-demand later
             version: current_version,
         };
 
         cache.set_snapshot(snapshot);
         (edge_ids_arc, sources_arc, targets_arc, neighbors_arc)
+    }
+
+    /// Get CSR-style adjacency data aligned with the active nodes.
+    ///
+    /// Returns tuple of (node_ids, offsets, neighbor_nodes, neighbor_edges).
+    pub fn snapshot_csr(
+        &self,
+        pool: &GraphPool,
+    ) -> (
+        Arc<Vec<NodeId>>,
+        Arc<Vec<usize>>,
+        Arc<Vec<NodeId>>,
+        Arc<Vec<EdgeId>>,
+    ) {
+        let current_version = self.version;
+
+        if let Some(snapshot) = {
+            let cache = self.cache.read().unwrap();
+            cache.try_get_snapshot(current_version)
+        } {
+            return (
+                snapshot.node_ids,
+                snapshot.neighbor_offsets,
+                snapshot.neighbor_nodes,
+                snapshot.neighbor_edges,
+            );
+        }
+
+        // Build snapshot (populates cache)
+        let _ = self.snapshot(pool);
+
+        let cache = self.cache.read().unwrap();
+        let snapshot = cache
+            .try_get_snapshot(current_version)
+            .expect("Topology snapshot should be available after rebuild");
+
+        (
+            snapshot.node_ids,
+            snapshot.neighbor_offsets,
+            snapshot.neighbor_nodes,
+            snapshot.neighbor_edges,
+        )
     }
 
     /// Rebuild columnar topology from active edges (PERFORMANCE: O(E))

@@ -127,11 +127,17 @@ impl Algorithm for DijkstraShortestPath {
         let distances = self.run(ctx, &subgraph)?;
         ctx.record_duration("pathfinding.dijkstra", start.elapsed());
 
-        let mut attrs = HashMap::new();
-        attrs.insert(self.output_attr.clone(), distances.into_iter().collect());
-        subgraph
-            .set_node_attrs(attrs)
+        if ctx.persist_results() {
+            let attr_values: Vec<(NodeId, AttrValue)> = distances
+                .iter()
+                .map(|(&node, value)| (node, value.clone()))
+                .collect();
+
+            ctx.with_scoped_timer("pathfinding.dijkstra.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })
             .map_err(|err| anyhow!("failed to persist dijkstra distances: {err}"))?;
+        }
         Ok(subgraph)
     }
 }

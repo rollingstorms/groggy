@@ -1,4 +1,5 @@
 use std::fmt;
+use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -127,14 +128,21 @@ pub struct Pipeline {
 impl Pipeline {
     /// Execute the pipeline sequentially.
     pub fn run(&self, ctx: &mut Context, mut subgraph: Subgraph) -> Result<Subgraph> {
+        let pipeline_start = Instant::now();
         for (idx, step) in self.steps.iter().enumerate() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("pipeline cancelled before step {idx}"));
             }
             ctx.begin_step(idx, step.id.as_str());
+            let timer_label = format!("algorithm.{}", step.id);
+            let step_start = Instant::now();
             subgraph = step.algorithm.execute(ctx, subgraph)?;
+            let step_elapsed = step_start.elapsed();
+            ctx.record_duration(timer_label, step_elapsed);
             ctx.finish_step();
         }
+        let elapsed = pipeline_start.elapsed();
+        ctx.record_duration("pipeline.run", elapsed);
         Ok(subgraph)
     }
 

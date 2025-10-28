@@ -109,7 +109,7 @@ impl Algorithm for Infomap {
         Self::metadata_template()
     }
 
-    fn execute(&self, _ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+    fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         // Seed random if specified
         if let Some(seed) = self.seed {
             fastrand::seed(seed);
@@ -205,18 +205,16 @@ impl Algorithm for Infomap {
             *comm = mapped;
         }
 
-        // Write results
-        let attrs: Vec<(NodeId, AttrValue)> = nodes
-            .iter()
-            .map(|&node| {
-                let comm = partition[&node];
-                (node, AttrValue::Int(comm.try_into().unwrap_or(0)))
-            })
-            .collect();
+        if ctx.persist_results() {
+            let attr_values: Vec<(NodeId, AttrValue)> = partition
+                .iter()
+                .map(|(&node, &comm)| (node, AttrValue::Int(comm.try_into().unwrap_or(0))))
+                .collect();
 
-        let mut attrs_map = HashMap::new();
-        attrs_map.insert(self.output_attr.clone(), attrs);
-        subgraph.set_node_attrs(attrs_map)?;
+            ctx.with_scoped_timer("community.infomap.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })?;
+        }
 
         Ok(subgraph)
     }

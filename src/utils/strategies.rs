@@ -64,6 +64,17 @@ pub trait TemporalStorageStrategy: std::fmt::Debug {
         new_index: usize,
     );
 
+    /// Record multiple node attribute changes efficiently (bulk operation)
+    /// Default implementation delegates to individual calls, but strategies can optimize
+    fn record_node_attr_changes_bulk(
+        &mut self,
+        changes: &[(NodeId, AttrName, Option<usize>, usize)],
+    ) {
+        for &(node_id, ref attr_name, old_index, new_index) in changes {
+            self.record_node_attr_change(node_id, attr_name.clone(), old_index, new_index);
+        }
+    }
+
     /// Record that an edge attribute changed (index-based)
     fn record_edge_attr_change(
         &mut self,
@@ -72,6 +83,17 @@ pub trait TemporalStorageStrategy: std::fmt::Debug {
         old_index: Option<usize>,
         new_index: usize,
     );
+
+    /// Record multiple edge attribute changes efficiently (bulk operation)
+    /// Default implementation delegates to individual calls, but strategies can optimize
+    fn record_edge_attr_changes_bulk(
+        &mut self,
+        changes: &[(EdgeId, AttrName, Option<usize>, usize)],
+    ) {
+        for &(edge_id, ref attr_name, old_index, new_index) in changes {
+            self.record_edge_attr_change(edge_id, attr_name.clone(), old_index, new_index);
+        }
+    }
 
     /*
     === DELTA CREATION ===
@@ -362,6 +384,27 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
         self.record_node_attr_index_change(node_id, attr_name, old_index, new_index);
     }
 
+    // Optimized bulk recording for node attributes
+    fn record_node_attr_changes_bulk(
+        &mut self,
+        changes: &[(NodeId, AttrName, Option<usize>, usize)],
+    ) {
+        // Reserve capacity upfront to avoid reallocations
+        self.node_attr_index_changes.reserve(changes.len());
+
+        // Bulk append without individual update_change_metadata calls
+        for &(node_id, ref attr_name, old_index, new_index) in changes {
+            self.node_attr_index_changes
+                .push((node_id, attr_name.clone(), old_index, new_index));
+        }
+
+        // Single metadata update for the entire bulk operation
+        self.total_changes += changes.len();
+        if self.first_change_timestamp.is_none() {
+            self.first_change_timestamp = Some(self.current_timestamp());
+        }
+    }
+
     fn record_edge_attr_change(
         &mut self,
         edge_id: EdgeId,
@@ -371,6 +414,27 @@ impl TemporalStorageStrategy for IndexDeltaStrategy {
     ) {
         // Same clean delegation to index-specific method
         self.record_edge_attr_index_change(edge_id, attr_name, old_index, new_index);
+    }
+
+    // Optimized bulk recording for edge attributes
+    fn record_edge_attr_changes_bulk(
+        &mut self,
+        changes: &[(EdgeId, AttrName, Option<usize>, usize)],
+    ) {
+        // Reserve capacity upfront to avoid reallocations
+        self.edge_attr_index_changes.reserve(changes.len());
+
+        // Bulk append without individual update_change_metadata calls
+        for &(edge_id, ref attr_name, old_index, new_index) in changes {
+            self.edge_attr_index_changes
+                .push((edge_id, attr_name.clone(), old_index, new_index));
+        }
+
+        // Single metadata update for the entire bulk operation
+        self.total_changes += changes.len();
+        if self.first_change_timestamp.is_none() {
+            self.first_change_timestamp = Some(self.current_timestamp());
+        }
     }
 
     fn create_delta(&self) -> DeltaObject {

@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 
-use crate::algorithms::community::modularity::{modularity, ModularityData};
+use crate::algorithms::community::modularity::{modularity, modularity_delta, ModularityData};
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
@@ -112,22 +112,35 @@ impl Algorithm for Louvain {
             .map(|(idx, &node)| (node, idx))
             .collect();
 
+        // ⚡ OPTIMIZATION: Track community degrees and internal edges incrementally
+        let mut community_degrees: HashMap<usize, f64> = HashMap::new();
+        let mut community_internal: HashMap<usize, f64> = HashMap::new();
+
+        // Initialize community stats (each node starts in its own community)
+        for (&node, &comm) in &partition {
+            let deg = modularity_data.degree(&node);
+            *community_degrees.entry(comm).or_insert(0.0) += deg;
+            *community_internal.entry(comm).or_insert(0.0) += 0.0;
+        }
+
         let epsilon = 1e-6;
 
         if self.max_phases > 0 {
             let phase = 0;
             let phase_start = Instant::now();
             let mut improved = false;
+
             for _ in 0..self.max_iter {
                 if ctx.is_cancelled() {
                     return Err(anyhow!("louvain cancelled"));
                 }
 
                 let mut changed = false;
+
                 for &node in &snapshot.nodes {
-                    let baseline = modularity(&partition, &snapshot.edges, &modularity_data);
                     let current_comm = partition[&node];
 
+                    // Find candidate communities (neighbors' communities)
                     let mut candidate_comms: HashSet<usize> = HashSet::new();
                     candidate_comms.insert(current_comm);
                     if let Some(neighbours) = adjacency.get(&node) {
@@ -139,21 +152,45 @@ impl Algorithm for Louvain {
                     }
 
                     let mut best_local_comm = current_comm;
-                    let mut best_local_q = baseline;
+                    let mut best_delta = 0.0;
+
+                    // ⚡ OPTIMIZATION: Use incremental modularity (no clones!)
                     for &candidate in &candidate_comms {
                         if candidate == current_comm {
                             continue;
                         }
-                        let mut test_partition = partition.clone();
-                        test_partition.insert(node, candidate);
-                        let q = modularity(&test_partition, &snapshot.edges, &modularity_data);
-                        if q > best_local_q + epsilon {
-                            best_local_q = q;
+
+                        // Calculate delta without cloning partition
+                        let delta = modularity_delta(
+                            node,
+                            current_comm,
+                            candidate,
+                            &partition,
+                            &adjacency,
+                            &modularity_data,
+                            &community_degrees,
+                            &community_internal,
+                        );
+
+                        if delta > best_delta + epsilon {
+                            best_delta = delta;
                             best_local_comm = candidate;
                         }
                     }
 
+                    // Apply best move and update community stats incrementally
                     if best_local_comm != current_comm {
+                        let node_degree = modularity_data.degree(&node);
+
+                        // Update old community
+                        if let Some(deg) = community_degrees.get_mut(&current_comm) {
+                            *deg -= node_degree;
+                        }
+
+                        // Update new community
+                        *community_degrees.entry(best_local_comm).or_insert(0.0) += node_degree;
+
+                        // Move node
                         partition.insert(node, best_local_comm);
                         changed = true;
                     }
@@ -172,7 +209,7 @@ impl Algorithm for Louvain {
 
             if !improved {
                 // No improvement in this phase – early exit.
-                return self.persist_partition(subgraph, partition);
+                return self.persist_partition(ctx, subgraph, partition);
             }
 
             // NOTE: Full Louvain contracts communities between phases. To keep phase 2 scoped,
@@ -180,28 +217,28 @@ impl Algorithm for Louvain {
             // graph aggregation which is slated for later roadmap steps.
         }
 
-        self.persist_partition(subgraph, partition)
+        self.persist_partition(ctx, subgraph, partition)
     }
 }
 
 impl Louvain {
     fn persist_partition(
         &self,
+        ctx: &mut Context,
         subgraph: Subgraph,
         partition: HashMap<NodeId, usize>,
     ) -> Result<Subgraph> {
-        let mut attrs: HashMap<AttrName, Vec<(NodeId, AttrValue)>> = HashMap::new();
-        attrs.insert(
-            self.output_attr.clone(),
-            partition
-                .into_iter()
-                .map(|(node, community)| (node, AttrValue::Int(community as i64)))
-                .collect(),
-        );
+        if ctx.persist_results() {
+            let attr_values: Vec<(NodeId, AttrValue)> = partition
+                .iter()
+                .map(|(&node, &community)| (node, AttrValue::Int(community as i64)))
+                .collect();
 
-        subgraph
-            .set_node_attrs(attrs)
+            ctx.with_scoped_timer("community.louvain.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })
             .map_err(|err| anyhow!("failed to persist Louvain communities: {err}"))?;
+        }
 
         Ok(subgraph)
     }

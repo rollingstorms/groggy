@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -18,6 +19,63 @@ pub struct LabelPropagation {
     tolerance: f64,
     output_attr: AttrName,
     seed_attr: Option<AttrName>,
+}
+
+#[derive(Clone)]
+struct LabelState {
+    nodes: Vec<NodeId>,
+    labels: Vec<AttrValue>,
+    node_index: HashMap<NodeId, usize>,
+}
+
+impl LabelState {
+    fn new(nodes: Vec<NodeId>, labels: Vec<AttrValue>) -> Self {
+        let mut node_index = HashMap::with_capacity(nodes.len());
+        for (idx, node) in nodes.iter().copied().enumerate() {
+            node_index.insert(node, idx);
+        }
+        Self {
+            nodes,
+            labels,
+            node_index,
+        }
+    }
+
+    #[cfg(test)]
+    fn label_for(&self, node: NodeId) -> Option<&AttrValue> {
+        self.node_index
+            .get(&node)
+            .and_then(|&idx| self.labels.get(idx))
+    }
+
+    #[cfg(test)]
+    fn index_of(&self, node: NodeId) -> Option<usize> {
+        self.node_index.get(&node).copied()
+    }
+
+    #[cfg(test)]
+    fn labels(&self) -> &[AttrValue] {
+        &self.labels
+    }
+
+    fn into_pairs(self) -> Vec<(NodeId, AttrValue)> {
+        self.nodes
+            .into_iter()
+            .zip(self.labels.into_iter())
+            .collect()
+    }
+}
+
+#[derive(Clone, Copy)]
+struct LabelStats {
+    count: usize,
+    order_key: u64,
+}
+
+fn label_order_key(value: &AttrValue) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
 }
 
 impl LabelPropagation {
@@ -83,16 +141,17 @@ impl LabelPropagation {
         }
     }
 
-    fn initialise_labels(&self, subgraph: &Subgraph) -> Result<HashMap<NodeId, AttrValue>> {
-        let nodes: Vec<NodeId> = subgraph.nodes().iter().copied().collect();
-        let mut labels = HashMap::with_capacity(nodes.len());
+    fn initialise_labels(&self, subgraph: &Subgraph) -> Result<LabelState> {
+        let mut nodes: Vec<NodeId> = subgraph.nodes().iter().copied().collect();
+        nodes.sort_unstable();
+        let mut labels = Vec::with_capacity(nodes.len());
         if nodes.is_empty() {
-            return Ok(labels);
+            return Ok(LabelState::new(nodes, labels));
         }
 
         let graph_handle = subgraph.graph();
         let graph = graph_handle.borrow();
-        for &node in &nodes {
+        for &node in nodes.iter() {
             let label = if let Some(seed_attr) = &self.seed_attr {
                 graph
                     .get_node_attr(node, seed_attr)?
@@ -100,48 +159,59 @@ impl LabelPropagation {
             } else {
                 AttrValue::Int(node as i64)
             };
-            labels.insert(node, label);
+            labels.push(label);
         }
-        Ok(labels)
+        Ok(LabelState::new(nodes, labels))
     }
 
     fn dominant_label(
         &self,
-        neighbors: &[NodeId],
-        labels: &HashMap<NodeId, AttrValue>,
+        neighbor_indices: &[usize],
+        labels: &[AttrValue],
         current: &AttrValue,
+        counts: &mut HashMap<AttrValue, LabelStats>,
     ) -> AttrValue {
-        if neighbors.is_empty() {
+        if neighbor_indices.is_empty() {
             return current.clone();
         }
 
-        let mut counts: HashMap<AttrValue, usize> = HashMap::new();
-        counts.insert(current.clone(), 1);
-        for neighbor in neighbors {
-            let label = labels
-                .get(neighbor)
-                .cloned()
-                .unwrap_or(AttrValue::Int(*neighbor as i64));
-            *counts.entry(label).or_insert(0) += 1;
+        counts.clear();
+        counts.insert(
+            current.clone(),
+            LabelStats {
+                count: 1,
+                order_key: label_order_key(current),
+            },
+        );
+
+        for &neighbor_idx in neighbor_indices {
+            if let Some(label) = labels.get(neighbor_idx) {
+                let entry = counts.entry(label.clone()).or_insert_with(|| LabelStats {
+                    count: 0,
+                    order_key: label_order_key(label),
+                });
+                entry.count += 1;
+            }
         }
 
         let mut best_label = None;
-        for (label, count) in counts.into_iter() {
-            let repr = format!("{:?}", &label);
-            match &mut best_label {
-                None => best_label = Some((label, count, repr)),
-                Some((best, best_count, best_repr)) => {
-                    if count > *best_count || (count == *best_count && repr < *best_repr) {
-                        *best = label;
-                        *best_count = count;
-                        *best_repr = repr;
+        for (label, stats) in counts.iter() {
+            match best_label {
+                None => {
+                    best_label = Some((label, stats.count, stats.order_key));
+                }
+                Some((_, best_count, best_order)) => {
+                    if stats.count > best_count
+                        || (stats.count == best_count && stats.order_key < best_order)
+                    {
+                        best_label = Some((label, stats.count, stats.order_key));
                     }
                 }
             }
         }
 
         best_label
-            .map(|(label, _, _)| label)
+            .map(|(label, _, _)| label.clone())
             .unwrap_or_else(|| current.clone())
     }
 
@@ -149,30 +219,41 @@ impl LabelPropagation {
         &self,
         ctx: &mut Context,
         subgraph: &Subgraph,
-        mut labels: HashMap<NodeId, AttrValue>,
-    ) -> Result<HashMap<NodeId, AttrValue>> {
-        let nodes: Vec<NodeId> = subgraph.nodes().iter().copied().collect();
-        let total = nodes.len();
+        mut state: LabelState,
+    ) -> Result<LabelState> {
+        let total = state.nodes.len();
         if total == 0 {
-            return Ok(labels);
+            return Ok(state);
         }
 
+        let mut neighbor_indices: Vec<Vec<usize>> = Vec::with_capacity(total);
+        for &node in &state.nodes {
+            let neighbors = subgraph.neighbors(node)?;
+            let mapped = neighbors
+                .into_iter()
+                .filter_map(|n| state.node_index.get(&n).copied())
+                .collect();
+            neighbor_indices.push(mapped);
+        }
+
+        let mut counts: HashMap<AttrValue, LabelStats> = HashMap::new();
         for iteration in 0..self.max_iter {
             if ctx.is_cancelled() {
                 return Err(anyhow!("label propagation cancelled"));
             }
 
             let mut updates = 0usize;
-            for &node in &nodes {
-                let neighbors = subgraph.neighbors(node)?;
-                let current = labels
-                    .get(&node)
+            for (idx, neighbor_list) in neighbor_indices.iter().enumerate() {
+                let current = state
+                    .labels
+                    .get(idx)
                     .cloned()
-                    .unwrap_or(AttrValue::Int(node as i64));
-                let candidate = self.dominant_label(&neighbors, &labels, &current);
+                    .unwrap_or_else(|| AttrValue::Int(state.nodes[idx] as i64));
+                let candidate =
+                    self.dominant_label(neighbor_list, &state.labels, &current, &mut counts);
                 if candidate != current {
                     updates += 1;
-                    labels.insert(node, candidate);
+                    state.labels[idx] = candidate;
                 }
             }
 
@@ -184,7 +265,7 @@ impl LabelPropagation {
             }
         }
 
-        Ok(labels)
+        Ok(state)
     }
 }
 
@@ -198,19 +279,18 @@ impl Algorithm for LabelPropagation {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let labels = self.initialise_labels(&subgraph)?;
+        let state = self.initialise_labels(&subgraph)?;
         let start = Instant::now();
-        let labels = self.run_iterations(ctx, &subgraph, labels)?;
+        let state = self.run_iterations(ctx, &subgraph, state)?;
         ctx.record_duration("community.lpa", start.elapsed());
 
-        let mut attrs = HashMap::new();
-        attrs.insert(
-            self.output_attr.clone(),
-            labels.into_iter().collect::<Vec<(NodeId, AttrValue)>>(),
-        );
-        subgraph
-            .set_node_attrs(attrs)
+        if ctx.persist_results() {
+            let attr_values = state.into_pairs();
+            ctx.with_scoped_timer("community.lpa.write_attrs", || {
+                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
+            })
             .map_err(|err| anyhow!("failed to persist labels: {err}"))?;
+        }
         Ok(subgraph)
     }
 }
@@ -267,13 +347,19 @@ mod tests {
         let algo = LabelPropagation::new(10, 0.0, "community".into(), None).unwrap();
 
         let mut analytic_ctx = Context::new();
-        let expected_labels = {
+        let expected_state = {
             let initial = algo.initialise_labels(&subgraph).unwrap();
             let neighbors = subgraph.neighbors(b).unwrap();
-            let current = initial.get(&b).unwrap().clone();
-            let candidate = algo.dominant_label(&neighbors, &initial, &current);
+            let neighbor_indices: Vec<usize> = neighbors
+                .iter()
+                .filter_map(|&node| initial.index_of(node))
+                .collect();
+            let current = initial.label_for(b).unwrap().clone();
+            let mut counts = HashMap::new();
+            let candidate =
+                algo.dominant_label(&neighbor_indices, initial.labels(), &current, &mut counts);
             assert_ne!(candidate, current);
-            let neighbor_label = initial.get(&a).unwrap().clone();
+            let neighbor_label = initial.label_for(a).unwrap().clone();
             assert_eq!(candidate, neighbor_label);
             algo.run_iterations(&mut analytic_ctx, &subgraph, initial)
                 .unwrap()
@@ -288,9 +374,9 @@ mod tests {
         let attr_c = result.get_node_attribute(c, &attr_name).unwrap().unwrap();
         let attr_d = result.get_node_attribute(d, &attr_name).unwrap().unwrap();
 
-        assert_eq!(expected_labels.get(&a), expected_labels.get(&b));
-        assert_eq!(expected_labels.get(&c), expected_labels.get(&d));
-        assert_ne!(expected_labels.get(&a), expected_labels.get(&c));
+        assert_eq!(expected_state.label_for(a), expected_state.label_for(b));
+        assert_eq!(expected_state.label_for(c), expected_state.label_for(d));
+        assert_ne!(expected_state.label_for(a), expected_state.label_for(c));
 
         assert_eq!(attr_a, attr_b);
         assert_eq!(attr_c, attr_d);

@@ -130,9 +130,6 @@ if not _DISPLAY_AVAILABLE:
 __version__ = "0.5.1"
 TemporalSnapshot = _groggy.TemporalSnapshot
 ExistenceIndex = _groggy.ExistenceIndex
-TemporalScope = _groggy.TemporalScope
-TemporalDelta = _groggy.TemporalDelta
-ChangedEntities = _groggy.ChangedEntities
 
 __all__ = [
     "Graph",
@@ -231,12 +228,8 @@ __all__ = [
     "builder",
     "AlgorithmBuilder",
     "VarHandle",
-    # Temporal extensions
     "TemporalSnapshot",
     "ExistenceIndex",
-    "TemporalScope",
-    "TemporalDelta",
-    "ChangedEntities",
 ]
 
 # Apply visualization capabilities to main data structures
@@ -270,7 +263,7 @@ def _setup_widget_environment():
 # Viz accessors are now implemented directly in Rust FFI
 
 # Add convenience method to Subgraph for method chaining
-def _subgraph_apply(self, algorithm_or_pipeline):
+def _subgraph_apply(self, algorithm_or_pipeline, persist=True, return_profile=False):
     """
     Apply an algorithm or pipeline to this subgraph.
     
@@ -278,15 +271,18 @@ def _subgraph_apply(self, algorithm_or_pipeline):
     
     Args:
         algorithm_or_pipeline: AlgorithmHandle, Pipeline, or list of algorithms
+        persist: Whether to persist algorithm results as attributes (default: True)
+        return_profile: If True, return (subgraph, profile_dict); otherwise just subgraph (default: False)
         
     Returns:
-        Processed subgraph with algorithm results
+        Processed subgraph with algorithm results (or tuple with profile if return_profile=True)
         
     Example:
         >>> result = sg.apply(algorithms.centrality.pagerank()).table()
         >>> result = sg.apply([algo1, algo2, algo3]).viz.draw()
+        >>> result, profile = sg.apply(algo, return_profile=True)
     """
-    return apply(self, algorithm_or_pipeline)
+    return apply(self, algorithm_or_pipeline, persist=persist, return_profile=return_profile)
 
 # Monkey-patch the method onto Subgraph
 Subgraph.apply = _subgraph_apply

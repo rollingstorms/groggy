@@ -8,7 +8,7 @@ use crate::traits::SubgraphOperations;
 use crate::types::NodeId;
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
-use super::core::{Step, StepMetadata, StepScope};
+use super::core::{NodeColumn, Step, StepMetadata, StepScope};
 
 /// Community seeding strategy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,13 +81,12 @@ impl Step for CommunitySeedStep {
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let nodes: Vec<NodeId> = scope.node_ids().copied().collect();
-        let mut map = HashMap::with_capacity(nodes.len());
+        let mut values = Vec::with_capacity(nodes.len());
 
         match self.strategy {
             SeedStrategy::Singleton => {
-                // Each node gets its own community ID
                 for &node in &nodes {
-                    map.insert(node, AlgorithmParamValue::Int(node as i64));
+                    values.push(AlgorithmParamValue::Int(node as i64));
                 }
             }
             SeedStrategy::DegreeBased => {
@@ -129,9 +128,9 @@ impl Step for CommunitySeedStep {
                     assigned.insert(node, neighbor_label);
                 }
 
-                // Convert to result map
-                for (&node, &label) in &assigned {
-                    map.insert(node, AlgorithmParamValue::Int(label));
+                for &node in &nodes {
+                    let label = assigned.get(&node).copied().unwrap_or(node as i64);
+                    values.push(AlgorithmParamValue::Int(label));
                 }
             }
             SeedStrategy::Random => {
@@ -148,14 +147,16 @@ impl Step for CommunitySeedStep {
                 }
 
                 // Randomly assign each node to one of k communities
-                for &node in &nodes {
+                for _node in &nodes {
                     let label = fastrand::usize(0..k) as i64;
-                    map.insert(node, AlgorithmParamValue::Int(label));
+                    values.push(AlgorithmParamValue::Int(label));
                 }
             }
         }
 
-        scope.variables_mut().set_node_map(self.target.clone(), map);
+        scope
+            .variables_mut()
+            .set_node_column(self.target.clone(), NodeColumn::new(nodes, values));
         Ok(())
     }
 }
@@ -197,32 +198,23 @@ impl Step for ModularityGainStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let partition = scope.variables().node_map(&self.partition)?;
-        let nodes: Vec<NodeId> = scope.node_ids().copied().collect();
+        let partition = scope.variables().node_column(&self.partition)?.clone();
+        let nodes: Vec<NodeId> = partition.nodes().to_vec();
+        let total_edges = scope.edge_ids().count() as f64;
+        let cache = scope.neighbor_cache()?;
 
         // Compute total edge weight (2m)
-        let total_edges = scope.edge_ids().count() as f64;
         if total_edges == 0.0 {
-            // Empty graph: all gains are zero
-            let map: HashMap<NodeId, AlgorithmParamValue> = nodes
-                .iter()
-                .map(|&n| (n, AlgorithmParamValue::Float(0.0)))
-                .collect();
-            scope.variables_mut().set_node_map(self.target.clone(), map);
+            let zeros = vec![AlgorithmParamValue::Float(0.0); nodes.len()];
+            scope
+                .variables_mut()
+                .set_node_column(self.target.clone(), NodeColumn::new(nodes, zeros));
             return Ok(());
         }
 
         let two_m = total_edges * 2.0;
 
-        // Compute degree for each node
-        let mut degrees: HashMap<NodeId, f64> = HashMap::new();
-        for &node in &nodes {
-            let degree = scope.subgraph().degree(node)? as f64;
-            degrees.insert(node, degree);
-        }
-
-        // For each node, compute modularity gain if it moves to best neighbor community
-        let mut gains: HashMap<NodeId, AlgorithmParamValue> = HashMap::new();
+        let mut gains = Vec::with_capacity(nodes.len());
 
         for &node in &nodes {
             if ctx.is_cancelled() {
@@ -230,21 +222,22 @@ impl Step for ModularityGainStep {
             }
 
             let current_comm = partition
-                .get(&node)
+                .get(node)
                 .and_then(|v| match v {
                     AlgorithmParamValue::Int(i) => Some(*i),
                     _ => None,
                 })
                 .unwrap_or(node as i64);
 
-            let neighbors = scope.subgraph().neighbors(node)?;
-            let _node_degree = degrees.get(&node).copied().unwrap_or(0.0);
+            let neighbors = cache
+                .neighbors(node)
+                .ok_or_else(|| anyhow!("node {node} missing from neighbor cache"))?;
 
             // Count edges to communities and find best alternative
             let mut comm_edges: HashMap<i64, f64> = HashMap::new();
-            for &neighbor in &neighbors {
+            for &neighbor in neighbors {
                 let neighbor_comm = partition
-                    .get(&neighbor)
+                    .get(neighbor)
                     .and_then(|v| match v {
                         AlgorithmParamValue::Int(i) => Some(*i),
                         _ => None,
@@ -270,10 +263,12 @@ impl Step for ModularityGainStep {
                 }
             }
 
-            gains.insert(node, AlgorithmParamValue::Float(best_gain));
+            gains.push(AlgorithmParamValue::Float(best_gain));
         }
 
-        scope.variables_mut().set_node_map(self.target.clone(), gains);
+        scope
+            .variables_mut()
+            .set_node_column(self.target.clone(), NodeColumn::new(nodes, gains));
         Ok(())
     }
 }
@@ -316,84 +311,67 @@ impl Step for LabelPropagateStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let current_labels = scope.variables().node_map(&self.labels)?;
-        let nodes: Vec<NodeId> = scope.node_ids().copied().collect();
-
-        let mut new_labels: HashMap<NodeId, AlgorithmParamValue> =
-            HashMap::with_capacity(nodes.len());
+        let current_labels = scope.variables().node_column(&self.labels)?.clone();
+        let cache = scope.neighbor_cache()?;
+        let nodes: Vec<NodeId> = current_labels.nodes().to_vec();
+        let mut new_values = Vec::with_capacity(nodes.len());
 
         for &node in &nodes {
             if ctx.is_cancelled() {
                 return Err(anyhow!("label_propagate_step cancelled"));
             }
 
-            let current = current_labels.get(&node).cloned().unwrap_or_else(|| {
-                AlgorithmParamValue::Int(node as i64)
-            });
+            let current = current_labels
+                .get(node)
+                .cloned()
+                .unwrap_or_else(|| AlgorithmParamValue::Int(node as i64));
 
-            let neighbors = scope.subgraph().neighbors(node)?;
+            let neighbors = cache
+                .neighbors(node)
+                .ok_or_else(|| anyhow!("node {node} missing from neighbor cache"))?;
             if neighbors.is_empty() {
                 // No neighbors: keep current label
-                new_labels.insert(node, current);
+                new_values.push(current);
                 continue;
             }
 
             // Count neighbor labels (including current node's label with weight 1)
-            let mut counts: HashMap<String, usize> = HashMap::new();
+            let mut counts: HashMap<String, (AlgorithmParamValue, usize)> = HashMap::new();
             let current_repr = format!("{:?}", current);
-            counts.insert(current_repr.clone(), 1);
+            counts.insert(current_repr.clone(), (current.clone(), 1));
 
-            for &neighbor in &neighbors {
-                let neighbor_label = current_labels.get(&neighbor).cloned().unwrap_or_else(|| {
-                    AlgorithmParamValue::Int(neighbor as i64)
-                });
+            for &neighbor in neighbors {
+                let neighbor_label = current_labels
+                    .get(neighbor)
+                    .cloned()
+                    .unwrap_or_else(|| AlgorithmParamValue::Int(neighbor as i64));
                 let repr = format!("{:?}", neighbor_label);
-                *counts.entry(repr).or_insert(0) += 1;
+                let entry = counts.entry(repr).or_insert((neighbor_label, 0));
+                entry.1 += 1;
             }
 
             // Find the most common label (ties broken by lexicographic order for determinism)
-            let mut best: Option<(String, usize)> = None;
-            for (repr, count) in counts {
-                match &mut best {
-                    None => best = Some((repr, count)),
-                    Some((best_repr, best_count)) => {
-                        if count > *best_count || (count == *best_count && repr < *best_repr) {
-                            *best_repr = repr;
-                            *best_count = count;
-                        }
-                    }
+            let mut best_repr = current_repr.clone();
+            let mut best_count = 1usize;
+            for (repr, (_, count)) in &counts {
+                if *count > best_count || (*count == best_count && repr < &best_repr) {
+                    best_repr = repr.clone();
+                    best_count = *count;
                 }
             }
 
             // Adopt the best label (re-parse from representation)
-            let new_label = if let Some((best_repr, _)) = best {
-                if best_repr == current_repr {
-                    current
-                } else {
-                    // Find the actual value from neighbors or current
-                    let mut found = None;
-                    for &neighbor in &neighbors {
-                        let neighbor_label =
-                            current_labels.get(&neighbor).cloned().unwrap_or_else(|| {
-                                AlgorithmParamValue::Int(neighbor as i64)
-                            });
-                        if format!("{:?}", neighbor_label) == best_repr {
-                            found = Some(neighbor_label);
-                            break;
-                        }
-                    }
-                    found.unwrap_or(current)
-                }
-            } else {
-                current
-            };
+            let best_label = counts
+                .get(&best_repr)
+                .map(|(value, _)| value.clone())
+                .unwrap_or(current);
 
-            new_labels.insert(node, new_label);
+            new_values.push(best_label);
         }
 
         scope
             .variables_mut()
-            .set_node_map(self.target.clone(), new_labels);
+            .set_node_column(self.target.clone(), NodeColumn::new(nodes, new_values));
         Ok(())
     }
 }
@@ -441,12 +419,11 @@ mod tests {
 
         step.apply(&mut ctx, &mut scope).unwrap();
 
-        let labels = scope.variables().node_map("labels").unwrap();
-        for &node in &nodes {
-            let label = labels.get(&node).unwrap();
+        let column = scope.variables().node_column("labels").unwrap();
+        for (&node, value) in column.iter() {
             assert_eq!(
-                *label,
-                AlgorithmParamValue::Int(node as i64),
+                value,
+                &AlgorithmParamValue::Int(node as i64),
                 "Node {} should have label {}",
                 node,
                 node
@@ -468,16 +445,10 @@ mod tests {
 
         step.apply(&mut ctx, &mut scope).unwrap();
 
-        let labels = scope.variables().node_map("labels").unwrap();
-        // Check that labels are in range [0, 3)
-        for &node in &nodes {
-            let label = labels.get(&node).unwrap();
-            if let AlgorithmParamValue::Int(i) = label {
-                assert!(
-                    *i >= 0 && *i < 3,
-                    "Label {} should be in [0, 3)",
-                    i
-                );
+        let column = scope.variables().node_column("labels").unwrap();
+        for (_, value) in column.iter() {
+            if let AlgorithmParamValue::Int(i) = value {
+                assert!(*i >= 0 && *i < 3, "Label {} should be in [0, 3)", i);
             } else {
                 panic!("Expected Int label");
             }
@@ -502,9 +473,9 @@ mod tests {
         let lpa_step = LabelPropagateStep::new("labels", "new_labels");
         lpa_step.apply(&mut ctx, &mut scope).unwrap();
 
-        let new_labels = scope.variables().node_map("new_labels").unwrap();
+        let new_labels = scope.variables().node_column("new_labels").unwrap();
         // Node 1 should adopt label from node 0 or 2 (its neighbors)
-        let label_1 = new_labels.get(&nodes[1]).unwrap();
+        let label_1 = new_labels.get(nodes[1]).unwrap();
         assert!(
             *label_1 == AlgorithmParamValue::Int(nodes[0] as i64)
                 || *label_1 == AlgorithmParamValue::Int(nodes[2] as i64)
@@ -515,12 +486,9 @@ mod tests {
     #[test]
     fn test_modularity_gain_empty_graph() {
         let graph = Graph::new();
-        let subgraph = Subgraph::from_nodes(
-            Rc::new(RefCell::new(graph)),
-            HashSet::new(),
-            "empty".into(),
-        )
-        .unwrap();
+        let subgraph =
+            Subgraph::from_nodes(Rc::new(RefCell::new(graph)), HashSet::new(), "empty".into())
+                .unwrap();
 
         let step = ModularityGainStep::new("labels", "gains");
         let mut ctx = Context::new();
@@ -528,13 +496,14 @@ mod tests {
         let mut scope = StepScope::new(&subgraph, &mut vars);
 
         // Add empty partition
-        scope
-            .variables_mut()
-            .set_node_map("labels".to_string(), HashMap::new());
+        scope.variables_mut().set_node_column(
+            "labels".to_string(),
+            NodeColumn::new(Vec::new(), Vec::new()),
+        );
 
         step.apply(&mut ctx, &mut scope).unwrap();
-        let gains = scope.variables().node_map("gains").unwrap();
-        assert_eq!(gains.len(), 0);
+        let gains = scope.variables().node_column("gains").unwrap();
+        assert_eq!(gains.nodes().len(), 0);
     }
 
     #[test]
@@ -544,27 +513,30 @@ mod tests {
         let subgraph =
             Subgraph::from_nodes(Rc::new(RefCell::new(graph)), node_set, "test".into()).unwrap();
 
-        // Initialize partition: 0,1,2 in community 0; 3,4,5 in community 1
-        let mut partition = HashMap::new();
-        for &node in &nodes[0..3] {
-            partition.insert(node, AlgorithmParamValue::Int(0));
-        }
-        for &node in &nodes[3..6] {
-            partition.insert(node, AlgorithmParamValue::Int(1));
-        }
-
         let mut ctx = Context::new();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&subgraph, &mut vars);
-        scope
-            .variables_mut()
-            .set_node_map("labels".to_string(), partition);
+        scope.variables_mut().set_node_column(
+            "labels".to_string(),
+            NodeColumn::new(
+                nodes.clone(),
+                nodes
+                    .iter()
+                    .map(|&n| {
+                        if nodes[..3].contains(&n) {
+                            AlgorithmParamValue::Int(0)
+                        } else {
+                            AlgorithmParamValue::Int(1)
+                        }
+                    })
+                    .collect(),
+            ),
+        );
 
         let step = ModularityGainStep::new("labels", "gains");
         step.apply(&mut ctx, &mut scope).unwrap();
 
-        let gains = scope.variables().node_map("gains").unwrap();
-        // All nodes should have computed gains (likely zero since partition matches clusters)
-        assert_eq!(gains.len(), nodes.len());
+        let gains = scope.variables().node_column("gains").unwrap();
+        assert_eq!(gains.nodes().len(), nodes.len());
     }
 }

@@ -7,7 +7,7 @@ from groggy import _groggy
 from groggy.algorithms.base import AlgorithmHandle
 
 
-def apply(subgraph, algorithm_or_pipeline):
+def apply(subgraph, algorithm_or_pipeline, persist=True, return_profile=False):
     """
     Apply an algorithm or pipeline to a subgraph.
 
@@ -20,9 +20,11 @@ def apply(subgraph, algorithm_or_pipeline):
     Args:
         subgraph: The subgraph to process
         algorithm_or_pipeline: Algorithm handle, list of handles, or ``Pipeline``
+        persist: Whether to persist algorithm results as attributes (default: True)
+        return_profile: If True, return (subgraph, profile_dict); otherwise just subgraph (default: False)
 
     Returns:
-        Processed subgraph with algorithm results
+        Processed subgraph with algorithm results (or tuple with profile if return_profile=True)
 
     Example:
         >>> from groggy import algorithms, builder, apply
@@ -33,6 +35,10 @@ def apply(subgraph, algorithm_or_pipeline):
         ...     algorithms.pathfinding.bfs(start_attr="is_start", output_attr="dist")
         ... ])
         >>>
+        >>> # Control persistence and get profiling info
+        >>> result, profile = apply(subgraph, algo, persist=False, return_profile=True)
+        >>> print(f"Algorithm took {profile['run_time']:.6f}s")
+        >>>
         >>> b = builder("degree")
         >>> nodes = b.init_nodes(default=0.0)
         >>> b.attach_as("degree", b.node_degrees(nodes))
@@ -40,13 +46,13 @@ def apply(subgraph, algorithm_or_pipeline):
         >>> result = apply(subgraph, custom)
     """
     if isinstance(algorithm_or_pipeline, Pipeline):
-        return algorithm_or_pipeline(subgraph)
+        return algorithm_or_pipeline(subgraph, persist=persist, return_profile=return_profile)
     elif isinstance(algorithm_or_pipeline, list):
         pipe = Pipeline(algorithm_or_pipeline)
-        return pipe(subgraph)
+        return pipe(subgraph, persist=persist, return_profile=return_profile)
     elif isinstance(algorithm_or_pipeline, AlgorithmHandle):
         pipe = Pipeline([algorithm_or_pipeline])
-        return pipe(subgraph)
+        return pipe(subgraph, persist=persist, return_profile=return_profile)
     else:
         raise TypeError(
             f"Expected Pipeline, AlgorithmHandle, or list, got {type(algorithm_or_pipeline)}"
@@ -82,6 +88,7 @@ class Pipeline:
         """
         self.algorithms = algorithms
         self._handle = None
+        self._last_profile = None
         self._validate_algorithms()
     
     def _validate_algorithms(self):
@@ -120,31 +127,53 @@ class Pipeline:
             spec = self._build_spec()
             self._handle = _groggy.pipeline.build_pipeline(spec)
     
-    def run(self, subgraph):
+    def run(self, subgraph, persist=True, return_profile=False):
         """
         Run the pipeline on a subgraph.
         
         Args:
             subgraph: The subgraph to process
+            persist: Whether to persist algorithm results as attributes (default: True)
+            return_profile: If True, return (subgraph, profile_dict); otherwise just subgraph (default: False)
             
         Returns:
-            Processed subgraph with algorithm results
+            Processed subgraph with algorithm results (or tuple with profile if return_profile=True)
         """
         self._ensure_built()
-        result = _groggy.pipeline.run_pipeline(self._handle, subgraph)
-        return result
+        result_subgraph, profile_dict = _groggy.pipeline.run_pipeline(
+            self._handle, subgraph, persist_results=persist
+        )
+        
+        # Store the profile for last_profile() method
+        self._last_profile = profile_dict
+        
+        if return_profile:
+            return result_subgraph, profile_dict
+        else:
+            return result_subgraph
     
-    def __call__(self, subgraph):
+    def last_profile(self):
+        """
+        Get the profile information from the last pipeline run.
+        
+        Returns:
+            Dictionary with profiling information from the last run, or None if no run yet
+        """
+        return self._last_profile
+    
+    def __call__(self, subgraph, persist=True, return_profile=False):
         """
         Allow pipeline to be called as a function.
         
         Args:
             subgraph: The subgraph to process
+            persist: Whether to persist algorithm results as attributes (default: True)
+            return_profile: If True, return (subgraph, profile_dict); otherwise just subgraph (default: False)
             
         Returns:
-            Processed subgraph
+            Processed subgraph (or tuple with profile if return_profile=True)
         """
-        return self.run(subgraph)
+        return self.run(subgraph, persist=persist, return_profile=return_profile)
     
     def __del__(self):
         """Clean up the FFI pipeline handle."""

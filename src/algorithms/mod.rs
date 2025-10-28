@@ -14,7 +14,7 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::subgraphs::Subgraph;
-use crate::types::AttrValue;
+use crate::types::{AttrValue, NodeId};
 
 pub mod builder;
 pub mod centrality;
@@ -392,13 +392,15 @@ impl From<serde_json::Value> for AlgorithmParamValue {
 }
 
 /// Execution telemetry surfaced to algorithms and steps.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Context {
     timers: HashMap<String, Duration>,
     iteration_events: Vec<IterationEvent>,
     active_step: Option<ActiveStep>,
     cancel_token: Option<Arc<AtomicBool>>,
     temporal_scope: Option<temporal::TemporalScope>,
+    persist_results: bool,
+    outputs: HashMap<String, AlgorithmOutput>,
 }
 
 impl Context {
@@ -446,9 +448,10 @@ impl Context {
     }
 
     /// Begin tracking a pipeline step.
-    pub fn begin_step(&mut self, index: usize, _algorithm_id: impl Into<String>) {
+    pub fn begin_step(&mut self, index: usize, algorithm_id: impl Into<String>) {
         self.active_step = Some(ActiveStep {
             index,
+            label: algorithm_id.into(),
             started_at: Instant::now(),
         });
     }
@@ -457,7 +460,11 @@ impl Context {
     pub fn finish_step(&mut self) {
         if let Some(active) = self.active_step.take() {
             let elapsed = active.started_at.elapsed();
-            let metric = format!("pipeline.step.{}", active.index);
+            let metric = if active.label.is_empty() {
+                format!("pipeline.step.{}", active.index)
+            } else {
+                format!("pipeline.step.{}.{}", active.index, active.label)
+            };
             self.record_duration(metric, elapsed);
         }
     }
@@ -476,6 +483,31 @@ impl Context {
     /// Access aggregated timer metrics.
     pub fn timers(&self) -> &HashMap<String, Duration> {
         &self.timers
+    }
+
+    /// Snapshot the timers as an owned map for external reporting.
+    pub fn timer_snapshot(&self) -> HashMap<String, Duration> {
+        self.timers.clone()
+    }
+
+    /// Returns whether algorithms should persist their results into the graph.
+    pub fn persist_results(&self) -> bool {
+        self.persist_results
+    }
+
+    /// Configure whether algorithms should persist their results into the graph.
+    pub fn set_persist_results(&mut self, persist: bool) {
+        self.persist_results = persist;
+    }
+
+    /// Record an output payload produced by an algorithm.
+    pub fn add_output(&mut self, key: impl Into<String>, output: AlgorithmOutput) {
+        self.outputs.insert(key.into(), output);
+    }
+
+    /// Drain collected algorithm outputs.
+    pub fn take_outputs(&mut self) -> HashMap<String, AlgorithmOutput> {
+        std::mem::take(&mut self.outputs)
     }
 
     /// Whether cancellation has been requested.
@@ -587,9 +619,24 @@ impl Context {
     }
 }
 
+impl Default for Context {
+    fn default() -> Self {
+        Self {
+            timers: HashMap::new(),
+            iteration_events: Vec::new(),
+            active_step: None,
+            cancel_token: None,
+            temporal_scope: None,
+            persist_results: true,
+            outputs: HashMap::new(),
+        }
+    }
+}
+
 #[derive(Debug)]
 struct ActiveStep {
     index: usize,
+    label: String,
     started_at: Instant,
 }
 
@@ -598,6 +645,12 @@ struct ActiveStep {
 pub struct IterationEvent {
     pub iteration: usize,
     pub updates: usize,
+}
+
+/// Structured payload returned by algorithm execution when persistence is disabled.
+#[derive(Clone, Debug)]
+pub enum AlgorithmOutput {
+    Components(Vec<Vec<NodeId>>),
 }
 
 /// Trait implemented by all core algorithms.
