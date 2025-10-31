@@ -1765,23 +1765,19 @@ impl PyGraph {
         }
         // Cache miss - need to rebuild
 
-        // Create a simple subgraph containing all nodes and edges
-        let all_nodes: Vec<NodeId> = self_.inner.borrow().node_ids();
-        let all_edges: Vec<EdgeId> = self_.inner.borrow().edge_ids();
+        // OPTIMIZATION: Get HashSets directly (avoids Vec intermediate)
+        let graph_ref = self_.inner.borrow();
+        let node_set = graph_ref.node_ids_set();
+        let edge_set = graph_ref.edge_ids_set();
+        drop(graph_ref);
 
-        // Pre-allocate HashSet capacity to avoid expensive resizing during insertion
-        let mut node_set = std::collections::HashSet::with_capacity(all_nodes.len());
-        let mut edge_set = std::collections::HashSet::with_capacity(all_edges.len());
-
-        // Extend is more efficient than collect() for pre-allocated HashSets
-        node_set.extend(all_nodes);
-        edge_set.extend(all_edges);
-
-        let subgraph = groggy::subgraphs::Subgraph::new(
+        // OPTIMIZATION: Use reserved ID 1 for cached views (avoids atomic counter overhead)
+        let subgraph = groggy::subgraphs::Subgraph::new_with_simple_id(
             self_.inner.clone(),
             node_set,
             edge_set,
             "cached_full_view".to_string(),
+            1, // Reserved ID for cached views
         );
 
         let py_subgraph = PySubgraph::from_core_subgraph(subgraph)?;
@@ -2503,23 +2499,57 @@ impl PyGraph {
 
         // Try delegating to subgraph methods (like degree, in_degree, out_degree)
         // Create a full subgraph containing all nodes and edges
+        // PERFORMANCE: Use reserved ID 2 for delegation views (fastest path)
+        
+        use std::time::Instant;
+        let delegation_start = Instant::now();
+        
+        // OPTIMIZATION: Get HashSets directly (avoids Vec→HashSet conversion)
         let graph_ref = self.inner.borrow();
-        let all_nodes = graph_ref.node_ids().into_iter().collect();
-        let all_edges = graph_ref.edge_ids().into_iter().collect();
+        let all_nodes = graph_ref.node_ids_set();
+        let all_edges = graph_ref.edge_ids_set();
         drop(graph_ref); // Release borrow
+        
+        let collect_elapsed = delegation_start.elapsed();
 
-        let concrete_subgraph = groggy::subgraphs::Subgraph::new(
+        let subgraph_create_start = Instant::now();
+        let concrete_subgraph = groggy::subgraphs::Subgraph::new_with_simple_id(
             self.inner.clone(),
             all_nodes,
             all_edges,
             "full_graph_delegation".to_string(),
+            2, // Reserved ID for delegation views
         );
+        let subgraph_create_elapsed = subgraph_create_start.elapsed();
 
+        let py_wrap_start = Instant::now();
         match PySubgraph::from_core_subgraph(concrete_subgraph) {
             Ok(py_subgraph) => {
+                let py_wrap_elapsed = py_wrap_start.elapsed();
+                
+                let py_new_start = Instant::now();
                 let subgraph_obj = Py::new(py, py_subgraph)?;
+                let py_new_elapsed = py_new_start.elapsed();
+                
+                let getattr_start = Instant::now();
                 match subgraph_obj.getattr(py, name.as_str()) {
-                    Ok(result) => return Ok(result),
+                    Ok(result) => {
+                        let getattr_elapsed = getattr_start.elapsed();
+                        let total_elapsed = delegation_start.elapsed();
+                        
+                        // Log delegation timing for debugging
+                        if std::env::var("GROGGY_DEBUG_DELEGATION").is_ok() {
+                            eprintln!("__getattr__ delegation timing for '{}':", name);
+                            eprintln!("  collect_ids: {:?}", collect_elapsed);
+                            eprintln!("  create_subgraph: {:?}", subgraph_create_elapsed);
+                            eprintln!("  py_wrap: {:?}", py_wrap_elapsed);
+                            eprintln!("  py_new: {:?}", py_new_elapsed);
+                            eprintln!("  getattr: {:?}", getattr_elapsed);
+                            eprintln!("  TOTAL: {:?}", total_elapsed);
+                        }
+                        
+                        return Ok(result);
+                    }
                     Err(_) => {
                         // Subgraph doesn't have this method either, fall through to error
                     }
@@ -2548,6 +2578,27 @@ impl PyGraph {
         };
 
         Ok(crate::ffi::storage::table::PyGraphTable { table: graph_table })
+    }
+
+    /// Create a full-graph subgraph view efficiently (for apply method)
+    /// This is used by Graph.apply() to avoid __getattr__ delegation overhead
+    pub fn to_subgraph(&self) -> PyResult<crate::ffi::subgraphs::subgraph::PySubgraph> {
+        let graph_ref = self.inner.borrow();
+        // OPTIMIZATION: Use _set() methods to clone HashSets directly (avoids Vec intermediate)
+        let all_nodes = graph_ref.node_ids_set();
+        let all_edges = graph_ref.edge_ids_set();
+        drop(graph_ref);
+
+        // OPTIMIZATION: Use reserved ID 0 for apply views (avoids atomic counter overhead)
+        let concrete_subgraph = groggy::subgraphs::Subgraph::new_with_simple_id(
+            self.inner.clone(),
+            all_nodes,
+            all_edges,
+            "full_graph_view".to_string(),
+            0, // Reserved ID for apply views
+        );
+
+        crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(concrete_subgraph)
     }
 }
 

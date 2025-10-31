@@ -287,6 +287,32 @@ def _subgraph_apply(self, algorithm_or_pipeline, persist=True, return_profile=Fa
 # Monkey-patch the method onto Subgraph
 Subgraph.apply = _subgraph_apply
 
+# Monkey-patch a direct apply method onto Graph to avoid expensive __getattr__ delegation
+def _graph_apply(self, algorithm_or_pipeline, persist=True, return_profile=False):
+    """
+    Apply an algorithm or pipeline to this graph.
+    
+    Creates a full-graph subgraph view and delegates to Subgraph.apply.
+    This direct method avoids the overhead of Python's __getattr__ delegation.
+    
+    Args:
+        algorithm_or_pipeline: AlgorithmHandle, Pipeline, or list of algorithms
+        persist: Whether to persist algorithm results as attributes (default: True)
+        return_profile: If True, return (subgraph, profile_dict); otherwise just subgraph (default: False)
+        
+    Returns:
+        Processed subgraph with algorithm results (or tuple with profile if return_profile=True)
+        
+    Example:
+        >>> result = g.apply(algorithms.centrality.pagerank())
+        >>> result, profile = g.apply(algo, return_profile=True)
+    """
+    # Use the efficient Rust method to create a full subgraph
+    full_subgraph = self.to_subgraph()
+    return apply(full_subgraph, algorithm_or_pipeline, persist=persist, return_profile=return_profile)
+
+Graph.apply = _graph_apply
+
 def _jupyter_labextension_paths():
     """
     Discovery hook for JupyterLab federated extensions.

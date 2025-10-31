@@ -124,14 +124,56 @@ struct CsrCacheEntry {
 
 impl Subgraph {
     /// Create a new Subgraph from a Graph with specific nodes and edges
+    /// 
+    /// PERFORMANCE: Automatically chooses between content-based hashing and simple IDs
+    /// based on subgraph size. For large subgraphs (>10k nodes or >30k edges), uses
+    /// simple IDs to avoid expensive sorting+hashing overhead. For small subgraphs,
+    /// uses content-based IDs for deduplication benefits.
+    /// 
+    /// Use `new_with_content_id()` if you specifically need content-based IDs for
+    /// pool storage or deduplication regardless of size.
     pub fn new(
+        graph: Rc<RefCell<Graph>>,
+        nodes: HashSet<NodeId>,
+        edges: HashSet<EdgeId>,  // FIXED: Must be EdgeId, not NodeId
+        subgraph_type: String,
+    ) -> Self {
+        // SMART STRATEGY: Choose ID generation based on size
+        // Hashing overhead becomes significant above these thresholds
+        const HASH_THRESHOLD_NODES: usize = 10_000;
+        const HASH_THRESHOLD_EDGES: usize = 30_000;
+        
+        let use_simple_id = nodes.len() > HASH_THRESHOLD_NODES 
+                         || edges.len() > HASH_THRESHOLD_EDGES;
+        
+        if use_simple_id {
+            // Large subgraph - use simple ID for performance
+            Self::new_with_simple_id(
+                graph,
+                nodes,
+                edges,
+                subgraph_type,
+                Self::generate_simple_id(),
+            )
+        } else {
+            // Small subgraph - use content-based ID for deduplication
+            Self::new_with_content_id(graph, nodes, edges, subgraph_type)
+        }
+    }
+    
+    /// Create a new Subgraph with content-based ID (always uses hashing)
+    /// 
+    /// Use this when you need deterministic, content-addressable IDs for:
+    /// - Pool storage via `store_subgraph()`
+    /// - Deduplication of identical subgraphs
+    /// - Subgraphs that will be looked up by content
+    pub fn new_with_content_id(
         graph: Rc<RefCell<Graph>>,
         nodes: HashSet<NodeId>,
         edges: HashSet<EdgeId>,
         subgraph_type: String,
     ) -> Self {
-        // Generate subgraph ID using hash-based approach to avoid borrow conflicts
-        // TODO: In the future, we can store this in the pool after creation
+        // Generate subgraph ID using hash-based approach
         let subgraph_id = {
             use std::collections::hash_map::DefaultHasher;
             use std::hash::{Hash, Hasher};
@@ -165,6 +207,14 @@ impl Subgraph {
             topology_cache: RefCell::new(HashMap::new()),
         }
     }
+    
+    /// Generate a unique simple ID using atomic counter
+    fn generate_simple_id() -> SubgraphId {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        // Start at 100 to avoid reserved IDs (0, 1 used for special views)
+        static COUNTER: AtomicUsize = AtomicUsize::new(100);
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    }
 
     /// Create a new Subgraph with just nodes, calculating induced edges
     pub fn from_nodes(
@@ -174,6 +224,36 @@ impl Subgraph {
     ) -> GraphResult<Self> {
         let edges = Self::calculate_induced_edges(&graph, &nodes)?;
         Ok(Self::new(graph, nodes, edges, subgraph_type))
+    }
+
+    /// Create a new Subgraph with a simple numeric ID (skips expensive hashing)
+    /// 
+    /// Use this directly when you have a specific ID you want to use (e.g., 
+    /// reserved IDs like 0 for delegation views, 1 for cached views).
+    /// 
+    /// Most users should call `new()` which automatically chooses between
+    /// simple and content-based IDs based on size.
+    pub fn new_with_simple_id(
+        graph: Rc<RefCell<Graph>>,
+        nodes: HashSet<NodeId>,
+        edges: HashSet<EdgeId>,
+        subgraph_type: String,
+        simple_id: SubgraphId,
+    ) -> Self {
+        let nodes = Arc::new(nodes);
+        let edges = Arc::new(edges);
+
+        Self {
+            graph,
+            nodes,
+            edges,
+            subgraph_type,
+            subgraph_id: simple_id,
+            component_cache: Rc::new(RefCell::new(ComponentCacheStore::default())),
+            ordered_nodes_cache: Arc::new(OnceLock::new()),
+            ordered_edges_cache: Arc::new(OnceLock::new()),
+            topology_cache: RefCell::new(HashMap::new()),
+        }
     }
 
     pub(crate) fn component_cache_get(

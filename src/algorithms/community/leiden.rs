@@ -414,10 +414,11 @@ mod tests {
         let result = leiden.execute(&mut ctx, subgraph).unwrap();
 
         // Check that nodes are assigned communities
+        let attr_name: AttrName = "community".into();
         let communities: HashMap<NodeId, i64> = nodes
             .iter()
             .map(|&n| {
-                let val = result.get_node_attr(n, "community").unwrap();
+                let val = result.get_node_attribute(n, &attr_name).unwrap().unwrap();
                 (n, val.as_int().unwrap())
             })
             .collect();

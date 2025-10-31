@@ -32,7 +32,7 @@ use crate::types::{
 use crate::utils::config::GraphConfig;
 use crate::viz::VizModule;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
@@ -1352,6 +1352,18 @@ impl Graph {
     /// Get all edge IDs currently in the graph
     pub fn edge_ids(&self) -> Vec<EdgeId> {
         self.space.get_active_edges().iter().copied().collect()
+    }
+
+    /// Get all node IDs as a HashSet (zero-copy clone)
+    /// PERFORMANCE: Use this when you need a HashSet to avoid Vec intermediate
+    pub fn node_ids_set(&self) -> HashSet<NodeId> {
+        self.space.get_active_nodes().clone()
+    }
+
+    /// Get all edge IDs as a HashSet (zero-copy clone)
+    /// PERFORMANCE: Use this when you need a HashSet to avoid Vec intermediate
+    pub fn edge_ids_set(&self) -> HashSet<EdgeId> {
+        self.space.get_active_edges().clone()
     }
 
     /// Get all source node IDs for edges currently in the graph

@@ -235,6 +235,8 @@ impl PySubgraph {
         persist: bool,
         return_profile: bool,
     ) -> PyResult<PyObject> {
+        let apply_total_start = Instant::now();
+        
         if let Some((result, profile)) =
             self.try_apply_pipeline_object(py, algorithm_or_pipeline, persist)?
         {
@@ -261,14 +263,23 @@ impl PySubgraph {
         let run_call_start = Instant::now();
         let run_result = py_run_pipeline(py, &handle, self, persist);
         let run_call_elapsed = run_call_start.elapsed();
+
+        let drop_start = Instant::now();
         py_drop_pipeline(&handle);
+        let drop_elapsed = drop_start.elapsed();
         let (result, profile) = run_result?;
+        
+        let create_subgraph_obj_start = Instant::now();
+        let subgraph_obj = Py::new(py, result)?.into_py(py);
+        let create_subgraph_obj_elapsed = create_subgraph_obj_start.elapsed();
 
         if let Ok(profile_dict) = profile.as_ref(py).downcast::<PyDict>() {
             let python_apply = PyDict::new(py);
             python_apply.set_item("collect_spec", collect_elapsed.as_secs_f64())?;
             python_apply.set_item("build_pipeline_py", build_elapsed.as_secs_f64())?;
             python_apply.set_item("run_pipeline_py", run_call_elapsed.as_secs_f64())?;
+            python_apply.set_item("drop_pipeline_py", drop_elapsed.as_secs_f64())?;
+            python_apply.set_item("create_subgraph_obj_py", create_subgraph_obj_elapsed.as_secs_f64())?;
 
             if let Ok(Some(run_time_obj)) = profile_dict.get_item("run_time") {
                 if let Ok(run_time) = run_time_obj.extract::<f64>() {
@@ -277,9 +288,16 @@ impl PySubgraph {
                 }
             }
 
+            let accounted = collect_elapsed
+                + build_elapsed
+                + run_call_elapsed
+                + drop_elapsed
+                + create_subgraph_obj_elapsed;
+            let remaining = apply_total_start.elapsed().checked_sub(accounted).map(|d| d.as_secs_f64()).unwrap_or(0.0);
+            python_apply.set_item("apply_remaining_py", remaining)?;
+
             profile_dict.set_item("python_apply", python_apply)?;
         }
-        let subgraph_obj = Py::new(py, result)?.into_py(py);
         if return_profile {
             let tuple = PyTuple::new(py, &[subgraph_obj.clone_ref(py), profile]);
             Ok(tuple.into())

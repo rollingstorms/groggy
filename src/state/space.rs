@@ -577,6 +577,18 @@ impl GraphSpace {
         self.active_edges.iter().copied().collect()
     }
 
+    /// Get all active node IDs as a HashSet (zero-copy clone)
+    /// PERFORMANCE: Use this when you need a HashSet to avoid Vec intermediate
+    pub fn node_ids_set(&self) -> HashSet<NodeId> {
+        self.active_nodes.clone()
+    }
+
+    /// Get all active edge IDs as a HashSet (zero-copy clone)
+    /// PERFORMANCE: Use this when you need a HashSet to avoid Vec intermediate
+    pub fn edge_ids_set(&self) -> HashSet<EdgeId> {
+        self.active_edges.clone()
+    }
+
     /*
     === UNIFIED CACHE ACCESS ===
     Single method to get consistent topology and adjacency data with interior mutability

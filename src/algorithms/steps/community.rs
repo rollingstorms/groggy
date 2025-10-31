@@ -420,7 +420,7 @@ mod tests {
         step.apply(&mut ctx, &mut scope).unwrap();
 
         let column = scope.variables().node_column("labels").unwrap();
-        for (&node, value) in column.iter() {
+        for (node, value) in column.iter() {
             assert_eq!(
                 value,
                 &AlgorithmParamValue::Int(node as i64),

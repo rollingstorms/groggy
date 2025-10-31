@@ -2,7 +2,8 @@
 High-level Pipeline API for algorithm composition.
 """
 
-from typing import List, Union
+from typing import List, Union, Dict
+import time
 from groggy import _groggy
 from groggy.algorithms.base import AlgorithmHandle
 
@@ -89,7 +90,11 @@ class Pipeline:
         self.algorithms = algorithms
         self._handle = None
         self._last_profile = None
+        self._build_timings: Dict[str, float] = {}
+
+        start = time.perf_counter()
         self._validate_algorithms()
+        self._build_timings["pipeline.validate"] = time.perf_counter() - start
     
     def _validate_algorithms(self):
         """Validate all algorithms in the pipeline."""
@@ -124,8 +129,21 @@ class Pipeline:
     def _ensure_built(self):
         """Ensure the pipeline is built in the FFI layer."""
         if self._handle is None:
+            timings: Dict[str, float] = dict(self._build_timings)
+            build_total_start = time.perf_counter()
+
+            spec_start = time.perf_counter()
             spec = self._build_spec()
-            self._handle = _groggy.pipeline.build_pipeline(spec)
+            timings["pipeline.build_spec"] = time.perf_counter() - spec_start
+
+            build_handle_start = time.perf_counter()
+            handle = _groggy.pipeline.build_pipeline(spec)
+            timings["pipeline.build_handle"] = time.perf_counter() - build_handle_start
+
+            timings["pipeline.build_total"] = time.perf_counter() - build_total_start
+
+            self._handle = handle
+            self._build_timings = timings
     
     def run(self, subgraph, persist=True, return_profile=False):
         """
@@ -140,9 +158,41 @@ class Pipeline:
             Processed subgraph with algorithm results (or tuple with profile if return_profile=True)
         """
         self._ensure_built()
+        run_call_start = time.perf_counter()
         result_subgraph, profile_dict = _groggy.pipeline.run_pipeline(
             self._handle, subgraph, persist_results=persist
         )
+        run_call_elapsed = time.perf_counter() - run_call_start
+
+        python_timings: Dict[str, float] = dict(self._build_timings)
+        python_timings["pipeline.run_call"] = run_call_elapsed
+
+        ffi_total = 0.0
+        if isinstance(profile_dict, dict):
+            ffi_section = profile_dict.get("ffi_timers")
+            if isinstance(ffi_section, dict):
+                ffi_total = float(ffi_section.get("ffi.total", 0.0))
+                # Ensure ffi section values are floats
+                for key, value in list(ffi_section.items()):
+                    try:
+                        ffi_section[key] = float(value)
+                    except (TypeError, ValueError):
+                        ffi_section[key] = 0.0
+
+        python_timings["pipeline.run_python_overhead"] = max(0.0, run_call_elapsed - ffi_total)
+
+        if isinstance(profile_dict, dict):
+            profile_dict["python_pipeline_timings"] = python_timings
+            profile_dict["python_apply"] = {
+                "collect_spec": self._build_timings.get("pipeline.build_spec", 0.0),
+                "build_pipeline_py": self._build_timings.get("pipeline.build_total", 0.0),
+                "run_pipeline_py": run_call_elapsed,
+                "run_pipeline_overhead": python_timings.get("pipeline.run_python_overhead", 0.0),
+                "drop_pipeline_py": 0.0,
+                "create_subgraph_obj_py": 0.0,
+                "apply_remaining_py": 0.0,
+            }
+        self._build_timings = python_timings
         
         # Store the profile for last_profile() method
         self._last_profile = profile_dict

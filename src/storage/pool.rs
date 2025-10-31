@@ -286,9 +286,12 @@ pub struct GraphPool {
     === TOPOLOGY STORAGE ===
     Raw storage for all edge connectivity information
     */
-    /// All edges ever created: edge_id -> (source_node, target_node)
-    /// STORAGE: This never shrinks, even for "deleted" edges
-    topology: HashMap<EdgeId, (NodeId, NodeId)>,
+    /// Dense storage for edge sources aligned by EdgeId
+    edge_sources: Vec<NodeId>,
+    /// Dense storage for edge targets aligned by EdgeId
+    edge_targets: Vec<NodeId>,
+    /// Tombstone bit indicating if an edge slot is currently active
+    edge_alive: Vec<bool>,
 
     /*
     === SUBGRAPH STORAGE ===
@@ -328,7 +331,9 @@ impl GraphPool {
             graph_type,
             node_attributes: HashMap::new(),
             edge_attributes: HashMap::new(),
-            topology: HashMap::new(),
+            edge_sources: Vec::new(),
+            edge_targets: Vec::new(),
+            edge_alive: Vec::new(),
             stored_subgraphs: HashMap::new(),
             next_node_id: 0,
             next_edge_id: 0,
@@ -409,29 +414,48 @@ impl GraphPool {
         }
     }
 
+    /// Ensure internal edge vectors can address the requested edge slot
+    fn ensure_edge_slot(&mut self, edge_id: EdgeId) {
+        if edge_id >= self.edge_sources.len() {
+            let new_len = edge_id + 1;
+            self.edge_sources.resize(new_len, NodeId::default());
+            self.edge_targets.resize(new_len, NodeId::default());
+            self.edge_alive.resize(new_len, false);
+        }
+    }
+
+    /// Write edge endpoints into dense storage with tombstone tracking
+    fn write_edge_slot(&mut self, edge_id: EdgeId, source: NodeId, target: NodeId) {
+        self.ensure_edge_slot(edge_id);
+        self.edge_sources[edge_id] = source;
+        self.edge_targets[edge_id] = target;
+        self.edge_alive[edge_id] = true;
+    }
+
     /// Create a new edge between two nodes
     /// DESIGN: Pool creates and stores the edge, Space tracks it as active
     pub fn add_edge(&mut self, source: NodeId, target: NodeId) -> EdgeId {
         let edge_id = self.next_edge_id;
         self.next_edge_id += 1;
-        self.topology.insert(edge_id, (source, target));
+        self.write_edge_slot(edge_id, source, target);
         edge_id
     }
 
-    /// Create multiple edges with bulk HashMap insertion (BULK OPTIMIZED)
+    /// Create multiple edges with bulk vector insertion (BULK OPTIMIZED)
     ///
-    /// PERFORMANCE: Batch validation + bulk HashMap operations
+    /// PERFORMANCE: Batch validation + dense vector writes
     /// Returns Vec<EdgeId> for created edges
     pub fn add_edges(&mut self, edges: &[(NodeId, NodeId)]) -> Vec<EdgeId> {
         let start_id = self.next_edge_id;
         let edge_ids: Vec<EdgeId> = (start_id..start_id + edges.len()).collect();
 
-        // Reserve HashMap capacity to prevent rehashing
-        self.topology.reserve(edges.len());
+        self.edge_sources.reserve(edges.len());
+        self.edge_targets.reserve(edges.len());
+        self.edge_alive.reserve(edges.len());
 
-        // Bulk insert into topology HashMap
         for (i, &(source, target)) in edges.iter().enumerate() {
-            self.topology.insert(start_id + i, (source, target));
+            let edge_id = start_id + i;
+            self.write_edge_slot(edge_id, source, target);
         }
 
         // Single counter update
@@ -443,7 +467,7 @@ impl GraphPool {
     /// Create an edge with a specific ID (used for state reconstruction)
     /// This is used when restoring historical states during branch switching
     pub fn add_edge_with_id(&mut self, edge_id: EdgeId, source: NodeId, target: NodeId) {
-        self.topology.insert(edge_id, (source, target));
+        self.write_edge_slot(edge_id, source, target);
         // Update next_edge_id if necessary to avoid ID collisions
         if edge_id >= self.next_edge_id {
             self.next_edge_id = edge_id + 1;
@@ -452,7 +476,11 @@ impl GraphPool {
 
     /// Get the endpoints of an edge from storage
     pub fn get_edge_endpoints(&self, edge_id: EdgeId) -> Option<(NodeId, NodeId)> {
-        self.topology.get(&edge_id).copied()
+        let idx = edge_id;
+        if idx < self.edge_alive.len() && self.edge_alive[idx] {
+            return Some((self.edge_sources[idx], self.edge_targets[idx]));
+        }
+        None
     }
 
     /*
@@ -814,9 +842,14 @@ impl GraphPool {
     /// Check if there's an edge between two nodes
     pub fn has_edge_between(&self, source: NodeId, target: NodeId) -> bool {
         // Check if any edge connects these two nodes
-        for (_edge_id, (edge_source, edge_target)) in &self.topology {
-            if (*edge_source == source && *edge_target == target)
-                || (*edge_source == target && *edge_target == source)
+        for idx in 0..self.edge_alive.len() {
+            if !self.edge_alive[idx] {
+                continue;
+            }
+            let edge_source = self.edge_sources[idx];
+            let edge_target = self.edge_targets[idx];
+            if (edge_source == source && edge_target == target)
+                || (edge_source == target && edge_target == source)
             {
                 return true;
             }
@@ -829,13 +862,17 @@ impl GraphPool {
         let mut incident_edges = Vec::new();
 
         // Check all edges to find ones connected to this node
-        // BUT only return edges that are still active (not just in topology)
-        for (edge_id, (edge_source, edge_target)) in &self.topology {
-            if *edge_source == node_id || *edge_target == node_id {
+        // BUT only return edges that are still active (edge_alive tombstone check)
+        for edge_id in 0..self.edge_sources.len() {
+            if !self.edge_alive[edge_id] {
+                continue;
+            }
+            let edge_source = self.edge_sources[edge_id];
+            let edge_target = self.edge_targets[edge_id];
+            if edge_source == node_id || edge_target == node_id {
                 // CONSISTENCY FIX: Only return edges that are still active
-                // The topology HashMap contains all edges (even deactivated ones)
-                // but we only want to return edges that are actually active
-                incident_edges.push(*edge_id);
+                // Dense storage contains tombstoned edges as well, so rely on edge_alive
+                incident_edges.push(edge_id);
             }
         }
 
