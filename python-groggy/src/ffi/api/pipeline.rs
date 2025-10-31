@@ -152,6 +152,8 @@ pub fn py_run_pipeline(
     subgraph: &crate::ffi::subgraphs::subgraph::PySubgraph,
     persist_results: bool,
 ) -> PyResult<(crate::ffi::subgraphs::subgraph::PySubgraph, PyObject)> {
+    let total_start = Instant::now();
+
     // Get the pipeline from registry
     let (pipeline, build_time_seconds) = {
         let registry_guard = registry().lock().unwrap();
@@ -166,6 +168,7 @@ pub fn py_run_pipeline(
     let subgraph_inner = subgraph.inner.clone();
     let clone_elapsed = clone_start.elapsed();
 
+    let context_start = Instant::now();
     // NOTE: GIL Release Limitation
     // We cannot release the GIL here because Subgraph contains Rc<RefCell<Graph>>,
     // which is not Send. To enable GIL release for long-running algorithms:
@@ -177,6 +180,8 @@ pub fn py_run_pipeline(
 
     let mut context = groggy::algorithms::Context::new();
     context.set_persist_results(persist_results);
+    let context_elapsed = context_start.elapsed();
+
     let run_start = Instant::now();
     let result = pipeline
         .run(&mut context, subgraph_inner)
@@ -184,16 +189,38 @@ pub fn py_run_pipeline(
     let run_elapsed = run_start.elapsed();
     let run_time_seconds = run_elapsed.as_secs_f64();
 
+    let post_run_start = Instant::now();
+
     let timers = context.timer_snapshot();
     let py_timers = PyDict::new(py);
     for (key, duration) in timers {
         py_timers.set_item(key, duration.as_secs_f64())?;
     }
 
+    let call_counters = context.call_counter_snapshot();
+    let py_calls = PyDict::new(py);
+    for (key, counter) in call_counters {
+        let sub = PyDict::new(py);
+        sub.set_item("count", counter.count())?;
+        sub.set_item("total", counter.total_duration().as_secs_f64())?;
+        if let Some(avg) = counter.avg_duration() {
+            sub.set_item("avg", avg.as_secs_f64())?;
+        }
+        py_calls.set_item(key, sub)?;
+    }
+
+    let stats_map = context.stat_snapshot();
+    let py_stats = PyDict::new(py);
+    for (key, value) in stats_map {
+        py_stats.set_item(key, value)?;
+    }
+
     let stats = PyDict::new(py);
     stats.set_item("build_time", build_time_seconds)?;
     stats.set_item("run_time", run_time_seconds)?;
     stats.set_item("timers", py_timers)?;
+    stats.set_item("call_counters", py_calls)?;
+    stats.set_item("stats", py_stats)?;
     stats.set_item("subgraph_clone_time", clone_elapsed.as_secs_f64())?;
     stats.set_item("persist_results", persist_results)?;
 
@@ -217,6 +244,25 @@ pub fn py_run_pipeline(
     stats.set_item("outputs", py_outputs)?;
 
     let py_subgraph = crate::ffi::subgraphs::subgraph::PySubgraph::from_core_subgraph(result)?;
+    let post_run_elapsed = post_run_start.elapsed();
+
+    let total_elapsed = total_start.elapsed();
+    let total_secs = total_elapsed.as_secs_f64();
+    let clone_secs = clone_elapsed.as_secs_f64();
+    let context_secs = context_elapsed.as_secs_f64();
+    let outputs_secs = post_run_elapsed.as_secs_f64();
+    let overhead_secs =
+        (total_secs - clone_secs - context_secs - run_time_seconds - outputs_secs).max(0.0);
+
+    let ffi_timers = PyDict::new(py);
+    ffi_timers.set_item("ffi.total", total_secs)?;
+    ffi_timers.set_item("ffi.clone_subgraph", clone_secs)?;
+    ffi_timers.set_item("ffi.context_setup", context_secs)?;
+    ffi_timers.set_item("ffi.pipeline_run", run_time_seconds)?;
+    ffi_timers.set_item("ffi.outputs_marshalling", outputs_secs)?;
+    ffi_timers.set_item("ffi.overhead_misc", overhead_secs)?;
+    stats.set_item("ffi_timers", ffi_timers)?;
+
     Ok((py_subgraph, stats.into()))
 }
 

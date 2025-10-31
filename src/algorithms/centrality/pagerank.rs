@@ -154,7 +154,7 @@ impl Algorithm for PageRank {
         // Precompute adjacency lists and out-degrees
         let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n];
         let mut out_degree: Vec<f64> = vec![0.0; n];
-        
+
         for (idx, &node) in nodes.iter().enumerate() {
             let neighbors = subgraph.neighbors(node)?;
             adjacency[idx].reserve(neighbors.len());

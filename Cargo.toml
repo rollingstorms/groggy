@@ -23,6 +23,7 @@ rayon = "1.7"
 parking_lot = "0.12"  # High-performance locks
 dashmap = "5.4"       # Concurrent HashMap
 ahash = "0.8"         # Fast hash algorithm
+rustc-hash = "1.1"    # Fast FxHashMap for small keys
 bitvec = "1.0"        # Efficient bit vectors for indexing
 wide = "0.7"          # SIMD operations
 console = "0.15"      # Console utilities for display
@@ -46,6 +47,7 @@ ctrlc = "3.4" # Ctrl+C signal handling
 [features]
 default = []
 python = ["pyo3"]
+profiling = [] # Enable profiling timers
 integration_tests_disabled = []
 
 [dev-dependencies]

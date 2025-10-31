@@ -20,13 +20,14 @@
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::query::traversal::TraversalEngine;
+use crate::state::topology::Csr;
 use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId, SubgraphId};
 use crate::viz::VizModule;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// Similarity metrics for comparing subgraphs
 #[derive(Debug, Clone, PartialEq)]
@@ -99,6 +100,26 @@ pub struct Subgraph {
 
     /// Cached component computations keyed by traversal mode
     component_cache: Rc<RefCell<ComponentCacheStore>>,
+
+    /// Cached ascending node order for deterministic algorithms
+    ordered_nodes_cache: Arc<OnceLock<Arc<[NodeId]>>>,
+
+    /// Cached ascending edge order for deterministic algorithms
+    ordered_edges_cache: Arc<OnceLock<Arc<[EdgeId]>>>,
+
+    /// Cached CSR adjacency keyed by traversal mode (reverse flag)
+    topology_cache: RefCell<HashMap<CsrCacheKey, CsrCacheEntry>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct CsrCacheKey {
+    add_reverse: bool,
+}
+
+#[derive(Debug, Clone)]
+struct CsrCacheEntry {
+    version: u64,
+    csr: Arc<Csr>,
 }
 
 impl Subgraph {
@@ -139,6 +160,9 @@ impl Subgraph {
             subgraph_type,
             subgraph_id,
             component_cache: Rc::new(RefCell::new(ComponentCacheStore::default())),
+            ordered_nodes_cache: Arc::new(OnceLock::new()),
+            ordered_edges_cache: Arc::new(OnceLock::new()),
+            topology_cache: RefCell::new(HashMap::new()),
         }
     }
 
@@ -268,6 +292,54 @@ impl Subgraph {
     /// Get all edge IDs as a Vec (for compatibility with existing APIs)
     pub fn edge_ids(&self) -> Vec<EdgeId> {
         self.edges.iter().copied().collect()
+    }
+
+    /// Deterministic ordered node list (ascending).
+    pub(crate) fn ordered_nodes(&self) -> Arc<[NodeId]> {
+        let cache = self.ordered_nodes_cache.get_or_init(|| {
+            let mut nodes_vec: Vec<NodeId> = self.nodes.iter().copied().collect();
+            nodes_vec.sort_unstable();
+            Arc::<[NodeId]>::from(nodes_vec.into_boxed_slice())
+        });
+        Arc::clone(cache)
+    }
+
+    /// Deterministic ordered edge list (ascending).
+    pub(crate) fn ordered_edges(&self) -> Arc<[EdgeId]> {
+        let cache = self.ordered_edges_cache.get_or_init(|| {
+            let mut edges_vec: Vec<EdgeId> = self.edges.iter().copied().collect();
+            edges_vec.sort_unstable();
+            Arc::<[EdgeId]>::from(edges_vec.into_boxed_slice())
+        });
+        Arc::clone(cache)
+    }
+
+    /// Retrieve a cached CSR adjacency if the current version matches.
+    pub(crate) fn csr_cache_get(&self, add_reverse: bool) -> Option<Arc<Csr>> {
+        let version = {
+            let graph = self.graph.borrow();
+            graph.space().get_version()
+        };
+
+        let key = CsrCacheKey { add_reverse };
+        self.topology_cache
+            .borrow()
+            .get(&key)
+            .filter(|entry| entry.version == version)
+            .map(|entry| entry.csr.clone())
+    }
+
+    /// Store a CSR adjacency in the cache.
+    pub(crate) fn csr_cache_store(&self, add_reverse: bool, csr: Arc<Csr>) {
+        let version = {
+            let graph = self.graph.borrow();
+            graph.space().get_version()
+        };
+
+        let key = CsrCacheKey { add_reverse };
+        self.topology_cache
+            .borrow_mut()
+            .insert(key, CsrCacheEntry { version, csr });
     }
 
     /// Get a NodesTable representation of subgraph nodes
@@ -1287,7 +1359,7 @@ impl SubgraphOperations for Subgraph {
             // Convert to HashSet for Subgraph construction
             let nodes_set: HashSet<NodeId> = component_nodes.into_iter().collect();
             let edges_set: HashSet<EdgeId> = component_edges.into_iter().collect();
-            
+
             let component_subgraph = Subgraph::new(
                 self.graph.clone(),
                 nodes_set,

@@ -391,10 +391,42 @@ impl From<serde_json::Value> for AlgorithmParamValue {
     }
 }
 
+/// Call counter for profiling - tracks invocation counts
+#[derive(Debug, Clone, Default)]
+pub struct CallCounter {
+    count: usize,
+    total_duration: Duration,
+}
+
+impl CallCounter {
+    pub fn increment(&mut self, duration: Duration) {
+        self.count += 1;
+        self.total_duration += duration;
+    }
+
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    pub fn total_duration(&self) -> Duration {
+        self.total_duration
+    }
+
+    pub fn avg_duration(&self) -> Option<Duration> {
+        if self.count > 0 {
+            Some(self.total_duration / self.count as u32)
+        } else {
+            None
+        }
+    }
+}
+
 /// Execution telemetry surfaced to algorithms and steps.
 #[derive(Debug)]
 pub struct Context {
     timers: HashMap<String, Duration>,
+    call_counters: HashMap<String, CallCounter>,
+    stats: HashMap<String, f64>,
     iteration_events: Vec<IterationEvent>,
     active_step: Option<ActiveStep>,
     cancel_token: Option<Arc<AtomicBool>>,
@@ -488,6 +520,97 @@ impl Context {
     /// Snapshot the timers as an owned map for external reporting.
     pub fn timer_snapshot(&self) -> HashMap<String, Duration> {
         self.timers.clone()
+    }
+
+    // === CALL COUNTER PROFILING ===
+
+    /// Record a function call with its duration for profiling.
+    /// This tracks both call counts and cumulative duration.
+    pub fn record_call(&mut self, name: impl Into<String>, duration: Duration) {
+        let entry = self
+            .call_counters
+            .entry(name.into())
+            .or_insert_with(CallCounter::default);
+        entry.increment(duration);
+    }
+
+    /// Execute a closure while timing it and recording the call count.
+    pub fn with_counted_timer<F, R>(&mut self, name: impl Into<String>, func: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        let name = name.into();
+        let start = Instant::now();
+        let output = func();
+        let elapsed = start.elapsed();
+        self.record_call(name, elapsed);
+        output
+    }
+
+    /// Get call counters for detailed profiling analysis.
+    pub fn call_counters(&self) -> &HashMap<String, CallCounter> {
+        &self.call_counters
+    }
+
+    /// Take a snapshot of call counters for reporting.
+    pub fn call_counter_snapshot(&self) -> HashMap<String, CallCounter> {
+        self.call_counters.clone()
+    }
+
+    /// Record a scalar statistic (e.g., counts) for reporting.
+    pub fn record_stat(&mut self, name: impl Into<String>, value: f64) {
+        self.stats.insert(name.into(), value);
+    }
+
+    /// Snapshot recorded scalar statistics.
+    pub fn stat_snapshot(&self) -> HashMap<String, f64> {
+        self.stats.clone()
+    }
+
+    /// Print a detailed profiling report to stdout.
+    pub fn print_profiling_report(&self, algorithm_name: &str) {
+        println!("\n{}", "=".repeat(80));
+        println!("Profiling Report: {}", algorithm_name);
+        println!("{}", "=".repeat(80));
+
+        // Sort by total duration (descending)
+        let mut counters: Vec<_> = self.call_counters.iter().collect();
+        counters.sort_by(|a, b| b.1.total_duration().cmp(&a.1.total_duration()));
+
+        println!(
+            "\n{:<50} {:>10} {:>12} {:>12}",
+            "Phase", "Calls", "Total (ms)", "Avg (μs)"
+        );
+        println!("{}", "-".repeat(84));
+
+        for (name, counter) in counters.iter() {
+            let total_ms = counter.total_duration().as_secs_f64() * 1000.0;
+            let avg_us = counter
+                .avg_duration()
+                .map(|d| d.as_secs_f64() * 1_000_000.0)
+                .unwrap_or(0.0);
+
+            println!(
+                "{:<50} {:>10} {:>12.3} {:>12.3}",
+                name,
+                counter.count(),
+                total_ms,
+                avg_us
+            );
+        }
+
+        if !self.stats.is_empty() {
+            println!("\nRecorded Statistics");
+            println!("{}", "-".repeat(80));
+            let mut stats: Vec<_> = self.stats.iter().collect();
+            stats.sort_by(|a, b| a.0.cmp(b.0));
+            for (name, value) in stats {
+                println!("{:<50} {:>20.3}", name, value);
+            }
+        }
+
+        println!("{}", "=".repeat(80));
+        println!();
     }
 
     /// Returns whether algorithms should persist their results into the graph.
@@ -623,6 +746,8 @@ impl Default for Context {
     fn default() -> Self {
         Self {
             timers: HashMap::new(),
+            call_counters: HashMap::new(),
+            stats: HashMap::new(),
             iteration_events: Vec::new(),
             active_step: None,
             cancel_token: None,

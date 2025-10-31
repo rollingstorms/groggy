@@ -14,11 +14,13 @@ pub mod history;
 pub mod ref_manager;
 pub mod space;
 pub mod state;
+pub mod topology;
 
 pub use change_tracker::*;
 pub use delta::*;
 pub use ref_manager::*;
 pub use space::*;
+pub use topology::*;
 
 // Re-export history items except those that conflict with state module
 pub use history::{
