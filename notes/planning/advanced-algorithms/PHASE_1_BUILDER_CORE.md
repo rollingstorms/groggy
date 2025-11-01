@@ -2,14 +2,30 @@
 
 **Timeline**: 4-6 weeks  
 **Dependencies**: None (can run in parallel with temporal work)
-**Status**: ✅ Module structure refactored, 20+ primitives implemented
-**Implementation**: See `PHASE_1_IMPLEMENTATION_STATUS.md` for detailed status
+**Status**: ✅ Complete – 48+ primitives implemented across 15 modules (see `PHASE_1_IMPLEMENTATION_STATUS.md`)
 
 ### Objectives
 
 Expand the builder step primitive catalog to support advanced algorithm composition without
 requiring Rust implementation. Each primitive must be columnar, composable, and validated
 for performance (targeting O(1) amortized overhead).
+
+**Achievement**: Phase 1 delivered comprehensive step primitive coverage enabling complex graph computations through composable building blocks. All primitives follow the performance-first design established in the STYLE_ALGO refactoring.
+
+### Relationship to STYLE_ALGO
+
+While Phase 1 focused on **compositional step primitives** for the builder DSL, the concurrent performance refactoring established **STYLE_ALGO** for full algorithms. Key differences:
+
+- **Step Primitives** (Phase 1): Small, reusable operations composed into custom algorithms
+- **Full Algorithms** (STYLE_ALGO): Optimized end-to-end implementations with CSR caching
+
+Both follow similar principles:
+- Columnar operations on `Vec<AttrValue>`
+- Pre-allocated buffers, no inner-loop allocations  
+- Profiling instrumentation
+- Deterministic ordering via `ordered_nodes()`/`ordered_edges()`
+
+Where applicable, step primitives use CSR (e.g., `structural.rs` degree computations) following the same caching patterns as full algorithms.
 
 ### Module Organization
 

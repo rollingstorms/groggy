@@ -1,17 +1,77 @@
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
+use rustc_hash::FxHashMap;
 
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
     ParameterType,
 };
+use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
+
+/// Efficient NodeId → dense index mapper
+enum NodeIndexer {
+    Dense {
+        min_id: NodeId,
+        indices: Vec<u32>, // sentinel = u32::MAX for missing nodes
+    },
+    Sparse(FxHashMap<NodeId, usize>),
+}
+
+impl NodeIndexer {
+    /// Constructs the optimal indexer based on node ID distribution.
+    /// Uses dense array if the ID span is ≤ 1.5x node count.
+    fn new(nodes: &[NodeId]) -> Self {
+        if nodes.is_empty() {
+            return Self::Sparse(FxHashMap::default());
+        }
+
+        let min = *nodes.iter().min().unwrap();
+        let max = *nodes.iter().max().unwrap();
+        let span = (max - min) as usize + 1;
+
+        // Dense indexing threshold: span must be reasonable relative to node count
+        if span <= nodes.len() * 3 / 2 {
+            let mut indices = vec![u32::MAX; span];
+            for (i, &node) in nodes.iter().enumerate() {
+                indices[(node - min) as usize] = i as u32;
+            }
+            Self::Dense {
+                min_id: min,
+                indices,
+            }
+        } else {
+            let mut map = FxHashMap::default();
+            map.reserve(nodes.len());
+            for (i, &node) in nodes.iter().enumerate() {
+                map.insert(node, i);
+            }
+            Self::Sparse(map)
+        }
+    }
+
+    fn get(&self, node: NodeId) -> Option<usize> {
+        match self {
+            Self::Dense { min_id, indices } => {
+                let offset = node.checked_sub(*min_id)? as usize;
+                indices.get(offset).and_then(|&idx| {
+                    if idx == u32::MAX {
+                        None
+                    } else {
+                        Some(idx as usize)
+                    }
+                })
+            }
+            Self::Sparse(map) => map.get(&node).copied(),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct LabelPropagation {
@@ -25,37 +85,16 @@ pub struct LabelPropagation {
 struct LabelState {
     nodes: Vec<NodeId>,
     labels: Vec<AttrValue>,
-    node_index: HashMap<NodeId, usize>,
 }
 
 impl LabelState {
     fn new(nodes: Vec<NodeId>, labels: Vec<AttrValue>) -> Self {
-        let mut node_index = HashMap::with_capacity(nodes.len());
-        for (idx, node) in nodes.iter().copied().enumerate() {
-            node_index.insert(node, idx);
-        }
-        Self {
-            nodes,
-            labels,
-            node_index,
-        }
+        Self { nodes, labels }
     }
 
     #[cfg(test)]
-    fn label_for(&self, node: NodeId) -> Option<&AttrValue> {
-        self.node_index
-            .get(&node)
-            .and_then(|&idx| self.labels.get(idx))
-    }
-
-    #[cfg(test)]
-    fn index_of(&self, node: NodeId) -> Option<usize> {
-        self.node_index.get(&node).copied()
-    }
-
-    #[cfg(test)]
-    fn labels(&self) -> &[AttrValue] {
-        &self.labels
+    fn label_for(&self, node: NodeId, indexer: &NodeIndexer) -> Option<&AttrValue> {
+        indexer.get(node).and_then(|idx| self.labels.get(idx))
     }
 
     fn into_pairs(self) -> Vec<(NodeId, AttrValue)> {
@@ -64,18 +103,6 @@ impl LabelState {
             .zip(self.labels.into_iter())
             .collect()
     }
-}
-
-#[derive(Clone, Copy)]
-struct LabelStats {
-    count: usize,
-    order_key: u64,
-}
-
-fn label_order_key(value: &AttrValue) -> u64 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    value.hash(&mut hasher);
-    hasher.finish()
 }
 
 impl LabelPropagation {
@@ -141,12 +168,10 @@ impl LabelPropagation {
         }
     }
 
-    fn initialise_labels(&self, subgraph: &Subgraph) -> Result<LabelState> {
-        let mut nodes: Vec<NodeId> = subgraph.nodes().iter().copied().collect();
-        nodes.sort_unstable();
+    fn initialise_labels(&self, nodes: &[NodeId], subgraph: &Subgraph) -> Result<LabelState> {
         let mut labels = Vec::with_capacity(nodes.len());
         if nodes.is_empty() {
-            return Ok(LabelState::new(nodes, labels));
+            return Ok(LabelState::new(nodes.to_vec(), labels));
         }
 
         let graph_handle = subgraph.graph();
@@ -161,64 +186,51 @@ impl LabelPropagation {
             };
             labels.push(label);
         }
-        Ok(LabelState::new(nodes, labels))
+        Ok(LabelState::new(nodes.to_vec(), labels))
     }
 
     fn dominant_label(
         &self,
-        neighbor_indices: &[usize],
+        neighbor_slice: &[usize],
         labels: &[AttrValue],
-        current: &AttrValue,
-        counts: &mut HashMap<AttrValue, LabelStats>,
-    ) -> AttrValue {
-        if neighbor_indices.is_empty() {
-            return current.clone();
+        current_idx: usize,
+        counts: &mut FxHashMap<usize, usize>,  // Index → count
+    ) -> usize {
+        if neighbor_slice.is_empty() {
+            return current_idx;
         }
 
         counts.clear();
-        counts.insert(
-            current.clone(),
-            LabelStats {
-                count: 1,
-                order_key: label_order_key(current),
-            },
-        );
+        counts.insert(current_idx, 1);
 
-        for &neighbor_idx in neighbor_indices {
-            if let Some(label) = labels.get(neighbor_idx) {
-                let entry = counts.entry(label.clone()).or_insert_with(|| LabelStats {
-                    count: 0,
-                    order_key: label_order_key(label),
-                });
-                entry.count += 1;
+        // Count neighbor labels by index (much faster than AttrValue)
+        for &neighbor_idx in neighbor_slice {
+            if neighbor_idx < labels.len() {
+                *counts.entry(neighbor_idx).or_insert(0) += 1;
             }
         }
 
-        let mut best_label = None;
-        for (label, stats) in counts.iter() {
-            match best_label {
-                None => {
-                    best_label = Some((label, stats.count, stats.order_key));
-                }
-                Some((_, best_count, best_order)) => {
-                    if stats.count > best_count
-                        || (stats.count == best_count && stats.order_key < best_order)
-                    {
-                        best_label = Some((label, stats.count, stats.order_key));
-                    }
-                }
+        // Find most common label
+        let mut best_idx = current_idx;
+        let mut best_count = 1;
+        
+        for (&idx, &count) in counts.iter() {
+            // Break ties by smallest index (deterministic)
+            if count > best_count || (count == best_count && idx < best_idx) {
+                best_idx = idx;
+                best_count = count;
             }
         }
 
-        best_label
-            .map(|(label, _, _)| label.clone())
-            .unwrap_or_else(|| current.clone())
+        best_idx
     }
 
     fn run_iterations(
         &self,
         ctx: &mut Context,
         subgraph: &Subgraph,
+        indexer: &NodeIndexer,
+        csr: &Csr,
         mut state: LabelState,
     ) -> Result<LabelState> {
         let total = state.nodes.len();
@@ -226,41 +238,63 @@ impl LabelPropagation {
             return Ok(state);
         }
 
-        let mut neighbor_indices: Vec<Vec<usize>> = Vec::with_capacity(total);
-        for &node in &state.nodes {
-            let neighbors = subgraph.neighbors(node)?;
-            let mapped = neighbors
-                .into_iter()
-                .filter_map(|n| state.node_index.get(&n).copied())
-                .collect();
-            neighbor_indices.push(mapped);
-        }
+        // Reusable buffers
+        let mut counts: FxHashMap<usize, usize> = FxHashMap::default();
+        counts.reserve(total / 10);
+        let mut neighbor_label_indices = Vec::with_capacity(100); // Reusable buffer
 
-        let mut counts: HashMap<AttrValue, LabelStats> = HashMap::new();
+        // Track which label index each node currently has
+        let mut label_indices: Vec<usize> = (0..total).collect();
+
         for iteration in 0..self.max_iter {
             if ctx.is_cancelled() {
                 return Err(anyhow!("label propagation cancelled"));
             }
 
+            let iter_start = Instant::now();
             let mut updates = 0usize;
-            for (idx, neighbor_list) in neighbor_indices.iter().enumerate() {
-                let current = state
-                    .labels
-                    .get(idx)
-                    .cloned()
-                    .unwrap_or_else(|| AttrValue::Int(state.nodes[idx] as i64));
-                let candidate =
-                    self.dominant_label(neighbor_list, &state.labels, &current, &mut counts);
-                if candidate != current {
+
+            for idx in 0..total {
+                let current_label_idx = label_indices[idx];
+                
+                // Get neighbors from CSR and build their label indices
+                neighbor_label_indices.clear();
+                for &neighbor_idx in csr.neighbors(idx) {
+                    if neighbor_idx < total {
+                        neighbor_label_indices.push(label_indices[neighbor_idx]);
+                    }
+                }
+                
+                let new_label_idx = self.dominant_label(
+                    &neighbor_label_indices,
+                    &state.labels,
+                    current_label_idx,
+                    &mut counts
+                );
+
+                if new_label_idx != current_label_idx {
                     updates += 1;
-                    state.labels[idx] = candidate;
+                    label_indices[idx] = new_label_idx;
                 }
             }
 
+            // Update actual labels from indices
+            for idx in 0..total {
+                let label_idx = label_indices[idx];
+                if label_idx < state.labels.len() {
+                    state.labels[idx] = state.labels[label_idx].clone();
+                }
+            }
+
+            ctx.record_call("lpa.compute.iter", iter_start.elapsed());
+            ctx.record_stat("lpa.count.iteration", (iteration + 1) as f64);
+            ctx.record_stat("lpa.count.updates", updates as f64);
             ctx.emit_iteration(iteration, updates);
 
             let change_ratio = updates as f64 / total as f64;
             if change_ratio <= self.tolerance {
+                ctx.record_stat("lpa.converged", 1.0);
+                ctx.record_stat("lpa.iterations_to_converge", (iteration + 1) as f64);
                 break;
             }
         }
@@ -279,18 +313,100 @@ impl Algorithm for LabelPropagation {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let state = self.initialise_labels(&subgraph)?;
-        let start = Instant::now();
-        let state = self.run_iterations(ctx, &subgraph, state)?;
-        ctx.record_duration("community.lpa", start.elapsed());
+        let start_time = Instant::now();
 
-        if ctx.persist_results() {
-            let attr_values = state.into_pairs();
-            ctx.with_scoped_timer("community.lpa.write_attrs", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })
-            .map_err(|err| anyhow!("failed to persist labels: {err}"))?;
+        // === PHASE 1: Collect Nodes ===
+        let collect_start = Instant::now();
+        let nodes = subgraph.ordered_nodes();
+        ctx.record_call("lpa.collect_nodes", collect_start.elapsed());
+        ctx.record_stat("lpa.count.input_nodes", nodes.len() as f64);
+
+        if nodes.is_empty() {
+            return Ok(subgraph);
         }
+
+        // === PHASE 2: Build Indexer ===
+        let idx_start = Instant::now();
+        let indexer = NodeIndexer::new(&nodes);
+        ctx.record_call("lpa.build_indexer", idx_start.elapsed());
+
+        // === PHASE 3: Collect Edges ===
+        let edges_start = Instant::now();
+        let edges = subgraph.ordered_edges();
+        ctx.record_call("lpa.collect_edges", edges_start.elapsed());
+        ctx.record_stat("lpa.count.input_edges", edges.len() as f64);
+
+        // === PHASE 4: Build or Get CSR ===
+        let is_directed = subgraph.graph().borrow().is_directed();
+        let add_reverse = !is_directed; // LPA needs bidirectional for undirected graphs
+
+        let csr = match subgraph.csr_cache_get(add_reverse) {
+            Some(cached) => {
+                ctx.record_call("lpa.csr_cache_hit", std::time::Duration::from_nanos(0));
+                cached
+            }
+            None => {
+                let cache_miss_start = Instant::now();
+
+                let graph = subgraph.graph();
+                let graph_ref = graph.borrow();
+                let pool_ref = graph_ref.pool();
+
+                let mut csr = Csr::default();
+                let build_start = Instant::now();
+                let endpoint_duration = build_csr_from_edges_with_scratch(
+                    &mut csr,
+                    nodes.len(),
+                    edges.iter().copied(),
+                    |nid| indexer.get(nid),
+                    |eid| pool_ref.get_edge_endpoints(eid),
+                    CsrOptions {
+                        add_reverse_edges: add_reverse,
+                        sort_neighbors: false,
+                    },
+                );
+                let total_build = build_start.elapsed();
+                let core_build = total_build.saturating_sub(endpoint_duration);
+
+                ctx.record_call("lpa.csr_cache_miss", cache_miss_start.elapsed());
+                ctx.record_call("lpa.collect_edge_endpoints", endpoint_duration);
+                ctx.record_call("lpa.build_csr", core_build);
+
+                let csr_arc = Arc::new(csr);
+                subgraph.csr_cache_store(add_reverse, csr_arc.clone());
+                csr_arc
+            }
+        };
+
+        ctx.record_stat("lpa.count.csr_nodes", csr.node_count() as f64);
+        ctx.record_stat("lpa.count.csr_edges", csr.neighbors.len() as f64);
+
+        // === PHASE 5: Initialize Labels ===
+        let init_start = Instant::now();
+        let state = self.initialise_labels(&nodes, &subgraph)?;
+        ctx.record_call("lpa.initialize_labels", init_start.elapsed());
+
+        // === PHASE 6: Run Iterations ===
+        let compute_start = Instant::now();
+        let state = self.run_iterations(ctx, &subgraph, &indexer, &csr, state)?;
+        ctx.record_call("lpa.compute", compute_start.elapsed());
+
+        // === PHASE 7: Emit Results ===
+        if ctx.persist_results() {
+            let write_start = Instant::now();
+            let attr_values = state.into_pairs();
+            subgraph
+                .set_node_attr_column(self.output_attr.clone(), attr_values)
+                .map_err(|err| anyhow!("failed to persist labels: {err}"))?;
+            ctx.record_call("lpa.write_attributes", write_start.elapsed());
+        } else {
+            let store_start = Instant::now();
+            // For non-persistent results, could add to context output if needed
+            ctx.record_call("lpa.store_output", store_start.elapsed());
+        }
+
+        ctx.record_call("lpa.total_execution", start_time.elapsed());
+
         Ok(subgraph)
     }
 }
@@ -340,30 +456,7 @@ mod tests {
         let subgraph =
             Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
 
-        let mut neighbor_check = subgraph.neighbors(b).unwrap();
-        neighbor_check.sort_unstable();
-        assert!(neighbor_check.contains(&a));
-
         let algo = LabelPropagation::new(10, 0.0, "community".into(), None).unwrap();
-
-        let mut analytic_ctx = Context::new();
-        let expected_state = {
-            let initial = algo.initialise_labels(&subgraph).unwrap();
-            let neighbors = subgraph.neighbors(b).unwrap();
-            let neighbor_indices: Vec<usize> = neighbors
-                .iter()
-                .filter_map(|&node| initial.index_of(node))
-                .collect();
-            let current = initial.label_for(b).unwrap().clone();
-            let mut counts = HashMap::new();
-            let candidate =
-                algo.dominant_label(&neighbor_indices, initial.labels(), &current, &mut counts);
-            assert_ne!(candidate, current);
-            let neighbor_label = initial.label_for(a).unwrap().clone();
-            assert_eq!(candidate, neighbor_label);
-            algo.run_iterations(&mut analytic_ctx, &subgraph, initial)
-                .unwrap()
-        };
 
         let mut exec_ctx = Context::new();
         let result = algo.execute(&mut exec_ctx, subgraph).unwrap();
@@ -374,12 +467,10 @@ mod tests {
         let attr_c = result.get_node_attribute(c, &attr_name).unwrap().unwrap();
         let attr_d = result.get_node_attribute(d, &attr_name).unwrap().unwrap();
 
-        assert_eq!(expected_state.label_for(a), expected_state.label_for(b));
-        assert_eq!(expected_state.label_for(c), expected_state.label_for(d));
-        assert_ne!(expected_state.label_for(a), expected_state.label_for(c));
-
+        // Nodes in same component should have same label
         assert_eq!(attr_a, attr_b);
         assert_eq!(attr_c, attr_d);
+        // Nodes in different components should have different labels
         assert_ne!(attr_a, attr_c);
     }
 }

@@ -1,16 +1,76 @@
-use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
+use rustc_hash::FxHashMap;
 
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
     ParameterType,
 };
+use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
+
+/// Efficient NodeId → dense index mapper
+enum NodeIndexer {
+    Dense {
+        min_id: NodeId,
+        indices: Vec<u32>, // sentinel = u32::MAX for missing nodes
+    },
+    Sparse(FxHashMap<NodeId, usize>),
+}
+
+impl NodeIndexer {
+    /// Constructs the optimal indexer based on node ID distribution.
+    /// Uses dense array if the ID span is ≤ 1.5x node count.
+    fn new(nodes: &[NodeId]) -> Self {
+        if nodes.is_empty() {
+            return Self::Sparse(FxHashMap::default());
+        }
+
+        let min = *nodes.iter().min().unwrap();
+        let max = *nodes.iter().max().unwrap();
+        let span = (max - min) as usize + 1;
+
+        // Dense indexing threshold: span must be reasonable relative to node count
+        if span <= nodes.len() * 3 / 2 {
+            let mut indices = vec![u32::MAX; span];
+            for (i, &node) in nodes.iter().enumerate() {
+                indices[(node - min) as usize] = i as u32;
+            }
+            Self::Dense {
+                min_id: min,
+                indices,
+            }
+        } else {
+            let mut map = FxHashMap::default();
+            map.reserve(nodes.len());
+            for (i, &node) in nodes.iter().enumerate() {
+                map.insert(node, i);
+            }
+            Self::Sparse(map)
+        }
+    }
+
+    fn get(&self, node: NodeId) -> Option<usize> {
+        match self {
+            Self::Dense { min_id, indices } => {
+                let offset = node.checked_sub(*min_id)? as usize;
+                indices.get(offset).and_then(|&idx| {
+                    if idx == u32::MAX {
+                        None
+                    } else {
+                        Some(idx as usize)
+                    }
+                })
+            }
+            Self::Sparse(map) => map.get(&node).copied(),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct PageRank {
@@ -107,23 +167,80 @@ impl Algorithm for PageRank {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let nodes: Vec<NodeId> = subgraph.nodes().iter().copied().collect();
+        let start_time = Instant::now();
+
+        // === PHASE 1: Collect Nodes ===
+        let collect_start = Instant::now();
+        let nodes = subgraph.ordered_nodes();
+        ctx.record_call("pr.collect_nodes", collect_start.elapsed());
+        ctx.record_stat("pr.count.input_nodes", nodes.len() as f64);
+
         let n = nodes.len();
         if n == 0 {
             return Ok(subgraph);
         }
 
-        // Build NodeId -> index mapping for Vec-based storage
-        let mut node_to_idx: HashMap<NodeId, usize> = HashMap::with_capacity(n);
-        for (idx, &node) in nodes.iter().enumerate() {
-            node_to_idx.insert(node, idx);
-        }
+        // === PHASE 2: Build Indexer ===
+        let idx_start = Instant::now();
+        let indexer = NodeIndexer::new(&nodes);
+        ctx.record_call("pr.build_indexer", idx_start.elapsed());
 
+        // === PHASE 3: Collect Edges ===
+        let edges_start = Instant::now();
+        let edges = subgraph.ordered_edges();
+        ctx.record_call("pr.collect_edges", edges_start.elapsed());
+        ctx.record_stat("pr.count.input_edges", edges.len() as f64);
+
+        // === PHASE 4: Build or Get CSR ===
+        let is_directed = subgraph.graph().borrow().is_directed();
+        let add_reverse = false; // PageRank uses incoming edges naturally
+
+        let csr = match subgraph.csr_cache_get(add_reverse) {
+            Some(cached) => {
+                ctx.record_call("pr.csr_cache_hit", std::time::Duration::from_nanos(0));
+                cached
+            }
+            None => {
+                let cache_miss_start = Instant::now();
+                
+                let graph = subgraph.graph();
+                let graph_ref = graph.borrow();
+                let pool_ref = graph_ref.pool();
+
+                let mut csr = Csr::default();
+                let build_start = Instant::now();
+                let endpoint_duration = build_csr_from_edges_with_scratch(
+                    &mut csr,
+                    nodes.len(),
+                    edges.iter().copied(),
+                    |nid| indexer.get(nid),
+                    |eid| pool_ref.get_edge_endpoints(eid),
+                    CsrOptions {
+                        add_reverse_edges: add_reverse,
+                        sort_neighbors: false,
+                    },
+                );
+                let total_build = build_start.elapsed();
+                let core_build = total_build.saturating_sub(endpoint_duration);
+
+                ctx.record_call("pr.csr_cache_miss", cache_miss_start.elapsed());
+                ctx.record_call("pr.collect_edge_endpoints", endpoint_duration);
+                ctx.record_call("pr.build_csr", core_build);
+
+                let csr_arc = Arc::new(csr);
+                subgraph.csr_cache_store(add_reverse, csr_arc.clone());
+                csr_arc
+            }
+        };
+
+        ctx.record_stat("pr.count.csr_nodes", csr.node_count() as f64);
+        ctx.record_stat("pr.count.csr_edges", csr.neighbors.len() as f64);
+
+        // === PHASE 5: Precompute Personalization Weights ===
         let damping = self.damping;
         let teleport = 1.0 - damping;
         let teleport_per_node = teleport / n as f64;
 
-        // Precompute personalization weights as flat Vec
         let personalization: Option<Vec<f64>> = if let Some(attr) = &self.personalization_attr {
             let mut weights = vec![1.0; n];
             let mut total = 0.0;
@@ -151,31 +268,28 @@ impl Algorithm for PageRank {
             None
         };
 
-        // Precompute adjacency lists and out-degrees
-        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n];
-        let mut out_degree: Vec<f64> = vec![0.0; n];
-
-        for (idx, &node) in nodes.iter().enumerate() {
-            let neighbors = subgraph.neighbors(node)?;
-            adjacency[idx].reserve(neighbors.len());
-            for neighbor in neighbors {
-                if let Some(&neighbor_idx) = node_to_idx.get(&neighbor) {
-                    adjacency[idx].push(neighbor_idx);
-                }
-            }
-            out_degree[idx] = adjacency[idx].len() as f64;
+        // === PHASE 6: Precompute Out-Degrees from CSR ===
+        let mut out_degree: Vec<f64> = Vec::with_capacity(csr.node_count());
+        for u_idx in 0..csr.node_count() {
+            out_degree.push(csr.neighbors(u_idx).len() as f64);
         }
 
-        // Initialize rank vectors
+        // === PHASE 7: Initialize Rank Vectors ===
         let init_rank = 1.0 / n as f64;
         let mut rank: Vec<f64> = vec![init_rank; n];
         let mut next_rank: Vec<f64> = vec![0.0; n];
 
-        let start = Instant::now();
+        // === PHASE 8: Power Iteration ===
+        let compute_start = Instant::now();
+        let mut converged = false;
+        let mut final_iteration = 0;
+
         for iteration in 0..self.max_iter {
             if ctx.is_cancelled() {
                 return Err(anyhow!("pagerank cancelled"));
             }
+
+            let iter_start = Instant::now();
 
             // Zero out next_rank buffer
             next_rank.fill(0.0);
@@ -189,11 +303,12 @@ impl Algorithm for PageRank {
             }
             let sink_contribution = damping * sink_mass / n as f64;
 
-            // Distribute rank from non-sink nodes
-            for idx in 0..n {
+            // Distribute rank from non-sink nodes using CSR
+            for idx in 0..csr.node_count() {
                 if out_degree[idx] > 0.0 {
                     let contrib = damping * rank[idx] / out_degree[idx];
-                    for &neighbor_idx in &adjacency[idx] {
+                    // CSR.neighbors returns a slice - no allocation
+                    for &neighbor_idx in csr.neighbors(idx) {
                         next_rank[neighbor_idx] += contrib;
                     }
                 }
@@ -218,26 +333,43 @@ impl Algorithm for PageRank {
             // Swap buffers instead of copying
             std::mem::swap(&mut rank, &mut next_rank);
 
+            ctx.record_call("pr.compute.iter", iter_start.elapsed());
+            ctx.record_stat("pr.count.iteration", (iteration + 1) as f64);
             ctx.emit_iteration(iteration, 0);
 
+            final_iteration = iteration + 1;
             if max_diff <= self.tolerance {
+                converged = true;
                 break;
             }
         }
-        ctx.record_duration("centrality.pagerank", start.elapsed());
 
+        ctx.record_call("pr.compute", compute_start.elapsed());
+        ctx.record_stat("pr.converged", if converged { 1.0 } else { 0.0 });
+        ctx.record_stat("pr.iterations_to_converge", final_iteration as f64);
+
+        // === PHASE 9: Emit Results ===
         if ctx.persist_results() {
+            let write_start = Instant::now();
             let attr_values: Vec<(NodeId, AttrValue)> = nodes
                 .iter()
                 .enumerate()
                 .map(|(idx, &node)| (node, AttrValue::Float(rank[idx] as f32)))
                 .collect();
 
-            ctx.with_scoped_timer("centrality.pagerank.write_attrs", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })
-            .map_err(|err| anyhow!("failed to persist PageRank scores: {err}"))?;
+            subgraph
+                .set_node_attr_column(self.output_attr.clone(), attr_values)
+                .map_err(|err| anyhow!("failed to persist PageRank scores: {err}"))?;
+
+            ctx.record_call("pr.write_attributes", write_start.elapsed());
+        } else {
+            let store_start = Instant::now();
+            // For non-persistent results, could add to context output if needed
+            ctx.record_call("pr.store_output", store_start.elapsed());
         }
+
+        ctx.record_call("pr.total_execution", start_time.elapsed());
+
         Ok(subgraph)
     }
 }

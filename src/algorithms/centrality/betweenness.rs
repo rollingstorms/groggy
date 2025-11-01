@@ -1,7 +1,9 @@
 use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
+use rustc_hash::FxHashMap;
 
 use crate::algorithms::pathfinding::utils::collect_edge_weights;
 use crate::algorithms::registry::Registry;
@@ -9,11 +11,67 @@ use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
     ParameterType,
 };
+use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 const EPS: f64 = 1e-9;
+
+/// Efficient NodeId → dense index mapper
+enum NodeIndexer {
+    Dense {
+        min_id: NodeId,
+        indices: Vec<u32>,
+    },
+    Sparse(FxHashMap<NodeId, usize>),
+}
+
+impl NodeIndexer {
+    fn new(nodes: &[NodeId]) -> Self {
+        if nodes.is_empty() {
+            return Self::Sparse(FxHashMap::default());
+        }
+
+        let min = *nodes.iter().min().unwrap();
+        let max = *nodes.iter().max().unwrap();
+        let span = (max - min) as usize + 1;
+
+        if span <= nodes.len() * 3 / 2 {
+            let mut indices = vec![u32::MAX; span];
+            for (i, &node) in nodes.iter().enumerate() {
+                indices[(node - min) as usize] = i as u32;
+            }
+            Self::Dense {
+                min_id: min,
+                indices,
+            }
+        } else {
+            let mut map = FxHashMap::default();
+            map.reserve(nodes.len());
+            for (i, &node) in nodes.iter().enumerate() {
+                map.insert(node, i);
+            }
+            Self::Sparse(map)
+        }
+    }
+
+    fn get(&self, node: NodeId) -> Option<usize> {
+        match self {
+            Self::Dense { min_id, indices } => {
+                let offset = node.checked_sub(*min_id)? as usize;
+                indices.get(offset).and_then(|&idx| {
+                    if idx == u32::MAX {
+                        None
+                    } else {
+                        Some(idx as usize)
+                    }
+                })
+            }
+            Self::Sparse(map) => map.get(&node).copied(),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct BetweennessCentrality {
@@ -70,8 +128,8 @@ impl BetweennessCentrality {
         &self,
         source: NodeId,
         nodes: &[NodeId],
-        node_to_index: &HashMap<NodeId, usize>,
-        neighbors_map: &std::collections::HashMap<NodeId, Vec<(NodeId, crate::types::EdgeId)>>,
+        indexer: &NodeIndexer,
+        csr: &Csr,
         weight_map: Option<&HashMap<(NodeId, NodeId), f64>>,
         // Pre-allocated arrays (reused between sources)
         sigma: &mut Vec<f64>,
@@ -79,7 +137,7 @@ impl BetweennessCentrality {
         predecessors: &mut Vec<Vec<NodeId>>,
     ) -> Result<Vec<NodeId>> {
         let n = nodes.len();
-        let source_idx = node_to_index[&source];
+        let source_idx = indexer.get(source).ok_or_else(|| anyhow!("source not in indexer"))?;
 
         // Reset arrays (much faster than allocating new HashMaps!)
         for i in 0..n {
@@ -94,7 +152,7 @@ impl BetweennessCentrality {
         sigma[source_idx] = 1.0;
 
         if weight_map.is_none() {
-            // Unweighted BFS
+            // Unweighted BFS using CSR
             distance[source_idx] = 0.0;
             let mut stack = Vec::with_capacity(n);
             let mut queue = VecDeque::with_capacity(n);
@@ -102,25 +160,25 @@ impl BetweennessCentrality {
 
             while let Some(v) = queue.pop_front() {
                 stack.push(v);
-                let v_idx = node_to_index[&v];
+                let v_idx = indexer.get(v).unwrap();
                 let v_dist = distance[v_idx];
 
-                // Direct adjacency access (no subgraph.neighbors() call!)
-                if let Some(neighbors) = neighbors_map.get(&v) {
-                    for &(w, _edge_id) in neighbors {
-                        if let Some(&w_idx) = node_to_index.get(&w) {
-                            let w_dist = distance[w_idx];
+                // Use CSR neighbors (slice - no allocation!)
+                for &w_idx in csr.neighbors(v_idx) {
+                    if w_idx >= n {
+                        continue;
+                    }
+                    let w = nodes[w_idx];
+                    let w_dist = distance[w_idx];
 
-                            if w_dist < 0.0 {
-                                distance[w_idx] = v_dist + 1.0;
-                                queue.push_back(w);
-                            }
+                    if w_dist < 0.0 {
+                        distance[w_idx] = v_dist + 1.0;
+                        queue.push_back(w);
+                    }
 
-                            if (distance[w_idx] - (v_dist + 1.0)).abs() < EPS {
-                                sigma[w_idx] += sigma[v_idx];
-                                predecessors[w_idx].push(v);
-                            }
-                        }
+                    if (distance[w_idx] - (v_dist + 1.0)).abs() < EPS {
+                        sigma[w_idx] += sigma[v_idx];
+                        predecessors[w_idx].push(v);
                     }
                 }
             }
@@ -166,34 +224,34 @@ impl BetweennessCentrality {
             let mut order = Vec::with_capacity(n);
 
             while let Some(State { cost, node }) = heap.pop() {
-                let node_idx = node_to_index[&node];
+                let node_idx = indexer.get(node).unwrap();
                 if cost > distance[node_idx] + EPS {
                     continue;
                 }
                 order.push(node);
 
-                // Direct adjacency access
-                if let Some(neighbors) = neighbors_map.get(&node) {
-                    for &(neighbor, _edge_id) in neighbors {
-                        if let Some(&neighbor_idx) = node_to_index.get(&neighbor) {
-                            let weight = weights.get(&(node, neighbor)).copied().unwrap_or(1.0);
-                            let next = cost + weight;
-                            let current = distance[neighbor_idx];
+                // Use CSR neighbors
+                for &neighbor_idx in csr.neighbors(node_idx) {
+                    if neighbor_idx >= n {
+                        continue;
+                    }
+                    let neighbor = nodes[neighbor_idx];
+                    let weight = weights.get(&(node, neighbor)).copied().unwrap_or(1.0);
+                    let next = cost + weight;
+                    let current = distance[neighbor_idx];
 
-                            if next + EPS < current {
-                                distance[neighbor_idx] = next;
-                                sigma[neighbor_idx] = sigma[node_idx];
-                                predecessors[neighbor_idx].clear();
-                                predecessors[neighbor_idx].push(node);
-                                heap.push(State {
-                                    cost: next,
-                                    node: neighbor,
-                                });
-                            } else if (next - current).abs() <= EPS {
-                                sigma[neighbor_idx] += sigma[node_idx];
-                                predecessors[neighbor_idx].push(node);
-                            }
-                        }
+                    if next + EPS < current {
+                        distance[neighbor_idx] = next;
+                        sigma[neighbor_idx] = sigma[node_idx];
+                        predecessors[neighbor_idx].clear();
+                        predecessors[neighbor_idx].push(node);
+                        heap.push(State {
+                            cost: next,
+                            node: neighbor,
+                        });
+                    } else if (next - current).abs() <= EPS {
+                        sigma[neighbor_idx] += sigma[node_idx];
+                        predecessors[neighbor_idx].push(node);
                     }
                 }
             }
@@ -203,67 +261,130 @@ impl BetweennessCentrality {
     }
 
     fn compute(&self, ctx: &mut Context, subgraph: &Subgraph) -> Result<HashMap<NodeId, f64>> {
-        let nodes: Vec<NodeId> = subgraph.nodes().iter().copied().collect();
+        let compute_start = Instant::now();
+
+        // === PHASE 1: Collect Nodes ===
+        let collect_start = Instant::now();
+        let nodes = subgraph.ordered_nodes();
         let n = nodes.len();
+        ctx.record_call("betweenness.collect_nodes", collect_start.elapsed());
+        ctx.record_stat("betweenness.count.input_nodes", n as f64);
 
-        // ⚡ OPTIMIZATION: Get adjacency snapshot ONCE (not per source!)
-        let graph = subgraph.graph();
-        let graph_ref = graph.borrow();
-        let pool = graph_ref.pool();
-        let space = graph_ref.space();
-        let (_, _, _, neighbors_map) = space.snapshot(&pool);
+        if n == 0 {
+            return Ok(HashMap::new());
+        }
 
-        // ⚡ OPTIMIZATION: Create node ID → index mapping for O(1) array access
-        let node_to_index: HashMap<NodeId, usize> = nodes
-            .iter()
-            .enumerate()
-            .map(|(i, &node)| (node, i))
-            .collect();
+        // === PHASE 2: Build Indexer ===
+        let idx_start = Instant::now();
+        let indexer = NodeIndexer::new(&nodes);
+        ctx.record_call("betweenness.build_indexer", idx_start.elapsed());
 
-        // ⚡ OPTIMIZATION: Pre-allocate arrays (reused for ALL sources!)
+        // === PHASE 3: Collect Edges ===
+        let edges_start = Instant::now();
+        let edges = subgraph.ordered_edges();
+        ctx.record_call("betweenness.collect_edges", edges_start.elapsed());
+        ctx.record_stat("betweenness.count.input_edges", edges.len() as f64);
+
+        // === PHASE 4: Build or Get CSR ===
+        let is_directed = subgraph.graph().borrow().is_directed();
+        let add_reverse = !is_directed; // Betweenness needs bidirectional
+
+        let csr = match subgraph.csr_cache_get(add_reverse) {
+            Some(cached) => {
+                ctx.record_call("betweenness.csr_cache_hit", std::time::Duration::from_nanos(0));
+                cached
+            }
+            None => {
+                let cache_miss_start = Instant::now();
+
+                let graph = subgraph.graph();
+                let graph_ref = graph.borrow();
+                let pool_ref = graph_ref.pool();
+
+                let mut csr = Csr::default();
+                let build_start = Instant::now();
+                let endpoint_duration = build_csr_from_edges_with_scratch(
+                    &mut csr,
+                    nodes.len(),
+                    edges.iter().copied(),
+                    |nid| indexer.get(nid),
+                    |eid| pool_ref.get_edge_endpoints(eid),
+                    CsrOptions {
+                        add_reverse_edges: add_reverse,
+                        sort_neighbors: false,
+                    },
+                );
+                let total_build = build_start.elapsed();
+                let core_build = total_build.saturating_sub(endpoint_duration);
+
+                ctx.record_call("betweenness.csr_cache_miss", cache_miss_start.elapsed());
+                ctx.record_call("betweenness.collect_edge_endpoints", endpoint_duration);
+                ctx.record_call("betweenness.build_csr", core_build);
+
+                let csr_arc = Arc::new(csr);
+                subgraph.csr_cache_store(add_reverse, csr_arc.clone());
+                csr_arc
+            }
+        };
+
+        ctx.record_stat("betweenness.count.csr_nodes", csr.node_count() as f64);
+        ctx.record_stat("betweenness.count.csr_edges", csr.neighbors.len() as f64);
+
+        // === PHASE 5: Collect Weights (if weighted) ===
+        let weight_map = if let Some(attr) = &self.weight_attr {
+            let weight_start = Instant::now();
+            let map = collect_edge_weights(subgraph, attr);
+            ctx.record_call("betweenness.collect_weights", weight_start.elapsed());
+            Some(map)
+        } else {
+            None
+        };
+
+        // === PHASE 6: Pre-allocate Arrays ===
+        let alloc_start = Instant::now();
         let mut sigma = vec![0.0; n];
         let mut distance = vec![0.0; n];
         let mut predecessors: Vec<Vec<NodeId>> = vec![Vec::new(); n];
         let mut delta = vec![0.0; n];
-
-        // Centrality scores (final result)
         let mut centrality = vec![0.0; n];
+        ctx.record_call("betweenness.allocate_arrays", alloc_start.elapsed());
 
-        let weight_map = self
-            .weight_attr
-            .as_ref()
-            .map(|attr| collect_edge_weights(subgraph, attr));
+        // === PHASE 7: Main Loop - Compute from Each Source ===
+        let main_loop_start = Instant::now();
+        let mut total_paths_computed = 0;
 
-        // Main loop: compute betweenness from each source
         for (idx, &source) in nodes.iter().enumerate() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("betweenness cancelled"));
             }
 
-            // ⚡ Compute shortest paths (arrays are reset inside, not reallocated!)
+            let source_start = Instant::now();
+
+            // Compute shortest paths (arrays are reset inside)
             let order = self.shortest_paths(
                 source,
                 &nodes,
-                &node_to_index,
-                &neighbors_map,
+                &indexer,
+                &csr,
                 weight_map.as_ref(),
                 &mut sigma,
                 &mut distance,
                 &mut predecessors,
             )?;
 
-            // ⚡ Reset delta array (faster than allocating new HashMap!)
+            total_paths_computed += order.len();
+
+            // Reset delta array
             for i in 0..n {
                 delta[i] = 0.0;
             }
 
             // Dependency accumulation
             for &w in order.iter().rev() {
-                let w_idx = node_to_index[&w];
+                let w_idx = indexer.get(w).unwrap();
 
-                // ⚡ Direct array access (no HashMap lookups!)
                 for &v in &predecessors[w_idx] {
-                    let v_idx = node_to_index[&v];
+                    let v_idx = indexer.get(v).unwrap();
                     let sigma_w = sigma[w_idx];
                     if sigma_w > 0.0 {
                         let sigma_v = sigma[v_idx];
@@ -276,10 +397,18 @@ impl BetweennessCentrality {
                 }
             }
 
+            ctx.record_call("betweenness.compute.source", source_start.elapsed());
             ctx.emit_iteration(idx, 0);
         }
 
-        // Post-processing: divide by 2 (undirected graphs count edges twice)
+        ctx.record_call("betweenness.compute.main_loop", main_loop_start.elapsed());
+        ctx.record_stat("betweenness.total_sources", nodes.len() as f64);
+        ctx.record_stat("betweenness.total_paths", total_paths_computed as f64);
+
+        // === PHASE 8: Post-processing ===
+        let post_start = Instant::now();
+
+        // Divide by 2 (undirected graphs count edges twice)
         for value in centrality.iter_mut() {
             *value /= 2.0;
         }
@@ -292,12 +421,16 @@ impl BetweennessCentrality {
             }
         }
 
-        // Convert Vec → HashMap for result
+        ctx.record_call("betweenness.postprocess", post_start.elapsed());
+
+        // Convert Vec → HashMap
         let result: HashMap<NodeId, f64> = nodes
             .iter()
             .enumerate()
             .map(|(i, &node)| (node, centrality[i]))
             .collect();
+
+        ctx.record_call("betweenness.compute", compute_start.elapsed());
 
         Ok(result)
     }
@@ -313,21 +446,29 @@ impl Algorithm for BetweennessCentrality {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let start = Instant::now();
+        let start_time = Instant::now();
         let scores = self.compute(ctx, &subgraph)?;
-        ctx.record_duration("centrality.betweenness", start.elapsed());
 
+        // === Persist Results ===
         if ctx.persist_results() {
+            let write_start = Instant::now();
             let attr_values: Vec<(NodeId, AttrValue)> = scores
                 .iter()
-                .map(|(&node, score)| (node, AttrValue::Float(*score as f32)))
+                .map(|(&node, &score)| (node, AttrValue::Float(score as f32)))
                 .collect();
 
-            ctx.with_scoped_timer("centrality.betweenness.write_attrs", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })
-            .map_err(|err| anyhow!("failed to persist betweenness scores: {err}"))?;
+            subgraph
+                .set_node_attr_column(self.output_attr.clone(), attr_values)
+                .map_err(|err| anyhow!("failed to persist betweenness scores: {err}"))?;
+
+            ctx.record_call("betweenness.write_attributes", write_start.elapsed());
+        } else {
+            let store_start = Instant::now();
+            ctx.record_call("betweenness.store_output", store_start.elapsed());
         }
+
+        ctx.record_call("betweenness.total_execution", start_time.elapsed());
+
         Ok(subgraph)
     }
 }

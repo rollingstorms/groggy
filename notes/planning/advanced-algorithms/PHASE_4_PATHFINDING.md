@@ -1,19 +1,98 @@
 ## Phase 4 – Pathfinding Algorithms (Traversal & Distance)
 
 **Timeline**: 4-5 weeks  
-**Dependencies**: Phase 1 (builder primitives)
+**Dependencies**: Phase 1 (builder primitives)  
+**Status**: ✅ Core algorithms complete, 🚧 Performance optimization in progress
 
 ### Objectives
 
 Extend pathfinding beyond basic Dijkstra/BFS to include advanced shortest path algorithms,
 k-shortest paths, all-pairs algorithms, and specialized traversals.
 
-### Current State (v0.5.0)
+**All algorithms follow STYLE_ALGO** (see `notes/development/STYLE_ALGO.md`):
+- CSR caching for O(1) neighbor access
+- Pre-allocated buffers (queues, distances, visited sets)
+- Comprehensive profiling instrumentation
+- Deterministic ordering via `ordered_nodes()`/`ordered_edges()`
 
-- ✅ Dijkstra's algorithm
-- ✅ BFS (breadth-first search)
-- ✅ DFS (depth-first search)
-- ✅ A* pathfinding
+### Current State (v0.6)
+
+#### ✅ Implemented, Needs Performance Optimization
+- **Dijkstra** – Target 50ms @ 200K (single-source, priority queue)
+- **BFS/DFS** – Target 20ms @ 200K (simple traversal)
+- **A*** – Target 60ms @ 200K (heuristic search)
+
+All three need STYLE_ALGO refactoring:
+- Add CSR caching
+- Pre-allocate traversal state (queue/stack, visited, distances)
+- Add comprehensive profiling
+- Ensure deterministic ordering
+
+### Completed Implementations (Need Refactoring)
+
+#### 4.0.1 Dijkstra's Algorithm
+**File**: `src/algorithms/pathfinding/dijkstra.rs`  
+**Status**: ✅ Implemented, 🚧 Performance optimization needed
+
+- ✅ Single-source shortest paths
+- ✅ Priority queue (binary heap)
+- ✅ Weighted graphs
+- ✅ Parameters: `source`, `weight_attr`, `output_attr`
+- 🚧 Apply STYLE_ALGO refactoring
+- 🚧 Target: 50ms @ 200K nodes
+
+**Refactoring TODO**:
+- Add CSR caching
+- Pre-allocate priority queue, distances, visited
+- Add profiling: `dijkstra.collect_edges`, `dijkstra.build_csr`, `dijkstra.sssp`, `dijkstra.total_execution`
+- Consider buffer reuse for multiple queries
+
+#### 4.0.2 BFS (Breadth-First Search)
+**File**: `src/algorithms/pathfinding/bfs_dfs.rs`  
+**Status**: ✅ Implemented, 🚧 Performance optimization needed
+
+- ✅ Level-by-level traversal
+- ✅ Shortest paths in unweighted graphs
+- ✅ Parameters: `source`, `output_attr`
+- 🚧 Apply STYLE_ALGO refactoring
+- 🚧 Target: 20ms @ 200K nodes (should be very fast)
+
+**Refactoring TODO**:
+- Add CSR caching
+- Pre-allocate queue, visited, distances
+- Add profiling: `bfs.collect_edges`, `bfs.build_csr`, `bfs.traversal`, `bfs.total_execution`
+
+#### 4.0.3 DFS (Depth-First Search)
+**File**: `src/algorithms/pathfinding/bfs_dfs.rs`  
+**Status**: ✅ Implemented, 🚧 Performance optimization needed
+
+- ✅ Stack-based traversal
+- ✅ Component discovery, cycle detection
+- ✅ Parameters: `source`, `output_attr`
+- 🚧 Apply STYLE_ALGO refactoring
+- 🚧 Target: 20ms @ 200K nodes
+
+**Refactoring TODO**:
+- Add CSR caching
+- Pre-allocate stack, visited
+- Add profiling: `dfs.collect_edges`, `dfs.build_csr`, `dfs.traversal`, `dfs.total_execution`
+
+#### 4.0.4 A* Pathfinding
+**File**: `src/algorithms/pathfinding/astar.rs`  
+**Status**: ✅ Implemented, 🚧 Performance optimization needed
+
+- ✅ Heuristic-guided shortest path
+- ✅ Euclidean distance heuristic
+- ✅ Weighted graphs
+- ✅ Parameters: `source`, `target`, `heuristic`, `weight_attr`
+- 🚧 Apply STYLE_ALGO refactoring
+- 🚧 Target: 60ms @ 200K nodes (similar to Dijkstra + heuristic overhead)
+
+**Refactoring TODO**:
+- Add CSR caching
+- Pre-allocate priority queue, g_scores, f_scores, visited
+- Add profiling: `astar.collect_edges`, `astar.build_csr`, `astar.search`, `astar.total_execution`
+- Ensure heuristic function calls are cheap (inline)
 
 ### Planned Additions
 

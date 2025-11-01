@@ -1,7 +1,9 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
+use rustc_hash::FxHashMap;
 
 use crate::algorithms::community::modularity::{modularity, modularity_delta, ModularityData};
 use crate::algorithms::registry::Registry;
@@ -9,9 +11,65 @@ use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
     ParameterType,
 };
+use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
+
+/// Efficient NodeId → dense index mapper
+enum NodeIndexer {
+    Dense {
+        min_id: NodeId,
+        indices: Vec<u32>,
+    },
+    Sparse(FxHashMap<NodeId, usize>),
+}
+
+impl NodeIndexer {
+    fn new(nodes: &[NodeId]) -> Self {
+        if nodes.is_empty() {
+            return Self::Sparse(FxHashMap::default());
+        }
+
+        let min = *nodes.iter().min().unwrap();
+        let max = *nodes.iter().max().unwrap();
+        let span = (max - min) as usize + 1;
+
+        if span <= nodes.len() * 3 / 2 {
+            let mut indices = vec![u32::MAX; span];
+            for (i, &node) in nodes.iter().enumerate() {
+                indices[(node - min) as usize] = i as u32;
+            }
+            Self::Dense {
+                min_id: min,
+                indices,
+            }
+        } else {
+            let mut map = FxHashMap::default();
+            map.reserve(nodes.len());
+            for (i, &node) in nodes.iter().enumerate() {
+                map.insert(node, i);
+            }
+            Self::Sparse(map)
+        }
+    }
+
+    fn get(&self, node: NodeId) -> Option<usize> {
+        match self {
+            Self::Dense { min_id, indices } => {
+                let offset = node.checked_sub(*min_id)? as usize;
+                indices.get(offset).and_then(|&idx| {
+                    if idx == u32::MAX {
+                        None
+                    } else {
+                        Some(idx as usize)
+                    }
+                })
+            }
+            Self::Sparse(map) => map.get(&node).copied(),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Louvain {
@@ -97,22 +155,113 @@ impl Algorithm for Louvain {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let _ = self.resolution; // placeholder until multi-resolution support lands
-        let snapshot = CommunityGraph::from_subgraph(&subgraph)?;
-        if snapshot.edges.is_empty() {
+        let start_time = Instant::now();
+
+        // === PHASE 1: Collect Nodes ===
+        let collect_start = Instant::now();
+        let nodes = subgraph.ordered_nodes();
+        ctx.record_call("louvain.collect_nodes", collect_start.elapsed());
+        ctx.record_stat("louvain.count.input_nodes", nodes.len() as f64);
+
+        if nodes.is_empty() {
             return Ok(subgraph);
         }
 
-        let modularity_data = ModularityData::new(&snapshot.edges);
-        let adjacency = snapshot.build_adjacency();
-        let mut partition: HashMap<NodeId, usize> = snapshot
-            .nodes
-            .iter()
-            .enumerate()
-            .map(|(idx, &node)| (node, idx))
-            .collect();
+        // === PHASE 2: Build Indexer ===
+        let idx_start = Instant::now();
+        let indexer = NodeIndexer::new(&nodes);
+        ctx.record_call("louvain.build_indexer", idx_start.elapsed());
 
-        // ⚡ OPTIMIZATION: Track community degrees and internal edges incrementally
+        // === PHASE 3: Collect Edges ===
+        let edges_start = Instant::now();
+        let edges = subgraph.ordered_edges();
+        ctx.record_call("louvain.collect_edges", edges_start.elapsed());
+        ctx.record_stat("louvain.count.input_edges", edges.len() as f64);
+
+        if edges.is_empty() {
+            return Ok(subgraph);
+        }
+
+        // === PHASE 4: Build or Get CSR ===
+        let is_directed = subgraph.graph().borrow().is_directed();
+        let add_reverse = !is_directed; // Louvain needs bidirectional for undirected
+
+        let csr = match subgraph.csr_cache_get(add_reverse) {
+            Some(cached) => {
+                ctx.record_call("louvain.csr_cache_hit", std::time::Duration::from_nanos(0));
+                cached
+            }
+            None => {
+                let cache_miss_start = Instant::now();
+
+                let graph = subgraph.graph();
+                let graph_ref = graph.borrow();
+                let pool_ref = graph_ref.pool();
+
+                let mut csr = Csr::default();
+                let build_start = Instant::now();
+                let endpoint_duration = build_csr_from_edges_with_scratch(
+                    &mut csr,
+                    nodes.len(),
+                    edges.iter().copied(),
+                    |nid| indexer.get(nid),
+                    |eid| pool_ref.get_edge_endpoints(eid),
+                    CsrOptions {
+                        add_reverse_edges: add_reverse,
+                        sort_neighbors: false,
+                    },
+                );
+                let total_build = build_start.elapsed();
+                let core_build = total_build.saturating_sub(endpoint_duration);
+
+                ctx.record_call("louvain.csr_cache_miss", cache_miss_start.elapsed());
+                ctx.record_call("louvain.collect_edge_endpoints", endpoint_duration);
+                ctx.record_call("louvain.build_csr", core_build);
+
+                let csr_arc = Arc::new(csr);
+                subgraph.csr_cache_store(add_reverse, csr_arc.clone());
+                csr_arc
+            }
+        };
+
+        ctx.record_stat("louvain.count.csr_nodes", csr.node_count() as f64);
+        ctx.record_stat("louvain.count.csr_edges", csr.neighbors.len() as f64);
+
+        // === PHASE 5: Build Edge List and Modularity Data ===
+        let mod_start = Instant::now();
+        
+        // Build undirected edge list from edges
+        let edge_list: Vec<(NodeId, NodeId)> = {
+            let graph = subgraph.graph();
+            let graph_ref = graph.borrow();
+            let pool_ref = graph_ref.pool();
+            
+            let mut list = Vec::new();
+            for &edge_id in edges.iter() {
+                if let Some((u, v)) = pool_ref.get_edge_endpoints(edge_id) {
+                    if u != v {
+                        let pair = if u <= v { (u, v) } else { (v, u) };
+                        list.push(pair);
+                    }
+                }
+            }
+            list
+        };
+        
+        let modularity_data = ModularityData::new(&edge_list);
+        ctx.record_call("louvain.build_modularity_data", mod_start.elapsed());
+        ctx.record_stat("louvain.count.unique_edges", edge_list.len() as f64);
+
+        // === PHASE 6: Initialize Partition ===
+        let init_start = Instant::now();
+        let mut partition: HashMap<NodeId, usize> = HashMap::new();
+        partition.reserve(nodes.len());
+        for (idx, &node) in nodes.iter().enumerate() {
+            partition.insert(node, idx);
+        }
+        ctx.record_call("louvain.initialize_partition", init_start.elapsed());
+
+        // Track community degrees and internal edges incrementally
         let mut community_degrees: HashMap<usize, f64> = HashMap::new();
         let mut community_internal: HashMap<usize, f64> = HashMap::new();
 
@@ -125,27 +274,36 @@ impl Algorithm for Louvain {
 
         let epsilon = 1e-6;
 
+        // === PHASE 7: Louvain Iterations ===
+        let compute_start = Instant::now();
+        let mut total_moves = 0;
+        let mut total_iterations = 0;
+
         if self.max_phases > 0 {
             let phase = 0;
             let phase_start = Instant::now();
             let mut improved = false;
 
-            for _ in 0..self.max_iter {
+            for iteration in 0..self.max_iter {
                 if ctx.is_cancelled() {
                     return Err(anyhow!("louvain cancelled"));
                 }
 
+                let iter_start = Instant::now();
                 let mut changed = false;
+                let mut moves_this_iter = 0;
 
-                for &node in &snapshot.nodes {
+                for (node_idx, &node) in nodes.iter().enumerate() {
                     let current_comm = partition[&node];
 
-                    // Find candidate communities (neighbors' communities)
+                    // Find candidate communities using CSR neighbors
                     let mut candidate_comms: HashSet<usize> = HashSet::new();
                     candidate_comms.insert(current_comm);
-                    if let Some(neighbours) = adjacency.get(&node) {
-                        for &neigh in neighbours {
-                            if let Some(&comm) = partition.get(&neigh) {
+                    
+                    for &neighbor_idx in csr.neighbors(node_idx) {
+                        if neighbor_idx < nodes.len() {
+                            let neighbor_node = nodes[neighbor_idx];
+                            if let Some(&comm) = partition.get(&neighbor_node) {
                                 candidate_comms.insert(comm);
                             }
                         }
@@ -154,19 +312,28 @@ impl Algorithm for Louvain {
                     let mut best_local_comm = current_comm;
                     let mut best_delta = 0.0;
 
-                    // ⚡ OPTIMIZATION: Use incremental modularity (no clones!)
+                    // Build temp adjacency for this node (for modularity_delta)
+                    let mut node_adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
+                    let mut neighbors_vec = Vec::new();
+                    for &neighbor_idx in csr.neighbors(node_idx) {
+                        if neighbor_idx < nodes.len() {
+                            neighbors_vec.push(nodes[neighbor_idx]);
+                        }
+                    }
+                    node_adjacency.insert(node, neighbors_vec);
+
+                    // Find best move
                     for &candidate in &candidate_comms {
                         if candidate == current_comm {
                             continue;
                         }
 
-                        // Calculate delta without cloning partition
                         let delta = modularity_delta(
                             node,
                             current_comm,
                             candidate,
                             &partition,
-                            &adjacency,
+                            &node_adjacency,
                             &modularity_data,
                             &community_degrees,
                             &community_internal,
@@ -178,7 +345,7 @@ impl Algorithm for Louvain {
                         }
                     }
 
-                    // Apply best move and update community stats incrementally
+                    // Apply best move
                     if best_local_comm != current_comm {
                         let node_degree = modularity_data.degree(&node);
 
@@ -193,8 +360,16 @@ impl Algorithm for Louvain {
                         // Move node
                         partition.insert(node, best_local_comm);
                         changed = true;
+                        moves_this_iter += 1;
                     }
                 }
+
+                total_iterations += 1;
+                total_moves += moves_this_iter;
+
+                ctx.record_call("louvain.compute.iter", iter_start.elapsed());
+                ctx.record_stat("louvain.count.iteration", (iteration + 1) as f64);
+                ctx.record_stat("louvain.count.moves", moves_this_iter as f64);
 
                 if !changed {
                     break;
@@ -202,22 +377,22 @@ impl Algorithm for Louvain {
                 improved = true;
             }
 
-            ctx.record_duration(
-                format!("community.louvain.phase{}", phase),
-                phase_start.elapsed(),
-            );
+            ctx.record_call("louvain.compute.phase", phase_start.elapsed());
+            ctx.record_stat("louvain.phase.improved", if improved { 1.0 } else { 0.0 });
 
             if !improved {
-                // No improvement in this phase – early exit.
-                return self.persist_partition(ctx, subgraph, partition);
+                ctx.record_call("louvain.compute", compute_start.elapsed());
+                ctx.record_stat("louvain.total_iterations", total_iterations as f64);
+                ctx.record_stat("louvain.total_moves", total_moves as f64);
+                return self.persist_partition(ctx, subgraph, partition, start_time);
             }
-
-            // NOTE: Full Louvain contracts communities between phases. To keep phase 2 scoped,
-            // we stop after the first improvement phase. Additional phases would require
-            // graph aggregation which is slated for later roadmap steps.
         }
 
-        self.persist_partition(ctx, subgraph, partition)
+        ctx.record_call("louvain.compute", compute_start.elapsed());
+        ctx.record_stat("louvain.total_iterations", total_iterations as f64);
+        ctx.record_stat("louvain.total_moves", total_moves as f64);
+
+        self.persist_partition(ctx, subgraph, partition, start_time)
     }
 }
 
@@ -227,60 +402,28 @@ impl Louvain {
         ctx: &mut Context,
         subgraph: Subgraph,
         partition: HashMap<NodeId, usize>,
+        start_time: Instant,
     ) -> Result<Subgraph> {
         if ctx.persist_results() {
+            let write_start = Instant::now();
             let attr_values: Vec<(NodeId, AttrValue)> = partition
                 .iter()
                 .map(|(&node, &community)| (node, AttrValue::Int(community as i64)))
                 .collect();
 
-            ctx.with_scoped_timer("community.louvain.write_attrs", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })
-            .map_err(|err| anyhow!("failed to persist Louvain communities: {err}"))?;
+            subgraph
+                .set_node_attr_column(self.output_attr.clone(), attr_values)
+                .map_err(|err| anyhow!("failed to persist Louvain communities: {err}"))?;
+
+            ctx.record_call("louvain.write_attributes", write_start.elapsed());
+        } else {
+            let store_start = Instant::now();
+            ctx.record_call("louvain.store_output", store_start.elapsed());
         }
+
+        ctx.record_call("louvain.total_execution", start_time.elapsed());
 
         Ok(subgraph)
-    }
-}
-
-struct CommunityGraph {
-    nodes: Vec<NodeId>,
-    edges: Vec<(NodeId, NodeId)>,
-}
-
-impl CommunityGraph {
-    fn from_subgraph(subgraph: &Subgraph) -> Result<Self> {
-        let mut nodes: Vec<NodeId> = subgraph.nodes().iter().copied().collect();
-        nodes.sort_unstable();
-
-        let mut edge_set: HashSet<(NodeId, NodeId)> = HashSet::new();
-        if nodes.len() >= 2 {
-            let graph_ref = subgraph.graph();
-            let graph = graph_ref.borrow();
-            for &edge_id in subgraph.edge_set() {
-                let (u, v) = graph.edge_endpoints(edge_id)?;
-                if u == v {
-                    continue;
-                }
-                let pair = if u <= v { (u, v) } else { (v, u) };
-                edge_set.insert(pair);
-            }
-        }
-
-        Ok(Self {
-            nodes,
-            edges: edge_set.into_iter().collect(),
-        })
-    }
-
-    fn build_adjacency(&self) -> HashMap<NodeId, Vec<NodeId>> {
-        let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
-        for &(u, v) in &self.edges {
-            adjacency.entry(u).or_default().push(v);
-            adjacency.entry(v).or_default().push(u);
-        }
-        adjacency
     }
 }
 

@@ -1,4 +1,5 @@
 use std::collections::{BinaryHeap, HashMap};
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{anyhow, Result};
@@ -9,6 +10,7 @@ use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
     ParameterType,
 };
+use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
@@ -192,7 +194,19 @@ impl AStarPathfinding {
             if cost > g_score.get(&node).copied().unwrap_or(f64::INFINITY) + EPS {
                 continue;
             }
-            let neighbors = subgraph.neighbors(node)?;
+            
+            // Try CSR path for optimal performance
+            let neighbors: Vec<NodeId> = if let Some(csr) = subgraph.csr_cache_get(false) {
+                let nodes = subgraph.ordered_nodes();
+                if let Some(node_idx) = nodes.iter().position(|&n| n == node) {
+                    csr.neighbors(node_idx).iter().map(|&idx| nodes[idx]).collect()
+                } else {
+                    subgraph.neighbors(node)?
+                }
+            } else {
+                subgraph.neighbors(node)?
+            };
+            
             for neighbor in neighbors {
                 let edge_weight = weight_map
                     .as_ref()
@@ -248,21 +262,68 @@ impl Algorithm for AStarPathfinding {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
-        let start = Instant::now();
+        let t0 = Instant::now();
+        
+        // Phase 1: Collect nodes
+        let nodes_start = Instant::now();
+        let nodes = subgraph.ordered_nodes();
+        ctx.record_call("astar.collect_nodes", nodes_start.elapsed());
+        ctx.record_stat("astar.count.input_nodes", nodes.len() as f64);
+        
+        // Phase 2: Build indexer
+        let idx_start = Instant::now();
+        let mut node_to_index = rustc_hash::FxHashMap::default();
+        node_to_index.reserve(nodes.len());
+        for (i, &node) in nodes.iter().enumerate() {
+            node_to_index.insert(node, i);
+        }
+        ctx.record_call("astar.build_indexer", idx_start.elapsed());
+        
+        // Phase 3: Build or retrieve CSR
+        let add_reverse = false;
+        if subgraph.csr_cache_get(add_reverse).is_some() {
+            ctx.record_call("astar.csr_cache_hit", std::time::Duration::from_nanos(0));
+        } else {
+            let csr_start = Instant::now();
+            
+            let edges = subgraph.ordered_edges();
+            let graph_ref = subgraph.graph();
+            let graph_borrow = graph_ref.borrow();
+            
+            let mut csr = Csr::default();
+            let csr_time = build_csr_from_edges_with_scratch(
+                &mut csr,
+                nodes.len(),
+                edges.iter().copied(),
+                |nid| node_to_index.get(&nid).copied(),
+                |eid| graph_borrow.edge_endpoints(eid).ok(),
+                CsrOptions {
+                    add_reverse_edges: add_reverse,
+                    sort_neighbors: false,
+                },
+            );
+            ctx.record_call("astar.csr_cache_miss", csr_start.elapsed());
+            ctx.record_call("astar.build_csr", csr_time);
+            subgraph.csr_cache_store(add_reverse, Arc::new(csr));
+        }
+        
+        // Phase 3: Execute A* (will use cached CSR automatically)
         let path_attr = self.run(ctx, &subgraph)?;
-        ctx.record_duration("pathfinding.astar", start.elapsed());
-
+        
+        // Phase 4: Write results
         if ctx.persist_results() {
             let attr_values: Vec<(NodeId, AttrValue)> = path_attr
                 .iter()
                 .map(|(&node, value)| (node, value.clone()))
                 .collect();
 
-            ctx.with_scoped_timer("pathfinding.astar.write_attrs", || {
+            ctx.with_scoped_timer("astar.write_attributes", || {
                 subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
             })
             .map_err(|err| anyhow!("failed to persist astar path: {err}"))?;
         }
+        
+        ctx.record_duration("astar.total_execution", t0.elapsed());
         Ok(subgraph)
     }
 }

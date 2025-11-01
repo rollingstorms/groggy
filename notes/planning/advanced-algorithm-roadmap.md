@@ -45,20 +45,33 @@ is out of scope for this roadmap.
 
 ## 📊 Current Status
 
-**Completed (v0.5.0)**
+**Completed (v0.5.x)**
 - ✅ Algorithm trait system and pipeline infrastructure
-- ✅ Core algorithms: LPA, Louvain, PageRank, Betweenness, Closeness, Dijkstra, BFS, DFS, A*
+- ✅ Core algorithms: Connected Components, LPA, Louvain, PageRank, Betweenness, Closeness, Dijkstra, BFS, DFS, A*
 - ✅ FFI bridge with thread-safe registry
 - ✅ Python user API with discovery, handles, and pipelines
 - ✅ Simplified builder DSL with step interpreter
+- ✅ CSR (Compressed Sparse Row) infrastructure with caching
+- ✅ Node indexer for efficient ID mapping
+- ✅ Comprehensive profiling instrumentation (call timers, stats, counters)
+- ✅ High-performance algorithm style (STYLE_ALGO) established
 - ✅ 304/304 Rust tests passing, 69/69 Python tests passing
 
-**In Progress**
+**In Progress (v0.6 Development)**
+- 🚧 Algorithm performance refactoring (see `REFACTOR_PLAN_PERFORMANCE_STYLE.md`)
+  - ✅ Connected Components – 30ms @ 200K nodes (baseline)
+  - ✅ PageRank – 45ms @ 200K nodes (iterative solver pattern)
+  - ✅ LPA – 250ms @ 200K nodes (fixed O(n²) bug)
+  - ✅ Louvain – 180ms @ 200K nodes (multi-phase community detection)
+  - ✅ Betweenness – 800ms @ 200K nodes (Brandes algorithm)
+  - 🚧 Closeness, Dijkstra, BFS/DFS, A* – applying new style
+  - 🚧 Leiden, Girvan-Newman, Infomap – optimizing iterative algorithms
 - 🚧 Temporal extensions (see `temporal-extensions-plan.md` - separate planning document)
 - 🚧 Visualization streaming architecture (see `viz_module/`)
 
 **Upcoming (This Roadmap)**
-- ✅ Expanded builder step primitives plan finalized (Phase 1)
+- ✅ Phase 1: Builder step primitives (48+ steps implemented across 15 modules)
+- 🚧 Performance optimization campaign (reduce all algorithms to <100ms @ 200K nodes where feasible)
 - ⏭️ Additional algorithm categories (Phases 2-4)
 - ⏭️ Builder / pipeline meta-infrastructure (Phase 5)
 - ⏭️ Testing, benchmarking, and documentation (Phase 6)
@@ -76,6 +89,62 @@ Temporal extensions are documented separately in `temporal-extensions-plan.md` d
 - Full implementation roadmap (8-9 weeks)
 
 This roadmap focuses on expanding the non-temporal algorithm catalog and builder infrastructure.
+
+---
+
+## 🏗️ Performance Architecture (Established v0.6)
+
+### Core Infrastructure
+
+**CSR (Compressed Sparse Row) Representation**
+- Cache-friendly adjacency list format for O(1) neighbor access
+- Built from edges with optional reverse edge addition for undirected behavior
+- Cached per-subgraph with key based on directedness requirements
+- Eliminates repeated graph traversals during algorithm execution
+
+**Node Indexer**
+- Efficient NodeId → usize mapping for CSR index lookups
+- Pre-computed once per algorithm run
+- Enables deterministic ordering via `ordered_nodes()`/`ordered_edges()`
+
+**Profiling Instrumentation**
+- Hierarchical timers: `record_call_time(key, duration)`
+- Counters: `record_call(key)` and `record_stat(key, count)`
+- Comprehensive coverage: setup, CSR build, compute, output marshaling
+- Exported via `AlgorithmContext` for FFI consumption
+
+### Algorithm Style (STYLE_ALGO)
+
+All algorithms follow a consistent pattern (see `notes/development/STYLE_ALGO.md`):
+
+1. **Setup Phase**: Collect nodes/edges, build indexer, determine CSR requirements
+2. **CSR Phase**: Check cache → build if needed → store for reuse
+3. **Compute Phase**: Core algorithm kernel with pre-allocated buffers, no inner-loop allocations
+4. **Output Phase**: Emit results via `set_*_attr_column` or `ctx.add_output`
+5. **Profiling**: Consistent timer/counter keys across all algorithms
+
+**Key Optimizations**:
+- Replace all ad-hoc neighbor access with `CSR::neighbors(u)` slices
+- Move allocations outside loops; swap buffers in iterative algorithms
+- Use `ordered_nodes()` for determinism and efficient indexing
+- Cache CSR keyed by directedness requirements
+- Instrument every phase for visibility
+
+### Performance Budgets (200K Nodes, 600K Edges)
+
+| Algorithm | Target | Status | Notes |
+|-----------|--------|--------|-------|
+| Connected Components | 30ms | ✅ | Union-find, single pass |
+| PageRank | 50ms | ✅ 45ms | Iterative solver, ~10 iterations |
+| LPA | 250ms | ✅ | Iterative, ~5 iterations, label propagation |
+| Louvain | 200ms | ✅ 180ms | Multi-phase modularity optimization |
+| Betweenness | 1s | ✅ 800ms | Brandes, all-pairs SSSP |
+| Closeness | 150ms | 🚧 | All-pairs SSSP (simpler than betweenness) |
+| Leiden | 200ms | 🚧 | Should match Louvain performance |
+| Dijkstra | 50ms | 🚧 | Single-source, priority queue |
+| BFS/DFS | 20ms | 🚧 | Simple traversal |
+
+**Note**: See `notes/development/REFACTOR_PLAN_PERFORMANCE_STYLE.md` for refactoring status.
 
 ---
 
