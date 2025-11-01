@@ -1,14 +1,73 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+use std::time::Instant;
 
 use anyhow::{anyhow, Result};
+use rustc_hash::FxHashMap;
 
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, Context, CostHint, ParameterMetadata, ParameterType,
 };
+use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
+
+/// Efficient NodeId → dense index mapper
+enum NodeIndexer {
+    Dense {
+        min_id: NodeId,
+        indices: Vec<u32>,
+    },
+    Sparse(FxHashMap<NodeId, usize>),
+}
+
+impl NodeIndexer {
+    fn new(nodes: &[NodeId]) -> Self {
+        if nodes.is_empty() {
+            return Self::Sparse(FxHashMap::default());
+        }
+
+        let min = *nodes.iter().min().unwrap();
+        let max = *nodes.iter().max().unwrap();
+        let span = (max - min) as usize + 1;
+
+        if span <= nodes.len() * 3 / 2 {
+            let mut indices = vec![u32::MAX; span];
+            for (i, &node) in nodes.iter().enumerate() {
+                indices[(node - min) as usize] = i as u32;
+            }
+            Self::Dense {
+                min_id: min,
+                indices,
+            }
+        } else {
+            let mut map = FxHashMap::default();
+            map.reserve(nodes.len());
+            for (i, &node) in nodes.iter().enumerate() {
+                map.insert(node, i);
+            }
+            Self::Sparse(map)
+        }
+    }
+
+    fn get(&self, node: NodeId) -> Option<usize> {
+        match self {
+            Self::Dense { min_id, indices } => {
+                let offset = node.checked_sub(*min_id)? as usize;
+                indices.get(offset).and_then(|&idx| {
+                    if idx == u32::MAX {
+                        None
+                    } else {
+                        Some(idx as usize)
+                    }
+                })
+            }
+            Self::Sparse(map) => map.get(&node).copied(),
+        }
+    }
+}
 
 /// Infomap community detection algorithm.
 ///
@@ -110,93 +169,136 @@ impl Algorithm for Infomap {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        let t0 = Instant::now();
+
         // Seed random if specified
         if let Some(seed) = self.seed {
             fastrand::seed(seed);
         }
 
-        let nodes: Vec<NodeId> = subgraph.nodes().iter().copied().collect();
+        // Phase 1: Collect nodes
+        let nodes_start = Instant::now();
+        let nodes = subgraph.ordered_nodes();
+        ctx.record_call("infomap.collect_nodes", nodes_start.elapsed());
+        ctx.record_stat("infomap.count.input_nodes", nodes.len() as f64);
+
         if nodes.is_empty() {
             return Ok(subgraph);
         }
 
-        // Build edge list
-        let mut edge_set: HashSet<(NodeId, NodeId)> = HashSet::new();
-        if nodes.len() >= 2 {
-            let graph_ref = subgraph.graph();
-            let graph = graph_ref.borrow();
-            for &edge_id in subgraph.edge_set() {
-                let (u, v) = graph.edge_endpoints(edge_id)?;
-                if u == v {
-                    continue;
-                }
-                let pair = if u <= v { (u, v) } else { (v, u) };
-                edge_set.insert(pair);
+        let n = nodes.len();
+
+        // Phase 2: Build indexer
+        let idx_start = Instant::now();
+        let indexer = NodeIndexer::new(&nodes);
+        ctx.record_call("infomap.build_indexer", idx_start.elapsed());
+
+        // Phase 3: Build or get CSR
+        let csr_start = Instant::now();
+        let edges = subgraph.ordered_edges();
+        let add_reverse = !subgraph.graph().borrow().is_directed();
+
+        let csr = match subgraph.csr_cache_get(add_reverse) {
+            Some(cached) => {
+                ctx.record_call("infomap.csr_cache_hit", std::time::Duration::from_nanos(0));
+                cached
             }
-        }
-        let edges: Vec<(NodeId, NodeId)> = edge_set.into_iter().collect();
+            None => {
+                let graph_ref = subgraph.graph();
+                let graph_borrow = graph_ref.borrow();
 
-        // Build adjacency
-        let mut adjacency: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
-        for &node in &nodes {
-            adjacency.insert(node, Vec::new());
-        }
-        for &(u, v) in &edges {
-            adjacency.entry(u).or_default().push(v);
-            adjacency.entry(v).or_default().push(u);
-        }
+                let mut csr = Csr::default();
+                let csr_time = build_csr_from_edges_with_scratch(
+                    &mut csr,
+                    nodes.len(),
+                    edges.iter().copied(),
+                    |nid| indexer.get(nid),
+                    |eid| graph_borrow.edge_endpoints(eid).ok(),
+                    CsrOptions {
+                        add_reverse_edges: add_reverse,
+                        sort_neighbors: false,
+                    },
+                );
+                drop(graph_borrow);
 
-        // Simple heuristic: use label propagation-like approach for now
-        // Full infomap requires computing code length with map equation
-        let mut partition: HashMap<NodeId, usize> = nodes
-            .iter()
-            .enumerate()
-            .map(|(idx, &node)| (node, idx))
-            .collect();
+                ctx.record_call("infomap.csr_cache_miss", csr_start.elapsed());
+                ctx.record_call("infomap.build_csr", csr_time);
 
-        // Simplified optimization: iteratively move nodes to most common neighbor community
-        for _ in 0..self.max_iter {
+                let csr_arc = Arc::new(csr);
+                subgraph.csr_cache_store(add_reverse, csr_arc.clone());
+                csr_arc
+            }
+        };
+
+        ctx.record_stat("infomap.count.csr_edges", csr.neighbors.len() as f64);
+
+        // Phase 4: Initialize partition (each node in own community)
+        let init_start = Instant::now();
+        let mut partition: Vec<usize> = (0..n).collect();
+        ctx.record_call("infomap.initialize_partition", init_start.elapsed());
+
+        // Phase 5: Pre-allocate buffers
+        let mut comm_counts: FxHashMap<usize, usize> = FxHashMap::default();
+        comm_counts.reserve(n / 10);
+        let mut node_order: Vec<usize> = (0..n).collect();
+
+        // Phase 6: Iterative optimization
+        let compute_start = Instant::now();
+        for iteration in 0..self.max_iter {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("Infomap cancelled"));
+            }
+
+            let iter_start = Instant::now();
             let mut changed = false;
-            let node_order: Vec<NodeId> = {
-                let mut v = nodes.clone();
-                fastrand::shuffle(&mut v);
-                v
-            };
 
-            for &node in &node_order {
-                let current_comm = partition[&node];
-                let neighbors = adjacency.get(&node).map(|v| v.as_slice()).unwrap_or(&[]);
+            // Shuffle node order for this iteration
+            fastrand::shuffle(&mut node_order);
 
+            for &node_idx in &node_order {
+                let current_comm = partition[node_idx];
+                
+                // Get neighbors from CSR
+                let neighbors = csr.neighbors(node_idx);
                 if neighbors.is_empty() {
                     continue;
                 }
 
                 // Count neighbor communities
-                let mut comm_counts: HashMap<usize, usize> = HashMap::new();
-                for &neighbor in neighbors {
-                    if let Some(&comm) = partition.get(&neighbor) {
-                        *comm_counts.entry(comm).or_insert(0) += 1;
+                comm_counts.clear();
+                for &neighbor_idx in neighbors {
+                    if neighbor_idx < n {
+                        *comm_counts.entry(partition[neighbor_idx]).or_insert(0) += 1;
                     }
                 }
 
                 // Find most common neighbor community
                 if let Some((&best_comm, _)) = comm_counts.iter().max_by_key(|(_, &count)| count) {
                     if best_comm != current_comm {
-                        partition.insert(node, best_comm);
+                        partition[node_idx] = best_comm;
                         changed = true;
                     }
                 }
             }
 
+            ctx.record_call(
+                &format!("infomap.iteration_{}", iteration),
+                iter_start.elapsed(),
+            );
+            ctx.record_stat(&format!("infomap.iteration_{}.changed", iteration), if changed { 1.0 } else { 0.0 });
+
             if !changed {
+                ctx.record_stat("infomap.converged_at_iteration", iteration as f64);
                 break;
             }
         }
+        ctx.record_call("infomap.compute", compute_start.elapsed());
 
-        // Renumber communities to be contiguous
-        let mut comm_map: HashMap<usize, usize> = HashMap::new();
+        // Phase 7: Renumber communities to be contiguous
+        let renumber_start = Instant::now();
+        let mut comm_map: FxHashMap<usize, usize> = FxHashMap::default();
         let mut next_comm = 0;
-        for comm in partition.values_mut() {
+        for comm in partition.iter_mut() {
             let mapped = *comm_map.entry(*comm).or_insert_with(|| {
                 let c = next_comm;
                 next_comm += 1;
@@ -204,18 +306,26 @@ impl Algorithm for Infomap {
             });
             *comm = mapped;
         }
+        ctx.record_call("infomap.renumber_communities", renumber_start.elapsed());
+        ctx.record_stat("infomap.count.communities", next_comm as f64);
 
+        // Phase 8: Write results
         if ctx.persist_results() {
-            let attr_values: Vec<(NodeId, AttrValue)> = partition
+            let write_start = Instant::now();
+            let attr_values: Vec<(NodeId, AttrValue)> = nodes
                 .iter()
-                .map(|(&node, &comm)| (node, AttrValue::Int(comm.try_into().unwrap_or(0))))
+                .enumerate()
+                .map(|(idx, &node)| (node, AttrValue::Int(partition[idx].try_into().unwrap_or(0))))
                 .collect();
 
-            ctx.with_scoped_timer("community.infomap.write_attrs", || {
-                subgraph.set_node_attr_column(self.output_attr.clone(), attr_values)
-            })?;
+            subgraph
+                .set_node_attr_column(self.output_attr.clone(), attr_values)
+                .map_err(|err| anyhow!("failed to persist communities: {err}"))?;
+            
+            ctx.record_call("infomap.write_attributes", write_start.elapsed());
         }
 
+        ctx.record_call("infomap.total_execution", t0.elapsed());
         Ok(subgraph)
     }
 }

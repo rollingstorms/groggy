@@ -6,16 +6,58 @@
 //! - Random walks with optional restart
 
 use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
+use rustc_hash::FxHashMap;
 
 use crate::algorithms::pathfinding::utils::{bfs_layers, dijkstra};
 use crate::algorithms::{AlgorithmParamValue, Context};
+use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::subgraphs::Subgraph;
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, AttrValue, NodeId};
 
 use super::core::{Step, StepMetadata, StepScope};
+
+/// Ensures CSR cache is warmed for optimal pathfinding performance.
+/// This enables the pathfinding utilities to use their fast CSR code paths.
+fn ensure_csr_cache(subgraph: &Subgraph, add_reverse: bool) {
+    // Check if cache already exists
+    if subgraph.csr_cache_get(add_reverse).is_some() {
+        return;
+    }
+
+    // Build and cache CSR
+    let nodes = subgraph.ordered_nodes();
+    let edges = subgraph.ordered_edges();
+
+    // Build node indexer
+    let mut node_to_index = FxHashMap::default();
+    node_to_index.reserve(nodes.len());
+    for (i, &node) in nodes.iter().enumerate() {
+        node_to_index.insert(node, i);
+    }
+
+    let graph_ref = subgraph.graph();
+    let graph = graph_ref.borrow();
+
+    let mut csr = Csr::default();
+    build_csr_from_edges_with_scratch(
+        &mut csr,
+        nodes.len(),
+        edges.iter().copied(),
+        |nid| node_to_index.get(&nid).copied(),
+        |eid| graph.edge_endpoints(eid).ok(),
+        CsrOptions {
+            add_reverse_edges: add_reverse,
+            sort_neighbors: false,
+        },
+    );
+
+    drop(graph);
+    subgraph.csr_cache_store(add_reverse, Arc::new(csr));
+}
 
 /// Computes single-source shortest paths from a source node to all reachable nodes.
 ///
@@ -74,39 +116,53 @@ impl Step for ShortestPathMapStep {
             return Err(anyhow!("source node {} not in subgraph", source));
         }
 
+        // Warm CSR cache for optimal performance
+        let is_directed = subgraph.graph().borrow().is_directed();
+        ctx.with_scoped_timer("step.shortest_path_map.warm_csr", || -> Result<()> {
+            ensure_csr_cache(subgraph, !is_directed);
+            Ok(())
+        })?;
+
         let distances: HashMap<NodeId, AlgorithmParamValue> =
             if let Some(weight_attr) = &self.weight_attr {
                 // Weighted: use Dijkstra
-                let graph_ref = subgraph.graph();
-                let graph = graph_ref.borrow();
-                let mut weight_map: HashMap<(NodeId, NodeId), f64> = HashMap::new();
+                let weight_map = ctx.with_scoped_timer("step.shortest_path_map.collect_weights", || -> Result<HashMap<(NodeId, NodeId), f64>> {
+                    let graph_ref = subgraph.graph();
+                    let graph = graph_ref.borrow();
+                    let mut map: HashMap<(NodeId, NodeId), f64> = HashMap::new();
 
-                for &edge_id in subgraph.edge_set() {
-                    if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
-                        if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
-                            if let Some(weight) = match value {
-                                AttrValue::Float(f) => Some(f as f64),
-                                AttrValue::Int(i) => Some(i as f64),
-                                _ => None,
-                            } {
-                                weight_map.insert((u, v), weight);
+                    for &edge_id in subgraph.edge_set() {
+                        if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
+                            if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
+                                if let Some(weight) = match value {
+                                    AttrValue::Float(f) => Some(f as f64),
+                                    AttrValue::Int(i) => Some(i as f64),
+                                    _ => None,
+                                } {
+                                    map.insert((u, v), weight);
+                                }
                             }
                         }
                     }
-                }
+                    Ok(map)
+                })?;
 
-                dijkstra(subgraph, source, |u, v| {
-                    weight_map.get(&(u, v)).copied().unwrap_or(1.0)
-                })
+                ctx.with_scoped_timer("step.shortest_path_map.dijkstra", || -> Result<HashMap<NodeId, f64>> {
+                    Ok(dijkstra(subgraph, source, |u, v| {
+                        weight_map.get(&(u, v)).copied().unwrap_or(1.0)
+                    }))
+                })?
                 .into_iter()
                 .map(|(node, dist)| (node, AlgorithmParamValue::Float(dist)))
                 .collect()
             } else {
                 // Unweighted: use BFS
-                bfs_layers(subgraph, source)
-                    .into_iter()
-                    .map(|(node, dist)| (node, AlgorithmParamValue::Int(dist as i64)))
-                    .collect()
+                ctx.with_scoped_timer("step.shortest_path_map.bfs", || -> Result<HashMap<NodeId, usize>> {
+                    Ok(bfs_layers(subgraph, source))
+                })?
+                .into_iter()
+                .map(|(node, dist)| (node, AlgorithmParamValue::Int(dist as i64)))
+                .collect()
             };
 
         ctx.emit_iteration(0, distances.len());
@@ -161,6 +217,7 @@ impl KShortestPathsStep {
     }
 
     /// Dijkstra that also tracks predecessors for path reconstruction
+    /// Uses CSR for optimal performance
     fn dijkstra_with_path(
         &self,
         subgraph: &Subgraph,
@@ -196,6 +253,78 @@ impl KShortestPathsStep {
             }
         }
 
+        // Try CSR path first (will be available due to ensure_csr_cache call)
+        if let Some(csr) = subgraph.csr_cache_get(false) {
+            let nodes = subgraph.ordered_nodes();
+            let mut node_to_idx = FxHashMap::default();
+            for (i, &nid) in nodes.iter().enumerate() {
+                node_to_idx.insert(nid, i);
+            }
+
+            let source_idx = *node_to_idx.get(&source)?;
+            let target_idx = *node_to_idx.get(&target)?;
+
+            let mut dist = vec![f64::INFINITY; nodes.len()];
+            let mut prev = vec![None; nodes.len()];
+            let mut heap: BinaryHeap<State> = BinaryHeap::new();
+
+            dist[source_idx] = 0.0;
+            heap.push(State {
+                cost: 0.0,
+                node: source,
+            });
+
+            while let Some(State { cost, node }) = heap.pop() {
+                let node_idx = node_to_idx[&node];
+
+                if node == target {
+                    // Reconstruct path
+                    let mut path = vec![target];
+                    let mut current_idx = target_idx;
+                    while let Some(pred_idx) = prev[current_idx] {
+                        path.push(nodes[pred_idx]);
+                        current_idx = pred_idx;
+                    }
+                    path.reverse();
+                    return Some((path, cost));
+                }
+
+                if cost > dist[node_idx] + f64::EPSILON {
+                    continue;
+                }
+
+                // Use CSR for neighbor iteration
+                let start = csr.offsets[node_idx];
+                let end = csr.offsets[node_idx + 1];
+
+                for i in start..end {
+                    let neighbor_idx = csr.neighbors[i];
+                    let neighbor = nodes[neighbor_idx];
+
+                    // Skip excluded edges
+                    if excluded_edges.contains(&(node, neighbor)) {
+                        continue;
+                    }
+
+                    let weight = weight_map.get(&(node, neighbor)).copied().unwrap_or(1.0);
+                    let next_cost = cost + weight;
+                    let best = dist[neighbor_idx];
+
+                    if next_cost + f64::EPSILON < best {
+                        dist[neighbor_idx] = next_cost;
+                        prev[neighbor_idx] = Some(node_idx);
+                        heap.push(State {
+                            cost: next_cost,
+                            node: neighbor,
+                        });
+                    }
+                }
+            }
+
+            return None;
+        }
+
+        // Fallback to trait-based (should not happen after ensure_csr_cache)
         let mut dist: HashMap<NodeId, f64> = HashMap::new();
         let mut prev: HashMap<NodeId, NodeId> = HashMap::new();
         let mut heap: BinaryHeap<State> = BinaryHeap::new();
@@ -390,30 +519,42 @@ impl Step for KShortestPathsStep {
             return Err(anyhow!("target node {} not in subgraph", target));
         }
 
+        // Warm CSR cache - although Yen's uses trait-based neighbors,
+        // warming the cache may help future algorithm steps
+        let is_directed = subgraph.graph().borrow().is_directed();
+        ctx.with_scoped_timer("step.k_shortest_paths.warm_csr", || -> Result<()> {
+            ensure_csr_cache(subgraph, !is_directed);
+            Ok(())
+        })?;
+
         // Build weight map
-        let weight_map = if let Some(weight_attr) = &self.weight_attr {
-            let graph_ref = subgraph.graph();
-            let graph = graph_ref.borrow();
-            let mut wm = HashMap::new();
-            for &edge_id in subgraph.edge_set() {
-                if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
-                    if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
-                        if let Some(weight) = match value {
-                            AttrValue::Float(f) => Some(f as f64),
-                            AttrValue::Int(i) => Some(i as f64),
-                            _ => None,
-                        } {
-                            wm.insert((u, v), weight);
+        let weight_map = ctx.with_scoped_timer("step.k_shortest_paths.collect_weights", || -> Result<HashMap<(NodeId, NodeId), f64>> {
+            if let Some(weight_attr) = &self.weight_attr {
+                let graph_ref = subgraph.graph();
+                let graph = graph_ref.borrow();
+                let mut wm = HashMap::new();
+                for &edge_id in subgraph.edge_set() {
+                    if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
+                        if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
+                            if let Some(weight) = match value {
+                                AttrValue::Float(f) => Some(f as f64),
+                                AttrValue::Int(i) => Some(i as f64),
+                                _ => None,
+                            } {
+                                wm.insert((u, v), weight);
+                            }
                         }
                     }
                 }
+                Ok(wm)
+            } else {
+                Ok(HashMap::new()) // Will default to 1.0
             }
-            wm
-        } else {
-            HashMap::new() // Will default to 1.0
-        };
+        })?;
 
-        let paths = self.yens_algorithm(subgraph, source, target, &weight_map);
+        let paths = ctx.with_scoped_timer("step.k_shortest_paths.yens_algorithm", || -> Result<Vec<(Vec<NodeId>, f64)>> {
+            Ok(self.yens_algorithm(subgraph, source, target, &weight_map))
+        })?;
 
         ctx.emit_iteration(0, paths.len());
 
