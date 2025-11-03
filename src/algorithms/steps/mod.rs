@@ -280,7 +280,7 @@ mod tests {
         let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
         let mut vars = StepVariables::default();
         let mut scope = StepScope::new(&sg, &mut vars);
-        let step = NodeDegreeStep::new("degree");
+        let step = NodeDegreeStep::new("degree", None);
         step.apply(&mut Context::new(), &mut scope).unwrap();
         let map = scope.variables().node_map("degree").unwrap();
         assert_eq!(map.get(&a), Some(&AlgorithmParamValue::Int(1)));

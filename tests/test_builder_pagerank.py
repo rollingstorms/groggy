@@ -61,6 +61,9 @@ def test_builder_pagerank_basic():
     with builder.iterate(20):
         ranks = _pagerank_step(builder, ranks, node_count, damping=0.85)
     
+    # Normalize once after iterations
+    ranks = builder.core.normalize_sum(ranks)
+    
     # Attach result
     builder.attach_as("pagerank", ranks)
     
@@ -112,6 +115,9 @@ def test_builder_pagerank_matches_native():
     with builder.iterate(20):
         ranks = _pagerank_step(builder, ranks, node_count, damping=0.85)
     
+    # Normalize once after iterations
+    ranks = builder.core.normalize_sum(ranks)
+    
     builder.attach_as("pagerank", ranks)
     
     # Execute both
@@ -155,6 +161,9 @@ def test_builder_pagerank_converges():
     with builder.iterate(50):
         ranks = _pagerank_step(builder, ranks, node_count, damping=0.85)
     
+    # Normalize once after iterations
+    ranks = builder.core.normalize_sum(ranks)
+    
     builder.attach_as("pagerank", ranks)
     
     # Execute
@@ -188,6 +197,9 @@ def test_builder_pagerank_no_edges():
     
     with builder.iterate(10):
         ranks = _pagerank_step(builder, ranks, node_count, damping=0.85)
+    
+    # Normalize once after iterations
+    ranks = builder.core.normalize_sum(ranks)
     
     builder.attach_as("pagerank", ranks)
     

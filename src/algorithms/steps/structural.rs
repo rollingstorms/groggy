@@ -41,9 +41,6 @@ impl Step for NodeDegreeStep {
     fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let subgraph = scope.subgraph();
 
-        let graph = subgraph.graph();
-        let graph_ref = graph.borrow();
-
         // Determine which nodes to evaluate, preserving deterministic ordering when possible.
         let nodes: Vec<NodeId> = if let Some(ref source_name) = self.source {
             if let Ok(column) = scope.variables().node_column(source_name) {
@@ -60,11 +57,31 @@ impl Step for NodeDegreeStep {
         };
 
         let mut map = HashMap::with_capacity(nodes.len());
-        for node in nodes {
-            let degree = graph_ref.out_degree(node).unwrap_or(0);
-            map.insert(node, AlgorithmParamValue::Int(degree as i64));
+
+        let is_directed = {
+            let graph = subgraph.graph();
+            let graph_ref = graph.borrow();
+            graph_ref.is_directed()
+        };
+
+        if is_directed {
+            let mut out_counts: HashMap<NodeId, usize> = HashMap::new();
+            for &edge_id in scope.edge_ids() {
+                if let Ok((source, _)) = subgraph.edge_endpoints(edge_id) {
+                    *out_counts.entry(source).or_insert(0) += 1;
+                }
+            }
+
+            for node in nodes {
+                let degree = out_counts.get(&node).copied().unwrap_or(0);
+                map.insert(node, AlgorithmParamValue::Int(degree as i64));
+            }
+        } else {
+            for node in nodes {
+                let degree = subgraph.degree(node).unwrap_or(0);
+                map.insert(node, AlgorithmParamValue::Int(degree as i64));
+            }
         }
-        drop(graph_ref);
 
         scope.variables_mut().set_node_map(self.target.clone(), map);
         Ok(())

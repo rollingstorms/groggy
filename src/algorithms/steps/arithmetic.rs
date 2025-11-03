@@ -186,14 +186,18 @@ fn combine_maps<K>(
     right_name: &str,
 ) -> Result<HashMap<K, AlgorithmParamValue>>
 where
-    K: Copy + Eq + Hash + Debug,
+    K: Copy + Eq + Hash + Ord + Debug,
 {
     if left.is_empty() {
         return Ok(HashMap::new());
     }
 
+    let mut keys: Vec<K> = left.keys().copied().collect();
+    keys.sort_unstable();
+
     let mut result = HashMap::with_capacity(left.len());
-    for (&key, left_value) in left.iter() {
+    for key in keys {
+        let left_value = left.get(&key).expect("key must exist");
         let right_value = right.get(&key).ok_or_else(|| {
             anyhow!(
                 "variable '{}' missing entry for id {:?} matching '{}'",
@@ -206,8 +210,8 @@ where
         result.insert(key, computed);
     }
 
-    for key in right.keys() {
-        if !left.contains_key(key) {
+    for key in right.keys().copied() {
+        if !left.contains_key(&key) {
             bail!(
                 "variable '{}' contains entry for id {:?} missing in '{}'",
                 right_name,
@@ -229,14 +233,18 @@ fn combine_map_scalar<K>(
     scalar_left: bool,
 ) -> Result<HashMap<K, AlgorithmParamValue>>
 where
-    K: Copy + Eq + Hash + Debug,
+    K: Copy + Eq + Hash + Ord + Debug,
 {
     if map.is_empty() {
         return Ok(HashMap::new());
     }
 
+    let mut keys: Vec<K> = map.keys().copied().collect();
+    keys.sort_unstable();
+
     let mut result = HashMap::with_capacity(map.len());
-    for (&key, value) in map.iter() {
+    for key in keys {
+        let value = map.get(&key).expect("key must exist");
         let computed = if scalar_left {
             op.apply(scalar, value, scalar_name, map_name)?
         } else {
@@ -451,14 +459,18 @@ fn apply_recip_to_map<K>(
     map_name: &str,
 ) -> Result<HashMap<K, AlgorithmParamValue>>
 where
-    K: Copy + Eq + Hash,
+    K: Copy + Eq + Hash + Ord,
 {
     if map.is_empty() {
         return Ok(HashMap::new());
     }
 
+    let mut keys: Vec<K> = map.keys().copied().collect();
+    keys.sort_unstable();
+
     let mut result = HashMap::with_capacity(map.len());
-    for (&key, value) in map.iter() {
+    for key in keys {
+        let value = map.get(&key).expect("key must exist");
         let recip = apply_recip_scalar(value, epsilon, map_name)?;
         result.insert(key, recip);
     }
@@ -635,14 +647,18 @@ fn compare_maps<K>(
     right_name: &str,
 ) -> Result<HashMap<K, AlgorithmParamValue>>
 where
-    K: Copy + Eq + Hash + Debug,
+    K: Copy + Eq + Hash + Ord + Debug,
 {
     if left.is_empty() {
         return Ok(HashMap::new());
     }
 
+    let mut keys: Vec<K> = left.keys().copied().collect();
+    keys.sort_unstable();
+
     let mut result = HashMap::with_capacity(left.len());
-    for (&key, left_value) in left.iter() {
+    for key in keys {
+        let left_value = left.get(&key).expect("key must exist");
         let right_value = right.get(&key).ok_or_else(|| {
             anyhow!(
                 "variable '{}' missing entry for id {:?} matching '{}'",
@@ -661,8 +677,8 @@ where
         result.insert(key, AlgorithmParamValue::Float(mask_value));
     }
 
-    for key in right.keys() {
-        if !left.contains_key(key) {
+    for key in right.keys().copied() {
+        if !left.contains_key(&key) {
             bail!(
                 "variable '{}' contains entry for id {:?} missing in '{}'",
                 right_name,
@@ -810,9 +826,13 @@ fn where_node_map(
         return Ok(HashMap::new());
     }
 
+    let mut keys: Vec<NodeId> = condition.keys().copied().collect();
+    keys.sort_unstable();
+
     let mut result = HashMap::with_capacity(condition.len());
 
-    for (&node, cond_val) in condition.iter() {
+    for node in keys {
+        let cond_val = condition.get(&node).expect("key must exist");
         let cond_num = NumericValue::from(cond_val, cond_name)?;
         let is_true = cond_num.as_f64().abs() > f64::EPSILON;
 
@@ -860,9 +880,13 @@ fn where_edge_map(
         return Ok(HashMap::new());
     }
 
+    let mut keys: Vec<EdgeId> = condition.keys().copied().collect();
+    keys.sort_unstable();
+
     let mut result = HashMap::with_capacity(condition.len());
 
-    for (&edge, cond_val) in condition.iter() {
+    for edge in keys {
+        let cond_val = condition.get(&edge).expect("key must exist");
         let cond_num = NumericValue::from(cond_val, cond_name)?;
         let is_true = cond_num.as_f64().abs() > f64::EPSILON;
 
@@ -1000,14 +1024,17 @@ fn reduce_map_to_scalar<K>(
     map_name: &str,
 ) -> Result<AlgorithmParamValue>
 where
-    K: Eq + Hash,
+    K: Eq + Hash + Ord + Copy,
 {
     if map.is_empty() {
         return Ok(AlgorithmParamValue::Float(0.0));
     }
 
     let mut values = Vec::with_capacity(map.len());
-    for value in map.values() {
+    let mut keys: Vec<K> = map.keys().copied().collect();
+    keys.sort_unstable();
+    for key in keys {
+        let value = map.get(&key).expect("key must exist");
         let num = NumericValue::from(value, map_name)?;
         values.push(num.as_f64());
     }
@@ -1094,7 +1121,9 @@ fn broadcast_to_node_map(
     scalar: &AlgorithmParamValue,
 ) -> HashMap<NodeId, AlgorithmParamValue> {
     let mut result = HashMap::with_capacity(reference.len());
-    for &node_id in reference.keys() {
+    let mut keys: Vec<NodeId> = reference.keys().copied().collect();
+    keys.sort_unstable();
+    for node_id in keys {
         result.insert(node_id, scalar.clone());
     }
     result
@@ -1105,7 +1134,9 @@ fn broadcast_to_edge_map(
     scalar: &AlgorithmParamValue,
 ) -> HashMap<EdgeId, AlgorithmParamValue> {
     let mut result = HashMap::with_capacity(reference.len());
-    for &edge_id in reference.keys() {
+    let mut keys: Vec<EdgeId> = reference.keys().copied().collect();
+    keys.sort_unstable();
+    for edge_id in keys {
         result.insert(edge_id, scalar.clone());
     }
     result

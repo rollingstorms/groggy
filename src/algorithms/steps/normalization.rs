@@ -94,14 +94,17 @@ fn normalize_map<K>(
     source_name: &str,
 ) -> Result<HashMap<K, AlgorithmParamValue>>
 where
-    K: Copy + std::cmp::Eq + std::hash::Hash,
+    K: Copy + std::cmp::Eq + std::hash::Hash + Ord,
 {
     let mut normalized = HashMap::with_capacity(map.len());
+    let mut keys: Vec<K> = map.keys().copied().collect();
+    keys.sort_unstable();
 
     match method {
         NormalizeMethod::Sum => {
             let mut sum = 0.0;
-            for value in map.values() {
+            for key in &keys {
+                let value = map.get(key).expect("key must exist");
                 sum += value_as_f64(value, source_name)?;
             }
 
@@ -113,14 +116,16 @@ where
                 ));
             }
 
-            for (&key, value) in map.iter() {
+            for key in keys {
+                let value = map.get(&key).expect("key must exist");
                 let raw = value_as_f64(value, source_name)?;
                 normalized.insert(key, AlgorithmParamValue::Float(raw / sum));
             }
         }
         NormalizeMethod::Max => {
             let mut max_value = f64::NEG_INFINITY;
-            for value in map.values() {
+            for key in &keys {
+                let value = map.get(key).expect("key must exist");
                 let raw = value_as_f64(value, source_name)?;
                 if raw > max_value {
                     max_value = raw;
@@ -135,7 +140,8 @@ where
                 ));
             }
 
-            for (&key, value) in map.iter() {
+            for key in keys {
+                let value = map.get(&key).expect("key must exist");
                 let raw = value_as_f64(value, source_name)?;
                 normalized.insert(key, AlgorithmParamValue::Float(raw / max_value));
             }
@@ -143,7 +149,8 @@ where
         NormalizeMethod::MinMax => {
             let mut min_value = f64::INFINITY;
             let mut max_value = f64::NEG_INFINITY;
-            for value in map.values() {
+            for key in &keys {
+                let value = map.get(key).expect("key must exist");
                 let raw = value_as_f64(value, source_name)?;
                 if raw < min_value {
                     min_value = raw;
@@ -162,7 +169,8 @@ where
                 ));
             }
 
-            for (&key, value) in map.iter() {
+            for key in keys {
+                let value = map.get(&key).expect("key must exist");
                 let raw = value_as_f64(value, source_name)?;
                 let normalized_value = (raw - min_value) / range;
                 normalized.insert(key, AlgorithmParamValue::Float(normalized_value));
