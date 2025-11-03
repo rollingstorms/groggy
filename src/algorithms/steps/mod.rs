@@ -10,6 +10,7 @@ mod aggregations;
 mod arithmetic;
 mod attributes;
 mod community;
+pub mod composition;
 mod core;
 mod expression;
 mod filtering;
@@ -19,9 +20,11 @@ mod normalization;
 mod pathfinding;
 mod registry;
 mod sampling;
+pub mod schema;
 mod structural;
 pub mod temporal;
 mod transformations;
+pub mod validation;
 
 // Re-export core types
 pub use core::{
@@ -43,13 +46,19 @@ pub use aggregations::{
     EntropyStep, HistogramStep, MedianStep, ModeStep, QuantileStep, ReduceNodeValuesStep,
     Reduction, StdDevStep,
 };
-pub use arithmetic::BinaryArithmeticStep;
+pub use arithmetic::{
+    BinaryArithmeticStep, BroadcastScalarStep, CollectNeighborValuesStep, CompareOp, CompareStep,
+    ModeListStep, ModeTieBreak, RecipStep, ReduceScalarStep, ReductionOp, WhereStep,
+};
 pub use attributes::{
     AttachEdgeAttrStep, AttachNodeAttrStep, EdgeWeightScaleStep, LoadEdgeAttrStep, LoadNodeAttrStep,
 };
 pub use community::{CommunitySeedStep, LabelPropagateStep, ModularityGainStep, SeedStrategy};
 pub use flow::{FlowUpdateStep, ResidualCapacityStep};
-pub use init::{InitEdgesStep, InitNodesStep};
+pub use init::{
+    GraphEdgeCountStep, GraphNodeCountStep, InitEdgesStep, InitNodesStep, InitNodesWithIndexStep,
+    InitScalarStep,
+};
 pub use normalization::{
     ClipValuesStep, NormalizeMethod, NormalizeNodeValuesStep, NormalizeValuesStep, StandardizeStep,
 };
@@ -68,6 +77,18 @@ pub use temporal::{
 
 // Re-export registration functions
 pub use registry::{ensure_core_steps_registered, register_core_steps};
+
+// Re-export schema and validation types
+pub use schema::{
+    Constraint, ParameterSchema, ParameterSchemaBuilder, ParameterType, SchemaRegistry, StepSchema,
+    StepSchemaBuilder,
+};
+pub use validation::{
+    ErrorCategory, PipelineValidator, ValidationError, ValidationReport, ValidationWarning,
+};
+
+// Re-export composition helpers
+pub use composition::{StepComposer, StepTemplate};
 
 #[cfg(test)]
 mod tests {
@@ -135,6 +156,26 @@ mod tests {
         let map = scope.variables().node_map("scores").unwrap();
         assert_eq!(map.get(&a), Some(&AlgorithmParamValue::Float(0.5)));
         assert_eq!(map.get(&b), Some(&AlgorithmParamValue::Float(1.5)));
+    }
+
+    #[test]
+    fn load_entity_id_defaults_to_node_id() {
+        let mut graph = Graph::new();
+        let a = graph.add_node();
+        let b = graph.add_node();
+        let nodes: HashSet<NodeId> = [a, b].into_iter().collect();
+        let sg = Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
+        let mut vars = StepVariables::default();
+        let mut scope = StepScope::new(&sg, &mut vars);
+        let step = LoadNodeAttrStep::new(
+            "entity_ids",
+            AttrName::from("entity_id".to_string()),
+            AlgorithmParamValue::Float(0.0),
+        );
+        step.apply(&mut Context::new(), &mut scope).unwrap();
+        let map = scope.variables().node_map("entity_ids").unwrap();
+        assert_eq!(map.get(&a), Some(&AlgorithmParamValue::Int(a as i64)));
+        assert_eq!(map.get(&b), Some(&AlgorithmParamValue::Int(b as i64)));
     }
 
     #[test]

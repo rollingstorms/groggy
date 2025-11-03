@@ -18,10 +18,7 @@ use crate::types::{AttrName, AttrValue, NodeId};
 
 /// Efficient NodeId → dense index mapper
 enum NodeIndexer {
-    Dense {
-        min_id: NodeId,
-        indices: Vec<u32>,
-    },
+    Dense { min_id: NodeId, indices: Vec<u32> },
     Sparse(FxHashMap<NodeId, usize>),
 }
 
@@ -122,7 +119,13 @@ impl ClosenessCentrality {
         }
     }
 
-    fn compute(&self, ctx: &mut Context, subgraph: &Subgraph, csr: &Csr, nodes: &[NodeId]) -> Result<HashMap<NodeId, f64>> {
+    fn compute(
+        &self,
+        ctx: &mut Context,
+        subgraph: &Subgraph,
+        csr: &Csr,
+        nodes: &[NodeId],
+    ) -> Result<HashMap<NodeId, f64>> {
         let n = nodes.len();
         if n == 0 {
             return Ok(HashMap::new());
@@ -134,7 +137,7 @@ impl ClosenessCentrality {
             .map(|attr| collect_edge_weights(subgraph, attr));
 
         let mut scores: Vec<f64> = vec![0.0; n];
-        
+
         // Pre-allocate buffers for BFS (reused across all sources!)
         let mut distance_buf = vec![usize::MAX; n];
         let mut queue_buf = VecDeque::with_capacity(n);
@@ -152,7 +155,7 @@ impl ClosenessCentrality {
                 let dist = dijkstra(subgraph, source, |u, v| {
                     weights.get(&(u, v)).copied().unwrap_or(1.0)
                 });
-                
+
                 for (&target, &d) in &dist {
                     if target == source {
                         continue;
@@ -220,35 +223,38 @@ impl Algorithm for ClosenessCentrality {
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let t0 = Instant::now();
-        
+
         // Phase 1: Collect nodes
         let nodes_start = Instant::now();
         let nodes = subgraph.ordered_nodes();
         ctx.record_call("closeness.collect_nodes", nodes_start.elapsed());
         ctx.record_stat("closeness.count.input_nodes", nodes.len() as f64);
-        
+
         let n = nodes.len();
         if n == 0 {
             return Ok(subgraph);
         }
-        
+
         // Phase 2: Build indexer
         let idx_start = Instant::now();
         let indexer = NodeIndexer::new(&nodes);
         ctx.record_call("closeness.build_indexer", idx_start.elapsed());
-        
+
         // Phase 3: Build or retrieve CSR
         let add_reverse = false;
         let csr = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
-            ctx.record_call("closeness.csr_cache_hit", std::time::Duration::from_nanos(0));
+            ctx.record_call(
+                "closeness.csr_cache_hit",
+                std::time::Duration::from_nanos(0),
+            );
             cached
         } else {
             let csr_start = Instant::now();
-            
+
             let edges = subgraph.ordered_edges();
             let graph_ref = subgraph.graph();
             let graph_borrow = graph_ref.borrow();
-            
+
             let mut csr_new = Csr::default();
             let csr_time = build_csr_from_edges_with_scratch(
                 &mut csr_new,
@@ -263,19 +269,19 @@ impl Algorithm for ClosenessCentrality {
             );
             ctx.record_call("closeness.csr_cache_miss", csr_start.elapsed());
             ctx.record_call("closeness.build_csr", csr_time);
-            
+
             let csr_arc = Arc::new(csr_new);
             subgraph.csr_cache_store(add_reverse, csr_arc.clone());
             csr_arc
         };
-        
+
         ctx.record_stat("closeness.count.csr_edges", csr.neighbors.len() as f64);
-        
+
         // Phase 4: Compute closeness (uses CSR-optimized BFS/Dijkstra)
         let compute_start = Instant::now();
         let scores = self.compute(ctx, &subgraph, &csr, &nodes)?;
         ctx.record_call("closeness.compute", compute_start.elapsed());
-        
+
         // Phase 5: Write results
         if ctx.persist_results() {
             let attr_values: Vec<(NodeId, AttrValue)> = scores
@@ -288,7 +294,7 @@ impl Algorithm for ClosenessCentrality {
             })
             .map_err(|err| anyhow!("failed to persist closeness scores: {err}"))?;
         }
-        
+
         ctx.record_duration("closeness.total_execution", t0.elapsed());
         Ok(subgraph)
     }

@@ -34,3 +34,25 @@ class NotImplementedError(GroggyError):
         if tracking_issue:
             message += f". See: {tracking_issue}"
         super().__init__(message)
+
+class ValidationError(GroggyError):
+    """Raised when pipeline validation fails"""
+    def __init__(self, errors: list[str], warnings: list[str] = None):
+        self.errors = errors
+        self.warnings = warnings or []
+        
+        # Format error message
+        message = f"Pipeline validation failed with {len(errors)} error(s)"
+        if self.warnings:
+            message += f" and {len(self.warnings)} warning(s)"
+        message += ":\n\n"
+        
+        for i, err in enumerate(errors, 1):
+            message += f"  {i}. {err}\n"
+        
+        if self.warnings:
+            message += "\nWarnings:\n"
+            for i, warn in enumerate(self.warnings, 1):
+                message += f"  {i}. {warn}\n"
+        
+        super().__init__(message)

@@ -126,13 +126,13 @@ impl Algorithm for DijkstraShortestPath {
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
         let t0 = Instant::now();
-        
+
         // Phase 1: Collect nodes
         let nodes_start = Instant::now();
         let nodes = subgraph.ordered_nodes();
         ctx.record_call("dijkstra.collect_nodes", nodes_start.elapsed());
         ctx.record_stat("dijkstra.count.input_nodes", nodes.len() as f64);
-        
+
         // Phase 2: Build indexer
         let idx_start = Instant::now();
         let mut node_to_index = rustc_hash::FxHashMap::default();
@@ -141,18 +141,18 @@ impl Algorithm for DijkstraShortestPath {
             node_to_index.insert(node, i);
         }
         ctx.record_call("dijkstra.build_indexer", idx_start.elapsed());
-        
+
         // Phase 3: Build or retrieve CSR
         let add_reverse = false;
         if subgraph.csr_cache_get(add_reverse).is_some() {
             ctx.record_call("dijkstra.csr_cache_hit", std::time::Duration::from_nanos(0));
         } else {
             let csr_start = Instant::now();
-            
+
             let edges = subgraph.ordered_edges();
             let graph_ref = subgraph.graph();
             let graph_borrow = graph_ref.borrow();
-            
+
             let mut csr = Csr::default();
             let csr_time = build_csr_from_edges_with_scratch(
                 &mut csr,
@@ -169,10 +169,10 @@ impl Algorithm for DijkstraShortestPath {
             ctx.record_call("dijkstra.build_csr", csr_time);
             subgraph.csr_cache_store(add_reverse, Arc::new(csr));
         }
-        
+
         // Phase 3: Execute Dijkstra (will use cached CSR automatically)
         let distances = self.run(ctx, &subgraph)?;
-        
+
         // Phase 4: Write results
         if ctx.persist_results() {
             let attr_values: Vec<(NodeId, AttrValue)> = distances
@@ -185,7 +185,7 @@ impl Algorithm for DijkstraShortestPath {
             })
             .map_err(|err| anyhow!("failed to persist dijkstra distances: {err}"))?;
         }
-        
+
         ctx.record_duration("dijkstra.total_execution", t0.elapsed());
         Ok(subgraph)
     }

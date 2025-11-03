@@ -91,6 +91,18 @@ pub struct ExprContext<'a> {
     pub node: NodeId,
     pub input: &'a StepInput<'a>,
     pub current_value: Option<&'a AlgorithmParamValue>,
+    /// Optional CSR context for optimized neighbor access
+    pub csr_ctx: Option<CsrContext<'a>>,
+}
+
+/// CSR context for efficient neighbor operations in expressions
+pub struct CsrContext<'a> {
+    /// Current node's CSR index
+    pub node_idx: usize,
+    /// Reference to CSR adjacency
+    pub csr: &'a crate::state::topology::Csr,
+    /// Ordered nodes array (for index->NodeId mapping)
+    pub ordered_nodes: &'a [crate::types::NodeId],
 }
 
 impl<'a> ExprContext<'a> {
@@ -99,6 +111,7 @@ impl<'a> ExprContext<'a> {
             node,
             input,
             current_value: None,
+            csr_ctx: None,
         }
     }
 
@@ -111,6 +124,27 @@ impl<'a> ExprContext<'a> {
             node,
             input,
             current_value: Some(value),
+            csr_ctx: None,
+        }
+    }
+
+    /// Create context with CSR optimization (for Phase 3 neighbor aggregation)
+    pub fn with_csr(
+        node: NodeId,
+        node_idx: usize,
+        csr: &'a crate::state::topology::Csr,
+        ordered_nodes: &'a [crate::types::NodeId],
+        input: &'a StepInput<'a>,
+    ) -> Self {
+        Self {
+            node,
+            input,
+            current_value: None,
+            csr_ctx: Some(CsrContext {
+                node_idx,
+                csr,
+                ordered_nodes,
+            }),
         }
     }
 }
@@ -346,6 +380,226 @@ fn eval_function(func: &str, args: &[Expr], ctx: &ExprContext) -> Result<Algorit
             }
             let degree = ctx.input.subgraph.degree(ctx.node)?;
             Ok(AlgorithmParamValue::Int(degree as i64))
+        }
+
+        "neighbor_values" => {
+            // Get variable values for current node's neighbors
+            if args.len() != 1 {
+                return Err(anyhow!("neighbor_values requires 1 argument"));
+            }
+
+            // The argument should be a variable reference
+            let Expr::Var { name } = &args[0] else {
+                return Err(anyhow!("neighbor_values expects a variable name"));
+            };
+
+            // Get the variable map
+            let var_map = ctx.input.variables.node_map(name)?;
+
+            // Get neighbors
+            let neighbors = ctx.input.subgraph.neighbors(ctx.node)?;
+
+            // Collect neighbor values, preserving integer-only collections when possible.
+            let mut int_values = Vec::new();
+            let mut float_values = Vec::new();
+            let mut use_float = false;
+
+            // Include current node's own value first (for LPA-style algorithms)
+            // This allows the node to "keep" its current label if no neighbor consensus
+            if let Some(val) = var_map.get(&ctx.node) {
+                match val {
+                    AlgorithmParamValue::Float(f) => {
+                        use_float = true;
+                        float_values.push(*f);
+                    }
+                    AlgorithmParamValue::Int(i) => {
+                        int_values.push(*i);
+                    }
+                    AlgorithmParamValue::FloatList(list) => {
+                        use_float = true;
+                        float_values.extend(list.iter().copied());
+                    }
+                    AlgorithmParamValue::IntList(list) => {
+                        int_values.extend(list.iter().copied());
+                    }
+                    _ => {}
+                }
+            }
+
+            // Collect neighbor values
+            for neighbor in neighbors {
+                if let Some(val) = var_map.get(&neighbor) {
+                    match val {
+                        AlgorithmParamValue::Float(f) => {
+                            if !use_float {
+                                use_float = true;
+                                if !int_values.is_empty() {
+                                    float_values.extend(int_values.iter().map(|i| *i as f64));
+                                    int_values.clear();
+                                }
+                            }
+                            float_values.push(*f);
+                        }
+                        AlgorithmParamValue::Int(i) => {
+                            if use_float {
+                                float_values.push(*i as f64);
+                            } else {
+                                int_values.push(*i);
+                            }
+                        }
+                        AlgorithmParamValue::FloatList(list) => {
+                            if !use_float {
+                                use_float = true;
+                                if !int_values.is_empty() {
+                                    float_values.extend(int_values.iter().map(|i| *i as f64));
+                                    int_values.clear();
+                                }
+                            }
+                            float_values.extend(list.iter().copied());
+                        }
+                        AlgorithmParamValue::IntList(list) => {
+                            if use_float {
+                                float_values.extend(list.iter().map(|i| *i as f64));
+                            } else {
+                                int_values.extend(list.iter().copied());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            if use_float {
+                if !int_values.is_empty() {
+                    float_values.extend(int_values.into_iter().map(|i| i as f64));
+                }
+                Ok(AlgorithmParamValue::FloatList(float_values))
+            } else {
+                Ok(AlgorithmParamValue::IntList(int_values))
+            }
+        }
+
+        "sum" => {
+            // Sum an array of values
+            if args.len() != 1 {
+                return Err(anyhow!("sum requires 1 argument"));
+            }
+
+            let values = args[0].eval(ctx)?;
+
+            match values {
+                AlgorithmParamValue::FloatList(vec) => {
+                    let sum: f64 = vec.iter().sum();
+                    Ok(AlgorithmParamValue::Float(sum))
+                }
+                AlgorithmParamValue::IntList(vec) => {
+                    let sum: i64 = vec.iter().sum();
+                    Ok(AlgorithmParamValue::Int(sum))
+                }
+                AlgorithmParamValue::Float(f) => Ok(AlgorithmParamValue::Float(f)),
+                AlgorithmParamValue::Int(i) => Ok(AlgorithmParamValue::Int(i)),
+                _ => Err(anyhow!("sum requires numeric array or value")),
+            }
+        }
+
+        "mean" => {
+            // Calculate mean of an array
+            if args.len() != 1 {
+                return Err(anyhow!("mean requires 1 argument"));
+            }
+
+            let values = args[0].eval(ctx)?;
+
+            match values {
+                AlgorithmParamValue::FloatList(vec) => {
+                    if vec.is_empty() {
+                        return Ok(AlgorithmParamValue::Float(0.0));
+                    }
+                    let sum: f64 = vec.iter().sum();
+                    let mean = sum / vec.len() as f64;
+                    Ok(AlgorithmParamValue::Float(mean))
+                }
+                AlgorithmParamValue::IntList(vec) => {
+                    if vec.is_empty() {
+                        return Ok(AlgorithmParamValue::Float(0.0));
+                    }
+                    let sum: i64 = vec.iter().sum();
+                    let mean = sum as f64 / vec.len() as f64;
+                    Ok(AlgorithmParamValue::Float(mean))
+                }
+                _ => Err(anyhow!("mean requires numeric array")),
+            }
+        }
+
+        "mode" => {
+            // Find most common value in an array
+            if args.len() != 1 {
+                return Err(anyhow!("mode requires 1 argument"));
+            }
+
+            let values = args[0].eval(ctx)?;
+
+            match values {
+                AlgorithmParamValue::FloatList(vec) => {
+                    if vec.is_empty() {
+                        return Ok(AlgorithmParamValue::Float(0.0));
+                    }
+
+                    // Count occurrences - use integer representation for HashMap key
+                    use std::collections::HashMap;
+                    let mut counts: HashMap<i64, usize> = HashMap::new();
+                    for &val in &vec {
+                        // Convert to bits for exact comparison
+                        let key = val.to_bits() as i64;
+                        *counts.entry(key).or_insert(0) += 1;
+                    }
+
+                    // Find most common
+                    let mut best_key = 0i64;
+                    let mut best_count = 0usize;
+                    let mut first = true;
+                    for (key, count) in counts.into_iter() {
+                        if first
+                            || count > best_count
+                            || (count == best_count && key < best_key)
+                        {
+                            best_key = key;
+                            best_count = count;
+                            first = false;
+                        }
+                    }
+                    Ok(AlgorithmParamValue::Float(f64::from_bits(best_key as u64)))
+                }
+                AlgorithmParamValue::IntList(vec) => {
+                    if vec.is_empty() {
+                        return Ok(AlgorithmParamValue::Int(0));
+                    }
+
+                    // Count occurrences
+                    use std::collections::HashMap;
+                    let mut counts: HashMap<i64, usize> = HashMap::new();
+                    for &val in &vec {
+                        *counts.entry(val).or_insert(0) += 1;
+                    }
+
+                    // Find most common
+                    let mut best_val = 0i64;
+                    let mut best_count = 0usize;
+                    let mut first = true;
+                    for (val, count) in counts.into_iter() {
+                        if first
+                            || count > best_count
+                            || (count == best_count && val < best_val)
+                        {
+                            best_val = val;
+                            best_count = count;
+                            first = false;
+                        }
+                    }
+                    Ok(AlgorithmParamValue::Int(best_val))
+                }
+                _ => Err(anyhow!("mode requires numeric array")),
+            }
         }
 
         _ => Err(anyhow!("unknown function: {}", func)),

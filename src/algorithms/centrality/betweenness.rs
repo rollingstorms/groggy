@@ -20,10 +20,7 @@ const EPS: f64 = 1e-9;
 
 /// Efficient NodeId → dense index mapper
 enum NodeIndexer {
-    Dense {
-        min_id: NodeId,
-        indices: Vec<u32>,
-    },
+    Dense { min_id: NodeId, indices: Vec<u32> },
     Sparse(FxHashMap<NodeId, usize>),
 }
 
@@ -137,7 +134,9 @@ impl BetweennessCentrality {
         predecessors: &mut Vec<Vec<NodeId>>,
     ) -> Result<Vec<NodeId>> {
         let n = nodes.len();
-        let source_idx = indexer.get(source).ok_or_else(|| anyhow!("source not in indexer"))?;
+        let source_idx = indexer
+            .get(source)
+            .ok_or_else(|| anyhow!("source not in indexer"))?;
 
         // Reset arrays (much faster than allocating new HashMaps!)
         for i in 0..n {
@@ -291,7 +290,10 @@ impl BetweennessCentrality {
 
         let csr = match subgraph.csr_cache_get(add_reverse) {
             Some(cached) => {
-                ctx.record_call("betweenness.csr_cache_hit", std::time::Duration::from_nanos(0));
+                ctx.record_call(
+                    "betweenness.csr_cache_hit",
+                    std::time::Duration::from_nanos(0),
+                );
                 cached
             }
             None => {

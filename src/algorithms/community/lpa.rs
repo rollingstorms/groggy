@@ -1,4 +1,3 @@
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -194,7 +193,7 @@ impl LabelPropagation {
         neighbor_slice: &[usize],
         labels: &[AttrValue],
         current_idx: usize,
-        counts: &mut FxHashMap<usize, usize>,  // Index → count
+        counts: &mut FxHashMap<usize, usize>, // Index → count
     ) -> usize {
         if neighbor_slice.is_empty() {
             return current_idx;
@@ -213,7 +212,7 @@ impl LabelPropagation {
         // Find most common label
         let mut best_idx = current_idx;
         let mut best_count = 1;
-        
+
         for (&idx, &count) in counts.iter() {
             // Break ties by smallest index (deterministic)
             if count > best_count || (count == best_count && idx < best_idx) {
@@ -256,7 +255,7 @@ impl LabelPropagation {
 
             for idx in 0..total {
                 let current_label_idx = label_indices[idx];
-                
+
                 // Get neighbors from CSR and build their label indices
                 neighbor_label_indices.clear();
                 for &neighbor_idx in csr.neighbors(idx) {
@@ -264,12 +263,12 @@ impl LabelPropagation {
                         neighbor_label_indices.push(label_indices[neighbor_idx]);
                     }
                 }
-                
+
                 let new_label_idx = self.dominant_label(
                     &neighbor_label_indices,
                     &state.labels,
                     current_label_idx,
-                    &mut counts
+                    &mut counts,
                 );
 
                 if new_label_idx != current_label_idx {

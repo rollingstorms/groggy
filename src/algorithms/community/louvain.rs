@@ -5,7 +5,7 @@ use std::time::Instant;
 use anyhow::{anyhow, Result};
 use rustc_hash::FxHashMap;
 
-use crate::algorithms::community::modularity::{modularity, modularity_delta, ModularityData};
+use crate::algorithms::community::modularity::{modularity_delta, ModularityData};
 use crate::algorithms::registry::Registry;
 use crate::algorithms::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, Context, CostHint, ParameterMetadata,
@@ -18,10 +18,7 @@ use crate::types::{AttrName, AttrValue, NodeId};
 
 /// Efficient NodeId → dense index mapper
 enum NodeIndexer {
-    Dense {
-        min_id: NodeId,
-        indices: Vec<u32>,
-    },
+    Dense { min_id: NodeId, indices: Vec<u32> },
     Sparse(FxHashMap<NodeId, usize>),
 }
 
@@ -229,13 +226,13 @@ impl Algorithm for Louvain {
 
         // === PHASE 5: Build Edge List and Modularity Data ===
         let mod_start = Instant::now();
-        
+
         // Build undirected edge list from edges
         let edge_list: Vec<(NodeId, NodeId)> = {
             let graph = subgraph.graph();
             let graph_ref = graph.borrow();
             let pool_ref = graph_ref.pool();
-            
+
             let mut list = Vec::new();
             for &edge_id in edges.iter() {
                 if let Some((u, v)) = pool_ref.get_edge_endpoints(edge_id) {
@@ -247,7 +244,7 @@ impl Algorithm for Louvain {
             }
             list
         };
-        
+
         let modularity_data = ModularityData::new(&edge_list);
         ctx.record_call("louvain.build_modularity_data", mod_start.elapsed());
         ctx.record_stat("louvain.count.unique_edges", edge_list.len() as f64);
@@ -299,7 +296,7 @@ impl Algorithm for Louvain {
                     // Find candidate communities using CSR neighbors
                     let mut candidate_comms: HashSet<usize> = HashSet::new();
                     candidate_comms.insert(current_comm);
-                    
+
                     for &neighbor_idx in csr.neighbors(node_idx) {
                         if neighbor_idx < nodes.len() {
                             let neighbor_node = nodes[neighbor_idx];

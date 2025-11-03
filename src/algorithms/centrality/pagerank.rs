@@ -202,7 +202,7 @@ impl Algorithm for PageRank {
             }
             None => {
                 let cache_miss_start = Instant::now();
-                
+
                 let graph = subgraph.graph();
                 let graph_ref = graph.borrow();
                 let pool_ref = graph_ref.pool();

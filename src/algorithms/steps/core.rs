@@ -204,6 +204,17 @@ impl StepVariables {
         }
     }
 
+    pub fn node_map_mut(
+        &mut self,
+        name: &str,
+    ) -> Result<&mut HashMap<NodeId, AlgorithmParamValue>> {
+        match self.values.get_mut(name) {
+            Some(StepValue::NodeMap(map)) => Ok(map),
+            Some(_) => Err(anyhow!("variable '{name}' is not stored as a node map")),
+            None => Err(anyhow!("variable '{name}' not found")),
+        }
+    }
+
     pub fn set_scalar(&mut self, name: impl Into<String>, value: AlgorithmParamValue) {
         self.values.insert(name.into(), StepValue::Scalar(value));
     }

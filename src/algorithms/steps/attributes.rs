@@ -43,11 +43,17 @@ impl Step for LoadNodeAttrStep {
     fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
         let mut map = HashMap::with_capacity(scope.subgraph().node_set().len());
         for &node in scope.node_ids() {
-            let value = scope
+            let value = match scope
                 .subgraph()
                 .get_node_attribute(node, &self.attr)?
                 .and_then(AlgorithmParamValue::from_attr_value)
-                .unwrap_or_else(|| self.default.clone());
+            {
+                Some(attr_value) => attr_value,
+                None if self.attr.as_str() == "entity_id" || self.attr.as_str() == "node_id" => {
+                    AlgorithmParamValue::Int(node as i64)
+                }
+                None => self.default.clone(),
+            };
             map.insert(node, value);
         }
         scope.variables_mut().set_node_map(self.target.clone(), map);

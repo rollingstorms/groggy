@@ -126,40 +126,47 @@ impl Step for ShortestPathMapStep {
         let distances: HashMap<NodeId, AlgorithmParamValue> =
             if let Some(weight_attr) = &self.weight_attr {
                 // Weighted: use Dijkstra
-                let weight_map = ctx.with_scoped_timer("step.shortest_path_map.collect_weights", || -> Result<HashMap<(NodeId, NodeId), f64>> {
-                    let graph_ref = subgraph.graph();
-                    let graph = graph_ref.borrow();
-                    let mut map: HashMap<(NodeId, NodeId), f64> = HashMap::new();
+                let weight_map = ctx.with_scoped_timer(
+                    "step.shortest_path_map.collect_weights",
+                    || -> Result<HashMap<(NodeId, NodeId), f64>> {
+                        let graph_ref = subgraph.graph();
+                        let graph = graph_ref.borrow();
+                        let mut map: HashMap<(NodeId, NodeId), f64> = HashMap::new();
 
-                    for &edge_id in subgraph.edge_set() {
-                        if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
-                            if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
-                                if let Some(weight) = match value {
-                                    AttrValue::Float(f) => Some(f as f64),
-                                    AttrValue::Int(i) => Some(i as f64),
-                                    _ => None,
-                                } {
-                                    map.insert((u, v), weight);
+                        for &edge_id in subgraph.edge_set() {
+                            if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
+                                if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
+                                    if let Some(weight) = match value {
+                                        AttrValue::Float(f) => Some(f as f64),
+                                        AttrValue::Int(i) => Some(i as f64),
+                                        _ => None,
+                                    } {
+                                        map.insert((u, v), weight);
+                                    }
                                 }
                             }
                         }
-                    }
-                    Ok(map)
-                })?;
+                        Ok(map)
+                    },
+                )?;
 
-                ctx.with_scoped_timer("step.shortest_path_map.dijkstra", || -> Result<HashMap<NodeId, f64>> {
-                    Ok(dijkstra(subgraph, source, |u, v| {
-                        weight_map.get(&(u, v)).copied().unwrap_or(1.0)
-                    }))
-                })?
+                ctx.with_scoped_timer(
+                    "step.shortest_path_map.dijkstra",
+                    || -> Result<HashMap<NodeId, f64>> {
+                        Ok(dijkstra(subgraph, source, |u, v| {
+                            weight_map.get(&(u, v)).copied().unwrap_or(1.0)
+                        }))
+                    },
+                )?
                 .into_iter()
                 .map(|(node, dist)| (node, AlgorithmParamValue::Float(dist)))
                 .collect()
             } else {
                 // Unweighted: use BFS
-                ctx.with_scoped_timer("step.shortest_path_map.bfs", || -> Result<HashMap<NodeId, usize>> {
-                    Ok(bfs_layers(subgraph, source))
-                })?
+                ctx.with_scoped_timer(
+                    "step.shortest_path_map.bfs",
+                    || -> Result<HashMap<NodeId, usize>> { Ok(bfs_layers(subgraph, source)) },
+                )?
                 .into_iter()
                 .map(|(node, dist)| (node, AlgorithmParamValue::Int(dist as i64)))
                 .collect()
@@ -528,33 +535,39 @@ impl Step for KShortestPathsStep {
         })?;
 
         // Build weight map
-        let weight_map = ctx.with_scoped_timer("step.k_shortest_paths.collect_weights", || -> Result<HashMap<(NodeId, NodeId), f64>> {
-            if let Some(weight_attr) = &self.weight_attr {
-                let graph_ref = subgraph.graph();
-                let graph = graph_ref.borrow();
-                let mut wm = HashMap::new();
-                for &edge_id in subgraph.edge_set() {
-                    if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
-                        if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
-                            if let Some(weight) = match value {
-                                AttrValue::Float(f) => Some(f as f64),
-                                AttrValue::Int(i) => Some(i as f64),
-                                _ => None,
-                            } {
-                                wm.insert((u, v), weight);
+        let weight_map = ctx.with_scoped_timer(
+            "step.k_shortest_paths.collect_weights",
+            || -> Result<HashMap<(NodeId, NodeId), f64>> {
+                if let Some(weight_attr) = &self.weight_attr {
+                    let graph_ref = subgraph.graph();
+                    let graph = graph_ref.borrow();
+                    let mut wm = HashMap::new();
+                    for &edge_id in subgraph.edge_set() {
+                        if let Ok((u, v)) = graph.edge_endpoints(edge_id) {
+                            if let Ok(Some(value)) = graph.get_edge_attr(edge_id, weight_attr) {
+                                if let Some(weight) = match value {
+                                    AttrValue::Float(f) => Some(f as f64),
+                                    AttrValue::Int(i) => Some(i as f64),
+                                    _ => None,
+                                } {
+                                    wm.insert((u, v), weight);
+                                }
                             }
                         }
                     }
+                    Ok(wm)
+                } else {
+                    Ok(HashMap::new()) // Will default to 1.0
                 }
-                Ok(wm)
-            } else {
-                Ok(HashMap::new()) // Will default to 1.0
-            }
-        })?;
+            },
+        )?;
 
-        let paths = ctx.with_scoped_timer("step.k_shortest_paths.yens_algorithm", || -> Result<Vec<(Vec<NodeId>, f64)>> {
-            Ok(self.yens_algorithm(subgraph, source, target, &weight_map))
-        })?;
+        let paths = ctx.with_scoped_timer(
+            "step.k_shortest_paths.yens_algorithm",
+            || -> Result<Vec<(Vec<NodeId>, f64)>> {
+                Ok(self.yens_algorithm(subgraph, source, target, &weight_map))
+            },
+        )?;
 
         ctx.emit_iteration(0, paths.len());
 

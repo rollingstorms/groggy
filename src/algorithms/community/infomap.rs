@@ -1,4 +1,3 @@
-use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -16,10 +15,7 @@ use crate::types::{AttrName, AttrValue, NodeId};
 
 /// Efficient NodeId → dense index mapper
 enum NodeIndexer {
-    Dense {
-        min_id: NodeId,
-        indices: Vec<u32>,
-    },
+    Dense { min_id: NodeId, indices: Vec<u32> },
     Sparse(FxHashMap<NodeId, usize>),
 }
 
@@ -257,7 +253,7 @@ impl Algorithm for Infomap {
 
             for &node_idx in &node_order {
                 let current_comm = partition[node_idx];
-                
+
                 // Get neighbors from CSR
                 let neighbors = csr.neighbors(node_idx);
                 if neighbors.is_empty() {
@@ -285,7 +281,10 @@ impl Algorithm for Infomap {
                 &format!("infomap.iteration_{}", iteration),
                 iter_start.elapsed(),
             );
-            ctx.record_stat(&format!("infomap.iteration_{}.changed", iteration), if changed { 1.0 } else { 0.0 });
+            ctx.record_stat(
+                &format!("infomap.iteration_{}.changed", iteration),
+                if changed { 1.0 } else { 0.0 },
+            );
 
             if !changed {
                 ctx.record_stat("infomap.converged_at_iteration", iteration as f64);
@@ -321,7 +320,7 @@ impl Algorithm for Infomap {
             subgraph
                 .set_node_attr_column(self.output_attr.clone(), attr_values)
                 .map_err(|err| anyhow!("failed to persist communities: {err}"))?;
-            
+
             ctx.record_call("infomap.write_attributes", write_start.elapsed());
         }
 

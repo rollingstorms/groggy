@@ -8,8 +8,8 @@ use crate::types::AttrName;
 
 use super::super::{AlgorithmParamValue, CostHint};
 use super::aggregations::{
-    EntropyStep, HistogramStep, MedianStep, ModeStep, QuantileStep, ReduceNodeValuesStep,
-    Reduction, StdDevStep,
+    EntropyStep, HistogramStep, MedianStep, ModeStep, NeighborAggType, NeighborAggregationStep,
+    QuantileStep, ReduceNodeValuesStep, Reduction, StdDevStep,
 };
 use super::arithmetic::{read_binary_operands, BinaryArithmeticStep, BinaryOperation};
 use super::attributes::{
@@ -23,7 +23,7 @@ use super::filtering::{
     TopKStep,
 };
 use super::flow::{FlowUpdateStep, ResidualCapacityStep};
-use super::init::{InitEdgesStep, InitNodesStep};
+use super::init::{InitEdgesStep, InitNodesStep, InitNodesWithIndexStep};
 use super::normalization::{
     ClipValuesStep, NormalizeMethod, NormalizeNodeValuesStep, NormalizeValuesStep, StandardizeStep,
 };
@@ -57,6 +57,75 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .cloned()
                 .unwrap_or(AlgorithmParamValue::None);
             Ok(Box::new(InitNodesStep::new(target.to_string(), value)))
+        },
+    )?;
+
+    registry.register(
+        "core.init_nodes_with_index",
+        StepMetadata {
+            id: "core.init_nodes_with_index".to_string(),
+            description: "Initialize node variable with sequential indices".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.init_nodes_with_index requires 'target' param"))?;
+            Ok(Box::new(InitNodesWithIndexStep::new(target.to_string())))
+        },
+    )?;
+
+    registry.register(
+        "core.init_scalar",
+        StepMetadata {
+            id: "core.init_scalar".to_string(),
+            description: "Initialize a scalar variable with a constant value".to_string(),
+            cost_hint: CostHint::Constant,
+        },
+        |spec| {
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.init_scalar requires 'target' param"))?;
+            let value = spec
+                .params
+                .get("value")
+                .cloned()
+                .unwrap_or(AlgorithmParamValue::None);
+            Ok(Box::new(super::init::InitScalarStep::new(target.to_string(), value)))
+        },
+    )?;
+
+    registry.register(
+        "core.graph_node_count",
+        StepMetadata {
+            id: "core.graph_node_count".to_string(),
+            description: "Get the number of nodes in the graph".to_string(),
+            cost_hint: CostHint::Constant,
+        },
+        |spec| {
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.graph_node_count requires 'target' param"))?;
+            Ok(Box::new(super::init::GraphNodeCountStep::new(target.to_string())))
+        },
+    )?;
+
+    registry.register(
+        "core.graph_edge_count",
+        StepMetadata {
+            id: "core.graph_edge_count".to_string(),
+            description: "Get the number of edges in the graph".to_string(),
+            cost_hint: CostHint::Constant,
+        },
+        |spec| {
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.graph_edge_count requires 'target' param"))?;
+            Ok(Box::new(super::init::GraphEdgeCountStep::new(target.to_string())))
         },
     )?;
 
@@ -211,6 +280,282 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
     )?;
 
     registry.register(
+        "core.recip",
+        StepMetadata {
+            id: "core.recip".to_string(),
+            description: "Element-wise reciprocal (1/x) with safe zero handling".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let source = spec
+                .params
+                .get_text("source")
+                .ok_or_else(|| anyhow!("core.recip requires 'source' param"))?
+                .to_string();
+            
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.recip requires 'target' param"))?
+                .to_string();
+            
+            let epsilon = spec
+                .params
+                .get_float("epsilon")
+                .unwrap_or(1e-10);
+            
+            Ok(Box::new(super::arithmetic::RecipStep::new(source, target, epsilon)))
+        },
+    )?;
+
+    registry.register(
+        "core.compare",
+        StepMetadata {
+            id: "core.compare".to_string(),
+            description: "Element-wise comparison producing 0/1 masks".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let left = spec
+                .params
+                .get_text("left")
+                .ok_or_else(|| anyhow!("core.compare requires 'left' param"))?
+                .to_string();
+            
+            let op_str = spec
+                .params
+                .get_text("op")
+                .ok_or_else(|| anyhow!("core.compare requires 'op' param"))?;
+            
+            let op = super::arithmetic::CompareOp::from_str(op_str)?;
+            
+            let right = spec
+                .params
+                .get_text("right")
+                .ok_or_else(|| anyhow!("core.compare requires 'right' param"))?
+                .to_string();
+            
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.compare requires 'target' param"))?
+                .to_string();
+            
+            Ok(Box::new(super::arithmetic::CompareStep::new(left, op, right, target)))
+        },
+    )?;
+
+    registry.register(
+        "core.where",
+        StepMetadata {
+            id: "core.where".to_string(),
+            description: "Element-wise conditional selection".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let condition = spec
+                .params
+                .get_text("condition")
+                .ok_or_else(|| anyhow!("core.where requires 'condition' param"))?
+                .to_string();
+            
+            let if_true = spec
+                .params
+                .get_text("if_true")
+                .ok_or_else(|| anyhow!("core.where requires 'if_true' param"))?
+                .to_string();
+            
+            let if_false = spec
+                .params
+                .get_text("if_false")
+                .ok_or_else(|| anyhow!("core.where requires 'if_false' param"))?
+                .to_string();
+            
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.where requires 'target' param"))?
+                .to_string();
+            
+            Ok(Box::new(super::arithmetic::WhereStep::new(condition, if_true, if_false, target)))
+        },
+    )?;
+
+    registry.register(
+        "core.reduce_scalar",
+        StepMetadata {
+            id: "core.reduce_scalar".to_string(),
+            description: "Reduce map to scalar value".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let source = spec
+                .params
+                .get_text("source")
+                .ok_or_else(|| anyhow!("core.reduce_scalar requires 'source' param"))?
+                .to_string();
+            
+            let op_str = spec
+                .params
+                .get_text("op")
+                .ok_or_else(|| anyhow!("core.reduce_scalar requires 'op' param"))?;
+            
+            let op = super::arithmetic::ReductionOp::from_str(op_str)?;
+            
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.reduce_scalar requires 'target' param"))?
+                .to_string();
+            
+            Ok(Box::new(super::arithmetic::ReduceScalarStep::new(source, op, target)))
+        },
+    )?;
+
+    registry.register(
+        "core.broadcast_scalar",
+        StepMetadata {
+            id: "core.broadcast_scalar".to_string(),
+            description: "Broadcast scalar to all nodes/edges".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let scalar = spec
+                .params
+                .get_text("scalar")
+                .ok_or_else(|| anyhow!("core.broadcast_scalar requires 'scalar' param"))?
+                .to_string();
+            
+            let reference = spec
+                .params
+                .get_text("reference")
+                .ok_or_else(|| anyhow!("core.broadcast_scalar requires 'reference' param"))?
+                .to_string();
+            
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.broadcast_scalar requires 'target' param"))?
+                .to_string();
+            
+            Ok(Box::new(super::arithmetic::BroadcastScalarStep::new(scalar, reference, target)))
+        },
+    )?;
+
+    registry.register(
+        "core.collect_neighbor_values",
+        StepMetadata {
+            id: "core.collect_neighbor_values".to_string(),
+            description: "Collect neighbor values into lists".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let source = spec
+                .params
+                .get_text("source")
+                .ok_or_else(|| anyhow!("core.collect_neighbor_values requires 'source' param"))?
+                .to_string();
+            
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.collect_neighbor_values requires 'target' param"))?
+                .to_string();
+            
+            let include_self = spec
+                .params
+                .get_bool("include_self")
+                .unwrap_or(true);
+            
+            Ok(Box::new(super::arithmetic::CollectNeighborValuesStep::new(
+                source,
+                target,
+                include_self,
+            )))
+        },
+    )?;
+
+    registry.register(
+        "core.mode_list",
+        StepMetadata {
+            id: "core.mode_list".to_string(),
+            description: "Find most frequent value in lists".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let source = spec
+                .params
+                .get_text("source")
+                .ok_or_else(|| anyhow!("core.mode_list requires 'source' param"))?
+                .to_string();
+            
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.mode_list requires 'target' param"))?
+                .to_string();
+            
+            let tie_break = spec
+                .params
+                .get_text("tie_break")
+                .map(|s| match s {
+                    "lowest" => super::arithmetic::ModeTieBreak::Lowest,
+                    "highest" => super::arithmetic::ModeTieBreak::Highest,
+                    "keep" => super::arithmetic::ModeTieBreak::Keep,
+                    _ => super::arithmetic::ModeTieBreak::Lowest,
+                })
+                .unwrap_or(super::arithmetic::ModeTieBreak::Lowest);
+            
+            Ok(Box::new(super::arithmetic::ModeListStep::new(
+                source,
+                target,
+                tie_break,
+            )))
+        },
+    )?;
+
+    registry.register(
+        "core.update_in_place",
+        StepMetadata {
+            id: "core.update_in_place".to_string(),
+            description: "Update target map in-place with source values".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let source = spec
+                .params
+                .get_text("source")
+                .ok_or_else(|| anyhow!("core.update_in_place requires 'source' param"))?
+                .to_string();
+            
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.update_in_place requires 'target' param"))?
+                .to_string();
+            
+            let ordered = spec
+                .params
+                .get_bool("ordered")
+                .unwrap_or(false);
+            
+            let output = spec.params.get_text("output").map(|s| s.to_string());
+            
+            let mut step = super::transformations::UpdateInPlaceStep::new(
+                source,
+                target,
+                ordered,
+            );
+            
+            if let Some(output_var) = output {
+                step = step.with_output(output_var);
+            }
+            
+            Ok(Box::new(step))
+        },
+    )?;
+
+    registry.register(
         "core.reduce_nodes",
         StepMetadata {
             id: "core.reduce_nodes".to_string(),
@@ -238,6 +583,46 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 target.to_string(),
                 reducer,
             )))
+        },
+    )?;
+
+    registry.register(
+        "core.neighbor_agg",
+        StepMetadata {
+            id: "core.neighbor_agg".to_string(),
+            description: "Aggregate neighbor values for each node".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let source = spec
+                .params
+                .get_text("source")
+                .ok_or_else(|| anyhow!("core.neighbor_agg requires 'source' param"))?;
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.neighbor_agg requires 'target' param"))?;
+            let agg_type = match spec.params.get_text("agg") {
+                Some("sum") | None => NeighborAggType::Sum,
+                Some("mean") => NeighborAggType::Mean,
+                Some("mode") => NeighborAggType::Mode,
+                Some("min") => NeighborAggType::Min,
+                Some("max") => NeighborAggType::Max,
+                Some(other) => return Err(anyhow!("unknown aggregation type '{other}'")),
+            };
+            
+            let mut step = NeighborAggregationStep::new(
+                source.to_string(),
+                target.to_string(),
+                agg_type,
+            );
+            
+            // Add optional weights
+            if let Some(weights) = spec.params.get_text("weights") {
+                step = step.with_weights(weights.to_string());
+            }
+            
+            Ok(Box::new(step))
         },
     )?;
 
@@ -612,8 +997,13 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         |spec| {
             let source = spec.params.expect_text("source")?.to_string();
             let target = spec.params.expect_text("target")?.to_string();
-            let min = spec.params.get_float("min").unwrap_or(f64::NEG_INFINITY);
-            let max = spec.params.get_float("max").unwrap_or(f64::INFINITY);
+            // Accept both "min"/"max" and "min_value"/"max_value" for compatibility
+            let min = spec.params.get_float("min_value")
+                .or_else(|| spec.params.get_float("min"))
+                .unwrap_or(f64::NEG_INFINITY);
+            let max = spec.params.get_float("max_value")
+                .or_else(|| spec.params.get_float("max"))
+                .unwrap_or(f64::INFINITY);
             Ok(Box::new(ClipValuesStep::new(source, target, min, max)))
         },
     )?;
@@ -637,13 +1027,22 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
                 .ok_or_else(|| anyhow!("'expr' parameter is required"))?;
 
             // Convert to JSON value for serde deserialization
-            let json_value = serde_json::to_value(expr_value)
-                .map_err(|e| anyhow!("failed to convert expr to JSON: {}", e))?;
+            let json_value = match expr_value {
+                AlgorithmParamValue::Json(v) => v.clone(),
+                _ => serde_json::to_value(expr_value)
+                    .map_err(|e| anyhow!("failed to convert expr to JSON: {}", e))?,
+            };
 
             let expr: Expr = serde_json::from_value(json_value)
                 .map_err(|e| anyhow!("failed to parse expression: {}", e))?;
 
-            Ok(Box::new(MapNodesExprStep::new(source, target, expr)))
+            // Check for async_update flag
+            let async_update = spec.params.get_bool("async_update").unwrap_or(false);
+
+            let step = MapNodesExprStep::new(source, target, expr)
+                .with_async_update(async_update);
+            
+            Ok(Box::new(step))
         },
     )?;
 

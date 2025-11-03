@@ -17,10 +17,7 @@ use crate::types::{AttrName, AttrValue, NodeId};
 
 /// Efficient NodeId → dense index mapper
 enum NodeIndexer {
-    Dense {
-        min_id: NodeId,
-        indices: Vec<u32>,
-    },
+    Dense { min_id: NodeId, indices: Vec<u32> },
     Sparse(FxHashMap<NodeId, usize>),
 }
 
@@ -493,7 +490,10 @@ impl GirvanNewman {
         }
 
         let initial_edge_count = all_edge_pairs.len();
-        ctx.record_stat("girvan_newman.count.initial_edges", initial_edge_count as f64);
+        ctx.record_stat(
+            "girvan_newman.count.initial_edges",
+            initial_edge_count as f64,
+        );
 
         // Phase 4: Pre-allocate buffers (reused across all iterations)
         let n = nodes.len();
@@ -607,8 +607,14 @@ impl GirvanNewman {
 
             for &(u_idx, v_idx) in &active_edges {
                 if u_idx < v_idx {
-                    let betweenness = edge_betweenness.get(&(u_idx, v_idx)).copied().unwrap_or(0.0)
-                        + edge_betweenness.get(&(v_idx, u_idx)).copied().unwrap_or(0.0);
+                    let betweenness = edge_betweenness
+                        .get(&(u_idx, v_idx))
+                        .copied()
+                        .unwrap_or(0.0)
+                        + edge_betweenness
+                            .get(&(v_idx, u_idx))
+                            .copied()
+                            .unwrap_or(0.0);
                     if betweenness > max_betweenness {
                         max_betweenness = betweenness;
                         edge_to_remove = Some((u_idx, v_idx));
@@ -857,20 +863,31 @@ mod tests {
             Subgraph::from_nodes(Rc::new(RefCell::new(graph)), nodes, "test".into()).unwrap();
 
         // Run weighted version
-        let algo_weighted = GirvanNewman::new(Some(1), None, Some("weight".into()), "community".into());
+        let algo_weighted =
+            GirvanNewman::new(Some(1), None, Some("weight".into()), "community".into());
         let mut ctx_weighted = Context::new();
-        let result_weighted = algo_weighted.execute(&mut ctx_weighted, subgraph.clone()).unwrap();
+        let result_weighted = algo_weighted
+            .execute(&mut ctx_weighted, subgraph.clone())
+            .unwrap();
 
         // Run unweighted version
         let algo_unweighted = GirvanNewman::new(Some(1), None, None, "community_unweighted".into());
         let mut ctx_unweighted = Context::new();
-        let result_unweighted = algo_unweighted.execute(&mut ctx_unweighted, subgraph).unwrap();
+        let result_unweighted = algo_unweighted
+            .execute(&mut ctx_unweighted, subgraph)
+            .unwrap();
 
         let attr_weighted: AttrName = "community".to_string();
         let attr_unweighted: AttrName = "community_unweighted".to_string();
 
         // Both versions should successfully complete
-        result_weighted.get_node_attribute(n0, &attr_weighted).unwrap().unwrap();
-        result_unweighted.get_node_attribute(n0, &attr_unweighted).unwrap().unwrap();
+        result_weighted
+            .get_node_attribute(n0, &attr_weighted)
+            .unwrap()
+            .unwrap();
+        result_unweighted
+            .get_node_attribute(n0, &attr_unweighted)
+            .unwrap()
+            .unwrap();
     }
 }

@@ -9,7 +9,8 @@ use crate::subgraphs::Subgraph;
 use super::pipeline::AlgorithmSpec;
 use super::registry::Registry;
 use super::steps::{
-    ensure_core_steps_registered, global_step_registry, Step, StepScope, StepSpec, StepVariables,
+    ensure_core_steps_registered, global_step_registry, PipelineValidator, SchemaRegistry, Step,
+    StepScope, StepSpec, StepVariables, ValidationReport,
 };
 use super::{
     Algorithm, AlgorithmMetadata, AlgorithmParamValue, AlgorithmParams, Context, CostHint,
@@ -23,6 +24,22 @@ pub fn register_algorithms(registry: &Registry) -> Result<()> {
     })
 }
 
+/// Get the global schema registry if schemas have been registered.
+/// Returns None if schemas haven't been initialized yet.
+fn get_schema_registry() -> Option<SchemaRegistry> {
+    // For now, schemas are optional. In the future, this could return
+    // a lazily-initialized global registry similar to the step registry.
+    None
+}
+
+/// Validate a pipeline without executing it.
+/// Returns a validation report with errors and warnings.
+pub fn validate_pipeline(steps: &[StepSpec]) -> ValidationReport {
+    let schema_registry = get_schema_registry().unwrap_or_default();
+    let validator = PipelineValidator::new(&schema_registry);
+    validator.validate(steps)
+}
+
 struct StepPipelineAlgorithm {
     display_name: String,
     steps: Vec<Box<dyn Step>>,
@@ -34,17 +51,39 @@ impl StepPipelineAlgorithm {
 
         let definition = extract_definition(spec)?;
 
-        let registry = global_step_registry();
-        let mut instantiated_steps = Vec::with_capacity(definition.steps.len());
-
-        for raw_step in definition.steps {
-            let params = convert_params(raw_step.params)?;
+        // Build step specs for validation and instantiation
+        let mut step_specs = Vec::with_capacity(definition.steps.len());
+        for raw_step in &definition.steps {
+            let params = convert_params(raw_step.params.clone())?;
             let step_spec = StepSpec {
-                id: raw_step.id,
+                id: raw_step.id.clone(),
                 params,
-                inputs: raw_step.inputs,
-                outputs: raw_step.outputs,
+                inputs: raw_step.inputs.clone(),
+                outputs: raw_step.outputs.clone(),
             };
+            step_specs.push(step_spec);
+        }
+
+        // Optional: validate pipeline if schema registry is available
+        // This provides early error detection before instantiation
+        if let Some(schema_registry) = get_schema_registry() {
+            let validator = PipelineValidator::new(&schema_registry);
+            let report = validator.validate(&step_specs);
+
+            if !report.is_valid() {
+                return Err(anyhow!("Pipeline validation failed:\n{}", report.format()));
+            }
+
+            // Log warnings if any
+            if !report.warnings.is_empty() {
+                eprintln!("Pipeline validation warnings:\n{}", report.format());
+            }
+        }
+
+        // Instantiate steps
+        let registry = global_step_registry();
+        let mut instantiated_steps = Vec::with_capacity(step_specs.len());
+        for step_spec in step_specs {
             let step = registry.instantiate(&step_spec)?;
             instantiated_steps.push(step);
         }

@@ -20,7 +20,7 @@
 use crate::api::graph::Graph;
 use crate::errors::{GraphError, GraphResult};
 use crate::query::traversal::TraversalEngine;
-use crate::state::topology::Csr;
+use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 use crate::traits::{GraphEntity, SubgraphOperations};
 use crate::types::{AttrName, AttrValue, EdgeId, EntityId, NodeId, SubgraphId};
 use crate::viz::VizModule;
@@ -124,28 +124,28 @@ struct CsrCacheEntry {
 
 impl Subgraph {
     /// Create a new Subgraph from a Graph with specific nodes and edges
-    /// 
+    ///
     /// PERFORMANCE: Automatically chooses between content-based hashing and simple IDs
     /// based on subgraph size. For large subgraphs (>10k nodes or >30k edges), uses
     /// simple IDs to avoid expensive sorting+hashing overhead. For small subgraphs,
     /// uses content-based IDs for deduplication benefits.
-    /// 
+    ///
     /// Use `new_with_content_id()` if you specifically need content-based IDs for
     /// pool storage or deduplication regardless of size.
     pub fn new(
         graph: Rc<RefCell<Graph>>,
         nodes: HashSet<NodeId>,
-        edges: HashSet<EdgeId>,  // FIXED: Must be EdgeId, not NodeId
+        edges: HashSet<EdgeId>, // FIXED: Must be EdgeId, not NodeId
         subgraph_type: String,
     ) -> Self {
         // SMART STRATEGY: Choose ID generation based on size
         // Hashing overhead becomes significant above these thresholds
         const HASH_THRESHOLD_NODES: usize = 10_000;
         const HASH_THRESHOLD_EDGES: usize = 30_000;
-        
-        let use_simple_id = nodes.len() > HASH_THRESHOLD_NODES 
-                         || edges.len() > HASH_THRESHOLD_EDGES;
-        
+
+        let use_simple_id =
+            nodes.len() > HASH_THRESHOLD_NODES || edges.len() > HASH_THRESHOLD_EDGES;
+
         if use_simple_id {
             // Large subgraph - use simple ID for performance
             Self::new_with_simple_id(
@@ -160,9 +160,9 @@ impl Subgraph {
             Self::new_with_content_id(graph, nodes, edges, subgraph_type)
         }
     }
-    
+
     /// Create a new Subgraph with content-based ID (always uses hashing)
-    /// 
+    ///
     /// Use this when you need deterministic, content-addressable IDs for:
     /// - Pool storage via `store_subgraph()`
     /// - Deduplication of identical subgraphs
@@ -207,7 +207,7 @@ impl Subgraph {
             topology_cache: RefCell::new(HashMap::new()),
         }
     }
-    
+
     /// Generate a unique simple ID using atomic counter
     fn generate_simple_id() -> SubgraphId {
         use std::sync::atomic::{AtomicUsize, Ordering};
@@ -227,10 +227,10 @@ impl Subgraph {
     }
 
     /// Create a new Subgraph with a simple numeric ID (skips expensive hashing)
-    /// 
-    /// Use this directly when you have a specific ID you want to use (e.g., 
+    ///
+    /// Use this directly when you have a specific ID you want to use (e.g.,
     /// reserved IDs like 0 for delegation views, 1 for cached views).
-    /// 
+    ///
     /// Most users should call `new()` which automatically chooses between
     /// simple and content-based IDs based on size.
     pub fn new_with_simple_id(
@@ -420,6 +420,61 @@ impl Subgraph {
         self.topology_cache
             .borrow_mut()
             .insert(key, CsrCacheEntry { version, csr });
+    }
+
+    /// Get or build CSR adjacency following STYLE_ALGO pattern.
+    ///
+    /// This is the internal method used by neighbors() and degree() overrides
+    /// to provide CSR-optimized access patterns.
+    ///
+    /// # Arguments
+    /// * `add_reverse` - If true, add reverse edges for undirected traversal
+    ///
+    /// # Returns
+    /// Arc to cached or newly built CSR
+    fn get_or_build_csr_internal(&self, add_reverse: bool) -> GraphResult<Arc<Csr>> {
+        // Check cache first
+        if let Some(cached) = self.csr_cache_get(add_reverse) {
+            return Ok(cached);
+        }
+
+        // Cache miss - build CSR following STYLE_ALGO pattern
+        let nodes = self.ordered_nodes();
+        let edges = self.ordered_edges();
+
+        // Build simple indexer: node_id -> CSR index mapping
+        // Use HashMap for simplicity (could optimize to dense array later)
+        let mut node_to_idx: HashMap<NodeId, usize> = HashMap::new();
+        for (idx, &node) in nodes.iter().enumerate() {
+            node_to_idx.insert(node, idx);
+        }
+
+        // Build CSR using scratch buffer (reuses allocations)
+        let mut csr = Csr::default();
+        {
+            // Scope the borrow to ensure it's released before caching
+            let graph = self.graph.borrow();
+            let pool = graph.pool();
+
+            let _build_time = build_csr_from_edges_with_scratch(
+                &mut csr,
+                nodes.len(),
+                edges.iter().copied(),
+                |nid| node_to_idx.get(&nid).copied(),
+                |eid| pool.get_edge_endpoints(eid),
+                CsrOptions {
+                    add_reverse_edges: add_reverse,
+                    sort_neighbors: false,
+                },
+            );
+        } // graph and pool dropped here
+
+        let csr_arc = Arc::new(csr);
+
+        // Store in cache for future use
+        self.csr_cache_store(add_reverse, csr_arc.clone());
+
+        Ok(csr_arc)
     }
 
     /// Get a NodesTable representation of subgraph nodes
@@ -1614,6 +1669,73 @@ impl SubgraphOperations for Subgraph {
 
         // Create and return VizModule
         crate::viz::VizModule::new(data_source)
+    }
+
+    // ============================================================================
+    // CSR-OPTIMIZED NEIGHBOR ACCESS (PHASE 1 OF STEP PRIMITIVES OPTIMIZATION)
+    // ============================================================================
+    // Override default implementations to use cached CSR for 10-50x speedup
+    // Following STYLE_ALGO pattern used by PageRank, LPA, and other algorithms
+
+    fn neighbors(&self, node_id: NodeId) -> GraphResult<Vec<NodeId>> {
+        // Build CSR with reverse edges when the backing graph is undirected so that
+        // single stored edges appear for both endpoints.
+        let add_reverse = {
+            let graph = self.graph.borrow();
+            graph.is_undirected()
+        };
+
+        // Get or build CSR (cached across calls)
+        let csr = self.get_or_build_csr_internal(add_reverse)?;
+
+        // Get ordered nodes for indexing
+        let ordered_nodes = self.ordered_nodes();
+
+        // Find node index using binary search (ordered_nodes is sorted)
+        let node_idx =
+            ordered_nodes
+                .binary_search(&node_id)
+                .map_err(|_| GraphError::NodeNotFound {
+                    node_id,
+                    operation: "neighbors".to_string(),
+                    suggestion: "Node not found in subgraph".to_string(),
+                })?;
+
+        // Get neighbor indices from CSR (O(1) slice access!)
+        let neighbor_indices = csr.neighbors(node_idx);
+
+        // Map CSR indices back to NodeIds
+        Ok(neighbor_indices
+            .iter()
+            .map(|&idx| ordered_nodes[idx])
+            .collect())
+    }
+
+    fn degree(&self, node_id: NodeId) -> GraphResult<usize> {
+        // Match neighbors() behavior: include reverse edges for undirected graphs.
+        let add_reverse = {
+            let graph = self.graph.borrow();
+            graph.is_undirected()
+        };
+
+        // Get or build CSR (cached across calls)
+        let csr = self.get_or_build_csr_internal(add_reverse)?;
+
+        // Get ordered nodes for indexing
+        let ordered_nodes = self.ordered_nodes();
+
+        // Find node index using binary search
+        let node_idx =
+            ordered_nodes
+                .binary_search(&node_id)
+                .map_err(|_| GraphError::NodeNotFound {
+                    node_id,
+                    operation: "degree".to_string(),
+                    suggestion: "Node not found in subgraph".to_string(),
+                })?;
+
+        // Get degree from CSR (just neighbor count)
+        Ok(csr.neighbors(node_idx).len())
     }
 }
 

@@ -520,6 +520,282 @@ impl Step for HistogramStep {
     }
 }
 
+/// Aggregation type for neighbor operations.
+#[derive(Clone, Copy, Debug)]
+pub enum NeighborAggType {
+    Sum,
+    Mean,
+    Mode,
+    Min,
+    Max,
+}
+
+/// Aggregate values from neighbors for each node.
+///
+/// This step follows STYLE_ALGO pattern with CSR optimization for efficient
+/// neighbor access. It's the foundation for PageRank and LPA builder patterns.
+///
+/// # Example
+/// ```ignore
+/// // PageRank iteration: sum(ranks[neighbors(node)])
+/// let step = NeighborAggregationStep::new("ranks", "neighbor_sum", NeighborAggType::Sum);
+/// // Weighted: sum(ranks[neighbors] * weights[neighbors])
+/// let step = NeighborAggregationStep::new("ranks", "weighted_sum", NeighborAggType::Sum)
+///     .with_weights("inv_degrees");
+/// ```
+pub struct NeighborAggregationStep {
+    source: String,
+    target: String,
+    agg_type: NeighborAggType,
+    weights: Option<String>,
+}
+
+impl NeighborAggregationStep {
+    pub fn new(
+        source: impl Into<String>,
+        target: impl Into<String>,
+        agg_type: NeighborAggType,
+    ) -> Self {
+        Self {
+            source: source.into(),
+            target: target.into(),
+            agg_type,
+            weights: None,
+        }
+    }
+
+    pub fn with_weights(mut self, weights: impl Into<String>) -> Self {
+        self.weights = Some(weights.into());
+        self
+    }
+}
+
+impl Step for NeighborAggregationStep {
+    fn id(&self) -> &'static str {
+        "core.neighbor_agg"
+    }
+
+    fn metadata(&self) -> StepMetadata {
+        StepMetadata {
+            id: self.id().to_string(),
+            description: format!("Aggregate neighbor values using {:?}", self.agg_type),
+            cost_hint: CostHint::Linear, // O(n + m) with CSR
+        }
+    }
+
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
+        use std::time::Instant;
+
+        let start = Instant::now();
+
+        // STYLE_ALGO: Get ordered nodes and build CSR
+        let subgraph = scope.subgraph();
+        let nodes = subgraph.ordered_nodes();
+
+        // Detect if graph is directed to determine add_reverse
+        let graph_rc = subgraph.graph();
+        let add_reverse = {
+            let graph = graph_rc.borrow();
+            graph.is_undirected()
+        };
+
+        // Get or build CSR (using the cache pattern)
+        let csr = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
+            cached
+        } else {
+            // Build new CSR
+            let mut csr = Csr::default();
+            let edges = subgraph.edges();
+
+            let mut node_to_idx = std::collections::HashMap::new();
+            for (idx, &node_id) in nodes.iter().enumerate() {
+                node_to_idx.insert(node_id, idx);
+            }
+
+            {
+                let graph = graph_rc.borrow();
+                let pool = graph.pool();
+
+                let _build_time = build_csr_from_edges_with_scratch(
+                    &mut csr,
+                    nodes.len(),
+                    edges.iter().copied(),
+                    |nid| node_to_idx.get(&nid).copied(),
+                    |eid| pool.get_edge_endpoints(eid),
+                    CsrOptions {
+                        add_reverse_edges: add_reverse,
+                        sort_neighbors: false,
+                    },
+                );
+            }
+
+            let csr_arc = std::sync::Arc::new(csr);
+            subgraph.csr_cache_store(add_reverse, csr_arc.clone());
+            csr_arc
+        };
+
+        ctx.record_stat("neighbor_agg.count.nodes", nodes.len() as f64);
+
+        // Get source values
+        let source_map = scope.variables().node_map(&self.source)?;
+
+        // Get optional weights
+        let weights_map = if let Some(ref weights_name) = self.weights {
+            Some(scope.variables().node_map(weights_name)?)
+        } else {
+            None
+        };
+
+        // Pre-allocate result map
+        let mut result = HashMap::with_capacity(nodes.len());
+
+        // STYLE_ALGO: Iterate with CSR indices (cache-friendly)
+        for u_idx in 0..csr.node_count() {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("neighbor_agg cancelled"));
+            }
+
+            let node = nodes[u_idx];
+            let nbrs = csr.neighbors(u_idx); // O(1) slice access!
+
+            // Aggregate neighbor values
+            let agg_value = match self.agg_type {
+                NeighborAggType::Sum => {
+                    let sum: f64 = if let Some(ref weights) = weights_map {
+                        // Weighted sum: sum(values[neighbor] * weights[neighbor])
+                        nbrs.iter()
+                            .filter_map(|&nbr_idx| {
+                                let nbr_node = nodes[nbr_idx];
+                                let value = source_map.get(&nbr_node).and_then(|v| match v {
+                                    AlgorithmParamValue::Float(f) => Some(*f),
+                                    AlgorithmParamValue::Int(i) => Some(*i as f64),
+                                    _ => None,
+                                })?;
+                                let weight = weights.get(&nbr_node).and_then(|w| match w {
+                                    AlgorithmParamValue::Float(f) => Some(*f),
+                                    AlgorithmParamValue::Int(i) => Some(*i as f64),
+                                    _ => None,
+                                })?;
+                                Some(value * weight)
+                            })
+                            .sum()
+                    } else {
+                        // Unweighted sum: sum(values[neighbor])
+                        nbrs.iter()
+                            .filter_map(|&nbr_idx| {
+                                let nbr_node = nodes[nbr_idx];
+                                source_map.get(&nbr_node).and_then(|v| match v {
+                                    AlgorithmParamValue::Float(f) => Some(*f),
+                                    AlgorithmParamValue::Int(i) => Some(*i as f64),
+                                    _ => None,
+                                })
+                            })
+                            .sum()
+                    };
+                    AlgorithmParamValue::Float(sum)
+                }
+
+                NeighborAggType::Mean => {
+                    let mut sum = 0.0;
+                    let mut count = 0;
+                    for &nbr_idx in nbrs {
+                        let nbr_node = nodes[nbr_idx];
+                        if let Some(value) = source_map.get(&nbr_node) {
+                            match value {
+                                AlgorithmParamValue::Float(f) => {
+                                    sum += f;
+                                    count += 1;
+                                }
+                                AlgorithmParamValue::Int(i) => {
+                                    sum += *i as f64;
+                                    count += 1;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    if count > 0 {
+                        AlgorithmParamValue::Float(sum / count as f64)
+                    } else {
+                        AlgorithmParamValue::Float(0.0)
+                    }
+                }
+
+                NeighborAggType::Min => {
+                    let min = nbrs
+                        .iter()
+                        .filter_map(|&nbr_idx| {
+                            let nbr_node = nodes[nbr_idx];
+                            source_map.get(&nbr_node).and_then(|v| match v {
+                                AlgorithmParamValue::Float(f) => Some(*f),
+                                AlgorithmParamValue::Int(i) => Some(*i as f64),
+                                _ => None,
+                            })
+                        })
+                        .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+                    min.map(AlgorithmParamValue::Float)
+                        .unwrap_or(AlgorithmParamValue::None)
+                }
+
+                NeighborAggType::Max => {
+                    let max = nbrs
+                        .iter()
+                        .filter_map(|&nbr_idx| {
+                            let nbr_node = nodes[nbr_idx];
+                            source_map.get(&nbr_node).and_then(|v| match v {
+                                AlgorithmParamValue::Float(f) => Some(*f),
+                                AlgorithmParamValue::Int(i) => Some(*i as f64),
+                                _ => None,
+                            })
+                        })
+                        .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+                    max.map(AlgorithmParamValue::Float)
+                        .unwrap_or(AlgorithmParamValue::None)
+                }
+
+                NeighborAggType::Mode => {
+                    // Count occurrences of each value
+                    let mut counts: HashMap<String, usize> = HashMap::new();
+                    for &nbr_idx in nbrs {
+                        let nbr_node = nodes[nbr_idx];
+                        if let Some(value) = source_map.get(&nbr_node) {
+                            let key = format!("{:?}", value);
+                            *counts.entry(key).or_insert(0) += 1;
+                        }
+                    }
+
+                    // Find most common value
+                    if let Some((mode_key, _)) = counts.iter().max_by_key(|(_, &count)| count) {
+                        // Find the original value
+                        nbrs.iter()
+                            .filter_map(|&nbr_idx| {
+                                let nbr_node = nodes[nbr_idx];
+                                source_map.get(&nbr_node)
+                            })
+                            .find(|value| format!("{:?}", value) == *mode_key)
+                            .cloned()
+                            .unwrap_or(AlgorithmParamValue::None)
+                    } else {
+                        AlgorithmParamValue::None
+                    }
+                }
+            };
+
+            result.insert(node, agg_value);
+        }
+
+        ctx.record_duration("neighbor_agg.total", start.elapsed());
+
+        scope
+            .variables_mut()
+            .set_node_map(self.target.clone(), result);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -657,5 +933,13 @@ mod tests {
         for count in bin_counts {
             assert!(count >= 9 && count <= 11);
         }
+    }
+
+    #[test]
+    fn test_neighbor_agg_type() {
+        // Just verify the enum and struct exist
+        let _agg_type = NeighborAggType::Sum;
+        let _step = NeighborAggregationStep::new("src", "tgt", NeighborAggType::Mean);
+        // Actual integration test will be in Python or higher-level Rust test
     }
 }

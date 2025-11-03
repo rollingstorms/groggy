@@ -304,14 +304,14 @@ Beyond individual steps, Phase 1 includes infrastructure for step management:
 
 #### Pipeline Builder Enhancements
 
-- [ ] **Step schema registry**: Each step declares inputs, outputs, parameters, types
+- [x] **Step schema registry**: Each step declares inputs, outputs, parameters, types
 - [ ] **Validation framework**: Type checking, data-flow analysis, cost estimation
 - [ ] **Error reporting**: Structured errors pointing to problematic steps
 - [ ] **Step composition helpers**: Macros for common multi-step patterns
 
 #### FFI Runtime
 
-- [ ] **Spec serialization**: JSON/TOML roundtrip for pipeline specs
+- [x] **Spec serialization**: JSON/TOML roundtrip for pipeline specs
 - [ ] **Handle lifecycle**: Automatic cleanup, reference counting for shared state
 - [ ] **Error translation**: Rust error types mapped to Python exceptions
 - [ ] **GIL management**: Release during expensive operations, reacquire for callbacks
@@ -430,14 +430,14 @@ must support weighted graphs, provide quality metrics, and compose with pipeline
 
 Leiden improves on Louvain by guaranteeing connected communities and faster convergence.
 
-- [ ] Rust core implementation in `src/algorithms/community/leiden.rs`
-- [ ] Move proposal phase with quality function
-- [ ] Refinement phase for connectivity
+- [x] Rust core implementation in `src/algorithms/community/leiden.rs`
+- [x] Move proposal phase with quality function
+- [x] Refinement phase for connectivity
 - [ ] Aggregation phase
-- [ ] Parameters: `resolution`, `iterations`, `seed`
-- [ ] Integration with existing modularity helpers
-- [ ] Benchmark against Louvain (speed, quality)
-- [ ] Python factory: `groggy.algorithms.community.leiden()`
+- [x] Parameters: `resolution`, `iterations`, `seed`
+- [x] Integration with existing modularity helpers
+- [x] Benchmark against Louvain (speed, quality)
+- [x] Python factory: `groggy.algorithms.community.leiden()`
 
 **Algorithm Notes:**
 - Use same modularity optimization as Louvain
