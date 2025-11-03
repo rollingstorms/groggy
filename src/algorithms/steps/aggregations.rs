@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use anyhow::{anyhow, Result};
 
 use crate::types::NodeId;
+use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{Step, StepMetadata, StepScope};
@@ -584,58 +585,42 @@ impl Step for NeighborAggregationStep {
     }
 
     fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
         use std::time::Instant;
 
         let start = Instant::now();
 
-        // STYLE_ALGO: Get ordered nodes and build CSR
         let subgraph = scope.subgraph();
         let nodes = subgraph.ordered_nodes();
+        ctx.record_stat("neighbor_agg.count.nodes", nodes.len() as f64);
 
-        // Detect if graph is directed to determine add_reverse
-        let graph_rc = subgraph.graph();
-        let add_reverse = {
-            let graph = graph_rc.borrow();
-            graph.is_undirected()
-        };
+        // Build CSR of incoming edges (target -> sources)
+        let mut node_to_idx = HashMap::new();
+        for (idx, &node_id) in nodes.iter().enumerate() {
+            node_to_idx.insert(node_id, idx);
+        }
 
-        // Get or build CSR (using the cache pattern)
-        let csr = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
-            cached
-        } else {
-            // Build new CSR
-            let mut csr = Csr::default();
+        let mut csr = Csr::default();
+        {
+            let graph = subgraph.graph();
+            let graph_ref = graph.borrow();
+            let pool = graph_ref.pool();
             let edges = subgraph.edges();
 
-            let mut node_to_idx = std::collections::HashMap::new();
-            for (idx, &node_id) in nodes.iter().enumerate() {
-                node_to_idx.insert(node_id, idx);
-            }
-
-            {
-                let graph = graph_rc.borrow();
-                let pool = graph.pool();
-
-                let _build_time = build_csr_from_edges_with_scratch(
-                    &mut csr,
-                    nodes.len(),
-                    edges.iter().copied(),
-                    |nid| node_to_idx.get(&nid).copied(),
-                    |eid| pool.get_edge_endpoints(eid),
-                    CsrOptions {
-                        add_reverse_edges: add_reverse,
-                        sort_neighbors: false,
-                    },
-                );
-            }
-
-            let csr_arc = std::sync::Arc::new(csr);
-            subgraph.csr_cache_store(add_reverse, csr_arc.clone());
-            csr_arc
-        };
-
-        ctx.record_stat("neighbor_agg.count.nodes", nodes.len() as f64);
+            let _build_time = build_csr_from_edges_with_scratch(
+                &mut csr,
+                nodes.len(),
+                edges.iter().copied(),
+                |nid| node_to_idx.get(&nid).copied(),
+                |eid| {
+                    pool.get_edge_endpoints(eid)
+                        .map(|(source, target)| (target, source))
+                },
+                CsrOptions {
+                    add_reverse_edges: false,
+                    sort_neighbors: false,
+                },
+            );
+        }
 
         // Get source values
         let source_map = scope.variables().node_map(&self.source)?;
@@ -650,21 +635,20 @@ impl Step for NeighborAggregationStep {
         // Pre-allocate result map
         let mut result = HashMap::with_capacity(nodes.len());
 
-        // STYLE_ALGO: Iterate with CSR indices (cache-friendly)
-        for u_idx in 0..csr.node_count() {
+        for (idx, &node) in nodes.iter().enumerate() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("neighbor_agg cancelled"));
             }
 
-            let node = nodes[u_idx];
-            let nbrs = csr.neighbors(u_idx); // O(1) slice access!
+            let neighbor_indices = csr.neighbors(idx);
 
             // Aggregate neighbor values
             let agg_value = match self.agg_type {
                 NeighborAggType::Sum => {
                     let sum: f64 = if let Some(ref weights) = weights_map {
                         // Weighted sum: sum(values[neighbor] * weights[neighbor])
-                        nbrs.iter()
+                        neighbor_indices
+                            .iter()
                             .filter_map(|&nbr_idx| {
                                 let nbr_node = nodes[nbr_idx];
                                 let value = source_map.get(&nbr_node).and_then(|v| match v {
@@ -682,7 +666,8 @@ impl Step for NeighborAggregationStep {
                             .sum()
                     } else {
                         // Unweighted sum: sum(values[neighbor])
-                        nbrs.iter()
+                        neighbor_indices
+                            .iter()
                             .filter_map(|&nbr_idx| {
                                 let nbr_node = nodes[nbr_idx];
                                 source_map.get(&nbr_node).and_then(|v| match v {
@@ -699,7 +684,7 @@ impl Step for NeighborAggregationStep {
                 NeighborAggType::Mean => {
                     let mut sum = 0.0;
                     let mut count = 0;
-                    for &nbr_idx in nbrs {
+                    for &nbr_idx in neighbor_indices {
                         let nbr_node = nodes[nbr_idx];
                         if let Some(value) = source_map.get(&nbr_node) {
                             match value {
@@ -723,7 +708,7 @@ impl Step for NeighborAggregationStep {
                 }
 
                 NeighborAggType::Min => {
-                    let min = nbrs
+                    let min = neighbor_indices
                         .iter()
                         .filter_map(|&nbr_idx| {
                             let nbr_node = nodes[nbr_idx];
@@ -740,7 +725,7 @@ impl Step for NeighborAggregationStep {
                 }
 
                 NeighborAggType::Max => {
-                    let max = nbrs
+                    let max = neighbor_indices
                         .iter()
                         .filter_map(|&nbr_idx| {
                             let nbr_node = nodes[nbr_idx];
@@ -759,7 +744,7 @@ impl Step for NeighborAggregationStep {
                 NeighborAggType::Mode => {
                     // Count occurrences of each value
                     let mut counts: HashMap<String, usize> = HashMap::new();
-                    for &nbr_idx in nbrs {
+                    for &nbr_idx in neighbor_indices {
                         let nbr_node = nodes[nbr_idx];
                         if let Some(value) = source_map.get(&nbr_node) {
                             let key = format!("{:?}", value);
@@ -770,7 +755,8 @@ impl Step for NeighborAggregationStep {
                     // Find most common value
                     if let Some((mode_key, _)) = counts.iter().max_by_key(|(_, &count)| count) {
                         // Find the original value
-                        nbrs.iter()
+                        neighbor_indices
+                            .iter()
                             .filter_map(|&nbr_idx| {
                                 let nbr_node = nodes[nbr_idx];
                                 source_map.get(&nbr_node)

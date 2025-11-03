@@ -55,9 +55,21 @@ pub trait GraphEntity: std::fmt::Debug {
         let graph = binding.borrow();
         match self.entity_id() {
             EntityId::Node(id) | EntityId::MetaNode(id) => {
-                graph.pool().get_node_attribute(id, name)
+                if let Some(index) = graph.space().get_node_attr_index(id, name) {
+                    let pool = graph.pool();
+                    Ok(pool.get_attr_by_index(name, index, true).cloned())
+                } else {
+                    Ok(None)
+                }
             }
-            EntityId::Edge(id) => graph.pool().get_edge_attribute(id, name),
+            EntityId::Edge(id) => {
+                if let Some(index) = graph.space().get_edge_attr_index(id, name) {
+                    let pool = graph.pool();
+                    Ok(pool.get_attr_by_index(name, index, false).cloned())
+                } else {
+                    Ok(None)
+                }
+            }
             EntityId::Subgraph(id)
             | EntityId::Neighborhood(id)
             | EntityId::Component(id)
@@ -76,12 +88,10 @@ pub trait GraphEntity: std::fmt::Debug {
     /// Uses our existing optimized AttributeColumn storage with memory pooling
     fn set_attribute(&self, name: AttrName, value: AttrValue) -> GraphResult<()> {
         let binding = self.graph_ref();
-        let graph = binding.borrow_mut();
+        let mut graph = binding.borrow_mut();
         match self.entity_id() {
-            EntityId::Node(id) | EntityId::MetaNode(id) => {
-                graph.pool_mut().set_node_attribute(id, name, value)
-            }
-            EntityId::Edge(id) => graph.pool_mut().set_edge_attribute(id, name, value),
+            EntityId::Node(id) | EntityId::MetaNode(id) => graph.set_node_attr(id, name, value),
+            EntityId::Edge(id) => graph.set_edge_attr(id, name, value),
             EntityId::Subgraph(id)
             | EntityId::Neighborhood(id)
             | EntityId::Component(id)

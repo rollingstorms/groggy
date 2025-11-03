@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::traits::SubgraphOperations;
 use crate::types::{AttrName, NodeId};
 
+use std::collections::{HashMap, HashSet};
+
 use super::super::AlgorithmParamValue;
 use super::core::StepInput;
 
@@ -404,30 +406,19 @@ fn eval_function(func: &str, args: &[Expr], ctx: &ExprContext) -> Result<Algorit
             let mut float_values = Vec::new();
             let mut use_float = false;
 
-            // Include current node's own value first (for LPA-style algorithms)
-            // This allows the node to "keep" its current label if no neighbor consensus
-            if let Some(val) = var_map.get(&ctx.node) {
-                match val {
-                    AlgorithmParamValue::Float(f) => {
-                        use_float = true;
-                        float_values.push(*f);
-                    }
-                    AlgorithmParamValue::Int(i) => {
-                        int_values.push(*i);
-                    }
-                    AlgorithmParamValue::FloatList(list) => {
-                        use_float = true;
-                        float_values.extend(list.iter().copied());
-                    }
-                    AlgorithmParamValue::IntList(list) => {
-                        int_values.extend(list.iter().copied());
-                    }
-                    _ => {}
-                }
-            }
-
-            // Collect neighbor values
+            // Collect neighbor values (excluding self; use core.collect_neighbor_values with include_self=True for that)
+            let mut seen_neighbors = HashSet::new();
             for neighbor in neighbors {
+                if !ctx
+                    .input
+                    .subgraph
+                    .has_edge_between(ctx.node, neighbor)?
+                {
+                    continue;
+                }
+                if !seen_neighbors.insert(neighbor) {
+                    continue;
+                }
                 if let Some(val) = var_map.get(&neighbor) {
                     match val {
                         AlgorithmParamValue::Float(f) => {
@@ -546,7 +537,6 @@ fn eval_function(func: &str, args: &[Expr], ctx: &ExprContext) -> Result<Algorit
                     }
 
                     // Count occurrences - use integer representation for HashMap key
-                    use std::collections::HashMap;
                     let mut counts: HashMap<i64, usize> = HashMap::new();
                     for &val in &vec {
                         // Convert to bits for exact comparison

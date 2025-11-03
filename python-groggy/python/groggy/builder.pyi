@@ -128,10 +128,33 @@ class CoreOps:
         """
         ...
     
+    def update_in_place(
+        self,
+        source: VarHandle,
+        target: VarHandle,
+        ordered: bool = False,
+    ) -> VarHandle:
+        """
+        Update a target map in-place with values from another map.
+        """
+        ...
+
+    def neighbor_mode_update(
+        self,
+        target: VarHandle,
+        include_self: bool = True,
+        tie_break: str = "lowest",
+        ordered: bool = True,
+    ) -> VarHandle:
+        """
+        Update labels in-place by taking the mode of neighbor labels.
+        """
+        ...
+
     def normalize_sum(self, values: VarHandle) -> VarHandle:
         """
         Normalize values so they sum to 1.0.
-        
+
         Args:
             values: Values to normalize
             

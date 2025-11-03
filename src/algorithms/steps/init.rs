@@ -36,8 +36,9 @@ impl Step for InitNodesStep {
     }
 
     fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let mut map = HashMap::new();
-        for &node in scope.subgraph().nodes() {
+        let nodes = scope.subgraph().ordered_nodes();
+        let mut map = HashMap::with_capacity(nodes.len());
+        for &node in nodes.iter() {
             map.insert(node, self.value.clone());
         }
         scope.variables_mut().set_node_map(self.target.clone(), map);

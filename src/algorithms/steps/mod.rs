@@ -67,7 +67,9 @@ pub use sampling::{EntityType, ReservoirSampleStep, SampleEdgesStep, SampleNodes
 pub use structural::{
     EdgeWeightSumStep, KCoreMarkStep, NodeDegreeStep, TriangleCountStep, WeightedDegreeStep,
 };
-pub use transformations::{MapNodesExprStep, MapNodesStep, NodeMapFn};
+pub use transformations::{
+    MapNodesExprStep, MapNodesStep, NeighborModeUpdateStep, NodeMapFn,
+};
 
 // Re-export temporal steps
 pub use temporal::{

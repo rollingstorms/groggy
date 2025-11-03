@@ -12,12 +12,14 @@ use super::core::{Step, StepMetadata, StepScope};
 
 /// Compute node degrees and store them as a node map.
 pub struct NodeDegreeStep {
+    source: Option<String>,
     target: String,
 }
 
 impl NodeDegreeStep {
-    pub fn new(target: impl Into<String>) -> Self {
+    pub fn new(target: impl Into<String>, source: Option<String>) -> Self {
         Self {
+            source,
             target: target.into(),
         }
     }
@@ -37,11 +39,33 @@ impl Step for NodeDegreeStep {
     }
 
     fn apply(&self, _ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
-        let mut map = HashMap::with_capacity(scope.subgraph().node_set().len());
-        for &node in scope.node_ids() {
-            let degree = scope.subgraph().degree(node)? as i64;
-            map.insert(node, AlgorithmParamValue::Int(degree));
+        let subgraph = scope.subgraph();
+
+        let graph = subgraph.graph();
+        let graph_ref = graph.borrow();
+
+        // Determine which nodes to evaluate, preserving deterministic ordering when possible.
+        let nodes: Vec<NodeId> = if let Some(ref source_name) = self.source {
+            if let Ok(column) = scope.variables().node_column(source_name) {
+                column.nodes().to_vec()
+            } else if let Ok(map) = scope.variables().node_map(source_name) {
+                let mut keys: Vec<NodeId> = map.keys().copied().collect();
+                keys.sort_unstable();
+                keys
+            } else {
+                subgraph.ordered_nodes().as_ref().to_vec()
+            }
+        } else {
+            subgraph.ordered_nodes().as_ref().to_vec()
+        };
+
+        let mut map = HashMap::with_capacity(nodes.len());
+        for node in nodes {
+            let degree = graph_ref.out_degree(node).unwrap_or(0);
+            map.insert(node, AlgorithmParamValue::Int(degree as i64));
         }
+        drop(graph_ref);
+
         scope.variables_mut().set_node_map(self.target.clone(), map);
         Ok(())
     }

@@ -1,15 +1,18 @@
 //! Transformation step primitives that map values.
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 
 use crate::types::NodeId;
+use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions};
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{Step, StepInput, StepMetadata, StepScope};
 use super::expression::{Expr, ExprContext};
+use super::arithmetic::ModeTieBreak;
 
 /// Callback trait for node-wise mapping steps.
 pub trait NodeMapFn: Send + Sync {
@@ -115,6 +118,223 @@ impl Step for MapNodesStep {
             .variables_mut()
             .set_node_map(self.target.clone(), result);
         Ok(())
+    }
+}
+
+/// Update target labels in-place using neighbor mode (async label propagation semantics).
+pub struct NeighborModeUpdateStep {
+    target: String,
+    include_self: bool,
+    tie_break: ModeTieBreak,
+    ordered: bool,
+    output: Option<String>,
+}
+
+impl NeighborModeUpdateStep {
+    pub fn new(
+        target: impl Into<String>,
+        include_self: bool,
+        tie_break: ModeTieBreak,
+        ordered: bool,
+    ) -> Self {
+        Self {
+            target: target.into(),
+            include_self,
+            tie_break,
+            ordered,
+            output: None,
+        }
+    }
+
+    pub fn with_output(mut self, output: Option<String>) -> Self {
+        self.output = output;
+        self
+    }
+}
+
+impl Step for NeighborModeUpdateStep {
+    fn id(&self) -> &'static str {
+        "core.neighbor_mode_update"
+    }
+
+    fn metadata(&self) -> StepMetadata {
+        StepMetadata {
+            id: self.id().to_string(),
+            description: "Update labels in-place using neighbor mode with deterministic ordering"
+                .to_string(),
+            cost_hint: CostHint::Linear,
+        }
+    }
+
+    fn apply(&self, ctx: &mut Context, scope: &mut StepScope<'_>) -> Result<()> {
+        if ctx.is_cancelled() {
+            return Err(anyhow!("core.neighbor_mode_update cancelled"));
+        }
+
+        let subgraph = scope.subgraph();
+        let nodes = subgraph.ordered_nodes();
+
+        // Determine if we need reverse edges (undirected graphs require bidirectional view).
+        let add_reverse = subgraph.graph().borrow().is_undirected();
+
+        // Reuse CSR cache where possible.
+        let csr = if let Some(cached) = subgraph.csr_cache_get(add_reverse) {
+            cached
+        } else {
+            let mut csr = Csr::default();
+            let edges = subgraph.edges();
+
+            let mut node_to_idx = HashMap::new();
+            for (idx, &node_id) in nodes.iter().enumerate() {
+                node_to_idx.insert(node_id, idx);
+            }
+
+            {
+                let graph = subgraph.graph();
+                let graph_ref = graph.borrow();
+                let pool = graph_ref.pool();
+
+                let _build_time = build_csr_from_edges_with_scratch(
+                    &mut csr,
+                    nodes.len(),
+                    edges.iter().copied(),
+                    |nid| node_to_idx.get(&nid).copied(),
+                    |eid| pool.get_edge_endpoints(eid),
+                    CsrOptions {
+                        add_reverse_edges: add_reverse,
+                        sort_neighbors: false,
+                    },
+                );
+            }
+
+            let csr_arc = Arc::new(csr);
+            subgraph.csr_cache_store(add_reverse, csr_arc.clone());
+            csr_arc
+        };
+
+        // Map NodeId -> CSR index for quick lookup.
+        let mut node_to_idx = HashMap::new();
+        for (idx, &node_id) in nodes.iter().enumerate() {
+            node_to_idx.insert(node_id, idx);
+        }
+
+        // Determine iteration order before mutably borrowing variables.
+        let iteration_nodes: Vec<NodeId> = if self.ordered {
+            nodes.iter().copied().collect()
+        } else {
+            scope.node_ids().copied().collect()
+        };
+
+        let mut target_map = scope.variables_mut().node_map_mut(&self.target)?;
+
+        let mut counts: HashMap<String, (usize, AlgorithmParamValue)> = HashMap::new();
+        let mut order_keys: Vec<String> = Vec::new();
+
+        for node_id in iteration_nodes {
+            if ctx.is_cancelled() {
+                return Err(anyhow!("core.neighbor_mode_update cancelled"));
+            }
+
+            let Some(&csr_idx) = node_to_idx.get(&node_id) else {
+                continue;
+            };
+
+            counts.clear();
+            order_keys.clear();
+
+            // Helper closure to insert value into counts map.
+            let mut record_value = |value: &AlgorithmParamValue| {
+                let key = format!("{:?}", value);
+                order_keys.push(key.clone());
+                counts
+                    .entry(key)
+                    .and_modify(|(count, _)| *count += 1)
+                    .or_insert((1, value.clone()));
+            };
+
+            if self.include_self {
+                if let Some(value) = target_map.get(&node_id) {
+                    record_value(value);
+                }
+            }
+
+            for &nbr_idx in csr.neighbors(csr_idx) {
+                let neighbor_node = nodes[nbr_idx];
+                if let Some(value) = target_map.get(&neighbor_node) {
+                    record_value(value);
+                }
+            }
+
+            if counts.is_empty() {
+                continue;
+            }
+
+            let max_freq = counts
+                .values()
+                .map(|(count, _)| *count)
+                .max()
+                .unwrap_or(0);
+
+            let mut candidates: Vec<(String, AlgorithmParamValue)> = counts
+                .iter()
+                .filter(|(_, (count, _))| *count == max_freq)
+                .map(|(key, (_, value))| (key.clone(), value.clone()))
+                .collect();
+
+            let selected = match self.tie_break {
+                ModeTieBreak::Keep => {
+                    let mut chosen: Option<AlgorithmParamValue> = None;
+                    for key in &order_keys {
+                        if let Some((_, value)) =
+                            candidates.iter().find(|(candidate_key, _)| candidate_key == key)
+                        {
+                            chosen = Some(value.clone());
+                            break;
+                        }
+                    }
+                    chosen.unwrap_or_else(|| candidates[0].1.clone())
+                }
+                ModeTieBreak::Lowest => {
+                    candidates.sort_by(|(_, a), (_, b)| compare_values(a, b));
+                    candidates[0].1.clone()
+                }
+                ModeTieBreak::Highest => {
+                    candidates.sort_by(|(_, a), (_, b)| compare_values(b, a));
+                    candidates[0].1.clone()
+                }
+            };
+
+            target_map.insert(node_id, selected);
+        }
+
+        if let Some(output_var) = &self.output {
+            if output_var != &self.target {
+                let final_map = target_map.clone();
+                scope
+                    .variables_mut()
+                    .set_node_map(output_var.clone(), final_map);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn compare_values(left: &AlgorithmParamValue, right: &AlgorithmParamValue) -> Ordering {
+    match (left, right) {
+        (AlgorithmParamValue::Int(a), AlgorithmParamValue::Int(b)) => a.cmp(b),
+        (AlgorithmParamValue::Float(a), AlgorithmParamValue::Float(b)) => {
+            a.partial_cmp(b).unwrap_or(Ordering::Equal)
+        }
+        (AlgorithmParamValue::Int(a), AlgorithmParamValue::Float(b)) => {
+            (*a as f64).partial_cmp(b).unwrap_or(Ordering::Equal)
+        }
+        (AlgorithmParamValue::Float(a), AlgorithmParamValue::Int(b)) => {
+            a.partial_cmp(&(*b as f64)).unwrap_or(Ordering::Equal)
+        }
+        (AlgorithmParamValue::Text(a), AlgorithmParamValue::Text(b)) => a.cmp(b),
+        (AlgorithmParamValue::Bool(a), AlgorithmParamValue::Bool(b)) => a.cmp(b),
+        _ => Ordering::Equal,
     }
 }
 

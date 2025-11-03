@@ -556,6 +556,49 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
     )?;
 
     registry.register(
+        "core.neighbor_mode_update",
+        StepMetadata {
+            id: "core.neighbor_mode_update".to_string(),
+            description:
+                "Update labels in-place using neighbor mode with deterministic ordering".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| {
+            let target = spec
+                .params
+                .get_text("target")
+                .ok_or_else(|| anyhow!("core.neighbor_mode_update requires 'target' param"))?
+                .to_string();
+
+            let include_self = spec.params.get_bool("include_self").unwrap_or(true);
+
+            let tie_break = spec
+                .params
+                .get_text("tie_break")
+                .map(|s| match s {
+                    "highest" => super::arithmetic::ModeTieBreak::Highest,
+                    "keep" => super::arithmetic::ModeTieBreak::Keep,
+                    _ => super::arithmetic::ModeTieBreak::Lowest,
+                })
+                .unwrap_or(super::arithmetic::ModeTieBreak::Lowest);
+
+            let ordered = spec.params.get_bool("ordered").unwrap_or(false);
+
+            let output = spec.params.get_text("output").map(|s| s.to_string());
+
+            let step = super::transformations::NeighborModeUpdateStep::new(
+                target.clone(),
+                include_self,
+                tie_break,
+                ordered,
+            )
+            .with_output(output);
+
+            Ok(Box::new(step))
+        },
+    )?;
+
+    registry.register(
         "core.reduce_nodes",
         StepMetadata {
             id: "core.reduce_nodes".to_string(),
@@ -842,7 +885,8 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
         },
         |spec| {
             let target = spec.params.expect_text("target")?.to_string();
-            Ok(Box::new(NodeDegreeStep::new(target)))
+            let source = spec.params.get_text("source").map(|s| s.to_string());
+            Ok(Box::new(NodeDegreeStep::new(target, source)))
         },
     )?;
 

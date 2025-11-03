@@ -4,13 +4,43 @@ Tests for PageRank algorithm built with the builder DSL.
 import pytest
 
 
+def _pagerank_step(builder, ranks, node_count, damping=0.85):
+    """
+    Execute one PageRank iteration using builder primitives that match the native implementation.
+    """
+    degrees = builder.node_degrees(ranks)
+    inv_degrees = builder.core.recip(degrees, epsilon=1e-9)
+    is_sink = builder.core.compare(degrees, "eq", 0.0)
+
+    weighted = builder.core.mul(ranks, inv_degrees)
+    weighted = builder.core.where(is_sink, 0.0, weighted)
+
+    neighbor_sums = builder.core.neighbor_agg(weighted, agg="sum")
+
+    damped = builder.core.mul(neighbor_sums, damping)
+
+    inv_n_scalar = builder.core.recip(node_count, epsilon=1e-9)
+    inv_n_map = builder.core.broadcast_scalar(inv_n_scalar, degrees)
+    teleport_map = builder.core.mul(inv_n_map, 1.0 - damping)
+
+    sink_ranks = builder.core.where(is_sink, ranks, 0.0)
+    sink_mass = builder.core.reduce_scalar(sink_ranks, op="sum")
+    sink_map = builder.core.mul(inv_n_map, sink_mass)
+    sink_map = builder.core.mul(sink_map, damping)
+
+    total = builder.core.add(damped, teleport_map)
+    total = builder.core.add(total, sink_map)
+    ranks = builder.var("ranks", total)
+    return ranks
+
+
 def test_builder_pagerank_basic():
     """Build PageRank using the builder DSL."""
     from groggy import Graph
     from groggy.builder import AlgorithmBuilder
-    
+
     # Create test graph (3-node cycle)
-    graph = Graph()
+    graph = Graph(directed=True)
     a, b, c = graph.add_node(), graph.add_node(), graph.add_node()
     graph.add_edge(a, b)
     graph.add_edge(b, c)
@@ -18,25 +48,18 @@ def test_builder_pagerank_basic():
     sg = graph.view()
     
     # Build PageRank with builder
-    builder = AlgorithmBuilder("custom_pagerank")
+    builder = AlgorithmBuilder("builder_pagerank_basic")
     
     # Initialize ranks to 1.0
     ranks = builder.init_nodes(default=1.0)
+    node_count = builder.graph_node_count()
+    inv_n_scalar = builder.core.recip(node_count, epsilon=1e-9)
+    uniform = builder.core.broadcast_scalar(inv_n_scalar, ranks)
+    ranks = builder.var("ranks", uniform)
     
-    # Iterate 20 times
+    # Iterate 20 times using the full PageRank update
     with builder.iterate(20):
-        # Sum neighbor ranks divided by their degree
-        neighbor_sums = builder.map_nodes(
-            "sum(ranks[neighbors(node)])",
-            inputs={"ranks": ranks}
-        )
-        
-        # Apply damping: 0.85 * neighbor_sums + 0.15
-        damped = builder.core.mul(neighbor_sums, 0.85)
-        ranks = builder.var("ranks", builder.core.add(damped, 0.15))
-        
-        # Normalize
-        ranks = builder.var("ranks", builder.core.normalize_sum(ranks))
+        ranks = _pagerank_step(builder, ranks, node_count, damping=0.85)
     
     # Attach result
     builder.attach_as("pagerank", ranks)
@@ -62,10 +85,10 @@ def test_builder_pagerank_matches_native():
     """Verify builder PageRank matches native implementation."""
     from groggy import Graph
     from groggy.builder import AlgorithmBuilder
-    from groggy.algorithms import pagerank
+    from groggy.algorithms.centrality import pagerank
     
     # Create test graph
-    graph = Graph()
+    graph = Graph(directed=True)
     nodes = [graph.add_node() for _ in range(5)]
     
     # Create a more complex graph
@@ -79,35 +102,33 @@ def test_builder_pagerank_matches_native():
     sg = graph.view()
     
     # Build PageRank with builder
-    builder = AlgorithmBuilder("custom_pagerank")
+    builder = AlgorithmBuilder("builder_pagerank_matches_native")
     ranks = builder.init_nodes(default=1.0)
+    node_count = builder.graph_node_count()
+    inv_n_scalar = builder.core.recip(node_count, epsilon=1e-9)
+    uniform = builder.core.broadcast_scalar(inv_n_scalar, ranks)
+    ranks = builder.var("ranks", uniform)
     
     with builder.iterate(20):
-        neighbor_sums = builder.map_nodes(
-            "sum(ranks[neighbors(node)])",
-            inputs={"ranks": ranks}
-        )
-        damped = builder.core.mul(neighbor_sums, 0.85)
-        ranks = builder.var("ranks", builder.core.add(damped, 0.15))
-        ranks = builder.var("ranks", builder.core.normalize_sum(ranks))
+        ranks = _pagerank_step(builder, ranks, node_count, damping=0.85)
     
     builder.attach_as("pagerank", ranks)
     
     # Execute both
     algo = builder.build()
     result_builder = sg.apply(algo)
-    result_native = sg.apply(pagerank(iterations=20, damping=0.85))
+    builder_values = {node.id: node.pagerank for node in result_builder.nodes}
+
+    # Run native PageRank on a fresh view of the same graph
+    result_native = graph.view().apply(pagerank(max_iter=20, damping=0.85))
     
     # Compare results
-    for node in result_builder.nodes:
-        pr_builder = node.pagerank
-        pr_native = node.pagerank
-        
-        # Note: Results may differ slightly due to implementation details
-        # We're checking they're in the same ballpark
+    for node_id, pr_builder in builder_values.items():
+        pr_native = result_native.get_node_attribute(node_id, "pagerank")
+
         assert pr_builder is not None
         assert pr_native is not None
-        assert abs(pr_builder - pr_native) < 0.1  # Within 10% (relaxed for now)
+        assert abs(pr_builder - pr_native) < 1e-6
 
 
 def test_builder_pagerank_converges():
@@ -116,25 +137,23 @@ def test_builder_pagerank_converges():
     from groggy.builder import AlgorithmBuilder
     
     # Create simple graph
-    graph = Graph()
+    graph = Graph(directed=True)
     a, b = graph.add_node(), graph.add_node()
     graph.add_edge(a, b)
     graph.add_edge(b, a)
     sg = graph.view()
     
     # Build PageRank
-    builder = AlgorithmBuilder("converge_test")
+    builder = AlgorithmBuilder("builder_pagerank_converges")
     ranks = builder.init_nodes(default=1.0)
+    node_count = builder.graph_node_count()
+    inv_n_scalar = builder.core.recip(node_count, epsilon=1e-9)
+    uniform = builder.core.broadcast_scalar(inv_n_scalar, ranks)
+    ranks = builder.var("ranks", uniform)
     
     # Run for many iterations
     with builder.iterate(50):
-        neighbor_sums = builder.map_nodes(
-            "sum(ranks[neighbors(node)])",
-            inputs={"ranks": ranks}
-        )
-        damped = builder.core.mul(neighbor_sums, 0.85)
-        ranks = builder.var("ranks", builder.core.add(damped, 0.15))
-        ranks = builder.var("ranks", builder.core.normalize_sum(ranks))
+        ranks = _pagerank_step(builder, ranks, node_count, damping=0.85)
     
     builder.attach_as("pagerank", ranks)
     
@@ -144,8 +163,8 @@ def test_builder_pagerank_converges():
     
     # For a symmetric 2-node graph, ranks should be equal
     nodes = list(result.nodes)
-    pr1 = result.get_node_attr(nodes[0], "pagerank")
-    pr2 = result.get_node_attr(nodes[1], "pagerank")
+    pr1 = nodes[0].pagerank
+    pr2 = nodes[1].pagerank
     
     # Should both be 0.5 (equal ranks)
     assert abs(pr1 - 0.5) < 0.01
@@ -158,22 +177,17 @@ def test_builder_pagerank_no_edges():
     from groggy.builder import AlgorithmBuilder
     
     # Create isolated nodes
-    graph = Graph()
+    graph = Graph(directed=True)
     a, b, c = graph.add_node(), graph.add_node(), graph.add_node()
     sg = graph.view()
     
     # Build PageRank
-    builder = AlgorithmBuilder("isolated_nodes")
+    builder = AlgorithmBuilder("builder_pagerank_no_edges")
     ranks = builder.init_nodes(default=1.0)
+    node_count = builder.graph_node_count()
     
     with builder.iterate(10):
-        neighbor_sums = builder.map_nodes(
-            "sum(ranks[neighbors(node)])",
-            inputs={"ranks": ranks}
-        )
-        damped = builder.core.mul(neighbor_sums, 0.85)
-        ranks = builder.var("ranks", builder.core.add(damped, 0.15))
-        ranks = builder.var("ranks", builder.core.normalize_sum(ranks))
+        ranks = _pagerank_step(builder, ranks, node_count, damping=0.85)
     
     builder.attach_as("pagerank", ranks)
     

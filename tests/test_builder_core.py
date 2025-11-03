@@ -158,6 +158,32 @@ def test_builder_map_nodes_with_context():
     assert len(builder.steps[2]["inputs"]) == 2
 
 
+def test_builder_node_degrees_directed_chain():
+    """Node degrees respect directed edges and preserve ordering."""
+    from groggy import Graph
+    from groggy.builder import AlgorithmBuilder
+
+    graph = Graph()
+    n0, n1, n2 = graph.add_node(), graph.add_node(), graph.add_node()
+    graph.add_edge(n0, n1)
+    graph.add_edge(n1, n2)
+    sg = graph.view()
+
+    builder = AlgorithmBuilder("degree_chain")
+    init = builder.init_nodes(default=0)
+    degrees = builder.node_degrees(init)
+    builder.attach_as("deg", degrees)
+
+    result = sg.apply(builder.build())
+    deg0 = result.get_node_attribute(n0, "deg")
+    deg1 = result.get_node_attribute(n1, "deg")
+    deg2 = result.get_node_attribute(n2, "deg")
+
+    assert deg0 == 1
+    assert deg1 == 1
+    assert deg2 == 0
+
+
 def test_builder_map_nodes_encoding():
     """Test that map_nodes encodes correctly."""
     from groggy.builder import AlgorithmBuilder
