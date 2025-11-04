@@ -2,10 +2,12 @@
 Benchmark builder-based PageRank and LPA vs native implementations.
 Tests on 50k and 200k node graphs.
 Validates that results match between builder and native implementations.
+
+Updated to use new decorator-based DSL syntax.
 """
 import time
 from groggy import Graph, print_profile
-from groggy.builder import AlgorithmBuilder
+from groggy.builder.examples import pagerank, label_propagation
 from groggy.algorithms import centrality, community
 
 # Set to True to see detailed per-step profiling
@@ -13,78 +15,15 @@ SHOW_PROFILING = False
 
 
 def build_pagerank_algorithm(damping=0.85, max_iter=100):
-    """Build PageRank using the builder DSL with proper primitives."""
-    builder = AlgorithmBuilder("custom_pagerank")
-    
-    # Get node count from the graph at runtime
-    node_count = builder.graph_node_count()
-    
-    # Initialize ranks uniformly (will be 1/N at runtime)
-    ranks = builder.init_nodes(default=1.0)
-    inv_n_scalar = builder.core.recip(node_count, epsilon=1e-9)
-    uniform = builder.core.broadcast_scalar(inv_n_scalar, ranks)
-    ranks = builder.var("ranks", uniform)
-    
-    # Compute out-degrees  
-    degrees = builder.node_degrees(ranks)
-    
-    # Safe reciprocal for division (avoid division by zero)
-    inv_degrees = builder.core.recip(degrees, epsilon=1e-9)
-    
-    # Identify sinks (nodes with no outgoing edges)
-    is_sink = builder.core.compare(degrees, "eq", 0.0)
-    
-    with builder.iterate(max_iter):
-        # Compute contribution from each node: rank / out_degree
-        contrib = builder.core.mul(ranks, inv_degrees)
-        contrib = builder.core.where(is_sink, 0.0, contrib)
-        
-        # Sum neighbor contributions (via incoming edges)
-        neighbor_sum = builder.core.neighbor_agg(contrib, agg="sum")
-        
-        # Apply damping to neighbor contributions
-        damped_neighbors = builder.core.mul(neighbor_sum, damping)
-        
-        # Compute teleport term: (1-damping)/N broadcast to all nodes
-        inv_n_map = builder.core.broadcast_scalar(inv_n_scalar, degrees)
-        teleport_map = builder.core.mul(inv_n_map, 1.0 - damping)
-        
-        # Handle sink redistribution: collect rank from sinks and redistribute
-        sink_ranks = builder.core.where(is_sink, ranks, 0.0)
-        sink_mass = builder.core.reduce_scalar(sink_ranks, op="sum")
-        sink_map = builder.core.mul(inv_n_map, sink_mass)
-        sink_map = builder.core.mul(sink_map, damping)
-        
-        # Combine all components
-        updated = builder.core.add(damped_neighbors, teleport_map)
-        updated = builder.core.add(updated, sink_map)
-        ranks = builder.var("ranks", updated)
-    
-    # Normalize once after iterations to ensure sum = 1.0
-    ranks = builder.core.normalize_sum(ranks)
-    
-    builder.attach_as("pagerank", ranks)
-    return builder.build()
+    """Build PageRank using the new decorator-based DSL."""
+    # Note: pagerank() creates an algorithm with output attribute "pagerank_new"
+    return pagerank(damping=damping, max_iter=max_iter)
 
 
 def build_lpa_algorithm(max_iter=10):
-    """Build LPA using the builder DSL with proper primitives."""
-    builder = AlgorithmBuilder("custom_lpa")
-    
-    # Initialize each node with unique label (0, 1, 2, ...)
-    labels = builder.init_nodes(unique=True)
-    
-    with builder.iterate(max_iter):
-        # Update labels in-place using neighbor mode (async LPA semantics)
-        labels = builder.core.neighbor_mode_update(
-            labels,
-            include_self=True,
-            tie_break="lowest",
-            ordered=True
-        )
-    
-    builder.attach_as("community", labels)
-    return builder.build()
+    """Build LPA using the new decorator-based DSL."""
+    # Note: label_propagation() creates an algorithm with output attribute "label_propagation"
+    return label_propagation(max_iter=max_iter)
 
 
 def create_test_graph(num_nodes, avg_degree=10):
@@ -175,7 +114,7 @@ def benchmark_pagerank(graph, name):
     # Get some sample values
     print(f"  Sample values:")
     builder_nodes = list(result_builder.nodes)
-    builder_map = {node.id: node.pagerank for node in builder_nodes}
+    builder_map = {node.id: node.pagerank_new for node in builder_nodes}
     for node_id in sample_nodes:
         builder_val = builder_map.get(node_id, 0.0)
         print(f"    Node {node_id}: {builder_val:.6f}")
@@ -261,7 +200,7 @@ def benchmark_lpa(graph, name):
     # Count communities
     communities = {}
     for node in result_builder.nodes:
-        comm = node.community
+        comm = node.label_propagation  # Updated attribute name
         communities[comm] = communities.get(comm, 0) + 1
     
     print(f"  Communities found: {len(communities)}")
