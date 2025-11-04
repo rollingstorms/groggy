@@ -15,7 +15,6 @@ use super::arithmetic::{read_binary_operands, BinaryArithmeticStep, BinaryOperat
 use super::attributes::{
     AttachEdgeAttrStep, AttachNodeAttrStep, EdgeWeightScaleStep, LoadEdgeAttrStep, LoadNodeAttrStep,
 };
-use super::centrality::PageRankIterStep;
 use super::community::{CommunitySeedStep, LabelPropagateStep, ModularityGainStep, SeedStrategy};
 use super::core::{global_step_registry, StepMetadata, StepRegistry};
 use super::expression::Expr;
@@ -1569,33 +1568,6 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             let flow = spec.params.expect_text("flow")?.to_string();
             let target = spec.params.expect_text("target")?.to_string();
             Ok(Box::new(ResidualCapacityStep::new(capacity, flow, target)))
-        },
-    )?;
-
-    registry.register(
-        "core.pagerank_iter",
-        StepMetadata {
-            id: "core.pagerank_iter".to_string(),
-            description: "Fused PageRank power iteration step (high-performance)".to_string(),
-            cost_hint: CostHint::Linear,
-        },
-        |spec| {
-            let rank_source = spec.params.expect_text("rank_source")?.to_string();
-            let degree_source = spec.params.expect_text("degree_source")?.to_string();
-            let rank_target = spec.params.expect_text("rank_target")?.to_string();
-            let converged_target = spec.params.expect_text("converged_target")?.to_string();
-            let max_diff_target = spec.params.expect_text("max_diff_target")?.to_string();
-            let damping = spec.params.get_float("damping").unwrap_or(0.85);
-            let tolerance = spec.params.get_float("tolerance").unwrap_or(1e-6);
-            Ok(Box::new(PageRankIterStep::new(
-                rank_source,
-                degree_source,
-                rank_target,
-                converged_target,
-                max_diff_target,
-                damping,
-                tolerance,
-            )))
         },
     )?;
 
