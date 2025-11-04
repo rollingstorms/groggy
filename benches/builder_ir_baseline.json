@@ -1,0 +1,12 @@
+{
+  "ffi_overhead_ms": 0.25042708999999996,
+  "operation_times": {
+    "init_nodes": 8.551792000000003,
+    "scalar_mul": 0.5472499999999991,
+    "degrees": 1.35445900000003
+  },
+  "build_time_ms": 0.04008300000002407,
+  "exec_time_ms": 0.9901250000000084,
+  "loop_overhead_ms": 0.1839590000000113,
+  "pagerank_builder_ms": 5.292458
+}

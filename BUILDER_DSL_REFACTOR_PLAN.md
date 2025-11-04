@@ -1282,20 +1282,20 @@ def benchmark_syntax_overhead():
 
 **Note:** Remaining items (Day 16-19) are **optimization tasks** deferred for future work:
 
-- [ ] **Day 16-17: IR foundation** (DEFERRED - optimization, not blocking)
+- [ ] **Day 16-17: IR foundation** 
   - [ ] Define `IRNode` and `IRGraph` dataclasses in `builder/ir/types.py`
   - [ ] Implement expression tree builder from step specs
   - [ ] Write visualization function for IR (for debugging)
   - [ ] Add basic analysis: count ops by domain, identify patterns
 
-- [ ] **Day 17-18: Fusion detection** (DEFERRED - optimization, not blocking)
+- [ ] **Day 17-18: Fusion detection** 
   - [ ] Implement pattern matcher for common sequences
   - [ ] Detect: `mul + add`, `recip + mul`, `compare + where`
   - [ ] Detect: neighbor_agg + arithmetic combinations
   - [ ] Collect statistics on fusion opportunities
   - [ ] Document findings for Strategy 2 implementation
 
-- [ ] **Day 18-19: Optimization infrastructure** (DEFERRED - optimization, not blocking)
+- [ ] **Day 18-19: Optimization infrastructure** 
   - [ ] Implement dead code elimination pass
   - [ ] Implement common subexpression elimination (CSE)
   - [ ] Implement loop-invariant code motion (LICM)

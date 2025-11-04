@@ -13,6 +13,7 @@ from groggy.builder.traits.core import CoreOps
 from groggy.builder.traits.graph import GraphOps
 from groggy.builder.traits.attr import AttrOps
 from groggy.builder.traits.iter import IterOps
+from groggy.builder.ir import IRGraph, IRNode
 
 # Import the original implementation temporarily during refactor
 # This will be fully replaced as we migrate functionality
@@ -55,15 +56,23 @@ class AlgorithmBuilder:
         >>> result = builder.core.add(nodes, degrees)
     """
     
-    def __init__(self, name: str):
+    def __init__(self, name: str, use_ir: bool = True):
         """
         Create a new algorithm builder.
         
         Args:
             name: Name for the algorithm
+            use_ir: If True, use typed IR graph (default); if False, use legacy steps list
         """
         self.name = name
+        self.use_ir = use_ir
+        
+        # New IR-based representation
+        self.ir_graph = IRGraph(name) if use_ir else None
+        
+        # Legacy step list (maintained for backward compatibility)
         self.steps = []
+        
         self.variables = {}
         self._var_counter = 0
         self._input_ref = None
@@ -494,6 +503,77 @@ class AlgorithmBuilder:
             algo._validated = True
         
         return algo
+    
+    # ====================================================================
+    # IR Support Methods (Phase 1: IR Foundation)
+    # ====================================================================
+    
+    def _add_ir_node(self, node: IRNode):
+        """
+        Add an IR node to the graph (if using IR mode).
+        
+        Also adds a legacy step for backward compatibility.
+        
+        Args:
+            node: IR node to add
+        """
+        if self.use_ir and self.ir_graph is not None:
+            self.ir_graph.add_node(node)
+        
+        # Always maintain legacy steps list for backward compatibility
+        self.steps.append(node.to_step())
+    
+    def get_ir_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about the IR graph.
+        
+        Returns:
+            Dictionary with node counts, variable counts, and domain distribution
+        """
+        if not self.use_ir or self.ir_graph is None:
+            return {
+                "use_ir": False,
+                "total_steps": len(self.steps)
+            }
+        
+        return self.ir_graph.stats()
+    
+    def visualize_ir(self, format: str = "text") -> str:
+        """
+        Visualize the IR graph.
+        
+        Args:
+            format: Output format - "text" for pretty-print, "dot" for Graphviz
+            
+        Returns:
+            String representation of the IR
+            
+        Example:
+            >>> print(builder.visualize_ir("text"))
+            >>> # Or save DOT for visualization
+            >>> with open("algorithm.dot", "w") as f:
+            ...     f.write(builder.visualize_ir("dot"))
+        """
+        if not self.use_ir or self.ir_graph is None:
+            return "IR mode not enabled"
+        
+        if format == "dot":
+            return self.ir_graph.to_dot()
+        elif format == "text":
+            return self.ir_graph.pretty_print()
+        else:
+            raise ValueError(f"Unknown format: {format}. Use 'text' or 'dot'")
+    
+    def _get_steps_from_ir(self) -> list:
+        """
+        Generate legacy steps list from IR graph.
+        
+        Returns:
+            List of step dictionaries for FFI serialization
+        """
+        if self.use_ir and self.ir_graph is not None:
+            return self.ir_graph.to_steps()
+        return self.steps
 
 
 def builder(name: str) -> AlgorithmBuilder:
