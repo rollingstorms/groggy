@@ -9,6 +9,7 @@
 mod aggregations;
 mod arithmetic;
 mod attributes;
+mod centrality;
 mod community;
 pub mod composition;
 mod core;
@@ -53,6 +54,7 @@ pub use arithmetic::{
 pub use attributes::{
     AttachEdgeAttrStep, AttachNodeAttrStep, EdgeWeightScaleStep, LoadEdgeAttrStep, LoadNodeAttrStep,
 };
+pub use centrality::PageRankIterStep;
 pub use community::{CommunitySeedStep, LabelPropagateStep, ModularityGainStep, SeedStrategy};
 pub use flow::{FlowUpdateStep, ResidualCapacityStep};
 pub use init::{

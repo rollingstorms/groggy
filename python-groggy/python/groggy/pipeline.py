@@ -271,3 +271,98 @@ def pipeline(algorithms: List[Union[AlgorithmHandle, dict]]) -> Pipeline:
         >>> result = pipe(subgraph)
     """
     return Pipeline(algorithms)
+
+
+def print_profile(profile: dict, show_steps: bool = True, show_details: bool = False):
+    """
+    Pretty-print profiling information from a pipeline run.
+    
+    Args:
+        profile: Profile dictionary returned from pipeline.run(..., return_profile=True)
+        show_steps: If True, show per-step timings (default: True)
+        show_details: If True, show detailed call counters and stats (default: False)
+        
+    Example:
+        >>> result, profile = pipe.run(subgraph, return_profile=True)
+        >>> print_profile(profile)
+        >>> 
+        >>> # Or use with builder algorithms
+        >>> algo = builder.build()
+        >>> result, profile = apply(subgraph, algo, return_profile=True)
+        >>> print_profile(profile, show_details=True)
+    """
+    if not isinstance(profile, dict):
+        print("No profile data available")
+        return
+    
+    print("\n" + "=" * 80)
+    print("Pipeline Profiling Report")
+    print("=" * 80)
+    
+    # Overall timing
+    build_time = profile.get("build_time", 0.0)
+    run_time = profile.get("run_time", 0.0)
+    total_time = build_time + run_time
+    
+    print(f"\n{'Total Time:':<30} {total_time*1000:>10.3f} ms")
+    print(f"{'  Build:':<30} {build_time*1000:>10.3f} ms ({build_time/total_time*100:>5.1f}%)")
+    print(f"{'  Run:':<30} {run_time*1000:>10.3f} ms ({run_time/total_time*100:>5.1f}%)")
+    
+    # Per-step timings
+    if show_steps:
+        timers = profile.get("timers", {})
+        step_timers = {k: v for k, v in timers.items() if k.startswith("pipeline.step.")}
+        
+        if step_timers:
+            print("\n" + "-" * 80)
+            print("Per-Step Timings")
+            print("-" * 80)
+            print(f"{'Step':<50} {'Time (ms)':>12} {'% of Run':>10}")
+            print("-" * 80)
+            
+            # Sort by step index
+            sorted_steps = sorted(step_timers.items(), key=lambda x: x[0])
+            
+            for step_name, step_time in sorted_steps:
+                # Extract step number and algorithm name
+                parts = step_name.replace("pipeline.step.", "").split(".", 1)
+                step_label = f"[{parts[0]}] {parts[1]}" if len(parts) > 1 else step_name
+                
+                time_ms = step_time * 1000
+                pct = (step_time / run_time * 100) if run_time > 0 else 0
+                print(f"{step_label:<50} {time_ms:>12.3f} {pct:>10.1f}%")
+    
+    # Call counters (detailed profiling)
+    if show_details:
+        call_counters = profile.get("call_counters", {})
+        if call_counters:
+            print("\n" + "-" * 80)
+            print("Detailed Call Counters")
+            print("-" * 80)
+            print(f"{'Function':<50} {'Calls':>10} {'Total (ms)':>12} {'Avg (μs)':>12}")
+            print("-" * 80)
+            
+            # Sort by total time descending
+            sorted_counters = sorted(
+                call_counters.items(),
+                key=lambda x: x[1].get("total", 0),
+                reverse=True
+            )
+            
+            for name, counter in sorted_counters:
+                count = counter.get("count", 0)
+                total = counter.get("total", 0) * 1000
+                avg = counter.get("avg", 0) * 1_000_000 if "avg" in counter else 0
+                
+                print(f"{name:<50} {count:>10} {total:>12.3f} {avg:>12.3f}")
+        
+        # Stats
+        stats = profile.get("stats", {})
+        if stats:
+            print("\n" + "-" * 80)
+            print("Statistics")
+            print("-" * 80)
+            for name, value in sorted(stats.items()):
+                print(f"{name:<60} {value:>15.3f}")
+    
+    print("=" * 80 + "\n")

@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use groggy::algorithms::centrality::{BetweennessCentrality, ClosenessCentrality, PageRank};
+use groggy::algorithms::centrality::{BetweennessCentrality, ClosenessCentrality};
 use groggy::algorithms::{Algorithm, Context};
 use groggy::api::graph::Graph;
 use groggy::subgraphs::Subgraph;
@@ -23,22 +23,6 @@ fn build_chain(length: usize) -> Subgraph {
     }
     let set: HashSet<NodeId> = nodes.into_iter().collect();
     Subgraph::from_nodes(Rc::new(RefCell::new(graph)), set, "centrality".into()).unwrap()
-}
-
-fn bench_pagerank(c: &mut Criterion) {
-    let mut group = c.benchmark_group("centrality_pagerank");
-    group.bench_function("pagerank_chain_128", |b| {
-        b.iter_batched(
-            || build_chain(128),
-            |subgraph| {
-                let algo = PageRank::new(0.85, 40, 1e-6, None, "pr".into()).unwrap();
-                let mut ctx = Context::new();
-                let _ = algo.execute(&mut ctx, subgraph).unwrap();
-            },
-            BatchSize::SmallInput,
-        )
-    });
-    group.finish();
 }
 
 fn bench_betweenness(c: &mut Criterion) {
@@ -75,7 +59,6 @@ fn bench_closeness(c: &mut Criterion) {
 
 criterion_group!(
     centrality,
-    bench_pagerank,
     bench_betweenness,
     bench_closeness
 );

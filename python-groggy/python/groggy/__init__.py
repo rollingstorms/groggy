@@ -108,7 +108,7 @@ from .imports import (
 )
 
 # Import algorithm and pipeline APIs (Phase 4)
-from .pipeline import pipeline, Pipeline, apply
+from .pipeline import pipeline, Pipeline, apply, print_profile
 from . import algorithms
 
 # Import builder DSL (Phase 5)
@@ -223,6 +223,7 @@ __all__ = [
     "pipeline",
     "Pipeline",
     "apply",
+    "print_profile",
     "algorithms",
     # Builder DSL (Phase 5)
     "builder",
