@@ -1,10 +1,13 @@
 //! Core types and traits for the step system.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock, RwLock};
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
+
+static STEP_VARIABLES_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 use crate::subgraphs::Subgraph;
 use crate::temporal::{TemporalIndex, TemporalSnapshot};
@@ -139,10 +142,41 @@ impl StepValue {
 }
 
 /// Mutable variable storage passed between steps.
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct StepVariables {
     values: HashMap<String, StepValue>,
     neighbor_cache: Option<NeighborCache>,
+    instance_id: u64,
+}
+
+impl Default for StepVariables {
+    fn default() -> Self {
+        let instance_id = STEP_VARIABLES_COUNTER.fetch_add(1, Ordering::SeqCst);
+        if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+            eprintln!(
+                "[StepVariables::{}] Created new instance",
+                instance_id
+            );
+        }
+        Self {
+            values: HashMap::new(),
+            neighbor_cache: None,
+            instance_id,
+        }
+    }
+}
+
+impl Drop for StepVariables {
+    fn drop(&mut self) {
+        if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+            eprintln!(
+                "[StepVariables::{}] Dropping (had {} variables, neighbor_cache={})",
+                self.instance_id,
+                self.values.len(),
+                self.neighbor_cache.is_some()
+            );
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -278,6 +312,10 @@ impl StepVariables {
     pub fn iter(&self) -> impl Iterator<Item = (&String, &StepValue)> {
         self.values.iter()
     }
+
+    pub fn count(&self) -> usize {
+        self.values.len()
+    }
 }
 
 /// Mutable scope passed between steps, providing access to the subgraph and variables.
@@ -310,12 +348,25 @@ impl<'a> StepScope<'a> {
     pub(crate) fn neighbor_cache(&mut self) -> Result<&NeighborCache> {
         if self.variables.neighbor_cache.is_none() {
             let nodes: Vec<NodeId> = self.subgraph.nodes().iter().copied().collect();
+            if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+                eprintln!(
+                    "[StepVariables::{}] Building neighbor_cache for {} nodes: {:?}",
+                    self.variables.instance_id,
+                    nodes.len(),
+                    if nodes.len() <= 10 { format!("{:?}", nodes) } else { format!("[{} nodes]", nodes.len()) }
+                );
+            }
             let mut adjacency = Vec::with_capacity(nodes.len());
             for &node in &nodes {
                 let neighbors = self.subgraph.neighbors(node).map_err(|err| anyhow!(err))?;
                 adjacency.push(neighbors);
             }
             self.variables.neighbor_cache = Some(NeighborCache::new(nodes, adjacency));
+        } else if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+            eprintln!(
+                "[StepVariables::{}] Reusing existing neighbor_cache",
+                self.variables.instance_id
+            );
         }
         Ok(self.variables.neighbor_cache.as_ref().unwrap())
     }

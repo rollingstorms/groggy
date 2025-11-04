@@ -1,8 +1,11 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::{anyhow, Result};
 
 use serde::Deserialize;
+
+static EXECUTION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 use crate::subgraphs::Subgraph;
 
@@ -125,11 +128,37 @@ impl Algorithm for StepPipelineAlgorithm {
     }
 
     fn execute(&self, ctx: &mut Context, subgraph: Subgraph) -> Result<Subgraph> {
+        let execution_id = EXECUTION_COUNTER.fetch_add(1, Ordering::SeqCst);
+        if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+            eprintln!(
+                "[exec_{}] Pipeline '{}' starting with {} steps",
+                execution_id, self.display_name, self.steps.len()
+            );
+        }
+
         let mut variables = StepVariables::default();
+
+        if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+            eprintln!(
+                "[exec_{}] Initial variables size: {}",
+                execution_id,
+                variables.count()
+            );
+        }
 
         for (index, step) in self.steps.iter().enumerate() {
             if ctx.is_cancelled() {
                 return Err(anyhow!("builder pipeline cancelled before step {index}"));
+            }
+
+            if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+                eprintln!(
+                    "[exec_{}] Step {} ({}): variables before = {}",
+                    execution_id,
+                    index,
+                    step.id(),
+                    variables.count()
+                );
             }
 
             ctx.begin_step(index, step.id());
@@ -139,6 +168,24 @@ impl Algorithm for StepPipelineAlgorithm {
             };
             ctx.finish_step();
             result?;
+
+            if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+                eprintln!(
+                    "[exec_{}] Step {} ({}): variables after = {}",
+                    execution_id,
+                    index,
+                    step.id(),
+                    variables.count()
+                );
+            }
+        }
+
+        if std::env::var("GROGGY_DEBUG_PIPELINE").is_ok() {
+            eprintln!(
+                "[exec_{}] Pipeline complete, final variables: {}",
+                execution_id,
+                variables.count()
+            );
         }
 
         Ok(subgraph)

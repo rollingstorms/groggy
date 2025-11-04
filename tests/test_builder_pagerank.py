@@ -57,8 +57,8 @@ def test_builder_pagerank_basic():
     uniform = builder.core.broadcast_scalar(inv_n_scalar, ranks)
     ranks = builder.var("ranks", uniform)
     
-    # Iterate 20 times using the full PageRank update
-    with builder.iterate(20):
+    # Iterate 100 times to ensure full convergence
+    with builder.iterate(100):
         ranks = _pagerank_step(builder, ranks, node_count, damping=0.85)
     
     # Normalize once after iterations
@@ -112,7 +112,7 @@ def test_builder_pagerank_matches_native():
     uniform = builder.core.broadcast_scalar(inv_n_scalar, ranks)
     ranks = builder.var("ranks", uniform)
     
-    with builder.iterate(20):
+    with builder.iterate(100):
         ranks = _pagerank_step(builder, ranks, node_count, damping=0.85)
     
     # Normalize once after iterations
@@ -125,8 +125,8 @@ def test_builder_pagerank_matches_native():
     result_builder = sg.apply(algo)
     builder_values = {node.id: node.pagerank for node in result_builder.nodes}
 
-    # Run native PageRank on a fresh view of the same graph
-    result_native = graph.view().apply(pagerank(max_iter=20, damping=0.85))
+    # Run native PageRank with matching iterations to ensure convergence
+    result_native = graph.view().apply(pagerank(max_iter=100, damping=0.85))
     
     # Compare results
     for node_id, pr_builder in builder_values.items():

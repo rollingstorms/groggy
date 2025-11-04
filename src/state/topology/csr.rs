@@ -36,17 +36,12 @@ pub struct CsrScratch {
 
 impl CsrScratch {
     fn prepare(&mut self, node_count: usize) {
-        if self.degree.len() != node_count {
-            self.degree.resize(node_count, 0);
-        } else {
-            self.degree.fill(0);
-        }
-
-        if self.cursor.len() != node_count {
-            self.cursor.resize(node_count, 0);
-        } else {
-            self.cursor.fill(0);
-        }
+        // Always clear and resize to ensure no stale data
+        self.degree.clear();
+        self.degree.resize(node_count, 0);
+        
+        self.cursor.clear();
+        self.cursor.resize(node_count, 0);
 
         self.pairs.clear();
     }
