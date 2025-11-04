@@ -94,8 +94,18 @@ def pagerank_simple(sG, damping=0.85, max_iter=100):
     Returns:
         VarHandle with PageRank scores
     """
-    ranks = sG.nodes(1.0 / sG.N)
+    # Initialize ranks uniformly: 1/N per node
+    ranks = sG.nodes(1.0)
+    n_scalar = sG.N
+    inv_n_scalar = sG.builder.core.recip(n_scalar, epsilon=1e-9)
+    ranks = sG.builder.core.broadcast_scalar(inv_n_scalar, ranks)
+    ranks = sG.var("ranks", ranks)
+    
     deg = ranks.degrees()
+    
+    # Compute teleport value: (1-damping)/N as a map
+    inv_n_map = sG.builder.core.broadcast_scalar(inv_n_scalar, ranks)
+    teleport_map = inv_n_map * (1.0 - damping)
     
     with sG.iterate(max_iter):
         # Each node distributes rank evenly to neighbors
@@ -104,7 +114,7 @@ def pagerank_simple(sG, damping=0.85, max_iter=100):
         
         # Update with damping
         ranks = sG.var("ranks",
-            damping * neighbor_sum + (1 - damping) / sG.N
+            damping * neighbor_sum + teleport_map
         )
     
     return ranks.normalize()

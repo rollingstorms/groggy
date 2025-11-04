@@ -7,7 +7,7 @@ Updated to use new decorator-based DSL syntax.
 """
 import time
 from groggy import Graph, print_profile
-from groggy.builder.examples import pagerank, label_propagation
+from groggy.builder.examples import pagerank_simple, label_propagation
 from groggy.algorithms import centrality, community
 
 # Set to True to see detailed per-step profiling
@@ -16,8 +16,8 @@ SHOW_PROFILING = False
 
 def build_pagerank_algorithm(damping=0.85, max_iter=100):
     """Build PageRank using the new decorator-based DSL."""
-    # Note: pagerank() creates an algorithm with output attribute "pagerank_new"
-    return pagerank(damping=damping, max_iter=max_iter)
+    # Note: pagerank_simple() creates an algorithm with output attribute "pagerank_simple"
+    return pagerank_simple(damping=damping, max_iter=max_iter)
 
 
 def build_lpa_algorithm(max_iter=10):
@@ -114,7 +114,7 @@ def benchmark_pagerank(graph, name):
     # Get some sample values
     print(f"  Sample values:")
     builder_nodes = list(result_builder.nodes)
-    builder_map = {node.id: node.pagerank_new for node in builder_nodes}
+    builder_map = {node.id: node.pagerank_simple for node in builder_nodes}
     for node_id in sample_nodes:
         builder_val = builder_map.get(node_id, 0.0)
         print(f"    Node {node_id}: {builder_val:.6f}")

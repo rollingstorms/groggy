@@ -1,6 +1,6 @@
 # Groggy Algorithm Benchmark Results
 
-Generated: 2025-11-04 09:25:13
+Generated: 2025-11-04 14:46:54
 
 ## Connected Components
 
@@ -9,63 +9,63 @@ Generated: 2025-11-04 09:25:13
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
 | networkit | 0.0000 | 0.00 | ✓ baseline |
-| igraph | 0.0001 | 0.00 | 3.41x |
-| groggy | 0.0002 | 0.00 | 6.66x |
-| networkx | 0.0004 | 0.03 | 14.23x |
+| igraph | 0.0001 | 0.00 | 2.98x |
+| groggy | 0.0002 | 0.05 | 5.99x |
+| networkx | 0.0003 | 0.00 | 10.73x |
 
 ### Graph: 10,000 nodes, 20,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0003 | 0.00 | ✓ baseline |
-| igraph | 0.0009 | 0.00 | 2.97x |
-| groggy | 0.0010 | 0.02 | 3.58x |
-| networkx | 0.0043 | 0.02 | 14.88x |
+| networkit | 0.0004 | 0.00 | ✓ baseline |
+| igraph | 0.0008 | 0.00 | 2.06x |
+| groggy | 0.0011 | 0.00 | 2.56x |
+| networkx | 0.0038 | 0.00 | 9.15x |
 
 ### Graph: 20,000 nodes, 40,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
 | networkit | 0.0006 | 0.00 | ✓ baseline |
-| igraph | 0.0017 | 0.00 | 2.91x |
-| groggy | 0.0021 | 0.00 | 3.56x |
-| networkx | 0.0119 | 0.00 | 20.26x |
+| igraph | 0.0017 | 0.00 | 2.83x |
+| groggy | 0.0022 | 0.00 | 3.70x |
+| networkx | 0.0101 | 0.00 | 16.71x |
 
 ### Graph: 50,000 nodes, 100,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0016 | 0.00 | ✓ baseline |
-| igraph | 0.0045 | 0.00 | 2.84x |
-| groggy | 0.0053 | 0.00 | 3.37x |
-| networkx | 0.0340 | 0.00 | 21.65x |
+| networkit | 0.0018 | 0.00 | ✓ baseline |
+| igraph | 0.0045 | 0.00 | 2.55x |
+| groggy | 0.0056 | 0.00 | 3.16x |
+| networkx | 0.0373 | 0.00 | 21.22x |
 
 ### Graph: 100,000 nodes, 300,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0041 | 0.00 | ✓ baseline |
-| igraph | 0.0122 | 0.00 | 2.99x |
-| groggy | 0.0144 | 0.00 | 3.55x |
-| networkx | 0.1134 | 0.00 | 27.84x |
+| networkit | 0.0046 | 0.28 | ✓ baseline |
+| igraph | 0.0123 | 0.00 | 2.66x |
+| groggy | 0.0147 | 0.00 | 3.18x |
+| networkx | 0.1120 | 0.00 | 24.19x |
 
 ### Graph: 200,000 nodes, 600,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0119 | 0.58 | ✓ baseline |
-| igraph | 0.0303 | 0.02 | 2.54x |
-| groggy | 0.0322 | 1.91 | 2.69x |
-| networkx | 0.2870 | 0.00 | 24.03x |
+| networkit | 0.0146 | 0.58 | ✓ baseline |
+| igraph | 0.0320 | 0.17 | 2.20x |
+| groggy | 0.0382 | 2.11 | 2.62x |
+| networkx | 0.3062 | 11.30 | 21.02x |
 
 ### Graph: 1,000,000 nodes, 2,000,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0894 | 3.16 | ✓ baseline |
-| groggy | 0.2053 | 13.17 | 2.30x |
-| igraph | 0.2140 | 7.22 | 2.39x |
-| networkx | 1.5888 | 51.45 | 17.78x |
+| networkit | 0.0979 | 1.81 | ✓ baseline |
+| igraph | 0.2175 | 16.83 | 2.22x |
+| groggy | 0.2861 | 66.44 | 2.92x |
+| networkx | 1.7619 | 0.00 | 18.00x |
 
 ## Label Propagation
 
@@ -74,63 +74,63 @@ Generated: 2025-11-04 09:25:13
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
 | groggy | 0.0003 | 0.00 | ✓ baseline |
-| networkit | 0.0004 | 0.00 | 1.52x |
-| igraph | 0.0038 | 0.00 | 12.90x |
-| networkx | 0.0131 | 0.00 | 44.66x |
+| networkit | 0.0005 | 0.00 | 1.89x |
+| igraph | 0.0038 | 0.02 | 14.52x |
+| networkx | 0.0136 | 0.02 | 52.43x |
 
 ### Graph: 10,000 nodes, 20,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0021 | 0.00 | ✓ baseline |
-| groggy | 0.0027 | 0.03 | 1.30x |
-| networkx | 0.1259 | 0.05 | 61.01x |
-| igraph | 0.1924 | 0.02 | 93.27x |
+| networkit | 0.0019 | 0.00 | ✓ baseline |
+| groggy | 0.0027 | 0.00 | 1.40x |
+| networkx | 0.1302 | 0.05 | 66.99x |
+| igraph | 0.1940 | 0.00 | 99.77x |
 
 ### Graph: 20,000 nodes, 40,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0037 | 0.00 | ✓ baseline |
-| groggy | 0.0077 | 0.00 | 2.08x |
-| networkx | 0.2514 | 0.06 | 68.09x |
-| igraph | 0.4896 | 0.05 | 132.58x |
+| networkit | 0.0032 | 0.00 | ✓ baseline |
+| groggy | 0.0079 | 0.00 | 2.45x |
+| networkx | 0.2526 | 0.00 | 77.98x |
+| igraph | 0.4978 | 0.00 | 153.68x |
 
 ### Graph: 50,000 nodes, 100,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0084 | 0.00 | ✓ baseline |
-| groggy | 0.0316 | 0.00 | 3.78x |
-| networkx | 0.7744 | 0.00 | 92.73x |
-| igraph | 1.8254 | 0.00 | 218.58x |
+| networkit | 0.0077 | 0.00 | ✓ baseline |
+| groggy | 0.0319 | 0.02 | 4.15x |
+| networkx | 0.7674 | 0.45 | 99.77x |
+| igraph | 1.7906 | 0.00 | 232.80x |
 
 ### Graph: 100,000 nodes, 300,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0145 | 0.00 | ✓ baseline |
-| groggy | 0.1173 | 0.00 | 8.10x |
-| igraph | 1.4479 | 0.00 | 100.02x |
-| networkx | 1.6318 | 1.75 | 112.72x |
+| networkit | 0.0136 | 0.00 | ✓ baseline |
+| groggy | 0.1191 | 0.02 | 8.75x |
+| igraph | 1.5673 | 0.00 | 115.24x |
+| networkx | 1.6189 | 1.56 | 119.03x |
 
 ### Graph: 200,000 nodes, 600,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0303 | 0.05 | ✓ baseline |
-| groggy | 0.4796 | 0.00 | 15.80x |
-| networkx | 3.8690 | 10.50 | 127.48x |
-| igraph | 7.1859 | 0.00 | 236.77x |
+| networkit | 0.0326 | 1.59 | ✓ baseline |
+| groggy | 0.5045 | 7.66 | 15.45x |
+| networkx | 4.6669 | 0.00 | 142.96x |
+| igraph | 9.6890 | 0.00 | 296.80x |
 
 ### Graph: 1,000,000 nodes, 2,000,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.1722 | 0.16 | ✓ baseline |
-| groggy | 9.3685 | 0.00 | 54.41x |
-| networkx | 24.3380 | 420.22 | 141.34x |
-| igraph | 579.1774 | 0.00 | 3363.53x |
+| networkit | 0.1731 | 5.42 | ✓ baseline |
+| groggy | 9.1388 | 0.00 | 52.78x |
+| networkx | 22.3409 | 502.75 | 129.04x |
+| igraph | 643.2176 | 0.00 | 3715.05x |
 
 ## Pagerank
 
@@ -138,64 +138,64 @@ Generated: 2025-11-04 09:25:13
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| groggy | 0.0003 | 0.00 | ✓ baseline |
-| igraph | 0.0007 | 0.00 | 2.89x |
-| networkx | 0.0028 | 0.00 | 11.26x |
-| networkit | 0.0048 | 0.00 | 19.10x |
+| groggy | 0.0002 | 0.00 | ✓ baseline |
+| igraph | 0.0007 | 0.02 | 3.02x |
+| networkx | 0.0029 | 0.52 | 12.00x |
+| networkit | 0.0045 | 0.03 | 18.73x |
 
 ### Graph: 10,000 nodes, 20,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| groggy | 0.0023 | 0.00 | ✓ baseline |
-| networkit | 0.0061 | 0.00 | 2.61x |
-| igraph | 0.0083 | 0.42 | 3.56x |
-| networkx | 0.0241 | 0.69 | 10.29x |
+| groggy | 0.0023 | 0.12 | ✓ baseline |
+| networkit | 0.0059 | 0.00 | 2.55x |
+| igraph | 0.0086 | 0.00 | 3.68x |
+| networkx | 0.0229 | 1.67 | 9.86x |
 
 ### Graph: 20,000 nodes, 40,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| groggy | 0.0042 | 0.00 | ✓ baseline |
-| networkit | 0.0074 | 0.00 | 1.75x |
-| igraph | 0.0173 | 0.39 | 4.10x |
-| networkx | 0.0930 | 2.92 | 21.98x |
+| groggy | 0.0043 | 0.00 | ✓ baseline |
+| networkit | 0.0072 | 0.00 | 1.67x |
+| igraph | 0.0172 | 1.09 | 3.97x |
+| networkx | 0.0907 | 0.58 | 20.90x |
 
 ### Graph: 50,000 nodes, 100,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0097 | 0.00 | ✓ baseline |
-| groggy | 0.0106 | 0.50 | 1.09x |
-| igraph | 0.0440 | 0.00 | 4.52x |
-| networkx | 0.2400 | 2.11 | 24.68x |
+| networkit | 0.0098 | 0.00 | ✓ baseline |
+| groggy | 0.0108 | 0.00 | 1.10x |
+| igraph | 0.0439 | 0.39 | 4.46x |
+| networkx | 0.2385 | 4.20 | 24.25x |
 
 ### Graph: 100,000 nodes, 300,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0121 | 0.00 | ✓ baseline |
-| groggy | 0.0269 | 0.00 | 2.23x |
-| igraph | 0.1060 | 0.00 | 8.78x |
-| networkx | 0.6670 | 11.48 | 55.24x |
+| networkit | 0.0135 | 0.00 | ✓ baseline |
+| groggy | 0.0233 | 0.33 | 1.73x |
+| igraph | 0.1062 | 0.00 | 7.88x |
+| networkx | 0.6780 | 22.14 | 50.33x |
 
 ### Graph: 200,000 nodes, 600,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| networkit | 0.0281 | 0.00 | ✓ baseline |
-| groggy | 0.0477 | 6.02 | 1.70x |
-| igraph | 0.2177 | 2.70 | 7.75x |
-| networkx | 1.4625 | 2.44 | 52.08x |
+| networkit | 0.0322 | 0.38 | ✓ baseline |
+| groggy | 0.0450 | 0.00 | 1.40x |
+| igraph | 0.4326 | 10.16 | 13.43x |
+| networkx | 1.8612 | 0.00 | 57.80x |
 
 ### Graph: 1,000,000 nodes, 2,000,000 edges
 
 | Library | Time (s) | Memory (MB) | Speedup vs Fastest |
 |---------|----------|-------------|--------------------|
-| groggy | 0.2253 | 71.86 | ✓ baseline |
-| networkit | 0.3406 | 0.00 | 1.51x |
-| igraph | 1.2670 | 20.80 | 5.62x |
-| networkx | 6.0526 | 266.14 | 26.87x |
+| groggy | 0.2656 | 74.20 | ✓ baseline |
+| networkit | 0.5257 | 0.00 | 1.98x |
+| igraph | 1.3589 | 57.34 | 5.12x |
+| networkx | 7.6580 | 564.70 | 28.84x |
 
 ## Performance Insights
 
