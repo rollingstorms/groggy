@@ -984,6 +984,18 @@ class AlgorithmBuilder:
                         new_step["target"]
                     )
                 
+                # Handle a, b fields (used by core.mul, core.add, etc.)
+                if "a" in new_step and isinstance(new_step["a"], str):
+                    new_step["a"] = var_mapping.get(
+                        new_step["a"],
+                        new_step["a"]
+                    )
+                if "b" in new_step and isinstance(new_step["b"], str):
+                    new_step["b"] = var_mapping.get(
+                        new_step["b"],
+                        new_step["b"]
+                    )
+                
                 # Note: alias target is NOT renamed - it's the logical name we're assigning to
                 
                 # Generate unique output name for this iteration
@@ -1248,7 +1260,7 @@ class BuiltAlgorithm(AlgorithmHandle):
     ) -> Dict[str, Any]:
         step_type = step.get("type")
 
-        if step_type == "init_nodes":
+        if step_type in ["init_nodes", "core.init_nodes"]:
             params: Dict[str, Any] = {"target": step["output"]}
             default = step.get("default")
             if default is not None:
@@ -1256,7 +1268,7 @@ class BuiltAlgorithm(AlgorithmHandle):
                 params["value"] = self._resolve_operand(default, alias_map)
             return {"id": "core.init_nodes", "params": params}
 
-        if step_type == "init_nodes_with_index":
+        if step_type in ["init_nodes_with_index", "core.init_nodes_with_index"]:
             return {
                 "id": "core.init_nodes_with_index",
                 "params": {"target": step["output"]}
@@ -1269,7 +1281,7 @@ class BuiltAlgorithm(AlgorithmHandle):
                 params["value"] = value
             return {"id": "core.init_scalar", "params": params}
 
-        if step_type == "graph_node_count":
+        if step_type in ["graph_node_count", "core.graph_node_count"]:
             return {
                 "id": "core.graph_node_count",
                 "params": {"target": step["output"]}
@@ -1281,7 +1293,7 @@ class BuiltAlgorithm(AlgorithmHandle):
                 "params": {"target": step["output"]}
             }
 
-        if step_type == "node_degree":
+        if step_type in ["node_degree", "core.node_degree", "graph.degree"]:
             params = {
                 "target": step["output"],
             }
@@ -1301,7 +1313,7 @@ class BuiltAlgorithm(AlgorithmHandle):
             }
             return {"id": "core.normalize_node_values", "params": params}
 
-        if step_type == "attach_attr":
+        if step_type in ["attach_attr", "core.attach_attr", "attr.save"]:
             # Resolve variable name through aliases
             resolved_input = self._resolve_with_alias(step["input"], alias_map)
             return {
@@ -1309,79 +1321,96 @@ class BuiltAlgorithm(AlgorithmHandle):
                 "params": {"source": resolved_input, "attr": step["attr_name"]},
             }
         
-        if step_type == "core.add":
+        # Handle both prefixed and unprefixed versions for new DSL compatibility
+        # Also handle both 'left'/'right' (legacy) and 'a'/'b' (IR) field names
+        if step_type in ["core.add", "add"]:
+            left = step.get("left", step.get("a"))
+            right = step.get("right", step.get("b"))
             return {
                 "id": "core.add",
                 "params": {
-                    "left": self._resolve_operand(step["left"], alias_map),
-                    "right": self._resolve_operand(step["right"], alias_map),
+                    "left": self._resolve_operand(left, alias_map),
+                    "right": self._resolve_operand(right, alias_map),
                     "target": step["output"]
                 }
             }
         
-        if step_type == "core.sub":
+        if step_type in ["core.sub", "sub"]:
+            left = step.get("left", step.get("a"))
+            right = step.get("right", step.get("b"))
             return {
                 "id": "core.sub",
                 "params": {
-                    "left": self._resolve_operand(step["left"], alias_map),
-                    "right": self._resolve_operand(step["right"], alias_map),
+                    "left": self._resolve_operand(left, alias_map),
+                    "right": self._resolve_operand(right, alias_map),
                     "target": step["output"]
                 }
             }
         
-        if step_type == "core.mul":
+        if step_type in ["core.mul", "mul"]:
+            left = step.get("left", step.get("a"))
+            right = step.get("right", step.get("b"))
             return {
                 "id": "core.mul",
                 "params": {
-                    "left": self._resolve_operand(step["left"], alias_map),
-                    "right": self._resolve_operand(step["right"], alias_map),
+                    "left": self._resolve_operand(left, alias_map),
+                    "right": self._resolve_operand(right, alias_map),
                     "target": step["output"]
                 }
             }
         
-        if step_type == "core.div":
+        if step_type in ["core.div", "div"]:
+            left = step.get("left", step.get("a"))
+            right = step.get("right", step.get("b"))
             return {
                 "id": "core.div",
                 "params": {
-                    "left": self._resolve_operand(step["left"], alias_map),
-                    "right": self._resolve_operand(step["right"], alias_map),
+                    "left": self._resolve_operand(left, alias_map),
+                    "right": self._resolve_operand(right, alias_map),
                     "target": step["output"]
                 }
             }
         
-        if step_type == "core.recip":
+        if step_type in ["core.recip", "recip"]:
+            source = step.get("source", step.get("input"))
             return {
                 "id": "core.recip",
                 "params": {
-                    "source": self._resolve_operand(step["source"], alias_map),
+                    "source": self._resolve_operand(source, alias_map),
                     "target": step["output"],
                     "epsilon": step.get("epsilon", 1e-10)
                 }
             }
         
-        if step_type == "core.compare":
+        if step_type in ["core.compare", "compare"]:
+            left = step.get("left", step.get("a"))
+            right = step.get("right", step.get("b"))
             return {
                 "id": "core.compare",
                 "params": {
-                    "left": self._resolve_operand(step["left"], alias_map),
+                    "left": self._resolve_operand(left, alias_map),
                     "op": step["op"],
-                    "right": self._resolve_operand(step["right"], alias_map),
+                    "right": self._resolve_operand(right, alias_map),
                     "target": step["output"]
                 }
             }
         
-        if step_type == "core.where":
+        if step_type in ["core.where", "where"]:
+            # Handle both 'condition'/'mask' and 'if_true'/'if_false' field names
+            condition = step.get("condition", step.get("mask"))
+            if_true = step.get("if_true")
+            if_false = step.get("if_false")
             return {
                 "id": "core.where",
                 "params": {
-                    "condition": self._resolve_operand(step["condition"], alias_map),
-                    "if_true": self._resolve_operand(step["if_true"], alias_map),
-                    "if_false": self._resolve_operand(step["if_false"], alias_map),
+                    "condition": self._resolve_operand(condition, alias_map),
+                    "if_true": self._resolve_operand(if_true, alias_map),
+                    "if_false": self._resolve_operand(if_false, alias_map),
                     "target": step["output"]
                 }
             }
         
-        if step_type == "core.reduce_scalar":
+        if step_type in ["core.reduce_scalar", "reduce_scalar"]:
             return {
                 "id": "core.reduce_scalar",
                 "params": {
@@ -1391,7 +1420,16 @@ class BuiltAlgorithm(AlgorithmHandle):
                 }
             }
         
-        if step_type == "core.broadcast_scalar":
+        if step_type in ["core.constant", "constant", "init_scalar"]:
+            return {
+                "id": "core.init_scalar",
+                "params": {
+                    "value": step["value"],
+                    "target": step["output"]
+                }
+            }
+        
+        if step_type in ["core.broadcast_scalar", "broadcast_scalar"]:
             return {
                 "id": "core.broadcast_scalar",
                 "params": {
@@ -1401,7 +1439,7 @@ class BuiltAlgorithm(AlgorithmHandle):
                 }
             }
         
-        if step_type == "core.neighbor_agg":
+        if step_type in ["core.neighbor_agg", "neighbor_agg", "graph.neighbor_agg"]:
             params = {
                 "source": self._resolve_operand(step["source"], alias_map),
                 "agg": step.get("agg", "sum"),
@@ -1462,7 +1500,7 @@ class BuiltAlgorithm(AlgorithmHandle):
                 "params": params
             }
         
-        if step_type == "normalize_sum":
+        if step_type in ["normalize_sum", "core.normalize_sum"]:
             return {
                 "id": "core.normalize_values",
                 "params": {

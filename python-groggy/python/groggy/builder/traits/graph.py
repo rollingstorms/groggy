@@ -44,15 +44,29 @@ class GraphOps:
             >>> degrees = nodes.degrees()
         """
         var = self.builder._new_var("degrees")
-        step = {"type": "node_degree", "output": var.name}
-        if nodes:
-            step["source"] = nodes.name
-        else:
-            # If no source provided, use a dummy node init
-            # The Rust backend will compute degrees for all nodes
+        
+        # For IR mode, we don't need a dummy source
+        source_name = nodes.name if nodes else None
+        
+        if not source_name:
+            # If no source provided, create a dummy one
             dummy = self.builder.init_nodes(0.0)
-            step["source"] = dummy.name
-        self.builder.steps.append(step)
+            source_name = dummy.name
+        
+        if self.builder.use_ir and self.builder.ir_graph is not None:
+            from groggy.builder.ir.nodes import GraphIRNode, IRDomain
+            
+            node = GraphIRNode(
+                node_id=f"node_{len(self.builder.ir_graph.nodes)}",
+                op_type='degree',
+                inputs=[source_name] if source_name else [],
+                output=var.name
+            )
+            self.builder._add_ir_node(node)
+        else:
+            step = {"type": "node_degree", "output": var.name, "source": source_name}
+            self.builder.steps.append(step)
+        
         return var
     
     def neighbor_agg(
@@ -88,15 +102,33 @@ class GraphOps:
             >>> weighted = builder.graph.neighbor_agg(ranks, "sum", weights=edge_weights)
         """
         var = self.builder._new_var("neighbor_agg")
-        step = {
-            "type": "core.neighbor_agg",  # Keep same step type for Rust backend
-            "source": values.name,
-            "agg": agg,
-            "output": var.name
-        }
-        if weights is not None:
-            step["weights"] = weights.name
-        self.builder.steps.append(step)
+        
+        if self.builder.use_ir and self.builder.ir_graph is not None:
+            from groggy.builder.ir.nodes import GraphIRNode, IRDomain
+            
+            inputs = [values.name]
+            if weights is not None:
+                inputs.append(weights.name)
+            
+            node = GraphIRNode(
+                node_id=f"node_{len(self.builder.ir_graph.nodes)}",
+                op_type='neighbor_agg',
+                inputs=inputs,
+                output=var.name,
+                agg=agg
+            )
+            self.builder._add_ir_node(node)
+        else:
+            step = {
+                "type": "core.neighbor_agg",
+                "source": values.name,
+                "agg": agg,
+                "output": var.name
+            }
+            if weights is not None:
+                step["weights"] = weights.name
+            self.builder.steps.append(step)
+        
         return var
     
     def collect_neighbor_values(

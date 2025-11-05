@@ -187,6 +187,42 @@ class AlgorithmBuilder:
         return self._input_ref
     
     # Convenience methods (delegate to implementations or will move to traits)
+    def constant(self, value: Any) -> VarHandle:
+        """
+        Create a constant value variable.
+        
+        Args:
+            value: The constant value
+            
+        Returns:
+            Variable handle for the constant
+            
+        Example:
+            >>> damping = builder.constant(0.85)
+            >>> ranks = ranks * damping
+        """
+        var = self._new_var("const")
+        
+        if self.use_ir and self.ir_graph is not None:
+            from .ir.nodes import CoreIRNode
+            
+            node = CoreIRNode(
+                node_id=f"node_{len(self.ir_graph.nodes)}",
+                op_type="constant",
+                inputs=[],
+                output=var.name,
+                value=value
+            )
+            self._add_ir_node(node)
+        else:
+            self.steps.append({
+                "type": "constant",
+                "output": var.name,
+                "value": value
+            })
+        
+        return var
+    
     def init_nodes(self, default: Any = 0.0, *, unique: bool = False) -> VarHandle:
         """
         Initialize node values.
@@ -204,17 +240,30 @@ class AlgorithmBuilder:
         """
         var = self._new_var("nodes")
         
-        if unique:
-            self.steps.append({
-                "type": "init_nodes_with_index",
-                "output": var.name
-            })
+        if self.use_ir and self.ir_graph is not None:
+            from .ir.nodes import CoreIRNode
+            
+            op_type = "init_nodes_unique" if unique else "init_nodes"
+            node = CoreIRNode(
+                node_id=f"node_{len(self.ir_graph.nodes)}",
+                op_type=op_type,
+                inputs=[],
+                output=var.name,
+                **{"default": default} if not unique else {}
+            )
+            self._add_ir_node(node)
         else:
-            self.steps.append({
-                "type": "init_nodes",
-                "output": var.name,
-                "default": default
-            })
+            if unique:
+                self.steps.append({
+                    "type": "init_nodes_with_index",
+                    "output": var.name
+                })
+            else:
+                self.steps.append({
+                    "type": "init_nodes",
+                    "output": var.name,
+                    "default": default
+                })
         
         return var
     

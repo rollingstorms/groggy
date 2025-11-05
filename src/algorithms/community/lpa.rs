@@ -274,14 +274,10 @@ impl LabelPropagation {
                 if new_label_idx != current_label_idx {
                     updates += 1;
                     label_indices[idx] = new_label_idx;
-                }
-            }
-
-            // Update actual labels from indices
-            for idx in 0..total {
-                let label_idx = label_indices[idx];
-                if label_idx < state.labels.len() {
-                    state.labels[idx] = state.labels[label_idx].clone();
+                    // Asynchronous update: apply immediately so subsequent nodes see it
+                    if new_label_idx < state.labels.len() {
+                        state.labels[idx] = state.labels[new_label_idx].clone();
+                    }
                 }
             }
 

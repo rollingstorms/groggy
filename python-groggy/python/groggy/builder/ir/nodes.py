@@ -104,6 +104,13 @@ class CoreIRNode(IRNode):
     
     def to_step(self) -> Dict[str, Any]:
         """Convert to legacy step format."""
+        # Handle special case: init_nodes_unique -> init_nodes_with_index
+        if self.op_type == "init_nodes_unique":
+            return {
+                "type": "init_nodes_with_index",
+                "output": self.output
+            }
+        
         step = {
             "type": f"core.{self.op_type}",
             "output": self.output

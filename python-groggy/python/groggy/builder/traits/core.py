@@ -5,7 +5,7 @@ This module provides CoreOps, containing pure value-space operations
 like arithmetic, reductions, conditionals, and scalar operations.
 """
 
-from typing import TYPE_CHECKING, Union, Optional, Any
+from typing import TYPE_CHECKING, Union, Optional, Any, Dict
 
 if TYPE_CHECKING:
     from groggy.builder.algorithm_builder import AlgorithmBuilder
@@ -25,19 +25,84 @@ class CoreOps:
         """
         self.builder = builder
     
+    def _add_op(self, op_type: str, inputs: list, metadata: Optional[Dict] = None) -> VarHandle:
+        """
+        Add an operation (supports both IR and step modes).
+        
+        Args:
+            op_type: Operation type (e.g., 'add', 'mul')
+            inputs: List of input variable names
+            metadata: Optional metadata dict
+            
+        Returns:
+            VarHandle for the result
+        """
+        var = self.builder._new_var(op_type)
+        
+        if self.builder.use_ir and self.builder.ir_graph is not None:
+            # Import here to avoid circular dependency
+            from groggy.builder.ir.nodes import CoreIRNode, IRDomain
+            
+            node = CoreIRNode(
+                node_id=f"node_{len(self.builder.ir_graph.nodes)}",
+                op_type=op_type,
+                inputs=inputs,
+                output=var.name,
+                **(metadata or {})
+            )
+            self.builder._add_ir_node(node)
+        else:
+            # Legacy step mode (without domain prefix - added by encoder)
+            step = {"type": op_type, "output": var.name}
+            step.update(metadata or {})
+            if len(inputs) >= 1:
+                step["left"] = inputs[0]
+            if len(inputs) >= 2:
+                step["right"] = inputs[1]
+            for i, inp in enumerate(inputs[2:], start=2):
+                step[f"input_{i}"] = inp
+            self.builder.steps.append(step)
+        
+        return var
+    
     def _ensure_var(self, value: Union[VarHandle, float, int]) -> str:
         """Convert value to variable name, creating scalar constant if needed."""
         if isinstance(value, VarHandle):
             return value.name
         else:
-            # Create a scalar constant variable
-            const_var = self.builder._new_var("scalar")
+            return self.constant(value).name
+    
+    def constant(self, value: Union[float, int]) -> VarHandle:
+        """
+        Create a constant scalar value.
+        
+        Args:
+            value: Constant value
+            
+        Returns:
+            VarHandle for the constant
+        """
+        var = self.builder._new_var("const")
+        
+        if self.builder.use_ir and self.builder.ir_graph is not None:
+            from groggy.builder.ir.nodes import CoreIRNode, IRDomain
+            
+            node = CoreIRNode(
+                node_id=f"node_{len(self.builder.ir_graph.nodes)}",
+                op_type='constant',
+                inputs=[],
+                output=var.name,
+                value=value
+            )
+            self.builder._add_ir_node(node)
+        else:
             self.builder.steps.append({
                 "type": "init_scalar",
-                "output": const_var.name,
+                "output": var.name,
                 "value": value
             })
-            return const_var.name
+        
+        return var
     
     def add(self, left: Union[VarHandle, float], right: Union[VarHandle, float]) -> VarHandle:
         """
@@ -57,22 +122,11 @@ class CoreOps:
         # Optimize: if both are scalar constants, compute at build time
         if not isinstance(left, VarHandle) and not isinstance(right, VarHandle):
             result_value = left + right
-            var = self.builder._new_var("scalar")
-            self.builder.steps.append({
-                "type": "init_scalar",
-                "output": var.name,
-                "value": result_value
-            })
-            return var
+            return self.constant(result_value)
         
-        var = self.builder._new_var("add")
-        self.builder.steps.append({
-            "type": "core.add",
-            "left": self._ensure_var(left),
-            "right": self._ensure_var(right),
-            "output": var.name
-        })
-        return var
+        left_var = self._ensure_var(left)
+        right_var = self._ensure_var(right)
+        return self._add_op("add", [left_var, right_var])
     
     def sub(self, left: Union[VarHandle, float], right: Union[VarHandle, float]) -> VarHandle:
         """
@@ -88,22 +142,11 @@ class CoreOps:
         # Optimize: if both are scalar constants, compute at build time
         if not isinstance(left, VarHandle) and not isinstance(right, VarHandle):
             result_value = left - right
-            var = self.builder._new_var("scalar")
-            self.builder.steps.append({
-                "type": "init_scalar",
-                "output": var.name,
-                "value": result_value
-            })
-            return var
+            return self.constant(result_value)
         
-        var = self.builder._new_var("sub")
-        self.builder.steps.append({
-            "type": "core.sub",
-            "left": self._ensure_var(left),
-            "right": self._ensure_var(right),
-            "output": var.name
-        })
-        return var
+        left_var = self._ensure_var(left)
+        right_var = self._ensure_var(right)
+        return self._add_op("sub", [left_var, right_var])
     
     def mul(self, left: Union[VarHandle, float], right: Union[VarHandle, float]) -> VarHandle:
         """
@@ -122,22 +165,11 @@ class CoreOps:
         # Optimize: if both are scalar constants, compute at build time
         if not isinstance(left, VarHandle) and not isinstance(right, VarHandle):
             result_value = left * right
-            var = self.builder._new_var("scalar")
-            self.builder.steps.append({
-                "type": "init_scalar",
-                "output": var.name,
-                "value": result_value
-            })
-            return var
+            return self.constant(result_value)
         
-        var = self.builder._new_var("mul")
-        self.builder.steps.append({
-            "type": "core.mul",
-            "left": self._ensure_var(left),
-            "right": self._ensure_var(right),
-            "output": var.name
-        })
-        return var
+        left_var = self._ensure_var(left)
+        right_var = self._ensure_var(right)
+        return self._add_op("mul", [left_var, right_var])
     
     def div(self, left: Union[VarHandle, float], right: Union[VarHandle, float]) -> VarHandle:
         """
@@ -153,22 +185,11 @@ class CoreOps:
         # Optimize: if both are scalar constants, compute at build time
         if not isinstance(left, VarHandle) and not isinstance(right, VarHandle):
             result_value = left / right
-            var = self.builder._new_var("scalar")
-            self.builder.steps.append({
-                "type": "init_scalar",
-                "output": var.name,
-                "value": result_value
-            })
-            return var
+            return self.constant(result_value)
         
-        var = self.builder._new_var("div")
-        self.builder.steps.append({
-            "type": "core.div",
-            "left": self._ensure_var(left),
-            "right": self._ensure_var(right),
-            "output": var.name
-        })
-        return var
+        left_var = self._ensure_var(left)
+        right_var = self._ensure_var(right)
+        return self._add_op("div", [left_var, right_var])
     
     def recip(self, values: VarHandle, epsilon: float = 1e-10) -> VarHandle:
         """
@@ -216,15 +237,8 @@ class CoreOps:
             >>> is_sink = builder.core.compare(degrees, "eq", 0.0)
             >>> is_high_degree = builder.core.compare(degrees, "gt", 10.0)
         """
-        var = self.builder._new_var("compare")
-        self.builder.steps.append({
-            "type": "core.compare",
-            "left": left.name,
-            "op": op,
-            "right": self._ensure_var(right),
-            "output": var.name
-        })
-        return var
+        right_var = self._ensure_var(right)
+        return self._add_op("compare", [left.name, right_var], {"op": op})
     
     def where(self, condition: VarHandle, if_true: Union[VarHandle, float], 
               if_false: Union[VarHandle, float]) -> VarHandle:
@@ -247,15 +261,9 @@ class CoreOps:
             >>> is_sink = builder.core.compare(degrees, "eq", 0.0)
             >>> sink_ranks = builder.core.where(is_sink, ranks, 0.0)
         """
-        var = self.builder._new_var("where")
-        self.builder.steps.append({
-            "type": "core.where",
-            "condition": condition.name,
-            "if_true": self._ensure_var(if_true),
-            "if_false": self._ensure_var(if_false),
-            "output": var.name
-        })
-        return var
+        true_var = self._ensure_var(if_true)
+        false_var = self._ensure_var(if_false)
+        return self._add_op("where", [condition.name, true_var, false_var])
     
     def reduce_scalar(self, values: VarHandle, op: str = "sum") -> VarHandle:
         """

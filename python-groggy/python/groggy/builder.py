@@ -983,6 +983,18 @@ class AlgorithmBuilder:
                         new_step["target"]
                     )
                 
+                # Handle a, b fields (used by core.mul, core.add, etc.)
+                if "a" in new_step and isinstance(new_step["a"], str):
+                    new_step["a"] = var_mapping.get(
+                        new_step["a"],
+                        new_step["a"]
+                    )
+                if "b" in new_step and isinstance(new_step["b"], str):
+                    new_step["b"] = var_mapping.get(
+                        new_step["b"],
+                        new_step["b"]
+                    )
+                
                 # Note: alias target is NOT renamed - it's the logical name we're assigning to
                 
                 # Generate unique output name for this iteration
