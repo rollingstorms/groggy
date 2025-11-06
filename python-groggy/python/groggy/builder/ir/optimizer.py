@@ -4,7 +4,7 @@ IR optimization passes for the builder DSL.
 Implements dead code elimination, constant folding, common subexpression
 elimination, and operation fusion to reduce IR size and improve execution efficiency.
 """
-from typing import Set, Dict, List, Any, Optional, Tuple
+from typing import Set, Dict, List, Any, Optional, Tuple, Union
 from .graph import IRGraph
 from .nodes import AnyIRNode, IRDomain, CoreIRNode
 
@@ -15,6 +15,7 @@ class IROptimizer:
     def __init__(self, ir_graph: IRGraph):
         self.ir = ir_graph
         self.modified = False
+        self.variable_renames: Dict[str, str] = {}  # Track variable renames during optimization
     
     def optimize(self, passes: Optional[List[str]] = None) -> bool:
         """
@@ -28,7 +29,8 @@ class IROptimizer:
             True if any modifications were made
         """
         if passes is None:
-            passes = ['constant_fold', 'cse', 'fuse_arithmetic', 'fuse_neighbor', 'dce']
+            # Skip DCE by default - it's too aggressive before outputs are attached
+            passes = ['constant_fold', 'cse', 'fuse_neighbor', 'fuse_arithmetic']
         
         total_modified = False
         
@@ -348,15 +350,110 @@ class IROptimizer:
     
     def fuse_neighbor_operations(self) -> bool:
         """
-        Fuse graph neighbor operations with pre/post arithmetic.
+        Fuse graph neighbor operations with arithmetic.
         
-        Patterns:
-        - transform(x) -> neighbor_agg -> fused_neighbor_agg(x, pre_transform)
-        - neighbor_agg -> transform(y) -> fused_neighbor_agg(x, post_transform)
-        - transform(x) -> neighbor_agg -> transform(y) -> fully fused
+        Patterns detected:
+        1. neighbor_agg(values) -> mul(scalars) -> FusedNeighborMulAgg
+        2. mul(a, x) -> add(mul(b, y)) -> FusedAXPY (a*x + b*y)
+        3. mul(a, b) -> add(c) -> FusedMADD (a*b + c)
         
         Returns:
             True if any operations were fused
+        """
+        modified = False
+        
+        # Pattern 1: neighbor_agg -> mul -> fused_neighbor_mul_agg
+        modified |= self._fuse_neighbor_mul_pattern()
+        
+        # Pattern 2 & 3: arithmetic chains
+        modified |= self._fuse_arithmetic_chains()
+        
+        # Rebuild variable tracking after graph modifications
+        if modified:
+            self.ir.rebuild_var_tracking()
+        
+        return modified
+    
+    def _is_scalar_variable(self, var_name: str) -> bool:
+        """
+        Check if a variable is a scalar (not a node-map).
+        
+        A variable is scalar if:
+        - It's defined by a constant operation
+        - It's defined by a scalar reduction (e.g., sum, mean)
+        - It's defined by a recip of a scalar
+        """
+        def_node = self.ir.var_defs.get(var_name)
+        if not def_node:
+            return False
+        
+        # Check for operations that produce scalars
+        scalar_ops = {
+            'constant', 'scalar', 'sum', 'mean', 'min', 'max', 'norm',
+            'graph_node_count', 'graph_edge_count'
+        }
+        
+        if def_node.op_type in scalar_ops:
+            return True
+        
+        # Recip of a scalar is also scalar
+        if def_node.op_type == 'recip' and len(def_node.inputs) >= 1:
+            return self._is_scalar_variable(def_node.inputs[0])
+        
+        # Division/multiplication of scalars produces scalar
+        if def_node.op_type in ['div', 'mul'] and len(def_node.inputs) >= 2:
+            return (self._is_scalar_variable(def_node.inputs[0]) and 
+                    self._is_scalar_variable(def_node.inputs[1]))
+        
+        return False
+    
+    def _ensure_node_map(self, var_name: str, reference_var: str, insert_before_node: 'AnyIRNode') -> str:
+        """
+        Ensure a variable is a node-map by inserting a broadcast if needed.
+        
+        Args:
+            var_name: Variable to check/convert
+            reference_var: Reference variable to get node count from
+            insert_before_node: Node to insert broadcast before (if needed)
+        
+        Returns:
+            Variable name (original if already node-map, new broadcast var if scalar)
+        """
+        if not self._is_scalar_variable(var_name):
+            return var_name
+        
+        # Need to broadcast scalar to node-map
+        # Create new broadcast node
+        from .nodes import CoreIRNode
+        
+        # Make broadcast variable name unique by including a counter
+        # This is critical for loops where the same scalar may be broadcast multiple times
+        broadcast_var = f"{var_name}_bcast_{self.ir._node_counter}"
+        
+        broadcast_node = CoreIRNode(
+            node_id=f"bcast_{self.ir._node_counter}",
+            op_type="broadcast_scalar",
+            inputs=[var_name, reference_var],
+            output=broadcast_var,
+            metadata={"broadcast_from": var_name}
+        )
+        self.ir._node_counter += 1
+        
+        # Insert broadcast node right before the node that will use it
+        insert_pos = self.ir.nodes.index(insert_before_node)
+        self.ir.nodes.insert(insert_pos, broadcast_node)
+        self.ir.node_map[broadcast_node.id] = broadcast_node
+        
+        # Tracking will be rebuilt after fusion completes
+        
+        return broadcast_var
+    
+    def _fuse_neighbor_mul_pattern(self) -> bool:
+        """
+        Detect: neighbor_agg(values) -> mul(result, scalars) -> fused_neighbor_mul_agg(values, scalars)
+        This is the critical PageRank/LPA pattern.
+        
+        If scalars is a scalar value, insert a broadcast before fusion.
         """
         modified = False
         
@@ -364,41 +461,148 @@ class IROptimizer:
             if node.domain != IRDomain.GRAPH or node.op_type != 'neighbor_agg':
                 continue
             
-            # Check for pre-transform pattern
-            if len(node.inputs) > 0:
-                inp_var = node.inputs[0]
-                inp_node = self.ir.get_defining_node(inp_var)
-                
-                # Can we fuse the input operation?
-                if inp_node and inp_node.domain == IRDomain.CORE:
-                    if inp_node.op_type in {'mul', 'div', 'where', 'fused_where_mul'}:
-                        uses = self.ir.var_uses.get(inp_var, [])
-                        if len(uses) == 1:  # Only used by this neighbor_agg
-                            # Fuse pre-transform
-                            node.op_type = f'fused_neighbor_{inp_node.op_type}'
-                            node.inputs = list(inp_node.inputs)
-                            node.metadata['pre_op'] = inp_node.op_type
-                            node.metadata['agg'] = node.metadata.get('agg', 'sum')
-                            modified = True
+            if not node.output:
+                continue
             
-            # Check for post-transform pattern (scan uses of this node)
-            if node.output:
-                uses = self.ir.var_uses.get(node.output, [])
-                if len(uses) == 1:
-                    use_node = uses[0]
-                    if use_node.domain == IRDomain.CORE and use_node.op_type in {'mul', 'add'}:
-                        # Fuse post-transform into the neighbor_agg
-                        if 'post_op' not in node.metadata:  # Don't double-fuse
-                            node.metadata['post_op'] = use_node.op_type
-                            node.metadata['post_inputs'] = [inp for inp in use_node.inputs if inp != node.output]
-                            # Update output to skip the intermediate operation
-                            node.output = use_node.output
-                            modified = True
+            # Check if result is used by a multiplication
+            uses = self.ir.var_uses.get(node.output, [])
+            if len(uses) != 1:
+                continue
+            
+            mul_node = uses[0]
+            if mul_node.domain != IRDomain.CORE or mul_node.op_type != 'mul':
+                continue
+            
+            # mul_node.inputs should be [neighbor_agg_output, scalars]
+            # Find the scalar input (the one that's not the neighbor_agg output)
+            scalar_var = None
+            for inp in mul_node.inputs:
+                if inp != node.output:
+                    scalar_var = inp
+                    break
+            
+            if not scalar_var:
+                continue
+            
+            # CRUCIAL FIX: Ensure scalar operand is a node-map (broadcast if needed)
+            # The fused kernel expects both operands to be node-maps
+            # Insert broadcast before the neighbor_agg node to ensure proper ordering
+            scalar_var = self._ensure_node_map(scalar_var, node.output, node)
+            
+            # Update mul_node's inputs to use the broadcast variable
+            # This is important so when we remove mul_node later, references are correct
+            for i, inp in enumerate(mul_node.inputs):
+                if inp != node.output and inp != scalar_var:
+                    mul_node.inputs[i] = scalar_var
+            
+            # Replace with fused operation
+            # Track the rename: old neighbor_agg output -> mul's output
+            # This is important for alias steps that reference intermediate variables
+            old_output = node.output
+            new_output = mul_node.output
+            if old_output != new_output:
+                self.variable_renames[old_output] = new_output
+            
+            # Change neighbor_agg node to fused_neighbor_mul_agg
+            node.op_type = 'fused_neighbor_mul_agg'
+            # inputs[0] is values, add scalars as second input
+            if len(node.inputs) >= 1:
+                node.inputs = [node.inputs[0], scalar_var]
+            node.output = new_output  # Take over mul's output
+            node.metadata['fused'] = True
+            node.metadata['direction'] = node.metadata.get('direction', 'in')
+            
+            # Remove the mul node
+            if mul_node in self.ir.nodes:
+                self.ir.nodes.remove(mul_node)
+                if mul_node.id in self.ir.node_map:
+                    del self.ir.node_map[mul_node.id]
+            
+            modified = True
+        
+        return modified
+    
+    def _fuse_arithmetic_chains(self) -> bool:
+        """
+        Detect arithmetic chains that can be fused:
+        - a*x + b*y -> FusedAXPY
+        - a*b + c -> FusedMADD
+        """
+        modified = False
+        
+        for node in list(self.ir.nodes):
+            if node.domain != IRDomain.CORE or node.op_type != 'add':
+                continue
+            
+            if len(node.inputs) < 2:
+                continue
+            
+            # Get the two inputs to the add
+            inp1_var, inp2_var = node.inputs[0], node.inputs[1]
+            inp1_node = self.ir.get_defining_node(inp1_var)
+            inp2_node = self.ir.get_defining_node(inp2_var)
+            
+            # Pattern: mul + mul -> check if it's AXPY (a*x + b*y)
+            if inp1_node and inp2_node and inp1_node.op_type == 'mul' and inp2_node.op_type == 'mul':
+                # Check if each mul is only used by this add
+                uses1 = self.ir.var_uses.get(inp1_var, [])
+                uses2 = self.ir.var_uses.get(inp2_var, [])
+                
+                if len(uses1) == 1 and len(uses2) == 1:
+                    # Fuse to AXPY: a*x + b*y
+                    # inp1_node.inputs = [a, x], inp2_node.inputs = [b, y]
+                    if len(inp1_node.inputs) >= 2 and len(inp2_node.inputs) >= 2:
+                        # Track renames: mul outputs are eliminated
+                        self.variable_renames[inp1_var] = node.output
+                        self.variable_renames[inp2_var] = node.output
+                        
+                        node.op_type = 'fused_axpy'
+                        # AXPY params: a, x, b, y
+                        node.inputs = [
+                            inp1_node.inputs[0], inp1_node.inputs[1],
+                            inp2_node.inputs[0], inp2_node.inputs[1]
+                        ]
+                        node.metadata['fused'] = True
+                        
+                        # Remove the mul nodes
+                        for n in [inp1_node, inp2_node]:
+                            if n in self.ir.nodes:
+                                self.ir.nodes.remove(n)
+                                if n.id in self.ir.node_map:
+                                    del self.ir.node_map[n.id]
+                        
+                        modified = True
+                        continue
+            
+            # Pattern: mul + scalar/vector -> FusedMADD (a*b + c)
+            if inp1_node and inp1_node.op_type == 'mul':
+                uses1 = self.ir.var_uses.get(inp1_var, [])
+                if len(uses1) == 1 and len(inp1_node.inputs) >= 2:
+                    # Track rename: mul output is eliminated
+                    self.variable_renames[inp1_var] = node.output
+                    
+                    # Fuse to MADD: a*b + c
+                    node.op_type = 'fused_madd'
+                    node.inputs = [inp1_node.inputs[0], inp1_node.inputs[1], inp2_var]
+                    node.metadata['fused'] = True
+                    
+                    # Remove the mul node
+                    if inp1_node in self.ir.nodes:
+                        self.ir.nodes.remove(inp1_node)
+                        if inp1_node.id in self.ir.node_map:
+                            del self.ir.node_map[inp1_node.id]
+                    
+                    modified = True
         
         return modified
 
 
-def optimize_ir(ir_graph: IRGraph, passes: Optional[List[str]] = None, max_iterations: int = 3) -> IRGraph:
+def optimize_ir(
+    ir_graph: IRGraph, 
+    passes: Optional[List[str]] = None, 
+    max_iterations: int = 3,
+    return_renames: bool = False
+) -> Union[IRGraph, Tuple[IRGraph, Dict[str, str]]]:
     """
     Apply optimization passes to an IR graph iteratively.
     
@@ -406,9 +610,10 @@ def optimize_ir(ir_graph: IRGraph, passes: Optional[List[str]] = None, max_itera
         ir_graph: The IR graph to optimize
         passes: List of optimization passes to apply
         max_iterations: Maximum number of optimization iterations
+        return_renames: If True, also return variable renames from fusion
     
     Returns:
-        Optimized IR graph
+        Optimized IR graph, or (ir_graph, variable_renames) if return_renames=True
     """
     optimizer = IROptimizer(ir_graph)
     
@@ -418,4 +623,6 @@ def optimize_ir(ir_graph: IRGraph, passes: Optional[List[str]] = None, max_itera
             # Reached fixed point
             break
     
+    if return_renames:
+        return ir_graph, optimizer.variable_renames
     return ir_graph

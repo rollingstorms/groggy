@@ -302,10 +302,23 @@ class AlgorithmBuilder:
             >>> uniform = builder.core.div(1.0, n)
         """
         var = self._new_var("n")
-        self.steps.append({
-            "type": "graph_node_count",
-            "output": var.name
-        })
+        
+        if self.use_ir and self.ir_graph is not None:
+            from .ir.nodes import GraphIRNode
+            
+            node = GraphIRNode(
+                node_id=f"node_{len(self.ir_graph.nodes)}",
+                op_type="graph_node_count",
+                inputs=[],
+                output=var.name
+            )
+            self._add_ir_node(node)
+        else:
+            self.steps.append({
+                "type": "graph_node_count",
+                "output": var.name
+            })
+        
         return var
     
     def graph_edge_count(self) -> VarHandle:
@@ -319,10 +332,23 @@ class AlgorithmBuilder:
             >>> m = builder.graph_edge_count()
         """
         var = self._new_var("m")
-        self.steps.append({
-            "type": "graph_edge_count",
-            "output": var.name
-        })
+        
+        if self.use_ir and self.ir_graph is not None:
+            from .ir.nodes import GraphIRNode
+            
+            node = GraphIRNode(
+                node_id=f"node_{len(self.ir_graph.nodes)}",
+                op_type="graph_edge_count",
+                inputs=[],
+                output=var.name
+            )
+            self._add_ir_node(node)
+        else:
+            self.steps.append({
+                "type": "graph_edge_count",
+                "output": var.name
+            })
+        
         return var
     
     def load_edge_attr(self, attr: str, default: Any = 0.0) -> VarHandle:
@@ -340,12 +366,27 @@ class AlgorithmBuilder:
             >>> edge_weights = builder.load_edge_attr("weight", default=1.0)
         """
         var = self._new_var("edge_attr")
-        self.steps.append({
-            "type": "load_edge_attr",
-            "attr_name": attr,
-            "default": default,
-            "output": var.name
-        })
+        
+        if self.use_ir and self.ir_graph is not None:
+            from .ir.nodes import GraphIRNode
+            
+            node = GraphIRNode(
+                node_id=f"node_{len(self.ir_graph.nodes)}",
+                op_type="load_edge_attr",
+                inputs=[],
+                output=var.name,
+                attr_name=attr,
+                default=default
+            )
+            self._add_ir_node(node)
+        else:
+            self.steps.append({
+                "type": "load_edge_attr",
+                "attr_name": attr,
+                "default": default,
+                "output": var.name
+            })
+        
         return var
     
     def node_degrees(self, nodes: VarHandle) -> VarHandle:
@@ -363,11 +404,24 @@ class AlgorithmBuilder:
             >>> degrees = builder.node_degrees(nodes)
         """
         var = self._new_var("degrees")
-        self.steps.append({
-            "type": "node_degree",
-            "source": nodes.name,
-            "output": var.name
-        })
+        
+        if self.use_ir and self.ir_graph is not None:
+            from .ir.nodes import GraphIRNode
+            
+            node = GraphIRNode(
+                node_id=f"node_{len(self.ir_graph.nodes)}",
+                op_type="degree",
+                inputs=[nodes.name],
+                output=var.name
+            )
+            self._add_ir_node(node)
+        else:
+            self.steps.append({
+                "type": "node_degree",
+                "source": nodes.name,
+                "output": var.name
+            })
+        
         return var
     
     def normalize(self, values: VarHandle, method: str = "sum") -> VarHandle:
@@ -415,7 +469,7 @@ class AlgorithmBuilder:
     
     def _finalize_loop(self, start_step: int, iterations: int, loop_vars: Dict[str, VarHandle]):
         """
-        Unroll loop by repeating steps.
+        Unroll loop by repeating steps AND IR nodes.
         
         This is called by LoopContext.__exit__() to expand the loop body.
         
@@ -424,12 +478,9 @@ class AlgorithmBuilder:
             iterations: Number of times to repeat
             loop_vars: Variables at loop start
         """
-        # Use the original implementation for now
-        # This will be kept as-is since it's working correctly
+        # First, unroll the steps using the original implementation
         from builder_original import AlgorithmBuilder as OriginalBuilder
         
-        # Temporarily create an instance to use its _finalize_loop method
-        # This is a transitional approach during refactoring
         temp_builder = OriginalBuilder(self.name)
         temp_builder.steps = self.steps
         temp_builder.variables = self.variables
@@ -441,6 +492,101 @@ class AlgorithmBuilder:
         self.steps = temp_builder.steps
         self.variables = temp_builder.variables
         self._var_counter = temp_builder._var_counter
+        
+        # Now unroll the IR graph if we're using IR
+        if self.use_ir and self.ir_graph is not None:
+            self._unroll_ir_loop(start_step, iterations, loop_vars)
+    
+    def _unroll_ir_loop(self, start_step: int, iterations: int, loop_vars: Dict[str, VarHandle]):
+        """
+        Unroll IR nodes to match the unrolled steps.
+        
+        The steps have already been unrolled by _finalize_loop. Now we need to
+        replicate the IR nodes and update their variable references to match.
+        
+        SIMPLE APPROACH: Just rebuild the IR from the final (unrolled) steps.
+        This works because steps are the source of truth after _finalize_loop.
+        
+        Args:
+            start_step: Index where loop body started (in original steps)
+            iterations: Number of iterations
+            loop_vars: Variables at loop start
+        """
+        from groggy.builder.ir.graph import IRGraph
+        from groggy.builder.ir.nodes import CoreIRNode, GraphIRNode, ControlIRNode
+        
+        # Create new IR graph from scratch
+        new_ir = IRGraph(self.ir_graph.name)
+        
+        # Convert each step into an IR node
+        for step in self.steps:
+            # Skip steps that don't create outputs (like alias, attach_attr)
+            output = step.get("output")
+            if not output:
+                continue
+            
+            step_type = step.get("type", "")
+            
+            # Skip alias steps - they don't create new values in IR
+            if step_type == "alias":
+                continue
+            
+            # Determine domain and op_type
+            if "." in step_type:
+                domain_str, op_type = step_type.split(".", 1)
+            else:
+                # Legacy types - default to core
+                domain_str = "core"
+                op_type = step_type
+            
+            # Collect input variable names
+            inputs = []
+            for field in ["input", "source", "a", "b", "left", "right", "scalar", "reference", 
+                          "condition", "if_true", "if_false", "weights", "values"]:
+                value = step.get(field)
+                if value and isinstance(value, str):
+                    inputs.append(value)
+            
+            # Collect metadata - all non-standard fields
+            metadata = {}
+            skip_fields = {"type", "output", "input", "source", "a", "b", "left", "right", 
+                          "scalar", "reference", "condition", "if_true", "if_false", "weights", "values"}
+            for key, value in step.items():
+                if key not in skip_fields:
+                    metadata[key] = value
+            
+            # Create appropriate IR node type
+            node_id = f"node_{len(new_ir.nodes)}"
+            
+            if domain_str == "control":
+                node = ControlIRNode(
+                    node_id=node_id,
+                    op_type=op_type,
+                    inputs=inputs,
+                    output=output,
+                    **metadata
+                )
+            elif domain_str == "graph":
+                node = GraphIRNode(
+                    node_id=node_id,
+                    op_type=op_type,
+                    inputs=inputs,
+                    output=output,
+                    **metadata
+                )
+            else:  # core or unknown
+                node = CoreIRNode(
+                    node_id=node_id,
+                    op_type=op_type,
+                    inputs=inputs,
+                    output=output,
+                    **metadata
+                )
+            
+            new_ir.add_node(node)
+        
+        # Replace the IR graph
+        self.ir_graph = new_ir
     
     def attach_as(self, attr_name: str, values: VarHandle):
         """
@@ -520,12 +666,13 @@ class AlgorithmBuilder:
         
         return handle
     
-    def build(self, validate: bool = True) -> AlgorithmHandle:
+    def build(self, validate: bool = True, optimize: bool = True) -> AlgorithmHandle:
         """
         Build the algorithm from accumulated steps.
         
         Args:
             validate: If True, validate pipeline before building (default: True)
+            optimize: If True, apply IR optimization passes (default: True)
         
         Returns:
             AlgorithmHandle ready for execution
@@ -533,7 +680,32 @@ class AlgorithmBuilder:
         Raises:
             ValidationError: If validation fails and validate=True
         """
-        algo = BuiltAlgorithm(self.name, self.steps)
+        # Apply IR optimization if enabled
+        steps = self.steps
+        has_aliases = any(step.get("type") == "alias" for step in self.steps)
+        
+        if optimize and self.use_ir and self.ir_graph is not None:
+            from groggy.builder.ir.optimizer import optimize_ir
+            
+            # Run optimization passes (returns (ir_graph, variable_renames))
+            self.ir_graph, variable_renames = optimize_ir(
+                self.ir_graph, passes=None, max_iterations=3, return_renames=True
+            )
+            
+            # Regenerate steps from optimized IR
+            ir_steps = self.ir_graph.to_steps()
+            
+            # Extract alias steps from original steps
+            alias_steps = [s for s in self.steps if s.get("type") == "alias"]
+            
+            # Update alias steps to track through fusion transformations
+            if alias_steps and variable_renames:
+                alias_steps = self._apply_renames_to_aliases(alias_steps, variable_renames)
+            
+            # Merge IR steps and alias steps in dependency order
+            steps = self._merge_steps_topologically(ir_steps, alias_steps)
+        
+        algo = BuiltAlgorithm(self.name, steps)
         
         if validate:
             errors, warnings = algo._validate()
@@ -552,6 +724,85 @@ class AlgorithmBuilder:
             algo._validated = True
         
         return algo
+    
+    def _apply_renames_to_aliases(self, steps, variable_renames):
+        """
+        Update alias steps to use renamed variables after fusion.
+        
+        When fusion combines operations, intermediate variables are eliminated.
+        Alias steps that reference those variables need to be updated to point
+        to the final output of the fused operation.
+        
+        Args:
+            steps: List of step dictionaries
+            variable_renames: Dict mapping old variable names to new names
+            
+        Returns:
+            Updated list of steps
+        """
+        # Follow rename chains to get final variable names
+        def follow_rename_chain(var_name):
+            """Follow variable renames to the final name."""
+            visited = set()
+            current = var_name
+            while current in variable_renames and current not in visited:
+                visited.add(current)
+                current = variable_renames[current]
+            return current
+        
+        updated_steps = []
+        for step in steps:
+            if step.get("type") == "alias":
+                # Update the 'source' field if it was renamed
+                source_var = step.get("source")
+                if source_var:
+                    final_var = follow_rename_chain(source_var)
+                    if final_var != source_var:
+                        step = step.copy()
+                        step["source"] = final_var
+            updated_steps.append(step)
+        return updated_steps
+    
+    def _merge_steps_topologically(self, ir_steps, alias_steps):
+        """
+        Merge IR and alias steps in dependency order.
+        
+        Ensures each alias step comes immediately after the step that defines
+        its source variable, maintaining correct execution order.
+        
+        Args:
+            ir_steps: List of IR-generated steps
+            alias_steps: List of alias steps with updated sources
+            
+        Returns:
+            Merged list of steps in correct order
+        """
+        if not alias_steps:
+            return ir_steps
+        
+        # Build map: variable name -> step index that defines it
+        var_to_step_idx = {}
+        for i, step in enumerate(ir_steps):
+            output = step.get('output')
+            if output:
+                var_to_step_idx[output] = i
+        
+        # Insert alias steps after their source variable is defined
+        merged = list(ir_steps)
+        inserted_count = 0
+        
+        for alias in alias_steps:
+            source = alias.get('source')
+            if source and source in var_to_step_idx:
+                # Insert immediately after the step that defines this variable
+                insert_pos = var_to_step_idx[source] + 1 + inserted_count
+                merged.insert(insert_pos, alias)
+                inserted_count += 1
+            else:
+                # Source not found in IR steps, append at end
+                merged.append(alias)
+        
+        return merged
     
     # ====================================================================
     # IR Support Methods (Phase 1: IR Foundation)

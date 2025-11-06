@@ -134,6 +134,28 @@ class CoreIRNode(IRNode):
             step["a"] = self.inputs[0]
             step["b"] = self.inputs[1] if len(self.inputs) > 1 else self.metadata.get("b", 0.0)
             step["op"] = self.metadata.get("op", "eq")
+        elif self.op_type == "fused_axpy":
+            # Fused AXPY: result = a * x + b * y
+            # Rust signature: FusedAXPY(a, x, b, y, target)
+            if len(self.inputs) >= 4:
+                step["a"] = self.inputs[0]
+                step["x"] = self.inputs[1]
+                step["b"] = self.inputs[2]
+                step["y"] = self.inputs[3]
+            step["target"] = self.output
+        elif self.op_type == "fused_madd":
+            # Fused MADD: result = a * b + c
+            # Rust signature: FusedMADD(a, b, c, target)
+            if len(self.inputs) >= 3:
+                step["a"] = self.inputs[0]
+                step["b"] = self.inputs[1]
+                step["c"] = self.inputs[2]
+            step["target"] = self.output
+        elif self.op_type == "broadcast_scalar":
+            # Broadcast scalar: inputs = [scalar, reference]
+            if len(self.inputs) >= 2:
+                step["scalar"] = self.inputs[0]
+                step["reference"] = self.inputs[1]
         
         # Add any additional metadata
         for key, value in self.metadata.items():
@@ -193,6 +215,16 @@ class GraphIRNode(IRNode):
             step["agg"] = self.metadata.get("agg", "sum")
             if "weights" in self.metadata:
                 step["weights"] = self.metadata["weights"]
+            if "direction" in self.metadata:
+                step["direction"] = self.metadata["direction"]
+        elif self.op_type == "fused_neighbor_mul_agg":
+            # Fused neighbor aggregation with multiplication
+            # Rust signature: FusedNeighborMulAgg(values, scalars, target)
+            if len(self.inputs) >= 2:
+                step["values"] = self.inputs[0]
+                step["scalars"] = self.inputs[1]
+            step["target"] = self.output
+            step["direction"] = self.metadata.get("direction", "in")
         elif self.op_type == "subgraph":
             step["mask"] = self.inputs[0]
         

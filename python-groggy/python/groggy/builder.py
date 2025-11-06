@@ -1574,6 +1574,40 @@ class BuiltAlgorithm(AlgorithmHandle):
             if "max_value" in step:
                 params["max_value"] = step["max_value"]
             return {"id": "core.clip", "params": params}
+        
+        # Fused operations
+        if step_type == "graph.fused_neighbor_mul_agg":
+            params = {
+                "values": self._resolve_operand(step["values"], alias_map),
+                "scalars": self._resolve_operand(step["scalars"], alias_map),
+                "target": step["target"]
+            }
+            if "direction" in step:
+                params["direction"] = step["direction"]
+            return {"id": "graph.fused_neighbor_mul_agg", "params": params}
+        
+        if step_type == "core.fused_axpy":
+            return {
+                "id": "core.fused_axpy",
+                "params": {
+                    "a": self._resolve_operand(step["a"], alias_map),
+                    "x": self._resolve_operand(step["x"], alias_map),
+                    "b": self._resolve_operand(step["b"], alias_map),
+                    "y": self._resolve_operand(step["y"], alias_map),
+                    "target": step["target"]
+                }
+            }
+        
+        if step_type == "core.fused_madd":
+            return {
+                "id": "core.fused_madd",
+                "params": {
+                    "a": self._resolve_operand(step["a"], alias_map),
+                    "b": self._resolve_operand(step["b"], alias_map),
+                    "c": self._resolve_operand(step["c"], alias_map),
+                    "target": step["target"]
+                }
+            }
 
         raise ValueError(f"Unsupported builder step type: {step_type}")
     

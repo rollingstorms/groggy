@@ -1281,13 +1281,13 @@ class BuiltAlgorithm(AlgorithmHandle):
                 params["value"] = value
             return {"id": "core.init_scalar", "params": params}
 
-        if step_type in ["graph_node_count", "core.graph_node_count"]:
+        if step_type in ["graph_node_count", "core.graph_node_count", "graph.graph_node_count"]:
             return {
                 "id": "core.graph_node_count",
                 "params": {"target": step["output"]}
             }
 
-        if step_type == "graph_edge_count":
+        if step_type in ["graph_edge_count", "core.graph_edge_count", "graph.graph_edge_count"]:
             return {
                 "id": "core.graph_edge_count",
                 "params": {"target": step["output"]}
@@ -1580,7 +1580,7 @@ class BuiltAlgorithm(AlgorithmHandle):
                 params["default"] = default
             return {"id": "core.load_node_attr", "params": params}
         
-        if step_type == "load_edge_attr":
+        if step_type in ["load_edge_attr", "graph.load_edge_attr"]:
             params: Dict[str, Any] = {
                 "attr": step["attr_name"],
                 "target": step["output"]
@@ -1610,6 +1610,40 @@ class BuiltAlgorithm(AlgorithmHandle):
             if "max_value" in step:
                 params["max_value"] = step["max_value"]
             return {"id": "core.clip", "params": params}
+        
+        # Fused operations
+        if step_type == "graph.fused_neighbor_mul_agg":
+            params = {
+                "values": self._resolve_operand(step["values"], alias_map),
+                "scalars": self._resolve_operand(step["scalars"], alias_map),
+                "target": step["target"]
+            }
+            if "direction" in step:
+                params["direction"] = step["direction"]
+            return {"id": "graph.fused_neighbor_mul_agg", "params": params}
+        
+        if step_type == "core.fused_axpy":
+            return {
+                "id": "core.fused_axpy",
+                "params": {
+                    "a": self._resolve_operand(step["a"], alias_map),
+                    "x": self._resolve_operand(step["x"], alias_map),
+                    "b": self._resolve_operand(step["b"], alias_map),
+                    "y": self._resolve_operand(step["y"], alias_map),
+                    "target": step["target"]
+                }
+            }
+        
+        if step_type == "core.fused_madd":
+            return {
+                "id": "core.fused_madd",
+                "params": {
+                    "a": self._resolve_operand(step["a"], alias_map),
+                    "b": self._resolve_operand(step["b"], alias_map),
+                    "c": self._resolve_operand(step["c"], alias_map),
+                    "target": step["target"]
+                }
+            }
 
         raise ValueError(f"Unsupported builder step type: {step_type}")
     

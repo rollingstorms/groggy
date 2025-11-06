@@ -312,12 +312,27 @@ class CoreOps:
             >>> # Now sink_contrib has the same value for every node
         """
         var = self.builder._new_var("broadcast")
-        self.builder.steps.append({
-            "type": "core.broadcast_scalar",
-            "scalar": scalar.name,
-            "reference": reference.name,
-            "output": var.name
-        })
+        
+        if self.builder.use_ir and self.builder.ir_graph is not None:
+            from groggy.builder.ir.nodes import CoreIRNode
+            
+            node = CoreIRNode(
+                node_id=f"node_{len(self.builder.ir_graph.nodes)}",
+                op_type="broadcast_scalar",
+                inputs=[scalar.name, reference.name],
+                output=var.name,
+                scalar=scalar.name,
+                reference=reference.name
+            )
+            self.builder._add_ir_node(node)
+        else:
+            self.builder.steps.append({
+                "type": "core.broadcast_scalar",
+                "scalar": scalar.name,
+                "reference": reference.name,
+                "output": var.name
+            })
+        
         return var
     
     def neighbor_agg(self, values: VarHandle, agg: str = "sum", 

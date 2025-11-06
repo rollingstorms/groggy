@@ -12,9 +12,11 @@ mod attributes;
 mod community;
 pub mod composition;
 mod core;
+pub mod direction;
 mod expression;
 mod filtering;
 mod flow;
+mod fused;
 mod init;
 mod normalization;
 mod pathfinding;
@@ -70,6 +72,12 @@ pub use structural::{
 pub use transformations::{
     MapNodesExprStep, MapNodesStep, NeighborModeUpdateStep, NodeMapFn,
 };
+
+// Re-export fused operations
+pub use fused::{FusedAXPY, FusedMADD, FusedNeighborMulAgg};
+
+// Re-export direction types
+pub use direction::NeighborDirection;
 
 // Re-export temporal steps
 pub use temporal::{

@@ -9,6 +9,7 @@ use crate::state::topology::{build_csr_from_edges_with_scratch, Csr, CsrOptions}
 
 use super::super::{AlgorithmParamValue, Context, CostHint};
 use super::core::{Step, StepMetadata, StepScope};
+use super::direction::NeighborDirection;
 
 /// Extract numeric values from a map, returning f64 values.
 fn extract_numeric_values(map: &HashMap<NodeId, AlgorithmParamValue>) -> Result<Vec<f64>> {
@@ -549,6 +550,7 @@ pub struct NeighborAggregationStep {
     target: String,
     agg_type: NeighborAggType,
     weights: Option<String>,
+    direction: NeighborDirection,
 }
 
 impl NeighborAggregationStep {
@@ -562,11 +564,17 @@ impl NeighborAggregationStep {
             target: target.into(),
             agg_type,
             weights: None,
+            direction: NeighborDirection::default(), // Default to incoming for PageRank/LPA
         }
     }
 
     pub fn with_weights(mut self, weights: impl Into<String>) -> Self {
         self.weights = Some(weights.into());
+        self
+    }
+
+    pub fn with_direction(mut self, direction: NeighborDirection) -> Self {
+        self.direction = direction;
         self
     }
 }
@@ -593,7 +601,7 @@ impl Step for NeighborAggregationStep {
         let nodes = subgraph.ordered_nodes();
         ctx.record_stat("neighbor_agg.count.nodes", nodes.len() as f64);
 
-        // Build CSR of incoming edges (target -> sources)
+        // Build CSR with specified direction
         let mut node_to_idx = HashMap::new();
         for (idx, &node_id) in nodes.iter().enumerate() {
             node_to_idx.insert(node_id, idx);
@@ -606,20 +614,41 @@ impl Step for NeighborAggregationStep {
             let pool = graph_ref.pool();
             let edges = subgraph.edges();
 
-            let _build_time = build_csr_from_edges_with_scratch(
-                &mut csr,
-                nodes.len(),
-                edges.iter().copied(),
-                |nid| node_to_idx.get(&nid).copied(),
-                |eid| {
-                    pool.get_edge_endpoints(eid)
-                        .map(|(source, target)| (target, source))
-                },
-                CsrOptions {
-                    add_reverse_edges: false,
-                    sort_neighbors: false,
-                },
-            );
+            let _build_time = match self.direction {
+                NeighborDirection::In => build_csr_from_edges_with_scratch(
+                    &mut csr,
+                    nodes.len(),
+                    edges.iter().copied(),
+                    |nid| node_to_idx.get(&nid).copied(),
+                    |eid| pool.get_edge_endpoints(eid).map(|(source, target)| (target, source)),
+                    CsrOptions {
+                        add_reverse_edges: false,
+                        sort_neighbors: false,
+                    },
+                ),
+                NeighborDirection::Out => build_csr_from_edges_with_scratch(
+                    &mut csr,
+                    nodes.len(),
+                    edges.iter().copied(),
+                    |nid| node_to_idx.get(&nid).copied(),
+                    |eid| pool.get_edge_endpoints(eid).map(|(source, target)| (source, target)),
+                    CsrOptions {
+                        add_reverse_edges: false,
+                        sort_neighbors: false,
+                    },
+                ),
+                NeighborDirection::Undirected => build_csr_from_edges_with_scratch(
+                    &mut csr,
+                    nodes.len(),
+                    edges.iter().copied(),
+                    |nid| node_to_idx.get(&nid).copied(),
+                    |eid| pool.get_edge_endpoints(eid).map(|(source, target)| (source, target)),
+                    CsrOptions {
+                        add_reverse_edges: true,
+                        sort_neighbors: false,
+                    },
+                ),
+            };
         }
 
         // Get source values

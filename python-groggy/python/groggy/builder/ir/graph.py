@@ -249,6 +249,26 @@ class IRGraph:
             "stats": self.stats()
         }
     
+    def rebuild_var_tracking(self) -> None:
+        """
+        Rebuild var_defs and var_uses from current node graph.
+        
+        Call this after fusion passes that remove nodes to ensure
+        variable tracking is consistent with the actual graph structure.
+        """
+        self.var_defs.clear()
+        self.var_uses = defaultdict(list)
+        
+        for node in self.nodes:
+            # Track what each variable is defined by
+            if node.output:
+                self.var_defs[node.output] = node
+            
+            # Track what nodes use each variable
+            for inp in node.inputs:
+                if isinstance(inp, str):  # Variable reference (not literal)
+                    self.var_uses[inp].append(node)
+    
     def clone(self) -> 'IRGraph':
         """
         Create a deep copy of this graph.
@@ -260,6 +280,31 @@ class IRGraph:
         for node in self.nodes:
             new_graph.add_node(node)
         return new_graph
+    
+    def rebuild_var_tracking(self) -> None:
+        """
+        Rebuild var_defs and var_uses from current node graph.
+        
+        Call this after any optimization pass that modifies graph structure
+        (adds/removes/replaces nodes) to ensure variable tracking stays consistent.
+        
+        This is necessary because when nodes are removed or modified, the var_defs
+        and var_uses dictionaries can contain stale references to deleted nodes.
+        """
+        # Clear existing tracking
+        self.var_defs.clear()
+        self.var_uses.clear()
+        
+        # Rescan all nodes to rebuild tracking
+        for node in self.nodes:
+            # Track what each variable is defined by
+            if node.output:
+                self.var_defs[node.output] = node
+            
+            # Track what nodes use each variable
+            for inp in node.inputs:
+                if isinstance(inp, str):  # Variable reference (not a constant)
+                    self.var_uses[inp].append(node)
     
     def __len__(self) -> int:
         """Return number of nodes in the graph."""

@@ -36,6 +36,7 @@ use super::temporal::{
     TemporalPredicate, WindowAggregateStep,
 };
 use super::transformations::MapNodesExprStep;
+use super::fused::{FusedAXPY, FusedMADD, FusedNeighborMulAgg};
 
 /// Register the core steps that ship with the engine.
 pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
@@ -1569,6 +1570,37 @@ pub fn register_core_steps(registry: &StepRegistry) -> Result<()> {
             let target = spec.params.expect_text("target")?.to_string();
             Ok(Box::new(ResidualCapacityStep::new(capacity, flow, target)))
         },
+    )?;
+
+    // Fused operations for performance optimization
+    registry.register(
+        "graph.fused_neighbor_mul_agg",
+        StepMetadata {
+            id: "graph.fused_neighbor_mul_agg".to_string(),
+            description: "Fused neighbor aggregation with element-wise multiplication".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| Ok(Box::new(FusedNeighborMulAgg::from_spec(spec)?)),
+    )?;
+
+    registry.register(
+        "core.fused_axpy",
+        StepMetadata {
+            id: "core.fused_axpy".to_string(),
+            description: "Fused AXPY operation: result = a * x + b * y".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| Ok(Box::new(FusedAXPY::from_spec(spec)?)),
+    )?;
+
+    registry.register(
+        "core.fused_madd",
+        StepMetadata {
+            id: "core.fused_madd".to_string(),
+            description: "Fused multiply-add: result = a * b + c".to_string(),
+            cost_hint: CostHint::Linear,
+        },
+        |spec| Ok(Box::new(FusedMADD::from_spec(spec)?)),
     )?;
 
     Ok(())
